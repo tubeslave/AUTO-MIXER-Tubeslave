@@ -1,0 +1,217 @@
+{
+  "wing": {
+    "default_ip": "192.168.1.100",
+    "send_port": 2222,
+    "receive_port": 2223,
+    "models": [
+      "Wing Rack",
+      "Wing Full",
+      "Wing Compact"
+    ],
+    "firmware": "3.0.5"
+  },
+  "server": {
+    "websocket_host": "localhost",
+    "websocket_port": 8765
+  },
+  "automation": {
+    "lufs_gain_staging": {
+      "enabled": true,
+      "target_lufs": -23.0,
+      "true_peak_limit": -1.0,
+      "max_gain_db": 12.0,
+      "min_gain_db": -12.0,
+      "ratio": 4.0,
+      "attack_ms": 50.0,
+      "release_ms": 500.0,
+      "hold_ms": 200.0,
+      "gate_threshold_lufs": -50.0,
+      "update_interval_ms": 100,
+      "live_mode": false,
+      "min_trim_db_live": -8.0,
+      "presets": {
+        "soundcheck": {
+          "target_lufs": -18.0,
+          "ratio": 2.0,
+          "attack_ms": 50.0,
+          "release_ms": 500.0,
+          "gate_threshold_lufs": -50.0
+        },
+        "live": {
+          "target_lufs": -16.0,
+          "ratio": 1.5,
+          "attack_ms": 200.0,
+          "release_ms": 2000.0,
+          "gate_threshold_lufs": -40.0
+        }
+      }
+    },
+    "auto_eq": {
+      "enabled": false,
+      "mud_range": [
+        200,
+        500
+      ],
+      "threshold": -10,
+      "max_cut": -6,
+      "q_factor": 3.0
+    },
+    "auto_mix": {
+      "enabled": false,
+      "lead_channel": 1,
+      "ducking_amount": -3,
+      "attack_time": 10,
+      "release_time": 100
+    },
+    "auto_fader": {
+      "fader_range_db": 3.0,
+      "avg_window_sec": 5.0,
+      "sensitivity": 0.5,
+      "attack_ms": 100.0,
+      "release_ms": 1000.0,
+      "gate_threshold": -50.0,
+      "bleed_threshold": -50.0,
+      "calibration_duration_sec": 5.0,
+      "update_interval_ms": 100,
+      "lufs_window_sec": 3.0,
+      "controller_mode": "dynamic",
+      "controller_type": "pid",
+      "pid_kp": 0.5,
+      "pid_ki": 0.05,
+      "pid_kd": 0.0,
+      "pid_output_limit": 6.0,
+      "pid_dead_zone": 0.5,
+      "osc_throttle_hz": 10.0,
+      "hierarchical_mix_enabled": false,
+      "mix_overload_threshold_lufs": -18.0,
+      "hierarchical_max_step_cut_db": 3.0,
+      "hierarchical_cut_scale": 0.6,
+      "channel_priorities": {},
+      "ducking_enabled": false,
+      "ducking_amount_db": -4.0,
+      "ducking_attack_ms": 10.0,
+      "ducking_release_ms": 100.0,
+      "vocal_channels": [],
+      "spectral_masking_enabled": false,
+      "pan_separation_enabled": false,
+      "pan_max_offset": 20.0,
+      "adaptive_noise_gate_enabled": false,
+      "noise_gate_hold_sec": 0.8,
+      "noise_gate_threshold_lufs": -50.0
+    },
+    "bleed_protection": {
+      "enabled": true,
+      "update_interval_ms": 200,
+      "compensation_factor_db": 6.0,
+      "compensation_mode": "band_level",
+      "spectral": {
+        "enabled": true,
+        "dominance_threshold": 0.7
+      },
+      "temporal": {
+        "enabled": true,
+        "max_delay_ms": 20,
+        "correlation_threshold": 0.6
+      }
+    },
+    "peak_gain_staging": {
+      "enabled": false,
+      "default_peak_threshold": -6.0,
+      "trim_reduction_step_db": 1.0,
+      "min_trim_db": -18.0,
+      "check_interval_ms": 100
+    },
+    "auto_soundcheck": {
+      "gain_staging_duration": 30,
+      "phase_alignment_duration": 30,
+      "auto_eq_duration": 30,
+      "auto_fader_duration": 30
+    },
+    "auto_compressor": {
+      "soundcheck_duration_per_channel": 7,
+      "target_gr_db": 6
+    },
+    "safe_gain_calibration": {
+      "target_lufs": -18.0,
+      "max_peak_limit": -3.0,
+      "noise_gate_threshold": -40.0,
+      "min_signal_presence": 0.05,
+      "learning_duration_sec": 30.0,
+      "preset_targets": {
+        "kick": {
+          "target_lufs": -25.0,
+          "max_peak_limit": -6.0
+        },
+        "snare": {
+          "target_lufs": -25.0,
+          "max_peak_limit": -6.0
+        },
+        "tom": {
+          "target_lufs": -25.0,
+          "max_peak_limit": -6.0
+        },
+        "hihat": {
+          "target_lufs": -35.0,
+          "max_peak_limit": -12.0
+        },
+        "ride": {
+          "target_lufs": -35.0,
+          "max_peak_limit": -12.0
+        },
+        "overheads": {
+          "target_lufs": -35.0,
+          "max_peak_limit": -12.0
+        },
+        "room": {
+          "target_lufs": -40.0,
+          "max_peak_limit": -18.0
+        },
+        "bass": {
+          "target_lufs": -25.0,
+          "max_peak_limit": -12.0
+        },
+        "leadVocal": {
+          "target_lufs": -22.0,
+          "max_peak_limit": -6.0
+        },
+        "backingVocal": {
+          "target_lufs": -22.0,
+          "max_peak_limit": -6.0
+        },
+        "electricGuitar": {
+          "target_lufs": -25.0,
+          "max_peak_limit": -12.0
+        },
+        "acousticGuitar": {
+          "target_lufs": -25.0,
+          "max_peak_limit": -12.0
+        },
+        "keyboard": {
+          "target_lufs": -18.0,
+          "max_peak_limit": -3.0
+        },
+        "playback": {
+          "target_lufs": -25.0,
+          "max_peak_limit": -12.0
+        },
+        "accordion": {
+          "target_lufs": -25.0,
+          "max_peak_limit": -12.0
+        },
+        "custom": {
+          "target_lufs": -18.0,
+          "max_peak_limit": -3.0
+        },
+        "cymbals": {
+          "target_lufs": -35.0,
+          "max_peak_limit": -12.0
+        }
+      }
+    }
+  },
+  "safety": {
+    "max_fader": 10,
+    "max_gain": 18,
+    "enable_limits": true
+  }
+}

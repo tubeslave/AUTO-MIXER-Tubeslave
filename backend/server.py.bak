@@ -1,0 +1,174 @@
+import asyncio
+import json
+import logging
+from typing import Set
+import websockets
+from websockets.server import WebSocketServerProtocol
+
+from wing_client import WingClient
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class AutoMixerServer:
+    def __init__(self, ws_host: str = "localhost", ws_port: int = 8765):
+        self.ws_host = ws_host
+        self.ws_port = ws_port
+        
+        self.wing_client: WingClient = None
+        self.connected_clients: Set[WebSocketServerProtocol] = set()
+        
+        logger.info(f"AutoMixer Server initialized on {ws_host}:{ws_port}")
+
+    async def register_client(self, websocket: WebSocketServerProtocol):
+        self.connected_clients.add(websocket)
+        logger.info(f"Client connected. Total clients: {len(self.connected_clients)}")
+        
+        if self.wing_client and self.wing_client.is_connected:
+            await self.send_to_client(websocket, {
+                "type": "connection_status",
+                "connected": True,
+                "state": self.wing_client.get_state()
+            })
+
+    async def unregister_client(self, websocket: WebSocketServerProtocol):
+        self.connected_clients.discard(websocket)
+        logger.info(f"Client disconnected. Total clients: {len(self.connected_clients)}")
+
+    async def send_to_client(self, websocket: WebSocketServerProtocol, message: dict):
+        try:
+            await websocket.send(json.dumps(message))
+        except Exception as e:
+            logger.error(f"Error sending to client: {e}")
+
+    async def broadcast(self, message: dict):
+        if self.connected_clients:
+            await asyncio.gather(
+                *[self.send_to_client(client, message) for client in self.connected_clients],
+                return_exceptions=True
+            )
+
+    async def handle_client_message(self, websocket: WebSocketServerProtocol, message: str):
+        try:
+            data = json.loads(message)
+            msg_type = data.get("type")
+            
+            if msg_type == "connect_wing":
+                await self.connect_wing(data.get("ip"), data.get("send_port"), data.get("receive_port"))
+                
+            elif msg_type == "disconnect_wing":
+                await self.disconnect_wing()
+                
+            elif msg_type == "set_fader":
+                channel = data.get("channel")
+                value = data.get("value")
+                if self.wing_client:
+                    self.wing_client.set_channel_fader(channel, value)
+                    
+            elif msg_type == "set_gain":
+                channel = data.get("channel")
+                value = data.get("value")
+                if self.wing_client:
+                    self.wing_client.set_channel_gain(channel, value)
+                    
+            elif msg_type == "set_eq":
+                channel = data.get("channel")
+                band = data.get("band")
+                freq = data.get("freq")
+                gain = data.get("gain")
+                q = data.get("q")
+                if self.wing_client:
+                    self.wing_client.set_eq_band(channel, band, freq, gain, q)
+                    
+            elif msg_type == "set_compressor":
+                channel = data.get("channel")
+                params = data.get("params", {})
+                if self.wing_client:
+                    self.wing_client.set_compressor(
+                        channel,
+                        params.get("threshold", 0),
+                        params.get("ratio", 1),
+                        params.get("attack", 0),
+                        params.get("release", 0)
+                    )
+                    
+            elif msg_type == "get_state":
+                if self.wing_client:
+                    await self.send_to_client(websocket, {
+                        "type": "state_update",
+                        "state": self.wing_client.get_state()
+                    })
+                    
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON received")
+        except Exception as e:
+            logger.error(f"Error handling message: {e}")
+
+    async def connect_wing(self, ip: str, send_port: int = 2222, receive_port: int = 2223):
+        try:
+            self.wing_client = WingClient(ip, send_port, receive_port)
+            
+            def on_wing_update(address: str, *args):
+                asyncio.create_task(self.broadcast({
+                    "type": "wing_update",
+                    "address": address,
+                    "values": args
+                }))
+            
+            success = self.wing_client.connect()
+            
+            if success:
+                await self.broadcast({
+                    "type": "connection_status",
+                    "connected": True,
+                    "ip": ip,
+                    "state": self.wing_client.get_state()
+                })
+                logger.info("Wing connected successfully")
+            else:
+                await self.broadcast({
+                    "type": "connection_status",
+                    "connected": False,
+                    "error": "Connection failed"
+                })
+                
+        except Exception as e:
+            logger.error(f"Error connecting to Wing: {e}")
+            await self.broadcast({
+                "type": "connection_status",
+                "connected": False,
+                "error": str(e)
+            })
+
+    async def disconnect_wing(self):
+        if self.wing_client:
+            self.wing_client.disconnect()
+            self.wing_client = None
+            
+            await self.broadcast({
+                "type": "connection_status",
+                "connected": False
+            })
+            logger.info("Wing disconnected")
+
+    async def handler(self, websocket: WebSocketServerProtocol, path: str):
+        await self.register_client(websocket)
+        
+        try:
+            async for message in websocket:
+                await self.handle_client_message(websocket, message)
+        except websockets.exceptions.ConnectionClosed:
+            logger.info("Client connection closed")
+        finally:
+            await self.unregister_client(websocket)
+
+    async def start(self):
+        logger.info(f"Starting WebSocket server on {self.ws_host}:{self.ws_port}")
+        async with websockets.serve(self.handler, self.ws_host, self.ws_port):
+            await asyncio.Future()
+
+
+if __name__ == "__main__":
+    server = AutoMixerServer()
+    asyncio.run(server.start())

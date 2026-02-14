@@ -1,0 +1,106 @@
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+const { spawn } = require('child_process');
+
+let mainWindow;
+let backendProcess;
+
+const isDev = !app.isPackaged;
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1600,
+    height: 1000,
+    minWidth: 1200,
+    minHeight: 800,
+    backgroundColor: '#1a1a1a',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    },
+    titleBarStyle: 'hiddenInset',
+    show: false
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
+
+  const startUrl = isDev
+    ? 'http://localhost:3000'
+    : `file://${path.join(__dirname, '../build/index.html')}`;
+
+  mainWindow.loadURL(startUrl);
+
+  if (isDev) {
+    mainWindow.webContents.openDevTools();
+  }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+function startBackend() {
+  const backendPath = isDev
+    ? path.join(__dirname, '../../backend/server.py')
+    : path.join(process.resourcesPath, 'backend');
+
+  if (isDev) {
+    const pythonExecutable = process.platform === 'win32' ? 'python' : 'python3';
+    backendProcess = spawn(pythonExecutable, [backendPath], {
+      cwd: path.join(__dirname, '../../backend')
+    });
+  } else {
+    backendProcess = spawn(backendPath, [], {
+      cwd: path.join(process.resourcesPath, 'backend')
+    });
+  }
+
+  backendProcess.stdout.on('data', (data) => {
+    console.log(`Backend: ${data}`);
+  });
+
+  backendProcess.stderr.on('data', (data) => {
+    console.error(`Backend Error: ${data}`);
+  });
+
+  backendProcess.on('close', (code) => {
+    console.log(`Backend process exited with code ${code}`);
+  });
+}
+
+function stopBackend() {
+  if (backendProcess) {
+    backendProcess.kill();
+    backendProcess = null;
+  }
+}
+
+app.on('ready', () => {
+  startBackend();
+  setTimeout(createWindow, 2000);
+});
+
+app.on('window-all-closed', () => {
+  stopBackend();
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (mainWindow === null) {
+    createWindow();
+  }
+});
+
+app.on('before-quit', () => {
+  stopBackend();
+});
+
+ipcMain.on('quit-app', () => {
+  stopBackend();
+  app.quit();
+});
