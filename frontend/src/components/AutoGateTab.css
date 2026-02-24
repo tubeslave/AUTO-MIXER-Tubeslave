@@ -1,0 +1,95 @@
+.auto-gate-tab {
+  padding: 20px;
+}
+
+.auto-gate-section {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.architecture-components {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 15px 0;
+}
+
+.comp {
+  padding: 10px 15px;
+  background: rgba(0,212,255,0.1);
+  border: 1px solid rgba(0,212,255,0.3);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.comp-name {
+  display: block;
+  font-weight: 600;
+  color: #00d4ff;
+}
+
+.comp small {
+  display: block;
+  font-size: 11px;
+  color: #888;
+}
+
+.groups-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.group-item {
+  padding: 10px;
+  border-left: 3px solid;
+  background: rgba(255,255,255,0.03);
+  border-radius: 4px;
+}
+
+.drum-priorities {
+  display: grid;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.drum-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+}
+
+.priority-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+}
+
+.priority-fill {
+  height: 100%;
+  background: #00d4ff;
+  border-radius: 3px;
+}
+
+.gate-visual {
+  flex: 1;
+}
+
+.gate-bar {
+  height: 20px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  position: relative;
+}
+
+.gate-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}

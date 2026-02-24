@@ -1,0 +1,329 @@
+/* Phase Alignment Tab Styles */
+
+.phase-alignment-tab {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.phase-alignment-section {
+  background: rgba(15, 52, 96, 0.6);
+  border-radius: 12px;
+  padding: 25px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.phase-alignment-section h2 {
+  margin: 0 0 20px 0;
+  color: #00d4ff;
+  font-size: 1.3em;
+  font-weight: 500;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.3);
+}
+
+.phase-alignment-section h3 {
+  margin: 20px 0 15px 0;
+  color: #00d4ff;
+  font-size: 1.1em;
+  font-weight: 500;
+}
+
+.phase-alignment-header {
+  margin-bottom: 25px;
+}
+
+.section-description {
+  color: #aaa;
+  font-size: 0.95em;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Channel Selection */
+.channel-selection-section {
+  margin-bottom: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.control-group label {
+  color: #aaa;
+  font-size: 0.95em;
+  font-weight: 500;
+  min-width: 150px;
+}
+
+.channel-select {
+  padding: 10px 15px;
+  border: 2px solid rgba(0, 212, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(22, 33, 62, 0.8);
+  color: #e6e6e6;
+  font-size: 0.95em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 200px;
+}
+
+.channel-select:hover:not(:disabled) {
+  border-color: rgba(0, 212, 255, 0.5);
+}
+
+.channel-select:focus {
+  outline: none;
+  border-color: #00d4ff;
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+}
+
+.channel-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.channels-to-align {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.channels-to-align label {
+  color: #aaa;
+  font-size: 0.95em;
+  font-weight: 500;
+}
+
+.channels-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.channel-tag {
+  padding: 6px 12px;
+  background: rgba(0, 212, 255, 0.2);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 6px;
+  color: #00d4ff;
+  font-size: 0.9em;
+}
+
+.no-channels {
+  color: #888;
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+/* Control Buttons */
+.control-buttons {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.btn-phase-align {
+  padding: 12px 30px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-phase-align.start {
+  background: linear-gradient(135deg, #00c851 0%, #00a844 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 200, 81, 0.3);
+}
+
+.btn-phase-align.start:hover:not(:disabled) {
+  background: linear-gradient(135deg, #00d961 0%, #00b84d 100%);
+  box-shadow: 0 6px 20px rgba(0, 200, 81, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-phase-align.stop {
+  background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 68, 68, 0.3);
+}
+
+.btn-phase-align.stop:hover {
+  background: linear-gradient(135deg, #ff6666 0%, #ff0000 100%);
+  box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-phase-align.reset {
+  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
+}
+
+.btn-phase-align.reset:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+  box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-phase-align:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Status Section */
+.status-section {
+  margin-bottom: 25px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #666;
+  transition: all 0.3s ease;
+}
+
+.status-indicator.active .status-dot {
+  background: #00c851;
+  box-shadow: 0 0 10px rgba(0, 200, 81, 0.5);
+  animation: pulse 2s infinite;
+}
+
+.status-indicator.inactive .status-dot {
+  background: #666;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.status-indicator span:last-child {
+  color: #aaa;
+  font-size: 0.95em;
+  font-weight: 500;
+}
+
+.status-message {
+  padding: 10px 15px;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 6px;
+  color: #00d4ff;
+  font-size: 0.9em;
+  margin-top: 10px;
+}
+
+/* Measurements Table */
+.measurements-section {
+  margin-top: 30px;
+}
+
+.measurements-table {
+  background: rgba(22, 33, 62, 0.4);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  gap: 15px;
+  padding: 15px;
+  background: rgba(0, 212, 255, 0.1);
+  border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+  font-weight: 600;
+  color: #00d4ff;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  gap: 15px;
+  padding: 15px;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+  transition: background 0.2s ease;
+}
+
+.table-row:hover {
+  background: rgba(0, 212, 255, 0.05);
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.col-channel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.col-channel .ref-label {
+  font-size: 0.8em;
+  color: #888;
+  font-style: italic;
+}
+
+.col-delay,
+.col-phase,
+.col-coherence,
+.col-phase-invert {
+  color: #e6e6e6;
+  font-size: 0.95em;
+  display: flex;
+  align-items: center;
+}
+
+.no-channels-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+}
+
+.no-channels-message p {
+  margin: 10px 0;
+  font-size: 0.95em;
+}

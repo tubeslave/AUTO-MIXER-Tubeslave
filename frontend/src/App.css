@@ -1,0 +1,366 @@
+/* Auto Mixer Tubeslave - Simplified GUI */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  min-height: 100vh;
+  color: #e6e6e6;
+}
+
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.App-header {
+  background: rgba(15, 52, 96, 0.8);
+  padding: 20px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #00d4ff;
+  backdrop-filter: blur(10px);
+}
+
+.App-header h1 {
+  margin: 0;
+  font-size: 1.8em;
+  color: #00d4ff;
+  font-weight: 600;
+}
+
+.status-indicators {
+  display: flex;
+  gap: 20px;
+}
+
+.indicator {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.indicator.connected {
+  background: rgba(0, 200, 81, 0.2);
+  color: #00c851;
+  border: 1px solid #00c851;
+}
+
+.indicator.disconnected {
+  background: rgba(255, 68, 68, 0.2);
+  color: #ff4444;
+  border: 1px solid #ff4444;
+}
+
+/* Main Content */
+.App-main {
+  flex: 1;
+  padding: 40px;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Tabs Navigation */
+.tabs-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 30px;
+  border-bottom: 2px solid rgba(0, 212, 255, 0.2);
+  padding-bottom: 5px;
+  justify-content: center;
+}
+
+.tab-button {
+  padding: 8px 12px;
+  font-size: 0.7em;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-radius: 4px 4px 0 0;
+}
+
+.tab-button:hover {
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.05);
+}
+
+.tab-button.active {
+  color: #00d4ff;
+  border-bottom-color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+}
+
+/* Config Sections */
+.config-section {
+  background: rgba(15, 52, 96, 0.6);
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 25px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.config-section h2 {
+  margin: 0 0 20px 0;
+  color: #00d4ff;
+  font-size: 1.3em;
+  font-weight: 500;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.3);
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.config-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.config-item label {
+  font-size: 0.9em;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.config-item input,
+.config-item select {
+  padding: 12px 15px;
+  border: 2px solid rgba(0, 212, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(22, 33, 62, 0.8);
+  color: #e6e6e6;
+  font-size: 1em;
+  transition: all 0.3s ease;
+}
+
+.config-item input:focus,
+.config-item select:focus {
+  outline: none;
+  border-color: #00d4ff;
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+}
+
+.config-item input:disabled,
+.config-item select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Channels Section */
+.channels-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.channels-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.channels-header label {
+  font-size: 0.9em;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.channels-header-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 0.85em;
+  border: 1px solid #00d4ff;
+  border-radius: 5px;
+  background: transparent;
+  color: #00d4ff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-small:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.2);
+}
+
+.btn-small:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: rgba(0, 212, 255, 0.3);
+  color: rgba(0, 212, 255, 0.5);
+}
+
+.channels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 10px;
+  background: rgba(22, 33, 62, 0.5);
+  border-radius: 8px;
+}
+
+.channel-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  font-size: 0.9em;
+}
+
+.channel-checkbox:hover {
+  background: rgba(0, 212, 255, 0.1);
+}
+
+.channel-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #00d4ff;
+}
+
+.selected-count {
+  margin-top: 15px;
+  text-align: center;
+  color: #888;
+  font-size: 0.85em;
+}
+
+/* Actions Section */
+.actions-section {
+  text-align: center;
+  padding: 20px;
+}
+
+.btn-connect {
+  padding: 15px 50px;
+  font-size: 1.2em;
+  font-weight: 600;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: linear-gradient(135deg, #00c851 0%, #007e33 100%);
+  color: white;
+  box-shadow: 0 4px 20px rgba(0, 200, 81, 0.4);
+}
+
+.btn-connect:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(0, 200, 81, 0.6);
+}
+
+.btn-connect.connected {
+  background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+  box-shadow: 0 4px 20px rgba(255, 68, 68, 0.4);
+}
+
+.btn-connect.connected:hover:not(:disabled) {
+  box-shadow: 0 6px 25px rgba(255, 68, 68, 0.6);
+}
+
+.btn-connect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.status-message {
+  margin-top: 20px;
+  color: #888;
+  font-size: 0.95em;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(22, 33, 62, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.7);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .tab-button {
+    padding: 7px 12px;
+    font-size: 0.8em;
+    letter-spacing: 0.2px;
+  }
+}
+
+@media (max-width: 600px) {
+  .App-header {
+    flex-direction: column;
+    gap: 15px;
+    padding: 15px 20px;
+  }
+  
+  .App-main {
+    padding: 20px;
+  }
+  
+  .tabs-navigation {
+    gap: 4px;
+  }
+  
+  .tab-button {
+    padding: 6px 10px;
+    font-size: 0.75em;
+    letter-spacing: 0.1px;
+  }
+  
+  .config-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .channels-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

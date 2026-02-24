@@ -1,0 +1,28 @@
+{
+  "name": "Rock",
+  "description": "Rock music preset - forward midrange, tight bass, aggressive guitars",
+  "target_curve": [
+    [63, 1.0], [125, 2.0], [250, 1.0], [500, 2.0],
+    [1000, 3.0], [2000, 2.0], [4000, 1.0], [8000, 1.5], [16000, 0.5]
+  ],
+  "cut_frequencies": [
+    [100, -2.0, 1.5],
+    [250, -3.0, 1.8],
+    [3000, -2.0, 2.0]
+  ],
+  "boost_frequencies": [
+    [2500, 2.0, 0.9],
+    [4000, 1.5, 0.8],
+    [8000, 2.0, 0.7]
+  ],
+  "low_cut_freq": 40,
+  "high_cut_freq": 16000,
+  "vocal_priority": 0.85,
+  "instrument_balance": {
+    "lead_vocal": {"target_lufs": -17, "presence": 2.5},
+    "kick": {"target_lufs": -18, "sub_boost": 1.5},
+    "snare": {"target_lufs": -16, "crack": 3.0},
+    "bass": {"target_lufs": -18, "tight": 2.0},
+    "guitars": {"target_lufs": -19, "bite": 2.5}
+  }
+}
