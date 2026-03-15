@@ -22,6 +22,7 @@ from wing_client import WingClient
 from osc.enhanced_osc_client import EnhancedOSCClient
 from mixing_station_client import MixingStationClient, discover_mixing_station
 from audio_devices import get_audio_devices
+from dante_routing_config import get_routing_as_dict, get_module_signal_info
 from voice_control import VoiceControl
 from voice_control_v2 import VoiceControlV2
 try:
@@ -391,6 +392,14 @@ class AutoMixerServer:
                 await self.send_to_client(websocket, {
                     "type": "audio_devices",
                     "devices": devices
+                })
+
+            elif msg_type == "get_dante_routing":
+                total_ch = data.get("total_channels", 64)
+                await self.send_to_client(websocket, {
+                    "type": "dante_routing",
+                    "routing_scheme": get_routing_as_dict(total_ch),
+                    "module_signal_info": get_module_signal_info(),
                 })
                 
             # Connection commands

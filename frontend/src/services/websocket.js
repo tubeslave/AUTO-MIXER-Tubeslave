@@ -610,6 +610,14 @@ console.error(`Error in listener for ${eventType}:`, error);
     });
   }
 
+  // Get Dante routing scheme
+  getDanteRouting(totalChannels = 64) {
+    this.send({
+      type: 'get_dante_routing',
+      total_channels: totalChannels
+    });
+  }
+
   // Load all saved settings
   loadAllSettings() {
     console.log('loadAllSettings called');
