@@ -16,205 +16,187 @@ import CrossAdaptiveEQTab from './components/CrossAdaptiveEQTab';
 import SystemMeasurementTab from './components/SystemMeasurementTab';
 import SettingsTab from './components/SettingsTab';
 
+// Color map for routing roles
+const ROLE_COLORS = {
+  channel_analysis: '#00d4ff',
+  channel_dry: '#f0883e',
+  master: '#f85149',
+  drum_bus: '#3fb950',
+  vocal_bus: '#a371f7',
+  instrument_bus: '#d29922',
+  measurement_mic: '#39d353',
+  ambient_mic: '#f778ba',
+  matrix: '#8b949e',
+  reserve: '#484f58',
+};
+
+const NAV_ITEMS = [
+  { id: 'mixer', icon: '🔌', label: 'Connect' },
+  { id: 'gainStaging', icon: '📊', label: 'Gain' },
+  { id: 'phaseAlignment', icon: '⟳', label: 'Phase' },
+  { id: 'autoEQ', icon: '〰', label: 'EQ' },
+  { id: 'autoCompressor', icon: '⬇', label: 'Comp' },
+  { id: 'autoGate', icon: '🚪', label: 'Gate' },
+  { id: 'autoFader', icon: '🎚', label: 'Fader' },
+  { id: 'autoPanner', icon: '🎧', label: 'Pan' },
+  { id: 'autoReverb', icon: '🌊', label: 'Reverb' },
+  { id: 'autoEffects', icon: '✨', label: 'FX' },
+  { id: 'crossAdaptiveEQ', icon: '🔀', label: 'X-EQ' },
+  { id: 'autoSoundcheck', icon: '🎯', label: 'Soundcheck' },
+  { id: 'systemMeasurement', icon: '📐', label: 'Measure' },
+  { id: 'voice', icon: '🎙', label: 'Voice' },
+  { id: 'settings', icon: '⚙', label: 'Settings' },
+];
+
 function App() {
-  // Connection state
   const [serverConnected, setServerConnected] = useState(false);
   const [mixerConnected, setMixerConnected] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
-  
-  // Mixer settings
   const [mixerIp, setMixerIp] = useState('192.168.1.102');
   const [mixerPort, setMixerPort] = useState(2223);
-  
-  // Audio device settings
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedDevice, setSelectedDevice] = useState('');
   const [availableChannels, setAvailableChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
-  
-  // Connection in progress
   const [connecting, setConnecting] = useState(false);
-  
-  // Tab management
   const [activeTab, setActiveTab] = useState('mixer');
+  const [globalMode, setGlobalMode] = useState('soundcheck');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [routingScheme, setRoutingScheme] = useState([]);
+  const [routingChannelCount, setRoutingChannelCount] = useState(64);
 
   useEffect(() => {
-    // Register listeners FIRST before connecting
-    
-    // Handle connection status updates
     websocketService.on('connection_status', (data) => {
       setConnecting(false);
       setMixerConnected(data.connected);
       if (data.connected) {
-        setStatusMessage(`Connected to Wing at ${mixerIp}`);
+        setStatusMessage(`Wing: ${mixerIp}`);
       } else {
         if (data.error) {
-          setStatusMessage(`Error: ${data.error}`);
+          setStatusMessage(`Ошибка: ${data.error}`);
         } else {
-          setStatusMessage('Disconnected from mixer');
+          setStatusMessage('Отключен');
         }
       }
     });
 
-    // Handle audio devices list
     websocketService.on('audio_devices', (data) => {
       setAudioDevices(data.devices || []);
       if (data.devices && data.devices.length > 0) {
-        // Try to find Dante device first
-        const danteDevice = data.devices.find(device => 
+        const danteDevice = data.devices.find(device =>
           device.name && device.name.toLowerCase().includes('dante')
         );
-        
-        // Select Dante if found, otherwise select first device
         const deviceToSelect = danteDevice || data.devices[0];
         setSelectedDevice(deviceToSelect.id);
         setAvailableChannels(deviceToSelect.channels || []);
       }
     });
 
-    // Handle bypass result
     websocketService.on('bypass_result', (data) => {
       if (data.error) {
-        setStatusMessage(`Bypass error: ${data.error}`);
+        setStatusMessage(`Bypass: ${data.error}`);
       } else if (data.success) {
-        setStatusMessage(`Bypass completed: ${data.success_count}/40 channels processed`);
-      } else {
-        setStatusMessage('Bypass operation failed');
+        setStatusMessage(`Bypass OK: ${data.success_count}/40`);
       }
     });
 
-    // Helper function to check if channel name is a default name (not an instrument/vocal name)
     const isDefaultChannelName = (name) => {
       if (!name || !name.trim()) return true;
       const trimmedName = name.trim();
-      
-      // Check for default patterns: "Ch 1", "Ch 2", "Channel 1", "Channel 2", etc.
       const defaultPatterns = [
-        /^ch\s*\d+$/i,           // "Ch 1", "ch 2", "CH 3", etc.
-        /^channel\s*\d+$/i,      // "Channel 1", "channel 2", etc.
-        /^\d+$/,                 // Just numbers "1", "2", "3", etc.
-        /^input\s*\d+$/i,        // "Input 1", "input 2", etc.
-        /^in\s*\d+$/i,           // "In 1", "in 2", etc.
+        /^ch\s*\d+$/i,
+        /^channel\s*\d+$/i,
+        /^\d+$/,
+        /^input\s*\d+$/i,
+        /^in\s*\d+$/i,
       ];
-      
       return defaultPatterns.some(pattern => pattern.test(trimmedName));
     };
 
-    // Handle mixer channel names scan result
     websocketService.on('mixer_channel_names', (data) => {
       if (data.error) {
-        setStatusMessage(`Error scanning mixer: ${data.error}`);
+        setStatusMessage(`Scan: ${data.error}`);
         return;
       }
-      
       if (data.channel_names) {
-        // Update channel names in availableChannels
         setAvailableChannels(prevChannels => {
           const updatedChannels = prevChannels.map(channel => {
-            // Try to match by channel number
-            // channel.id might be a number or string like "1", "2", etc.
             const channelNum = typeof channel.id === 'number' ? channel.id : parseInt(channel.id);
-            
-            // Try both numeric and string keys (JSON may serialize numeric keys as strings)
             let newName = null;
             if (!isNaN(channelNum)) {
-              // Try numeric key first
               newName = data.channel_names[channelNum];
-              // If not found, try string key
-              if (!newName) {
-                newName = data.channel_names[String(channelNum)];
-              }
+              if (!newName) newName = data.channel_names[String(channelNum)];
             }
-            
             if (newName && newName.trim()) {
-              return {
-                ...channel,
-                name: newName.trim()
-              };
+              return { ...channel, name: newName.trim() };
             }
-            
-            // Also try matching by channel name if it contains a number
             const nameMatch = channel.name?.match(/(\d+)/);
             if (nameMatch) {
               const numFromName = parseInt(nameMatch[1]);
               if (!isNaN(numFromName)) {
-                // Try both numeric and string keys
                 let nameFromMatch = data.channel_names[numFromName] || data.channel_names[String(numFromName)];
                 if (nameFromMatch && nameFromMatch.trim()) {
-                  return {
-                    ...channel,
-                    name: nameFromMatch.trim()
-                  };
+                  return { ...channel, name: nameFromMatch.trim() };
                 }
               }
             }
             return channel;
           });
-          
-          // Automatically select channels with instrument/vocal names (not default names)
+
           const channelsWithNames = updatedChannels.filter(channel => {
-            const channelName = channel.name || '';
-            return !isDefaultChannelName(channelName);
+            return !isDefaultChannelName(channel.name || '');
           });
-          
           if (channelsWithNames.length > 0) {
-            const channelIds = channelsWithNames.map(ch => ch.id);
-            setSelectedChannels(channelIds);
-            const count = Object.keys(data.channel_names).length;
-            setStatusMessage(`Scanned ${count} channel names. Auto-selected ${channelsWithNames.length} channels with instrument/vocal names.`);
+            setSelectedChannels(channelsWithNames.map(ch => ch.id));
+            setStatusMessage(`Найдено ${channelsWithNames.length} каналов`);
           } else {
-            const count = Object.keys(data.channel_names).length;
-            setStatusMessage(`Scanned ${count} channel names from mixer. No channels with custom names found.`);
+            setStatusMessage('Каналы просканированы');
           }
-          
           return updatedChannels;
         });
-      } else {
-        setStatusMessage('No channel names received from mixer');
       }
     });
 
-    // Handle disconnection
     websocketService.on('disconnected', () => {
       setServerConnected(false);
       setMixerConnected(false);
-      setStatusMessage('Backend connection lost. Reconnecting...');
+      setStatusMessage('Переподключение...');
     });
 
-    // Handle saved settings for mixer connection
     const handleAllSettingsLoaded = (data) => {
       if (data.settings && data.settings.mixer) {
         const m = data.settings.mixer;
         if (m.mixerIp) setMixerIp(m.mixerIp);
         if (m.mixerPort) setMixerPort(m.mixerPort);
-        console.log('App: Applied saved mixer settings:', m);
       }
     };
     websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
 
-    // NOW connect to backend WebSocket (after all listeners are registered)
+    websocketService.on('dante_routing', (data) => {
+      if (data.routing_scheme) setRoutingScheme(data.routing_scheme);
+    });
+
     websocketService.connect()
       .then(() => {
         setServerConnected(true);
-        setStatusMessage('Backend connected');
-        // Request audio devices list
+        setStatusMessage('Backend OK');
         websocketService.send({ type: 'get_audio_devices' });
-        // Load saved settings
         websocketService.loadAllSettings();
+        websocketService.getDanteRouting(64);
       })
       .catch(err => {
-        setStatusMessage('Failed to connect to backend');
+        setStatusMessage('Backend недоступен');
         console.error(err);
       });
 
     return () => {
-      // Clean up event listeners
       websocketService.off('connection_status', () => {});
       websocketService.off('audio_devices', () => {});
       websocketService.off('bypass_result', () => {});
       websocketService.off('mixer_channel_names', () => {});
       websocketService.off('disconnected', () => {});
       websocketService.off('all_settings_loaded', handleAllSettingsLoaded);
+      websocketService.off('dante_routing', () => {});
       websocketService.disconnect();
     };
   }, []);
@@ -229,13 +211,9 @@ function App() {
   };
 
   const handleChannelToggle = (channelId) => {
-    setSelectedChannels(prev => {
-      if (prev.includes(channelId)) {
-        return prev.filter(id => id !== channelId);
-      } else {
-        return [...prev, channelId];
-      }
-    });
+    setSelectedChannels(prev =>
+      prev.includes(channelId) ? prev.filter(id => id !== channelId) : [...prev, channelId]
+    );
   };
 
   const handleSelectAllChannels = () => {
@@ -247,26 +225,18 @@ function App() {
   };
 
   const handleScanMixer = () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7249/ingest/4264ed61-ddd5-4beb-978e-d0eb0972f907',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:handleScanMixer',message:'Function called',data:{mixerConnected},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     if (!mixerConnected) {
-      setStatusMessage('Please connect to mixer first');
+      setStatusMessage('Сначала подключитесь');
       return;
     }
-    setStatusMessage('Scanning mixer channel names...');
+    setStatusMessage('Сканирую...');
     websocketService.scanMixerChannelNames();
   };
 
   const handleBypass = () => {
-    if (!mixerConnected) {
-      setStatusMessage('Please connect to mixer first');
-      return;
-    }
-    if (!window.confirm('This will disable all modules and set all faders to 0dB on all 40 channels. Continue?')) {
-      return;
-    }
-    setStatusMessage('Bypassing mixer (disabling modules and setting faders to 0dB)...');
+    if (!mixerConnected) return;
+    if (!window.confirm('Сбросить все модули и фейдеры на 0dB?')) return;
+    setStatusMessage('Bypass...');
     websocketService.bypassMixer();
   };
 
@@ -275,358 +245,247 @@ function App() {
       websocketService.disconnectMixer();
     } else {
       setConnecting(true);
-      setStatusMessage('Connecting to Wing...');
+      setStatusMessage('Подключаю...');
       websocketService.connectWing(mixerIp, mixerPort, mixerPort);
     }
   };
 
+  const sharedProps = {
+    selectedChannels,
+    availableChannels,
+    selectedDevice,
+    audioDevices,
+    globalMode,
+  };
+
   return (
     <div className="App">
-      <header className="App-header">
-        <h1>Auto Mixer Tubeslave</h1>
-        <div className="status-indicators">
-          <span className={`indicator ${serverConnected ? 'connected' : 'disconnected'}`}>
-            Backend: {serverConnected ? 'Online' : 'Offline'}
-          </span>
-          <span className={`indicator ${mixerConnected ? 'connected' : 'disconnected'}`}>
-            Mixer: {mixerConnected ? 'Connected' : 'Disconnected'}
-          </span>
+      {/* Sidebar */}
+      <nav className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        <div className="sidebar-header">
+          <h1 className="logo">{sidebarCollapsed ? 'AM' : 'AutoMixer'}</h1>
+          <button className="btn-collapse" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+            {sidebarCollapsed ? '▶' : '◀'}
+          </button>
         </div>
-      </header>
 
-      <main className="App-main">
-        {/* Tabs Navigation */}
-        <div className="tabs-navigation">
+        <div className="sidebar-status">
+          <div className={`status-dot ${serverConnected ? 'on' : 'off'}`} title={serverConnected ? 'Backend Online' : 'Backend Offline'} />
+          <div className={`status-dot ${mixerConnected ? 'on' : 'off'}`} title={mixerConnected ? 'Mixer OK' : 'Mixer Off'} />
+          {!sidebarCollapsed && (
+            <span className="status-text-small">
+              {serverConnected ? (mixerConnected ? 'Всё ОК' : 'Mixer ✕') : 'Offline'}
+            </span>
+          )}
+        </div>
+
+        {/* Global Mode Toggle */}
+        <div className="mode-toggle">
           <button
-            className={`tab-button ${activeTab === 'mixer' ? 'active' : ''}`}
-            onClick={() => setActiveTab('mixer')}
+            className={`mode-btn ${globalMode === 'soundcheck' ? 'active' : ''}`}
+            onClick={() => setGlobalMode('soundcheck')}
+            title="Soundcheck: анализ → применить"
           >
-            Mixer Connection
+            {sidebarCollapsed ? 'SC' : 'Soundcheck'}
           </button>
           <button
-            className={`tab-button ${activeTab === 'gainStaging' ? 'active' : ''}`}
-            onClick={() => setActiveTab('gainStaging')}
+            className={`mode-btn ${globalMode === 'live' ? 'active' : ''}`}
+            onClick={() => setGlobalMode('live')}
+            title="Live: непрерывная коррекция"
           >
-            GAIN STAGING
+            {sidebarCollapsed ? 'LV' : 'Live'}
           </button>
-          <button
-            className={`tab-button ${activeTab === 'phaseAlignment' ? 'active' : ''}`}
-            onClick={() => setActiveTab('phaseAlignment')}
-          >
-            PHASE ALIGNMENT
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'autoEQ' ? 'active' : ''}`}
-            onClick={() => setActiveTab('autoEQ')}
-          >
-            AUTO EQ
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'autoCompressor' ? 'active' : ''}`}
-            onClick={() => setActiveTab('autoCompressor')}
-          >
-            AUTO COMPRESSOR
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'autoFader' ? 'active' : ''}`}
-            onClick={() => setActiveTab('autoFader')}
-          >
-            AUTO FADER
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'autoSoundcheck' ? 'active' : ''}`}
-            onClick={() => setActiveTab('autoSoundcheck')}
-          >
-            AUTO SOUNDCHECK
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'autoEffects' ? 'active' : ''}`}
-            onClick={() => setActiveTab('autoEffects')}
-          >
-            AUTO EFFECTS
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'autoPanner' ? 'active' : ''}`}
-            onClick={() => setActiveTab('autoPanner')}
-          >
-            AUTO PANNER
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'autoGate' ? 'active' : ''}`}
-            onClick={() => setActiveTab('autoGate')}
-          >
-            AUTO GATE
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'autoReverb' ? 'active' : ''}`}
-            onClick={() => setActiveTab('autoReverb')}
-          >
-            AUTO REVERB
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'crossAdaptiveEQ' ? 'active' : ''}`}
-            onClick={() => setActiveTab('crossAdaptiveEQ')}
-          >
-            CROSS-ADAPTIVE EQ
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'systemMeasurement' ? 'active' : ''}`}
-            onClick={() => setActiveTab('systemMeasurement')}
-          >
-            SYSTEM MEASUREMENT
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'voice' ? 'active' : ''}`}
-            onClick={() => setActiveTab('voice')}
-          >
-            VOICE CONTROL
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            SETTINGS
-          </button>
+        </div>
+
+        <div className="nav-items">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.id}
+              className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(item.id)}
+              title={item.label}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              {!sidebarCollapsed && <span className="nav-label">{item.label}</span>}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="main-content">
+        {/* Top bar with mode indicator */}
+        <div className="topbar">
+          <span className="topbar-title">
+            {NAV_ITEMS.find(n => n.id === activeTab)?.icon}{' '}
+            {NAV_ITEMS.find(n => n.id === activeTab)?.label}
+          </span>
+          <div className={`mode-badge ${globalMode}`}>
+            {globalMode === 'soundcheck' ? '🎯 Soundcheck' : '🔴 Live'}
+          </div>
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'mixer' && (
-          <>
-            <section className="config-section">
-              <h2>Mixer Connection</h2>
-          
-          <div className="config-grid">
-            <div className="config-item">
-              <label>Wing IP Address</label>
-              <input
-                type="text"
-                value={mixerIp}
-                onChange={(e) => setMixerIp(e.target.value)}
-                disabled={mixerConnected}
-                placeholder="192.168.1.102"
-              />
-            </div>
-            
-            <div className="config-item">
-              <label>OSC Port</label>
-              <input
-                type="number"
-                value={mixerPort}
-                onChange={(e) => setMixerPort(parseInt(e.target.value))}
-                disabled={mixerConnected}
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="config-section">
-          <h2>Audio Device</h2>
-          
-          <div className="config-grid">
-            <div className="config-item full-width">
-              <label>Select Audio Device</label>
-              <select
-                value={selectedDevice}
-                onChange={(e) => handleDeviceChange(e.target.value)}
-                disabled={audioDevices.length === 0}
-              >
-                {audioDevices.length === 0 ? (
-                  <option value="">No audio devices found</option>
-                ) : (
-                  audioDevices.map(device => (
-                    <option key={device.id} value={device.id}>
-                      {device.name}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-          </div>
-
-          {availableChannels.length > 0 && (
-            <div className="channels-section">
-              <div className="channels-header">
-                <label>Select Channels to Process</label>
-                <div className="channels-header-buttons">
-                  <button 
-                    className="btn-small"
-                    onClick={handleSelectAllChannels}
+        <div className="tab-content">
+          {activeTab === 'mixer' && (
+            <div className="connect-page">
+              <div className="connect-card">
+                <div className="connect-row">
+                  <div className="field">
+                    <label>Wing IP</label>
+                    <input
+                      type="text"
+                      value={mixerIp}
+                      onChange={(e) => setMixerIp(e.target.value)}
+                      disabled={mixerConnected}
+                      placeholder="192.168.1.102"
+                    />
+                  </div>
+                  <div className="field">
+                    <label>OSC Port</label>
+                    <input
+                      type="number"
+                      value={mixerPort}
+                      onChange={(e) => setMixerPort(parseInt(e.target.value))}
+                      disabled={mixerConnected}
+                    />
+                  </div>
+                  <button
+                    className={`btn-connect ${mixerConnected ? 'connected' : ''}`}
+                    onClick={handleConnect}
+                    disabled={!serverConnected || connecting}
                   >
-                    {selectedChannels.length === availableChannels.length ? 'Deselect All' : 'Select All'}
-                  </button>
-                  <button 
-                    className="btn-small"
-                    onClick={handleBypass}
-                    disabled={!mixerConnected}
-                    title={mixerConnected ? "Disable all modules and set faders to 0dB" : "Connect to mixer first"}
-                  >
-                    Bypass
-                  </button>
-                  <button 
-                    className="btn-small"
-                    onClick={handleScanMixer}
-                    disabled={!mixerConnected}
-                    title={mixerConnected ? "Scan channel names from mixer" : "Connect to mixer first"}
-                  >
-                    Scan Mixer
+                    {connecting ? '...' : mixerConnected ? 'Отключить' : 'Подключить'}
                   </button>
                 </div>
+                {statusMessage && <p className="status-msg">{statusMessage}</p>}
               </div>
-              
-              <div className="channels-grid">
-                {availableChannels.map(channel => (
-                  <label key={channel.id} className="channel-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedChannels.includes(channel.id)}
-                      onChange={() => handleChannelToggle(channel.id)}
-                    />
-                    <span>{channel.name || `Ch ${channel.id}`}</span>
-                  </label>
-                ))}
+
+              <div className="connect-card">
+                <div className="field full">
+                  <label>Аудио устройство</label>
+                  <select
+                    value={selectedDevice}
+                    onChange={(e) => handleDeviceChange(e.target.value)}
+                    disabled={audioDevices.length === 0}
+                  >
+                    {audioDevices.length === 0 ? (
+                      <option value="">Нет устройств</option>
+                    ) : (
+                      audioDevices.map(device => (
+                        <option key={device.id} value={device.id}>
+                          {device.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
               </div>
-              
-              <div className="selected-count">
-                {selectedChannels.length} of {availableChannels.length} channels selected
+
+              {/* Routing Scheme Card */}
+              <div className="connect-card">
+                <div className="routing-scheme">
+                  <div className="routing-scheme-header">
+                    <h3>Схема маршрутизации Dante</h3>
+                    <div className="scheme-selector">
+                      <button
+                        className={`scheme-btn ${routingChannelCount === 64 ? 'active' : ''}`}
+                        onClick={() => { setRoutingChannelCount(64); websocketService.getDanteRouting(64); }}
+                      >64 ch</button>
+                      <button
+                        className={`scheme-btn ${routingChannelCount === 32 ? 'active' : ''}`}
+                        onClick={() => { setRoutingChannelCount(32); websocketService.getDanteRouting(32); }}
+                      >32 ch</button>
+                    </div>
+                  </div>
+                  {routingScheme.map((row, idx) => (
+                    <div className="routing-row" key={idx}>
+                      <div className="routing-role-bar" style={{ background: ROLE_COLORS[row.role] || '#484f58' }} />
+                      <div className="routing-body">
+                        <div className="routing-top">
+                          <span className="routing-channels" style={{ color: ROLE_COLORS[row.role] || '#e6e6e6' }}>
+                            {row.label_short}
+                          </span>
+                          <span className="routing-tap">{row.tap_point}</span>
+                          <span className={`routing-badge ${row.required ? 'required' : 'optional'}`}>
+                            {row.required ? 'Обязательно' : 'Опционально'}
+                          </span>
+                        </div>
+                        <div className="routing-label">{row.label_full}</div>
+                        {row.wing_routing_hint && (
+                          <div className="routing-wing-hint">{row.wing_routing_hint}</div>
+                        )}
+                        {row.used_by && row.used_by.length > 0 && (
+                          <div className="routing-modules">
+                            {row.used_by.map((mod, i) => (
+                              <span className="routing-module-tag" key={i}>{mod}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {availableChannels.length > 0 && (
+                <div className="connect-card">
+                  <div className="channels-toolbar">
+                    <span className="ch-count">{selectedChannels.length}/{availableChannels.length}</span>
+                    <button className="btn-sm" onClick={handleSelectAllChannels}>
+                      {selectedChannels.length === availableChannels.length ? 'Снять все' : 'Выбрать все'}
+                    </button>
+                    <button className="btn-sm" onClick={handleScanMixer} disabled={!mixerConnected}>
+                      Скан
+                    </button>
+                    <button className="btn-sm danger" onClick={handleBypass} disabled={!mixerConnected}>
+                      Bypass
+                    </button>
+                  </div>
+
+                  <div className="channels-grid">
+                    {availableChannels.map(channel => (
+                      <label key={channel.id} className={`ch-chip ${selectedChannels.includes(channel.id) ? 'selected' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={selectedChannels.includes(channel.id)}
+                          onChange={() => handleChannelToggle(channel.id)}
+                        />
+                        <span>{channel.name || `Ch ${channel.id}`}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-        </section>
 
-        <section className="actions-section">
-          <button
-            className={`btn-connect ${mixerConnected ? 'connected' : ''}`}
-            onClick={handleConnect}
-            disabled={!serverConnected || connecting}
-          >
-            {connecting ? 'Connecting...' : mixerConnected ? 'Disconnect' : 'Connect to Wing'}
-          </button>
-          
-          <p className="status-message">{statusMessage}</p>
-        </section>
-          </>
-        )}
-
-        {activeTab === 'gainStaging' && (
-          <GainStagingTab 
-            selectedChannels={selectedChannels}
-            availableChannels={availableChannels}
-            selectedDevice={selectedDevice}
-            audioDevices={audioDevices}
-          />
-        )}
-
-        {activeTab === 'phaseAlignment' && (
-          <PhaseAlignmentTab 
-            selectedChannels={selectedChannels}
-            availableChannels={availableChannels}
-            selectedDevice={selectedDevice}
-            audioDevices={audioDevices}
-          />
-        )}
-
-        {activeTab === 'autoEQ' && (
-          <AutoEQTab 
-            selectedChannels={selectedChannels}
-            availableChannels={availableChannels}
-            selectedDevice={selectedDevice}
-            audioDevices={audioDevices}
-          />
-        )}
-
-        {activeTab === 'autoFader' && (
-          <AutoFaderTab 
-            selectedChannels={selectedChannels}
-            availableChannels={availableChannels}
-            selectedDevice={selectedDevice}
-            audioDevices={audioDevices}
-          />
-        )}
-
-        {activeTab === 'autoSoundcheck' && (
-          <AutoSoundcheckTab 
-            selectedChannels={selectedChannels}
-            availableChannels={availableChannels}
-            selectedDevice={selectedDevice}
-            audioDevices={audioDevices}
-          />
-        )}
-
-        {activeTab === 'autoCompressor' && (
-          <AutoCompressorTab
-            selectedChannels={selectedChannels}
-            availableChannels={availableChannels}
-            selectedDevice={selectedDevice}
-            audioDevices={audioDevices}
-          />
-        )}
-
-        {activeTab === 'autoEffects' && (
-          <AutoEffectsTab
-            selectedChannels={selectedChannels}
-            availableChannels={availableChannels}
-            selectedDevice={selectedDevice}
-            audioDevices={audioDevices}
-          />
-        )}
-
-        {activeTab === 'autoPanner' && (
-          <AutoPannerTab
-            selectedChannels={selectedChannels}
-            availableChannels={availableChannels}
-            selectedDevice={selectedDevice}
-            audioDevices={audioDevices}
-          />
-        )}
-
-        {activeTab === 'autoGate' && (
-          <AutoGateTab
-            selectedChannels={selectedChannels}
-            availableChannels={availableChannels}
-            selectedDevice={selectedDevice}
-            audioDevices={audioDevices}
-          />
-        )}
-
-        {activeTab === 'autoReverb' && (
-          <AutoReverbTab
-            selectedChannels={selectedChannels}
-            availableChannels={availableChannels}
-            selectedDevice={selectedDevice}
-            audioDevices={audioDevices}
-          />
-        )}
-
-        {activeTab === 'crossAdaptiveEQ' && (
-          <CrossAdaptiveEQTab
-            selectedChannels={selectedChannels}
-            availableChannels={availableChannels}
-            selectedDevice={selectedDevice}
-            audioDevices={audioDevices}
-          />
-        )}
-
-        {activeTab === 'systemMeasurement' && (
-          <SystemMeasurementTab
-            selectedDevice={selectedDevice}
-            mixerClient={null}
-          />
-        )}
-
-        {activeTab === 'voice' && (
-          <VoiceControlTab />
-        )}
-
-        {activeTab === 'settings' && (
-          <SettingsTab
-            mixerIp={mixerIp}
-            mixerPort={mixerPort}
-            onMixerSettingsChange={(key, value) => {
-              if (key === 'mixerIp') setMixerIp(value);
-              if (key === 'mixerPort') setMixerPort(value);
-            }}
-          />
-        )}
+          {activeTab === 'gainStaging' && <GainStagingTab {...sharedProps} />}
+          {activeTab === 'phaseAlignment' && <PhaseAlignmentTab {...sharedProps} />}
+          {activeTab === 'autoEQ' && <AutoEQTab {...sharedProps} />}
+          {activeTab === 'autoFader' && <AutoFaderTab {...sharedProps} />}
+          {activeTab === 'autoSoundcheck' && <AutoSoundcheckTab {...sharedProps} />}
+          {activeTab === 'autoCompressor' && <AutoCompressorTab {...sharedProps} />}
+          {activeTab === 'autoEffects' && <AutoEffectsTab {...sharedProps} />}
+          {activeTab === 'autoPanner' && <AutoPannerTab {...sharedProps} />}
+          {activeTab === 'autoGate' && <AutoGateTab {...sharedProps} />}
+          {activeTab === 'autoReverb' && <AutoReverbTab {...sharedProps} />}
+          {activeTab === 'crossAdaptiveEQ' && <CrossAdaptiveEQTab {...sharedProps} />}
+          {activeTab === 'systemMeasurement' && (
+            <SystemMeasurementTab selectedDevice={selectedDevice} mixerClient={null} globalMode={globalMode} />
+          )}
+          {activeTab === 'voice' && <VoiceControlTab globalMode={globalMode} />}
+          {activeTab === 'settings' && (
+            <SettingsTab
+              mixerIp={mixerIp}
+              mixerPort={mixerPort}
+              onMixerSettingsChange={(key, value) => {
+                if (key === 'mixerIp') setMixerIp(value);
+                if (key === 'mixerPort') setMixerPort(value);
+              }}
+            />
+          )}
+        </div>
       </main>
     </div>
   );
