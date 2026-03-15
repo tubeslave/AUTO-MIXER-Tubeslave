@@ -10,11 +10,8 @@ Covers:
 """
 
 import pytest
-import sys, os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend", "ml"))
-
-from lufs_targets import (
+from backend.ml.lufs_targets import (
     INSTRUMENT_LUFS_OFFSETS,
     GENRE_MODIFIERS,
     get_target_lufs,
