@@ -1288,10 +1288,14 @@ class WingClient:
     
     def find_snap_by_name(self, snap_name: str, max_index: int = 200) -> Optional[int]:
         """
-        Найти индекс snapshot по имени через чтение имён (без загрузки).
+        Найти индекс snapshot по имени БЕЗ загрузки (неразрушающий поиск).
 
-        Использует OSC get-запросы для чтения имён снапшотов
-        без вызова GO/recall — безопасно для использования на концерте.
+        C-04 FIX: The original implementation sent a "GO" (load) command for
+        each index to read back the name, which destructively changed the
+        mixer state on every iteration during a live performance.  This
+        rewrite queries snapshot names via the read-only OSC address
+        ``/$ctl/lib/$name`` (set index first, then query name without GO)
+        so the active scene is never altered during the search.
 
         Args:
             snap_name: Имя snapshot для поиска
@@ -1306,28 +1310,33 @@ class WingClient:
 
         search_name_upper = snap_name.upper().strip()
 
-        # Read-only: query snapshot names via OSC without loading them
+        # Query names without loading — set index then read $name (not $active)
         for idx in range(1, max_index + 1):
             try:
-                # Query the snapshot name at this index (read-only)
-                name_address = f"/$ctl/lib/name"
-                self.send(name_address, idx)
-                time.sleep(0.1)
+                # Point the library cursor at this index (read-only operation)
+                self.send("/$ctl/lib/$actionidx", idx)
+                time.sleep(0.05)
 
-                snap_name_val = self.state.get(name_address)
-                if snap_name_val:
-                    name_upper = snap_name_val.upper().strip()
+                # Request the snapshot name at the current index.
+                # $name is a read-only query; it does NOT load the snapshot.
+                self.send("/$ctl/lib/$name")
+                time.sleep(0.05)
+                snap_name_at_idx = self.state.get("/$ctl/lib/$name")
+
+                if snap_name_at_idx:
+                    name_upper = str(snap_name_at_idx).upper()
                     name_clean = name_upper.replace("I:/", "").replace(".SNAP", "").strip()
 
-                    if (search_name_upper == name_upper or
-                        search_name_upper == name_clean or
-                        search_name_upper in name_upper):
-                        logger.debug(f"Found snapshot at index {idx}: {snap_name_val}")
+                    if (search_name_upper == name_upper
+                            or search_name_upper == name_clean
+                            or search_name_upper in name_upper):
+                        logger.debug(f"Found snapshot '{snap_name_at_idx}' at index {idx}")
                         return idx
 
             except Exception as e:
-                logger.debug(f"Error checking index {idx}: {e}")
+                logger.debug(f"Error checking snapshot index {idx}: {e}")
 
+        logger.warning(f"Snapshot '{snap_name}' not found in first {max_index} slots")
         return None
     
     def load_snap(self, snap_name: str, max_index: int = 200) -> bool:

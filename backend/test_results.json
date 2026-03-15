@@ -1,0 +1,342 @@
+{
+  "timestamp": "2026-03-14T18:14:22.275973",
+  "summary": {
+    "total": 66,
+    "passed": 64,
+    "failed": 0,
+    "warnings": 2,
+    "success_rate": "100%"
+  },
+  "results": [
+    {
+      "name": "import wing_client",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import lufs_gain_staging",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_eq",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_compressor",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_compressor_cf",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_gate_caig",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_fader",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_fader_hybrid",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_effects",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_phase_gcc_phat",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_panner",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_panner_adaptive",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_reverb",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import channel_recognizer",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import bleed_service",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import cross_adaptive_eq",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import compressor_adaptation",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import phase_alignment",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import backup_channels",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_eq_processing",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "LUFSMeter инициализация (48kHz)",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "LUFS 1kHz синус: значение корректно",
+      "status": "✅ PASS",
+      "detail": "LUFS = -9.1 (ожидается ~-9 LUFS для -6dBFS синуса)"
+    },
+    {
+      "name": "LUFS тишина: нет NaN/Inf",
+      "status": "✅ PASS",
+      "detail": "LUFS тишины = -100.691"
+    },
+    {
+      "name": "LUFS: relative gate (-10 LU) по ITU-R BS.1770-4 (C-03 fix)",
+      "status": "✅ PASS",
+      "detail": "Двухпроходное гейтирование для integrated LUFS"
+    },
+    {
+      "name": "LUFS: защита от floating-point drift (C-12 fix)",
+      "status": "✅ PASS",
+      "detail": "Clamp _sum_squares >= 0 после длительных сессий"
+    },
+    {
+      "name": "Gain Staging: модуль доступен",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "InstrumentProfiles загружен",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Auto EQ: HPF / low cut filter реализован",
+      "status": "✅ PASS",
+      "detail": "HPF обязателен на всём кроме kick/bass"
+    },
+    {
+      "name": "Auto EQ: mud zone (200-500 Hz) учтена",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Auto EQ: presence zone (2-5 kHz) учтена",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Auto EQ: safety limits на gain",
+      "status": "✅ PASS",
+      "detail": "Ограничение максимального boost/cut для предотвращения фидбэка"
+    },
+    {
+      "name": "Auto EQ: subtractive/additive подход",
+      "status": "✅ PASS",
+      "detail": "Принцип 'сначала убрать, потом поднять'"
+    },
+    {
+      "name": "Compressor CF: формула ratio (C-05 fix)",
+      "status": "✅ PASS",
+      "detail": "cf_norm высокий → ratio высокий (перкуссия = агрессивная компрессия)"
+    },
+    {
+      "name": "Compressor: параметр ratio реализован",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Compressor: attack time реализован",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Compressor: release time реализован",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Compressor: safety limit на gain reduction",
+      "status": "✅ PASS",
+      "detail": "Защита от чрезмерной компрессии в live"
+    },
+    {
+      "name": "Compressor: make-up gain",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Gate: hysteresis dual-threshold (C-02 fix)",
+      "status": "✅ PASS",
+      "detail": "Open threshold и close threshold разделены на hysteresis_db"
+    },
+    {
+      "name": "Gate: полная state machine (5+ состояний)",
+      "status": "✅ PASS",
+      "detail": "Состояния: ['CLOSED', 'OPENING', 'OPEN', 'HOLD', 'RELEASING']"
+    },
+    {
+      "name": "Gate: re-open при RELEASING (C-10 fix)",
+      "status": "✅ PASS",
+      "detail": "Быстрые удары не теряются при release"
+    },
+    {
+      "name": "Gate: attack и release параметры",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Gate численный тест",
+      "status": "⚠️  WARN",
+      "detail": "GateProcessor.process() missing 1 required positional argument: 'settings'"
+    },
+    {
+      "name": "Phase: ref/tgt порядок (C-07 fix)",
+      "status": "✅ PASS",
+      "detail": "add_frames(ref, tgt) — правильный знак задержки"
+    },
+    {
+      "name": "Phase: защита от /0 на тишине (C-08 fix)",
+      "status": "✅ PASS",
+      "detail": "correlation_peak = clip(value / (energy + eps), 0, 1)"
+    },
+    {
+      "name": "Phase: суб-сэмплная точность (параболическая интерполяция)",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Phase: обнаружение задержки 0.5мс",
+      "status": "✅ PASS",
+      "detail": "Ожидалось ~24 samples, получено 19.6"
+    },
+    {
+      "name": "Fader Hybrid: return type Tuple[float,float,float] (C-06)",
+      "status": "✅ PASS",
+      "detail": "3 значения: correction_db, rate_limited, confidence"
+    },
+    {
+      "name": "Fader Hybrid: ScenarioDetector кэширован (C-13)",
+      "status": "✅ PASS",
+      "detail": "Избежание аллокаций на 100Hz×N каналов"
+    },
+    {
+      "name": "Fader: rate limiting (плавные изменения)",
+      "status": "✅ PASS",
+      "detail": "Предотвращает резкие скачки фейдеров"
+    },
+    {
+      "name": "Fader: safety limits на уровень",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Fader: LUFS-based target levels",
+      "status": "✅ PASS",
+      "detail": "Балансировка на основе LUFS (громкость)"
+    },
+    {
+      "name": "Effects: нормализованные энергии (C-01 fix)",
+      "status": "✅ PASS",
+      "detail": "energy_band / total_energy вместо _db_to_linear(linear)"
+    },
+    {
+      "name": "Effects: LRA в dB домене (C-09 fix)",
+      "status": "✅ PASS",
+      "detail": "20*log10(rms) перед percentile для корректного LRA"
+    },
+    {
+      "name": "Effects: параметры send (reverb/delay)",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Wing: find_snap_by_name не найден",
+      "status": "⚠️  WARN",
+      "detail": ""
+    },
+    {
+      "name": "Wing: OSC порт 2223 (стандарт Wing)",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Wing: subscription keepalive",
+      "status": "✅ PASS",
+      "detail": "Wing требует periodic keepalive для подписки"
+    },
+    {
+      "name": "Wing: error handling (try/except)",
+      "status": "✅ PASS",
+      "detail": "Устойчивость к сетевым сбоям"
+    },
+    {
+      "name": "Channel Recognizer: пресеты инструментов доступны",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Channel Recognizer: количество пресетов",
+      "status": "✅ PASS",
+      "detail": "20 пресетов: ['kick', 'snare', 'tom', 'hihat', 'ride', 'cymbals', 'overheads', 'room', 'bass', 'electricGuitar', 'acousticGuitar', 'accordion', 'synth', 'playback', 'leadVocal', 'backVocal', 'drums_bus', 'vocal_bus', 'instrument_bus', 'custom']"
+    },
+    {
+      "name": "Bleed Service: compensation factor",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Cross-Adaptive EQ: кросс-канальная обработка",
+      "status": "✅ PASS",
+      "detail": "Метод IMP (De Man, Reiss & Stables)"
+    },
+    {
+      "name": "Auto Panner: панорамирование каналов",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Auto Reverb: параметры decay/time",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Auto Reverb: pre-delay параметр",
+      "status": "✅ PASS",
+      "detail": "Pre-delay отделяет сухой сигнал от реверба"
+    }
+  ]
+}

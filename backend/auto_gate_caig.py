@@ -409,43 +409,59 @@ class GateProcessor:
     ) -> GateDecision:
         """Process one frame and return decision."""
         decision = GateDecision(channel_id=0, state=self.state)
-        
-        # Check if signal is above threshold
-        is_above = features.rms_db > threshold_db
-        
+
+        # C-02 FIX: Implement proper hysteresis.
+        # Gate OPENS when signal > threshold (open threshold).
+        # Gate CLOSES when signal < threshold - hysteresis_db (close threshold).
+        # This prevents gate chatter at threshold boundary in live sound.
+        open_threshold_db = threshold_db
+        close_threshold_db = threshold_db - settings.hysteresis_db
+
+        is_above_open = features.rms_db > open_threshold_db
+        is_below_close = features.rms_db < close_threshold_db
+
         # State machine
         if self.state == GateState.CLOSED:
-            if is_above:
+            if is_above_open:
                 self.state = GateState.OPENING
                 self.current_gain_db = settings.range_db
-        
+
         elif self.state == GateState.OPENING:
             # Attack phase
             gain_step = abs(settings.range_db) / max(1, self.attack_samples)
             self.current_gain_db += gain_step
-            
+
             if self.current_gain_db >= 0:
                 self.current_gain_db = 0
                 self.state = GateState.OPEN
-        
+
         elif self.state == GateState.OPEN:
-            if not is_above:
+            # Only start closing once signal drops below the CLOSE threshold
+            if is_below_close:
                 self.state = GateState.HOLD
                 self.hold_counter = self.hold_samples
-        
+
         elif self.state == GateState.HOLD:
             self.hold_counter -= 1
             if self.hold_counter <= 0:
                 self.state = GateState.RELEASING
-        
+            # If signal recovers above open threshold during hold, re-open
+            elif is_above_open:
+                self.state = GateState.OPEN
+
         elif self.state == GateState.RELEASING:
             # Release phase
             gain_step = abs(settings.range_db) / max(1, self.release_samples)
             self.current_gain_db -= gain_step
-            
+
             if self.current_gain_db <= settings.range_db:
                 self.current_gain_db = settings.range_db
                 self.state = GateState.CLOSED
+
+            # C-10 FIX: If signal recovers above open threshold during
+            # release, immediately re-open to avoid missing fast signals.
+            elif is_above_open:
+                self.state = GateState.OPENING
         
         # Fill decision
         decision.state = self.state

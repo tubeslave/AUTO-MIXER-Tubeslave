@@ -66,18 +66,41 @@ class SignalStats:
         self.signal_presence_ratio = self.active_samples / max(self.total_samples, 1)
 
     def calculate_integrated_lufs(self):
-        """Calculate integrated LUFS from collected RMS values."""
+        """Calculate integrated LUFS from collected RMS values.
+
+        C-03 FIX: Implements two-pass relative gating per ITU-R BS.1770-4
+        Section 2.8.  Without gating the integrated LUFS is underestimated
+        by 1-3 dB because silent / near-silent blocks drag the average down.
+
+        Pass 1: Absolute gate at -70 LUFS (unchanged).
+        Pass 2: Relative gate — discard any block more than 10 LU below the
+                Pass-1 ungated loudness.
+        """
         if len(self.rms_values) == 0:
             self.integrated_lufs = -100.0
             return
 
+        # Pass 1: absolute gate at -70 LUFS
         valid_lufs = [l for l in self.rms_values if l > -70.0]
         if len(valid_lufs) == 0:
             self.integrated_lufs = -100.0
             return
 
         lufs_linear = [10 ** (l / 10.0) for l in valid_lufs]
-        mean_linear = np.mean(lufs_linear)
+        ungated_mean_linear = float(np.mean(lufs_linear))
+        ungated_loudness = 10 * np.log10(ungated_mean_linear + 1e-10)
+
+        # Pass 2: relative gate — keep blocks >= (ungated_loudness - 10 LU)
+        relative_gate_threshold = ungated_loudness - 10.0
+        gated_lufs = [l for l in valid_lufs if l >= relative_gate_threshold]
+
+        if len(gated_lufs) == 0:
+            # Fallback: no blocks pass the relative gate; use ungated result
+            self.integrated_lufs = ungated_loudness
+            return
+
+        gated_linear = [10 ** (l / 10.0) for l in gated_lufs]
+        mean_linear = float(np.mean(gated_linear))
         self.integrated_lufs = 10 * np.log10(mean_linear + 1e-10)
 
     def calculate_crest_factor(self):
@@ -271,11 +294,17 @@ class LUFSMeter:
             # Удаляем старый сэмпл из суммы
             old_sample = self.buffer[0]
             self._sum_squares -= old_sample * old_sample
-            
+
             # Добавляем новый сэмпл
             self.buffer.append(sample)
             self._sum_squares += sample * sample
-        
+
+        # C-12 FIX: Floating-point accumulation can make _sum_squares drift
+        # slightly negative after long runs (catastrophic cancellation).
+        # Clamp to zero to prevent NaN / negative-log from max() bypass.
+        if self._sum_squares < 0.0:
+            self._sum_squares = 0.0
+
         # Вычисляем LUFS
         mean_square = max(self._sum_squares / self.window_samples, 1e-10)
         lufs = -0.691 + 10 * np.log10(mean_square)

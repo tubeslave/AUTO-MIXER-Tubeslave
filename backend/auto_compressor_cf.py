@@ -293,8 +293,12 @@ class CFCompressorCalculator:
         # Release: faster for high CF, slower for low CF
         release_ms = 100 * (1.2 - 0.4 * cf_norm)
         
-        # Ratio: higher for high CF, lower for low CF
-        ratio = 3.0 * (1.0 - 0.3 * cf_norm)
+        # Ratio: higher for high CF (percussive), lower for low CF (sustained).
+        # C-05 FIX: Original formula was inverted — (1.0 - 0.3 * cf_norm)
+        # made high CF produce LOW ratio (soft), opposite of correct behaviour.
+        # Percussion (cf_norm → 1) must get AGGRESSIVE compression (high ratio).
+        # New formula: ratio grows with cf_norm, range 1.5 × to 4.5 ×.
+        ratio = 3.0 * (1.0 + 0.5 * cf_norm)
         
         # Blend with base params (50% adaptive, 50% base)
         attack_ms = 0.5 * attack_ms + 0.5 * base['attack']

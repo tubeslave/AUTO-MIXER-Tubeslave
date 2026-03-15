@@ -282,10 +282,14 @@ class AudioCore:
     def _extract_tier5_features(self, audio: np.ndarray, features: AudioFeatures) -> AudioFeatures:
         """Extract slow features (5Hz)."""
         # LRA (Loudness Range) - simplified
-        # In production: proper ITU-R BS.1770 LRA calculation
+        # C-09 FIX: rms_buffer stores linear RMS values; percentile difference
+        # must be computed in dB, not on raw linear values (linear subtraction
+        # is meaningless for LRA).
         if len(self.rms_buffer) > 0:
             rms_values = np.array(list(self.rms_buffer))
-            features.lra = np.percentile(rms_values, 95) - np.percentile(rms_values, 10)
+            # Convert linear RMS to dB before computing LRA
+            rms_db_values = 20 * np.log10(np.maximum(rms_values, 1e-10))
+            features.lra = float(np.percentile(rms_db_values, 95) - np.percentile(rms_db_values, 10))
         
         return features
 
@@ -479,9 +483,13 @@ class StateManager:
         params['fader_db'] = 20 * np.log10(gain + 1e-10)
         
         # EQ: based on spectral features
-        params['eq_low_gain'] = self._db_to_linear(features.energy_low)
-        params['eq_mid_gain'] = self._db_to_linear(features.energy_mid)
-        params['eq_high_gain'] = self._db_to_linear(features.energy_high)
+        # C-01 FIX: energy_low/mid/high are linear FFT magnitude sums, NOT dB values.
+        # Using _db_to_linear() on them caused massive overflow/NaN.
+        # Instead compute normalized energy ratios (0..1) for each band.
+        _energy_sum = features.energy_low + features.energy_mid + features.energy_high + 1e-10
+        params['eq_low_gain'] = features.energy_low / _energy_sum
+        params['eq_mid_gain'] = features.energy_mid / _energy_sum
+        params['eq_high_gain'] = features.energy_high / _energy_sum
         
         # Compressor: based on crest factor and LRA
         params['comp_threshold'] = -20 - features.crest_factor

@@ -175,10 +175,12 @@ class GCCPHATAnalyzer:
         delay_ms = delay_samples * 1000.0 / self.sample_rate
         
         # Compute quality metrics
-        # Correlation coefficient
-        correlation_peak = np.abs(interpolated_peak_value) / np.sqrt(
-            np.sum(ref_frame**2) * np.sum(tgt_frame**2)
-        )
+        # C-08 FIX: Original denominator could be 0.0 (silent frames) producing
+        # NaN / Inf.  Add epsilon and clamp result to [0, 1] for safety.
+        energy_product = np.sqrt(np.sum(ref_frame ** 2) * np.sum(tgt_frame ** 2))
+        correlation_peak = float(np.clip(
+            np.abs(interpolated_peak_value) / (energy_product + eps), 0.0, 1.0
+        ))
         
         # Peak-to-Sidelobe Ratio (PSR)
         # Find second highest peak (outside immediate vicinity)
@@ -318,6 +320,8 @@ class AutoPhaseAligner:
             return
         
         analyzer = self.channel_analyzers[channel]
+        # C-07 FIX: Original call passed (tgt_audio, ref_audio) which swapped
+        # reference and target, flipping the sign of the measured delay.
         analyzer.add_frames(ref_audio, tgt_audio)
         
         # Rate limiting

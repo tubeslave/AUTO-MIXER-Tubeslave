@@ -277,21 +277,31 @@ class DecisionEngine:
         hybrid_level_db: float,
         scenario: Scenario,
         rate_limit_db: float
-    ) -> Tuple[float, float]:
+    ) -> Tuple[float, float, float]:
         """
         Calculate correction with rate limiting.
-        
+
+        C-06 FIX: Return type annotation was ``Tuple[float, float]`` but the
+        method actually returns three values (correction_db, rate_limited,
+        confidence).  The mismatch caused type-checker failures and confused
+        callers.  Updated annotation to ``Tuple[float, float, float]``.
+
         Args:
             channel_id: Channel ID
             hybrid_level_db: Current hybrid level
             scenario: Detected scenario
             rate_limit_db: Max correction per cycle
-            
+
         Returns:
-            (correction_db, rate_limited_correction_db)
+            (correction_db, rate_limited_correction_db, confidence)
         """
+        # C-13 FIX: Avoid creating a new ScenarioDetector() on every call.
+        # Store a single shared instance on the engine to avoid unnecessary
+        # object allocations in the real-time audio control loop.
+        if not hasattr(self, '_scenario_detector'):
+            self._scenario_detector = ScenarioDetector()
         # Get target for scenario
-        target = ScenarioDetector().get_target_lufs(scenario, self.target_lufs)
+        target = self._scenario_detector.get_target_lufs(scenario, self.target_lufs)
         
         # Error (positive = need to increase gain)
         error_db = target - hybrid_level_db
