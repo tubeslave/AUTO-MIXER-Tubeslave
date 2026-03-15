@@ -1,0 +1,38 @@
+# Core
+python-osc>=1.8.0
+websockets>=11.0
+numpy>=1.24.0
+scipy>=1.10.0
+pyloudnorm>=0.1.1
+sounddevice>=0.4.6
+librosa>=0.10.0
+
+# ML / Deep Learning
+torch>=2.0.0
+scikit-learn>=1.3.0
+joblib>=1.3.0
+
+# AI Agent
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+httpx>=0.24.0
+
+# Infrastructure
+structlog>=23.1.0
+prometheus-client>=0.17.0
+watchdog>=3.0.0
+matchering>=2.0.6
+pyyaml>=6.0
+
+# Audio
+pyaudio>=0.2.13
+aiohttp>=3.8.0
+rapidfuzz>=3.0.0
+
+# Optional
+essentia>=2.1b6; sys_platform == "linux"
+pedalboard>=0.9.0
+
+# Dev / Test
+pytest>=7.4.0
+pytest-asyncio>=0.21.0

@@ -1,0 +1,44 @@
+mixer:
+  type: wing
+  ip: "192.168.1.102"
+  osc_port: 2223
+  channels: 48
+
+audio:
+  sample_rate: 48000
+  buffer_size: 1024
+  device: null  # auto-detect
+  dante_channels: 64
+
+lufs:
+  target: -18.0
+  tolerance: 1.0
+  gate_threshold: -70.0
+  peak_limit: -1.0
+
+safety:
+  max_gain_change_db: 3.0
+  max_fader_value: 10.0
+  feedback_detection: true
+  feedback_max_notches: 8
+  feedback_max_cut_db: -12.0
+
+genres:
+  default: "rock"
+  available: ["rock", "pop", "jazz", "electronic", "classical", "acoustic", "metal"]
+
+agent:
+  tier1_rules: true
+  tier2_ollama: true
+  tier2_model: "llama3"
+  tier3_perplexity: false
+  perplexity_api_key: ""
+
+logging:
+  level: "INFO"
+  json: false
+  file: "logs/automixer.log"
+
+metrics:
+  enabled: false
+  port: 9090

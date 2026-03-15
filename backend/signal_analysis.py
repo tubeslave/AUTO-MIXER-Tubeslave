@@ -51,10 +51,14 @@ class ChannelSignalFeatures:
 def ratio_float_to_wing(ratio: float) -> str:
     """Convert float ratio to nearest Wing OSC ratio string."""
     if ratio <= 0:
-        return "1.1"
+        return "1.0:1"
+    if ratio == float('inf'):
+        return WING_RATIO_STRINGS[-1]
     best_idx = 0
     best_diff = abs(WING_RATIO_VALUES[0] - ratio)
     for i, v in enumerate(WING_RATIO_VALUES):
+        if v == float('inf'):
+            continue
         d = abs(v - ratio)
         if d < best_diff:
             best_diff = d

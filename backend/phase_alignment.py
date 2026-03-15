@@ -355,34 +355,35 @@ class PhaseAlignmentAnalyzer:
 
         # Inverse FFT (IMP Eq. 8.3): τ = argmax F^{-1}{ψP}
         gcc = np.real(np.fft.ifft(psi_phat))
+        N = len(gcc)
 
-        # Search for peak within allowed delay range
-        search_range = min(self.max_delay_samples, len(gcc) // 2)
-        search_start = len(gcc) // 2 - search_range
-        search_end = len(gcc) // 2 + search_range
+        # GCC output layout: indices [0..N/2] = positive lags,
+        # indices [N/2+1..N-1] = negative lags (wrapped).
+        # Use fftshift to get a contiguous array centered at lag 0.
+        gcc_shifted = np.fft.fftshift(gcc)
+        center = N // 2
 
-        search_region = gcc[search_start:search_end]
+        search_range = min(self.max_delay_samples, N // 2)
+        search_start = center - search_range
+        search_end = center + search_range + 1
+
+        search_region = gcc_shifted[search_start:search_end]
         abs_region = np.abs(search_region)
         max_peak = np.max(abs_region)
-        
+
         # Find minimum delay with good correlation (>= 70% of max peak)
-        # This prioritizes minimal latency while maintaining phase alignment
         threshold = 0.7 * max_peak
         good_peaks_mask = abs_region >= threshold
-        
+
         if np.any(good_peaks_mask):
-            # Get indices of all good peaks
             good_indices = np.where(good_peaks_mask)[0]
-            # Calculate delays for these peaks
-            delays = good_indices + search_start - len(gcc) // 2
-            # Find the index with minimum absolute delay
+            delays = good_indices + search_start - center
             min_delay_idx_in_subset = np.argmin(np.abs(delays))
             peak_idx = good_indices[min_delay_idx_in_subset]
         else:
-            # Fallback: use maximum peak if no peaks meet threshold
             peak_idx = np.argmax(abs_region)
-        
-        delay_samples = peak_idx + search_start - len(gcc) // 2
+
+        delay_samples = peak_idx + search_start - center
         peak_value = float(search_region[peak_idx])
 
         return delay_samples, peak_value
