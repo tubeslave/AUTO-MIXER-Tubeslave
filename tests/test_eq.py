@@ -77,10 +77,11 @@ class TestSpectralAnalysis:
         assert hasattr(result, "spectrum")
         assert len(result.spectrum) > 0
 
-    def test_spectral_analysis_silence(self, sample_rate, test_audio_silence):
+    def test_spectral_analysis_silence(self, sample_rate):
         """Silence should produce very low spectral energy."""
         analyzer = SpectrumAnalyzer(sample_rate=sample_rate)
-        result = analyzer.analyze(test_audio_silence)
+        silence = np.zeros(sample_rate, dtype=np.float32)
+        result = analyzer.analyze(silence)
         assert hasattr(result, "spectrum")
         max_energy = np.max(result.spectrum) if len(result.spectrum) > 0 else 0.0
         assert max_energy < 1e-6, f"Silence spectrum max should be ~0, got {max_energy}"

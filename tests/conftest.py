@@ -62,3 +62,15 @@ def multi_channel_audio(sample_rate):
         t = np.linspace(0, 1.0, sample_rate, dtype=np.float32)
         channels.append(np.sin(2 * np.pi * freq * t) * 0.3)
     return channels
+
+
+@pytest.fixture
+def test_audio_silence(sample_rate):
+    """Generate silence (alias for legacy test files)."""
+    return np.zeros(sample_rate, dtype=np.float32)
+
+
+@pytest.fixture
+def tmp_dir(tmp_path):
+    """Alias tmp_path as a string for legacy test files."""
+    return str(tmp_path)
