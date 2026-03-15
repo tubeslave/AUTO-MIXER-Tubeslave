@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 try:
     import sounddevice as sd
     HAS_SOUNDDEVICE = True
-except ImportError:
+except (ImportError, OSError):
     sd = None  # type: ignore[assignment]
     HAS_SOUNDDEVICE = False
 

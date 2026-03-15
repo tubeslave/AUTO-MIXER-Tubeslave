@@ -10,7 +10,7 @@ import pytest
 
 try:
     from audio_capture import RingBuffer, AudioCapture, TestGeneratorConfig
-except ImportError:
+except (ImportError, OSError):
     pytest.skip("audio_capture module not importable", allow_module_level=True)
 
 
