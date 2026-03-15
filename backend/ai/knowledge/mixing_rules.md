@@ -1,263 +1,272 @@
-# Comprehensive Mixing Rules for Live Sound
-
-This document contains professional mixing rules and best practices for live concert mixing, specifically tailored for the Behringer Wing Rack digital mixer platform. All values are based on established audio engineering standards and professional live sound literature.
-
-## Gain Staging
-
-Proper gain staging is the foundation of a clean mix. Every stage in the signal chain must operate within its optimal range to maximize signal-to-noise ratio while preventing clipping.
-
-### K-System Metering Standards
-
-The K-System, developed by mastering engineer Bob Katz, provides three metering scales for different applications:
-
-- **K-20 (Music mixing)**: 0 dBFS = +20 dB above reference. Target integrated loudness: -20 LUFS. This is the primary standard for live concert mixing. The meter should hover around the 0 mark (which corresponds to -20 dBFS). Peaks should rarely exceed +12 on the K-20 scale (which is -8 dBFS). This provides 20 dB of headroom for transients and dynamics.
-
-- **K-14 (Broadcast/Film)**: 0 dBFS = +14 dB above reference. Target: -14 LUFS. Used for broadcast work where less dynamic range is acceptable.
-
-- **K-12 (Commercial music)**: 0 dBFS = +12 dB above reference. Target: -12 LUFS. Not recommended for live sound as it leaves insufficient headroom.
-
-### Input Gain Procedure
-
-1. Start with all faders at unity (0 dB) and all channel processing bypassed.
-2. Have the performer play or sing at their expected performance level.
-3. Adjust the preamp gain until the input meter averages around -20 to -18 dBFS.
-4. Peaks should not exceed -6 dBFS at the preamp stage.
-5. On the Behringer Wing, trim control range is -18 dB to +18 dB.
-
-### Headroom Management
-
-- Maintain at least 12 dB of headroom on the master bus at all times.
-- Individual channels should average -20 LUFS with peaks no higher than -6 dBFS.
-- Bus masters should operate at or below unity (0 dB).
-- DCA/VCA groups should start at unity and be used for broad mix moves.
-
-### Digital vs. Analog Gain Staging
-
-On digital consoles like the Wing Rack:
-- The analog-to-digital converter clips at 0 dBFS — this is a hard wall, not soft saturation.
-- Internal processing on the Wing uses 40-bit floating point, providing virtually unlimited internal headroom.
-- The critical clip points are: (1) the preamp/ADC stage, and (2) the DAC output stage.
-- Always leave headroom at both conversion stages.
-
-## EQ by Instrument
-
-### Subtractive vs. Additive EQ
-
-The golden rule: cut narrow, boost wide. Use subtractive EQ to remove problems before reaching for additive boosts.
-
-- **Cuts**: Use a narrow Q (2.0-8.0) to surgically remove resonances, mud, or problem frequencies.
-- **Boosts**: Use a wider Q (0.5-1.5) to gently enhance desired character.
-- **Maximum recommended boost**: +6 dB for live sound. Anything beyond this suggests a mic placement or source issue.
-- **Shelf EQ**: Use low and high shelves for broad tonal shaping; parametric bands for surgical work.
-
-### Frequency Ranges by Character
-
-Understanding frequency character helps diagnose problems quickly:
-
-- **20-60 Hz**: Sub-bass. Felt more than heard. Important for kick and bass. Roll off on everything else.
-- **60-250 Hz**: Bass/warmth. Fundamental range for most instruments. Excess here causes mud.
-- **250-500 Hz**: Low-midrange. "Boxy" and "muddy" frequencies. Common problem area in live rooms.
-- **500-2000 Hz**: Midrange. Body and presence of most instruments. Critical for vocal intelligibility.
-- **2000-4000 Hz**: Upper midrange. Presence and attack. Human ear is most sensitive here. Harshness lives here.
-- **4000-8000 Hz**: Presence/brilliance. Sibilance (4-8 kHz), cymbal definition, string attack.
-- **8000-20000 Hz**: Air/sparkle. Adds openness and life. Roll off above 12 kHz on sources that don't need it.
-
-### Kick Drum EQ
-
-- **Sub punch** (50-80 Hz): Boost 2-4 dB, Q=1.5. The "chest thump."
-- **Mud/boxiness** (300-500 Hz): Cut 3-5 dB, Q=2.0. Almost always needs a cut here.
-- **Beater attack** (2-4 kHz): Boost 2-3 dB, Q=1.5. Provides click and definition.
-- **Air** (8-10 kHz): Gentle shelf boost 1-2 dB for modern pop/rock kick sounds.
-- **HPF**: 30 Hz, 18 dB/oct. Removes sub-rumble below the useful fundamental.
-
-### Snare Drum EQ
-
-- **Body/fatness** (150-250 Hz): Boost 2-3 dB, Q=1.5. Adds weight to the snare.
-- **Boxiness** (600-900 Hz): Cut 2-4 dB, Q=2.0. Removes cardboard-like character.
-- **Crack/attack** (3-5 kHz): Boost 2-4 dB, Q=1.5. The "snap" of the stick on the head.
-- **Sizzle** (8-12 kHz): Shelf boost 1-3 dB for snare wire shimmer and brightness.
-- **HPF**: 80 Hz to remove kick bleed.
-
-### Vocal EQ (Lead)
-
-- **Proximity effect** (100-250 Hz): Cut 2-4 dB, Q=1.5. Compensates for close-mic proximity boost.
-- **Nasal/honk** (600-900 Hz): Cut 1-3 dB, Q=2.0. Most common vocal problem frequency.
-- **Presence** (2-4 kHz): Boost 2-4 dB, Q=1.0-1.5. Critical for intelligibility and cut-through.
-- **Air** (8-12 kHz): Shelf boost 2-3 dB for breath and openness.
-- **Sibilance** (5-8 kHz): If problematic, narrow cut 2-4 dB at the specific sibilant frequency, or use de-esser.
-- **HPF**: 80-100 Hz at 18 dB/oct.
-
-### Bass Guitar/Bass DI EQ
-
-- **Sub weight** (60-100 Hz): Boost 1-3 dB for power. Be careful not to overdo it.
-- **Mud** (200-350 Hz): Cut 2-4 dB, Q=2.0. Cleans up the low-mid region.
-- **Growl/definition** (600-900 Hz): Boost 1-3 dB for midrange presence and note definition.
-- **String attack** (2-3 kHz): Boost 1-2 dB for finger/pick attack clarity.
-- **HPF**: 30-40 Hz. Only remove sub-rumble; preserve the low fundamental.
-
-### Electric Guitar EQ
-
-- **Boom** (150-250 Hz): Cut 2-3 dB to reduce low-end buildup from amps.
-- **Body/crunch** (600-1000 Hz): Gentle boost 1-2 dB for midrange character.
-- **Presence/bite** (2-4 kHz): Boost 2-3 dB for cut-through in a dense mix.
-- **Harshness** (5-7 kHz): Cut 1-2 dB if the amp is overly bright.
-- **HPF**: 100 Hz. Electric guitar fundamentals start at ~82 Hz (low E string).
-
-### Acoustic Guitar EQ
-
-- **Boominess** (80-150 Hz): Cut 2-4 dB. Acoustic bodies amplify low frequencies excessively.
-- **Mud** (200-350 Hz): Cut 1-3 dB for clarity.
-- **String clarity** (2-4 kHz): Boost 2-3 dB for pick/strum definition.
-- **Sparkle** (8-12 kHz): Shelf boost 2-3 dB for string shimmer and brightness.
-- **HPF**: 80 Hz.
-
-## Compression Settings
-
-### Compression Principles for Live Sound
-
-Live compression serves three purposes:
-1. **Dynamics control**: Reduce the difference between quiet and loud passages.
-2. **Tonal shaping**: Slower attack lets transients through for punch; faster attack controls them.
-3. **Level consistency**: Keep sources at a predictable level in the mix.
-
-### Attack and Release Guidelines
-
-- **Fast attack** (0.1-5 ms): Catches transients immediately. Good for controlling dynamics but reduces punch. Use on vocals and bass for consistent level.
-- **Medium attack** (5-20 ms): Lets the initial transient through, then compresses. Ideal for drums where you want punch plus control.
-- **Slow attack** (20-50 ms): Preserves most transient character. Good for acoustic instruments and gentle vocal compression.
-- **Auto release**: Many modern compressors, including the Wing, offer program-dependent release. This is often the best starting point for live sound.
-
-### Per-Instrument Compression
-
-**Kick drum**: Ratio 4:1, threshold -10 to -15 dB, attack 15-25 ms (let beater transient through), release 60-100 ms (fast enough to recover before next hit at 120 BPM).
-
-**Snare drum**: Ratio 4:1 to 6:1, threshold -8 to -12 dB, attack 3-8 ms, release 80-120 ms. Faster attack than kick to control rimshot dynamics.
-
-**Toms**: Ratio 3:1 to 4:1, threshold -10 to -14 dB, attack 8-15 ms, release 80-120 ms.
-
-**Bass guitar**: Ratio 4:1, threshold -12 to -18 dB, attack 20-40 ms (preserve finger/pick attack), release 150-250 ms.
-
-**Lead vocal**: Ratio 3:1 to 4:1, threshold -15 to -20 dB, attack 5-15 ms, release 80-150 ms. Most important channel to compress — keeps vocal present and audible.
-
-**Backing vocals**: Ratio 3:1 to 4:1, threshold -18 to -22 dB, attack 5-10 ms, release 80-120 ms. Can be compressed harder than leads for consistent blend.
-
-**Electric guitar**: Ratio 2:1 to 3:1, threshold -12 to -16 dB, attack 10-20 ms, release 150-250 ms. Amps already compress the signal; be gentle.
-
-**Acoustic guitar**: Ratio 2:1 to 3:1, threshold -16 to -20 dB, attack 10-20 ms, release 120-180 ms.
-
-**Keys/Synth**: Ratio 2:1 to 3:1, threshold -14 to -18 dB, attack 10-20 ms, release 120-200 ms.
-
-## Panning Conventions
-
-### Standard Live Stage Layout (Audience Perspective)
-
-Panning should reflect the physical stage layout from the audience's perspective:
-
-- **Center (0)**: Lead vocals, bass, kick, snare. These form the core of the mix and should be mono-compatible.
-- **Slight off-center (10-30)**: Hi-hat (slightly left in drummer's perspective from audience), ride (slightly right).
-- **Moderate pan (30-50)**: Guitars (typically one left, one right if two guitars), keyboards, tom fills spread L-to-R.
-- **Wide (50-80)**: Backing vocals (spread across stereo field), string sections, horn sections.
-- **Extreme (80-100)**: Rarely used in live sound due to PA system design. Only for special effects.
-
-### Tom Panning
-
-From audience perspective (drummer facing audience):
-- Floor tom: 30-40 right
-- Mid tom: 10-20 right
-- High tom: 10-20 left
-- Rack toms follow a left-to-right (high-to-low) spread
-
-### Overhead Panning
-
-- Left overhead: Pan 70-100 left
-- Right overhead: Pan 70-100 right
-- This creates the natural stereo image of the drum kit
-
-## Reverb and Effects
-
-### Reverb Types by Application
-
-- **Plate reverb**: Tight, bright, smooth. Ideal for vocals and snare. Decay 1.0-2.0 seconds.
-- **Hall reverb**: Spacious, natural. Good for overall ambience. Decay 1.5-3.0 seconds.
-- **Room reverb**: Short, natural. Adds depth without washing out clarity. Decay 0.3-1.0 seconds.
-- **Chamber reverb**: Warm, colored. Good for vocals and acoustic instruments. Decay 0.8-1.5 seconds.
-
-### Send Levels (General Starting Points)
-
-- Lead vocal: -10 to -6 dB send to plate reverb
-- Snare: -15 to -10 dB send to plate reverb
-- Toms: -18 to -12 dB send to room or hall reverb
-- Acoustic guitar: -15 to -10 dB send to hall reverb
-- Never send kick, bass, or sub-heavy sources to reverb (muddies the low end)
-
-### Effects Rules
-
-1. Use pre-fader sends for monitor mixes, post-fader for effects.
-2. High-pass the reverb return at 200-300 Hz to keep the low end clean.
-3. In a reverberant venue, reduce reverb sends. In a dry venue, increase them.
-4. Delay (slapback, 80-120 ms) can add depth without the wash of reverb.
-5. De-esser before reverb on vocal sends to prevent sibilant reverb artifacts.
-
-## Dynamics Processing
-
-### Gating Guidelines
-
-Gates are essential for reducing bleed between close-miked drum sources:
-
-- **Threshold**: Set just below the quietest intentional hit. Too high = missed hits; too low = bleed passes through.
-- **Attack**: As fast as possible (0.1-1 ms) for drums to capture the full transient.
-- **Hold**: Long enough to sustain the note — 30-80 ms for drums, 50-100 ms for vocals.
-- **Release**: Should match the natural decay — 100-250 ms for drums, 200-400 ms for vocals.
-- **Range**: 20-40 dB for drums (fully close the gate). 6-15 dB for vocals (gentle gain reduction, not full closure).
-
-### When NOT to Gate
-
-- Overheads and room mics (you want the full kit sound)
-- Acoustic instruments (natural dynamics are part of the sound)
-- Sustained synth pads
-- Pre-mixed playback tracks
-- Sources with very dynamic performance (gating can cut off quiet passages)
-
-## Bus and Group Processing
-
-### Subgroup Strategy
-
-- **Drum bus**: Gentle compression (2:1, -20 dB threshold) for glue. Parallel compression for punch (heavy 10:1, blended 20-30% wet).
-- **Vocal bus**: Light compression (2:1, -18 dB threshold) for consistent vocal blend. De-esser on the bus rather than individual channels if multiple vocals.
-- **Instrument bus**: Very gentle compression if any (2:1, -24 dB threshold). Mostly for level control.
-- **Master bus**: Limiter only, set at -1 dBFS. No master bus compression in live sound — it reduces your ability to make mix moves.
-
-### DCA/VCA Groups
-
-Use DCA groups for performance-level control without altering the internal gain structure:
-- DCA 1: All drums
-- DCA 2: All vocals
-- DCA 3: All instruments
-- DCA 4: Effects returns
-- This allows quick scene-level adjustments during a show.
-
-## Level Management
-
-### Mix Balance Starting Points
-
-These are typical starting fader positions for a rock/pop band (relative to lead vocal at unity):
-
-- Lead vocal: 0 dB (reference)
-- Kick: -3 to -6 dB below vocal
-- Snare: -6 to -8 dB below vocal
-- Bass: -3 to -6 dB below vocal
-- Electric guitar: -6 to -10 dB below vocal
-- Acoustic guitar: -8 to -12 dB below vocal
-- Keys/synth: -8 to -12 dB below vocal
-- Backing vocals: -6 to -10 dB below lead vocal
-- Overheads: -12 to -18 dB below vocal
-- Toms: -10 to -15 dB below vocal (unmuted only when playing)
-
-### Loudness Target for FOH
-
-For front-of-house concert mixing:
-- Standard rock/pop show: 95-100 dBA SPL (A-weighted, slow)
-- Acoustic/jazz: 85-95 dBA SPL
-- Corporate/speech: 80-90 dBA SPL
-- Festival main stage: 100-105 dBA SPL
-- Note: Always comply with local noise ordinances and venue limits.
+# Live Sound Mixing Rules
+
+Comprehensive reference for automated mixing decisions in live concert environments.
+These rules are designed for the Behringer Wing Rack digital mixer with 40 input channels.
+
+## Gain Staging Fundamentals
+
+Proper gain staging is the foundation of a good mix. Every channel must maintain
+sufficient headroom while keeping signal well above the noise floor.
+
+- **Preamp Gain Target**: Set input gain so that peaks hit approximately -18 dBFS to -12 dBFS
+  on the channel meter. This provides 12-18 dB of headroom before digital clipping.
+- **Unity Gain Principle**: Each processing stage (EQ, compressor, insert) should have
+  roughly equal input and output levels. Use makeup gain on compressors to compensate
+  for gain reduction.
+- **Fader Position**: Aim to keep channel faders at or near 0 dB (unity) during normal
+  operation. This gives the most resolution for fine adjustments. If faders are
+  consistently above +5 dB, increase preamp gain. If consistently below -20 dB,
+  reduce preamp gain.
+- **Bus Headroom**: Subgroup and main bus levels should peak at -6 dBFS to -3 dBFS.
+  Never allow main bus to exceed -1 dBFS.
+- **True Peak Limit**: Maximum allowed true peak is -1 dBTP on any output bus.
+  For broadcast feeds, limit to -2 dBTP.
+- **Noise Floor**: For 24-bit digital systems, the effective noise floor is around
+  -120 dBFS. Any channel with signal below -60 dBFS should be considered inactive.
+- **Digital Trim**: On the Wing Rack, use /$ch/N/preamp/trim (range -18 to +18 dB)
+  for fine digital gain adjustment without touching the analog preamp.
+
+## High-Pass Filter Settings
+
+Every non-bass source should have a high-pass filter (HPF) engaged to remove
+unwanted low-frequency content (rumble, handling noise, stage vibration).
+
+| Instrument         | HPF Frequency | Slope   | Notes                         |
+|--------------------|---------------|---------|-------------------------------|
+| Lead Vocal         | 80 Hz         | 18 dB/oct | Prevents plosive rumble       |
+| Backing Vocal      | 100 Hz        | 18 dB/oct | Slightly higher for clarity   |
+| Acoustic Guitar    | 80 Hz         | 12 dB/oct | Preserves body                |
+| Electric Guitar    | 80 Hz         | 18 dB/oct | Amp already filters sub       |
+| Snare Top          | 80 Hz         | 18 dB/oct | Removes kick bleed sub        |
+| Snare Bottom       | 100 Hz        | 18 dB/oct | Snare wire resonance focus    |
+| Hi-Hat             | 200 Hz        | 24 dB/oct | Aggressive — only cymbals     |
+| Overhead L/R       | 100-200 Hz    | 18 dB/oct | Depends on cymbal-vs-kit mix  |
+| Rack Tom           | 80 Hz         | 18 dB/oct | Keep fundamental              |
+| Floor Tom          | 60 Hz         | 12 dB/oct | Lower fundamental             |
+| Piano              | 60 Hz         | 12 dB/oct | Preserve left-hand bass       |
+| Organ              | 40 Hz         | 12 dB/oct | Organ pedals go very low      |
+| Strings            | 80 Hz         | 12 dB/oct | Bow noise below 80 Hz         |
+| Brass              | 80 Hz         | 18 dB/oct | Stand/handling noise           |
+| Percussion         | 100 Hz        | 18 dB/oct | Most percussion is mid/high   |
+| Kick (NO HPF)      | ---           | ---     | Never HPF a kick drum         |
+| Bass Guitar (NO HPF)| ---          | ---     | Never HPF bass guitar         |
+
+## EQ Techniques
+
+### Subtractive EQ (Cut First)
+
+Always cut before boosting. Subtractive EQ removes problem frequencies without
+adding noise or level. Use a narrow Q (3-6) for surgical cuts and a wider Q (0.5-1.5)
+for gentle shaping.
+
+- **Mud Region (200-400 Hz)**: The most common problem area in live sound. Cut 2-4 dB
+  with Q of 1.5-2.0 on most sources to add clarity. Be careful not to thin the sound.
+- **Boxiness (400-800 Hz)**: Especially problematic on toms, snare, and some vocal mics.
+  Sweep with a narrow boost to find the offending frequency, then cut.
+- **Harshness (2-5 kHz)**: Ear-fatiguing frequencies. Cut 1-3 dB on electric guitars,
+  brass, and aggressive vocals to tame harshness.
+- **Sibilance (5-8 kHz)**: On vocals, a narrow cut at 5-7 kHz can tame sibilance. A
+  dedicated de-esser is preferred for dynamic control.
+
+### Additive EQ (Boost)
+
+Use wider Q (0.5-1.5) for boosts. Keep boosts under 4 dB whenever possible.
+
+- **Vocal Presence (2-4 kHz)**: A gentle 2-3 dB shelf or bell boost adds intelligibility.
+- **Vocal Air (10-14 kHz)**: A high shelf boost of 1-2 dB adds "air" and openness.
+- **Kick Attack (3-5 kHz)**: Beater click. Boost 2-4 dB for definition in dense mixes.
+- **Kick Thump (60-80 Hz)**: Low shelf or bell boost 2-3 dB for weight.
+- **Snare Body (200 Hz)**: Gentle 2 dB boost for fullness.
+- **Snare Crack (4-6 kHz)**: 2-3 dB boost for snap and cut.
+- **Bass Growl (600-1000 Hz)**: Where bass "note" definition lives. 1-2 dB boost.
+- **Guitar Presence (2-3 kHz)**: Helps guitars cut through without volume increase.
+- **Cymbal Shimmer (8-12 kHz)**: Delicate boost for cymbals and hi-hat presence.
+
+## Compression Settings Per Instrument
+
+### Lead Vocal
+- **Threshold**: -20 to -16 dBFS (should trigger on every phrase)
+- **Ratio**: 3:1 to 4:1 (consistent level without squashing)
+- **Attack**: 5-15 ms (fast enough to catch peaks, slow enough for consonant transients)
+- **Release**: 80-150 ms (should release before next phrase)
+- **Knee**: Soft knee for natural feel
+- **Gain Reduction Target**: 4-8 dB on peaks
+- **Makeup Gain**: Match input/output levels visually
+
+### Kick Drum
+- **Threshold**: -16 to -12 dBFS
+- **Ratio**: 4:1 to 6:1
+- **Attack**: 10-30 ms (let transient through for click)
+- **Release**: 50-80 ms (fast — must release before next hit)
+- **Gain Reduction**: 4-6 dB
+- **Note**: Parallel compression can add weight without killing transient
+
+### Snare Drum
+- **Threshold**: -14 to -10 dBFS
+- **Ratio**: 3:1 to 4:1
+- **Attack**: 5-15 ms (preserve initial crack)
+- **Release**: 80-120 ms
+- **Gain Reduction**: 3-6 dB
+
+### Bass Guitar
+- **Threshold**: -18 to -14 dBFS
+- **Ratio**: 3:1 to 4:1
+- **Attack**: 10-20 ms
+- **Release**: 100-200 ms (follow the groove)
+- **Gain Reduction**: 4-8 dB (bass is very dynamic in live settings)
+- **Note**: Some engineers use two compressors in series — a fast one for peaks
+  and a slow one for overall envelope
+
+### Acoustic Guitar
+- **Threshold**: -18 to -14 dBFS
+- **Ratio**: 2:1 to 3:1 (gentle — preserve dynamics)
+- **Attack**: 15-30 ms (keep pick attack)
+- **Release**: 100-200 ms
+- **Gain Reduction**: 2-4 dB
+
+### Electric Guitar
+- **Ratio**: 2:1 (amps already compress heavily)
+- **Attack**: 20-40 ms
+- **Release**: 100-200 ms
+- **Note**: Distorted guitars may need no compression — they are already compressed
+
+### Keys/Piano
+- **Threshold**: -18 to -14 dBFS
+- **Ratio**: 2:1 to 3:1
+- **Attack**: 15-25 ms
+- **Release**: 100-200 ms
+- **Gain Reduction**: 3-5 dB
+
+## Vocal Mixing Chain
+
+The standard vocal processing chain order for live sound:
+
+1. **Preamp Gain**: Set for -18 to -12 dBFS peaks
+2. **High-Pass Filter**: 80 Hz, 18 dB/oct
+3. **De-Esser**: 5-7 kHz, 4:1 ratio, threshold set to catch only sibilants
+4. **EQ**:
+   - Cut 250 Hz by 2-3 dB (proximity effect/mud)
+   - Boost 3 kHz by 2 dB (presence/intelligibility)
+   - Gentle high shelf at 10 kHz, +1.5 dB (air)
+5. **Compressor**: 3:1, 10 ms attack, 100 ms release, 4-6 dB GR
+6. **Effects Send**: Plate reverb 1.2-1.8 second decay, pre-delay 30-50 ms.
+   Low-cut the reverb return at 200 Hz to keep low end clean.
+
+## Drum Mixing Approach
+
+### Kick Drum
+1. Gate: Threshold -30 dB, attack 0.5 ms, hold 100 ms, release 50 ms, range -40 dB
+2. EQ: Boost 60 Hz (+3 dB), cut 350 Hz (-4 dB), boost 4 kHz (+3 dB)
+3. Compressor: 4:1, 20 ms attack, 60 ms release
+4. Pan: Center (0.0)
+
+### Snare Top
+1. Gate: Threshold -25 dB, attack 0.5 ms, hold 80 ms, release 40 ms, range -30 dB
+2. EQ: HPF 80 Hz, boost 200 Hz (+2 dB), cut 800 Hz (-2 dB), boost 5 kHz (+3 dB)
+3. Compressor: 3:1, 8 ms attack, 100 ms release
+4. Pan: Center or slight right (+0.05 to +0.1)
+
+### Toms
+1. Gate: Threshold -28 dB, attack 0.5 ms, hold 120 ms, release 60 ms, range -40 dB
+2. EQ: HPF 60-80 Hz, boost fundamental (100-200 Hz, +2 dB), cut mud (400 Hz, -3 dB), boost attack (3-5 kHz, +2 dB)
+3. Compressor: 3:1, 15 ms attack, 80 ms release
+4. Pan: Rack toms left-center, floor tom right-center (audience perspective)
+
+### Overheads
+1. No gate (ambient mics)
+2. EQ: HPF 150 Hz (remove low bleed), gentle cut 400 Hz (-2 dB), boost 10 kHz (+2 dB)
+3. Light compression: 2:1, 20 ms attack, 150 ms release
+4. Pan: Hard left and right (L=-0.8, R=+0.8) or spaced
+
+## Bass Guitar Techniques
+
+- **DI Signal**: Clean, full range. Apply HPF at 30 Hz to remove sub-sonic rumble.
+  EQ: Cut 250 Hz (-2 dB) for clarity, boost 700 Hz (+2 dB) for note definition.
+- **Amp Signal**: Mid-focused, may have grind. HPF at 80 Hz, blend with DI.
+- **Blend Ratio**: Typically 60% DI / 40% amp for rock. Adjust per genre.
+- **Compression**: Essential. Bass is extremely dynamic live. 3:1-4:1 ratio.
+- **Low-End Management**: Bass and kick must occupy complementary frequency ranges.
+  If kick is boosted at 60 Hz, cut bass at 60 Hz and boost at 80-100 Hz (or vice versa).
+- **Side-chain**: Some engineers side-chain the bass compressor from the kick drum
+  to create space when both hit simultaneously.
+
+## Guitar Mixing
+
+- **Mid-Range Focus**: Guitars live in 200 Hz-5 kHz. Keep them out of the vocal and
+  bass territories.
+- **HPF Always**: 80 Hz minimum, even on distorted guitars.
+- **Delay-Based Effects**: Use short delays (50-120 ms) for width. Tempo-sync longer
+  delays for rhythmic effects (quarter note, dotted eighth).
+- **Reverb**: Short plate or room, 0.8-1.5 seconds. Low-cut the return at 200 Hz.
+- **Dual Guitar Panning**: Hard pan left and right (L=-0.6, R=+0.6) for two guitars.
+  Single guitar slightly off-center (-0.2 or +0.2).
+- **Clean vs. Distorted**: Clean guitars need more compression (3:1). Distorted
+  guitars are self-compressing and often need only subtle EQ shaping.
+
+## Stereo Image Management
+
+### LCR Panning Philosophy
+For live sound, the LCR (Left-Center-Right) approach provides the strongest and
+most consistent stereo image for large venues:
+
+- **Center (0.0)**: Kick, snare, bass, lead vocal, main keys
+- **Off-Center (0.2-0.4)**: Backing vocals, rhythm guitar, secondary keys
+- **Wide (0.5-0.8)**: Overheads, stereo keys, dual guitars, percussion
+- **Hard Pan (0.9-1.0)**: Only for true stereo sources (stereo keys, overhead pair)
+
+### Width Management
+- Mono-compatible mix is essential — many audience members are off-axis.
+- Check mono compatibility regularly by summing L+R and listening for cancellation.
+- Reverb and delay returns should be stereo to create width without panning dry sources.
+
+## Effects Recommendations
+
+### Reverb Types
+| Source        | Reverb Type | Decay Time | Pre-Delay | Notes                     |
+|---------------|-------------|------------|-----------|---------------------------|
+| Lead Vocal    | Plate       | 1.2-1.8s   | 30-50 ms  | Warm, smooth, adds depth  |
+| Backing Vocals| Plate/Hall  | 1.5-2.0s   | 20-40 ms  | Slightly longer than lead |
+| Snare         | Plate       | 0.8-1.2s   | 0-10 ms   | Adds body and sustain     |
+| Toms          | Room/Plate  | 0.6-1.0s   | 0-5 ms    | Short, supportive         |
+| Guitar        | Room/Spring | 0.8-1.5s   | 10-30 ms  | Genre dependent           |
+| Piano/Keys    | Hall        | 1.5-2.5s   | 20-40 ms  | Concert hall ambiance     |
+
+### Delay Settings
+- **Slapback**: 80-120 ms, single repeat, -6 dB feedback. For rockabilly/country vocals.
+- **Quarter Note**: BPM-synced. 120 BPM = 500 ms. 2-3 repeats, -10 dB feedback.
+- **Dotted Eighth**: BPM-synced. 120 BPM = 375 ms. Popular for guitar leads and U2-style.
+- **Stereo Ping-Pong**: Different L/R times for width. Useful on keys and guitar solos.
+
+## Live Mixing Best Practices
+
+### Feedback Prevention
+- Ring out monitors before the show using 1/3 octave or parametric EQ.
+- Keep monitor levels as low as possible while meeting musician needs.
+- Avoid boosting frequencies in the 1-4 kHz range on vocal monitors.
+- Place monitors at 45 degrees from the front of microphone rejection zone.
+- Use cardioid or hypercardioid microphones for better rejection.
+- If feedback starts, reduce gain first, then identify and notch the frequency.
+- Never exceed +3 dB boost on any frequency band in monitor EQ.
+
+### Monitor Mixing
+- Vocals should be the loudest element in vocal monitors.
+- Drummer needs kick and snare in their monitor, plus any click track.
+- Bass player needs kick drum and their own bass.
+- Guitar players need their vocals and a bit of the other guitar (if applicable).
+- Keys player often needs the most elements — full band at lower level.
+- Keep monitor reverb minimal — it causes feedback and muddiness.
+- Each monitor send is pre-fader on the Wing Rack (/$ch/N/send/1-16/level).
+
+### Safety Rules
+- **Maximum Preamp Gain**: Never exceed +50 dB of preamp gain. If more is needed,
+  check microphone connection and cable.
+- **True Peak Limit**: -1 dBTP on all outputs. Use the Wing limiter on main bus.
+- **SPL Monitoring**: Target 95-100 dBA for general live music. Never exceed
+  105 dBA sustained without hearing protection provisions.
+- **Noise Gate Best Practice**: Do not set gate thresholds too high — missed
+  notes are worse than a slightly higher noise floor.
+- **Emergency Mute**: Have main bus mute accessible at all times. On the Wing,
+  this is /$main/1/mute.
+- **Limiter on Outputs**: Always engage limiters on main L/R and any monitor/IEM
+  outputs. On the Wing, use /$main/1/dyn/comp as a limiter (ratio 10:1 or higher,
+  threshold at -3 dBFS, fast attack 0.1 ms).

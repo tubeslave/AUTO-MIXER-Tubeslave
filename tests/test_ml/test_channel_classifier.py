@@ -1,221 +1,127 @@
-"""
-Tests for backend.ml.channel_classifier — MFCC + spectral feature extraction,
-name-based classification, and ChannelClassifier ML pipeline.
-
-Uses numpy-generated audio and skips sklearn-dependent tests gracefully.
-"""
-
-import numpy as np
+"""Tests for ml.channel_classifier -- instrument classification from audio."""
 import pytest
+import numpy as np
 
-from backend.ml.channel_classifier import (
-    extract_features,
-    classify_from_name,
-    ChannelClassifier,
-    INSTRUMENT_CLASSES,
-    librosa_mel_frequencies,
-    _create_mel_filterbank,
-    HAS_SKLEARN,
-)
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
 
+import sys
+import os
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-@pytest.fixture
-def sine_440():
-    """1-second 440 Hz sine at 48 kHz."""
-    sr = 48000
-    t = np.linspace(0, 1.0, sr, endpoint=False, dtype=np.float32)
-    return np.sin(2 * np.pi * 440 * t)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
 
-@pytest.fixture
-def low_freq_burst():
-    """Short 60 Hz sine simulating a kick/bass."""
-    sr = 48000
-    n = 4096
-    t = np.linspace(0, n / sr, n, endpoint=False, dtype=np.float32)
-    return np.sin(2 * np.pi * 60 * t) * 0.9
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed (channel_classifier imports torch at module level)")
+class TestInstrumentClasses:
+    """Tests for the INSTRUMENT_CLASSES constant list."""
+
+    def test_instrument_classes_not_empty(self):
+        from ml.channel_classifier import INSTRUMENT_CLASSES
+        assert len(INSTRUMENT_CLASSES) > 0
+
+    def test_instrument_classes_contains_key_instruments(self):
+        from ml.channel_classifier import INSTRUMENT_CLASSES
+        expected = ['kick', 'snare', 'lead_vocal', 'bass_guitar', 'unknown']
+        for inst in expected:
+            assert inst in INSTRUMENT_CLASSES
+
+    def test_num_classes_matches(self):
+        from ml.channel_classifier import INSTRUMENT_CLASSES, NUM_CLASSES
+        assert NUM_CLASSES == len(INSTRUMENT_CLASSES)
+
+    def test_instrument_classes_are_unique(self):
+        from ml.channel_classifier import INSTRUMENT_CLASSES
+        assert len(INSTRUMENT_CLASSES) == len(set(INSTRUMENT_CLASSES))
 
 
-@pytest.fixture
-def high_freq_transient():
-    """Short noise burst with high-frequency content."""
-    rng = np.random.default_rng(123)
-    noise = rng.standard_normal(4096).astype(np.float32)
-    # Simple high-pass via differencing
-    return np.diff(noise, prepend=0.0)
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
+class TestChannelClassifierNet:
+    """Tests for the ChannelClassifierNet CNN."""
+
+    def test_instantiation_default(self):
+        from ml.channel_classifier import ChannelClassifierNet, NUM_CLASSES
+        net = ChannelClassifierNet()
+        assert net.fc2.out_features == NUM_CLASSES
+
+    def test_instantiation_custom_classes(self):
+        from ml.channel_classifier import ChannelClassifierNet
+        net = ChannelClassifierNet(n_mels=32, n_classes=10)
+        assert net.fc2.out_features == 10
+
+    def test_forward_output_shape(self):
+        from ml.channel_classifier import ChannelClassifierNet, NUM_CLASSES
+        net = ChannelClassifierNet(n_mels=64)
+        net.eval()
+        # Input: (batch, n_mels, time_frames)
+        x = torch.randn(2, 64, 32)
+        with torch.no_grad():
+            out = net(x)
+        assert out.shape == (2, NUM_CLASSES)
+
+    def test_forward_4d_input(self):
+        from ml.channel_classifier import ChannelClassifierNet, NUM_CLASSES
+        net = ChannelClassifierNet(n_mels=64)
+        net.eval()
+        # 4D input: (batch, 1, n_mels, time_frames)
+        x = torch.randn(1, 1, 64, 32)
+        with torch.no_grad():
+            out = net(x)
+        assert out.shape == (1, NUM_CLASSES)
+
+    def test_output_is_logits(self):
+        from ml.channel_classifier import ChannelClassifierNet
+        net = ChannelClassifierNet()
+        net.eval()
+        x = torch.randn(1, 64, 32)
+        with torch.no_grad():
+            out = net(x)
+        # Logits can be positive or negative (not bounded 0-1)
+        assert out.min().item() != out.max().item(), "Output should not be constant"
 
 
-# ---------------------------------------------------------------------------
-# Feature extraction tests
-# ---------------------------------------------------------------------------
-
-class TestExtractFeatures:
-
-    def test_output_length(self, sine_440):
-        features = extract_features(sine_440, sr=48000)
-        assert features.shape == (36,), f"Expected 36 features, got {features.shape}"
-
-    def test_output_dtype(self, sine_440):
-        features = extract_features(sine_440, sr=48000)
-        assert features.dtype == np.float32
-
-    def test_no_nan_or_inf(self, sine_440):
-        features = extract_features(sine_440, sr=48000)
-        assert not np.any(np.isnan(features)), "Features contain NaN"
-        assert not np.any(np.isinf(features)), "Features contain Inf"
-
-    def test_stereo_reduced_to_mono(self):
-        """Stereo input should be averaged to mono internally."""
-        sr = 48000
-        t = np.linspace(0, 0.5, sr // 2, endpoint=False, dtype=np.float32)
-        stereo = np.stack([np.sin(2 * np.pi * 440 * t),
-                           np.sin(2 * np.pi * 880 * t)])
-        features = extract_features(stereo, sr=sr)
-        assert features.shape == (36,)
-
-    def test_silent_input(self):
-        """All-zero input should still produce valid features."""
-        audio = np.zeros(4096, dtype=np.float32)
-        features = extract_features(audio, sr=48000)
-        assert features.shape == (36,)
-        assert not np.any(np.isnan(features))
-
-
-# ---------------------------------------------------------------------------
-# Mel-frequency helpers (numpy fallback path)
-# ---------------------------------------------------------------------------
-
-class TestMelHelpers:
-
-    def test_mel_frequencies_count(self):
-        freqs = librosa_mel_frequencies(42, fmin=0.0, fmax=24000.0)
-        assert len(freqs) == 42
-
-    def test_mel_frequencies_order(self):
-        freqs = librosa_mel_frequencies(42, fmin=0.0, fmax=24000.0)
-        assert np.all(np.diff(freqs) > 0), "Frequencies must be monotonically increasing"
-
-    def test_mel_filterbank_shape(self):
-        n_mels = 40
-        n_fft = 2048
-        sr = 48000
-        mel_freqs = librosa_mel_frequencies(n_mels + 2, fmin=0, fmax=sr / 2)
-        fb = _create_mel_filterbank(sr, n_fft, n_mels, mel_freqs)
-        assert fb.shape == (n_mels, n_fft // 2 + 1)
-
-    def test_mel_filterbank_nonnegative(self):
-        n_mels = 40
-        n_fft = 2048
-        sr = 48000
-        mel_freqs = librosa_mel_frequencies(n_mels + 2, fmin=0, fmax=sr / 2)
-        fb = _create_mel_filterbank(sr, n_fft, n_mels, mel_freqs)
-        assert np.all(fb >= 0), "Filter bank values must be non-negative"
-
-
-# ---------------------------------------------------------------------------
-# Name-based classification
-# ---------------------------------------------------------------------------
-
-class TestClassifyFromName:
-
-    @pytest.mark.parametrize("name,expected", [
-        ("Kick Drum", "kick"),
-        ("BD", "kick"),
-        ("Snare Top", "snare"),
-        ("SNR", "snare"),
-        ("Hi-Hat", "hihat"),
-        ("HH", "hihat"),
-        ("Tom 1", "toms"),
-        ("Floor", "toms"),
-        ("OH L", "overheads"),
-        ("Overhead", "overheads"),
-        ("Bass Guitar", "bass_guitar"),
-        ("DI Bass", "bass_guitar"),
-        ("E-Gtr", "electric_guitar"),
-        ("Lead Gtr", "electric_guitar"),
-        ("Acoustic Guitar", "acoustic_guitar"),
-        ("A Gtr", "acoustic_guitar"),
-        ("Keys", "keys"),
-        ("Piano", "keys"),
-        ("Synth", "keys"),
-        ("Lead Voc", "vocals"),
-        ("BGV", "vocals"),
-        ("Trumpet", "brass"),
-        ("Sax", "brass"),
-        ("Violin", "strings"),
-        ("Conga", "percussion"),
-        ("Shaker", "percussion"),
-    ])
-    def test_known_patterns(self, name, expected):
-        cls, conf = classify_from_name(name)
-        assert cls == expected, f"'{name}' should classify as '{expected}', got '{cls}'"
-        assert conf > 0
-
-    def test_unknown_name_returns_none(self):
-        cls, conf = classify_from_name("xyzzy")
-        assert cls is None
-        assert conf == 0.0
-
-    def test_empty_name(self):
-        cls, conf = classify_from_name("")
-        assert cls is None
-        assert conf == 0.0
-
-    def test_none_name(self):
-        cls, conf = classify_from_name(None)
-        assert cls is None
-
-
-# ---------------------------------------------------------------------------
-# ChannelClassifier
-# ---------------------------------------------------------------------------
-
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
 class TestChannelClassifier:
+    """Tests for the high-level ChannelClassifier interface."""
 
-    def test_heuristic_classify_returns_valid_class(self, low_freq_burst):
-        cc = ChannelClassifier()
-        cls, conf = cc._heuristic_classify(low_freq_burst, sr=48000)
-        assert cls in INSTRUMENT_CLASSES
-        assert 0 <= conf <= 1.0
+    def test_instantiation(self):
+        from ml.channel_classifier import ChannelClassifier
+        clf = ChannelClassifier(sample_rate=48000)
+        assert clf.sample_rate == 48000
+        assert clf.n_mels == 64
 
-    def test_heuristic_high_freq_not_kick(self, high_freq_transient):
-        cc = ChannelClassifier()
-        cls, _ = cc._heuristic_classify(high_freq_transient, sr=48000)
-        assert cls != "kick", "High-freq transient should not be classified as kick"
+    def test_classify_returns_dict(self):
+        from ml.channel_classifier import ChannelClassifier, INSTRUMENT_CLASSES
+        clf = ChannelClassifier()
+        audio = np.random.randn(48000).astype(np.float32) * 0.1
+        result = clf.classify(audio)
+        assert isinstance(result, dict)
+        assert set(result.keys()) == set(INSTRUMENT_CLASSES)
 
-    def test_classify_with_fallback_uses_name(self, sine_440):
-        """When ML confidence is low, name fallback should take over."""
-        cc = ChannelClassifier()
-        cls, conf = cc.classify_with_fallback(sine_440, sr=48000, channel_name="Kick Drum")
-        # Heuristic is low-confidence, so name match should win
-        assert cls == "kick"
-        assert conf >= 0.5
+    def test_classify_probabilities_sum_to_one(self):
+        from ml.channel_classifier import ChannelClassifier
+        clf = ChannelClassifier()
+        audio = np.random.randn(48000).astype(np.float32) * 0.1
+        result = clf.classify(audio)
+        total = sum(result.values())
+        assert abs(total - 1.0) < 1e-3
 
-    def test_classify_short_audio(self):
-        """Very short audio (<256 samples) returns default guess."""
-        cc = ChannelClassifier()
-        audio = np.zeros(100, dtype=np.float32)
-        cls, conf = cc._heuristic_classify(audio, sr=48000)
-        assert cls is not None
+    def test_classify_top_k(self):
+        from ml.channel_classifier import ChannelClassifier
+        clf = ChannelClassifier()
+        audio = np.random.randn(48000).astype(np.float32) * 0.1
+        top_3 = clf.classify_top_k(audio, k=3)
+        assert len(top_3) == 3
+        assert all(isinstance(pair, tuple) and len(pair) == 2 for pair in top_3)
+        # Top-k should be in descending order
+        assert top_3[0][1] >= top_3[1][1] >= top_3[2][1]
 
-    def test_train_and_classify_sklearn(self):
-        """Train a mini classifier and verify predictions (sklearn only)."""
-        if not HAS_SKLEARN:
-            pytest.skip("sklearn not installed")
-        cc = ChannelClassifier()
-        rng = np.random.default_rng(42)
-        n_samples = 50
-        n_features = 36
-        X = rng.standard_normal((n_samples, n_features)).astype(np.float32)
-        y = rng.integers(0, len(INSTRUMENT_CLASSES), size=n_samples)
-        acc = cc.train(X, y)
-        assert 0 <= acc <= 1.0
-        # Classify one of the training samples
-        cls, conf = cc.classify(
-            np.zeros(4096, dtype=np.float32), sr=48000
-        )
-        assert cls in INSTRUMENT_CLASSES
+    def test_audio_to_mel_returns_tensor(self):
+        from ml.channel_classifier import ChannelClassifier
+        clf = ChannelClassifier()
+        audio = np.random.randn(48000).astype(np.float32) * 0.1
+        mel = clf.audio_to_mel(audio)
+        assert isinstance(mel, torch.Tensor)
+        assert mel.dim() >= 2

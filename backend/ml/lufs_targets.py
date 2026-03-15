@@ -1,212 +1,132 @@
 """
-Per-instrument LUFS targets for automatic gain staging.
-
-Provides target loudness levels for each instrument type relative
-to a base reference level (default -18 LUFS), with genre-specific
-modifiers for different musical styles.
+Genre-aware LUFS target levels for automatic gain staging.
+Based on EBU R128, AES recommendations, and live sound engineering practices.
 """
+import numpy as np
+from dataclasses import dataclass, field
+from typing import Dict, Optional, List
 
-# Instrument LUFS offsets from base reference (-18 LUFS by default)
-# Positive = louder than reference, negative = quieter
-INSTRUMENT_LUFS_OFFSETS = {
-    # Drums
-    "kick": 3.0,        # Kick drum sits prominently in most mixes
-    "snare": 2.0,       # Snare is key rhythmic element
-    "hihat": -4.0,      # Hi-hats should sit back, avoid harshness
-    "toms": 0.0,        # Toms at reference level, fill hits
-    "overheads": -2.0,  # Overheads provide ambience, not dominant
-    "percussion": -1.0, # Percussion adds texture, slightly below ref
 
-    # Bass
-    "bass_guitar": 1.0,     # Bass foundation, slightly above ref
+@dataclass
+class LUFSTarget:
+    """LUFS target for a specific context."""
+    integrated: float  # Target integrated LUFS
+    short_term_max: float  # Maximum short-term LUFS
+    momentary_max: float  # Maximum momentary LUFS
+    true_peak_max: float  # Maximum true peak dBTP
+    loudness_range: float  # Target LRA (loudness range)
+    tolerance: float = 1.0  # Acceptable deviation in LU
 
-    # Guitars
-    "electric_guitar": -1.0,  # Electric guitar sits in the mid range
-    "acoustic_guitar": -2.0,  # Acoustic often accompaniment, slightly lower
 
-    # Keys
-    "keys": -1.5,       # Keys fill harmonic space, slightly below
-
-    # Vocals
-    "vocals": 4.0,      # Lead vocals are the loudest element in most mixes
-
-    # Orchestral
-    "brass": 0.5,       # Brass can cut through, slight boost
-    "strings": -2.0,    # Strings provide pad/texture, sit back
+GENRE_TARGETS: Dict[str, LUFSTarget] = {
+    'rock': LUFSTarget(-18.0, -14.0, -10.0, -1.0, 8.0),
+    'pop': LUFSTarget(-16.0, -12.0, -8.0, -1.0, 6.0),
+    'jazz': LUFSTarget(-20.0, -16.0, -12.0, -1.0, 12.0),
+    'classical': LUFSTarget(-23.0, -18.0, -14.0, -1.0, 15.0),
+    'edm': LUFSTarget(-14.0, -10.0, -6.0, -1.0, 4.0),
+    'folk': LUFSTarget(-20.0, -16.0, -12.0, -1.0, 10.0),
+    'metal': LUFSTarget(-16.0, -12.0, -8.0, -1.0, 5.0),
+    'hip_hop': LUFSTarget(-14.0, -10.0, -6.0, -1.0, 5.0),
+    'country': LUFSTarget(-18.0, -14.0, -10.0, -1.0, 8.0),
+    'r_and_b': LUFSTarget(-16.0, -12.0, -8.0, -1.0, 7.0),
+    'worship': LUFSTarget(-18.0, -14.0, -10.0, -1.0, 10.0),
+    'spoken_word': LUFSTarget(-24.0, -20.0, -16.0, -1.0, 8.0, tolerance=0.5),
+    'theater': LUFSTarget(-20.0, -16.0, -12.0, -1.0, 12.0),
+    'broadcast': LUFSTarget(-24.0, -20.0, -16.0, -2.0, 8.0, tolerance=0.5),
+    'default': LUFSTarget(-18.0, -14.0, -10.0, -1.0, 8.0),
 }
 
-# Genre-specific modifiers applied on top of base offsets
-# Values are additive dB adjustments per instrument for each genre
-GENRE_MODIFIERS = {
-    "rock": {
-        "kick": 1.0,
-        "snare": 1.5,
-        "hihat": -1.0,
-        "toms": 1.0,
-        "overheads": 0.0,
-        "bass_guitar": 1.0,
-        "electric_guitar": 2.0,    # Guitar-forward in rock
-        "acoustic_guitar": -1.0,
-        "keys": -1.0,
-        "vocals": 1.0,
-        "brass": 0.0,
-        "strings": -1.0,
-        "percussion": 0.0,
-    },
-    "jazz": {
-        "kick": -2.0,              # Softer drums in jazz
-        "snare": -1.0,
-        "hihat": 1.0,              # Hi-hat brushwork more prominent
-        "toms": -1.0,
-        "overheads": 1.0,          # Room/cymbals important in jazz
-        "bass_guitar": 2.0,        # Upright/electric bass featured
-        "electric_guitar": -1.0,
-        "acoustic_guitar": 1.0,
-        "keys": 2.0,               # Piano/keys often featured
-        "vocals": 2.0,
-        "brass": 3.0,              # Brass is central to jazz
-        "strings": 1.0,
-        "percussion": 1.0,
-    },
-    "pop": {
-        "kick": 2.0,
-        "snare": 2.0,
-        "hihat": -1.0,
-        "toms": 0.0,
-        "overheads": -1.0,
-        "bass_guitar": 1.0,
-        "electric_guitar": 0.0,
-        "acoustic_guitar": 0.0,
-        "keys": 1.0,
-        "vocals": 3.0,             # Vocals king in pop
-        "brass": -1.0,
-        "strings": 0.0,
-        "percussion": 0.0,
-    },
-    "electronic": {
-        "kick": 3.0,               # Heavy kick in electronic
-        "snare": 1.0,
-        "hihat": 0.0,
-        "toms": -1.0,
-        "overheads": -3.0,
-        "bass_guitar": 3.0,        # Sub-bass dominant
-        "electric_guitar": -2.0,
-        "acoustic_guitar": -3.0,
-        "keys": 2.0,               # Synths featured
-        "vocals": 1.0,
-        "brass": -2.0,
-        "strings": 0.0,
-        "percussion": 1.0,
-    },
-    "classical": {
-        "kick": -3.0,
-        "snare": -3.0,
-        "hihat": -3.0,
-        "toms": -2.0,
-        "overheads": 2.0,          # Natural room sound
-        "bass_guitar": -2.0,
-        "electric_guitar": -3.0,
-        "acoustic_guitar": 1.0,
-        "keys": 2.0,               # Piano prominent
-        "vocals": 3.0,             # Operatic/choral vocals
-        "brass": 2.0,
-        "strings": 3.0,            # Strings are central
-        "percussion": 0.0,         # Timpani etc.
-    },
-    "acoustic": {
-        "kick": -1.0,              # Cajon/light kick
-        "snare": -1.0,
-        "hihat": -2.0,
-        "toms": -1.0,
-        "overheads": 1.0,
-        "bass_guitar": 1.0,
-        "electric_guitar": -2.0,
-        "acoustic_guitar": 3.0,    # Acoustic guitar is central
-        "keys": 1.0,
-        "vocals": 3.0,
-        "brass": 0.0,
-        "strings": 2.0,
-        "percussion": 1.0,         # Shaker/tambourine
-    },
-    "metal": {
-        "kick": 3.0,               # Double kick prominent
-        "snare": 2.0,
-        "hihat": -1.0,
-        "toms": 1.0,
-        "overheads": 0.0,
-        "bass_guitar": 2.0,
-        "electric_guitar": 3.0,    # Wall of guitars
-        "acoustic_guitar": -3.0,
-        "keys": -2.0,
-        "vocals": 2.0,
-        "brass": -2.0,
-        "strings": -1.0,
-        "percussion": 0.0,
-    },
+VENUE_OFFSETS: Dict[str, float] = {
+    'small_club': 2.0,
+    'medium_venue': 0.0,
+    'large_arena': -2.0,
+    'outdoor_festival': -3.0,
+    'theater': 3.0,
+    'church': 2.0,
+    'conference': 4.0,
+    'broadcast_studio': 0.0,
 }
 
 
-def get_target_lufs(instrument, genre=None, base=-18.0):
-    """
-    Compute the target LUFS level for an instrument.
-
-    Args:
-        instrument: string instrument type (must be key in INSTRUMENT_LUFS_OFFSETS)
-        genre: optional genre string for genre-specific adjustment
-        base: base reference LUFS level (default -18 LUFS)
-
-    Returns:
-        target_lufs: float target loudness in LUFS
-
-    Examples:
-        >>> get_target_lufs("vocals")
-        -14.0
-        >>> get_target_lufs("kick", genre="electronic")
-        -12.0
-        >>> get_target_lufs("electric_guitar", genre="rock", base=-16)
-        -15.0
-    """
-    # Get base offset for instrument
-    offset = INSTRUMENT_LUFS_OFFSETS.get(instrument, 0.0)
-
-    # Apply genre modifier if available
-    genre_offset = 0.0
-    if genre and genre.lower() in GENRE_MODIFIERS:
-        genre_mods = GENRE_MODIFIERS[genre.lower()]
-        genre_offset = genre_mods.get(instrument, 0.0)
-
-    target = base + offset + genre_offset
-    return float(target)
+@dataclass
+class InstrumentLUFSProfile:
+    """Per-instrument target level relative to mix bus."""
+    relative_db: float  # Target level relative to mix bus LUFS
+    priority: int  # 1=highest (lead vocal), 5=lowest (ambient)
+    duck_amount: float = 0.0  # Auto-duck amount when higher priority plays
 
 
-def get_all_targets(genre=None, base=-18.0):
-    """
-    Get target LUFS for all instrument types.
+INSTRUMENT_PROFILES: Dict[str, InstrumentLUFSProfile] = {
+    'lead_vocal': InstrumentLUFSProfile(-0.0, 1),
+    'backing_vocal': InstrumentLUFSProfile(-6.0, 2),
+    'kick': InstrumentLUFSProfile(-6.0, 2),
+    'snare': InstrumentLUFSProfile(-8.0, 2),
+    'bass_guitar': InstrumentLUFSProfile(-6.0, 2),
+    'electric_guitar': InstrumentLUFSProfile(-8.0, 3),
+    'acoustic_guitar': InstrumentLUFSProfile(-8.0, 3),
+    'keys_piano': InstrumentLUFSProfile(-10.0, 3),
+    'overheads': InstrumentLUFSProfile(-12.0, 4),
+    'hi_hat': InstrumentLUFSProfile(-14.0, 4),
+    'toms': InstrumentLUFSProfile(-10.0, 3),
+    'room_mics': InstrumentLUFSProfile(-18.0, 5, duck_amount=3.0),
+    'ambient_mic': InstrumentLUFSProfile(-20.0, 5, duck_amount=6.0),
+    'audience': InstrumentLUFSProfile(-24.0, 5, duck_amount=6.0),
+    'brass': InstrumentLUFSProfile(-8.0, 3),
+    'woodwind': InstrumentLUFSProfile(-10.0, 3),
+    'strings': InstrumentLUFSProfile(-10.0, 3),
+    'synth': InstrumentLUFSProfile(-8.0, 3),
+    'organ': InstrumentLUFSProfile(-10.0, 3),
+    'percussion': InstrumentLUFSProfile(-10.0, 3),
+    'dj_playback': InstrumentLUFSProfile(-4.0, 1),
+    'click_track': InstrumentLUFSProfile(-60.0, 5),
+    'choir': InstrumentLUFSProfile(-6.0, 2),
+    'unknown': InstrumentLUFSProfile(-12.0, 3),
+}
 
-    Args:
-        genre: optional genre string
-        base: base reference LUFS level
 
-    Returns:
-        dict mapping instrument name to target LUFS
-    """
-    return {
-        inst: get_target_lufs(inst, genre=genre, base=base)
-        for inst in INSTRUMENT_LUFS_OFFSETS
-    }
+class LUFSTargetManager:
+    """Manages LUFS targets based on genre, venue, and instrument context."""
 
+    def __init__(self, genre: str = 'default', venue: str = 'medium_venue'):
+        self.genre = genre
+        self.venue = venue
+        self._custom_targets: Dict[str, LUFSTarget] = {}
 
-def get_relative_balance(genre=None):
-    """
-    Get relative dB balance between all instruments (independent of base).
+    @property
+    def target(self) -> LUFSTarget:
+        if self.genre in self._custom_targets:
+            return self._custom_targets[self.genre]
+        base = GENRE_TARGETS.get(self.genre, GENRE_TARGETS['default'])
+        offset = VENUE_OFFSETS.get(self.venue, 0.0)
+        return LUFSTarget(
+            integrated=base.integrated + offset,
+            short_term_max=base.short_term_max + offset,
+            momentary_max=base.momentary_max + offset,
+            true_peak_max=base.true_peak_max,
+            loudness_range=base.loudness_range,
+            tolerance=base.tolerance,
+        )
 
-    Args:
-        genre: optional genre string
+    def get_channel_target(self, instrument: str) -> float:
+        profile = INSTRUMENT_PROFILES.get(instrument, INSTRUMENT_PROFILES['unknown'])
+        return self.target.integrated + profile.relative_db
 
-    Returns:
-        dict mapping instrument name to relative dB offset
-    """
-    targets = get_all_targets(genre=genre, base=0.0)
-    # Normalize so vocals = 0 dB reference
-    vocal_target = targets.get("vocals", 0.0)
-    return {inst: level - vocal_target for inst, level in targets.items()}
+    def get_gain_adjustment(self, instrument: str, current_lufs: float) -> float:
+        target = self.get_channel_target(instrument)
+        if current_lufs < -70:
+            return 0.0
+        diff = target - current_lufs
+        return max(-12.0, min(12.0, diff))
+
+    def set_custom_target(self, genre: str, target: LUFSTarget):
+        self._custom_targets[genre] = target
+
+    def get_duck_amount(self, instrument: str) -> float:
+        return INSTRUMENT_PROFILES.get(
+            instrument, INSTRUMENT_PROFILES['unknown']
+        ).duck_amount
+
+    def get_priority(self, instrument: str) -> int:
+        return INSTRUMENT_PROFILES.get(
+            instrument, INSTRUMENT_PROFILES['unknown']
+        ).priority

@@ -1,191 +1,116 @@
-"""
-Tests for backend/auth.py — TokenAuth, RateLimiter, TLSConfig, AuthMiddleware.
-
-Covers token generation, validation, expiry, revocation, rate limiting,
-TLS context creation, and middleware integration.
-"""
-
-import time
+"""Tests for auth module."""
 import pytest
+import os
+import sys
+import time
 
-try:
-    from auth import TokenAuth, RateLimiter, TLSConfig, AuthMiddleware, TokenInfo
-except ImportError:
-    pytest.skip("auth module not importable", allow_module_level=True)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-@pytest.fixture
-def token_auth():
-    """TokenAuth instance with a short TTL for testing expiry."""
-    return TokenAuth(secret_key="test-secret", token_ttl=2.0)
+from auth import AuthManager
 
 
-@pytest.fixture
-def rate_limiter():
-    """RateLimiter with a very low rate so we can trigger limits quickly."""
-    return RateLimiter(rate=1.0, burst=2)
+class TestAuthManager:
+    """Tests for the AuthManager class."""
 
+    def test_init_defaults(self):
+        """AuthManager initializes with expected defaults."""
+        am = AuthManager()
+        assert am.enabled is False
+        # Secret key is auto-generated as a 64-char hex string
+        assert len(am.secret_key) == 64
+        assert '127.0.0.1' in am._allowed_ips
+        assert '::1' in am._allowed_ips
 
-@pytest.fixture
-def middleware(token_auth, rate_limiter):
-    """AuthMiddleware wired to the test token_auth and rate_limiter."""
-    return AuthMiddleware(token_auth, rate_limiter)
+    def test_generate_and_validate_token(self):
+        """Generated tokens are valid until revoked or expired."""
+        am = AuthManager(enabled=True)
+        token = am.generate_token('client_1', expires_hours=1.0)
+        assert isinstance(token, str)
+        assert len(token) > 20
+        assert am.validate_token(token) is True
 
+    def test_validate_token_when_disabled(self):
+        """Token validation always returns True when auth is disabled."""
+        am = AuthManager(enabled=False)
+        assert am.validate_token('bogus_token_that_doesnt_exist') is True
 
-# ---------------------------------------------------------------------------
-# TokenAuth tests
-# ---------------------------------------------------------------------------
+    def test_revoke_token(self):
+        """Revoking a token makes it invalid on subsequent validation."""
+        am = AuthManager(enabled=True)
+        token = am.generate_token('client_2')
+        assert am.validate_token(token) is True
+        am.revoke_token(token)
+        assert am.validate_token(token) is False
 
-class TestTokenAuth:
+    def test_ip_allowlist(self):
+        """check_ip allows listed IPs and rejects unlisted ones when enabled."""
+        am = AuthManager(enabled=True)
+        assert am.check_ip('127.0.0.1') is True
+        assert am.check_ip('10.0.0.99') is False
 
-    def test_generate_and_validate_token(self, token_auth):
-        """Generated token should validate successfully."""
-        raw = token_auth.generate_token(client_id="c1")
-        info = token_auth.validate_token(raw)
-        assert info is not None
-        assert info.client_id == "c1"
-        assert "read" in info.scopes
-        assert "write" in info.scopes
+        am.add_allowed_ip('10.0.0.99')
+        assert am.check_ip('10.0.0.99') is True
 
-    def test_invalid_token_returns_none(self, token_auth):
-        """An unknown token should fail validation."""
-        assert token_auth.validate_token("not-a-real-token") is None
+    def test_rate_limiting(self):
+        """Rate limiter rejects clients exceeding max_requests_per_minute."""
+        am = AuthManager(enabled=True)
+        am._max_requests_per_minute = 5
 
-    def test_revoke_token(self, token_auth):
-        """Revoking a token should prevent subsequent validation."""
-        raw = token_auth.generate_token(client_id="c2")
-        assert token_auth.validate_token(raw) is not None
-        assert token_auth.revoke_token(raw) is True
-        assert token_auth.validate_token(raw) is None
+        client = 'rate_test_client'
+        for _ in range(5):
+            assert am.check_rate_limit(client) is True
 
-    def test_revoke_unknown_token_returns_false(self, token_auth):
-        assert token_auth.revoke_token("nonexistent") is False
+        # 6th request within the same minute should be rejected
+        assert am.check_rate_limit(client) is False
 
-    def test_token_expiry(self):
-        """Token should be rejected after TTL expires."""
-        auth = TokenAuth(secret_key="key", token_ttl=0.1)
-        raw = auth.generate_token(client_id="c3")
-        assert auth.validate_token(raw) is not None
-        time.sleep(0.2)
-        assert auth.validate_token(raw) is None
+    def test_hmac_sign_and_verify(self):
+        """create_signed_message and verify_signed_message round-trip correctly."""
+        am = AuthManager(secret_key='test_secret_key_1234')
+        payload = 'channel:5:gain:-3.0'
+        signed = am.create_signed_message(payload)
+        assert '|' in signed
+        assert signed.startswith(payload + '|')
 
-    def test_cleanup_expired(self):
-        """cleanup_expired should remove tokens past their TTL."""
-        auth = TokenAuth(secret_key="key", token_ttl=0.1)
-        auth.generate_token(client_id="c4")
-        auth.generate_token(client_id="c5")
-        time.sleep(0.2)
-        removed = auth.cleanup_expired()
-        assert removed == 2
+        # Verification returns the original payload
+        verified = am.verify_signed_message(signed)
+        assert verified == payload
 
-    def test_custom_scopes(self, token_auth):
-        raw = token_auth.generate_token(client_id="scoped", scopes={"read"})
-        info = token_auth.validate_token(raw)
-        assert info is not None
-        assert info.scopes == {"read"}
+    def test_hmac_verify_rejects_tampered_message(self):
+        """verify_signed_message returns None for tampered messages."""
+        am = AuthManager(secret_key='test_secret_key_1234')
+        signed = am.create_signed_message('original_payload')
 
+        # Tamper with the payload portion
+        tampered = 'tampered_payload' + signed[signed.index('|'):]
+        assert am.verify_signed_message(tampered) is None
 
-# ---------------------------------------------------------------------------
-# RateLimiter tests
-# ---------------------------------------------------------------------------
+        # No pipe separator
+        assert am.verify_signed_message('no_pipe_here') is None
 
-class TestRateLimiter:
+    def test_cleanup_expired_tokens(self):
+        """cleanup_expired removes tokens past their expiration time."""
+        am = AuthManager(enabled=True)
+        token = am.generate_token('expiry_client', expires_hours=0.0)
+        # Token was created with immediate expiry (expires = time.time() + 0)
+        # Wait a tiny bit to ensure it's expired
+        time.sleep(0.01)
+        am.cleanup_expired()
+        assert token not in am._tokens
 
-    def test_allows_initial_burst(self, rate_limiter):
-        """First requests up to burst size should be allowed."""
-        assert rate_limiter.check("client_a") is True
-        assert rate_limiter.check("client_a") is True
+    def test_authenticate_full_flow(self):
+        """authenticate() checks IP, token, and rate limit in sequence."""
+        am = AuthManager(enabled=True)
+        token = am.generate_token('full_flow_client')
 
-    def test_denies_after_burst_exhausted(self, rate_limiter):
-        """Requests beyond burst should be denied when rate is low."""
-        rate_limiter.check("client_b")
-        rate_limiter.check("client_b")
-        # Third request immediately should fail with rate=1, burst=2
-        assert rate_limiter.check("client_b") is False
+        # Valid everything
+        assert am.authenticate(token=token, ip='127.0.0.1', client_id='full_flow_client') is True
 
-    def test_tokens_refill_over_time(self, rate_limiter):
-        """After some time, tokens should refill."""
-        rate_limiter.check("client_c")
-        rate_limiter.check("client_c")
-        assert rate_limiter.check("client_c") is False
-        time.sleep(1.1)  # rate=1 token/sec
-        assert rate_limiter.check("client_c") is True
+        # Invalid IP
+        assert am.authenticate(token=token, ip='192.168.0.1', client_id='full_flow_client') is False
 
-    def test_reset_client(self, rate_limiter):
-        """Resetting a client should restore their bucket."""
-        rate_limiter.check("client_d")
-        rate_limiter.check("client_d")
-        rate_limiter.check("client_d")  # may fail
-        rate_limiter.reset("client_d")
-        assert rate_limiter.check("client_d") is True
+        # Invalid token
+        assert am.authenticate(token='bad_token', ip='127.0.0.1', client_id='full_flow_client') is False
 
-    def test_separate_clients_independent(self, rate_limiter):
-        """Different clients should have independent buckets."""
-        rate_limiter.check("x")
-        rate_limiter.check("x")
-        rate_limiter.check("x")
-        # Client y should still have full burst
-        assert rate_limiter.check("y") is True
-
-
-# ---------------------------------------------------------------------------
-# TLSConfig tests
-# ---------------------------------------------------------------------------
-
-class TestTLSConfig:
-
-    def test_no_certs_returns_none(self):
-        """Without cert paths, get_ssl_context should return None."""
-        tls = TLSConfig()
-        assert tls.get_ssl_context() is None
-
-    def test_missing_cert_file_returns_none(self, tmp_path):
-        """If cert file does not exist, should return None."""
-        tls = TLSConfig(
-            cert_path=str(tmp_path / "nonexistent.pem"),
-            key_path=str(tmp_path / "key.pem"),
-        )
-        assert tls.get_ssl_context() is None
-
-    def test_attributes_stored(self):
-        tls = TLSConfig(cert_path="/a", key_path="/b", ca_path="/c")
-        assert tls.cert_path == "/a"
-        assert tls.key_path == "/b"
-        assert tls.ca_path == "/c"
-
-
-# ---------------------------------------------------------------------------
-# AuthMiddleware tests
-# ---------------------------------------------------------------------------
-
-class TestAuthMiddleware:
-
-    def test_authenticate_valid_token(self, middleware, token_auth):
-        raw = token_auth.generate_token(client_id="mw_client")
-        info = middleware.authenticate(raw)
-        assert info is not None
-        assert info.client_id == "mw_client"
-
-    def test_authenticate_invalid_token(self, middleware):
-        assert middleware.authenticate("bad-token") is None
-
-    def test_has_scope(self, middleware, token_auth):
-        raw = token_auth.generate_token(scopes={"read"})
-        info = middleware.authenticate(raw)
-        assert info is not None
-        assert middleware.has_scope(info, "read") is True
-        assert middleware.has_scope(info, "write") is False
-
-    def test_rate_limited_authentication(self, middleware, token_auth):
-        """After exceeding rate limit, authenticate should return None."""
-        raw = token_auth.generate_token(client_id="limited")
-        # Exhaust the burst (burst=2)
-        middleware.authenticate(raw)
-        middleware.authenticate(raw)
-        # Third attempt should be rate limited
-        result = middleware.authenticate(raw)
-        assert result is None
+        # When disabled, everything passes
+        am_disabled = AuthManager(enabled=False)
+        assert am_disabled.authenticate(token='any', ip='any', client_id='any') is True

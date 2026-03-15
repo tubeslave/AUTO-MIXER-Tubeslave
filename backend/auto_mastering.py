@@ -1,216 +1,177 @@
 """
-Reference-based automatic mastering using Matchering.
-
-Falls back to simple loudness matching + limiting when Matchering is unavailable.
+Auto mastering module — applies mastering chain to the mix bus.
+Uses matchering library for reference-based mastering when available.
 """
-
-import logging
-import os
-import tempfile
-from typing import Optional
-
 import numpy as np
+import logging
+from typing import Dict, Optional, Tuple
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-try:
-    import matchering as mg
-    HAS_MATCHERING = True
-except ImportError:
-    HAS_MATCHERING = False
-
-try:
-    from scipy import signal as scipy_signal
-    from scipy.io import wavfile
-    HAS_SCIPY = True
-except ImportError:
-    HAS_SCIPY = False
-
+@dataclass
+class MasteringResult:
+    """Result of mastering process."""
+    audio: np.ndarray
+    peak_db: float
+    lufs: float
+    gain_applied_db: float
+    limiter_reduction_db: float
+    eq_applied: bool
+    success: bool
+    error: Optional[str] = None
 
 class AutoMaster:
-    """Automatic mastering with reference matching."""
+    """Automatic mastering processor."""
 
-    def __init__(self, target_lufs: float = -14.0,
-                 true_peak_limit: float = -1.0,
-                 sample_rate: int = 48000):
+    def __init__(self, sample_rate: int = 48000, target_lufs: float = -14.0,
+                 true_peak_limit: float = -1.0):
+        self.sample_rate = sample_rate
         self.target_lufs = target_lufs
         self.true_peak_limit = true_peak_limit
-        self.sample_rate = sample_rate
+        self._matchering_available = False
+        try:
+            import matchering
+            self._matchering_available = True
+            logger.info("Matchering library available for reference-based mastering")
+        except ImportError:
+            logger.info("Matchering not available, using built-in mastering")
 
-    def master(self, input_audio: np.ndarray,
-               reference_audio: np.ndarray,
-               sr: int = 48000) -> np.ndarray:
-        """Master input audio to match the reference.
+    def master(self, audio: np.ndarray, reference: Optional[np.ndarray] = None) -> MasteringResult:
+        """Apply mastering chain to audio."""
+        if len(audio) == 0:
+            return MasteringResult(audio=audio, peak_db=-100, lufs=-100,
+                                   gain_applied_db=0, limiter_reduction_db=0,
+                                   eq_applied=False, success=False, error="Empty audio")
 
-        Args:
-            input_audio: Input audio array (mono or stereo).
-            reference_audio: Reference audio array.
-            sr: Sample rate.
+        audio = audio.astype(np.float32)
 
-        Returns:
-            Mastered audio as numpy array.
-        """
-        if HAS_MATCHERING:
-            return self._master_matchering(input_audio, reference_audio, sr)
-        return self._master_fallback(input_audio, reference_audio, sr)
+        if reference is not None and self._matchering_available:
+            return self._master_with_reference(audio, reference)
 
-    def master_file(self, input_path: str, reference_path: str,
-                    output_path: str) -> bool:
-        """Master a file to match a reference file.
+        return self._builtin_master(audio)
 
-        Args:
-            input_path: Path to input WAV file.
-            reference_path: Path to reference WAV file.
-            output_path: Path for output mastered WAV file.
+    def _builtin_master(self, audio: np.ndarray) -> MasteringResult:
+        """Built-in mastering chain: EQ -> Compression -> Limiting -> Normalization."""
+        processed = audio.copy()
 
-        Returns:
-            True if mastering was successful.
-        """
-        if HAS_MATCHERING:
+        # 1. Gentle high-pass filter at 30Hz
+        processed = self._apply_hpf(processed, 30.0)
+
+        # 2. Broadband compression
+        processed, comp_reduction = self._apply_compression(
+            processed, threshold_db=-18.0, ratio=2.0,
+            attack_ms=30.0, release_ms=200.0
+        )
+
+        # 3. Loudness normalization
+        current_rms = np.sqrt(np.mean(processed ** 2) + 1e-12)
+        current_db = 20 * np.log10(current_rms)
+        gain_db = self.target_lufs - current_db
+        gain_db = max(-12.0, min(12.0, gain_db))
+        gain_linear = 10 ** (gain_db / 20.0)
+        processed = processed * gain_linear
+
+        # 4. Brick-wall limiter
+        processed, limiter_reduction = self._apply_limiter(processed, self.true_peak_limit)
+
+        # Final measurements
+        peak_db = float(20 * np.log10(np.max(np.abs(processed)) + 1e-10))
+        rms_db = float(20 * np.log10(np.sqrt(np.mean(processed ** 2)) + 1e-10))
+
+        return MasteringResult(
+            audio=processed, peak_db=peak_db, lufs=rms_db,
+            gain_applied_db=gain_db, limiter_reduction_db=limiter_reduction,
+            eq_applied=True, success=True
+        )
+
+    def _master_with_reference(self, audio: np.ndarray, reference: np.ndarray) -> MasteringResult:
+        """Master using matchering library with a reference track."""
+        try:
+            import matchering as mg
+            import tempfile
+            import os
+
             try:
+                import soundfile as sf
+            except ImportError:
+                logger.warning("soundfile not available for matchering I/O")
+                return self._builtin_master(audio)
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                target_path = os.path.join(tmpdir, 'target.wav')
+                ref_path = os.path.join(tmpdir, 'reference.wav')
+                output_path = os.path.join(tmpdir, 'mastered.wav')
+
+                sf.write(target_path, audio, self.sample_rate)
+                sf.write(ref_path, reference, self.sample_rate)
+
                 mg.process(
-                    target=input_path,
-                    reference=reference_path,
+                    target=target_path,
+                    reference=ref_path,
                     results=[mg.pcm16(output_path)],
                 )
-                logger.info(f"Mastered file saved: {output_path}")
-                return True
-            except Exception as e:
-                logger.error(f"Matchering failed: {e}")
-                return self._master_file_fallback(input_path, reference_path, output_path)
 
-        return self._master_file_fallback(input_path, reference_path, output_path)
+                mastered, _ = sf.read(output_path, dtype='float32')
 
-    def _master_matchering(self, input_audio: np.ndarray,
-                           reference_audio: np.ndarray,
-                           sr: int) -> np.ndarray:
-        """Use Matchering library for mastering."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            in_path = os.path.join(tmpdir, "input.wav")
-            ref_path = os.path.join(tmpdir, "reference.wav")
-            out_path = os.path.join(tmpdir, "output.wav")
+                peak_db = float(20 * np.log10(np.max(np.abs(mastered)) + 1e-10))
+                rms_db = float(20 * np.log10(np.sqrt(np.mean(mastered ** 2)) + 1e-10))
+                gain_db = rms_db - 20 * np.log10(np.sqrt(np.mean(audio ** 2)) + 1e-10)
 
-            self._write_wav(in_path, input_audio, sr)
-            self._write_wav(ref_path, reference_audio, sr)
-
-            try:
-                mg.process(
-                    target=in_path,
-                    reference=ref_path,
-                    results=[mg.pcm16(out_path)],
+                return MasteringResult(
+                    audio=mastered, peak_db=peak_db, lufs=rms_db,
+                    gain_applied_db=float(gain_db), limiter_reduction_db=0,
+                    eq_applied=True, success=True
                 )
-                return self._read_wav(out_path)
-            except Exception as e:
-                logger.error(f"Matchering failed, using fallback: {e}")
-                return self._master_fallback(input_audio, reference_audio, sr)
+        except Exception as e:
+            logger.error(f"Matchering error: {e}, falling back to built-in")
+            return self._builtin_master(audio)
 
-    def _master_fallback(self, input_audio: np.ndarray,
-                         reference_audio: np.ndarray,
-                         sr: int) -> np.ndarray:
-        """Simple loudness matching + limiting fallback."""
-        input_lufs = self._estimate_lufs(input_audio)
-        ref_lufs = self._estimate_lufs(reference_audio)
-
-        if ref_lufs > -70 and input_lufs > -70:
-            gain_db = ref_lufs - input_lufs
-        else:
-            gain_db = self.target_lufs - input_lufs if input_lufs > -70 else 0.0
-
-        gain_db = max(min(gain_db, 12.0), -12.0)
-        gain_linear = 10.0 ** (gain_db / 20.0)
-
-        result = input_audio.astype(np.float64) * gain_linear
-
-        result = self._apply_eq_match(result, reference_audio, sr)
-        result = self._limit(result)
-
-        return result.astype(np.float32)
-
-    def _apply_eq_match(self, audio: np.ndarray,
-                        reference: np.ndarray, sr: int) -> np.ndarray:
-        """Simple spectral matching via frequency-domain transfer function."""
-        if not HAS_SCIPY:
+    def _apply_hpf(self, audio: np.ndarray, cutoff_hz: float) -> np.ndarray:
+        """Apply simple high-pass filter."""
+        try:
+            from scipy.signal import butter, sosfilt
+            sos = butter(2, cutoff_hz, btype='high', fs=self.sample_rate, output='sos')
+            return sosfilt(sos, audio).astype(np.float32)
+        except ImportError:
             return audio
 
-        n = min(len(audio), len(reference))
-        fft_size = 2 ** int(np.ceil(np.log2(n)))
+    def _apply_compression(self, audio: np.ndarray, threshold_db: float,
+                          ratio: float, attack_ms: float, release_ms: float) -> Tuple[np.ndarray, float]:
+        """Apply dynamic compression."""
+        eps = 1e-10
+        attack_coeff = np.exp(-1.0 / (attack_ms * self.sample_rate / 1000))
+        release_coeff = np.exp(-1.0 / (release_ms * self.sample_rate / 1000))
 
-        audio_fft = np.fft.rfft(audio[:n], fft_size)
-        ref_fft = np.fft.rfft(reference[:n], fft_size)
+        threshold_lin = 10 ** (threshold_db / 20.0)
+        output = np.copy(audio)
+        envelope = 0.0
+        max_reduction = 0.0
 
-        audio_mag = np.abs(audio_fft) + 1e-10
-        ref_mag = np.abs(ref_fft) + 1e-10
+        for i in range(len(audio)):
+            level = abs(audio[i])
+            if level > envelope:
+                envelope = attack_coeff * envelope + (1 - attack_coeff) * level
+            else:
+                envelope = release_coeff * envelope + (1 - release_coeff) * level
 
-        ratio = ref_mag / audio_mag
-        ratio = np.clip(ratio, 0.1, 10.0)
+            if envelope > threshold_lin:
+                gain_reduction = (envelope / threshold_lin) ** (1 - 1/ratio)
+                output[i] = audio[i] / (gain_reduction + eps)
+                reduction_db = 20 * np.log10(gain_reduction + eps)
+                max_reduction = max(max_reduction, reduction_db)
 
-        kernel_size = max(fft_size // 128, 3)
-        if kernel_size % 2 == 0:
-            kernel_size += 1
-        smoothed = np.convolve(ratio, np.ones(kernel_size) / kernel_size, mode='same')
+        return output, max_reduction
 
-        result_fft = audio_fft * smoothed
-        result = np.fft.irfft(result_fft, fft_size)[:n]
-
-        return result
-
-    def _limit(self, audio: np.ndarray) -> np.ndarray:
-        """Simple brick-wall limiter."""
-        peak_linear = 10.0 ** (self.true_peak_limit / 20.0)
+    def _apply_limiter(self, audio: np.ndarray, ceiling_db: float) -> Tuple[np.ndarray, float]:
+        """Apply brick-wall limiter."""
+        ceiling_lin = 10 ** (ceiling_db / 20.0)
         peak = np.max(np.abs(audio))
-        if peak > peak_linear:
-            audio = audio * (peak_linear / peak)
-        return audio
+        reduction_db = 0.0
 
-    @staticmethod
-    def _estimate_lufs(audio: np.ndarray) -> float:
-        """Estimate integrated LUFS (simplified)."""
-        audio = audio.astype(np.float64)
-        if audio.ndim > 1:
-            audio = np.mean(audio, axis=-1)
-        rms = np.sqrt(np.mean(audio ** 2))
-        if rms < 1e-10:
-            return -100.0
-        return float(20.0 * np.log10(rms + 1e-10))
+        if peak > ceiling_lin:
+            gain = ceiling_lin / peak
+            audio = audio * gain
+            reduction_db = float(20 * np.log10(gain))
 
-    @staticmethod
-    def _write_wav(path: str, audio: np.ndarray, sr: int) -> None:
-        """Write audio to WAV file."""
-        if HAS_SCIPY:
-            audio_int = np.clip(audio * 32767, -32768, 32767).astype(np.int16)
-            wavfile.write(path, sr, audio_int)
-        else:
-            import struct
-            audio_int = np.clip(audio * 32767, -32768, 32767).astype(np.int16)
-            n_samples = len(audio_int)
-            with open(path, "wb") as f:
-                f.write(b"RIFF")
-                f.write(struct.pack("<I", 36 + n_samples * 2))
-                f.write(b"WAVE")
-                f.write(b"fmt ")
-                f.write(struct.pack("<IHHIIHH", 16, 1, 1, sr, sr * 2, 2, 16))
-                f.write(b"data")
-                f.write(struct.pack("<I", n_samples * 2))
-                f.write(audio_int.tobytes())
-
-    @staticmethod
-    def _read_wav(path: str) -> np.ndarray:
-        """Read audio from WAV file."""
-        if HAS_SCIPY:
-            sr, data = wavfile.read(path)
-            return data.astype(np.float32) / 32768.0
-        return np.zeros(1, dtype=np.float32)
-
-    def _master_file_fallback(self, input_path: str, reference_path: str,
-                              output_path: str) -> bool:
-        """Fallback file mastering without Matchering."""
-        try:
-            input_audio = self._read_wav(input_path)
-            ref_audio = self._read_wav(reference_path)
-            result = self._master_fallback(input_audio, ref_audio, self.sample_rate)
-            self._write_wav(output_path, result, self.sample_rate)
-            logger.info(f"Fallback mastering saved: {output_path}")
-            return True
-        except Exception as e:
-            logger.error(f"Fallback mastering failed: {e}")
-            return False
+        return audio, abs(reduction_db)

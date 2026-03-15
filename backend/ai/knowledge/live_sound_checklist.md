@@ -1,440 +1,354 @@
-# Live Sound Checklist — Complete Show Procedure
+# Live Sound Checklist
 
-A comprehensive pre-show, soundcheck, performance, and post-show procedure for live concerts using the Behringer Wing Rack digital mixer. Follow this checklist systematically to ensure a reliable show.
+Comprehensive checklists for every phase of a live concert, from load-in
+to teardown. Designed for FOH engineers using the Behringer Wing Rack
+with AUTO-MIXER automation.
 
-## Pre-Show System Checks (Before Musicians Arrive)
+## Pre-Show Setup Checklist
 
-### Power and Signal Path
-1. Verify all power distribution is on and stable (UPS if available).
-2. Confirm Wing Rack is powered on and firmware is current.
-3. Verify Dante/AES50/USB connections are active and synced.
-4. Check clock source and sample rate (48 kHz standard for live).
-5. Verify all stage boxes and splitters are powered and connected.
-6. Test headphone/monitor outputs from the console.
-7. Confirm AUTO-MIXER Tubeslave software is running and connected to the Wing via OSC.
-8. Verify WebSocket connection between frontend and backend is active.
+### Physical Setup (Before Power On)
+- Verify all XLR cables are connected and labeled at both ends (stage and mixer)
+- Check that all DI boxes are in place and set to correct ground lift position
+- Confirm microphone stands are positioned correctly per the stage plot
+- Verify all wireless mic receivers are racked and antenna cables connected
+- Check that monitor wedges or IEM transmitters are positioned and cabled
+- Confirm main PA is rigged and cabled (L/R/Sub, confirm polarity markings)
+- Ensure UPS (uninterruptible power supply) is connected for mixer and critical gear
+- Check that all power conditioners are on and reading correct voltage (118-122V for US)
+- Verify network cables for Dante/AES50 stage boxes are connected and redundant
 
-### FOH PA System
-1. Power on amplifiers/powered speakers in correct sequence (processors first, then amps).
-2. Run pink noise through main L/R at low level to verify all cabinets are working.
-3. Check for any rattles, buzzes, or distortion from cabinets.
-4. Verify delay towers/fills are timed correctly if applicable.
-5. Confirm system EQ/processing is loaded and correct for the venue.
-6. Walk the venue to check coverage — listen for dead spots and excessive reflections.
+### Power On Sequence
+1. Power on audio snake / stage box first (AES50 or Dante units)
+2. Power on Behringer Wing Rack — allow 30 seconds for full boot
+3. Power on wireless receivers and transmitters
+4. Power on effects processors and outboard gear
+5. Power on amplifiers / powered speakers LAST (PA, monitors)
+6. Verify Wing Rack network connectivity (ping mixer IP)
+7. Launch AUTO-MIXER backend and confirm OSC handshake
+8. Verify WebSocket connection to frontend is established
 
-### Monitor System
-1. Verify all monitor wedges/IEM transmitters are powered on.
-2. Send pink noise to each monitor send individually to confirm routing.
-3. Label all monitor mixes clearly on the console.
-4. Have spare IEM receivers and earpieces ready.
-5. Check IEM RF frequencies for conflicts with other wireless systems.
+### Mixer Configuration
+- Load the appropriate show file or scene for the band
+- Verify input patch: every channel is receiving the correct source
+- Confirm all output routing: main L/R, subs, monitors, recording feeds
+- Set all channel faders to -infinity before line check
+- Verify all main and bus limiters are engaged (safety limiters)
+- Confirm talkback microphone is working and routed correctly
+- Check that automation scenes are loaded and sequenced if needed
+- Verify clock source: internal 48 kHz or external word clock
+- Confirm DCA group assignments match the mixing workflow
 
-### Console Preparation
-1. Load the show file or start from a clean scene.
-2. Verify routing: all inputs assigned to correct channels.
-3. Set all faders to -infinity initially.
-4. Reset all EQ, dynamics, and effects to default/bypassed state.
-5. Label all channels with source names and colors.
-6. Set up DCA groups: Drums, Vocals, Instruments, Effects.
-7. Assign talkback microphone and verify routing.
-8. Set up effects returns (reverbs, delays) on aux channels.
-9. Save the initial scene as a backup before making any changes.
+### Patch Verification (Channel by Channel)
+For each input channel on the Wing Rack:
+1. Confirm source routing matches stage plot
+2. Verify phantom power setting (on for condensers, off for dynamics/ribbons)
+3. Check that channel name and color are set correctly
+4. Confirm DCA group assignments match the mixing workflow
+5. Verify bus sends are configured (monitor sends pre-fader, FX sends post-fader)
+6. Ensure HPF is engaged and set to appropriate frequency for the source
+7. Confirm that channel EQ, comp, and gate have starting positions from the template
 
-### AUTO-MIXER Tubeslave Preparation
-1. Verify the YAML configuration file matches the current show layout.
-2. Confirm channel assignments in the config match the input list.
-3. Check that the AI knowledge base is indexed and responding.
-4. Enable or disable feedback detection based on the show type.
-5. Verify Dante routing configuration matches the physical patching (64-channel layout).
-6. Test OSC communication: send a query to `/ch/1/name` and confirm response.
-7. Confirm the `/xremote` keepalive is running (every 8 seconds).
+### Gain Setting Procedure (Ring-Out)
+For each channel, with musician playing or speaking at performance level:
+1. Set preamp gain so peaks read -18 to -12 dBFS on the channel meter
+2. Verify there is no clipping indicator on the preamp stage
+3. If using a pad, engage it for hot sources (drum mics near cymbals, loud amps)
+4. Set channel fader to 0 dB (unity)
+5. Check that the signal sounds clean — no distortion, hum, or buzz
+6. Document gain settings for recall during the show
+
+### Monitor Ring-Out Procedure
+For each monitor send (wedge or IEM):
+1. Turn up the monitor send with the vocal mic first
+2. Slowly increase level until feedback begins
+3. Identify the feedback frequency using RTA or ear training
+4. Apply a narrow notch filter (Q=8-12, depth -3 to -6 dB) at that frequency
+5. Continue raising level and notching until 3-4 notches are placed
+6. Mark the maximum safe level for that monitor mix
+7. Repeat for other instruments in that monitor mix
+8. Document all monitor EQ settings
 
 ## Line Check Procedure
 
-The line check verifies every signal path from stage to console before the musician soundcheck. Each channel is tested individually.
-
-### Line Check Steps
-1. Start at channel 1 and work through all inputs sequentially.
-2. For each channel:
-   a. Ask the stage tech to scratch/tap the mic or play the instrument.
-   b. Verify signal appears on the correct channel meter on the Wing.
-   c. Check the signal is clean (no buzz, hum, crackle, or intermittent).
-   d. Verify phase is correct (especially for multi-mic sources like drums).
-   e. Set initial gain: peaks at -18 to -12 dBFS.
-   f. Enable HPF at the default frequency for the instrument type.
-3. Check DI boxes: verify pad switches and ground lifts as needed.
-4. Test wireless systems: walk the stage to check for dropouts.
-5. Verify 48V phantom power is on only for condenser mics (NOT for ribbons or dynamics that don't need it).
-
-### Common Line Check Issues
-- No signal: Check cable, stage box channel, Wing input routing (`/ch/{n}/in/conn/grp` and `/ch/{n}/in/conn/in`).
-- Hum/buzz: Check ground lift on DI, cable shielding, power isolation.
-- Intermittent signal: Bad cable or connector — replace immediately.
-- Phase issues: Flip phase on one mic (`/ch/{n}/in/set/inv`); choose the position with more low end.
-- Wrong channel: Re-patch at stage box or reassign in Wing routing.
-
-## Channel-by-Channel Soundcheck Order
-
-Soundcheck is done one instrument at a time in a specific order designed to build the mix from the foundation up.
-
-### 1. Kick Drum
-- Have the drummer play kick only at performance level.
-- Set gain for peaks at -12 to -6 dBFS.
-- Enable HPF at 30 Hz.
-- Apply kick EQ preset: cut 400 Hz, boost 60 Hz and 2.5 kHz.
-- Set gate: threshold -30 dB, attack 0.5 ms, hold 50 ms, release 200 ms.
-- Set compressor: ratio 4:1, threshold -12 dB, attack 20 ms, release 80 ms.
-- Bring fader to -6 dB as starting point.
-
-### 2. Snare Drum
-- Snare only at performance level (regular hits AND rimshots).
-- Set gain, HPF at 80 Hz.
-- Apply snare EQ preset.
-- Set gate: threshold -28 dB, attack 0.5 ms.
-- Set compressor: ratio 4.5:1, threshold -10 dB.
-- Check phase against kick — both should sound full together.
-
-### 3. Toms
-- Each tom individually, then all toms together.
-- Set gain, HPF at 60-80 Hz (depending on tom size).
-- Apply tom EQ preset.
-- Set gates (toms are the most critical for gating due to bleed).
-- Set compressor.
-- Pan toms across stereo field (audience perspective).
-
-### 4. Hi-Hat
-- Hi-hat at performance level (open and closed).
-- Set gain, HPF at 200 Hz (aggressive filtering).
-- Apply hi-hat EQ preset.
-- Optional gate.
-- Pan slightly left (audience perspective).
-
-### 5. Overheads
-- Full kit playing while adjusting overheads.
-- Set gain, HPF at 100-150 Hz.
-- Check phase between overheads (should be equidistant from snare).
-- Light compression.
-- Pan hard left and right for stereo image.
-
-### 6. Room Mic (if used)
-- Full kit playing.
-- Blend room mic in for depth and ambience.
-- Heavy compression optional for "room sound" effect.
-
-### 7. Bass
-- Bass player plays typical riff at performance level.
-- Set gain, HPF at 30 Hz.
-- Apply bass EQ preset.
-- Set compressor: ratio 4:1, attack 25 ms.
-- Listen with kick drum together — they must not fight.
-- If kick and bass are masking each other, EQ one to emphasize low-end and the other mid-bass.
-
-### 8. Guitars
-- Each guitar individually at performance level (clean AND distorted tones).
-- Set gain, HPF at 100 Hz.
-- Apply guitar EQ preset.
-- Set compressor (gentle for already-compressed amp signals).
-- Pan guitars to opposite sides if two guitars.
-
-### 9. Keys / Synth
-- All patches the musician will use during the show.
-- Set gain, HPF as appropriate for the patches.
-- Check both quiet pads and loud leads for level consistency.
-- Apply compression for level control.
-
-### 10. Vocals (Most Important)
-- Lead vocal first, then backing vocals.
-- Have the vocalist sing at full performance level AND speak between songs.
-- Set gain for peaks at -12 to -6 dBFS.
-- HPF at 80 Hz (lead) / 100 Hz (backing).
-- Apply vocal EQ preset.
-- Set compressor: ratio 3:1, threshold -18 dB.
-- This is the most critical channel — spend the most time here.
-- Check for feedback by slowly increasing the fader with monitors active.
-
-### 11. Full Band
-- Have the entire band play a song section together.
-- Balance faders for a cohesive mix.
-- Adjust EQ to resolve masking issues between instruments.
-- Set overall volume to target SPL.
-- Check stereo image and panning.
-- Verify monitor mixes with musicians.
-- Save the soundcheck scene as a snapshot on the Wing.
-
-## Monitor Setup
-
-### In-Ear Monitors (IEM)
-1. Start with a safe, low level to protect musicians' hearing.
-2. Build the monitor mix one instrument at a time (same order as FOH soundcheck).
-3. Add a small amount of ambient/room mic for natural feel.
-4. Limit the maximum output level of the IEM transmitter.
-5. Always have a limiter on IEM sends to prevent dangerous levels.
-6. Verify stereo panning in IEM mixes if using stereo monitors.
-
-### Wedge Monitors
-1. Ring out each wedge: slowly raise the vocal mic level until feedback starts, then notch EQ the feedback frequency.
-2. Repeat until you achieve maximum gain before feedback.
-3. Build the monitor mix starting with the musician's own instrument/voice.
-4. Keep monitor levels as low as possible — less stage volume = cleaner FOH mix.
-5. Use graphic EQ on bus outputs for monitor ring-out on the Wing.
-
-## System Measurement (Optional)
-
-### RTA / FFT Measurement
-1. Place measurement microphone at mix position (FOH).
-2. Play pink noise through the PA system.
-3. Measure frequency response using RTA (Real-Time Analyzer).
-4. Apply system EQ corrections on the system processor (not the console).
-5. Target a smooth, gently falling response from low to high frequencies.
-
-### SPL Monitoring
-1. Set up SPL meter at FOH position.
-2. Target levels:
-   - Rock/pop: 95-100 dBA slow
-   - Acoustic/jazz: 85-95 dBA slow
-   - Corporate/speech: 80-90 dBA slow
-   - Festival main stage: 100-105 dBA slow
-3. Monitor throughout the show and adjust master fader as needed.
-4. Watch for local noise ordinance limits.
-
-## During the Show
-
-### Active Mixing Checklist
-1. Keep lead vocal consistently audible above the band.
-2. Watch meters — no channel should be clipping.
-3. Monitor master bus headroom (maintain at least 6 dB).
-4. Listen for feedback and react immediately with notch EQ or fader pullback.
-5. Adjust mix for venue fill as audience arrives (bodies absorb sound, especially high frequencies).
-6. Ride vocal fader for dynamics (verse quieter than chorus).
-7. Mute unused channels between songs to reduce noise floor.
-8. Check IEM/monitor levels with musicians between songs if possible.
-9. Watch for instrument changes (acoustic to electric guitar, different vocal mic, etc.) and adjust processing.
-10. Monitor AUTO-MIXER Tubeslave dashboard for alerts and signal warnings.
-
-### Song Transition Checklist
-1. Mute channels not needed for the next song.
-2. Unmute channels needed for the next song.
-3. Recall scene/snapshot if programmed for song-specific settings.
-4. Verify effects sends are appropriate for the next song's tempo and style.
-5. Reset any manual fader rides to starting positions.
-
-### Emergency Procedures
-- **Feedback**: Immediately pull down the offending channel fader, then apply notch EQ at the feedback frequency. Slowly bring fader back up. If AUTO-MIXER feedback detection is active, it should catch this automatically.
-- **Clip/distortion**: Reduce input gain or fader. Check for internal clip points (EQ boost stacking, compressor makeup gain).
-- **Signal loss**: Check cables, stage box, routing. Have backup cables ready. Verify Wing input routing via OSC: `/ch/{n}/in/conn/grp`.
-- **Power failure**: If UPS is available, gracefully shut down. Never hot-swap audio during a show.
-- **OSC connection lost**: AUTO-MIXER will attempt reconnection automatically. If persistent, verify network connectivity and restart the OSC client.
-- **Wireless dropout**: Switch to backup wireless unit or wired mic. Always have a wired backup for critical channels (lead vocal).
-
-## Post-Show Procedures
-
-### Immediate Post-Show
-1. Mute all channels and pull master fader to -infinity.
-2. Thank the band and crew.
-3. Save the final show scene as a snapshot on the Wing. Use a descriptive name including the date and venue.
-4. Export the show file from the Wing to USB for backup.
-5. Power down in reverse order: amps/speakers first, then processors, then console last.
-
-### Console Reset and Archival
-1. Save the complete show file to the Wing's internal storage and to an external USB drive.
-2. Document any notes about the show: problem channels, feedback frequencies, monitor preferences for each musician.
-3. If using AUTO-MIXER Tubeslave, export the session log for review.
-4. Record any EQ notch filters that were applied during the show — these indicate persistent feedback frequencies at this venue.
-5. Note the final master fader position and target SPL achieved.
-
-### Equipment Teardown
-1. Disconnect all stage box cables, coiling them properly (over-under technique).
-2. Check for damaged cables and set aside for repair.
-3. Pack microphones in protective cases.
-4. Coil and pack all audio snakes and multi-pin connectors.
-5. Safely store IEM transmitters and receivers.
-6. Shut down and pack the Wing Rack and associated networking equipment.
-7. Verify all equipment is accounted for against the load-in inventory.
-
-### Data and Settings Backup
-1. Copy the Wing show file to a cloud backup or separate drive.
-2. Save the AUTO-MIXER Tubeslave configuration YAML for this venue/show.
-3. Archive any Dante routing presets used.
-4. Back up the AI knowledge base if custom entries were added during the show.
-5. Record venue-specific notes: house PA system EQ, monitor positions, power distribution layout, stage plot.
-
-## Venue Size Adjustments
-
-### Small Venues (Under 200 capacity)
-
-#### Characteristics
-- Short throw distances (under 10 meters to back wall).
-- Room reflections are significant — early reflections arrive within 10-30 ms.
-- Bass buildup in corners and along walls.
-- Low ceiling height increases low-frequency problems.
-- Audience is close to the PA and stage.
-
-#### Adjustments
-- **Overall level**: Target 90-95 dBA. Small rooms get loud fast.
-- **Bass management**: Reduce low-end on kick and bass by 2-3 dB compared to standard settings. Room modes will reinforce bass naturally.
-- **Reverb**: Use very little or no reverb. The room provides its own natural ambience. If reverb is needed, use short room settings (0.3-0.6 seconds).
-- **HPF**: Raise HPF frequencies by 10-20 Hz across all channels to reduce low-end buildup.
-- **Monitor levels**: Keep extremely low. Stage volume directly competes with FOH in small rooms.
-- **Subwoofers**: Often not needed. If present, reduce sub level by 6-10 dB or disable them entirely.
-- **Delay**: No delay speakers needed. Throw distance is short enough for a single point source.
-- **Panning**: Reduce stereo width. Many audience members will be off-axis. Keep critical elements (vocals, kick, snare, bass) center.
-
-### Medium Venues (200-1000 capacity)
-
-#### Characteristics
-- Moderate throw distances (10-30 meters).
-- Mix of direct sound and room reflections.
-- More even bass distribution than small rooms.
-- May have balconies or mezzanines that need coverage.
-
-#### Adjustments
-- **Overall level**: Target 95-100 dBA for rock/pop.
-- **Bass management**: Standard settings from instrument profiles work well.
-- **Reverb**: Moderate use. Hall or plate reverb at 1.0-2.0 seconds. Adjust based on the room's natural reverb.
-- **Delay**: May need front fills for close seating areas. Time them to the main PA (distance in meters / 343 = delay in seconds).
-- **Subwoofers**: Standard deployment. Cardioid sub arrangement if available to reduce stage low-end.
-- **Panning**: Full stereo width is appropriate. The audience spread justifies left-right imaging.
-- **Coverage**: Check for dead spots under balconies. Use delay fills if needed.
-
-### Large Venues (1000-5000 capacity)
-
-#### Characteristics
-- Long throw distances (30-60+ meters).
-- Significant propagation delay between PA and rear seating.
-- Large air volume absorbs high frequencies over distance.
-- Multiple seating sections may need independent coverage.
-
-#### Adjustments
-- **Overall level**: Target 98-105 dBA at FOH position. Account for inverse square law losses at rear of venue.
-- **High-frequency compensation**: Boost high shelf by 1-2 dB on the system processor (not per-channel) to compensate for air absorption over distance.
-- **Bass management**: May need to reduce sub level if the venue has significant low-frequency resonances. Use measurement mic to identify problem frequencies.
-- **Reverb**: Reduce reverb or eliminate it. Large venues have significant natural reverb (RT60 of 1.5-3.0 seconds). Adding more will muddy the mix.
-- **Delay towers**: Essential for rear seating areas. Time delays to the main PA with an additional 10-15 ms offset (Haas effect) so the brain localizes sound to the stage.
-- **Subwoofers**: Fly subs or use cardioid ground-stacked configurations to direct bass energy toward the audience and away from the stage.
-- **Compression**: Tighten compression ratios slightly (add 0.5:1 to standard settings) to maintain consistency at distance. Dynamics get exaggerated over long throws.
-- **DCA management**: Essential. Use DCA groups actively to make broad mix moves during the show. Individual channel adjustments are less effective at these distances.
-
-### Outdoor Venues and Festivals
-
-#### Characteristics
-- No room reflections (except ground bounce).
-- Sound dissipates freely — no bass buildup from room modes.
-- Wind and environmental noise compete with the PA.
-- Long throw distances with no walls to help contain sound.
-- Temperature and humidity affect sound propagation.
-
-#### Adjustments
-- **Overall level**: Target 100-105 dBA at FOH. Outdoor shows need more power due to lack of room reinforcement.
-- **Bass boost**: Increase sub level by 3-6 dB compared to indoor settings. No room gain to help.
-- **High-frequency boost**: Add 2-3 dB shelf above 8 kHz on the system EQ. Air absorption is significant outdoors, especially in dry or hot conditions.
-- **Reverb**: Use more reverb than indoor shows. The absence of room reflections makes dry mixes sound thin and lifeless. Plate reverb at 1.5-2.5 seconds on vocals.
-- **Wind protection**: Ensure all outdoor mics have windscreens. Low-frequency wind noise can overload preamps.
-- **Delay towers**: Essential for audiences beyond 30 meters. Calculate timing based on temperature-adjusted speed of sound (approximately 331 + 0.6 * temperature_celsius m/s).
-- **Monitor levels**: Can be higher outdoors since there is no room to reflect monitor sound into the FOH mics. But IEMs are still preferred for consistency.
-- **HPF**: Standard settings. No room modes to worry about, so HPFs can be slightly lower than indoor settings.
-
-## Genre-Specific Mixing Adjustments
-
-### Rock / Hard Rock
-
-#### Mix Philosophy
-Aggressive, powerful, and loud. The energy comes from the drums and guitars. Vocals must cut through a dense wall of sound.
-
-#### Key Adjustments
-- **Drums**: Emphasize kick attack (boost 3-5 kHz) and snare crack (boost 3-5 kHz). Gate tightly. Heavy drum bus compression for glue.
-- **Bass**: Aggressive compression (5:1 ratio). Boost growl at 700-900 Hz for midrange presence. The bass should interlock with the kick — share the low-end space.
-- **Guitars**: Let them be loud in the mix. Pan hard left and right if two guitars. Reduce low-end aggressively (HPF at 120-150 Hz) to leave room for bass and kick.
-- **Vocals**: Heavy compression (4:1) to keep vocals above the wall of guitars. Boost presence at 3-4 kHz for cut-through. Use short plate reverb (1.0-1.5 seconds) to add depth without washing out.
-- **Overall mix**: Drums 40% of the mix energy, guitars 30%, vocals 20%, bass 10% (perceived). Target 98-102 dBA.
-- **Effects**: Short reverb, minimal delay. Keep things tight and punchy.
-
-### Pop / Dance
-
-#### Mix Philosophy
-Clean, polished, and commercially balanced. Vocals are the absolute priority. The low end should be tight and punchy.
-
-#### Key Adjustments
-- **Vocals**: The most important element. Use parallel compression for consistent level. Boost air shelf at 10-12 kHz for openness. Medium plate reverb (1.5-2.0 seconds).
-- **Kick/bass**: Tight, punchy, and controlled. Side-chain the bass to the kick for clarity. Heavy HPF on everything else to keep the low-end clean.
-- **Keys/synth**: Important for pop arrangements. Keep clean and present. Pan synth pads wide for stereo width.
-- **Guitars**: Support role only. Keep lower in the mix than rock. HPF at 150 Hz.
-- **Backing vocals**: Spread wide in stereo. Compress harder than leads (4:1) for a smooth, blended sound. Use reverb to push them slightly back.
-- **Overall mix**: Vocals 35% of mix energy, rhythm section 35%, instruments 20%, effects 10%. Target 95-100 dBA.
-- **Effects**: Lush reverbs on vocals. Tempo-synced delays (quarter note or dotted eighth). Clean, polished effects.
-
-### Jazz / Acoustic
-
-#### Mix Philosophy
-Natural, dynamic, and transparent. The mixer's job is to faithfully reproduce what the musicians are doing on stage. Minimal processing.
-
-#### Key Adjustments
-- **Dynamics**: Use compression very sparingly. Ratios of 2:1 maximum. Let the natural dynamics of the performance come through.
-- **EQ**: Subtractive only. Remove problems but do not shape the tone aggressively. The instruments should sound like themselves.
-- **Reverb**: Use natural-sounding hall or chamber reverb (1.5-2.5 seconds). The reverb should enhance the sense of space, not be noticeable as an effect.
-- **Drums**: Minimal gating. Jazz drumming includes ghost notes and brush work that gates will destroy. Use light compression only. Overheads are the primary drum source — close mics are supplementary.
-- **Bass**: Acoustic bass or upright needs careful EQ to control boominess (cut 100-200 Hz) while preserving warmth. Very gentle compression (2:1). No gate.
-- **Piano**: Full-range instrument. Minimal EQ. Light compression to control dynamics between pianissimo and fortissimo passages.
-- **Vocals**: Natural sound. Light compression (2:1 to 3:1). Minimal EQ. Avoid sibilance control unless truly necessary — jazz vocals are intimate and detail matters.
-- **Overall mix**: Balance should reflect the natural acoustic balance on stage. Target 85-95 dBA.
-- **Effects**: Subtle. The audience should not be aware that effects are being used.
-
-### Country / Folk
-
-#### Mix Philosophy
-Warm, organic, and vocal-forward. Acoustic instruments should sound natural. Storytelling is central, so vocal intelligibility is paramount.
-
-#### Key Adjustments
-- **Vocals**: Priority one. Warm but clear. Boost presence at 2-3 kHz for storytelling intelligibility. Use plate reverb (1.0-1.8 seconds) for warmth. Slapback delay (80-120 ms) is a classic country vocal effect.
-- **Acoustic guitar**: Major instrument in country/folk. Boost string clarity at 3 kHz. Use gentle compression to even out strumming dynamics. Pan slightly off-center.
-- **Fiddle/violin**: Similar to vocal treatment. HPF at 150 Hz. Boost 2-4 kHz for presence. Watch for harsh upper frequencies (5-7 kHz).
-- **Pedal steel/dobro**: Mid-heavy instrument. Boost 1-2 kHz for presence. Cut 300-500 Hz to avoid mud. Pan opposite to acoustic guitar.
-- **Electric guitar**: Cleaner tones than rock. Less gain, less compression. Boost midrange character at 800 Hz.
-- **Drums**: Slightly less aggressive than rock. Snare should crack without dominating. Tighter gating to keep the mix clean.
-- **Bass**: Warm and supportive. Less aggressive than rock. Follow kick drum closely.
-- **Overall mix**: Vocals 40%, acoustic instruments 30%, rhythm section 20%, effects 10%. Target 92-98 dBA.
-
-### Electronic / DJ
-
-#### Mix Philosophy
-The pre-mixed playback is the main source. The mixer's role is system management, level control, and ensuring the PA reproduces the material faithfully.
-
-#### Key Adjustments
-- **Playback channels**: Minimal processing. The material is already mixed and mastered. HPF at 20 Hz for subsonic protection only.
-- **EQ**: Avoid per-channel EQ on playback. Use system EQ only for room correction.
-- **Compression**: Do not compress the main playback. It is already mastered with dynamics processing.
-- **Sub management**: Electronic music relies heavily on sub-bass (30-60 Hz). Ensure the sub system is aligned and has sufficient headroom. Sub energy can be 6-10 dB louder than typical live band shows.
-- **Vocal (MC/DJ)**: If there is a live vocal mic, compress aggressively (4:1 to 6:1) and HPF at 100 Hz. The vocal must cut through the dense electronic mix.
-- **Monitoring**: DJ monitoring is typically via booth monitor or headphones. Keep the booth feed clean and unprocessed.
-- **Limiters**: Essential on the master bus. Electronic music has extreme peak-to-average ratios. Set limiters to protect the PA system.
-- **Overall level**: Target 100-105 dBA. Electronic music audiences expect high SPL levels.
-
-### Metal / Punk
-
-#### Mix Philosophy
-Maximum aggression and impact. Double bass drums, distorted guitars, and screaming vocals define the genre. Clarity in the chaos is the goal.
-
-#### Key Adjustments
-- **Kick drum**: Critical for double bass clarity. Boost beater click at 4-6 kHz aggressively (+4-5 dB). Use fast gate attack (0.3 ms) and short hold (30 ms) for maximum separation between rapid hits.
-- **Snare**: Heavy compression (6:1) to maintain consistent crack during blast beats. Boost 3-5 kHz for attack.
-- **Guitars**: HPF at 150 Hz minimum — bass guitar owns the low end. Scoop mids slightly (cut 400-600 Hz) for the classic metal tone, but not too much or guitars will disappear in the mix.
-- **Bass**: Must be audible through the wall of guitars. Boost 700-1000 Hz for midrange definition. Heavy compression (5:1) for consistency.
-- **Vocals**: Screaming/growling vocals need different treatment than clean singing. HPF at 120 Hz. Boost 2-4 kHz for intelligibility. Heavy compression (4:1 to 6:1). Less reverb — keep vocals dry and aggressive.
-- **Overall mix**: Massive wall of sound. Drums 35%, guitars 35%, vocals 20%, bass 10%. Target 100-105 dBA.
-- **Headroom**: Metal bands are loud. Ensure gain staging leaves sufficient headroom at all stages. Master bus limiter is essential.
-
-### Worship / Church
-
-#### Mix Philosophy
-Supporting the congregation, not performing a concert. Intelligibility of lyrics and spoken word is the top priority. The mix should never be distracting.
-
-#### Key Adjustments
-- **Vocals**: Absolute priority. Intelligibility above all. Boost presence at 2-4 kHz. Use compression (3:1) for consistent level. Reverb should be subtle — plate at 1.0-1.5 seconds.
-- **Spoken word**: Separate from singing. Use a different scene/snapshot for spoken word with tighter compression (4:1), no reverb, and HPF at 100 Hz. Reduce music levels during speech.
-- **Band levels**: Keep lower than a concert environment. The band supports the congregation singing — it should not overpower them.
-- **Dynamics**: Controlled but not squashed. The music should breathe but without extreme peaks that distract.
-- **Acoustic instruments**: Emphasize warmth and clarity. Acoustic guitar and piano are typically featured instruments.
-- **Electric guitar**: Keep subdued. Use amp modeling or low stage volume. HPF at 120 Hz.
-- **Drums**: Use electronic drums or drum shields when possible to control stage volume. If acoustic drums, gate tightly and keep overheads lower in the mix.
-- **Subwoofers**: Reduce by 3-6 dB from concert levels. Excessive bass is distracting in worship.
-- **Overall level**: Target 80-92 dBA. Many congregations and venues have strict limits.
-- **Room acoustics**: Churches often have long reverb times (RT60 of 2-5 seconds). Use minimal or no added reverb. Consider system delays for distributed speaker systems.
+The line check verifies every input is working and properly routed.
+Do this systematically from channel 1 through the last input.
+
+### Order of Line Check
+1. **Kick drum** — engineer says "kick please," drummer plays kick only
+2. **Snare** — top and bottom separately, verify phase between them
+3. **Hi-hat**
+4. **Toms** — high to low (rack 1, rack 2, floor)
+5. **Overheads** — verify stereo image and phase coherence with close mics
+6. **Bass guitar** — DI first, then amp mic, verify phase alignment
+7. **Electric guitars** — each guitar separately
+8. **Acoustic guitars**
+9. **Keys / Piano** — verify stereo routing if applicable
+10. **Other instruments** (horns, strings, percussion)
+11. **Backing tracks / playback** — verify stereo and click track routing
+12. **Backing vocals** — each mic individually
+13. **Lead vocal** — last (or first if time is limited and vocalist is available)
+
+### During Each Line Check
+- Verify signal appears on the correct channel
+- Listen for buzz, hum, crackle, or other artifacts
+- Check that phantom power is correct (no pops on engagement)
+- Verify mute group and DCA assignments
+- Briefly check HPF and basic EQ
+- Confirm monitor send reaches the correct wedge/IEM
+
+## Sound Check Order
+
+Sound check builds the mix layer by layer. This order ensures each
+element is heard in context.
+
+### Phase 1: Drums
+1. Kick drum alone — set level, basic EQ, gate, compression
+2. Snare alone — set level, basic EQ, gate, compression, check phase with kick
+3. Kick + Snare together — verify balance and low-end interaction
+4. Add hi-hat — set level, HPF, basic EQ
+5. Add toms — set levels, gates, basic EQ
+6. Add overheads — set level, HPF, blend with close mics. Check phase.
+7. Full kit — refine balance, verify in main PA
+
+### Phase 2: Bass
+1. Bass guitar alone — set level, EQ, compression
+2. Bass + Kick drum — verify low-end separation and complement
+3. Bass + Full drums — refine bass level in context
+
+### Phase 3: Guitars and Keys
+1. Each guitar individually — set level, EQ, pan position
+2. Keys/Piano — set level, EQ, pan
+3. All rhythm section together — guitars + keys + bass + drums
+4. Refine balance, check for frequency masking between instruments
+
+### Phase 4: Vocals
+1. Lead vocal alone — set level, EQ chain, compression, de-esser
+2. Lead vocal + band — adjust vocal level to sit properly above instruments
+3. Each backing vocal individually
+4. All backing vocals together — adjust blend and pan positions
+5. Full band + all vocals — final balance adjustments
+
+### Phase 5: Effects
+1. Add vocal reverb — adjust send level, decay time, pre-delay
+2. Add instrument reverbs/delays
+3. Verify effects levels in full-band context
+4. Check that effects are not muddying the mix
+
+### Phase 6: Full Band Run-Through
+1. Ask the band to play a representative song (verse, chorus, bridge)
+2. Walk the venue — check sound from different positions
+3. Adjust main system EQ if needed (graphic or parametric on output)
+4. Verify subwoofer level and crossover point
+5. Check monitor levels with the full band playing
+
+## Show Mixing Workflow
+
+### Verse/Chorus Management
+- Vocals typically need +1 to +2 dB boost going into choruses
+- Guitar levels may increase in choruses — be ready to manage
+- Cymbal wash increases in choruses — may need to duck overheads slightly
+- Bass level usually remains constant — it anchors the mix
+- Use DCA groups for quick section-level adjustments:
+  - DCA 1: All drums
+  - DCA 2: Bass
+  - DCA 3: Guitars
+  - DCA 4: Keys
+  - DCA 5: Lead vocal
+  - DCA 6: Backing vocals
+  - DCA 7: Effects returns
+  - DCA 8: Playback / click
+
+### Dynamic Song Sections
+- **Intro/Outro**: Often quieter — pull instruments back, let featured parts shine
+- **Verse**: Vocal is primary — everything else supports
+- **Pre-Chorus**: Building energy — gradually raise guitars and drums
+- **Chorus**: Full energy — all elements at peak. Vocal must still be above.
+- **Bridge**: Often a contrast — may need dramatic level changes
+- **Solo**: Feature the solo instrument (+2-3 dB), slightly reduce other mid-range
+  instruments to give it space
+
+### Real-Time Adjustments
+- Watch fader positions — if most are above +5 dB, the mix is too quiet overall.
+  Pull everything down 3 dB and raise the main bus.
+- Watch gain reduction meters on compressors — if GR exceeds 10 dB consistently,
+  the threshold is too low.
+- Keep an eye on main bus meters — target -6 to -3 dBFS peaks
+- Listen for feedback constantly — especially during quiet passages and monitor checks
+
+## Between-Song Protocols
+
+### Quick Check (15-30 seconds)
+1. Reset any song-specific effects (e.g., special delay, distortion on vocal)
+2. Bring vocal effects back to default reverb settings
+3. Check main bus meters — are we at a good level?
+4. Mute any channels that were only used for the previous song
+5. Unmute any channels needed for the next song
+6. If the setlist is known, recall the next scene/snapshot
+
+### Extended Break (Between Sets)
+1. Play walk-in music at appropriate level
+2. Mute all stage channels
+3. Check for any issues reported by musicians on monitors
+4. Review main bus limiter — has it been hitting too hard?
+5. Adjust system EQ if the room has changed (audience adds absorption)
+6. Check wireless mic battery levels (replace if below 40%)
+7. Reset all effects to default show settings
+
+## Emergency Procedures
+
+### Feedback Emergency
+1. **Immediately** reduce the master fader 3-5 dB
+2. Identify the offending channel (look for the channel with highest gain reduction
+   or use RTA to spot the frequency)
+3. Mute the offending channel
+4. Apply a narrow notch at the feedback frequency (-6 to -12 dB, Q=10)
+5. Slowly unmute and raise the channel
+6. If feedback returns, apply deeper cut or reduce the channel's monitor send
+
+### Signal Loss (No Audio from a Channel)
+1. Check if the channel is muted or fader is down
+2. Check if DCA group or mute group is engaged
+3. Verify the preamp is receiving signal (check input meter)
+4. If no signal at preamp, check cable connection at stage box
+5. Try a known-good cable
+6. Try a known-good mic or DI
+7. Re-patch to a spare input channel if available
+8. If the issue is on the musician's end (dead battery, broken cable), mute the
+   channel and wait for them to resolve it
+
+### Power Failure
+1. Do NOT panic — UPS should keep mixer alive for 5-15 minutes
+2. If PA goes silent, communicate with stage manager
+3. If mixer is on UPS, save the current scene immediately
+4. When power returns, wait 30 seconds before powering on amplifiers
+5. Verify all connections and clock sync before resuming
+6. Check that all scenes and automation recalled correctly
+
+### Excessive SPL / Safety
+1. If SPL readings exceed 105 dBA sustained, reduce main fader immediately
+2. If a single channel is causing excessive SPL (e.g., runaway feedback),
+   mute it immediately
+3. If limiters are engaging constantly, the overall level is too high
+4. Communicate with production manager about SPL requirements
+5. Document any SPL limit exceedances for compliance purposes
+
+### Wireless Mic Dropout
+1. Check if the transmitter is still powered on (battery may be dead)
+2. Check RF signal strength on the receiver
+3. If intermittent, suspect antenna placement or interference
+4. Switch to backup frequency if available
+5. As a last resort, replace with a wired mic
+
+## Post-Show Teardown
+
+### Power Down Sequence (Reverse of Power On)
+1. Fade main fader to -infinity
+2. Mute all outputs
+3. Power off amplifiers and powered speakers FIRST
+4. Power off outboard effects and processors
+5. Power off wireless receivers
+6. Save show file on the Wing Rack
+7. Power off the Wing Rack mixer
+8. Power off stage boxes
+9. Disconnect and coil all cables neatly
+
+### Documentation
+- Save show file with date and venue name
+- Note any issues encountered (problem channels, feedback frequencies)
+- Note wireless frequencies used (for future coordination)
+- Document any changes made from the default template
+- Note any equipment failures or concerns
+- Record AUTO-MIXER session log for analysis
+
+## Monitor Mixing Considerations
+
+### IEM (In-Ear Monitor) Specific
+- Always use a limiter on IEM bus outputs — maximum +10 dBu to protect hearing
+- Target 85 dBA average in IEM mixes (OSHA hearing safety guidelines)
+- Provide ambient mics (crowd/room) in IEM mixes for natural feel
+- Click track must be in a separate bus or clearly in one ear only
+- IEM mixes are typically mono per musician — check before assuming stereo
+- Bass player and drummer should have click and each other in their mix
+- Provide a "more me" bus control if possible
+
+### Wedge Monitor Specific
+- Maximum 2-3 open mics per wedge mix to prevent feedback
+- Wedge EQ should be ringed out before the show (see Ring-Out procedure)
+- Vocal monitors: voice + a little guitar/keys for pitch reference
+- Drum fill: kick, snare, vocals, and bass
+- Side fills: broader mix for keyboard players or horn sections
+- Never point a wedge directly at a microphone — angle at 45 degrees minimum
+- Keep wedge levels as low as possible while meeting musician needs
+
+### Common Monitor Requests and Solutions
+- "More me": Increase their channel in their mix by 2-3 dB
+- "Less band": Reduce everything except their channel by 2-3 dB
+- "More low end": Boost below 200 Hz in their monitor send, or adjust the wedge EQ
+- "It sounds harsh": Roll off high end above 6 kHz in their monitor send
+- "I can't hear myself": Often caused by excessive stage volume — address source
+
+## RF Frequency Management
+
+### Wireless Microphone Coordination
+- Survey the RF environment before the show using a spectrum analyzer
+- Avoid TV broadcast frequencies (check local TV channel assignments)
+- Maintain minimum 250 kHz spacing between wireless channels
+- Use intermodulation calculation software for 4+ simultaneous systems
+- Keep spare frequencies documented for emergency re-tuning
+- Check that all transmitters are on the correct frequency group/channel
+- Replace batteries before every show — do not rely on remaining charge
+- Always carry spare batteries for every wireless system
+
+### Antenna Placement
+- Use directional (paddle) antennas when possible, pointed at the stage
+- Mount antennas at least 1 meter above the floor
+- Keep antennas away from metal surfaces and other RF sources
+- Use antenna distribution systems for 4+ receivers
+- Maximum cable run from antenna to receiver: 15 meters with low-loss cable
+- Place antennas at stage left and stage right for diversity
+
+## Stage Volume Control
+
+### Managing Stage Volume
+- The single biggest challenge in live sound. Excessive stage volume
+  undermines the FOH mix.
+- Guitar amp volume: Ask guitarists to point amps across the stage (not at audience)
+  or use amp shields/isolation cabinets.
+- Drum volume: Drum screens (Perspex shields) help but do not solve the problem.
+  Electronic drum triggers can supplement mic'ed acoustic drums.
+- Monitor levels: Start low and build up. Musicians tend to ask for "more"
+  continuously — resist creeping levels.
+- IEM adoption: In-ear monitors dramatically reduce stage volume. Encourage adoption.
+- Communication: Talk to the band about stage volume before the show.
+  Explain that lower stage volume = better FOH mix = better audience experience.
+
+## Venue-Specific Adjustments
+
+### Indoor Small Club (Under 300 capacity)
+- Reduce sub bass (-3 dB below 60 Hz on mains)
+- Room reflections are strong: increase HPF frequencies on vocals
+- Lower overall SPL target: 95 dBA
+- Reverb may not be needed — room provides natural ambience
+- Stage volume is the dominant challenge
+
+### Indoor Theater / Auditorium (300-2000 capacity)
+- Standard SPL target: 100 dBA
+- More reverb from room; reduce FX send levels
+- Watch for slap-back echo from back wall
+- Check for standing waves in the bass region
+- PA delay towers or fill speakers may be needed for coverage
+
+### Outdoor Festival Stage
+- Increase sub bass (+3 dB below 80 Hz to compensate for no room gain)
+- Increase high-frequency (+2 dB above 8 kHz for air absorption over distance)
+- Higher SPL target: 103-105 dBA (competition from ambient noise)
+- Wind protection on all microphones is essential
+- Monitor mixes need more level due to open-air dispersion
+- Subwoofer cardioid arrays to reduce stage low-end bleed
+
+### House of Worship
+- Conservative dynamics (less compression, more natural feel)
+- Speech intelligibility is the top priority
+- Lower SPL target: 85-90 dBA average
+- Wide stereo image for choir and congregation
+- Longer reverb tails acceptable for hymns and worship songs

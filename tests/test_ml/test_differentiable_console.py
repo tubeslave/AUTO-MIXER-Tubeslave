@@ -1,148 +1,191 @@
-"""
-Tests for backend.ml.differentiable_console — differentiable mixing console
-with EQ, compressor, gain/pan.
-
-Tests the numpy fallback path unconditionally and the torch path when available.
-"""
-
-import numpy as np
+"""Tests for ml.differentiable_console -- differentiable mixing console modules."""
 import pytest
+import numpy as np
 
-from backend.ml.differentiable_console import DifferentiableMixingConsole, HAS_TORCH
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
+import sys
+import os
 
-@pytest.fixture
-def short_audio_np():
-    """2-channel, 4096-sample numpy audio (sine + noise)."""
-    sr = 48000
-    n = 4096
-    t = np.linspace(0, n / sr, n, endpoint=False, dtype=np.float32)
-    ch0 = np.sin(2 * np.pi * 440 * t) * 0.5
-    ch1 = np.sin(2 * np.pi * 880 * t) * 0.3
-    return np.stack([ch0, ch1], axis=0)  # (2, 4096)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
 
-# ---------------------------------------------------------------------------
-# Numpy-fallback console tests (always runnable)
-# ---------------------------------------------------------------------------
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
+class TestDifferentiableGain:
+    """Tests for DifferentiableGain -- dB-parameterized gain stage."""
 
-class TestNumpyConsoleDefaultParams:
-    """Test create_default_params in the numpy path."""
+    def test_instantiation(self):
+        from ml.differentiable_console import DifferentiableGain
+        gain = DifferentiableGain(n_channels=4, init_db=-6.0)
+        assert gain.gain_db.shape == (4,)
+        assert torch.allclose(gain.gain_db, torch.full((4,), -6.0))
 
-    def test_default_params_keys(self):
-        console = DifferentiableMixingConsole(num_channels=4, num_eq_bands=4, sr=48000)
-        if HAS_TORCH:
-            params = console.create_default_params(batch_size=1, num_channels=4)
-        else:
-            params = console.create_default_params(num_channels=4)
-        expected_keys = {
-            "eq_freq", "eq_gain", "eq_q",
-            "comp_threshold", "comp_ratio", "comp_attack", "comp_release",
-            "gain_db", "pan",
-        }
+    def test_forward_shape_preserved(self):
+        from ml.differentiable_console import DifferentiableGain
+        gain = DifferentiableGain(n_channels=3)
+        x = torch.randn(3, 1024)
+        out = gain(x)
+        assert out.shape == (3, 1024)
+
+    def test_zero_db_unity_gain(self):
+        from ml.differentiable_console import DifferentiableGain
+        gain = DifferentiableGain(n_channels=2, init_db=0.0)
+        x = torch.randn(2, 512)
+        out = gain(x)
+        assert torch.allclose(out, x, atol=1e-5)
+
+    def test_negative_db_reduces_amplitude(self):
+        from ml.differentiable_console import DifferentiableGain
+        gain = DifferentiableGain(n_channels=1, init_db=-20.0)
+        x = torch.ones(1, 256)
+        out = gain(x)
+        assert out.abs().max().item() < 1.0
+
+
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
+class TestDifferentiablePan:
+    """Tests for DifferentiablePan -- constant-power stereo panner."""
+
+    def test_instantiation(self):
+        from ml.differentiable_console import DifferentiablePan
+        pan = DifferentiablePan(n_channels=4)
+        assert pan.pan.shape == (4,)
+        assert torch.allclose(pan.pan, torch.zeros(4))
+
+    def test_center_pan_equal_left_right(self):
+        from ml.differentiable_console import DifferentiablePan
+        pan = DifferentiablePan(n_channels=1)
+        x = torch.ones(1, 512)
+        out = pan(x)
+        # At center pan (0), left and right should be equal
+        assert out.shape[1] == 2
+        left_energy = out[0, 0, :].pow(2).sum().item()
+        right_energy = out[0, 1, :].pow(2).sum().item()
+        assert abs(left_energy - right_energy) < 1e-3
+
+    def test_output_shape_2d_input(self):
+        from ml.differentiable_console import DifferentiablePan
+        pan = DifferentiablePan(n_channels=2)
+        x = torch.randn(2, 256)
+        out = pan(x)
+        assert out.shape == (2, 2, 256)
+
+    def test_pan_parameter_is_learnable(self):
+        from ml.differentiable_console import DifferentiablePan
+        pan = DifferentiablePan(n_channels=2)
+        assert pan.pan.requires_grad is True
+
+
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
+class TestDifferentiableEQ:
+    """Tests for DifferentiableEQ -- frequency-domain parametric EQ."""
+
+    def test_instantiation(self):
+        from ml.differentiable_console import DifferentiableEQ
+        eq = DifferentiableEQ(n_channels=2, n_bands=4)
+        assert eq.n_channels == 2
+        assert eq.n_bands == 4
+        assert eq.freq.shape == (2, 4)
+        assert eq.gain_db.shape == (2, 4)
+        assert eq.q.shape == (2, 4)
+
+    def test_forward_shape_preserved(self):
+        from ml.differentiable_console import DifferentiableEQ
+        eq = DifferentiableEQ(n_channels=2, n_bands=3)
+        x = torch.randn(2, 2048)
+        out = eq(x)
+        assert out.shape == x.shape
+
+    def test_zero_gain_passthrough(self):
+        from ml.differentiable_console import DifferentiableEQ
+        eq = DifferentiableEQ(n_channels=1, n_bands=4)
+        # Zero gain means no EQ applied; response should be ~1 everywhere
+        with torch.no_grad():
+            eq.gain_db.fill_(0.0)
+        x = torch.randn(1, 2048)
+        out = eq(x)
+        # With zero gain the EQ transfer function should be unity
+        assert torch.allclose(out, x, atol=1e-4)
+
+    def test_compute_biquad_output_shape(self):
+        from ml.differentiable_console import DifferentiableEQ
+        eq = DifferentiableEQ(n_channels=2, n_bands=3)
+        freq = torch.tensor([1000.0])
+        gain_db = torch.tensor([6.0])
+        q = torch.tensor([1.0])
+        coeffs = eq.compute_biquad(freq, gain_db, q)
+        assert coeffs.shape[-1] == 5
+
+
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
+class TestDifferentiableCompressor:
+    """Tests for DifferentiableCompressor -- differentiable dynamics compressor."""
+
+    def test_instantiation(self):
+        from ml.differentiable_console import DifferentiableCompressor
+        comp = DifferentiableCompressor(n_channels=4)
+        assert comp.threshold_db.shape == (4,)
+        assert comp.ratio.shape == (4,)
+
+    def test_forward_shape_preserved(self):
+        from ml.differentiable_console import DifferentiableCompressor
+        comp = DifferentiableCompressor(n_channels=2)
+        x = torch.randn(2, 1024)
+        out = comp(x)
+        assert out.shape == x.shape
+
+    def test_quiet_signal_passthrough(self):
+        from ml.differentiable_console import DifferentiableCompressor
+        comp = DifferentiableCompressor(n_channels=1)
+        # Very quiet signal should pass through unaffected (below threshold)
+        x = torch.ones(1, 512) * 1e-6
+        out = comp(x)
+        assert torch.allclose(out, x, atol=1e-8)
+
+    def test_compression_reduces_loud_signal(self):
+        from ml.differentiable_console import DifferentiableCompressor
+        comp = DifferentiableCompressor(n_channels=1)
+        with torch.no_grad():
+            comp.threshold_db.fill_(-20.0)
+            comp.ratio.fill_(10.0)
+        x = torch.ones(1, 512) * 0.9  # loud signal
+        out = comp(x)
+        # Compressed output should have lower peak
+        assert out.abs().max().item() <= x.abs().max().item()
+
+
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
+class TestDifferentiableMixingConsole:
+    """Tests for the full DifferentiableMixingConsole chain."""
+
+    def test_instantiation(self):
+        from ml.differentiable_console import DifferentiableMixingConsole
+        console = DifferentiableMixingConsole(n_channels=4, sample_rate=48000)
+        assert console.n_channels == 4
+
+    def test_forward_returns_mix_and_processed(self):
+        from ml.differentiable_console import DifferentiableMixingConsole
+        console = DifferentiableMixingConsole(n_channels=2, sample_rate=48000)
+        channels = [torch.randn(1, 2048), torch.randn(1, 2048)]
+        mix, processed = console(channels)
+        assert mix.shape == (1, 2048)
+        assert len(processed) == 2
+
+    def test_get_parameters_dict_keys(self):
+        from ml.differentiable_console import DifferentiableMixingConsole
+        console = DifferentiableMixingConsole(n_channels=3)
+        params = console.get_parameters_dict()
+        expected_keys = {'gain_db', 'pan', 'eq_freq', 'eq_gain', 'eq_q',
+                         'threshold', 'ratio'}
         assert set(params.keys()) == expected_keys
 
-    def test_default_params_shapes_numpy(self):
-        if HAS_TORCH:
-            pytest.skip("Testing numpy path only")
-        console = DifferentiableMixingConsole(num_channels=4, num_eq_bands=4, sr=48000)
-        params = console.create_default_params(num_channels=4)
-        assert params["eq_freq"].shape == (4, 4)
-        assert params["eq_gain"].shape == (4, 4)
-        assert params["gain_db"].shape == (4, 1)
-        assert params["pan"].shape == (4, 1)
-
-    def test_default_gain_is_zero(self):
-        console = DifferentiableMixingConsole(num_channels=2, sr=48000)
-        if HAS_TORCH:
-            params = console.create_default_params(batch_size=1, num_channels=2)
-            import torch
-            assert torch.allclose(params["gain_db"], torch.zeros_like(params["gain_db"]))
-        else:
-            params = console.create_default_params(num_channels=2)
-            np.testing.assert_allclose(params["gain_db"], 0.0)
-
-
-class TestNumpyConsoleForward:
-    """Test forward pass in the numpy path."""
-
-    def test_forward_produces_stereo(self, short_audio_np):
-        if HAS_TORCH:
-            pytest.skip("Testing numpy path only")
-        console = DifferentiableMixingConsole(num_channels=2, num_eq_bands=4, sr=48000)
-        params = console.create_default_params(num_channels=2)
-        output = console.forward(short_audio_np, params)
-        assert output.shape[0] == 2, "Output must be stereo (2 channels)"
-        assert output.shape[1] == short_audio_np.shape[1]
-
-    def test_flat_eq_passthrough(self, short_audio_np):
-        """With flat EQ (0 dB gain), output energy should roughly equal input energy."""
-        if HAS_TORCH:
-            pytest.skip("Testing numpy path only")
-        console = DifferentiableMixingConsole(num_channels=2, num_eq_bands=4, sr=48000)
-        params = console.create_default_params(num_channels=2)
-        # Set ratio to 1 (no compression) to isolate EQ test
-        params["comp_ratio"] = np.full((2, 1), 1.0)
-        output = console.forward(short_audio_np, params)
-        # Sum of L+R energy should be similar to input energy (center pan)
-        input_energy = np.sum(short_audio_np ** 2)
-        output_energy = np.sum(output ** 2)
-        # Allow generous tolerance because of filter edge effects
-        assert output_energy > 0, "Output should have non-zero energy"
-
-    def test_mute_via_large_negative_gain(self, short_audio_np):
-        """A very large negative gain should produce near-silence."""
-        if HAS_TORCH:
-            pytest.skip("Testing numpy path only")
-        console = DifferentiableMixingConsole(num_channels=2, num_eq_bands=4, sr=48000)
-        params = console.create_default_params(num_channels=2)
-        params["gain_db"] = np.full((2, 1), -120.0)
-        params["comp_ratio"] = np.full((2, 1), 1.0)
-        output = console.forward(short_audio_np, params)
-        assert np.max(np.abs(output)) < 1e-3
-
-
-# ---------------------------------------------------------------------------
-# Torch console tests (skipped when torch is unavailable)
-# ---------------------------------------------------------------------------
-
-class TestTorchConsole:
-    """Tests that exercise the PyTorch DifferentiableMixingConsole."""
-
-    def test_forward_shape(self, short_audio_np):
-        if not HAS_TORCH:
-            pytest.skip("torch not installed")
-        import torch
-        console = DifferentiableMixingConsole(num_channels=2, num_eq_bands=4, sr=48000)
-        params = console.create_default_params(batch_size=1, num_channels=2)
-        audio = torch.from_numpy(short_audio_np).unsqueeze(0)  # (1, 2, 4096)
-        output = console(audio, params)
-        assert output.shape == (1, 2, short_audio_np.shape[1])
-
-    def test_gradients_flow(self, short_audio_np):
-        """Parameters should receive gradients through the console."""
-        if not HAS_TORCH:
-            pytest.skip("torch not installed")
-        import torch
-        console = DifferentiableMixingConsole(num_channels=2, num_eq_bands=4, sr=48000)
-        params = console.create_default_params(batch_size=1, num_channels=2)
-        # Make gain_db require grad
-        params["gain_db"] = params["gain_db"].clone().requires_grad_(True)
-        audio = torch.from_numpy(short_audio_np).unsqueeze(0)
-        output = console(audio, params)
-        loss = output.sum()
-        loss.backward()
-        assert params["gain_db"].grad is not None
-        assert not torch.all(params["gain_db"].grad == 0)
-
-    def test_default_params_batch_size(self):
-        if not HAS_TORCH:
-            pytest.skip("torch not installed")
-        import torch
-        console = DifferentiableMixingConsole(num_channels=8, num_eq_bands=4, sr=48000)
-        params = console.create_default_params(batch_size=3, num_channels=8)
-        assert params["eq_freq"].shape == (3, 8, 4)
-        assert params["pan"].shape == (3, 8, 1)
+    def test_get_parameters_dict_lengths(self):
+        from ml.differentiable_console import DifferentiableMixingConsole
+        console = DifferentiableMixingConsole(n_channels=3)
+        params = console.get_parameters_dict()
+        assert len(params['gain_db']) == 3
+        assert len(params['pan']) == 3

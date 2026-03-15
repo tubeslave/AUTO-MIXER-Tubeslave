@@ -1,661 +1,197 @@
 """
-Session Lifecycle and Configuration Management
+Session lifecycle and configuration management.
 
-Manages mixing sessions for the AUTO MIXER system with:
-- Session creation and destruction with unique IDs
-- Config loading from YAML and JSON files with dot-notation access
-- Session state persistence to disk (JSON)
-- Multiple concurrent sessions with active-session selection
-- Session metadata tracking (duration, channel count, event name)
-- Auto-save on configurable interval
+Manages mixing sessions, user configurations, and session persistence.
 """
 
-import copy
 import json
 import logging
 import os
-import threading
 import time
-import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-try:
-    import yaml
-    HAS_YAML = True
-except ImportError:
-    HAS_YAML = False
-    logger.debug("PyYAML not installed — YAML config loading disabled")
-
-
-# ---------------------------------------------------------------------------
-# Session dataclass
-# ---------------------------------------------------------------------------
 
 @dataclass
-class Session:
-    """Represents a single mixing session."""
-    session_id: str
-    name: str
-    created_at: float
-    config: Dict[str, Any] = field(default_factory=dict)
-    state: str = "active"  # active, paused, destroyed
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    # Runtime tracking (not persisted by default)
-    _dirty: bool = field(default=False, repr=False)
+class SessionConfig:
+    """Configuration for a mixing session."""
+    name: str = "default"
+    venue: str = ""
+    genre: str = "pop_rock"
+    num_channels: int = 40
+    sample_rate: int = 48000
+    target_lufs: float = -18.0
+    safety_limits: Dict[str, float] = field(default_factory=lambda: {
+        "max_fader_db": 10.0,
+        "max_gain_change_db": 6.0,
+        "max_eq_cut_db": 15.0,
+        "max_eq_boost_db": 12.0,
+    })
+    automation_enabled: Dict[str, bool] = field(default_factory=lambda: {
+        "gain_staging": True,
+        "auto_eq": False,
+        "auto_fader": False,
+        "auto_compressor": False,
+        "phase_alignment": False,
+        "feedback_detection": True,
+    })
+    custom_params: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize session to a plain dictionary."""
         return {
-            "session_id": self.session_id,
             "name": self.name,
-            "created_at": self.created_at,
-            "config": self.config,
-            "state": self.state,
-            "metadata": self.metadata,
+            "venue": self.venue,
+            "genre": self.genre,
+            "num_channels": self.num_channels,
+            "sample_rate": self.sample_rate,
+            "target_lufs": self.target_lufs,
+            "safety_limits": self.safety_limits,
+            "automation_enabled": self.automation_enabled,
+            "custom_params": self.custom_params,
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Session":
-        """Deserialize session from a dictionary."""
-        return cls(
-            session_id=d["session_id"],
-            name=d.get("name", ""),
-            created_at=d.get("created_at", time.time()),
-            config=d.get("config", {}),
-            state=d.get("state", "active"),
-            metadata=d.get("metadata", {}),
-        )
+    def from_dict(cls, data: Dict[str, Any]) -> "SessionConfig":
+        return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
 
-# ---------------------------------------------------------------------------
-# Config helpers
-# ---------------------------------------------------------------------------
+@dataclass
+class Session:
+    """A mixing session with state and history."""
+    id: str
+    config: SessionConfig
+    created_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
+    active: bool = True
+    events: List[Dict[str, Any]] = field(default_factory=list)
 
-def _get_nested(data: Dict[str, Any], dotted_key: str, default: Any = None) -> Any:
-    """
-    Retrieve a value from a nested dict using dot notation.
+    def add_event(self, event_type: str, data: Dict[str, Any] = None):
+        self.events.append({
+            "type": event_type,
+            "data": data or {},
+            "timestamp": time.time(),
+        })
+        self.updated_at = time.time()
 
-    Example:
-        _get_nested({"a": {"b": 1}}, "a.b") -> 1
-    """
-    parts = dotted_key.split(".")
-    current: Any = data
-    for part in parts:
-        if isinstance(current, dict) and part in current:
-            current = current[part]
-        else:
-            return default
-    return current
-
-
-def _set_nested(data: Dict[str, Any], dotted_key: str, value: Any) -> None:
-    """
-    Set a value in a nested dict using dot notation, creating
-    intermediate dicts as needed.
-
-    Example:
-        d = {}
-        _set_nested(d, "a.b.c", 42)
-        # d == {"a": {"b": {"c": 42}}}
-    """
-    parts = dotted_key.split(".")
-    current = data
-    for part in parts[:-1]:
-        if part not in current or not isinstance(current[part], dict):
-            current[part] = {}
-        current = current[part]
-    current[parts[-1]] = value
-
-
-def _delete_nested(data: Dict[str, Any], dotted_key: str) -> bool:
-    """
-    Delete a key from a nested dict using dot notation.
-    Returns True if the key existed and was removed.
-    """
-    parts = dotted_key.split(".")
-    current = data
-    for part in parts[:-1]:
-        if isinstance(current, dict) and part in current:
-            current = current[part]
-        else:
-            return False
-    if isinstance(current, dict) and parts[-1] in current:
-        del current[parts[-1]]
-        return True
-    return False
-
-
-def _load_yaml_file(path: str) -> Dict[str, Any]:
-    """Load a YAML file, returning an empty dict on failure."""
-    if not HAS_YAML:
-        logger.warning("PyYAML not installed — cannot load %s", path)
-        return {}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        return data if isinstance(data, dict) else {}
-    except Exception as exc:
-        logger.error("Failed to load YAML %s: %s", path, exc)
-        return {}
-
-
-def _load_json_file(path: str) -> Dict[str, Any]:
-    """Load a JSON file, returning an empty dict on failure."""
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except Exception as exc:
-        logger.error("Failed to load JSON %s: %s", path, exc)
-        return {}
-
-
-# ---------------------------------------------------------------------------
-# SessionManager
-# ---------------------------------------------------------------------------
 
 class SessionManager:
     """
-    Manages mixing session lifecycle and configuration.
+    Manages mixing session lifecycle and persistence.
 
-    Supports:
-    - Multiple concurrent sessions (each with its own config namespace)
-    - Global config that serves as the default for new sessions
-    - YAML and JSON config file loading
-    - Dot-notation config get/set
-    - Periodic auto-save of the active session
-    - Session state persistence to disk
-    - Listeners for session lifecycle events
+    Provides:
+    - Session creation and destruction
+    - Configuration save/load
+    - Session history tracking
+    - Auto-save on changes
     """
 
-    def __init__(
-        self,
-        config_dir: str = "config",
-        sessions_dir: str = "sessions",
-        auto_save_interval_sec: float = 0.0,
-    ):
-        """
-        Args:
-            config_dir: Directory to search for config files.
-            sessions_dir: Directory to persist session JSON files.
-            auto_save_interval_sec: If > 0, start a background thread that
-                                    saves the active session at this interval.
-        """
+    def __init__(self, sessions_dir: str = "sessions"):
+        self._sessions_dir = Path(sessions_dir)
+        self._sessions_dir.mkdir(parents=True, exist_ok=True)
+        self._current_session: Optional[Session] = None
         self._sessions: Dict[str, Session] = {}
-        self._active_session_id: Optional[str] = None
-        self._config_dir = config_dir
-        self._sessions_dir = sessions_dir
-        self._global_config: Dict[str, Any] = {}
-        self._lock = threading.RLock()
 
-        # Lifecycle event listeners
-        self._listeners: List[Callable[[str, Session], None]] = []
-
-        # Auto-save
-        self._auto_save_interval = auto_save_interval_sec
-        self._auto_save_stop = threading.Event()
-        self._auto_save_thread: Optional[threading.Thread] = None
-
-        if auto_save_interval_sec > 0:
-            self._start_auto_save()
-
-        logger.info(
-            "SessionManager initialized (config_dir=%s, sessions_dir=%s, "
-            "auto_save=%.1fs)",
-            config_dir, sessions_dir, auto_save_interval_sec,
-        )
-
-    # ------------------------------------------------------------------
-    # Session CRUD
-    # ------------------------------------------------------------------
-
-    def create_session(
-        self,
-        name: str = "",
-        config: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Session:
-        """
-        Create a new mixing session.
-
-        Args:
-            name: Human-readable session name.  Auto-generated if empty.
-            config: Initial config dict. Defaults to a copy of the global config.
-            metadata: Optional metadata (event name, venue, etc.).
-
-        Returns:
-            The newly created Session.
-        """
-        session_id = str(uuid.uuid4())[:8]
-
-        with self._lock:
-            initial_config = config if config is not None else copy.deepcopy(self._global_config)
-            session = Session(
-                session_id=session_id,
-                name=name or f"Session-{session_id}",
-                created_at=time.time(),
-                config=initial_config,
-                metadata=metadata or {},
-            )
-            self._sessions[session_id] = session
-
-            # If no active session, make this one active
-            if self._active_session_id is None:
-                self._active_session_id = session_id
-
-        self._emit("created", session)
-        logger.info("Session created: %s (%s)", session.name, session_id)
+    def create_session(self, name: str = "default", **config_kwargs) -> Session:
+        """Create a new mixing session."""
+        config = SessionConfig(name=name, **config_kwargs)
+        session_id = f"{name}_{int(time.time())}"
+        session = Session(id=session_id, config=config)
+        self._sessions[session_id] = session
+        self._current_session = session
+        session.add_event("created")
+        logger.info(f"Created session '{session_id}'")
+        self._save_session(session)
         return session
 
-    def destroy_session(self, session_id: str) -> bool:
-        """
-        Destroy a session and clean up. If it was the active session,
-        the next available session becomes active.
+    def get_current_session(self) -> Optional[Session]:
+        """Get the current active session."""
+        return self._current_session
 
-        Returns True if the session existed.
-        """
-        with self._lock:
-            session = self._sessions.pop(session_id, None)
-            if not session:
-                return False
-
-            session.state = "destroyed"
-
-            if self._active_session_id == session_id:
-                remaining = list(self._sessions.keys())
-                self._active_session_id = remaining[0] if remaining else None
-
-        self._emit("destroyed", session)
-        logger.info("Session destroyed: %s (%s)", session.name, session_id)
-        return True
-
-    def get_session(self, session_id: str) -> Optional[Session]:
-        """Get a session by ID."""
-        with self._lock:
-            return self._sessions.get(session_id)
-
-    def get_active_session(self) -> Optional[Session]:
-        """Get the currently active session."""
-        with self._lock:
-            if self._active_session_id:
-                return self._sessions.get(self._active_session_id)
-        return None
-
-    def set_active_session(self, session_id: str) -> bool:
-        """
-        Set the active session by ID.
-        Returns True if the session exists and was activated.
-        """
-        with self._lock:
-            if session_id not in self._sessions:
-                return False
-            prev_id = self._active_session_id
-            self._active_session_id = session_id
-
-        logger.info("Active session changed: %s -> %s", prev_id, session_id)
-        session = self.get_session(session_id)
+    def set_current_session(self, session_id: str) -> Optional[Session]:
+        """Set the active session by ID."""
+        session = self._sessions.get(session_id)
         if session:
-            self._emit("activated", session)
-        return True
-
-    def list_sessions(self) -> List[Dict[str, Any]]:
-        """List all sessions with summary info."""
-        with self._lock:
-            return [
-                {
-                    "session_id": s.session_id,
-                    "name": s.name,
-                    "state": s.state,
-                    "created_at": s.created_at,
-                    "active": s.session_id == self._active_session_id,
-                    "config_keys": len(s.config),
-                    "metadata": s.metadata,
-                }
-                for s in self._sessions.values()
-            ]
-
-    def pause_session(self, session_id: str) -> bool:
-        """Pause a session (mark as paused). Returns True on success."""
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if not session or session.state != "active":
-                return False
-            session.state = "paused"
-        self._emit("paused", session)
-        return True
-
-    def resume_session(self, session_id: str) -> bool:
-        """Resume a paused session. Returns True on success."""
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if not session or session.state != "paused":
-                return False
-            session.state = "active"
-        self._emit("resumed", session)
-        return True
-
-    # ------------------------------------------------------------------
-    # Config access
-    # ------------------------------------------------------------------
-
-    def load_config(self, path: str) -> Dict[str, Any]:
-        """
-        Load configuration from a YAML or JSON file into the global config.
-
-        The loaded keys are merged into the existing global config.
-
-        Args:
-            path: Absolute or relative path. Relative paths are resolved
-                  against config_dir.
-
-        Returns:
-            The loaded config dict (may be empty on error).
-        """
-        # Resolve relative paths against config_dir
-        if not os.path.isabs(path):
-            path = os.path.join(self._config_dir, path)
-
-        if not os.path.isfile(path):
-            logger.warning("Config file not found: %s", path)
-            return {}
-
-        if path.endswith((".yaml", ".yml")):
-            config = _load_yaml_file(path)
-        else:
-            config = _load_json_file(path)
-
-        with self._lock:
-            self._global_config.update(config)
-
-        logger.info("Config loaded from %s: %d top-level keys", path, len(config))
-        return config
-
-    def load_config_into_session(
-        self, session_id: str, path: str
-    ) -> Dict[str, Any]:
-        """Load a config file directly into a specific session's config."""
-        if not os.path.isabs(path):
-            path = os.path.join(self._config_dir, path)
-
-        if not os.path.isfile(path):
-            logger.warning("Config file not found: %s", path)
-            return {}
-
-        if path.endswith((".yaml", ".yml")):
-            config = _load_yaml_file(path)
-        else:
-            config = _load_json_file(path)
-
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if session:
-                session.config.update(config)
-                session._dirty = True
-
-        return config
-
-    def get_config(self, key: str, default: Any = None) -> Any:
-        """
-        Get a config value using dot notation.
-
-        Looks in the active session's config first, then falls back to
-        the global config.
-
-        Args:
-            key: Dot-separated key, e.g. 'mixer.osc.ip'.
-            default: Default value if key is not found.
-        """
-        with self._lock:
-            session = self.get_active_session()
-            if session:
-                val = _get_nested(session.config, key)
-                if val is not None:
-                    return val
-            return _get_nested(self._global_config, key, default)
-
-    def set_config(self, key: str, value: Any) -> None:
-        """
-        Set a config value using dot notation.
-
-        Writes to the active session's config if one exists, otherwise
-        to the global config.
-        """
-        with self._lock:
-            session = self.get_active_session()
-            if session:
-                _set_nested(session.config, key, value)
-                session._dirty = True
-            else:
-                _set_nested(self._global_config, key, value)
-
-    def delete_config(self, key: str) -> bool:
-        """Delete a config key. Returns True if it existed."""
-        with self._lock:
-            session = self.get_active_session()
-            if session:
-                removed = _delete_nested(session.config, key)
-                if removed:
-                    session._dirty = True
-                return removed
-            return _delete_nested(self._global_config, key)
-
-    def get_global_config(self) -> Dict[str, Any]:
-        """Return a deep copy of the global config."""
-        with self._lock:
-            return copy.deepcopy(self._global_config)
-
-    def set_global_config(self, config: Dict[str, Any]) -> None:
-        """Replace the entire global config."""
-        with self._lock:
-            self._global_config = copy.deepcopy(config)
-
-    # ------------------------------------------------------------------
-    # Persistence
-    # ------------------------------------------------------------------
-
-    def save_session(
-        self, session_id: str, path: Optional[str] = None
-    ) -> bool:
-        """
-        Save a session to disk as JSON.
-
-        Args:
-            session_id: ID of the session to save.
-            path: File path. Defaults to sessions_dir/{session_id}.json.
-
-        Returns:
-            True on success.
-        """
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if not session:
-                logger.warning("Cannot save: session %s not found", session_id)
-                return False
-            data = session.to_dict()
-
-        save_path = path or os.path.join(
-            self._sessions_dir, f"{session_id}.json"
-        )
-        try:
-            os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
-            with open(save_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            with self._lock:
-                if session_id in self._sessions:
-                    self._sessions[session_id]._dirty = False
-            logger.info("Session saved: %s -> %s", session_id, save_path)
-            return True
-        except Exception as exc:
-            logger.error("Failed to save session %s: %s", session_id, exc)
-            return False
-
-    def save_active_session(self) -> bool:
-        """Save the active session to its default path."""
-        with self._lock:
-            sid = self._active_session_id
-        if sid:
-            return self.save_session(sid)
-        return False
-
-    def save_all_sessions(self) -> int:
-        """Save all sessions. Returns the count of successfully saved sessions."""
-        saved = 0
-        with self._lock:
-            session_ids = list(self._sessions.keys())
-        for sid in session_ids:
-            if self.save_session(sid):
-                saved += 1
-        return saved
-
-    def load_session(self, path: str) -> Optional[Session]:
-        """
-        Load a session from a JSON file on disk.
-
-        Args:
-            path: Path to the session JSON file.
-
-        Returns:
-            The loaded Session, or None on failure.
-        """
-        if not os.path.isfile(path):
-            logger.warning("Session file not found: %s", path)
-            return None
-
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception as exc:
-            logger.error("Failed to load session from %s: %s", path, exc)
-            return None
-
-        session = Session.from_dict(data)
-
-        with self._lock:
-            self._sessions[session.session_id] = session
-
-        self._emit("loaded", session)
-        logger.info("Session loaded: %s (%s) from %s",
-                     session.name, session.session_id, path)
+            if self._current_session:
+                self._current_session.active = False
+            self._current_session = session
+            session.active = True
+            session.add_event("activated")
+            logger.info(f"Activated session '{session_id}'")
         return session
 
-    def load_all_sessions(self) -> int:
-        """
-        Load all session JSON files from the sessions directory.
-        Returns the number of sessions loaded.
-        """
-        sessions_path = Path(self._sessions_dir)
-        if not sessions_path.is_dir():
-            return 0
+    def update_config(self, **kwargs) -> Optional[SessionConfig]:
+        """Update current session configuration."""
+        if not self._current_session:
+            return None
+        config = self._current_session.config
+        for key, value in kwargs.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        self._current_session.add_event("config_updated", kwargs)
+        self._save_session(self._current_session)
+        return config
 
-        loaded = 0
-        for json_file in sessions_path.glob("*.json"):
-            if self.load_session(str(json_file)):
-                loaded += 1
+    def end_session(self, session_id: str = None):
+        """End a session."""
+        session = self._sessions.get(
+            session_id or (self._current_session.id if self._current_session else "")
+        )
+        if session:
+            session.active = False
+            session.add_event("ended")
+            self._save_session(session)
+            if session == self._current_session:
+                self._current_session = None
+            logger.info(f"Ended session '{session.id}'")
 
-        logger.info("Loaded %d sessions from %s", loaded, self._sessions_dir)
-        return loaded
+    def list_sessions(self) -> List[Dict]:
+        """List all sessions."""
+        result = []
+        for sid, session in self._sessions.items():
+            result.append({
+                "id": sid,
+                "name": session.config.name,
+                "active": session.active,
+                "created_at": session.created_at,
+                "updated_at": session.updated_at,
+                "events_count": len(session.events),
+            })
+        return result
 
-    # ------------------------------------------------------------------
-    # Event listeners
-    # ------------------------------------------------------------------
-
-    def add_listener(
-        self, callback: Callable[[str, Session], None]
-    ) -> None:
-        """
-        Register a session lifecycle listener.
-
-        The callback receives (event_name, session) where event_name is
-        one of: 'created', 'destroyed', 'activated', 'paused', 'resumed',
-        'loaded'.
-        """
-        self._listeners.append(callback)
-
-    def remove_listener(
-        self, callback: Callable[[str, Session], None]
-    ) -> bool:
-        """Remove a listener. Returns True if found and removed."""
+    def _save_session(self, session: Session):
+        """Save session to disk."""
+        filepath = self._sessions_dir / f"{session.id}.json"
         try:
-            self._listeners.remove(callback)
-            return True
-        except ValueError:
-            return False
+            data = {
+                "id": session.id,
+                "config": session.config.to_dict(),
+                "created_at": session.created_at,
+                "updated_at": session.updated_at,
+                "active": session.active,
+                "events": session.events[-100:],  # Keep last 100 events
+            }
+            filepath.write_text(json.dumps(data, indent=2))
+        except Exception as e:
+            logger.error(f"Failed to save session: {e}")
 
-    def _emit(self, event: str, session: Session) -> None:
-        """Emit a lifecycle event to all listeners."""
-        for listener in self._listeners:
+    def load_sessions(self):
+        """Load all sessions from disk."""
+        for filepath in self._sessions_dir.glob("*.json"):
             try:
-                listener(event, session)
-            except Exception as exc:
-                logger.error("Session listener error (%s): %s", event, exc)
-
-    # ------------------------------------------------------------------
-    # Auto-save
-    # ------------------------------------------------------------------
-
-    def _start_auto_save(self) -> None:
-        """Start the auto-save background thread."""
-        self._auto_save_stop.clear()
-        self._auto_save_thread = threading.Thread(
-            target=self._auto_save_loop, name="session-autosave", daemon=True
-        )
-        self._auto_save_thread.start()
-        logger.info("Auto-save started (interval=%.1fs)", self._auto_save_interval)
-
-    def _auto_save_loop(self) -> None:
-        """Periodically save dirty sessions."""
-        while not self._auto_save_stop.is_set():
-            self._auto_save_stop.wait(timeout=self._auto_save_interval)
-            if self._auto_save_stop.is_set():
-                break
-
-            with self._lock:
-                dirty_ids = [
-                    sid for sid, s in self._sessions.items()
-                    if s._dirty and s.state != "destroyed"
-                ]
-
-            for sid in dirty_ids:
-                self.save_session(sid)
-
-    def stop_auto_save(self) -> None:
-        """Stop the auto-save background thread."""
-        self._auto_save_stop.set()
-        if self._auto_save_thread and self._auto_save_thread.is_alive():
-            self._auto_save_thread.join(timeout=3.0)
-        self._auto_save_thread = None
-
-    # ------------------------------------------------------------------
-    # Cleanup
-    # ------------------------------------------------------------------
-
-    def shutdown(self) -> None:
-        """
-        Graceful shutdown: save all sessions, stop auto-save,
-        and clean up resources.
-        """
-        logger.info("SessionManager shutting down...")
-        self.stop_auto_save()
-        self.save_all_sessions()
-        logger.info("SessionManager shutdown complete")
-
-    # ------------------------------------------------------------------
-    # Dunder methods
-    # ------------------------------------------------------------------
-
-    def __repr__(self) -> str:
-        return (
-            f"<SessionManager sessions={len(self._sessions)} "
-            f"active={self._active_session_id}>"
-        )
-
-    def __len__(self) -> int:
-        return len(self._sessions)
-
-    def __contains__(self, session_id: str) -> bool:
-        return session_id in self._sessions
+                data = json.loads(filepath.read_text())
+                config = SessionConfig.from_dict(data.get("config", {}))
+                session = Session(
+                    id=data["id"],
+                    config=config,
+                    created_at=data.get("created_at", 0),
+                    updated_at=data.get("updated_at", 0),
+                    active=data.get("active", False),
+                    events=data.get("events", []),
+                )
+                self._sessions[session.id] = session
+            except Exception as e:
+                logger.warning(f"Failed to load session {filepath}: {e}")
+        logger.info(f"Loaded {len(self._sessions)} sessions")

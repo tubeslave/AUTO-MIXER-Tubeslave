@@ -53,7 +53,7 @@ def ratio_float_to_wing(ratio: float) -> str:
     if ratio <= 0:
         return "1.0:1"
     if ratio == float('inf'):
-        return WING_RATIO_STRINGS[-1]
+        return "inf:1"
     best_idx = 0
     best_diff = abs(WING_RATIO_VALUES[0] - ratio)
     for i, v in enumerate(WING_RATIO_VALUES):

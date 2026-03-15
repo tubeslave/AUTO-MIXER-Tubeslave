@@ -1,224 +1,112 @@
-"""
-Tests for backend/config_manager.py — additional config integration tests.
-
-See also test_config_manager.py for comprehensive ConfigManager unit tests.
-"""
-
-import json
-import os
-import tempfile
+"""Tests for config_manager module."""
 import pytest
+import os
+import sys
+import tempfile
 
-try:
-    from config_manager import ConfigManager
-except ImportError:
-    pytest.skip("config_manager module not importable", allow_module_level=True)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
-try:
-    import yaml
-    HAS_YAML = True
-except ImportError:
-    HAS_YAML = False
+from config_manager import ConfigManager
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
+class TestConfigManager:
+    """Tests for the ConfigManager class."""
 
-@pytest.fixture
-def config_mgr():
-    return ConfigManager()
+    def test_defaults_loaded(self):
+        """ConfigManager loads all default sections without a config file."""
+        cm = ConfigManager()
+        assert cm.get('mixer.ip') == '192.168.1.1'
+        assert cm.get('mixer.port') == 2222
+        assert cm.get('audio.sample_rate') == 48000
+        assert cm.get('websocket.port') == 8765
+        assert cm.get('agent.mode') == 'suggest'
+        assert cm.get('safety.feedback_detection') is True
 
+    def test_get_with_missing_path_returns_default(self):
+        """get() returns the provided default when the path does not exist."""
+        cm = ConfigManager()
+        assert cm.get('nonexistent.key') is None
+        assert cm.get('nonexistent.key', 'fallback') == 'fallback'
+        assert cm.get('mixer.nonexistent', 42) == 42
 
-@pytest.fixture
-def json_config_file():
-    """Temporary JSON config file."""
-    data = {
-        "mixer": {
-            "ip": "192.168.1.102",
-            "port": 2223,
-            "channels": 40
-        },
-        "audio": {
-            "sample_rate": 48000,
-            "buffer_size": 1024
-        },
-        "safety": {
-            "max_gain_db": 10.0,
-            "feedback_detection": True
-        }
-    }
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        json.dump(data, f)
-        path = f.name
-    yield path
-    os.unlink(path)
+    def test_set_and_get_value(self):
+        """set() creates or updates a config value retrievable by get()."""
+        cm = ConfigManager()
+        cm.set('mixer.ip', '10.0.0.5')
+        assert cm.get('mixer.ip') == '10.0.0.5'
 
+        # Set a nested path that doesn't exist yet
+        cm.set('custom.section.key', 'test_value')
+        assert cm.get('custom.section.key') == 'test_value'
 
-@pytest.fixture
-def yaml_config_file():
-    """Temporary YAML config file."""
-    data = {
-        "mixer": {"ip": "10.0.0.1", "port": 2223},
-        "lufs": {"target": -18.0, "tolerance": 1.5},
-        "genres": {"rock": {"bass_boost": 3.0}},
-    }
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-        if HAS_YAML:
-            yaml.dump(data, f)
-        else:
-            json.dump(data, f)
-        path = f.name
-    yield path
-    os.unlink(path)
-
-
-# ---------------------------------------------------------------------------
-# JSON config loading
-# ---------------------------------------------------------------------------
-
-class TestJsonConfig:
-    def test_load_json(self, config_mgr, json_config_file):
-        config = config_mgr.load(json_config_file)
-        assert config["mixer"]["ip"] == "192.168.1.102"
-
-    def test_dot_notation_get(self, config_mgr, json_config_file):
-        config_mgr.load(json_config_file)
-        assert config_mgr.get("mixer.ip") == "192.168.1.102"
-        assert config_mgr.get("mixer.port") == 2223
-
-    def test_nested_dot_notation(self, config_mgr, json_config_file):
-        config_mgr.load(json_config_file)
-        assert config_mgr.get("audio.sample_rate") == 48000
-
-    def test_missing_key_returns_default(self, config_mgr, json_config_file):
-        config_mgr.load(json_config_file)
-        assert config_mgr.get("nonexistent.key", "fallback") == "fallback"
-
-
-# ---------------------------------------------------------------------------
-# YAML config loading
-# ---------------------------------------------------------------------------
-
-@pytest.mark.skipif(not HAS_YAML, reason="PyYAML not installed")
-class TestYamlConfig:
-    def test_load_yaml(self, config_mgr, yaml_config_file):
-        config = config_mgr.load(yaml_config_file)
-        assert config["mixer"]["ip"] == "10.0.0.1"
-
-    def test_yaml_dot_notation(self, config_mgr, yaml_config_file):
-        config_mgr.load(yaml_config_file)
-        assert config_mgr.get("lufs.target") == -18.0
-
-
-# ---------------------------------------------------------------------------
-# Config set and callbacks
-# ---------------------------------------------------------------------------
-
-class TestConfigSet:
-    def test_set_value(self, config_mgr, json_config_file):
-        config_mgr.load(json_config_file)
-        config_mgr.set("mixer.ip", "10.0.0.5")
-        assert config_mgr.get("mixer.ip") == "10.0.0.5"
-
-    def test_set_creates_intermediate(self, config_mgr):
-        config_mgr.set("new.nested.key", 42)
-        assert config_mgr.get("new.nested.key") == 42
-
-    def test_change_callback_fires(self, config_mgr, json_config_file):
-        config_mgr.load(json_config_file)
-        changes = []
-        config_mgr.on_change(lambda k, old, new: changes.append((k, old, new)))
-        config_mgr.set("mixer.ip", "10.0.0.99")
-        assert len(changes) == 1
-        assert changes[0][0] == "mixer.ip"
-        assert changes[0][2] == "10.0.0.99"
-
-    def test_no_callback_on_same_value(self, config_mgr, json_config_file):
-        config_mgr.load(json_config_file)
-        changes = []
-        config_mgr.on_change(lambda k, old, new: changes.append(1))
-        config_mgr.set("mixer.port", 2223)  # Same value
-        assert len(changes) == 0
-
-
-# ---------------------------------------------------------------------------
-# Config save
-# ---------------------------------------------------------------------------
-
-class TestConfigSave:
-    def test_save_json(self, config_mgr, json_config_file):
-        config_mgr.load(json_config_file)
-        config_mgr.set("mixer.ip", "10.10.10.10")
-        with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as f:
-            out_path = f.name
+    def test_load_yaml_config(self):
+        """ConfigManager loads and merges values from a YAML config file."""
         try:
-            config_mgr.save(out_path)
-            with open(out_path) as f:
-                saved = json.load(f)
-            assert saved["mixer"]["ip"] == "10.10.10.10"
+            import yaml
+        except ImportError:
+            pytest.skip("PyYAML not installed")
+
+        config_data = {
+            'mixer': {'ip': '10.10.10.10', 'port': 3333},
+            'logging': {'level': 'DEBUG'},
+        }
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            import yaml
+            yaml.dump(config_data, f)
+            yaml_path = f.name
+
+        try:
+            cm = ConfigManager(config_path=yaml_path)
+            # Overridden values
+            assert cm.get('mixer.ip') == '10.10.10.10'
+            assert cm.get('mixer.port') == 3333
+            assert cm.get('logging.level') == 'DEBUG'
+            # Defaults still present for non-overridden values
+            assert cm.get('audio.sample_rate') == 48000
         finally:
-            os.unlink(out_path)
+            os.unlink(yaml_path)
 
+    def test_get_section_returns_deep_copy(self):
+        """get_section returns a deep copy that doesn't mutate the config."""
+        cm = ConfigManager()
+        mixer = cm.get_section('mixer')
+        assert mixer['ip'] == '192.168.1.1'
+        mixer['ip'] = 'CHANGED'
+        # Original should be unchanged
+        assert cm.get('mixer.ip') == '192.168.1.1'
 
-# ---------------------------------------------------------------------------
-# Validation
-# ---------------------------------------------------------------------------
+    def test_on_change_callback(self):
+        """on_change callbacks are called when set() is invoked."""
+        cm = ConfigManager()
+        callback_calls = []
+        cm.on_change(lambda config: callback_calls.append(config.get('mixer', {}).get('ip')))
 
-class TestValidation:
-    def test_validate_required_missing(self, config_mgr):
-        config_mgr.set("mixer.ip", "10.0.0.1")
-        schema = {
-            "mixer": {
-                "required": True,
-                "type": "dict",
-                "children": {
-                    "ip": {"required": True, "type": "str"},
-                    "port": {"required": True, "type": "int"},
-                }
-            }
-        }
-        errors = config_mgr.validate(schema)
-        assert any("port" in e for e in errors)
+        cm.set('mixer.ip', '172.16.0.1')
+        assert len(callback_calls) == 1
+        assert callback_calls[0] == '172.16.0.1'
 
-    def test_validate_type_mismatch(self, config_mgr, json_config_file):
-        config_mgr.load(json_config_file)
-        schema = {
-            "mixer": {
-                "required": True,
-                "type": "dict",
-                "children": {
-                    "ip": {"required": True, "type": "int"},  # Wrong type
-                }
-            }
-        }
-        errors = config_mgr.validate(schema)
-        assert len(errors) > 0
+    def test_to_dict_returns_full_config(self):
+        """to_dict returns the full configuration as a dict."""
+        cm = ConfigManager()
+        d = cm.to_dict()
+        assert isinstance(d, dict)
+        assert 'mixer' in d
+        assert 'audio' in d
+        assert 'agent' in d
+        assert 'safety' in d
+        # Verify it's a deep copy
+        d['mixer']['ip'] = 'MUTATED'
+        assert cm.get('mixer.ip') != 'MUTATED'
 
-    def test_validate_passes(self, config_mgr, json_config_file):
-        config_mgr.load(json_config_file)
-        schema = {
-            "mixer": {
-                "required": True,
-                "type": "dict",
-                "children": {
-                    "ip": {"required": True, "type": "str"},
-                    "port": {"required": True, "type": "int"},
-                }
-            }
-        }
-        errors = config_mgr.validate(schema)
-        assert len(errors) == 0
-
-
-# ---------------------------------------------------------------------------
-# as_dict
-# ---------------------------------------------------------------------------
-
-class TestAsDict:
-    def test_returns_copy(self, config_mgr, json_config_file):
-        config_mgr.load(json_config_file)
-        d1 = config_mgr.as_dict()
-        d1["mixer"]["ip"] = "modified"
-        d2 = config_mgr.as_dict()
-        assert d2["mixer"]["ip"] != "modified"
+    def test_env_var_override(self):
+        """Environment variables with AUTOMIXER_ prefix override config values."""
+        original = os.environ.get('AUTOMIXER_MIXER_IP')
+        try:
+            os.environ['AUTOMIXER_MIXER_IP'] = '192.168.99.99'
+            cm = ConfigManager()
+            assert cm.get('mixer.ip') == '192.168.99.99'
+        finally:
+            if original is None:
+                os.environ.pop('AUTOMIXER_MIXER_IP', None)
+            else:
+                os.environ['AUTOMIXER_MIXER_IP'] = original
