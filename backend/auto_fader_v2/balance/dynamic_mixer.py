@@ -11,6 +11,7 @@ Uses "Calibrate → Stabilize → Maintain" approach:
 import logging
 import os
 import time
+from collections import deque
 from typing import Dict, Optional, List
 from enum import Enum
 from dataclasses import dataclass, field
@@ -37,16 +38,13 @@ class MixerPhase(Enum):
 @dataclass
 class ChannelCalibration:
     """Calibration data for a channel"""
-    lufs_samples: List[float] = field(default_factory=list)
+    lufs_samples: "deque" = field(default_factory=lambda: deque(maxlen=100))
     optimal_fader_offset: float = 0.0  # Calculated optimal offset from current position
     is_calibrated: bool = False
     locked_target_lufs: float = -25.0  # Locked target after calibration
     
     def add_sample(self, lufs: float):
         self.lufs_samples.append(lufs)
-        # Keep last 100 samples (~10 seconds at 100ms intervals)
-        if len(self.lufs_samples) > 100:
-            self.lufs_samples.pop(0)
     
     def get_average_lufs(self) -> float:
         if not self.lufs_samples:

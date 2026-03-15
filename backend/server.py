@@ -19,6 +19,7 @@ except ImportError:
     from websockets.legacy.server import WebSocketServerProtocol
 
 from wing_client import WingClient
+from osc.enhanced_osc_client import EnhancedOSCClient
 from mixing_station_client import MixingStationClient, discover_mixing_station
 from audio_devices import get_audio_devices
 from voice_control import VoiceControl
@@ -91,8 +92,8 @@ class AutoMixerServer:
         # Load configuration
         self.config = self._load_config()
         
-        # Unified mixer client (can be WingClient or MixingStationClient)
-        self.mixer_client: Optional[Union[WingClient, MixingStationClient]] = None
+        # Unified mixer client (can be EnhancedOSCClient wrapping WingClient, or MixingStationClient)
+        self.mixer_client: Optional[Union[EnhancedOSCClient, WingClient, MixingStationClient]] = None
         self.connection_mode: Optional[str] = None  # 'wing' or 'mixing_station'
         
         self.connected_clients: Set[WebSocketServerProtocol] = set()
@@ -453,7 +454,7 @@ class AutoMixerServer:
             
             # Routing commands
             elif msg_type == "route_output":
-                if self.mixer_client and isinstance(self.mixer_client, WingClient):
+                if self.mixer_client and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     output_group = data.get("output_group")
                     output_number = data.get("output_number")
                     source_group = data.get("source_group")
@@ -473,7 +474,7 @@ class AutoMixerServer:
                         })
             
             elif msg_type == "route_multiple_outputs":
-                if self.mixer_client and isinstance(self.mixer_client, WingClient):
+                if self.mixer_client and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     output_group = data.get("output_group")
                     start_output = data.get("start_output")
                     num_outputs = data.get("num_outputs")
@@ -496,7 +497,7 @@ class AutoMixerServer:
                         })
             
             elif msg_type == "get_output_routing":
-                if self.mixer_client and isinstance(self.mixer_client, WingClient):
+                if self.mixer_client and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     output_group = data.get("output_group")
                     output_number = data.get("output_number")
                     
@@ -509,7 +510,7 @@ class AutoMixerServer:
             
             # Channel input routing commands
             elif msg_type == "set_channel_input":
-                if self.mixer_client and isinstance(self.mixer_client, WingClient):
+                if self.mixer_client and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     channel = data.get("channel")
                     source_group = data.get("source_group")
                     source_channel = data.get("source_channel")
@@ -525,7 +526,7 @@ class AutoMixerServer:
                         })
             
             elif msg_type == "set_channel_alt_input":
-                if self.mixer_client and isinstance(self.mixer_client, WingClient):
+                if self.mixer_client and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     channel = data.get("channel")
                     source_group = data.get("source_group")
                     source_channel = data.get("source_channel")
@@ -541,7 +542,7 @@ class AutoMixerServer:
                         })
             
             elif msg_type == "get_channel_input_routing":
-                if self.mixer_client and isinstance(self.mixer_client, WingClient):
+                if self.mixer_client and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     channel = data.get("channel")
                     
                     if channel is not None:
@@ -553,7 +554,7 @@ class AutoMixerServer:
             
             # Snapshot/Scene commands
             elif msg_type == "load_snap":
-                if self.mixer_client and isinstance(self.mixer_client, WingClient):
+                if self.mixer_client and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     snap_name = data.get("snap_name")
                     
                     if snap_name:
@@ -565,7 +566,7 @@ class AutoMixerServer:
                         })
             
             elif msg_type == "save_snap":
-                if self.mixer_client and isinstance(self.mixer_client, WingClient):
+                if self.mixer_client and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     snap_name = data.get("snap_name")
                     
                     if snap_name:
@@ -992,7 +993,7 @@ class AutoMixerServer:
         await self.disconnect_mixer()
         
         try:
-            self.mixer_client = WingClient(ip, send_port)
+            self.mixer_client = EnhancedOSCClient(ip=ip, port=send_port)
             self.connection_mode = 'wing'
             
             # Store the event loop reference for thread-safe callback
@@ -1305,7 +1306,7 @@ class AutoMixerServer:
             logger.info("Setting up voice aliases from Wing channel names...")
             
             # Get channel names from Wing (only works with WingClient)
-            if not isinstance(self.mixer_client, WingClient):
+            if not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                 logger.info("Channel aliases only supported for Wing mixer")
                 return
                 
@@ -1406,7 +1407,7 @@ class AutoMixerServer:
         Force rescan of all channel names from Wing mixer and update voice aliases.
         Useful when channel names have changed on the mixer.
         """
-        if not self.mixer_client or not isinstance(self.mixer_client, WingClient):
+        if not self.mixer_client or not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
             logger.warning("Rescan only available for Wing mixer")
             return
         
@@ -1799,7 +1800,7 @@ class AutoMixerServer:
         
         try:
             # Get channel names from mixer
-            if isinstance(self.mixer_client, WingClient):
+            if isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                 # Per Wing Remote Protocols v3.0.5:
                 # /ch/X/name - для установки имени
                 # /ch/X/$name - для чтения имени (read-only, отражает связанный источник)
@@ -1874,7 +1875,7 @@ class AutoMixerServer:
             return
         
         try:
-            if isinstance(self.mixer_client, WingClient):
+            if isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                 # Scan all channels (1-40) using async approach
                 logger.info("Querying channel names for all 40 channels...")
                 
@@ -1970,7 +1971,7 @@ class AutoMixerServer:
             for ch in channels:
                 try:
                     # Set TRIM to 0 dB using direct OSC command for reliability
-                    if isinstance(self.mixer_client, WingClient):
+                    if isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                         # Use direct OSC address for TRIM
                         address = f"/ch/{ch}/in/set/trim"
                         logger.info(f"Channel {ch}: Sending TRIM reset to {address} = 0.0 dB")
@@ -2040,7 +2041,7 @@ class AutoMixerServer:
             await asyncio.sleep(0.5)
             
             # Verify TRIM values if possible (for WingClient)
-            if isinstance(self.mixer_client, WingClient):
+            if isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                 logger.info("Verifying TRIM reset...")
                 await asyncio.sleep(0.5)  # Increased delay for state updates
                 verification_success = 0
@@ -2121,7 +2122,7 @@ class AutoMixerServer:
             })
             return
         
-        if not isinstance(self.mixer_client, WingClient):
+        if not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
             await self.send_to_client(websocket, {
                 "type": "bypass_result",
                 "success": False,
@@ -4717,7 +4718,7 @@ class AutoMixerServer:
                 
             elif cmd_type == "load_snap":
                 snap_name = command.get("snap_name")
-                if isinstance(self.mixer_client, WingClient):
+                if isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     success = self.mixer_client.load_snap(snap_name)
                     await self.broadcast({
                         "type": "voice_command_executed",
@@ -4816,7 +4817,7 @@ class AutoMixerServer:
             elif cmd_type == "eq_on":
                 channel = command.get("channel")
                 on = command.get("on", 1)
-                if channel is not None and isinstance(self.mixer_client, WingClient):
+                if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     self.mixer_client.set_eq_on(channel, on)
                     logger.info(f"Set EQ {'on' if on else 'off'} for channel {channel}")
                     await self.broadcast({
@@ -4830,7 +4831,7 @@ class AutoMixerServer:
                 channel = command.get("channel")
                 band = command.get("band")
                 db_change = command.get("db", 3)
-                if channel is not None and band and isinstance(self.mixer_client, WingClient):
+                if channel is not None and band and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     # Get current gain
                     band_gain_key = f"{band}g" if band in ["1", "2", "3", "4"] else ("lg" if band == "low" else "hg")
                     current_gain = self.mixer_client.get_eq_band_gain(channel, band_gain_key) or 0.0
@@ -4853,7 +4854,7 @@ class AutoMixerServer:
             elif cmd_type == "compressor_on":
                 channel = command.get("channel")
                 on = command.get("on", 1)
-                if channel is not None and isinstance(self.mixer_client, WingClient):
+                if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     self.mixer_client.set_compressor_on(channel, on)
                     logger.info(f"Set compressor {'on' if on else 'off'} for channel {channel}")
                     await self.broadcast({
@@ -4866,7 +4867,7 @@ class AutoMixerServer:
             elif cmd_type == "compressor_threshold":
                 channel = command.get("channel")
                 threshold = command.get("threshold")
-                if channel is not None and threshold is not None and isinstance(self.mixer_client, WingClient):
+                if channel is not None and threshold is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     self.mixer_client.set_compressor_threshold(channel, threshold)
                     logger.info(f"Set compressor threshold for channel {channel}: {threshold:.1f} dB")
                     await self.broadcast({
@@ -4879,7 +4880,7 @@ class AutoMixerServer:
             elif cmd_type == "compressor_gain_up" or cmd_type == "compressor_gain_down":
                 channel = command.get("channel")
                 db_change = command.get("db", 3)
-                if channel is not None and isinstance(self.mixer_client, WingClient):
+                if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     current_gain = self.mixer_client.get_compressor_gain(channel) or 0.0
                     if cmd_type == "compressor_gain_up":
                         new_gain = min(12.0, current_gain + db_change)

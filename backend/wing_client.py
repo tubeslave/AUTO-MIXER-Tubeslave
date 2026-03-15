@@ -1288,62 +1288,46 @@ class WingClient:
     
     def find_snap_by_name(self, snap_name: str, max_index: int = 200) -> Optional[int]:
         """
-        Найти индекс snapshot по имени через перебор индексов
-        
+        Найти индекс snapshot по имени через чтение имён (без загрузки).
+
+        Использует OSC get-запросы для чтения имён снапшотов
+        без вызова GO/recall — безопасно для использования на концерте.
+
         Args:
             snap_name: Имя snapshot для поиска
             max_index: Максимальный индекс для проверки
-        
+
         Returns:
             Индекс snapshot или None если не найден
         """
         if not self.is_connected:
             logger.warning("Not connected to Wing")
             return None
-        
+
         search_name_upper = snap_name.upper().strip()
-        
-        # Сохраняем текущий активный snapshot
-        self.send("/$ctl/lib/$active")
-        time.sleep(0.2)
-        original_active = self.state.get("/$ctl/lib/$active")
-        
-        # Перебираем индексы и пробуем загрузить каждый для проверки имени
+
+        # Read-only: query snapshot names via OSC without loading them
         for idx in range(1, max_index + 1):
             try:
-                # Устанавливаем индекс
-                self.send("/$ctl/lib/$actionidx", idx)
+                # Query the snapshot name at this index (read-only)
+                name_address = f"/$ctl/lib/name"
+                self.send(name_address, idx)
                 time.sleep(0.1)
-                
-                # Отправляем GO для загрузки (чтобы увидеть имя)
-                self.send("/$ctl/lib/$action", "GO")
-                time.sleep(0.2)
-                
-                # Проверяем активную сцену
-                self.send("/$ctl/lib/$active")
-                time.sleep(0.1)
-                active_name = self.state.get("/$ctl/lib/$active")
-                
-                if active_name:
-                    name_upper = active_name.upper()
+
+                snap_name_val = self.state.get(name_address)
+                if snap_name_val:
+                    name_upper = snap_name_val.upper().strip()
                     name_clean = name_upper.replace("I:/", "").replace(".SNAP", "").strip()
-                    
-                    # Проверяем совпадение
-                    if (search_name_upper == name_upper or 
+
+                    if (search_name_upper == name_upper or
                         search_name_upper == name_clean or
                         search_name_upper in name_upper):
-                        logger.debug(f"Found snapshot at index {idx}: {active_name}")
+                        logger.debug(f"Found snapshot at index {idx}: {snap_name_val}")
                         return idx
-                
+
             except Exception as e:
                 logger.debug(f"Error checking index {idx}: {e}")
-        
-        # Восстанавливаем оригинальный snapshot если он был
-        if original_active:
-            # Пробуем найти и восстановить оригинальный
-            # (это может быть сложно без индекса)
-            pass
-        
+
         return None
     
     def load_snap(self, snap_name: str, max_index: int = 200) -> bool:

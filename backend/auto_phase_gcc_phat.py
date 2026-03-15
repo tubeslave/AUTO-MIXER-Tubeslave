@@ -318,7 +318,7 @@ class AutoPhaseAligner:
             return
         
         analyzer = self.channel_analyzers[channel]
-        analyzer.add_frames(tgt_audio, ref_audio)
+        analyzer.add_frames(ref_audio, tgt_audio)
         
         # Rate limiting
         current_time = time.time() * 1000

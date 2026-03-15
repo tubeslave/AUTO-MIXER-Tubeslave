@@ -15,6 +15,10 @@ from lufs_gain_staging import LUFSMeter, TruePeakMeter
 
 logger = logging.getLogger(__name__)
 
+# Wing compressor ratio values (float) and their corresponding OSC string labels
+WING_RATIO_VALUES = [1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 20.0, float('inf')]
+WING_RATIO_STRINGS = ["1.0:1", "1.5:1", "2.0:1", "3.0:1", "4.0:1", "6.0:1", "8.0:1", "10:1", "20:1", "inf:1"]
+
 
 @dataclass
 class ChannelSignalFeatures:
