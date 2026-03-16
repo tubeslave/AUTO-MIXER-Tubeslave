@@ -820,16 +820,18 @@ class AutoFaderController:
     2. Auto Fader (Static) - одноразовая установка баланса
     """
     
-    def __init__(self, 
+    def __init__(self,
                  mixer_client=None,
                  sample_rate: int = 48000,
                  chunk_size: int = 2048,
                  config: Optional[Dict[str, Any]] = None,
-                 bleed_service=None):
-        
+                 bleed_service=None,
+                 audio_capture=None):
+
         self.mixer_client = mixer_client
         self.sample_rate = sample_rate
         self.chunk_size = chunk_size
+        self._audio_capture = audio_capture
         self.config = config or {}
         self.bleed_service = bleed_service
         
@@ -959,43 +961,21 @@ class AutoFaderController:
         if self.is_active:
             logger.warning("Controller already active")
             return False
-        
+
         self.device_index = device_id
         self.channel_settings = channel_settings
         self.channel_mapping = channel_mapping
         self.on_status_update = on_status_callback
-        
-        try:
-            import pyaudio
-            
-            self.pa = pyaudio.PyAudio()
-            
-            # Получаем информацию об устройстве
-            device_info = self.pa.get_device_info_by_index(int(device_id))
-            max_channels = int(device_info.get('maxInputChannels', 2))
-            device_sample_rate = int(device_info.get('defaultSampleRate', 48000))
-            
-            logger.info(f"Audio device: {device_info.get('name')}, "
-                       f"max channels: {max_channels}, sample rate: {device_sample_rate}")
-            
-            self.sample_rate = device_sample_rate
-            
-            # Определяем количество каналов
-            required_channels = max(channels) if channels else 2
-            self._num_channels = min(required_channels, max_channels)
-            
-            # Очищаем старые каналы
+
+        def _init_channels(channels, channel_mapping, channel_settings):
             self.channels.clear()
             self._audio_buffers.clear()
             self.envelopes.clear()
-            
-            # Инициализируем каналы
             update_interval_ms = self.update_interval * 1000
             for audio_ch in channels:
                 mixer_ch = channel_mapping.get(audio_ch, audio_ch)
                 settings = channel_settings.get(audio_ch, {})
                 instrument_type = settings.get('instrument_type', 'custom')
-                
                 self.channels[audio_ch] = ChannelFaderState(
                     channel_id=audio_ch,
                     mixer_channel=mixer_ch,
@@ -1003,10 +983,7 @@ class AutoFaderController:
                     instrument_type=instrument_type,
                     lufs_window_sec=self.lufs_window_sec if self.mode == BalanceMode.REALTIME else None
                 )
-                
                 self._audio_buffers[audio_ch] = deque(maxlen=10)
-                
-                # Envelope для плавности
                 self.envelopes[audio_ch] = AGCEnvelope(
                     self.sample_rate,
                     self.attack_ms,
@@ -1014,7 +991,44 @@ class AutoFaderController:
                     self.hold_ms,
                     update_interval_ms
                 )
-            
+
+        # Use unified AudioCapture if available
+        if self._audio_capture is not None:
+            try:
+                self.sample_rate = self._audio_capture.sample_rate
+                self._num_channels = max(channels) if channels else 2
+                _init_channels(channels, channel_mapping, channel_settings)
+                self._audio_capture.subscribe('auto_fader', self._audio_capture_poll)
+                self.is_active = True
+                self._stop_event.clear()
+                logger.info(f"Auto Fader started via AudioCapture: {len(channels)} channels")
+                return True
+            except Exception as e:
+                logger.warning(f"AudioCapture integration failed, falling back to PyAudio: {e}")
+                self._audio_capture = None
+
+        # Fallback: direct PyAudio stream
+        try:
+            import pyaudio
+
+            self.pa = pyaudio.PyAudio()
+
+            # Получаем информацию об устройстве
+            device_info = self.pa.get_device_info_by_index(int(device_id))
+            max_channels = int(device_info.get('maxInputChannels', 2))
+            device_sample_rate = int(device_info.get('defaultSampleRate', 48000))
+
+            logger.info(f"Audio device: {device_info.get('name')}, "
+                       f"max channels: {max_channels}, sample rate: {device_sample_rate}")
+
+            self.sample_rate = device_sample_rate
+
+            # Определяем количество каналов
+            required_channels = max(channels) if channels else 2
+            self._num_channels = min(required_channels, max_channels)
+
+            _init_channels(channels, channel_mapping, channel_settings)
+
             # Открываем аудио поток
             self.stream = self.pa.open(
                 format=pyaudio.paFloat32,
@@ -1025,24 +1039,34 @@ class AutoFaderController:
                 frames_per_buffer=self.chunk_size,
                 stream_callback=self._audio_callback
             )
-            
+
             self.stream.start_stream()
             self.is_active = True
             self._stop_event.clear()
-            
+
             logger.info(f"Auto Fader started: {len(channels)} channels")
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to start Auto Fader: {e}", exc_info=True)
             self.stop()
             return False
     
+    def _audio_capture_poll(self):
+        """Poll AudioCapture buffers and fill local _audio_buffers."""
+        if not self._audio_capture:
+            return
+        for audio_ch in list(self.channels.keys()):
+            if audio_ch <= self._num_channels:
+                data = self._audio_capture.get_buffer(audio_ch, self.chunk_size)
+                if data is not None and len(data) > 0:
+                    self._audio_buffers[audio_ch].append(data.copy())
+
     def _audio_callback(self, in_data, frame_count, time_info, status):
         """PyAudio callback для обработки аудио"""
         import pyaudio
-        
+
         if not self.is_active:
             return (None, pyaudio.paComplete)
         
@@ -2060,10 +2084,16 @@ class AutoFaderController:
         """Полная остановка контроллера"""
         self.stop_realtime_fader()
         self.cancel_auto_balance()
-        
+
         self.is_active = False
         self._stop_event.set()
-        
+
+        if self._audio_capture is not None:
+            try:
+                self._audio_capture.unsubscribe('auto_fader')
+            except Exception:
+                pass
+
         if self.stream:
             try:
                 self.stream.stop_stream()
@@ -2071,18 +2101,18 @@ class AutoFaderController:
             except:
                 pass
             self.stream = None
-        
+
         if self.pa:
             try:
                 self.pa.terminate()
             except:
                 pass
             self.pa = None
-        
+
         self.channels.clear()
         self._audio_buffers.clear()
         self.envelopes.clear()
-        
+
         logger.info("AutoFaderController stopped")
     
     def set_profile(self, genre: str):

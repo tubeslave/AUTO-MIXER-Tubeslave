@@ -444,7 +444,11 @@ class ChannelState:
         
         # History for smoothing
         self.gain_history = deque(maxlen=10)
-        
+
+        # Cached processing objects (B7 fix: avoid re-creation per call)
+        self._hybrid_fusion = HybridMetricFusion()
+        self._scenario_detector = ScenarioDetector()
+
         logger.debug(f"ChannelState initialized: ch{channel_id} (mixer {mixer_channel})")
     
     def process_audio(self, audio: np.ndarray) -> ChannelFeatures:
@@ -472,12 +476,10 @@ class ChannelState:
         peak_db = 20 * np.log10(peak_5ms + 1e-10)
         
         # Compute hybrid level
-        hybrid = HybridMetricFusion()
-        hybrid_db = hybrid.compute_hybrid_level(lufs_db, rms_db, peak_db)
-        
+        hybrid_db = self._hybrid_fusion.compute_hybrid_level(lufs_db, rms_db, peak_db)
+
         # Detect scenario
-        detector = ScenarioDetector()
-        scenario = detector.detect_scenario(hybrid_db, peak_db)
+        scenario = self._scenario_detector.detect_scenario(hybrid_db, peak_db)
         
         # Update features
         self.features = ChannelFeatures(

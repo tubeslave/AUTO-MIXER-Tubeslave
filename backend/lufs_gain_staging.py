@@ -626,11 +626,13 @@ class LUFSGainStagingController:
                  sample_rate: int = 48000,
                  chunk_size: int = 2048,
                  config: Optional[Dict[str, Any]] = None,
-                 bleed_service=None):
-        
+                 bleed_service=None,
+                 audio_capture=None):
+
         self.mixer_client = mixer_client
         self.sample_rate = sample_rate
         self.chunk_size = chunk_size
+        self._audio_capture = audio_capture
         
         # Загрузка конфигурации
         self.config = config or {}
@@ -734,39 +736,18 @@ class LUFSGainStagingController:
         if self.is_active:
             logger.warning("Controller already active")
             return False
-        
+
         self.device_index = device_id
         self.channel_settings = channel_settings
         self.channel_mapping = channel_mapping
         self.on_status_update = on_status_callback
-        
-        try:
-            import pyaudio
-            
-            self.pa = pyaudio.PyAudio()
-            
-            # Получаем информацию об устройстве
-            device_info = self.pa.get_device_info_by_index(int(device_id))
-            max_channels = int(device_info.get('maxInputChannels', 2))
-            device_sample_rate = int(device_info.get('defaultSampleRate', 48000))
-            
-            logger.info(f"Audio device: {device_info.get('name')}, "
-                       f"max channels: {max_channels}, sample rate: {device_sample_rate}")
-            
-            self.sample_rate = device_sample_rate
-            
-            # Определяем количество каналов
-            required_channels = max(channels) if channels else 2
-            self._num_channels = min(required_channels, max_channels)
-            
-            # Очищаем старые каналы перед добавлением новых
+
+        def _init_channels(channels, channel_mapping):
             self.channels.clear()
             self._audio_buffers.clear()
             self.measured_levels.clear()
             logger.info(f"Cleared old channels, initializing {len(channels)} new channels")
-            
-            # Инициализируем AGC для каждого канала
-            update_interval_ms = self.update_interval * 1000  # Конвертируем секунды в мс
+            update_interval_ms = self.update_interval * 1000
             for audio_ch in channels:
                 mixer_ch = channel_mapping.get(audio_ch, audio_ch)
                 self.channels[audio_ch] = ChannelAGC(
@@ -784,7 +765,44 @@ class LUFSGainStagingController:
                     update_interval_ms=update_interval_ms,
                 )
                 self._audio_buffers[audio_ch] = deque(maxlen=10)
-            
+
+        # Use unified AudioCapture if available
+        if self._audio_capture is not None:
+            try:
+                self.sample_rate = self._audio_capture.sample_rate
+                self._num_channels = max(channels) if channels else 2
+                _init_channels(channels, channel_mapping)
+                self._audio_capture.subscribe('lufs_gain_staging', self._audio_capture_poll)
+                self.is_active = True
+                self._stop_event.clear()
+                logger.info(f"Audio capture started via AudioCapture: {len(channels)} channels")
+                return True
+            except Exception as e:
+                logger.warning(f"AudioCapture integration failed, falling back to PyAudio: {e}")
+                self._audio_capture = None
+
+        # Fallback: direct PyAudio stream
+        try:
+            import pyaudio
+
+            self.pa = pyaudio.PyAudio()
+
+            # Получаем информацию об устройстве
+            device_info = self.pa.get_device_info_by_index(int(device_id))
+            max_channels = int(device_info.get('maxInputChannels', 2))
+            device_sample_rate = int(device_info.get('defaultSampleRate', 48000))
+
+            logger.info(f"Audio device: {device_info.get('name')}, "
+                       f"max channels: {max_channels}, sample rate: {device_sample_rate}")
+
+            self.sample_rate = device_sample_rate
+
+            # Определяем количество каналов
+            required_channels = max(channels) if channels else 2
+            self._num_channels = min(required_channels, max_channels)
+
+            _init_channels(channels, channel_mapping)
+
             # Открываем аудио поток
             self.stream = self.pa.open(
                 format=pyaudio.paFloat32,
@@ -795,24 +813,33 @@ class LUFSGainStagingController:
                 frames_per_buffer=self.chunk_size,
                 stream_callback=self._audio_callback
             )
-            
+
             self.stream.start_stream()
             self.is_active = True
             self._stop_event.clear()
-            
+
             logger.info(f"Audio capture started: {len(channels)} channels")
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to start audio capture: {e}", exc_info=True)
             self.stop()
             return False
     
+    def _audio_capture_poll(self):
+        """Poll AudioCapture buffers and fill local _audio_buffers."""
+        if not self._audio_capture:
+            return
+        for audio_ch in list(self.channels.keys()):
+            data = self._audio_capture.get_buffer(audio_ch, self.chunk_size)
+            if data is not None and len(data) > 0:
+                self._audio_buffers[audio_ch].append(data.copy())
+
     def _audio_callback(self, in_data, frame_count, time_info, status):
         """PyAudio callback для обработки аудио."""
         import pyaudio
-        
+
         if not self.is_active:
             return (None, pyaudio.paComplete)
         
@@ -1095,10 +1122,16 @@ class LUFSGainStagingController:
     def stop(self):
         """Полная остановка контроллера."""
         self.stop_realtime_correction()
-        
+
         self.is_active = False
         self._stop_event.set()
-        
+
+        if self._audio_capture is not None:
+            try:
+                self._audio_capture.unsubscribe('lufs_gain_staging')
+            except Exception:
+                pass
+
         if self.stream:
             try:
                 self.stream.stop_stream()
@@ -1106,18 +1139,18 @@ class LUFSGainStagingController:
             except:
                 pass
             self.stream = None
-        
+
         if self.pa:
             try:
                 self.pa.terminate()
             except:
                 pass
             self.pa = None
-        
+
         self.channels.clear()
         self._audio_buffers.clear()
         self.measured_levels.clear()
-        
+
         logger.info("Controller stopped")
     
     def get_status(self) -> Dict:

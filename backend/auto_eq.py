@@ -98,24 +98,27 @@ class SpectrumAnalyzer:
     - MFCC for timbre analysis
     """
     
-    def __init__(self, 
+    def __init__(self,
                  sample_rate: int = 48000,
                  frame_size: int = 4096,
                  hop_size: int = 2048,
-                 device_index: int = None):
+                 device_index: int = None,
+                 audio_capture=None):
         """
         Initialize spectrum analyzer.
-        
+
         Args:
             sample_rate: Audio sample rate in Hz
             frame_size: FFT frame size (power of 2)
             hop_size: Hop size between frames
             device_index: PyAudio device index for audio input
+            audio_capture: Optional unified AudioCapture service
         """
         self.sample_rate = sample_rate
         self.frame_size = frame_size
         self.hop_size = hop_size
         self.device_index = device_index
+        self._audio_capture = audio_capture
         
         # Essentia algorithms (lazy initialization)
         self._essentia_initialized = False
@@ -200,29 +203,57 @@ class SpectrumAnalyzer:
             self._essentia_initialized = False
             return False
     
+    def _audio_capture_poll(self):
+        """Poll AudioCapture buffer for the target channel."""
+        if not self._audio_capture:
+            return
+        ch = self._target_channel + 1  # AudioCapture uses 1-based channels
+        data = self._audio_capture.get_buffer(ch, self.hop_size)
+        if data is not None and len(data) > 0:
+            self.audio_buffer.extend(data)
+
     def start(self, channel: int = 1, on_spectrum_callback: Callable = None) -> bool:
         """
         Start spectrum analysis.
-        
+
         Args:
             channel: Audio channel to analyze (1-based)
             on_spectrum_callback: Callback for spectrum updates
-            
+
         Returns:
             True if started successfully
         """
         if self.is_running:
             logger.warning("Spectrum analyzer already running")
             return False
-        
+
         self.on_spectrum_updated = on_spectrum_callback
         self._init_essentia()
-        
+        self._target_channel = channel - 1  # 0-based index
+
+        # Use unified AudioCapture if available
+        if self._audio_capture is not None:
+            try:
+                self.sample_rate = self._audio_capture.sample_rate
+                self._num_channels = channel
+                self.freq_bins = np.fft.rfftfreq(self.frame_size, 1.0 / self.sample_rate)
+                self._audio_capture.subscribe('auto_eq', self._audio_capture_poll)
+                self.is_running = True
+                self._stop_event.clear()
+                self._analysis_thread = threading.Thread(target=self._analysis_loop, daemon=True)
+                self._analysis_thread.start()
+                logger.info(f"Spectrum analyzer started via AudioCapture: ch{channel}, {self.sample_rate}Hz")
+                return True
+            except Exception as e:
+                logger.warning(f"AudioCapture integration failed, falling back to PyAudio: {e}")
+                self._audio_capture = None
+
+        # Fallback: direct PyAudio stream
         try:
             import pyaudio
-            
+
             self.pa = pyaudio.PyAudio()
-            
+
             # Get device info
             if self.device_index is not None:
                 device_info = self.pa.get_device_info_by_index(int(self.device_index))
@@ -234,13 +265,12 @@ class SpectrumAnalyzer:
                 max_channels = int(device_info.get('maxInputChannels', 2))
                 self.sample_rate = int(device_info.get('defaultSampleRate', 48000))
                 logger.info(f"Using default device: {device_info.get('name')}")
-            
+
             self._num_channels = min(channel, max_channels)
-            self._target_channel = channel - 1  # 0-based index
-            
+
             # Update frequency bins for actual sample rate
             self.freq_bins = np.fft.rfftfreq(self.frame_size, 1.0 / self.sample_rate)
-            
+
             # Open audio stream
             self.stream = self.pa.open(
                 format=pyaudio.paFloat32,
@@ -251,18 +281,18 @@ class SpectrumAnalyzer:
                 frames_per_buffer=self.hop_size,
                 stream_callback=self._audio_callback
             )
-            
+
             self.stream.start_stream()
             self.is_running = True
             self._stop_event.clear()
-            
+
             # Start analysis thread
             self._analysis_thread = threading.Thread(target=self._analysis_loop, daemon=True)
             self._analysis_thread.start()
-            
+
             logger.info(f"Spectrum analyzer started: {self._num_channels} channels, {self.sample_rate}Hz")
             return True
-            
+
         except ImportError as e:
             logger.error(f"PyAudio not installed: {e}")
             return False
@@ -274,7 +304,13 @@ class SpectrumAnalyzer:
         """Stop spectrum analysis."""
         self._stop_event.set()
         self.is_running = False
-        
+
+        if self._audio_capture is not None:
+            try:
+                self._audio_capture.unsubscribe('auto_eq')
+            except Exception:
+                pass
+
         if self.stream:
             try:
                 self.stream.stop_stream()
@@ -282,17 +318,17 @@ class SpectrumAnalyzer:
             except:
                 pass
             self.stream = None
-        
+
         if self.pa:
             try:
                 self.pa.terminate()
             except:
                 pass
             self.pa = None
-        
+
         if self._analysis_thread and self._analysis_thread.is_alive():
             self._analysis_thread.join(timeout=1.0)
-        
+
         logger.info("Spectrum analyzer stopped")
     
     def _audio_callback(self, in_data, frame_count, time_info, status):

@@ -54,6 +54,7 @@ class AutoCompressorController:
         soundcheck_duration_per_channel: float = 7.0,
         target_gr_db: float = 6.0,
         bleed_service=None,
+        audio_capture=None,
     ):
         self.mixer_client = mixer_client
         self.sample_rate = sample_rate
@@ -61,6 +62,7 @@ class AutoCompressorController:
         self.target_gr_db = target_gr_db
         self.bleed_service = bleed_service
         self.chunk_size = 1024
+        self._audio_capture = audio_capture
 
         self._pa = None
         self._stream = None
@@ -99,6 +101,11 @@ class AutoCompressorController:
         self._stop_event.set()
         self.soundcheck_running = False
         self.live_running = False
+        if self._audio_capture is not None:
+            try:
+                self._audio_capture.unsubscribe('auto_compressor')
+            except Exception:
+                pass
         self._stop_stream()
         self.is_active = False
         if self._pa:
@@ -139,6 +146,15 @@ class AutoCompressorController:
             logger.warning(f"Auto Compressor callback error: {e}", exc_info=True)
         return (None, pyaudio.paContinue)
 
+    def _audio_capture_poll(self):
+        """Poll AudioCapture buffers and fill local _audio_buffers."""
+        if not self._audio_capture:
+            return
+        for audio_ch in list(self._audio_buffers.keys()):
+            data = self._audio_capture.get_buffer(audio_ch, self.chunk_size)
+            if data is not None and len(data) > 0:
+                self._audio_buffers[audio_ch].append(data.copy())
+
     def start(
         self,
         device_id: int,
@@ -150,6 +166,33 @@ class AutoCompressorController:
         if self.is_active:
             logger.warning("Auto Compressor already active")
             return False
+
+        self.device_index = device_id
+        self.channels = list(channels)
+        self.channel_mapping = dict(channel_mapping)
+        self.channel_names = dict(channel_names or {})
+        self._stop_event.clear()
+
+        # Use unified AudioCapture if available
+        if self._audio_capture is not None:
+            try:
+                self.sample_rate = self._audio_capture.sample_rate
+                self._num_channels = max(channels) if channels else 2
+                self._audio_buffers.clear()
+                self._extractors.clear()
+                for audio_ch in channels:
+                    self._audio_buffers[audio_ch] = deque(maxlen=max(500, int(self.sample_rate * 12 / self.chunk_size)))
+                    self._extractors[audio_ch] = SignalFeatureExtractor(audio_ch, self.sample_rate, self.chunk_size)
+                self._audio_capture.subscribe('auto_compressor', self._audio_capture_poll)
+                self.is_active = True
+                time.sleep(1.0)
+                logger.info(f"Auto Compressor started via AudioCapture: {len(channels)} channels")
+                return True
+            except Exception as e:
+                logger.warning(f"AudioCapture integration failed, falling back to PyAudio: {e}")
+                self._audio_capture = None
+
+        # Fallback: direct PyAudio stream
         try:
             import pyaudio
             self._pa = pyaudio.PyAudio()
@@ -157,12 +200,7 @@ class AutoCompressorController:
             max_ch = int(device_info.get("maxInputChannels", 2))
             rate = int(device_info.get("defaultSampleRate", 48000))
             self.sample_rate = rate
-            self.device_index = device_id
-            self.channels = list(channels)
-            self.channel_mapping = dict(channel_mapping)
-            self.channel_names = dict(channel_names or {})
             self._num_channels = min(max(channels) if channels else 2, max_ch)
-            self._stop_event.clear()
 
             self._audio_buffers.clear()
             self._extractors.clear()
