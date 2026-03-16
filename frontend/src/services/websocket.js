@@ -131,6 +131,17 @@ console.error(`Error in listener for ${eventType}:`, error);
     });
   }
 
+  // dLive MIDI/TCP connection
+  connectDLive(ip, port = 51328, tls = false, midiBaseChannel = 0) {
+    this.send({
+      type: 'connect_dlive',
+      ip,
+      port,
+      tls,
+      midi_base_channel: midiBaseChannel
+    });
+  }
+
   // Mixing Station connection
   connectMixingStation(host = '127.0.0.1', oscPort = 8000, restPort = 8080) {
     this.send({

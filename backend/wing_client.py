@@ -7,11 +7,13 @@ import logging
 import time
 from typing import Callable, Dict, Any, Optional
 
+from mixer_client_base import MixerClientBase
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class WingClient:
+class WingClient(MixerClientBase):
     """OSC client for Behringer Wing mixer - uses correct Wing OSC address format"""
     
     def __init__(self, ip: str = "192.168.1.102", port: int = 2223):
@@ -1555,5 +1557,27 @@ class WingClient:
                 }
         except Exception as e:
             logger.error(f"Error getting channel {channel} input routing: {e}")
-        
+
         return None
+
+    # ── MixerClientBase ABC bridge methods ──────────────────────
+    def set_fader(self, channel: int, value_db: float):
+        self.set_channel_fader(channel, value_db)
+
+    def get_fader(self, channel: int) -> float:
+        address = f"/ch/{channel}/fdr"
+        val = self.state.get(address)
+        return float(val) if val is not None else -144.0
+
+    def set_mute(self, channel: int, muted: bool):
+        self.set_channel_mute(channel, 1 if muted else 0)
+
+    def get_mute(self, channel: int) -> bool:
+        val = self.get_channel_mute(channel)
+        return bool(val) if val is not None else False
+
+    def set_gain(self, channel: int, value_db: float):
+        self.set_channel_gain(channel, value_db)
+
+    def recall_scene(self, scene_number: int):
+        self.load_snap_by_index(scene_number)

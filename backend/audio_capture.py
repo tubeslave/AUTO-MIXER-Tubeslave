@@ -26,11 +26,78 @@ except (ImportError, OSError):
 
 class AudioSourceType(Enum):
     DANTE = "dante"
+    SOUNDGRID = "soundgrid"
     SOUNDDEVICE = "sounddevice"
     TEST_SINE = "test_sine"
     TEST_PINK_NOISE = "test_pink_noise"
     TEST_FILE = "test_file"
     SILENCE = "silence"
+
+
+class AudioDeviceType(Enum):
+    DANTE = "dante"
+    SOUNDGRID = "soundgrid"
+    ASIO = "asio"
+    DEFAULT = "default"
+
+
+# ── Device discovery helpers ──────────────────────────────────
+
+SOUNDGRID_PATTERNS = ("waves", "soundgrid", "sg ")
+
+def list_audio_devices() -> list:
+    """Return list of available audio input devices.
+
+    Each entry is a dict with 'index', 'name', 'max_input_channels', 'default_samplerate'.
+    """
+    if not HAS_SOUNDDEVICE:
+        return []
+    devices = []
+    try:
+        for idx, dev in enumerate(sd.query_devices()):
+            if dev.get("max_input_channels", 0) > 0:
+                devices.append({
+                    "index": idx,
+                    "name": dev["name"],
+                    "max_input_channels": dev["max_input_channels"],
+                    "default_samplerate": dev.get("default_samplerate", 48000),
+                })
+    except Exception as e:
+        logger.error(f"Error listing audio devices: {e}")
+    return devices
+
+
+def find_device_by_name(pattern: str) -> Optional[int]:
+    """Find audio device index whose name contains *pattern* (case-insensitive)."""
+    pattern_lower = pattern.lower()
+    for dev in list_audio_devices():
+        if pattern_lower in dev["name"].lower():
+            logger.info(f"Audio device matched: '{dev['name']}' (index {dev['index']})")
+            return dev["index"]
+    return None
+
+
+def detect_audio_device() -> tuple:
+    """Auto-detect best audio device.
+
+    Priority: SoundGrid > Dante > system default.
+    Returns (device_index_or_name, AudioDeviceType).
+    """
+    devices = list_audio_devices()
+    # 1) SoundGrid
+    for dev in devices:
+        name_lower = dev["name"].lower()
+        if any(p in name_lower for p in SOUNDGRID_PATTERNS):
+            logger.info(f"SoundGrid device detected: '{dev['name']}' ({dev['max_input_channels']}ch)")
+            return dev["index"], AudioDeviceType.SOUNDGRID
+    # 2) Dante
+    for dev in devices:
+        if "dante" in dev["name"].lower():
+            logger.info(f"Dante device detected: '{dev['name']}' ({dev['max_input_channels']}ch)")
+            return dev["index"], AudioDeviceType.DANTE
+    # 3) Default
+    logger.info("No SoundGrid/Dante device found — using system default")
+    return None, AudioDeviceType.DEFAULT
 
 
 @dataclass
@@ -143,7 +210,7 @@ class AudioCapture:
             return
         self._running = True
 
-        if self.source_type == AudioSourceType.DANTE or self.source_type == AudioSourceType.SOUNDDEVICE:
+        if self.source_type in (AudioSourceType.DANTE, AudioSourceType.SOUNDDEVICE, AudioSourceType.SOUNDGRID):
             if HAS_SOUNDDEVICE:
                 self._start_sounddevice()
             else:

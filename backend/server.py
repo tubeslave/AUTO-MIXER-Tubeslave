@@ -19,6 +19,7 @@ except ImportError:
     from websockets.legacy.server import WebSocketServerProtocol
 
 from wing_client import WingClient
+from dlive_client import DLiveClient
 from osc.enhanced_osc_client import EnhancedOSCClient
 from mixing_station_client import MixingStationClient, discover_mixing_station
 from audio_devices import get_audio_devices
@@ -94,9 +95,9 @@ class AutoMixerServer:
         # Load configuration
         self.config = self._load_config()
         
-        # Unified mixer client (can be EnhancedOSCClient wrapping WingClient, or MixingStationClient)
-        self.mixer_client: Optional[Union[EnhancedOSCClient, WingClient, MixingStationClient]] = None
-        self.connection_mode: Optional[str] = None  # 'wing' or 'mixing_station'
+        # Unified mixer client (can be EnhancedOSCClient wrapping WingClient, DLiveClient, or MixingStationClient)
+        self.mixer_client: Optional[Union[EnhancedOSCClient, WingClient, DLiveClient, MixingStationClient]] = None
+        self.connection_mode: Optional[str] = None  # 'wing', 'dlive', or 'mixing_station'
         
         self.connected_clients: Set[WebSocketServerProtocol] = set()
         
@@ -485,6 +486,44 @@ class AutoMixerServer:
                 
         except Exception as e:
             logger.error(f"Error connecting to Wing: {e}")
+            self.mixer_client = None
+            self.connection_mode = None
+            await self.broadcast({
+                "type": "connection_status",
+                "connected": False,
+                "error": str(e)
+            })
+
+    async def connect_dlive(self, ip: str = "192.168.1.70", port: int = 51328,
+                            tls: bool = False, midi_base_channel: int = 0):
+        """Connect to Allen & Heath dLive mixer via MIDI over TCP."""
+        await self.disconnect_mixer()
+
+        try:
+            client = DLiveClient(ip=ip, port=port, tls=tls, midi_base_channel=midi_base_channel)
+            success = client.connect()
+
+            if success:
+                self.mixer_client = client
+                self.connection_mode = 'dlive'
+
+                await self.broadcast({
+                    "type": "connection_status",
+                    "connected": True,
+                    "mode": "dlive",
+                    "ip": ip,
+                    "state": client.get_state()
+                })
+                logger.info(f"dLive connected at {ip}:{port}")
+            else:
+                await self.broadcast({
+                    "type": "connection_status",
+                    "connected": False,
+                    "error": "dLive connection failed"
+                })
+
+        except Exception as e:
+            logger.error(f"Error connecting to dLive: {e}")
             self.mixer_client = None
             self.connection_mode = None
             await self.broadcast({

@@ -3,7 +3,7 @@ import websocketService from '../services/websocket';
 import './SettingsTab.css';
 
 const DEFAULTS = {
-  mixer: { mixerIp: '192.168.1.102', mixerPort: 2223 },
+  mixer: { mixerType: 'wing', mixerIp: '192.168.1.102', mixerPort: 2223, dliveIp: '192.168.1.70', dlivePort: 51328, dliveTls: false, dliveMidiChannel: 0 },
   gainStaging: { targetLufs: -23, truePeakLimit: -1, ratio: 4, learningDurationSec: 30 },
   autoFader: { bleedThreshold: -50, targetLoudness: -18, smoothingAlpha: 0.3 },
   voiceControl: { language: 'ru', modelSize: 'small' },
@@ -63,17 +63,51 @@ function SettingsTab({ mixerIp, mixerPort, onMixerSettingsChange }) {
         <h3 className="settings-section-title">Mixer</h3>
         <div className="settings-body">
           <div className="setting-row">
-            <label>Wing IP</label>
-            <input type="text" value={allSettings.mixer.mixerIp}
-              onChange={e => handleChange('mixer', 'mixerIp', e.target.value)}
-              style={{flex:1, padding: '4px 8px', border: '1px solid #30363d', borderRadius: '4px', background: '#0d1117', color: '#e6e6e6'}} />
+            <label>Mixer Type</label>
+            <select value={allSettings.mixer.mixerType} onChange={e => handleChange('mixer', 'mixerType', e.target.value)}>
+              <option value="wing">Behringer Wing</option>
+              <option value="dlive">Allen & Heath dLive</option>
+            </select>
           </div>
-          <div className="setting-row">
-            <label>OSC Port</label>
-            <input type="number" value={allSettings.mixer.mixerPort}
-              onChange={e => handleChange('mixer', 'mixerPort', parseInt(e.target.value))}
-              style={{width: '80px', padding: '4px 8px', border: '1px solid #30363d', borderRadius: '4px', background: '#0d1117', color: '#e6e6e6'}} />
-          </div>
+          {allSettings.mixer.mixerType === 'wing' && (<>
+            <div className="setting-row">
+              <label>Wing IP</label>
+              <input type="text" value={allSettings.mixer.mixerIp}
+                onChange={e => handleChange('mixer', 'mixerIp', e.target.value)}
+                style={{flex:1, padding: '4px 8px', border: '1px solid #30363d', borderRadius: '4px', background: '#0d1117', color: '#e6e6e6'}} />
+            </div>
+            <div className="setting-row">
+              <label>OSC Port</label>
+              <input type="number" value={allSettings.mixer.mixerPort}
+                onChange={e => handleChange('mixer', 'mixerPort', parseInt(e.target.value))}
+                style={{width: '80px', padding: '4px 8px', border: '1px solid #30363d', borderRadius: '4px', background: '#0d1117', color: '#e6e6e6'}} />
+            </div>
+          </>)}
+          {allSettings.mixer.mixerType === 'dlive' && (<>
+            <div className="setting-row">
+              <label>dLive IP</label>
+              <input type="text" value={allSettings.mixer.dliveIp}
+                onChange={e => handleChange('mixer', 'dliveIp', e.target.value)}
+                style={{flex:1, padding: '4px 8px', border: '1px solid #30363d', borderRadius: '4px', background: '#0d1117', color: '#e6e6e6'}} />
+            </div>
+            <div className="setting-row">
+              <label>TCP Port</label>
+              <input type="number" value={allSettings.mixer.dlivePort}
+                onChange={e => handleChange('mixer', 'dlivePort', parseInt(e.target.value))}
+                style={{width: '80px', padding: '4px 8px', border: '1px solid #30363d', borderRadius: '4px', background: '#0d1117', color: '#e6e6e6'}} />
+            </div>
+            <div className="setting-row">
+              <label>TLS</label>
+              <input type="checkbox" checked={allSettings.mixer.dliveTls}
+                onChange={e => handleChange('mixer', 'dliveTls', e.target.checked)} />
+            </div>
+            <div className="setting-row">
+              <label>MIDI Base Ch</label>
+              <input type="number" min="0" max="15" value={allSettings.mixer.dliveMidiChannel}
+                onChange={e => handleChange('mixer', 'dliveMidiChannel', parseInt(e.target.value))}
+                style={{width: '60px', padding: '4px 8px', border: '1px solid #30363d', borderRadius: '4px', background: '#0d1117', color: '#e6e6e6'}} />
+            </div>
+          </>)}
         </div>
 
         <h3 className="settings-section-title">Gain Staging</h3>

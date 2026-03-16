@@ -39,9 +39,14 @@ class ConfigManager:
         """Build default configuration."""
         return {
             'mixer': {
+                'type': 'wing',
                 'ip': '192.168.1.1',
                 'port': 2222,
                 'protocol': 'osc',
+                'tls': False,
+                'midi_base_channel': 0,
+                'user_profile': 0,
+                'password': '',
                 'keepalive_interval': 5.0,
                 'command_rate_limit': 10.0,
                 'connection_timeout': 10.0,
@@ -52,6 +57,7 @@ class ConfigManager:
                 'channels': 40,
                 'source': 'dante',
                 'device_name': '',
+                'device_type': 'default',
                 'buffer_seconds': 5.0,
             },
             'websocket': {
@@ -120,6 +126,7 @@ class ConfigManager:
     def _apply_env_vars(self):
         """Apply environment variable overrides (AUTOMIXER_ prefix)."""
         env_map = {
+            'AUTOMIXER_MIXER_TYPE': ('mixer', 'type'),
             'AUTOMIXER_MIXER_IP': ('mixer', 'ip'),
             'AUTOMIXER_MIXER_PORT': ('mixer', 'port', int),
             'AUTOMIXER_WS_PORT': ('websocket', 'port', int),
