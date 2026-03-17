@@ -1,0 +1,89 @@
+# AUTO-MIXER-Tubeslave — Cursor Rules
+# Автоматический микшер для live sound. Behringer WING Rack (OSC) + Allen & Heath dLive (MIDI/TCP).
+# Уровень: Compounding Engineering (Level 4) → каждый урок фиксируется в правилах.
+
+## Проект
+- Назначение: AI-управляемый автоматический микшер для саундчеков и концертов
+- Backend: Python 3.10+ (asyncio, WebSocket, OSC, MIDI/TCP)
+- Frontend: React 18 + Electron (desktop app)
+- ML: PyTorch (channel classifier, gain/pan predictor, style transfer)
+- AI Agent: ChromaDB + RAG + Ollama (llama3) / Perplexity API
+- Целевые консоли: Behringer WING Rack (OSC, fw 3.0.5), Allen & Heath dLive (MIDI over TCP)
+- Аудио: Dante Virtual Soundcard, Waves SoundGrid (auto-detect)
+
+## Критические правила безопасности (LIVE SOUND)
+- НИКОГДА не отправлять OSC/MIDI команды без проверки границ: fader ≤ 0 dBFS, gain ≤ +60 dB
+- ВСЕГДА проверять true peak < -1.0 dBTP перед применением gain
+- feedback_detector.py — единственный модуль с правом экстренного снижения фейдера
+- find_snap_by_name() НЕ должна загружать снапшоты — только читать метаданные (кэш имён)
+- При сомнениях — снижай уровень, не повышай. Безопасность слуха важнее идеального микса
+
+## Архитектура
+- Точка входа: `backend/server.py` — WebSocket координатор, регистрирует handler-модули
+- Handlers: `backend/handlers/` — 14 модулей (audio, automation, compressor, eq, fader, gain_staging, phase, routing, snapshot, soundcheck, voice и др.)
+- Mixer clients: `backend/wing_client.py` (OSC), `backend/dlive_client.py` (MIDI/TCP) — оба наследуют `MixerClientBase`
+- Agents: `backend/agents/` — base_agent, coordinator, eq_agent, fader_agent, gain_agent
+- ML: `backend/ml/` — channel_classifier, gain_pan_predictor, style_transfer, losses, differentiable_console
+- AI: `backend/ai/` — agent.py (LLM orchestrator), knowledge_base.py (ChromaDB/RAG), llm_client.py, rule_engine.py
+- Thread safety: `backend/thread_safety.py` — ThreadSafeMixerState с asyncio.Lock, copy-on-read snapshots
+- Audio capture: `backend/audio_capture.py` — единый сервис с ring-буферами, subscribe pattern
+- Config: `config/automixer.yaml` — YAML, hot-reload через watchdog
+
+## Стиль кода
+- Python: PEP 8, type hints обязательны, docstrings (Google style)
+- Максимальная длина строки: 100 символов
+- Импорты: stdlib → third-party → local, разделённые пустой строкой
+- Все числовые константы DSP — именованные (не magic numbers)
+- Логирование: structlog (JSON в production, human-readable в dev)
+- Async: asyncio для I/O, threading только для блокирующего audio I/O
+
+## DSP и Audio — обязательные стандарты
+- LUFS: ITU-R BS.1770-4 с double gating (absolute -70 LUFS + relative -10 LU)
+- True Peak: 4x oversampling по ITU-R BS.1770-4
+- K-Weighting: два каскада biquad (high-shelf +4dB @ 1681 Hz, HPF 38 Hz)
+- GCC-PHAT: аргументы — gcc_phat(target, reference), НЕ наоборот
+- EQ biquads: Audio EQ Cookbook (Robert Bristow-Johnson)
+- Компрессия: ratio = 1 + (max_ratio - 1) * factor (НЕ инвертировать)
+- Gate hysteresis: объявленный hysteresis ДОЛЖЕН применяться в GateProcessor
+
+## Протоколы микшерных пультов
+### Behringer WING Rack (OSC)
+- Порт подключения: 2222 (инициация через 'WING?'), данные: 2223
+- Формат адресов: `/ch/{N}/...` где N = 1..40
+- Fader: 0.0 = -∞, 0.7498 = 0 dB, 1.0 = +10 dB
+- EQ: 4 band parametric, `/ch/{N}/eq/{band}/f`, `/ch/{N}/eq/{band}/g`, `/ch/{N}/eq/{band}/q`
+- Keepalive: XREMOTE каждые 5 секунд
+- Rate limit: ≤ 10 команд/сек на адрес (throttle в wing_client.py)
+
+### Allen & Heath dLive (MIDI over TCP)
+- Порт: 51328 (plain) / 51329 (TLS)
+- Fader: NRPN 14-bit, 0x0000 = -∞, 0x2AAA = 0 dB, 0x3FFF = +10 dB
+- EQ: NRPN MSB 0x40-0x4E (4 bands: freq, gain, Q)
+- SysEx header: F0 00 00 1A 50 10 01 00
+
+## Тестирование
+- Фреймворк: pytest + pytest-asyncio
+- Структура: `tests/test_ml/`, `tests/test_ai/`, `tests/test_infrastructure/`
+- CI: GitHub Actions (Python 3.10, 3.11, 3.12)
+- Virtual mixer: `virtual_mixer/virtual_mixer.py` — для тестов без реального оборудования
+- Каждый новый модуль ОБЯЗАН иметь тесты в `tests/`
+- DSP-тесты: проверять на синтетических сигналах (sine, pink noise, impulse)
+
+## Зафиксированные уроки (Compounding)
+1. GCC-PHAT аргументы: reference и target были перепутаны → ВСЕГДА gcc_phat(target, reference)
+2. Agent pause: while-цикл завершался при PAUSED → использовать asyncio.Event для ожидания
+3. find_snap_by_name: загружала снапшоты → кэшировать имена без загрузки
+4. ratio_float_to_wing: undefined symbols → WING_RATIO_VALUES и WING_RATIO_STRINGS на уровне модуля
+5. AudioCapture: 4 модуля создавали свои PyAudio потоки → единый сервис audio_capture.py с subscribe
+6. ScenarioDetector: создавался заново на каждый аудиоблок → кэшировать экземпляр
+7. server.py монолит: 5000+ строк → декомпозиция на handlers/ (14 модулей)
+8. ML classifier: заглушка с 4 типами ударных → полноценный классификатор на 25 классов (backend/ml/)
+9. НЕ добавлять зависимости без явной необходимости — если удалил пакет, агент добавит снова
+10. NumPy типы в JSON: np.float64 не сериализуется → convert_numpy_types() перед json.dumps()
+
+## Контекст для LLM
+- При работе с DSP — сверяться с docs/CONVENTIONS.md (формулы, единицы измерения)
+- При работе с OSC/MIDI — сверяться с docs/TOOLS.md (протоколы, адреса)
+- При изменении архитектуры — обновить docs/ARCHITECTURE.md
+- При обнаружении нового паттерна/бага — добавить в раздел «Зафиксированные уроки» этого файла
+- Документация WING: `Docs/WING Remote Protocols v3.0.5.pdf`
