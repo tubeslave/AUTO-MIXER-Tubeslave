@@ -3491,7 +3491,7 @@ class AutoMixerServer:
 
                 async def stop_phase_alignment():
                     try:
-                        self.phase_alignment_controller.stop()
+                        self.phase_alignment_controller.stop_analysis()
                         logger.info("Phase alignment stopped")
                     except Exception as e:
                         logger.warning(f"Error stopping phase alignment: {e}")
@@ -3776,7 +3776,7 @@ class AutoMixerServer:
 
         if self.phase_alignment_controller:
             try:
-                self.phase_alignment_controller.stop()
+                self.phase_alignment_controller.stop_analysis()
             except Exception:
                 pass
 
