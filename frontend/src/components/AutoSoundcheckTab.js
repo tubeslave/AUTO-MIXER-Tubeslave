@@ -1,0 +1,155 @@
+import React, { useState, useEffect } from 'react';
+import websocketService from '../services/websocket';
+import './AutoSoundcheckTab.css';
+import SignalHint from './SignalHint';
+import ChannelPresetSelect from './ChannelPresetSelect';
+import { mapPresetForMethod } from '../constants/instrumentPresets';
+
+const CYCLE_STEPS = [
+  { id: 'gain', label: 'Gain Staging' },
+  { id: 'phase', label: 'Phase' },
+  { id: 'eq', label: 'EQ' },
+  { id: 'comp', label: 'Compressor' },
+  { id: 'gate', label: 'Gate' },
+  { id: 'fader', label: 'Fader' },
+];
+
+function AutoSoundcheckTab({
+  selectedChannels,
+  availableChannels,
+  selectedDevice,
+  audioDevices,
+  globalMode,
+  channelPresets = {},
+  setChannelPreset = () => {},
+  detectInstrumentPreset = () => 'custom',
+}) {
+  const [running, setRunning] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [currentStep, setCurrentStep] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [log, setLog] = useState([]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [timings, setTimings] = useState({
+    gainDuration: 30, phaseDuration: 15, eqDuration: 20,
+    compDuration: 15, gateDuration: 10, faderDuration: 15,
+  });
+
+  useEffect(() => {
+    const handle = (data) => {
+      if (data.running !== undefined) setRunning(data.running);
+      if (data.message) {
+        setStatusMessage(data.message);
+        setLog(prev => [...prev.slice(-20), data.message]);
+      }
+      if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
+      if (data.current_step) setCurrentStep(data.current_step);
+      if (data.progress !== undefined) setProgress(data.progress);
+    };
+    websocketService.on('auto_soundcheck_status', handle);
+    websocketService.getAutoSoundcheckStatus();
+    return () => websocketService.off('auto_soundcheck_status', handle);
+  }, []);
+
+  const handleStart = () => {
+    if (!selectedDevice || !selectedChannels?.length) { setStatusMessage('Выберите устройство и каналы'); return; }
+    const mapping = {}; selectedChannels.forEach(ch => { mapping[ch] = ch; });
+    const chSettings = {};
+    selectedChannels.forEach(ch => {
+      const inferred = detectInstrumentPreset(availableChannels?.find(c => c.id === ch)?.name);
+      const preset = channelPresets[String(ch)] || inferred;
+      chSettings[ch] = { preset: mapPresetForMethod(preset, 'gain') };
+    });
+    setLog([]);
+    websocketService.startAutoSoundcheck(selectedDevice, selectedChannels, chSettings, mapping, timings);
+  };
+  const handleStop = () => websocketService.stopAutoSoundcheck();
+
+  const channels = selectedChannels || [];
+  if (!channels.length) return (<div><SignalHint moduleKey="auto_soundcheck" /><div className="no-channels">Выберите каналы на вкладке Connect</div></div>);
+
+  return (
+    <div className="auto-soundcheck-tab">
+      <SignalHint moduleKey="auto_soundcheck" />
+      <div className="module-card">
+        <div className="module-actions">
+          <button className={`btn-start ${running ? 'stop' : 'go'}`}
+            onClick={running ? handleStop : handleStart}
+            disabled={!selectedDevice || !channels.length}>
+            {running ? 'Стоп' : 'Запустить Soundcheck'}
+          </button>
+        </div>
+        {statusMessage && <div className="module-status">{statusMessage}</div>}
+
+        <table className="data-table" style={{ marginTop: 12 }}>
+          <thead>
+            <tr>
+              <th>Канал</th>
+              <th>Пресет</th>
+            </tr>
+          </thead>
+          <tbody>
+            {channels.map((ch) => {
+              const name = availableChannels?.find((c) => c.id === ch)?.name || `Ch ${ch}`;
+              const inferred = detectInstrumentPreset(name);
+              const preset = channelPresets[String(ch)] || inferred;
+              return (
+                <tr key={ch}>
+                  <td>{name}</td>
+                  <td>
+                    <ChannelPresetSelect
+                      value={preset}
+                      onChange={(presetId) => setChannelPreset(ch, presetId)}
+                      disabled={running}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {running && (
+          <div className="progress-section">
+            <div className="progress-bar">
+              <div className="progress-fill" style={{ width: `${progress * 100}%` }} />
+            </div>
+            <div className="step-indicators">
+              {CYCLE_STEPS.map(s => (
+                <span key={s.id} className={`step-chip ${currentStep === s.id ? 'active' : ''}`}>
+                  {s.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="settings-panel">
+          <div className="settings-toggle" onClick={() => setShowSettings(!showSettings)}>
+            <span>Тайминги</span><span>{showSettings ? '▼' : '▶'}</span>
+          </div>
+          {showSettings && (
+            <div className="settings-body">
+              {Object.entries(timings).map(([key, val]) => (
+                <div className="setting-row" key={key}>
+                  <label>{key.replace('Duration', '')}</label>
+                  <input type="range" min="5" max="60" step="5" value={val}
+                    onChange={e => setTimings(t => ({...t, [key]: parseInt(e.target.value)}))} disabled={running} />
+                  <span className="val">{val}s</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {log.length > 0 && (
+          <div className="soundcheck-log">
+            {log.map((msg, i) => <div key={i} className="log-line">{msg}</div>)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default AutoSoundcheckTab;

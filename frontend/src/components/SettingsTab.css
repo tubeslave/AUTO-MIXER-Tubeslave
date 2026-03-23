@@ -1,0 +1,7 @@
+/* Settings — minimal */
+.settings-tab { width: 100%; }
+.settings-section-title {
+  font-size: 0.85em; color: #00d4ff; text-transform: uppercase;
+  letter-spacing: 0.5px; margin: 16px 0 8px 0; padding-bottom: 4px;
+  border-bottom: 1px solid #21262d;
+}

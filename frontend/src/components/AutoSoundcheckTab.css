@@ -1,0 +1,20 @@
+/* Auto Soundcheck — minimal */
+.auto-soundcheck-tab { width: 100%; }
+.progress-section { margin: 12px 0; }
+.progress-bar {
+  height: 6px; background: #21262d; border-radius: 3px; overflow: hidden; margin-bottom: 8px;
+}
+.progress-fill {
+  height: 100%; background: #00d4ff; border-radius: 3px; transition: width 0.3s ease;
+}
+.step-indicators { display: flex; gap: 6px; flex-wrap: wrap; }
+.step-chip {
+  padding: 3px 8px; border-radius: 10px; font-size: 0.75em;
+  background: #21262d; color: #8b949e;
+}
+.step-chip.active { background: #00d4ff22; color: #00d4ff; }
+.soundcheck-log {
+  margin-top: 12px; padding: 8px; background: #0d1117; border-radius: 6px;
+  max-height: 150px; overflow-y: auto; font-size: 0.78em;
+}
+.log-line { padding: 2px 0; color: #8b949e; border-bottom: 1px solid #21262d11; }

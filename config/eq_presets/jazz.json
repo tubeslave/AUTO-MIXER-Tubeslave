@@ -1,0 +1,26 @@
+{
+  "name": "Jazz",
+  "description": "Jazz music preset - natural balance, minimal processing, warm mids",
+  "target_curve": [
+    [63, 0.5], [125, 1.0], [250, 1.5], [500, 2.0],
+    [1000, 2.0], [2000, 1.5], [4000, 1.0], [8000, 0.5], [16000, 0.0]
+  ],
+  "cut_frequencies": [
+    [60, -1.0, 1.2],
+    [200, -0.5, 1.5]
+  ],
+  "boost_frequencies": [
+    [250, 1.0, 1.0],
+    [1000, 1.5, 0.8],
+    [2500, 1.0, 0.9]
+  ],
+  "low_cut_freq": 35,
+  "high_cut_freq": 15000,
+  "vocal_priority": 0.75,
+  "instrument_balance": {
+    "lead_vocal": {"target_lufs": -18, "warmth": 1.5},
+    "double_bass": {"target_lufs": -19, "definition": 1.0},
+    "piano": {"target_lufs": -18, "clarity": 1.0},
+    "sax": {"target_lufs": -17, "presence": 1.5}
+  }
+}

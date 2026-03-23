@@ -1,0 +1,10 @@
+/* Auto Fader — minimal */
+.auto-fader-tab { width: 100%; }
+.mode-pills { display: flex; gap: 4px; }
+.pill {
+  padding: 4px 10px; border: 1px solid #30363d; border-radius: 12px;
+  background: transparent; color: #8b949e; cursor: pointer; font-size: 0.78em;
+  transition: all 0.15s;
+}
+.pill:hover { border-color: #484f58; color: #c9d1d9; }
+.pill.active { background: #00d4ff22; border-color: #00d4ff; color: #00d4ff; }

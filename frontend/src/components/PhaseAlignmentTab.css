@@ -1,0 +1,13 @@
+/* Phase Alignment — minimal */
+.phase-alignment-tab { width: 100%; }
+.ref-select { display: flex; align-items: center; gap: 6px; font-size: 0.85em; }
+.ref-select label { color: #8b949e; }
+.ref-select select {
+  padding: 3px 8px; border: 1px solid #30363d; border-radius: 4px;
+  background: #0d1117; color: #e6e6e6; font-size: 0.9em;
+}
+.phase-inv { color: #f0883e; font-weight: 600; }
+.ref-badge { margin-left: 6px; font-size: 0.75em; color: #58a6ff; }
+.ref-row { background: rgba(88, 166, 255, 0.08); }
+.eligible { color: #3fb950; }
+.ignored { color: #8b949e; opacity: 0.85; }

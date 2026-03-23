@@ -1,0 +1,4 @@
+/* System Measurement — minimal */
+.system-measurement-tab { width: 100%; }
+.measurement-controls { display: flex; gap: 8px; margin: 12px 0; }
+.measurement-results { margin-top: 12px; }

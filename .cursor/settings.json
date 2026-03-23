@@ -1,0 +1,40 @@
+{
+  "ai.model": "claude-sonnet-4-20250514",
+  "ai.contextFiles": [
+    ".cursorrules",
+    "CLAUDE.md",
+    "docs/ARCHITECTURE.md",
+    "docs/CONVENTIONS.md",
+    "docs/TOOLS.md"
+  ],
+  "ai.rules": [
+    "Always read .cursorrules and CLAUDE.md before starting work",
+    "Follow DSP standards from docs/CONVENTIONS.md",
+    "Check docs/TOOLS.md for OSC/MIDI protocol details",
+    "Run tests before committing: PYTHONPATH=backend python -m pytest tests/ -x",
+    "Never set fader above 0 dBFS without explicit operator request",
+    "Update 'Зафиксированные уроки' in .cursorrules when discovering new patterns or bugs"
+  ],
+  "python.defaultInterpreterPath": "python3",
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoImportCompletions": true,
+  "editor.formatOnSave": true,
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.git": true,
+    "**/node_modules": true,
+    "**/venv": true,
+    "**/*.pyc": true,
+    "backend/dist": true,
+    "backend/build": true,
+    "frontend/build": true,
+    "frontend/dist": true,
+    "backend/models": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/venv": true,
+    "**/__pycache__": true,
+    "frontend/package-lock.json": true
+  }
+}

@@ -1,0 +1,3 @@
+# Canonical requirements: use backend/requirements.txt for install.
+# This file kept for compatibility; run: pip install -r backend/requirements.txt
+-r backend/requirements.txt

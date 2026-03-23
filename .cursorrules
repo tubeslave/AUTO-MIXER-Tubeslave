@@ -1,0 +1,72 @@
+# AUTO-MIXER-Tubeslave — Cursor Rules
+# Автоматический микшер для live sound. Behringer WING Rack (OSC) + Allen & Heath dLive (MIDI/TCP).
+# Уровень: Compounding Engineering (Level 4) → каждый урок фиксируется в правилах.
+
+## Проект
+
+- Назначение: AI-управляемый автоматический микшер для саундчеков и концертов
+- Backend: Python (asyncio, WebSocket, OSC)
+- Frontend: React + Electron (desktop app)
+- Целевая консоль (текущий репозиторий): Behringer WING Rack (OSC, fw 3.0.5)
+
+## Критические правила безопасности (LIVE SOUND)
+
+- НИКОГДА не отправлять команды, которые повышают уровень, без ограничений: fader ≤ 0 dBFS, gain в разумных пределах.
+- ВСЕГДА проверять true peak < -1.0 dBTP перед повышением gain.
+- При сомнениях — снижай уровень, не повышай. Безопасность слуха важнее идеального микса.
+
+## Архитектура (ориентир)
+
+- Точка входа backend: `backend/server.py` — WebSocket координатор, регистрирует handlers.
+- Handlers: `backend/handlers/` — mixer, connection, eq, fader, gain_staging, voice, snapshot и др.
+- OSC клиент WING: `backend/wing_client.py` (safety_limits при enable_limits)
+- dLive: `backend/dlive_client.py`
+- Конфиг: `config/default_config.json` (safety, automation, wing)
+- Тесты: `tests/`, `tests/test_infrastructure/test_mixer_handlers_safety.py` — safety
+- Документация: `Docs/` (PDF), `docs/` (ARCHITECTURE, CONVENTIONS, TOOLS, IMPROVEMENT_PLAN, BLEED_DETECTION_FRAMEWORK)
+- agents/, ai/ — модули есть, интеграция в server — в планах
+- FeedbackDetector — интегрирован: handlers/feedback_handlers, start_feedback_detection (device_id, channels, channel_mapping)
+
+## Стиль кода
+
+- Python: PEP 8, type hints по возможности, аккуратная асинхронщина (asyncio для I/O).
+- Максимальная длина строки: 100 символов.
+- Импорты: stdlib → third-party → local (с пустой строкой между группами).
+- Все числовые DSP-константы — именованные (без magic numbers).
+
+## DSP и Audio — обязательные стандарты (см. `docs/CONVENTIONS.md`)
+
+- LUFS: ITU-R BS.1770-4 (double gating)
+- True Peak: oversampling (минимум 4x)
+- EQ biquads: Audio EQ Cookbook (RBJ)
+
+## Протоколы микшерных пультов (см. `docs/TOOLS.md`)
+
+### Behringer WING Rack (OSC)
+
+- Порт подключения (send): 2222, receive: 2223
+- Формат адресов: `/ch/{N}/...` где N = 1..40 (см. `backend/wing_addresses.py`)
+- Fader: 0.0 = -∞, 0.7498 ≈ 0 dB, 1.0 ≈ +10 dB
+- Keepalive: `/xremote` (периодически)
+
+## Тестирование
+
+- Фреймворк: pytest (+ pytest-asyncio при необходимости)
+- Базовая команда: `PYTHONPATH=backend python -m pytest tests/ -x`
+
+## Зафиксированные уроки (Compounding)
+
+1. Не повышать уровни без safety ceiling; в сомнительных местах — делать только уменьшение.
+2. Если в JSON попадают NumPy типы (np.float64) — конвертировать в базовые типы до `json.dumps()`.
+3. В Gain Staging bypass bleed-анализа только для пресетов: overhead, bass, guitar, playback, accordion. Kick, snare, tom, hi_hat, ride — bleed проверяется.
+4. Level-based bleed применяется ко всем инструментам в BleedDetector (bleed_protection): ambient_bleed_threshold_lufs (-25), high_level_own_source_lufs (-18), high_level_bleed_scale (0.5).
+5. Drums (kick, snare, tom) — transient instruments с высоким crest factor. Захваченный peak во время калибровки может быть на 10–15 dB ниже реального пика. Safe Gain: cap `drums_close_max_boost_db` (default 6 dB) для категории drums_close, чтобы избежать клиппинга при более сильных ударах.
+6. Bleed detection: Safe Gain передаёт band metrics в BleedService (`band_analyzer.samples_to_band_metrics`). Фреймворк для drums/vocals — `docs/BLEED_DETECTION_FRAMEWORK.md`. Без band metrics спектральная детекция отключена.
+7. Safe Gain bleed exclusion: при `exclude_bleed_from_own_capture=true` блоки с высоким bleed (`capture_bleed_guard_ratio` + `capture_bleed_guard_confidence`) не могут запускать/пополнять own-capture (WAIT/CAPTURE), чтобы bleed не попадал в оценку gain.
+
+## Контекст для LLM
+
+- При работе с DSP — сверяться с `docs/CONVENTIONS.md` (формулы, единицы).
+- При работе с OSC — сверяться с `docs/TOOLS.md` и `Docs/WING Remote Protocols v3.0.5.pdf`.
+- При изменении архитектуры — обновить `docs/ARCHITECTURE.md`.
+- При обнаружении нового паттерна/бага — добавить пункт в раздел «Зафиксированные уроки» этого файла.

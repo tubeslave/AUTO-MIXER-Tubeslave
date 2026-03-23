@@ -1,0 +1,66 @@
+/* Gain Staging — minimal */
+.gain-staging-tab { width: 100%; }
+.run-indicator { font-size: 0.85em; color: #484f58; font-weight: 600; }
+.run-indicator.on { color: #3fb950; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+.hot { color: #f0883e !important; }
+.positive { color: #3fb950; }
+.negative { color: #f85149; }
+.has-signal td:first-child { border-left: 2px solid #3fb950; }
+.is-ready td:first-child { border-left: 2px solid #2ea043; }
+.analysis-progress {
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.analysis-progress .progress-bar {
+  height: 100%;
+  background: #3fb950;
+  transition: width 0.3s ease;
+}
+
+.btn-start.completed {
+  box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.35), 0 0 18px rgba(63, 185, 80, 0.3);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.85em;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.status-badge.ready {
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.14);
+  border: 1px solid rgba(63, 185, 80, 0.35);
+}
+
+.status-badge.waiting {
+  color: #f0b429;
+  background: rgba(240, 180, 41, 0.12);
+  border: 1px solid rgba(240, 180, 41, 0.35);
+}
+
+.status-badge.neutral {
+  color: #8b949e;
+  background: rgba(139, 148, 158, 0.12);
+  border: 1px solid rgba(139, 148, 158, 0.25);
+}
+
+.status-badge.stereo {
+  color: #58a6ff;
+  background: rgba(88, 166, 255, 0.12);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+}
+
+.status-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}

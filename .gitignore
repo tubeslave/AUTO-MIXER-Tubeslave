@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# PyInstaller
+backend/dist/
+backend/build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# React
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Electron
+frontend/dist/
+*.dmg
+*.zip
+*.app
+
+# Runtime backend logs (EQ / отладка)
+logs/*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Presets (optional - remove this if you want to track presets)
+presets/*.json
+!presets/.gitkeep
+
+# Config overrides
+config/user_config.json
+
+# Temporary files
+*.tmp
+*.temp
+extracted_text.txt
+output.txt
+.claude/
+GitHub/
+backend/models/
+frontend/dist/
+frontend/node_modules/
+backend/venv/
+backend/models/
+frontend/dist/
+frontend/node_modules/
+backend/venv/
+.claude/
+GitHub/

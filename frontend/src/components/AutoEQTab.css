@@ -1,0 +1,6 @@
+/* Auto EQ — minimal */
+.auto-eq-tab { width: 100%; }
+.eq-status { font-weight: 600; font-size: 0.85em; }
+.eq-status.analyzing { color: #f0883e; }
+.eq-status.ready { color: #8b949e; }
+.eq-status.applied { color: #3fb950; }

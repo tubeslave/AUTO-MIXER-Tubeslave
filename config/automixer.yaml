@@ -1,0 +1,59 @@
+# AUTO-MIXER-Tubeslave Configuration (ConfigManager / experimental)
+# Server uses config/default_config.json. This file is for ConfigManager (tests, future use).
+# See config/README.md
+
+mixer:
+  ip: "192.168.1.1"
+  port: 2222
+  protocol: "osc"
+  keepalive_interval: 5.0
+  command_rate_limit: 10.0
+  connection_timeout: 10.0
+
+audio:
+  sample_rate: 48000
+  block_size: 1024
+  channels: 40
+  source: "dante"  # dante, sounddevice, test_sine, test_pink_noise, silence
+  device_name: ""
+  buffer_seconds: 5.0
+
+websocket:
+  host: "0.0.0.0"
+  port: 8765
+  max_clients: 10
+
+agent:
+  enabled: true
+  mode: "suggest"  # auto, suggest, manual
+  cycle_interval: 0.5
+  confidence_threshold: 0.6
+  max_actions_per_cycle: 5
+
+ai:
+  llm_backend: "ollama"  # ollama, perplexity
+  llm_model: "llama3"
+  ollama_url: "http://localhost:11434"
+  perplexity_api_key: ""
+  knowledge_dir: ""
+
+safety:
+  feedback_detection: true
+  max_gain_db: 10.0
+  true_peak_limit: -1.0
+  max_notch_filters: 8
+  max_notch_depth_db: -12.0
+
+logging:
+  level: "INFO"
+  json_output: false
+  log_file: ""
+
+metrics:
+  enabled: false
+  prometheus_port: 9090
+
+session:
+  auto_save: true
+  save_interval: 300
+  session_dir: "sessions"
