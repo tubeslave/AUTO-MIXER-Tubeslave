@@ -13,6 +13,9 @@ from typing import Set, Optional, Union, List, Dict, Any
 import websockets
 import numpy as np
 
+from utils import convert_numpy_types, setup_file_logging
+from config_loader import ConfigLoader
+
 try:
     from websockets import WebSocketServerProtocol
 except ImportError:
@@ -55,91 +58,11 @@ from controller_lifecycle import cleanup_all_controllers as _cleanup_all_control
 from services import FaderService, GainStagingService, FeedbackService
 
 
-def _setup_file_logging() -> str:
-    """
-    Дублировать INFO в logs/automixer-backend.log (удобно смотреть EQ после анализа).
-    """
-    log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, "automixer-backend.log")
-    abs_path = os.path.abspath(log_path)
-    root = logging.getLogger()
-    for h in root.handlers:
-        if isinstance(h, logging.FileHandler):
-            try:
-                if os.path.abspath(getattr(h, "baseFilename", "")) == abs_path:
-                    return log_path
-            except (OSError, TypeError, ValueError):
-                pass
-    fmt = logging.Formatter("%(asctime)s %(levelname)s:%(name)s:%(message)s")
-    fh = logging.FileHandler(log_path, encoding="utf-8")
-    fh.setLevel(logging.INFO)
-    fh.setFormatter(fmt)
-    root.addHandler(fh)
-    return log_path
-
-
 logging.basicConfig(level=logging.INFO)
-_FILE_LOG_PATH = _setup_file_logging()
+_FILE_LOG_PATH = setup_file_logging()
 logger = logging.getLogger(__name__)
 if _FILE_LOG_PATH:
     logger.info("Файл логов (в т.ч. Auto-EQ): %s", os.path.abspath(_FILE_LOG_PATH))
-
-
-def convert_numpy_types(obj: Any) -> Any:
-    """
-    Рекурсивно преобразует NumPy типы в нативные Python типы для JSON сериализации.
-
-    Args:
-        obj: Объект, который может содержать NumPy типы
-
-    Returns:
-        Объект с преобразованными типами
-    """
-    # Проверяем на NumPy скалярные типы
-    if isinstance(obj, np.generic):
-        if isinstance(
-            obj,
-            (
-                np.integer,
-                np.int_,
-                np.intc,
-                np.intp,
-                np.int8,
-                np.int16,
-                np.int32,
-                np.int64,
-                np.uint8,
-                np.uint16,
-                np.uint32,
-                np.uint64,
-            ),
-        ):
-            return int(obj)
-        elif isinstance(obj, (np.floating, np.float16, np.float32, np.float64)):
-            return float(obj)
-        elif isinstance(obj, np.bool_):
-            return bool(obj)
-        else:
-            # Для других NumPy типов пытаемся преобразовать в Python тип
-            try:
-                return obj.item()
-            except (AttributeError, ValueError):
-                return (
-                    float(obj)
-                    if np.issubdtype(type(obj), np.floating)
-                    else int(obj)
-                    if np.issubdtype(type(obj), np.integer)
-                    else bool(obj)
-                )
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, dict):
-        return {key: convert_numpy_types(value) for key, value in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [convert_numpy_types(item) for item in obj]
-    else:
-        return obj
 
 
 class AutoMixerServer:
@@ -156,7 +79,8 @@ class AutoMixerServer:
         self.ws_port = ws_port
 
         # Load configuration
-        self.config = self._load_config()
+        self._config_loader = ConfigLoader()
+        self.config = self._config_loader.config
 
         # Unified mixer client (can be EnhancedOSCClient wrapping WingClient, DLiveClient, or MixingStationClient)
         self.mixer_client: Optional[
@@ -260,86 +184,17 @@ class AutoMixerServer:
 
         logger.info("Graceful shutdown complete")
 
-    def _load_config(self) -> dict:
-        """Load configuration from default_config.json"""
-        import os
-
-        config_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "config", "default_config.json"
-        )
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = json.load(f)
-                logger.info(f"Configuration loaded from {config_path}")
-                return config
-        except Exception as e:
-            logger.warning(
-                f"Failed to load config from {config_path}: {e}. Using defaults."
-            )
-            return {
-                "automation": {
-                    "auto_gain": {
-                        "bleeding_rejection": {
-                            "enabled": True,
-                            "correlation_threshold": 0.7,
-                            "level_difference_threshold_db": 8.0,
-                        }
-                    }
-                }
-            }
-
-    def _get_user_config_path(self) -> str:
-        """Get path to user config file."""
-        import os
-
-        return os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "config", "user_config.json"
-        )
-
     def _load_user_config(self) -> dict:
         """Load user-saved settings from user_config.json."""
-        import os
-
-        path = self._get_user_config_path()
-        if not os.path.exists(path):
-            return {}
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                logger.info(f"User config loaded from {path}")
-                return data
-        except Exception as e:
-            logger.warning(f"Failed to load user config: {e}")
-            return {}
+        return self._config_loader.load_user_config()
 
     def _save_user_config(self, section: str, settings: dict):
         """Save user settings to user_config.json under a given section."""
-        import os
-
-        path = self._get_user_config_path()
-        # Load existing user config
-        existing = self._load_user_config()
-        existing[section] = settings
-        try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(existing, f, indent=2, ensure_ascii=False)
-            logger.info(f"User config saved to {path}: section={section}")
-        except Exception as e:
-            logger.error(f"Failed to save user config: {e}")
-            raise
+        self._config_loader.save_user_config(section, settings)
 
     def _get_method_preset_file(self, method_name: str, fallback: str) -> str:
         """Resolve method preset base file from config."""
-        try:
-            return (
-                self.config.get("automation", {})
-                .get("preset_bases", {})
-                .get(method_name, {})
-                .get("file", fallback)
-            )
-        except Exception:
-            return fallback
+        return self._config_loader.get_method_preset_file(method_name, fallback)
 
     async def register_client(self, websocket: WebSocketServerProtocol):
         self.connected_clients.add(websocket)
