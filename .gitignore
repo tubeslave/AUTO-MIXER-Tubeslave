@@ -79,3 +79,4 @@ frontend/node_modules/
 backend/venv/
 .claude/
 GitHub/
+external/
