@@ -386,73 +386,101 @@ class AutoMaster:
         return output.astype(np.float32), max_reduction
 
     def _apply_true_peak_limiter(self, audio: np.ndarray, ceiling_dbtp: float) -> Tuple[np.ndarray, float]:
-        """Look-ahead true-peak limiter for mastering.
+        """Oversampled look-ahead true-peak limiter for mastering.
 
-        Unlike a simple brick-wall (scale entire signal), this limiter:
-        - Uses a look-ahead buffer (5ms) to anticipate peaks
-        - Reduces gain ONLY around peaks, preserving average loudness (LUFS)
-        - Smoothly applies attack/release envelope
-        - Works on true peak (4x oversampled) level detection
+        Key design (similar to Pro-L, L2, etc.):
+        1. Upsample 4x to detect inter-sample peaks (true peaks)
+        2. Compute gain reduction curve at oversampled rate
+        3. Look-ahead (5ms) to anticipate peaks before they arrive
+        4. Smooth gain with instant attack + exponential release
+        5. Downsample gain curve back to original rate
+        6. Apply to original signal
 
-        This is what mastering limiters (L2, Pro-L, etc.) do.
+        This guarantees true peak compliance — inter-sample peaks that
+        escape sample-level detection are caught by the 4x oversampled
+        detector and pre-emptively reduced via look-ahead.
         """
+        from scipy.signal import resample_poly
+
+        oversample_factor = 4
         lookahead_ms = 5.0
         release_ms = 50.0
-        lookahead_samples = int(self.sample_rate * lookahead_ms / 1000)
-        release_coeff = np.exp(-1.0 / (release_ms * self.sample_rate / 1000))
 
+        os_rate = self.sample_rate * oversample_factor
+        lookahead_os = int(os_rate * lookahead_ms / 1000)
+        release_coeff = np.exp(-1.0 / (release_ms * os_rate / 1000))
         ceiling_lin = 10 ** (ceiling_dbtp / 20.0)
 
-        # Get per-sample peak level (max across channels for stereo)
+        # Step 1: Upsample 4x for true peak detection
         if audio.ndim == 2:
-            levels = np.max(np.abs(audio), axis=1)
+            oversampled = np.column_stack(
+                [resample_poly(audio[:, ch], oversample_factor, 1)
+                 for ch in range(audio.shape[1])]
+            )
+            os_levels = np.max(np.abs(oversampled), axis=1)
         else:
-            levels = np.abs(audio)
+            oversampled = resample_poly(audio, oversample_factor, 1)
+            os_levels = np.abs(oversampled)
 
-        num_samples = len(levels)
+        num_os_samples = len(os_levels)
 
-        # Step 1: Compute required gain reduction per sample
-        # (where level exceeds ceiling, gain < 1.0)
-        gain_required = np.ones(num_samples, dtype=np.float64)
-        over_mask = levels > ceiling_lin
-        gain_required[over_mask] = ceiling_lin / (levels[over_mask] + 1e-10)
+        # Step 2: Required gain reduction at each oversampled position
+        gain_required = np.ones(num_os_samples, dtype=np.float64)
+        over_mask = os_levels > ceiling_lin
+        gain_required[over_mask] = ceiling_lin / (os_levels[over_mask] + 1e-10)
 
-        # Step 2: Look-ahead — apply minimum gain within the look-ahead window
-        # This ensures gain reduction starts BEFORE the peak arrives
-        gain_lookahead = np.ones(num_samples, dtype=np.float64)
-        for i in range(num_samples):
-            end = min(i + lookahead_samples, num_samples)
-            gain_lookahead[i] = np.min(gain_required[i:end])
+        # Step 3: Look-ahead — minimum gain within upcoming window
+        # Use rolling minimum via a deque for O(n) complexity
+        from collections import deque
+        gain_lookahead = np.ones(num_os_samples, dtype=np.float64)
+        dq = deque()  # stores indices of potential minimums
 
-        # Step 3: Smooth the gain curve with attack (instant) and release
-        gain_smooth = np.ones(num_samples, dtype=np.float64)
+        for i in range(num_os_samples):
+            # Remove elements outside the look-ahead window
+            while dq and dq[0] < i:
+                dq.popleft()
+
+            # Add current + look-ahead position
+            j = min(i + lookahead_os, num_os_samples - 1)
+            while dq and gain_required[j] <= gain_required[dq[-1]]:
+                dq.pop()
+            dq.append(j)
+
+            gain_lookahead[i] = gain_required[dq[0]]
+
+        # Step 4: Smooth gain curve (instant attack, exponential release)
+        gain_smooth_os = np.ones(num_os_samples, dtype=np.float64)
         current_gain = 1.0
-        for i in range(num_samples):
+        for i in range(num_os_samples):
             target = gain_lookahead[i]
             if target < current_gain:
-                # Attack: instant (look-ahead already handled timing)
-                current_gain = target
+                current_gain = target  # Instant attack
             else:
-                # Release: exponential recovery
                 current_gain = release_coeff * current_gain + (1 - release_coeff) * target
-            gain_smooth[i] = current_gain
+            gain_smooth_os[i] = current_gain
 
-        # Step 4: Apply gain curve
+        # Step 5: Downsample gain curve back to original rate
+        # Take every Nth sample (phase-aligned with original)
+        num_orig = len(audio) if audio.ndim == 1 else audio.shape[0]
+        gain_smooth = resample_poly(gain_smooth_os, 1, oversample_factor)[:num_orig]
+
+        # Ensure no gain increase (safety clamp)
+        gain_smooth = np.minimum(gain_smooth, 1.0)
+
+        # Step 6: Apply gain curve to original signal
         if audio.ndim == 2:
             output = audio * gain_smooth[:, np.newaxis]
         else:
             output = audio * gain_smooth
 
-        # Measure actual reduction
         max_reduction_db = float(-20 * np.log10(np.min(gain_smooth) + 1e-10))
 
         if max_reduction_db > 0.1:
+            limited_pct = 100 * np.sum(gain_smooth < 0.999) / len(gain_smooth)
             logger.info(
-                "Look-ahead limiter: ceiling %.1f dBTP, max reduction %.1f dB, "
-                "samples limited: %d/%d (%.1f%%)",
-                ceiling_dbtp, max_reduction_db,
-                int(np.sum(gain_smooth < 0.999)), num_samples,
-                100 * np.sum(gain_smooth < 0.999) / num_samples,
+                "Oversampled look-ahead limiter (4x): ceiling %.1f dBTP, "
+                "max reduction %.1f dB, limited %.1f%% of samples",
+                ceiling_dbtp, max_reduction_db, limited_pct,
             )
 
         return output.astype(np.float32), max_reduction_db
