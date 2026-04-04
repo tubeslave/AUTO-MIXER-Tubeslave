@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automixer.local/schemas/mix_training_event_v1.json",
+  "title": "MixTrainingEventV1",
+  "description": "Single observation/action record for RAG logging, imitation learning, or dataset export. Aligns with docs/AGENT_TRAINING_DATA.md.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "event_id",
+    "recorded_at",
+    "source"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "UUID or ULID, unique within corpus"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC recommended"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Anonymized session identifier (no artist/venue names)"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "automixer_log",
+        "snapshot_export",
+        "manual_label",
+        "synthetic",
+        "shadow_mode"
+      ]
+    },
+    "license": {
+      "type": "string",
+      "description": "e.g. proprietary_rehearsal, cc_by_4, synthetic_only"
+    },
+    "consent_training_use": {
+      "type": "boolean",
+      "description": "Explicit consent to use this row for model training"
+    },
+    "backend_git_sha": {
+      "type": "string"
+    },
+    "config_digest": {
+      "type": "string",
+      "description": "Short hash of relevant safety/automation config slice"
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "index": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "instrument": { "type": "string" }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Metering and features at decision time",
+      "properties": {
+        "peak_dbfs": { "type": "number" },
+        "rms_dbfs": { "type": "number" },
+        "lufs_momentary": { "type": "number" },
+        "true_peak_dbtp": { "type": "number" },
+        "feature_artifact_uri": {
+          "type": "string",
+          "description": "Pointer to NPZ/WAV on disk or object storage"
+        }
+      }
+    },
+    "automation": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "component": {
+          "type": "string",
+          "enum": [
+            "auto_eq",
+            "gain_staging",
+            "auto_fader",
+            "mixing_agent",
+            "compressor_auto",
+            "feedback_detector"
+          ]
+        },
+        "recommended_action": { "type": "string" },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "operator": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "action_applied": { "type": "string" },
+        "parameters_final": { "type": "object", "additionalProperties": true },
+        "approved": { "type": "boolean" },
+        "rating": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "explicit_override_positive_fader": {
+          "type": "boolean",
+          "description": "Operator explicitly allowed fader above 0 dBFS (rare)"
+        },
+        "max_fader_dbfs_ceiling_used": { "type": "number" },
+        "max_gain_trim_db_ceiling_used": { "type": "number" },
+        "true_peak_limit_dbtp_used": { "type": "number" }
+      }
+    }
+  }
+}

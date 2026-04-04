@@ -32,7 +32,7 @@
 
 ## Документация
 
-- **docs/** (инженерные правила): ARCHITECTURE, CONVENTIONS, TOOLS, IMPROVEMENT_PLAN
+- **docs/** (инженерные правила): ARCHITECTURE, CONVENTIONS, TOOLS, IMPROVEMENT_PLAN, AGENT_TRAINING_DATA (сбор данных для RAG/ML/телеметрии, схемы в `docs/schemas/`)
 - **Docs/** (подробные материалы):
   - `WING Remote Protocols v3.0.5.pdf` — протокол OSC WING
   - TECHNICAL.md, CODE_REVIEW.md, AUTO_EQ_INTEGRATION.md, STAGE1_COMPLETE.md

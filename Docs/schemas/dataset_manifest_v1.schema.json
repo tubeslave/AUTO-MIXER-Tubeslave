@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automixer.local/schemas/dataset_manifest_v1.json",
+  "title": "TrainingDatasetManifestV1",
+  "description": "Bundle metadata for disk datasets consumed by backend/ml/train_*.py",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_name",
+    "dataset_version",
+    "task",
+    "created_at",
+    "rows"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "dataset_name": { "type": "string" },
+    "dataset_version": { "type": "string" },
+    "task": {
+      "type": "string",
+      "enum": [
+        "instrument_class_mel",
+        "gain_pan_multitrack",
+        "differentiable_mix_console",
+        "mix_events_jsonl"
+      ]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "backend_git_sha": { "type": "string" },
+    "config_digest": { "type": "string" },
+    "safety_filter_applied": { "type": "boolean" },
+    "license": { "type": "string" },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["rel_path"],
+        "properties": {
+          "rel_path": {
+            "type": "string",
+            "description": "Path relative to manifest file (JSONL shard or NPZ)"
+          },
+          "weight": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "feature_spec": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "e.g. n_mels, n_frames, sample_rate for classifier"
+    }
+  }
+}

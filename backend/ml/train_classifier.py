@@ -86,15 +86,27 @@ def train_classifier(
     lr: float = 1e-3,
     n_samples_per_class: int = 100,
     device: Optional[str] = None,
+    disk_jsonl: Optional[str] = None,
 ):
-    """Train the channel classifier model."""
+    """Train the channel classifier model.
+
+    If disk_jsonl is set, loads mel spectrograms from JSONL shards
+    (see docs/AGENT_TRAINING_DATA.md). Otherwise uses synthetic data.
+    """
     if device is None:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
     logger.info(f"Training on {device}")
-    dataset = SyntheticInstrumentDataset(
-        n_samples_per_class=n_samples_per_class,
-    )
+    if disk_jsonl:
+        from .training_dataset_io import DiskInstrumentMelDataset
+
+        class_to_idx = {c: i for i, c in enumerate(INSTRUMENT_CLASSES)}
+        dataset = DiskInstrumentMelDataset(disk_jsonl, class_to_idx)
+        logger.info("Using disk dataset %s (%s samples)", disk_jsonl, len(dataset))
+    else:
+        dataset = SyntheticInstrumentDataset(
+            n_samples_per_class=n_samples_per_class,
+        )
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_set, val_set = torch.utils.data.random_split(
@@ -166,5 +178,23 @@ def train_classifier(
 
 
 if __name__ == '__main__':
+    import argparse
+
     logging.basicConfig(level=logging.INFO)
-    train_classifier()
+    p = argparse.ArgumentParser(description='Train channel classifier')
+    p.add_argument(
+        '--disk-jsonl',
+        type=str,
+        default=None,
+        help='JSONL with {class, mel_npy} rows (see docs/AGENT_TRAINING_DATA.md)',
+    )
+    p.add_argument('--output', type=str, default='models/channel_classifier.pt')
+    p.add_argument('--epochs', type=int, default=20)
+    p.add_argument('--batch-size', type=int, default=32)
+    args = p.parse_args()
+    train_classifier(
+        output_path=args.output,
+        n_epochs=args.epochs,
+        batch_size=args.batch_size,
+        disk_jsonl=args.disk_jsonl,
+    )
