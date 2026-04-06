@@ -20,11 +20,12 @@ from .automation_handlers import register_handlers as _automation
 from .soundcheck_handlers import register_handlers as _soundcheck
 from .compressor_handlers import register_handlers as _compressor
 from .feedback_handlers import register_handlers as _feedback
+from .agent_handlers import register_handlers as _agent
 
 _ALL_REGISTRARS = [
     _audio, _connection, _mixer, _routing, _snapshot, _voice,
     _gain_staging, _channel_scan, _eq, _phase, _fader,
-    _automation, _soundcheck, _compressor, _feedback,
+    _automation, _soundcheck, _compressor, _feedback, _agent,
 ]
 
 

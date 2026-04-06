@@ -1,7 +1,9 @@
 from pythonosc import udp_client, dispatcher, osc_server
 from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_message import OscMessage
+from pythonosc.osc_bundle import OscBundle
 import socket
+import struct
 import threading
 import logging
 import time
@@ -31,8 +33,11 @@ class WingClient(MixerClientBase):
             safety_limits: Optional dict with max_fader, max_gain (dB). Applied before hardware clamp.
         """
         self.ip = ip
-        self.port = port
+        self.port = int(port) if port is not None else 2223
         self._safety_limits = safety_limits or {}
+
+        # Per-channel meter values from Wing /meters blobs (peak dBFS, -90..0)
+        self.channel_peak_db: Dict[int, float] = {}
 
         self.sock = None
         self.receiver_thread = None
@@ -152,10 +157,22 @@ class WingClient(MixerClientBase):
             if not self.sock:
                 break
             try:
-                data, addr = self.sock.recvfrom(4096)
+                data, addr = self.sock.recvfrom(65535)
                 try:
-                    osc_msg = OscMessage(data)
-                    self._handle_message(osc_msg.address, *osc_msg.params)
+                    if data[:8] == b"#bundle\x00":
+                        # OSC Bundle — iterate over contained messages
+                        try:
+                            bundle = OscBundle(data)
+                            for item in bundle:
+                                try:
+                                    self._handle_message(item.address, *item.params)
+                                except Exception as be:
+                                    logger.debug(f"Bundle item parse error: {be}")
+                        except Exception as be:
+                            logger.debug(f"Bundle parse error: {be}")
+                    else:
+                        osc_msg = OscMessage(data)
+                        self._handle_message(osc_msg.address, *osc_msg.params)
                 except Exception as e:
                     logger.debug(f"Error parsing OSC message: {e}")
             except socket.timeout:
@@ -172,6 +189,11 @@ class WingClient(MixerClientBase):
 
     def _handle_message(self, address: str, *args):
         """Handle incoming OSC message from Wing"""
+        # Decode Wing meter bundles → per-channel peak dBFS
+        if address.startswith("/meters/"):
+            self._decode_meters(address, args)
+            return
+
         # Log responses for name-related addresses (including $name)
         if "/name" in address or "/$name" in address:
             logger.info(f"Name response: {address} = {args}")
@@ -203,6 +225,40 @@ class WingClient(MixerClientBase):
                     callback(address, *args)
                 except Exception as e:
                     logger.error(f"Global callback error: {e}")
+
+    def _decode_meters(self, address: str, args: tuple) -> None:
+        """Decode Wing /meters blob into per-channel peak dBFS values.
+
+        Wing sends /meters/1 as a blob (bytes) containing float32 values.
+        Page 1 = channels 1-40 pre-fader input level (dBFS, typically -90..0).
+        Values are big-endian IEEE 754 floats.
+        """
+        if not args:
+            return
+        blob = args[0]
+        if not isinstance(blob, (bytes, bytearray)):
+            # Some pythonosc versions unwrap blobs as lists of ints
+            try:
+                blob = bytes(blob)
+            except Exception:
+                return
+        n_floats = len(blob) // 4
+        if n_floats == 0:
+            return
+        try:
+            values = struct.unpack(f">{n_floats}f", blob[:n_floats * 4])
+        except struct.error:
+            return
+
+        if address == "/meters/1":
+            # First 40 values → channels 1-40
+            for i, val in enumerate(values[:40]):
+                ch = i + 1
+                # Clamp to valid dBFS range
+                db = max(-90.0, min(0.0, float(val)))
+                self.channel_peak_db[ch] = db
+                self.state[f"/ch/{ch}/meter_peak"] = db
+            logger.debug(f"Meters decoded: {len(values)} values, ch1={values[0]:.1f}dBFS")
 
     def set_osc_throttle(self, enabled: bool = True, hz: float = 10.0):
         """
@@ -286,25 +342,30 @@ class WingClient(MixerClientBase):
         self.callbacks[address_pattern].append(callback)
 
     def _subscribe_to_updates(self):
-        """Subscribe to Wing updates"""
+        """Subscribe to Wing updates and meter bundles."""
         self.send("/xremote")
         logger.info("Subscribed to Wing updates via /xremote")
 
-        # Start periodic renewal
+        # Start periodic renewal (also re-requests meters each cycle)
         self._start_xremote_renewal()
 
     def _start_xremote_renewal(self):
-        """Periodically send /xremote to maintain subscription"""
+        """Periodically send /xremote and request meter data."""
 
         def renewal_loop():
             while self.is_connected and not self._stop_receiver:
                 time.sleep(8)
                 if self.is_connected:
                     self.send("/xremote")
-                    logger.debug("Renewed /xremote subscription")
+                    # Request channel input meters (page 1 = ch 1-40 pre-fader)
+                    self.send("/meters/1")
+                    logger.debug("Renewed /xremote subscription + meter request")
 
         thread = threading.Thread(target=renewal_loop, daemon=True)
         thread.start()
+
+        # Initial meter request
+        self.send("/meters/1")
 
     def _scan_console_state(self):
         """Scan initial Wing state"""
@@ -447,8 +508,8 @@ class WingClient(MixerClientBase):
         # Apply safety limits first (defense in depth)
         max_fader = self._safety_limits.get("max_fader")
         if max_fader is not None and db_value > max_fader:
-            logger.info(
-                f"set_channel_fader: safety clamp {db_value:.2f} -> {max_fader} dB"
+            logger.debug(
+                "set_channel_fader: safety clamp %.2f -> %s dB", db_value, max_fader
             )
             db_value = max_fader
         # Hardware range -144..10
@@ -457,7 +518,7 @@ class WingClient(MixerClientBase):
         elif db_value > 10.0:
             db_value = 10.0
 
-        logger.info(f"Setting fader /ch/{channel}/fdr = {db_value:.2f} dB")
+        logger.debug("Setting fader /ch/%d/fdr = %.2f dB", channel, db_value)
         self.send(address, db_value)
 
     def get_channel_mute(self, channel: int) -> Optional[int]:
@@ -1718,6 +1779,171 @@ class WingClient(MixerClientBase):
             logger.error(f"Error getting channel {channel} input routing: {e}")
 
         return None
+
+    # ── MixingAgent convenience API ─────────────────────────────
+    def set_channel_fader_db(self, channel: int, value_db: float):
+        """Set absolute channel fader in dB (alias for set_channel_fader)."""
+        self.set_channel_fader(channel, value_db)
+
+    def adjust_channel_fader(self, channel: int, delta_db: float):
+        """Relative fader move in dB.
+
+        If current fader value is unknown, requests it from Wing before adjusting.
+        Falls back to 0 dB (unity) when state is unavailable to avoid large jumps.
+        """
+        cur = self.get_channel_fader(channel)
+        if cur is None:
+            # Try requesting current value from Wing
+            self.send(f"/ch/{channel}/fdr")
+            time.sleep(0.05)
+            cur = self.get_channel_fader(channel)
+        if cur is None:
+            # Safe fallback: assume unity gain (0 dB) rather than -30 dB
+            cur = 0.0
+            logger.warning(f"ch{channel} fader unknown, assuming 0 dB before adjusting {delta_db:+.2f}dB")
+        self.set_channel_fader(channel, float(cur) + float(delta_db))
+
+    def set_channel_hpf(self, channel: int, frequency_hz: float, slope: str = "12"):
+        """Enable high-pass (low cut) at frequency_hz."""
+        self.set_low_cut(channel, 1, float(frequency_hz), slope)
+
+    def apply_eq_profile(self, channel: int, profile: dict) -> None:
+        """Apply a full EQ profile dict to a channel.
+
+        Profile format::
+            {
+                "low_shelf":  {"gain": float, "freq": float, "type": "SHV"|"PEQ"},
+                "bands":      [{"band": 1-4, "freq": float, "gain": float, "q": float}, ...],
+                "high_shelf": {"gain": float, "freq": float, "type": "SHV"|"PEQ"},
+            }
+        """
+        if not profile:
+            return
+        self.set_eq_on(channel, 1)
+        ls = profile.get("low_shelf")
+        if ls:
+            self.set_eq_low_shelf(
+                channel,
+                gain=float(ls["gain"]) if "gain" in ls else None,
+                freq=float(ls["freq"]) if "freq" in ls else None,
+                eq_type=ls.get("type", "SHV"),
+            )
+        for bd in profile.get("bands", []):
+            band_n = int(bd.get("band", 1))
+            if 1 <= band_n <= 4:
+                self.set_eq_band(
+                    channel, band_n,
+                    freq=float(bd["freq"]) if "freq" in bd else None,
+                    gain=float(bd["gain"]) if "gain" in bd else None,
+                    q=float(bd.get("q", 1.5)),
+                )
+        hs = profile.get("high_shelf")
+        if hs:
+            self.set_eq_high_shelf(
+                channel,
+                gain=float(hs["gain"]) if "gain" in hs else None,
+                freq=float(hs["freq"]) if "freq" in hs else None,
+                eq_type=hs.get("type", "SHV"),
+            )
+
+    def set_channel_compressor_full(
+        self,
+        channel: int,
+        threshold: float = -18.0,
+        ratio: float = 3.0,
+        attack: float = 10.0,
+        release: float = 100.0,
+        knee: int = 2,
+        makeup: float = 0.0,
+        det: str = "RMS",
+    ) -> None:
+        """Enable compressor with full parameter set including makeup gain and detector."""
+        self.set_compressor_on(channel, 1)
+        ratio_s = self._compressor_ratio_to_string(ratio)
+        self.set_compressor(
+            channel,
+            threshold=float(threshold),
+            ratio=ratio_s,
+            attack=float(attack),
+            release=float(release),
+            knee=int(knee),
+            gain=float(makeup),
+            det=det,
+        )
+
+    _COMP_RATIO_STRINGS = (
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.5",
+        "1.7",
+        "2.0",
+        "2.5",
+        "3.0",
+        "3.5",
+        "4.0",
+        "5.0",
+        "6.0",
+        "8.0",
+        "10",
+        "20",
+        "50",
+        "100",
+    )
+
+    @classmethod
+    def _compressor_ratio_to_string(cls, ratio: float) -> str:
+        try:
+            r = float(ratio)
+        except (TypeError, ValueError):
+            return "3.0"
+        best = cls._COMP_RATIO_STRINGS[0]
+        best_err = 1e9
+        for s in cls._COMP_RATIO_STRINGS:
+            try:
+                v = float(s)
+            except ValueError:
+                continue
+            err = abs(v - r)
+            if err < best_err:
+                best_err = err
+                best = s
+        return best
+
+    def set_channel_compressor(
+        self,
+        channel: int,
+        threshold: float = -18.0,
+        ratio: float = 3.0,
+        attack: float = 10.0,
+        release: float = 100.0,
+        knee: Optional[float] = None,
+    ):
+        """Enable dynamics and set common compressor parameters (WING OSC)."""
+        self.set_compressor_on(channel, 1)
+        ratio_s = self._compressor_ratio_to_string(ratio)
+        self.set_compressor(
+            channel,
+            threshold=float(threshold),
+            ratio=ratio_s,
+            attack=float(attack),
+            release=float(release),
+            knee=int(knee) if knee is not None else None,
+        )
+
+    def set_channel_deesser(
+        self,
+        channel: int,
+        frequency: float = 6500.0,
+        threshold_db: float = -20.0,
+        ratio: float = 4.0,
+    ):
+        """De-esser — not exposed as a single OSC group on all WING builds; no-op."""
+        logger.debug(
+            "set_channel_deesser: no standard OSC mapping for ch=%s (freq=%s)",
+            channel,
+            frequency,
+        )
 
     # ── MixerClientBase ABC bridge methods ──────────────────────
     def set_fader(self, channel: int, value_db: float):

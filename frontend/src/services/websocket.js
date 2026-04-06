@@ -378,6 +378,48 @@ console.error(`Error in listener for ${eventType}:`, error);
     });
   }
 
+  // MixingAgent (RAG / kb_first)
+  startMixingAgent(options = {}) {
+    this.send({
+      type: 'start_mixing_agent',
+      mode: options.mode || 'suggest',
+      kb_first: options.kb_first !== false,
+      channels: options.channels || [],
+      channel_mapping: options.channel_mapping || {},
+      device_id: options.device_id,
+      num_audio_channels: options.num_audio_channels,
+      sample_rate: options.sample_rate
+    });
+  }
+
+  stopMixingAgent() {
+    this.send({ type: 'stop_mixing_agent' });
+  }
+
+  setMixingAgentMode(mode) {
+    this.send({ type: 'set_mixing_agent_mode', mode });
+  }
+
+  getMixingAgentStatus() {
+    this.send({ type: 'get_mixing_agent_status' });
+  }
+
+  mixingAgentApprove(index) {
+    this.send({ type: 'mixing_agent_approve', index });
+  }
+
+  mixingAgentApproveAll() {
+    this.send({ type: 'mixing_agent_approve', approve_all: true });
+  }
+
+  mixingAgentDismiss(index) {
+    this.send({ type: 'mixing_agent_dismiss', index });
+  }
+
+  mixingAgentDismissAll() {
+    this.send({ type: 'mixing_agent_dismiss', dismiss_all: true });
+  }
+
   // Reset TRIM to 0dB for selected channels
   resetTrim(channels = []) {
     this.send({

@@ -56,6 +56,8 @@ from audio_capture import AudioCapture, AudioSourceType
 from handlers import register_all_handlers
 from controller_lifecycle import cleanup_all_controllers as _cleanup_all_controllers
 from services import FaderService, GainStagingService, FeedbackService
+from ai.agent import MixingAgent, AgentMode
+from ai.corpus_loader import build_knowledge_base
 
 
 logging.basicConfig(level=logging.INFO)
@@ -148,6 +150,27 @@ class AutoMixerServer:
 
         # Build message-type → handler dispatch table (B15 decomposition)
         self._dispatch = register_all_handlers(self)
+
+        self._project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        self._knowledge_base = None
+        try:
+            self._knowledge_base = build_knowledge_base(self.config, self._project_root)
+        except Exception as e:
+            logger.warning("Knowledge corpus build failed: %s", e)
+            try:
+                from ai.knowledge_base import KnowledgeBase
+
+                self._knowledge_base = KnowledgeBase()
+            except Exception as e2:
+                logger.error("Fallback KnowledgeBase failed: %s", e2)
+        self.mixing_agent: Optional[MixingAgent] = None
+        self._mixing_agent_task: Optional[asyncio.Task] = None
+        self._agent_observe_task: Optional[asyncio.Task] = None
+        self._agent_audio_capture: Optional[AudioCapture] = None
+        self._channel_instrument_map: Dict[int, str] = {}
+        self._agent_tracked_channels: List[int] = []
+        self._agent_channel_mapping: Dict[int, int] = {}
+        self._last_agent_pending_sig: str = ""
 
         logger.info(f"AutoMixer Server initialized on {ws_host}:{ws_port}")
 
@@ -671,6 +694,7 @@ class AutoMixerServer:
 
     async def disconnect_mixer(self):
         """Disconnect from current mixer (Wing or Mixing Station)"""
+        await self._stop_mixing_agent_internal()
         if self.mixer_client:
             self.mixer_client.disconnect()
             self.mixer_client = None
@@ -679,6 +703,451 @@ class AutoMixerServer:
 
             await self.broadcast({"type": "connection_status", "connected": False})
             logger.info(f"Disconnected from mixer (was: {mode})")
+
+    @staticmethod
+    def _normalize_instrument_for_agent(preset: Optional[str]) -> str:
+        if not preset:
+            return "unknown"
+        aliases = {
+            "leadVocal": "lead_vocal",
+            "backVocal": "backing_vocal",
+            "electricGuitar": "electric_guitar",
+            "acousticGuitar": "acoustic_guitar",
+        }
+        return aliases.get(preset, preset)
+
+    async def _stop_mixing_agent_internal(self) -> None:
+        if self._agent_observe_task and not self._agent_observe_task.done():
+            self._agent_observe_task.cancel()
+            try:
+                await self._agent_observe_task
+            except asyncio.CancelledError:
+                pass
+        self._agent_observe_task = None
+        if self._mixing_agent_task and not self._mixing_agent_task.done():
+            self._mixing_agent_task.cancel()
+            try:
+                await self._mixing_agent_task
+            except asyncio.CancelledError:
+                pass
+        self._mixing_agent_task = None
+        if self.mixing_agent:
+            self.mixing_agent.stop()
+        self.mixing_agent = None
+        if self._agent_audio_capture:
+            try:
+                self._agent_audio_capture.stop()
+            except Exception:
+                pass
+            self._agent_audio_capture = None
+
+    def _collect_agent_channel_states(self) -> Dict[int, Dict[str, Any]]:
+        out: Dict[int, Dict[str, Any]] = {}
+        if not self.mixer_client or not self.mixer_client.is_connected:
+            return out
+        channels = self._agent_tracked_channels or sorted(
+            self._channel_instrument_map.keys()
+        )
+        if not channels:
+            channels = list(range(1, 9))
+        st = self.mixer_client.state
+        ac = self._agent_audio_capture
+        has_audio = ac and ac.running
+        safety_max_fader = float(
+            self.config.get("safety", {}).get("max_fader", 0.0)
+        )
+
+        for wing_ch in channels:
+            wing_ch = int(wing_ch)
+            fdr = st.get(f"/ch/{wing_ch}/fdr")
+            mute_raw = st.get(f"/ch/{wing_ch}/mute")
+            inst = self._channel_instrument_map.get(wing_ch, "unknown")
+            audio_ch = self._agent_channel_mapping.get(wing_ch, wing_ch)
+
+            peak_db = -100.0
+            lufs_m = -100.0
+            rms_db = -100.0
+            band_energy: Dict[str, float] = {}
+            crest_factor_db = 0.0
+
+            if has_audio:
+                peak_db = float(ac.get_peak(audio_ch))
+                lufs_m = float(ac.get_lufs(audio_ch, 0.4))
+                rms_db = float(ac.get_rms(audio_ch, 4096))
+                crest_factor_db = max(0.0, peak_db - rms_db)
+                # Band energies from spectrum
+                try:
+                    spec = ac.get_spectrum(audio_ch, fft_size=2048)
+                    freqs = spec.get("frequencies")
+                    mag = spec.get("magnitude_db")
+                    if freqs is not None and mag is not None:
+                        from ai.signal_analyzer import compute_band_energies_from_spectrum
+                        band_energy = compute_band_energies_from_spectrum(freqs, mag)
+                except Exception:
+                    pass
+
+            # Fallback: use Wing internal meter values when AudioCapture has no data.
+            # Wing /meters/1 blob is decoded by WingClient._decode_meters() and stored
+            # in mixer_client.channel_peak_db[ch] and state["/ch/N/meter_peak"].
+            if peak_db <= -90.0:
+                wing_peak = st.get(f"/ch/{wing_ch}/meter_peak")
+                if wing_peak is not None:
+                    peak_db = float(wing_peak)
+                    # Approximate LUFS from peak using typical music crest factor (~12 dB)
+                    lufs_m = peak_db - 12.0
+                    rms_db = peak_db - 6.0
+
+            is_muted = False
+            if mute_raw is not None:
+                if isinstance(mute_raw, (list, tuple)):
+                    is_muted = bool(mute_raw[0])
+                else:
+                    is_muted = (
+                        bool(int(mute_raw)) if str(mute_raw).isdigit() else bool(mute_raw)
+                    )
+
+            needs_attention = peak_db > -3.0 or lufs_m > -10.0
+
+            # Phase corrections computed by _update_phase_corrections (runs separately)
+            phase_info = getattr(self, "_phase_corrections", {}).get(wing_ch, {})
+
+            # Current compressor threshold from OSC state
+            dyn_thr = st.get(f"/ch/{wing_ch}/dyn/thr")
+            comp_threshold_db = float(dyn_thr) if dyn_thr is not None else -18.0
+
+            out[wing_ch] = {
+                "channel_id": wing_ch,
+                "instrument": inst,
+                "peak_db": peak_db,
+                "true_peak_db": peak_db,
+                "lufs_momentary": lufs_m,
+                "rms_db": rms_db,
+                "crest_factor_db": crest_factor_db,
+                "band_energy": band_energy,
+                "current_fader_db": float(fdr) if fdr is not None else -30.0,
+                "max_fader_db": safety_max_fader,
+                "is_muted": is_muted,
+                "needs_attention": needs_attention,
+                "comp_threshold_db": comp_threshold_db,
+                "phase_delay_ms": phase_info.get("delay_ms", 0.0),
+                "phase_inverted": phase_info.get("inverted", False),
+                "phase_strength": phase_info.get("strength", 0.0),
+                "dynamic_range_db": crest_factor_db,
+                "mix_lufs": -24.0,
+                "feedback_detected": False,
+            }
+        return out
+
+    def _update_phase_corrections(self) -> None:
+        """Cross-correlate snare channel against all other channels.
+
+        Stores results in self._phase_corrections = {wing_ch: {delay_ms, inverted, strength}}.
+        Called periodically from the observe loop (every ~20s).
+        Requires AudioCapture running with multi-channel Dante input.
+        """
+        if not hasattr(self, "_phase_corrections"):
+            self._phase_corrections: Dict[int, Dict] = {}
+
+        ac = self._agent_audio_capture
+        if not ac or not ac.running:
+            return
+
+        # Find snare channel(s) — use the first recognized snare as reference
+        snare_wing_chs = [
+            ch for ch, inst in self._channel_instrument_map.items()
+            if "snare" in inst.lower()
+        ]
+        if not snare_wing_chs:
+            return
+
+        snare_wing_ch = snare_wing_chs[0]
+        snare_audio_ch = self._agent_channel_mapping.get(snare_wing_ch, snare_wing_ch)
+
+        try:
+            snare_buf = ac.get_buffer(snare_audio_ch, num_samples=ac.sample_rate * 2)
+        except Exception:
+            return
+        if snare_buf is None or len(snare_buf) < 512:
+            return
+
+        snare_peak = float(np.max(np.abs(snare_buf))) if len(snare_buf) else 0.0
+        if snare_peak < 0.001:
+            return  # Snare too quiet — no useful reference
+
+        try:
+            from ai.signal_analyzer import cross_correlate_for_delay
+        except ImportError:
+            return
+
+        # Channels to check for bleed: kick, toms, overheads, room
+        bleed_candidates = [
+            ch for ch, inst in self._channel_instrument_map.items()
+            if any(x in inst.lower() for x in ("kick", "tom", "overhead", "room", "accord"))
+            and ch != snare_wing_ch
+        ]
+
+        sr = ac.sample_rate
+        for wing_ch in bleed_candidates:
+            audio_ch = self._agent_channel_mapping.get(wing_ch, wing_ch)
+            try:
+                other_buf = ac.get_buffer(audio_ch, num_samples=sr * 2)
+                if other_buf is None or len(other_buf) < 512:
+                    continue
+                delay_ms, strength, inverted = cross_correlate_for_delay(
+                    snare_buf, other_buf, sr, max_delay_ms=20.0, min_correlation=0.15
+                )
+                if strength > 0.15:
+                    self._phase_corrections[wing_ch] = {
+                        "delay_ms": delay_ms,
+                        "inverted": inverted,
+                        "strength": strength,
+                        "snare_ref": snare_wing_ch,
+                    }
+                    logger.info(
+                        "Phase analysis ch%s (vs snare ch%s): delay=%.2fms "
+                        "corr=%.2f inverted=%s",
+                        wing_ch, snare_wing_ch, delay_ms, strength, inverted,
+                    )
+            except Exception as exc:
+                logger.debug("Phase analysis error ch%s: %s", wing_ch, exc)
+
+    async def _mixing_agent_observe_loop(self) -> None:
+        ai_cfg = (self.config.get("ai") or {}).get("agent") or {}
+        interval = float(ai_cfg.get("observe_interval_sec", 0.25))
+        phase_interval = float(ai_cfg.get("phase_analysis_interval_sec", 20.0))
+        last_phase = 0.0
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                if not self.mixing_agent or not self.mixing_agent.state.is_running:
+                    continue
+
+                now = asyncio.get_event_loop().time()
+
+                # Phase analysis — heavy, runs every phase_interval seconds
+                if now - last_phase > phase_interval:
+                    try:
+                        loop = asyncio.get_event_loop()
+                        await loop.run_in_executor(None, self._update_phase_corrections)
+                    except Exception as exc:
+                        logger.debug("Phase analysis exception: %s", exc)
+                    last_phase = now
+
+                try:
+                    batch = self._collect_agent_channel_states()
+                except Exception as exc:
+                    logger.error("observe loop _collect_agent_channel_states error: %s", exc)
+                    batch = {}
+                if batch:
+                    self.mixing_agent.update_channel_states_batch(batch)
+
+                if self.mixing_agent.state.mode == AgentMode.SUGGEST:
+                    pending = self.mixing_agent.get_pending_actions()
+                    if not pending:
+                        self._last_agent_pending_sig = ""
+                    else:
+                        sig = "|".join(
+                            f"{p.get('type')}:{p.get('channel')}" for p in pending
+                        )
+                        if sig != self._last_agent_pending_sig:
+                            self._last_agent_pending_sig = sig
+                            await self.broadcast(
+                                {
+                                    "type": "mixing_agent_suggestions",
+                                    "pending": pending,
+                                    "channels": len(batch),
+                                }
+                            )
+        except asyncio.CancelledError:
+            logger.debug("mixing_agent observe loop cancelled")
+
+    async def start_mixing_agent(self, websocket, data: Dict[str, Any]) -> None:
+        if not self.mixer_client or not self.mixer_client.is_connected:
+            await self.send_to_client(
+                websocket,
+                {"type": "error", "error": "Mixer not connected"},
+            )
+            return
+        if self._knowledge_base is None:
+            await self.send_to_client(
+                websocket,
+                {"type": "error", "error": "Knowledge base not available"},
+            )
+            return
+
+        await self._stop_mixing_agent_internal()
+
+        ai_root = self.config.get("ai") or {}
+        kb_first = bool(data.get("kb_first", ai_root.get("kb_first_default", True)))
+        mode_str = (data.get("mode") or "suggest").lower()
+        try:
+            mode = AgentMode(mode_str)
+        except ValueError:
+            mode = AgentMode.SUGGEST
+
+        ai_agent_cfg = ai_root.get("agent") or {}
+        cycle = float(ai_agent_cfg.get("cycle_interval_sec", 0.5))
+
+        channels = data.get("channels") or []
+        self._agent_tracked_channels = [int(c) for c in channels]
+        raw_map = data.get("channel_mapping") or {}
+        self._agent_channel_mapping = {int(k): int(v) for k, v in raw_map.items()}
+        self._last_agent_pending_sig = ""
+
+        device_id = data.get("device_id")
+        if device_id is not None and device_id != "":
+            num_ac = int(data.get("num_audio_channels", 32))
+            try:
+                dev = int(device_id) if str(device_id).isdigit() else device_id
+                # Auto-detect available channels for the device if exact count fails
+                try:
+                    import sounddevice as _sd
+                    dev_info = _sd.query_devices(dev, "input")
+                    max_ch = int(dev_info.get("max_input_channels", num_ac))
+                    num_ac = min(num_ac, max_ch)
+                except Exception:
+                    pass
+                self._agent_audio_capture = AudioCapture(
+                    num_channels=min(num_ac, 64),
+                    sample_rate=int(data.get("sample_rate", 48000)),
+                    source_type=AudioSourceType.SOUNDDEVICE,
+                    device_name=dev,
+                )
+                self._agent_audio_capture.start()
+                logger.info("Agent AudioCapture started: device=%s ch=%d", dev, num_ac)
+            except Exception as e:
+                logger.warning("Agent AudioCapture failed: %s", e)
+                self._agent_audio_capture = None
+
+        self.mixing_agent = MixingAgent(
+            knowledge_base=self._knowledge_base,
+            llm_client=None,
+            mixer_client=self.mixer_client,
+            mode=mode,
+            cycle_interval=cycle,
+            kb_first=kb_first,
+        )
+        self._mixing_agent_task = asyncio.create_task(self.mixing_agent.start())
+        self._agent_observe_task = asyncio.create_task(
+            self._mixing_agent_observe_loop()
+        )
+        await self.send_to_client(
+            websocket,
+            {
+                "type": "mixing_agent_started",
+                "status": self.mixing_agent.get_status(),
+            },
+        )
+        logger.info(
+            "MixingAgent started mode=%s kb_first=%s channels=%s",
+            mode.value,
+            kb_first,
+            self._agent_tracked_channels,
+        )
+
+    async def stop_mixing_agent(self, websocket, data: Dict[str, Any]) -> None:
+        await self._stop_mixing_agent_internal()
+        await self.send_to_client(
+            websocket,
+            {"type": "mixing_agent_stopped", "message": "MixingAgent stopped"},
+        )
+
+    async def set_mixing_agent_mode(self, websocket, data: Dict[str, Any]) -> None:
+        if not self.mixing_agent:
+            await self.send_to_client(
+                websocket,
+                {"type": "error", "error": "MixingAgent not running"},
+            )
+            return
+        mode_str = (data.get("mode") or "suggest").lower()
+        try:
+            self.mixing_agent.set_mode(AgentMode(mode_str))
+        except ValueError:
+            await self.send_to_client(
+                websocket,
+                {"type": "error", "error": f"Invalid mode: {mode_str}"},
+            )
+            return
+        await self.send_to_client(
+            websocket,
+            {
+                "type": "mixing_agent_status",
+                "status": self.mixing_agent.get_status(),
+            },
+        )
+
+    async def get_mixing_agent_status(self, websocket, data: Dict[str, Any]) -> None:
+        if not self.mixing_agent:
+            await self.send_to_client(
+                websocket,
+                {
+                    "type": "mixing_agent_status",
+                    "status": None,
+                    "message": "MixingAgent not running",
+                },
+            )
+            return
+        await self.send_to_client(
+            websocket,
+            {
+                "type": "mixing_agent_status",
+                "status": self.mixing_agent.get_status(),
+                "pending_actions": self.mixing_agent.get_pending_actions(),
+            },
+        )
+
+    async def mixing_agent_approve(self, websocket, data: Dict[str, Any]) -> None:
+        if not self.mixing_agent:
+            await self.send_to_client(
+                websocket,
+                {"type": "error", "error": "MixingAgent not running"},
+            )
+            return
+        idx = int(data.get("index", -1))
+        if data.get("approve_all"):
+            n = self.mixing_agent.approve_all_pending()
+            await self.send_to_client(
+                websocket,
+                {"type": "mixing_agent_approved", "count": n},
+            )
+        elif idx >= 0:
+            ok = self.mixing_agent.approve_action(idx)
+            await self.send_to_client(
+                websocket,
+                {"type": "mixing_agent_approved", "index": idx, "ok": ok},
+            )
+        else:
+            await self.send_to_client(
+                websocket,
+                {"type": "error", "error": "Missing index or approve_all"},
+            )
+
+    async def mixing_agent_dismiss(self, websocket, data: Dict[str, Any]) -> None:
+        if not self.mixing_agent:
+            await self.send_to_client(
+                websocket,
+                {"type": "error", "error": "MixingAgent not running"},
+            )
+            return
+        if data.get("dismiss_all"):
+            self.mixing_agent.dismiss_all_pending()
+            await self.send_to_client(
+                websocket,
+                {"type": "mixing_agent_dismissed", "all": True},
+            )
+            return
+        idx = int(data.get("index", -1))
+        if idx < 0:
+            await self.send_to_client(
+                websocket,
+                {"type": "error", "error": "Missing index"},
+            )
+            return
+        ok = self.mixing_agent.dismiss_action(idx)
+        await self.send_to_client(
+            websocket,
+            {"type": "mixing_agent_dismissed", "index": idx, "ok": ok},
+        )
 
     async def start_feedback_detection(
         self,
@@ -1242,6 +1711,12 @@ class AutoMixerServer:
 
                 # Run recognition
                 results = scan_and_recognize(channel_names)
+                for ch_num, r in results.items():
+                    preset = r.get("preset")
+                    if preset:
+                        self._channel_instrument_map[int(ch_num)] = (
+                            self._normalize_instrument_for_agent(preset)
+                        )
 
                 await self.send_to_client(
                     websocket,

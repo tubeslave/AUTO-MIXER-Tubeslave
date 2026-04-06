@@ -3,7 +3,11 @@
 
 def register_handlers(server):
     async def handle_connect_wing(websocket, data):
-        await server.connect_wing(data.get("ip"), data.get("send_port"), data.get("receive_port"))
+        await server.connect_wing(
+            data.get("ip"),
+            data.get("send_port") or 2223,
+            data.get("receive_port") or 2223,
+        )
 
     async def handle_connect_dlive(websocket, data):
         await server.connect_dlive(

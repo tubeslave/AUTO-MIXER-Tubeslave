@@ -71,6 +71,33 @@ class KnowledgeBase:
 
         logger.info(f"Loaded {len(self.entries)} knowledge entries from {self.knowledge_dir}")
 
+    def load_markdown_directory(
+        self, directory: str, category_prefix: Optional[str] = None
+    ) -> int:
+        """Load all *.md under directory (same ## section rules as primary knowledge)."""
+        if not os.path.isdir(directory):
+            logger.warning("Markdown directory not found: %s", directory)
+            return 0
+        prefix = category_prefix or os.path.basename(os.path.abspath(directory))
+        before = len(self.entries)
+        for filename in sorted(os.listdir(directory)):
+            if not filename.endswith(".md"):
+                continue
+            filepath = os.path.join(directory, filename)
+            if not os.path.isfile(filepath):
+                continue
+            category = f"{prefix}_{filename.replace('.md', '')}"
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    content = f.read()
+                for section in self._split_sections(content, category):
+                    self.add_entry(section)
+            except OSError as e:
+                logger.error("Error loading %s: %s", filepath, e)
+        added = len(self.entries) - before
+        logger.info("Loaded %s extra entries from %s", added, directory)
+        return added
+
     def _split_sections(self, content: str, category: str) -> List[KnowledgeEntry]:
         """Split markdown into sections at ## headings."""
         sections = []

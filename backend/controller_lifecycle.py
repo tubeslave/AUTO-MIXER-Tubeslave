@@ -104,6 +104,28 @@ def cleanup_all_controllers(server: Any) -> None:
     server.feedback_detector = None
     server._feedback_channel_mapping = {}
 
+    # MixingAgent (sync best-effort — async disconnect prefers _stop_mixing_agent_internal)
+    if getattr(server, "mixing_agent", None):
+        try:
+            server.mixing_agent.stop()
+        except Exception as e:
+            logger.debug("mixing_agent stop: %s", e)
+    for attr in ("_mixing_agent_task", "_agent_observe_task"):
+        task = getattr(server, attr, None)
+        if task is not None and not task.done():
+            try:
+                task.cancel()
+            except Exception:
+                pass
+        setattr(server, attr, None)
+    server.mixing_agent = None
+    if getattr(server, "_agent_audio_capture", None):
+        try:
+            server._agent_audio_capture.stop()
+        except Exception as e:
+            logger.debug("agent audio capture stop: %s", e)
+        server._agent_audio_capture = None
+
     # Disconnect mixer
     if server.mixer_client:
         try:

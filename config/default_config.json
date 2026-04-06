@@ -1,14 +1,14 @@
 {
   "mixer": {
     "type": "wing",
-    "ip": "192.168.1.100",
+    "ip": "192.168.1.102",
     "ableton_send_port": 11000,
     "ableton_recv_port": 11001,
     "channel_offset": 0
   },
   "wing": {
-    "default_ip": "192.168.1.100",
-    "send_port": 2222,
+    "default_ip": "192.168.1.102",
+    "send_port": 2223,
     "receive_port": 2223,
     "models": [
       "Wing Rack",
@@ -323,6 +323,24 @@
           "max_peak_limit": -12.0
         }
       }
+    }
+  },
+  "ai": {
+    "kb_first_default": true,
+    "use_chromadb": true,
+    "knowledge_extra_paths": [],
+    "corpus_ingest": {
+      "backend_log_glob": "logs/automixer-backend.log",
+      "channel_backup_glob": "presets/channel_backup_*.json",
+      "mix_events_glob": "",
+      "max_log_lines": 500,
+      "max_backup_files": 20,
+      "max_jsonl_rows": 200
+    },
+    "agent": {
+      "cycle_interval_sec": 0.5,
+      "observe_interval_sec": 0.25,
+      "phase_analysis_interval_sec": 20.0
     }
   },
   "safety": {

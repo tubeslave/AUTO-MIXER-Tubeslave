@@ -63,9 +63,13 @@
 5. Drums (kick, snare, tom) — transient instruments с высоким crest factor. Захваченный peak во время калибровки может быть на 10–15 dB ниже реального пика. Safe Gain: cap `drums_close_max_boost_db` (default 6 dB) для категории drums_close, чтобы избежать клиппинга при более сильных ударах.
 6. Bleed detection: Safe Gain передаёт band metrics в BleedService (`band_analyzer.samples_to_band_metrics`). Фреймворк для drums/vocals — `docs/BLEED_DETECTION_FRAMEWORK.md`. Без band metrics спектральная детекция отключена.
 7. Safe Gain bleed exclusion: при `exclude_bleed_from_own_capture=true` блоки с высоким bleed (`capture_bleed_guard_ratio` + `capture_bleed_guard_confidence`) не могут запускать/пополнять own-capture (WAIT/CAPTURE), чтобы bleed не попадал в оценку gain.
+8. Analysis-driven mixing: `backend/ai/signal_analyzer.py` — анализирует реальный сигнал по метрикам (FFT-бэнды, кросс-корреляция, crest factor), а не применяет пресеты. `compute_band_energies_from_spectrum` → EQ-коррекции только где отклонение >1.8 dB; `cross_correlate_for_delay` использует `irfft(O * conj(R))` (не `R * conj(O)`!) с Cauchy-Schwarz нормализацией; `analyze_compression_state` оценивает работу компрессора по crest factor; `smooth_level_adjustment` — плавная балансировка ±0.5 dB/цикл.
+9. Фазовый анализ малого барабана: `_update_phase_corrections()` в server.py кросс-коррелирует snare vs kick/tom/overhead/room каждые 20 с (в executor), результат → ch_state: `phase_delay_ms`, `phase_strength`, `phase_inverted`. Агент применяет `set_channel_delay` + `set_channel_phase_invert` если strength > 0.20 и delay > 0.3 ms.
 
 ## Контекст для LLM
 
+- Обобщённые выводы из учебной литературы по зонам (уровни, EQ, динамика, live, мастеринг): `backend/ai/knowledge/books_engineering_reference.md`.
+- Вокал в миксе (SOS, iZotope, порядок обработки): `backend/ai/knowledge/vocal_mixing_authoritative.md`.
 - При работе с DSP — сверяться с `docs/CONVENTIONS.md` (формулы, единицы).
 - При работе с OSC — сверяться с `docs/TOOLS.md` и `Docs/WING Remote Protocols v3.0.5.pdf`.
 - При изменении архитектуры — обновить `docs/ARCHITECTURE.md`.

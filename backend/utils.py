@@ -28,6 +28,10 @@ def setup_file_logging() -> str:
     fh = logging.FileHandler(log_path, encoding="utf-8")
     fh.setLevel(logging.INFO)
     fh.setFormatter(fmt)
+    # Ensure root logger level allows INFO messages (blake2 errors may have
+    # already called basicConfig, leaving root at WARNING).
+    if root.level == logging.NOTSET or root.level > logging.INFO:
+        root.setLevel(logging.INFO)
     root.addHandler(fh)
     return log_path
 

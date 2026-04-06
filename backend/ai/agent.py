@@ -58,7 +58,8 @@ class MixingAgent:
                  llm_client=None,
                  mixer_client=None,
                  mode: AgentMode = AgentMode.SUGGEST,
-                 cycle_interval: float = 0.5):
+                 cycle_interval: float = 0.5,
+                 kb_first: bool = False):
         # Lazy imports to avoid circular deps
         if knowledge_base is None:
             try:
@@ -67,7 +68,7 @@ class MixingAgent:
             except Exception as e:
                 logger.warning(f"Could not init knowledge base: {e}")
 
-        if rule_engine is None:
+        if rule_engine is None and not kb_first:
             try:
                 from .rule_engine import RuleEngine
                 rule_engine = RuleEngine()
@@ -78,14 +79,40 @@ class MixingAgent:
         self.rules = rule_engine
         self.llm = llm_client
         self.mixer = mixer_client
+        self.kb_first = kb_first
         self.state = AgentState(mode=mode)
         self.cycle_interval = cycle_interval
         self._confidence_threshold = 0.6
-        self._max_actions_per_cycle = 5
+        self._max_actions_per_cycle = 10
         self._action_history: List[AgentAction] = []
-        self._llm_query_interval = 10.0  # seconds between LLM consultations
+        self._llm_query_interval = 10.0
         self._last_llm_query = 0.0
-        logger.info(f"MixingAgent initialized in {mode.value} mode")
+        # cooldown: track last time each (channel, action_type) was applied
+        self._last_applied: Dict[tuple, float] = {}
+        # cooldowns per action type (seconds before re-firing same action on same ch)
+        self._cooldowns: Dict[str, float] = {
+            "apply_hpf":            300.0,  # structural, once per session
+            "apply_eq":              45.0,  # re-analyze every 45s (signal may change)
+            "adjust_compressor":     60.0,  # re-check compression every minute
+            "adjust_compression":    60.0,  # threshold fine-tune
+            "apply_phase_correction": 30.0, # phase — after bleed analysis
+            "reduce_gain":            8.0,  # level guard, reactive
+            "adjust_gain":            8.0,
+            "balance_level":          5.0,  # continuous smoothed balancing
+            "normalize_fader":      120.0,  # startup normalization (no signal needed)
+            "mute_channel":          60.0,
+            "unmute_channel":        60.0,
+            "llm_recommendation":    30.0,
+        }
+        # Per-channel smoothed level adjustment tracking (for gradual balancing)
+        self._level_smooth: Dict[int, float] = {}
+        # Signal analyzer import (lazy, avoid import-time errors)
+        self._signal_analyzer_available: Optional[bool] = None
+        logger.info(
+            "MixingAgent initialized mode=%s kb_first=%s",
+            mode.value,
+            kb_first,
+        )
 
     async def start(self):
         """Start the agent ODA loop."""
@@ -122,7 +149,10 @@ class MixingAgent:
         observations = await self._observe()
 
         # DECIDE
-        actions = self._decide(observations)
+        if self.kb_first:
+            actions = self._decide_kb_first(observations)
+        else:
+            actions = self._decide(observations)
 
         # ACT
         if self.state.mode == AgentMode.AUTO:
@@ -224,49 +254,723 @@ class MixingAgent:
         # Limit actions per cycle to prevent overwhelming the mixer
         return actions[:self._max_actions_per_cycle]
 
+    # ── Instrument profiles ───────────────────────────────────────────────────
+
+    # HPF cut-off frequencies (Hz) — applied once at startup
+    _INST_HPF: Dict[str, float] = {
+        "lead_vocal": 90.0,   "leadvocal":  90.0,
+        "back_vocal": 100.0,  "backvocal":  100.0,  "backing_vocal": 100.0,
+        "vocal":       90.0,
+        "snare":      100.0,
+        "hihat":      200.0,  "ride":       200.0,
+        "overheads":  100.0,  "overhead":   100.0,
+        "room":        80.0,
+        "electricguitar": 80.0,  "electric_guitar": 80.0,
+        "acousticguitar": 80.0,  "acoustic_guitar": 80.0,
+        "accordion":  80.0,
+    }
+
+    # No HPF for these (bass-heavy fundamentals)
+    _NO_HPF = frozenset({
+        "kick", "bass", "bass_guitar", "synth_bass", "sub",
+        "floor_tom", "tom", "playback", "room",
+    })
+
+    # EQ profiles — low_shelf / bands (1–4) / high_shelf
+    _INST_EQ: Dict[str, dict] = {
+        "kick": {
+            "bands": [
+                {"band": 1, "freq": 60.0,   "gain":  3.0, "q": 1.0},
+                {"band": 2, "freq": 350.0,  "gain": -4.0, "q": 2.0},
+                {"band": 3, "freq": 4000.0, "gain":  3.0, "q": 1.2},
+            ],
+            "high_shelf": {"gain": -2.0, "freq": 10000.0, "type": "SHV"},
+        },
+        "snare": {
+            "low_shelf": {"gain": -2.0, "freq": 100.0, "type": "SHV"},
+            "bands": [
+                {"band": 1, "freq": 200.0,  "gain":  2.0, "q": 1.5},
+                {"band": 2, "freq": 800.0,  "gain": -2.0, "q": 2.0},
+                {"band": 3, "freq": 5000.0, "gain":  3.0, "q": 1.2},
+            ],
+        },
+        "tom": {
+            "bands": [
+                {"band": 1, "freq": 100.0,  "gain":  2.0, "q": 1.0},
+                {"band": 2, "freq": 400.0,  "gain": -3.0, "q": 2.0},
+                {"band": 3, "freq": 3000.0, "gain":  2.0, "q": 1.5},
+            ],
+        },
+        "hihat": {
+            "bands": [
+                {"band": 1, "freq": 500.0,  "gain": -2.0, "q": 2.0},
+            ],
+            "high_shelf": {"gain": 2.0, "freq": 10000.0, "type": "SHV"},
+        },
+        "ride": {
+            "bands": [
+                {"band": 1, "freq": 400.0,  "gain": -2.0, "q": 2.0},
+            ],
+            "high_shelf": {"gain": 1.5, "freq": 8000.0, "type": "SHV"},
+        },
+        "overheads": {
+            "low_shelf": {"gain": -2.0, "freq": 200.0, "type": "SHV"},
+            "high_shelf": {"gain": 1.5, "freq": 8000.0, "type": "SHV"},
+        },
+        "overhead": {
+            "low_shelf": {"gain": -2.0, "freq": 200.0, "type": "SHV"},
+            "high_shelf": {"gain": 1.5, "freq": 8000.0, "type": "SHV"},
+        },
+        "room": {
+            "low_shelf": {"gain": -4.0, "freq": 200.0, "type": "SHV"},
+            "bands": [
+                {"band": 1, "freq": 500.0, "gain": -2.0, "q": 2.0},
+            ],
+        },
+        "bass": {
+            "low_shelf": {"gain": 2.0, "freq": 80.0, "type": "SHV"},
+            "bands": [
+                {"band": 1, "freq": 250.0, "gain": -2.0, "q": 1.5},
+                {"band": 2, "freq": 700.0, "gain":  1.5, "q": 1.5},
+            ],
+        },
+        "bass_guitar": {
+            "low_shelf": {"gain": 2.0, "freq": 80.0, "type": "SHV"},
+            "bands": [
+                {"band": 1, "freq": 250.0, "gain": -2.0, "q": 1.5},
+                {"band": 2, "freq": 700.0, "gain":  1.5, "q": 1.5},
+            ],
+        },
+        "lead_vocal": {
+            "bands": [
+                {"band": 1, "freq":  250.0, "gain": -2.0, "q": 1.5},
+                {"band": 2, "freq": 1000.0, "gain": -1.5, "q": 2.0},
+                {"band": 3, "freq": 3000.0, "gain":  2.0, "q": 1.0},
+            ],
+            "high_shelf": {"gain": 1.5, "freq": 10000.0, "type": "SHV"},
+        },
+        "leadvocal": {
+            "bands": [
+                {"band": 1, "freq":  250.0, "gain": -2.0, "q": 1.5},
+                {"band": 2, "freq": 1000.0, "gain": -1.5, "q": 2.0},
+                {"band": 3, "freq": 3000.0, "gain":  2.0, "q": 1.0},
+            ],
+            "high_shelf": {"gain": 1.5, "freq": 10000.0, "type": "SHV"},
+        },
+        "back_vocal": {
+            "bands": [
+                {"band": 1, "freq":  250.0, "gain": -3.0, "q": 1.5},
+                {"band": 2, "freq": 3000.0, "gain":  1.5, "q": 1.0},
+            ],
+            "high_shelf": {"gain": 1.0, "freq": 10000.0, "type": "SHV"},
+        },
+        "backvocal": {
+            "bands": [
+                {"band": 1, "freq":  250.0, "gain": -3.0, "q": 1.5},
+                {"band": 2, "freq": 3000.0, "gain":  1.5, "q": 1.0},
+            ],
+            "high_shelf": {"gain": 1.0, "freq": 10000.0, "type": "SHV"},
+        },
+        "electricguitar": {
+            "bands": [
+                {"band": 1, "freq":  300.0, "gain": -2.0, "q": 2.0},
+                {"band": 2, "freq": 2500.0, "gain":  2.0, "q": 1.2},
+                {"band": 3, "freq": 5000.0, "gain": -1.5, "q": 1.5},
+            ],
+        },
+        "electric_guitar": {
+            "bands": [
+                {"band": 1, "freq":  300.0, "gain": -2.0, "q": 2.0},
+                {"band": 2, "freq": 2500.0, "gain":  2.0, "q": 1.2},
+                {"band": 3, "freq": 5000.0, "gain": -1.5, "q": 1.5},
+            ],
+        },
+        "accordion": {
+            "bands": [
+                {"band": 1, "freq":  300.0, "gain": -2.0, "q": 2.0},
+                {"band": 2, "freq": 2000.0, "gain":  1.5, "q": 1.2},
+            ],
+        },
+    }
+
+    # Full compressor profiles: thr/ratio/attack/release/knee/makeup/det
+    _INST_COMP_FULL: Dict[str, dict] = {
+        "kick":          {"thr": -16.0, "ratio": 4.0, "att":  6.0, "rel": 100.0, "knee": 2, "makeup": 2.0, "det": "PEAK"},
+        "snare":         {"thr": -16.0, "ratio": 4.0, "att":  5.0, "rel":  80.0, "knee": 1, "makeup": 1.0, "det": "PEAK"},
+        "tom":           {"thr": -20.0, "ratio": 4.0, "att":  8.0, "rel": 120.0, "knee": 2, "makeup": 1.0, "det": "PEAK"},
+        "lead_vocal":    {"thr": -18.0, "ratio": 3.0, "att": 10.0, "rel": 120.0, "knee": 2, "makeup": 2.0, "det": "RMS"},
+        "leadvocal":     {"thr": -18.0, "ratio": 3.0, "att": 10.0, "rel": 120.0, "knee": 2, "makeup": 2.0, "det": "RMS"},
+        "back_vocal":    {"thr": -20.0, "ratio": 3.0, "att": 12.0, "rel": 150.0, "knee": 2, "makeup": 2.0, "det": "RMS"},
+        "backvocal":     {"thr": -20.0, "ratio": 3.0, "att": 12.0, "rel": 150.0, "knee": 2, "makeup": 2.0, "det": "RMS"},
+        "bass":          {"thr": -20.0, "ratio": 3.5, "att": 30.0, "rel": 200.0, "knee": 3, "makeup": 2.0, "det": "RMS"},
+        "bass_guitar":   {"thr": -20.0, "ratio": 3.5, "att": 30.0, "rel": 200.0, "knee": 3, "makeup": 2.0, "det": "RMS"},
+        "electricguitar":{"thr": -22.0, "ratio": 3.0, "att": 20.0, "rel": 150.0, "knee": 2, "makeup": 1.0, "det": "RMS"},
+        "electric_guitar":{"thr":-22.0, "ratio": 3.0, "att": 20.0, "rel": 150.0, "knee": 2, "makeup": 1.0, "det": "RMS"},
+        "accordion":     {"thr": -22.0, "ratio": 2.5, "att": 25.0, "rel": 200.0, "knee": 2, "makeup": 1.0, "det": "RMS"},
+        "overheads":     {"thr": -28.0, "ratio": 2.0, "att": 20.0, "rel": 300.0, "knee": 3, "makeup": 0.0, "det": "RMS"},
+        "overhead":      {"thr": -28.0, "ratio": 2.0, "att": 20.0, "rel": 300.0, "knee": 3, "makeup": 0.0, "det": "RMS"},
+    }
+
+    # Target LUFS (momentary) per instrument for level balancing
+    _TARGET_LUFS: Dict[str, float] = {
+        "kick":          -20.0,
+        "snare":         -20.0,
+        "tom":           -24.0,
+        "hihat":         -28.0,
+        "ride":          -30.0,
+        "overheads":     -24.0,
+        "overhead":      -24.0,
+        "room":          -32.0,
+        "bass":          -18.0,
+        "bass_guitar":   -18.0,
+        "lead_vocal":    -16.0,
+        "leadvocal":     -16.0,
+        "back_vocal":    -22.0,
+        "backvocal":     -22.0,
+        "backing_vocal": -22.0,
+        "electricguitar":-22.0,
+        "electric_guitar":-22.0,
+        "accordion":     -24.0,
+        "playback":      -20.0,
+    }
+
+    # Nominal fader positions (dB) by instrument type for startup normalization.
+    # Applied once per session when no audio signal is present, to put channels
+    # at reasonable starting positions.
+    _NOMINAL_FADER: Dict[str, float] = {
+        "kick":           0.0,
+        "snare":          0.0,
+        "tom":           -3.0,
+        "hihat":         -6.0,
+        "ride":          -6.0,
+        "overheads":     -6.0,
+        "overhead":      -6.0,
+        "room":         -10.0,
+        "bass":           0.0,
+        "bass_guitar":    0.0,
+        "lead_vocal":    +3.0,
+        "leadvocal":     +3.0,
+        "back_vocal":    -3.0,
+        "backvocal":     -3.0,
+        "backing_vocal": -3.0,
+        "electricguitar": -3.0,
+        "electric_guitar":-3.0,
+        "accordion":     -3.0,
+        "playback":      -6.0,
+    }
+
+    def _on_cooldown(self, ch: int, action_type: str, now: float) -> bool:
+        """Return True if this (channel, action_type) is still cooling down."""
+        key = (ch, action_type)
+        last = self._last_applied.get(key, 0.0)
+        return (now - last) < self._cooldowns.get(action_type, 30.0)
+
+    def _mark_applied(self, ch: int, action_type: str, now: float) -> None:
+        self._last_applied[(ch, action_type)] = now
+
+    def _load_signal_analyzer(self):
+        """Lazy-import signal_analyzer. Returns module or None."""
+        if self._signal_analyzer_available is False:
+            return None
+        try:
+            from ai import signal_analyzer as sa
+            self._signal_analyzer_available = True
+            return sa
+        except ImportError:
+            try:
+                import signal_analyzer as sa
+                self._signal_analyzer_available = True
+                return sa
+            except ImportError:
+                self._signal_analyzer_available = False
+                return None
+
+    def _decide_kb_first(self, observations: Dict) -> List[AgentAction]:
+        """Analysis-driven decisions — measure signal first, then decide corrections.
+
+        Decision pipeline per channel:
+        1. SAFETY GUARD    — clip/hot level → immediate fader trim
+        2. HPF             — instrument HPF freq (structural, one-shot)
+        3. EQ (analysis)   — compare measured spectral shape vs KB target, apply only needed bands
+        4. COMPRESSOR      — initial params from KB; then adjust based on crest factor analysis
+        5. COMPRESSION MON — ongoing: monitor crest factor, adjust threshold if over/under
+        6. LEVEL BALANCE   — smooth gradual LUFS tracking (±0.5 dB/step, 5s cooldown)
+        7. PHASE CORRECTION— apply delay/polarity correction from snare bleed analysis
+        8. LLM fallback    — for attention channels when LLM is configured
+        """
+        sa = self._load_signal_analyzer()
+        actions: List[AgentAction] = []
+        now = time.time()
+        llm_used_this_cycle = False
+
+        for ch_id, ch_state in observations.get("channels", {}).items():
+            ch = int(ch_id)
+            raw_inst = (ch_state.get("instrument") or "unknown")
+            inst = raw_inst.lower()
+            inst_key = inst.replace(" ", "_").replace("-", "_")
+
+            peak = float(ch_state.get("peak_db", ch_state.get("true_peak_db", -100.0)))
+            lufs_m = float(ch_state.get("lufs_momentary", ch_state.get("lufs", -100.0)))
+            rms_db = float(ch_state.get("rms_db", lufs_m))
+            crest_factor = float(ch_state.get("crest_factor_db", max(0.0, peak - rms_db)))
+            is_muted = bool(ch_state.get("is_muted", False))
+            has_signal = peak > -60.0
+            band_energy: Dict[str, float] = ch_state.get("band_energy") or {}
+            comp_thr = float(ch_state.get("comp_threshold_db", -18.0))
+
+            # ── 1. SAFETY: clip/hot level → immediate fader trim ─────────
+            hot = peak > -3.0 or lufs_m > -9.0
+            very_hot = peak > 0.0 or lufs_m > -6.0
+            if hot and not is_muted and not self._on_cooldown(ch, "reduce_gain", now):
+                amount = -3.0 if very_hot else -1.5
+                kb_title = ""
+                if self.kb:
+                    hits = self.kb.search(
+                        f"{inst} gain staging headroom clipping fader", n_results=2
+                    )
+                    kb_title = hits[0].metadata.get("title", "") if hits else ""
+                actions.append(AgentAction(
+                    action_type="reduce_gain",
+                    channel=ch,
+                    parameters={"amount_db": amount, "channel": ch},
+                    priority=1,
+                    confidence=0.92,
+                    reason=(
+                        f"{'CLIP' if very_hot else 'Hot'} level "
+                        f"peak={peak:.1f}dB LUFS={lufs_m:.1f} → {amount:+.1f}dB; {kb_title[:50]}"
+                    ),
+                    source="analysis",
+                    timestamp=now,
+                ))
+
+            # ── 2. HPF — structural, once per session ────────────────────
+            hpf_freq = self._INST_HPF.get(inst_key) or self._INST_HPF.get(inst)
+            if hpf_freq is None and "vocal" in inst:
+                hpf_freq = 90.0
+            if hpf_freq is None and ("guitar" in inst or "gtr" in inst):
+                hpf_freq = 80.0
+
+            if hpf_freq and inst_key not in self._NO_HPF and inst not in self._NO_HPF:
+                if not self._on_cooldown(ch, "apply_hpf", now):
+                    # If sub band is weak in measured spectrum, confirm HPF is appropriate
+                    sub_energy = band_energy.get("sub", -100.0)
+                    hpf_needed = sub_energy > -60.0  # sub energy present → HPF needed
+                    if not has_signal:
+                        hpf_needed = True  # No audio yet — apply preemptively
+                    if hpf_needed:
+                        kb_reason = f"Remove sub-rumble below {hpf_freq:.0f}Hz"
+                        if has_signal and sub_energy > -40.0:
+                            kb_reason = (
+                                f"Sub energy {sub_energy:.1f}dB detected below {hpf_freq:.0f}Hz → cut"
+                            )
+                        actions.append(AgentAction(
+                            action_type="apply_hpf",
+                            channel=ch,
+                            parameters={"frequency": hpf_freq, "channel": ch},
+                            priority=3,
+                            confidence=0.88,
+                            reason=f"HPF {hpf_freq:.0f}Hz for {raw_inst}: {kb_reason}",
+                            source="analysis",
+                            timestamp=now,
+                        ))
+
+            # ── 3. EQ — analysis-driven, re-check every 45s ─────────────
+            if not self._on_cooldown(ch, "apply_eq", now):
+                inst_target = (
+                    sa.INST_BAND_TARGETS.get(inst_key) if sa else None
+                ) or (sa.INST_BAND_TARGETS.get(inst) if sa else None)
+
+                if inst_target and has_signal and band_energy:
+                    # Analysis path: compare measured spectrum vs target
+                    corrections = sa.compute_eq_corrections(
+                        measured=band_energy,
+                        inst_target=inst_target,
+                        min_correction_db=1.8,
+                        max_correction_db=4.0,
+                        max_corrections=3,
+                    )
+                    if corrections:
+                        # Build EQ profile from analysis results
+                        eq_profile: Dict = {"bands": [], "low_shelf": None, "high_shelf": None}
+                        band_slot_counter = 1
+                        for corr in corrections:
+                            slot = corr.get("band_slot", "band")
+                            if slot == "low_shelf":
+                                eq_profile["low_shelf"] = {
+                                    "gain": corr["gain"], "freq": corr["freq"], "type": "SHV"
+                                }
+                            elif slot == "high_shelf":
+                                eq_profile["high_shelf"] = {
+                                    "gain": corr["gain"], "freq": corr["freq"], "type": "SHV"
+                                }
+                            else:
+                                if band_slot_counter <= 4:
+                                    eq_profile["bands"].append({
+                                        "band": band_slot_counter,
+                                        "freq": corr["freq"],
+                                        "gain": corr["gain"],
+                                        "q": corr.get("q", 1.5),
+                                    })
+                                    band_slot_counter += 1
+
+                        desc = " | ".join(
+                            f"{c['gain']:+.1f}dB@{c['freq']:.0f}Hz ({c['band']})"
+                            for c in corrections
+                        )
+                        actions.append(AgentAction(
+                            action_type="apply_eq",
+                            channel=ch,
+                            parameters={"profile": eq_profile, "channel": ch},
+                            priority=4,
+                            confidence=0.82,
+                            reason=f"Spectrum analysis {raw_inst}: {desc}",
+                            source="analysis",
+                            timestamp=now,
+                        ))
+                elif not has_signal:
+                    # No signal yet: apply knowledge-profile EQ preemptively
+                    eq_profile = self._INST_EQ.get(inst_key) or self._INST_EQ.get(inst)
+                    if eq_profile:
+                        bands_desc = " | ".join(
+                            f"{bd.get('gain',0):+.0f}dB@{bd.get('freq',0):.0f}Hz"
+                            for bd in eq_profile.get("bands", [])
+                        )
+                        actions.append(AgentAction(
+                            action_type="apply_eq",
+                            channel=ch,
+                            parameters={"profile": eq_profile, "channel": ch},
+                            priority=4,
+                            confidence=0.75,
+                            reason=f"KB profile EQ (no signal yet) {raw_inst}: {bands_desc}",
+                            source="knowledge_base",
+                            timestamp=now,
+                        ))
+
+            # ── 4. COMPRESSOR — initial setup from KB, then monitoring ───
+            comp = self._INST_COMP_FULL.get(inst_key) or self._INST_COMP_FULL.get(inst)
+            if comp and not self._on_cooldown(ch, "adjust_compressor", now):
+                actions.append(AgentAction(
+                    action_type="adjust_compressor",
+                    channel=ch,
+                    parameters={
+                        "threshold": comp["thr"],
+                        "ratio":     comp["ratio"],
+                        "attack":    comp["att"],
+                        "release":   comp["rel"],
+                        "knee":      comp.get("knee", 2),
+                        "makeup":    comp.get("makeup", 0.0),
+                        "det":       comp.get("det", "RMS"),
+                        "channel":   ch,
+                    },
+                    priority=5,
+                    confidence=0.85,
+                    reason=(
+                        f"Comp initial: {comp['thr']:.0f}dBFS/{comp['ratio']:.1f}:1 "
+                        f"att={comp['att']:.0f}ms rel={comp['rel']:.0f}ms "
+                        f"{comp.get('det','RMS')}"
+                    ),
+                    source="knowledge_base",
+                    timestamp=now,
+                ))
+
+            # ── 5. COMPRESSION MONITORING — crest factor analysis ────────
+            if (
+                comp
+                and has_signal
+                and not self._on_cooldown(ch, "adjust_compression", now)
+                and sa is not None
+            ):
+                comp_state = sa.analyze_compression_state(
+                    peak_db=peak,
+                    rms_db=rms_db,
+                    crest_factor_db=crest_factor,
+                    current_threshold_db=comp_thr,
+                    inst_type=inst,
+                )
+                if comp_state["state"] != "ok" and comp_state["confidence"] > 0.6:
+                    delta = comp_state["threshold_delta"]
+                    new_thr = max(-50.0, min(-6.0, comp_thr + delta))
+                    ideal_range = comp_state.get("ideal_range", (6, 15))
+                    actions.append(AgentAction(
+                        action_type="adjust_compression",
+                        channel=ch,
+                        parameters={
+                            "threshold": new_thr,
+                            "delta": delta,
+                            "channel": ch,
+                        },
+                        priority=5,
+                        confidence=comp_state["confidence"],
+                        reason=(
+                            f"Comp {comp_state['state']}: crest={crest_factor:.1f}dB "
+                            f"(ideal {ideal_range[0]}-{ideal_range[1]}dB) → thr {delta:+.1f}dB"
+                        ),
+                        source="analysis",
+                        timestamp=now,
+                    ))
+
+            # ── 6. LEVEL BALANCE — smooth gradual LUFS tracking ──────────
+            # Works with AudioCapture LUFS (precise) or Wing meter LUFS estimate (fallback).
+            target_lufs = self._TARGET_LUFS.get(inst_key) or self._TARGET_LUFS.get(inst)
+            effective_lufs = lufs_m if lufs_m > -90.0 else None
+            max_fader_db = float(ch_state.get("max_fader_db", 0.0))
+            current_fdr = float(ch_state.get("current_fader_db", 0.0))
+            # Skip upward balance if fader is already at the safety ceiling
+            at_fader_ceiling = current_fdr >= (max_fader_db - 0.1)
+            if (
+                target_lufs is not None
+                and effective_lufs is not None
+                and has_signal
+                and not is_muted
+                and effective_lufs > -55.0
+                and not self._on_cooldown(ch, "balance_level", now)
+                and sa is not None
+            ):
+                prev_adj = self._level_smooth.get(ch, 0.0)
+                adjust = sa.smooth_level_adjustment(
+                    current_lufs=effective_lufs,
+                    target_lufs=target_lufs,
+                    prev_adjustment=prev_adj,
+                    alpha=0.4,
+                    max_step_db=0.5,
+                    deadband_db=0.8,  # Tighter deadband → more responsive corrections
+                )
+                # Skip upward moves when fader is already at the safety ceiling
+                if adjust > 0 and at_fader_ceiling:
+                    adjust = 0.0
+                if adjust != 0.0:
+                    self._level_smooth[ch] = adjust
+                    direction = "↓" if adjust < 0 else "↑"
+                    actions.append(AgentAction(
+                        action_type="balance_level",
+                        channel=ch,
+                        parameters={"amount_db": adjust, "channel": ch,
+                                    "target_lufs": target_lufs,
+                                    "current_lufs": effective_lufs},
+                        priority=2,
+                        confidence=0.82,
+                        reason=(
+                            f"Balance {raw_inst}: {effective_lufs:.1f}→{target_lufs:.1f}LUFS "
+                            f"{direction}{abs(adjust):.2f}dB"
+                        ),
+                        source="analysis",
+                        timestamp=now,
+                    ))
+
+            # ── 6b. FADER NORMALIZATION — startup positioning without audio ──
+            # When there's no audio signal data, nudge the fader toward the
+            # nominal position for the instrument type. This gives useful
+            # channel setup even before Dante/audio capture is routing signal.
+            if (
+                not has_signal
+                and not is_muted
+                and inst_key in self._NOMINAL_FADER
+                and not self._on_cooldown(ch, "normalize_fader", now)
+            ):
+                nominal = min(self._NOMINAL_FADER[inst_key], max_fader_db)
+                # current_fdr already defined in level balance section above
+                delta = nominal - current_fdr
+                if abs(delta) > 0.5:  # Only if more than 0.5 dB away
+                    step = max(-2.0, min(2.0, delta * 0.3))  # 30% correction, ±2dB cap
+                    actions.append(AgentAction(
+                        action_type="normalize_fader",
+                        channel=ch,
+                        parameters={"amount_db": round(step, 2), "channel": ch,
+                                    "nominal_db": nominal, "current_fdr": current_fdr},
+                        priority=3,
+                        confidence=0.65,
+                        reason=(
+                            f"Normalize {raw_inst}: fader {current_fdr:.1f}→{nominal:.1f}dB "
+                            f"({step:+.2f}dB, no Dante signal)"
+                        ),
+                        source="analysis",
+                        timestamp=now,
+                    ))
+
+            # ── 7. PHASE CORRECTION — snare bleed analysis results ───────
+            phase_delay = float(ch_state.get("phase_delay_ms", 0.0))
+            phase_strength = float(ch_state.get("phase_strength", 0.0))
+            phase_inverted = bool(ch_state.get("phase_inverted", False))
+            if (
+                phase_strength > 0.20
+                and abs(phase_delay) > 0.3  # >0.3ms is audible
+                and not self._on_cooldown(ch, "apply_phase_correction", now)
+            ):
+                actions.append(AgentAction(
+                    action_type="apply_phase_correction",
+                    channel=ch,
+                    parameters={
+                        "delay_ms": phase_delay,
+                        "invert": phase_inverted,
+                        "channel": ch,
+                    },
+                    priority=3,
+                    confidence=min(0.95, 0.5 + phase_strength * 0.5),
+                    reason=(
+                        f"Snare bleed in {raw_inst}: delay={phase_delay:.2f}ms "
+                        f"corr={phase_strength:.2f} {'INVERT' if phase_inverted else ''}"
+                    ),
+                    source="analysis",
+                    timestamp=now,
+                ))
+
+            # ── 8. LLM fallback ──────────────────────────────────────────
+            if (
+                self.llm
+                and not llm_used_this_cycle
+                and ch_state.get("needs_attention", False)
+                and now - self._last_llm_query > self._llm_query_interval
+            ):
+                self._last_llm_query = now
+                llm_used_this_cycle = True
+                try:
+                    ctx: List[str] = []
+                    if self.kb:
+                        ctx = [
+                            e.content
+                            for e in self.kb.search(f"{inst} live mix problem", n_results=3)
+                        ]
+                    rec = self.llm.get_mix_recommendation(ch_state, ctx)
+                    if rec and rec.get("gain_db") is not None:
+                        actions.append(AgentAction(
+                            action_type="llm_recommendation",
+                            channel=ch,
+                            parameters=rec,
+                            priority=3,
+                            confidence=float(rec.get("confidence", 0.55) or 0.55),
+                            reason=rec.get("reason", "LLM recommendation"),
+                            source="llm",
+                            timestamp=now,
+                        ))
+                except Exception as e:
+                    logger.debug("LLM consultation error: %s", e)
+
+        actions.sort(key=lambda a: (a.priority, -a.confidence))
+        return actions[: self._max_actions_per_cycle]
+
     async def _act(self, actions: List[AgentAction]):
         """Execute decided actions on the mixer."""
         for action in actions:
             try:
                 applied = False
                 if self.mixer:
+                    ch = int(action.parameters.get("channel", action.channel))
                     if action.action_type == 'reduce_gain':
-                        amount = action.parameters.get('amount_db', -3)
-                        self.mixer.set_channel_fader_db(action.channel, amount)
+                        delta = float(action.parameters.get('amount_db', -3.0))
+                        if hasattr(self.mixer, "adjust_channel_fader"):
+                            self.mixer.adjust_channel_fader(ch, delta)
+                        else:
+                            cur = getattr(
+                                self.mixer, "get_channel_fader", lambda _c: -20.0
+                            )(ch)
+                            self.mixer.set_channel_fader(ch, float(cur) + delta)
                         applied = True
                     elif action.action_type == 'adjust_gain':
-                        adj = action.parameters.get('adjustment_db', 0)
-                        self.mixer.adjust_channel_fader(action.channel, adj)
+                        adj = action.parameters.get('adjustment_db')
+                        if adj is None:
+                            adj = action.parameters.get('target_relative_db', 1.0)
+                        adj = float(adj)
+                        if hasattr(self.mixer, "adjust_channel_fader"):
+                            self.mixer.adjust_channel_fader(ch, adj)
+                        else:
+                            cur = getattr(
+                                self.mixer, "get_channel_fader", lambda _c: -20.0
+                            )(ch)
+                            self.mixer.set_channel_fader(ch, float(cur) + adj)
                         applied = True
                     elif action.action_type == 'mute_channel':
-                        self.mixer.set_channel_mute(action.channel, True)
+                        self.mixer.set_channel_mute(ch, 1)
                         applied = True
                     elif action.action_type == 'unmute_channel':
-                        self.mixer.set_channel_mute(action.channel, False)
+                        self.mixer.set_channel_mute(ch, 0)
                         applied = True
                     elif action.action_type == 'apply_hpf':
                         freq = action.parameters.get('frequency', 80)
-                        self.mixer.set_channel_hpf(action.channel, freq)
+                        self.mixer.set_channel_hpf(ch, float(freq))
                         applied = True
+
+                    elif action.action_type == 'apply_eq':
+                        profile = action.parameters.get('profile') or {}
+                        if hasattr(self.mixer, 'apply_eq_profile'):
+                            self.mixer.apply_eq_profile(ch, profile)
+                        else:
+                            # Fallback: individual calls
+                            self.mixer.set_eq_on(ch, 1)
+                            for bd in profile.get('bands', []):
+                                band_n = int(bd.get('band', 1))
+                                if 1 <= band_n <= 4:
+                                    self.mixer.set_eq_band(
+                                        ch, band_n,
+                                        freq=float(bd['freq']) if 'freq' in bd else None,
+                                        gain=float(bd['gain']) if 'gain' in bd else None,
+                                        q=float(bd.get('q', 1.5)),
+                                    )
+                        applied = True
+
                     elif action.action_type == 'adjust_compressor':
-                        self.mixer.set_channel_compressor(
-                            action.channel,
-                            threshold=action.parameters.get('threshold_db', -18),
-                            ratio=action.parameters.get('ratio', 3.0),
-                            attack=action.parameters.get('attack_ms', 10),
-                            release=action.parameters.get('release_ms', 100),
-                        )
+                        p = action.parameters
+                        if hasattr(self.mixer, 'set_channel_compressor_full'):
+                            self.mixer.set_channel_compressor_full(
+                                ch,
+                                threshold=float(p.get('threshold', p.get('threshold_db', -18.0))),
+                                ratio=float(p.get('ratio', 3.0)),
+                                attack=float(p.get('attack', p.get('attack_ms', 10.0))),
+                                release=float(p.get('release', p.get('release_ms', 100.0))),
+                                knee=int(p.get('knee', 2)),
+                                makeup=float(p.get('makeup', 0.0)),
+                                det=str(p.get('det', 'RMS')),
+                            )
+                        else:
+                            self.mixer.set_channel_compressor(
+                                ch,
+                                threshold=float(p.get('threshold', p.get('threshold_db', -18.0))),
+                                ratio=float(p.get('ratio', 3.0)),
+                                attack=float(p.get('attack', p.get('attack_ms', 10.0))),
+                                release=float(p.get('release', p.get('release_ms', 100.0))),
+                            )
                         applied = True
+
+                    elif action.action_type in ('balance_level', 'normalize_fader'):
+                        amount = float(action.parameters.get('amount_db', 0.0))
+                        if hasattr(self.mixer, 'adjust_channel_fader'):
+                            self.mixer.adjust_channel_fader(ch, amount)
+                        applied = True
+
+                    elif action.action_type == 'apply_phase_correction':
+                        delay_ms = float(action.parameters.get('delay_ms', 0.0))
+                        invert = bool(action.parameters.get('invert', False))
+                        if hasattr(self.mixer, 'set_channel_delay') and abs(delay_ms) > 0.1:
+                            self.mixer.set_channel_delay(ch, abs(delay_ms), mode="MS")
+                        if hasattr(self.mixer, 'set_channel_phase_invert'):
+                            self.mixer.set_channel_phase_invert(ch, 1 if invert else 0)
+                        applied = True
+
+                    elif action.action_type == 'adjust_compression':
+                        # Fine-tune compressor threshold based on crest-factor analysis
+                        new_thr = float(action.parameters.get('threshold', -18.0))
+                        if hasattr(self.mixer, 'set_compressor_threshold'):
+                            self.mixer.set_compressor_threshold(ch, new_thr)
+                        applied = True
+
                     elif action.action_type == 'adjust_deesser':
                         self.mixer.set_channel_deesser(
-                            action.channel,
+                            ch,
                             frequency=action.parameters.get('frequency', 6500),
-                            threshold=action.parameters.get('threshold_db', -20),
+                            threshold_db=action.parameters.get('threshold_db', -20),
                             ratio=action.parameters.get('ratio', 4.0),
                         )
                         applied = True
 
+                    elif action.action_type == 'llm_recommendation':
+                        gdb = action.parameters.get("gain_db")
+                        if gdb is not None and hasattr(
+                            self.mixer, "adjust_channel_fader"
+                        ):
+                            self.mixer.adjust_channel_fader(ch, float(gdb))
+                            applied = True
+
                 if applied:
+                    self._mark_applied(action.channel, action.action_type, time.time())
                     self._action_history.append(action)
                     self.state.applied_actions.append(action)
 
@@ -276,9 +980,10 @@ class MixingAgent:
                     if len(self.state.applied_actions) > 100:
                         self.state.applied_actions = self.state.applied_actions[-50:]
 
-                    logger.debug(
-                        f"Applied: {action.action_type} on ch{action.channel} "
-                        f"(confidence={action.confidence:.2f}, reason={action.reason})"
+                    logger.info(
+                        "Applied %s ch%s conf=%.2f | %s",
+                        action.action_type, action.channel,
+                        action.confidence, action.reason[:100],
                     )
             except Exception as e:
                 error_msg = f"Action error: {action.action_type} ch{action.channel}: {e}"
@@ -361,6 +1066,7 @@ class MixingAgent:
             'confidence_threshold': self._confidence_threshold,
             'cycle_interval_ms': round(self.cycle_interval * 1000, 2),
             'recent_errors': self.state.errors[-5:] if self.state.errors else [],
+            'kb_first': self.kb_first,
         }
 
     def get_pending_actions(self) -> List[Dict]:
