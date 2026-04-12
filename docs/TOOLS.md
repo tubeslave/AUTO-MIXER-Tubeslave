@@ -132,7 +132,7 @@ audio:
   sample_rate: 48000
   block_size: 1024
   channels: 40
-  source: "dante"  # dante, sounddevice, test_sine, test_pink_noise, silence
+  source: "dante"  # dante, sounddevice, pipewire (Linux), test_sine, test_pink_noise, silence
 ```
 
 ---

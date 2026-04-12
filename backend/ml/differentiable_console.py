@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 
 class DifferentiableGain(nn.Module):
@@ -119,16 +119,30 @@ class DifferentiableMixingConsole(nn.Module):
         self.pan = DifferentiablePan(n_channels)
 
     def forward(self, channels):
-        processed = []
-        for i in range(min(self.n_channels, len(channels))):
+        """Mix a list of per-channel waveforms.
+
+        Each tensor is shaped ``(batch, n_samples)`` or ``(n_samples,)``. All
+        tensors are stacked along the channel dimension (rows) so that EQ,
+        dynamics, and gain use one row per mixer channel. Pan is applied per
+        channel; the mix bus is the sum of stereo images, downmixed to mono.
+        """
+        n = min(self.n_channels, len(channels))
+        rows: List[torch.Tensor] = []
+        for i in range(n):
             x = channels[i]
             if x.dim() == 1:
                 x = x.unsqueeze(0)
-            x = self.eq(x)
-            x = self.compressor(x)
-            x = self.gain(x)
-            processed.append(x)
-        mix = sum(processed)
+            rows.append(x)
+        x = torch.cat(rows, dim=0)
+        x = self.eq(x)
+        x = self.compressor(x)
+        x = self.gain(x)
+        # Pan expects (n_channels, n_samples): one pan parameter per row.
+        stereo = self.pan(x)
+        processed = [stereo[i : i + 1] for i in range(stereo.shape[0])]
+        # Sum stereo images across channels, then mono downmix (L+R)/2.
+        summed_lr = stereo.sum(dim=0)
+        mix = ((summed_lr[0] + summed_lr[1]) / 2.0).unsqueeze(0)
         return mix, processed
 
     def get_parameters_dict(self):

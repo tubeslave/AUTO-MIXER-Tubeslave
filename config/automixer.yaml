@@ -13,7 +13,8 @@ audio:
   sample_rate: 48000
   block_size: 1024
   channels: 40
-  source: "dante"  # dante, sounddevice, test_sine, test_pink_noise, silence
+  # dante, soundgrid, sounddevice, pipewire (Linux PW/JACK via PortAudio), test_*, silence
+  source: "dante"
   device_name: ""
   buffer_seconds: 5.0
 
