@@ -40,6 +40,7 @@ from backup_channels import backup_channel
 from restore_channels import restore_from_backup_using_client
 from bleed_service import BleedService
 from handlers import register_all_handlers
+from skills import register_builtin_skills
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -145,6 +146,8 @@ class AutoMixerServer:
         
         # Build message-type → handler dispatch table (B15 decomposition)
         self._dispatch = register_all_handlers(self)
+
+        register_builtin_skills()
 
         logger.info(f"AutoMixer Server initialized on {ws_host}:{ws_port}")
     

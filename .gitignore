@@ -59,6 +59,9 @@ presets/*.json
 # Config overrides
 config/user_config.json
 
+# Runtime session dumps
+sessions/
+
 # Temporary files
 *.tmp
 *.temp

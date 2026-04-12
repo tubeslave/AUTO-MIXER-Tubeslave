@@ -55,6 +55,7 @@ class ConfigManager:
                 'sample_rate': 48000,
                 'block_size': 1024,
                 'channels': 40,
+                # dante | soundgrid | sounddevice | pipewire | test_* | silence
                 'source': 'dante',
                 'device_name': '',
                 'device_type': 'default',

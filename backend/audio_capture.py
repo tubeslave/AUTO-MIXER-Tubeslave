@@ -28,6 +28,8 @@ class AudioSourceType(Enum):
     DANTE = "dante"
     SOUNDGRID = "soundgrid"
     SOUNDDEVICE = "sounddevice"
+    # Linux PipeWire/JACK: same capture path as sounddevice (PortAudio → PW).
+    PIPEWIRE = "pipewire"
     TEST_SINE = "test_sine"
     TEST_PINK_NOISE = "test_pink_noise"
     TEST_FILE = "test_file"
@@ -210,7 +212,12 @@ class AudioCapture:
             return
         self._running = True
 
-        if self.source_type in (AudioSourceType.DANTE, AudioSourceType.SOUNDDEVICE, AudioSourceType.SOUNDGRID):
+        if self.source_type in (
+            AudioSourceType.DANTE,
+            AudioSourceType.SOUNDDEVICE,
+            AudioSourceType.SOUNDGRID,
+            AudioSourceType.PIPEWIRE,
+        ):
             if HAS_SOUNDDEVICE:
                 self._start_sounddevice()
             else:
