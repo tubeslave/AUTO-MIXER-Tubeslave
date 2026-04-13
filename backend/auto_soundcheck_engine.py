@@ -33,6 +33,10 @@ from feedback_detector import FeedbackDetector, FeedbackEvent
 from mixer_discovery import (
     discover_mixer_auto, discover_mixers, DiscoveredMixer,
 )
+from audio_device_scanner import (
+    scan_audio_devices, select_best_device, detect_and_report,
+    AudioDevice, AudioProtocol,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,7 @@ class EngineState(Enum):
     IDLE = "idle"
     DISCOVERING = "discovering"
     CONNECTING = "connecting"
+    SCANNING_AUDIO = "scanning_audio"
     SCANNING_CHANNELS = "scanning_channels"
     WAITING_FOR_SIGNAL = "waiting_for_signal"
     ANALYZING = "analyzing"
@@ -289,6 +294,8 @@ class AutoSoundcheckEngine:
         self.audio_capture: Optional[AudioCapture] = None
         self.feedback_detector: Optional[FeedbackDetector] = None
         self.discovered_mixer: Optional[DiscoveredMixer] = None
+        self.selected_audio_device: Optional[AudioDevice] = None
+        self.audio_devices: List[AudioDevice] = []
 
         self.state = EngineState.IDLE
         self.channels: Dict[int, ChannelInfo] = {}
@@ -437,43 +444,89 @@ class AutoSoundcheckEngine:
     # ── 2. Detect & start audio ──────────────────────────────────
 
     def _start_audio(self) -> bool:
-        """Detect audio device and start capture."""
-        device = None
+        """Scan for audio devices, select the best one, and start capture."""
+        self._set_state(EngineState.SCANNING_AUDIO, "Scanning audio devices...")
+
+        # Step 1: Scan all available audio input devices
+        self.audio_devices = scan_audio_devices()
+
+        if not self.audio_devices:
+            logger.warning("No audio input devices found via scan")
+
+        # Step 2: Select the best device
+        preferred_proto = None
+        if self.audio_device_name:
+            name_lower = self.audio_device_name.lower()
+            if "soundgrid" in name_lower or "waves" in name_lower:
+                preferred_proto = AudioProtocol.SOUNDGRID
+            elif "dante" in name_lower:
+                preferred_proto = AudioProtocol.DANTE
+
+        best = select_best_device(
+            self.audio_devices,
+            preferred_protocol=preferred_proto,
+            preferred_name=self.audio_device_name,
+            min_channels=2,
+        )
+
+        device_index = None
         source_type = AudioSourceType.SOUNDDEVICE
 
-        if self.audio_device_name:
-            device_idx = find_device_by_name(self.audio_device_name)
-            if device_idx is not None:
-                device = device_idx
-                if "soundgrid" in self.audio_device_name.lower() or \
-                   "waves" in self.audio_device_name.lower():
-                    source_type = AudioSourceType.SOUNDGRID
-                elif "dante" in self.audio_device_name.lower():
-                    source_type = AudioSourceType.DANTE
-                logger.info(f"Using specified audio device: {self.audio_device_name} (idx={device_idx})")
-            else:
-                logger.warning(f"Device '{self.audio_device_name}' not found, auto-detecting...")
+        if best:
+            self.selected_audio_device = best
+            device_index = best.index
+            num_hw_channels = best.max_input_channels
 
-        if device is None:
-            device, dev_type = detect_audio_device()
-            if dev_type == AudioDeviceType.SOUNDGRID:
-                source_type = AudioSourceType.SOUNDGRID
-            elif dev_type == AudioDeviceType.DANTE:
-                source_type = AudioSourceType.DANTE
-            logger.info(f"Auto-detected audio device: {device} ({dev_type.value})")
+            # Map protocol to source type
+            proto_source_map = {
+                AudioProtocol.SOUNDGRID: AudioSourceType.SOUNDGRID,
+                AudioProtocol.DANTE: AudioSourceType.DANTE,
+            }
+            source_type = proto_source_map.get(best.protocol, AudioSourceType.SOUNDDEVICE)
 
+            # Adjust channel count to what the device actually supports
+            if num_hw_channels < self.num_channels:
+                logger.info(
+                    f"Device '{best.name}' has {num_hw_channels}ch, "
+                    f"reducing capture from {self.num_channels} to {num_hw_channels}"
+                )
+                self.num_channels = num_hw_channels
+
+            logger.info(
+                f"Audio device selected: [{best.index}] '{best.name}' "
+                f"({best.max_input_channels}ch, {best.protocol.value}, "
+                f"score={best.score})"
+            )
+        else:
+            logger.warning("No suitable audio device found, using system default")
+
+        # Log all discovered devices for diagnostics
+        if self.audio_devices:
+            logger.info(f"All audio devices ({len(self.audio_devices)}):")
+            for dev in self.audio_devices:
+                marker = " <<<" if dev == best else ""
+                logger.info(
+                    f"  [{dev.index}] {dev.name} | {dev.max_input_channels}ch | "
+                    f"{dev.protocol.value} | score={dev.score}{marker}"
+                )
+
+        # Step 3: Create AudioCapture and start
         self.audio_capture = AudioCapture(
             num_channels=self.num_channels,
             sample_rate=self.sample_rate,
             buffer_seconds=self.buffer_seconds,
             block_size=self.block_size,
             source_type=source_type,
-            device_name=device,
+            device_name=device_index,
         )
 
         try:
             self.audio_capture.start()
-            logger.info(f"Audio capture started: {source_type.value}, {self.num_channels}ch")
+            dev_name = best.name if best else "system default"
+            logger.info(
+                f"Audio capture started: '{dev_name}', "
+                f"{source_type.value}, {self.num_channels}ch"
+            )
             return True
         except Exception as e:
             logger.error(f"Failed to start audio capture: {e}")
@@ -885,12 +938,37 @@ class AutoSoundcheckEngine:
                 "response_ms": round(self.discovered_mixer.response_time_ms, 0),
             }
 
+        audio_device_info = None
+        if self.selected_audio_device:
+            audio_device_info = {
+                "index": self.selected_audio_device.index,
+                "name": self.selected_audio_device.name,
+                "channels": self.selected_audio_device.max_input_channels,
+                "protocol": self.selected_audio_device.protocol.value,
+                "samplerate": self.selected_audio_device.default_samplerate,
+                "score": self.selected_audio_device.score,
+            }
+
+        audio_devices_list = [
+            {
+                "index": d.index,
+                "name": d.name,
+                "channels": d.max_input_channels,
+                "protocol": d.protocol.value,
+                "is_multichannel": d.is_multichannel,
+                "score": d.score,
+            }
+            for d in self.audio_devices
+        ]
+
         return {
             "state": self.state.value,
             "mixer_type": self.mixer_type,
             "mixer_ip": self.mixer_ip,
             "mixer_connected": self.mixer_client.is_connected if self.mixer_client else False,
             "audio_running": self.audio_capture.running if self.audio_capture else False,
+            "audio_device": audio_device_info,
+            "audio_devices_available": audio_devices_list,
             "total_channels": self.num_channels,
             "channels_with_signal": sum(1 for c in self.channels.values() if c.has_signal),
             "channels_recognized": sum(1 for c in self.channels.values() if c.recognized),

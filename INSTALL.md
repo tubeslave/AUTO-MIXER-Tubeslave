@@ -213,7 +213,11 @@ python3 start_soundcheck.py --help
    TCP-подключение к известным IP на портах 51328/51329 для обнаружения dLive.
    Находит пульт, определяет его тип, IP и порт.
 2. **Подключение к пульту** — соединяется с найденным пультом.
-3. **Обнаружение аудиоустройства** — находит SoundGrid (или Dante) устройство.
+3. **Сканирование аудиоустройств** — перечисляет все доступные аудио-входы через
+   sounddevice/PortAudio, классифицирует каждое устройство по протоколу
+   (SoundGrid, Dante, MADI, AVB, USB, Thunderbolt, CoreAudio), подсчитывает
+   каналы, и автоматически выбирает лучшее многоканальное устройство по приоритету:
+   **SoundGrid > Dante > MADI > AVB > Thunderbolt > USB > ASIO > системное**.
 3. **Сканирование каналов** — считывает имена каналов с пульта.
 4. **Распознавание инструментов** — по имени канала определяет тип инструмента
    (Kick, Snare, Vocal и т.д.). Если имя не распознано — классифицирует
@@ -290,17 +294,36 @@ c.disconnect()
 ### Аудиоустройство не найдено
 
 ```bash
-# Список всех аудиоустройств:
-PYTHONPATH=backend python3 -c "
-from audio_capture import list_audio_devices
-for d in list_audio_devices():
-    print(f'[{d[\"index\"]}] {d[\"name\"]} ({d[\"max_input_channels\"]}ch, {d[\"default_samplerate\"]}Hz)')
-"
+# Полное сканирование аудиоустройств с классификацией:
+PYTHONPATH=backend python3 backend/audio_device_scanner.py
+
+# Или в формате JSON:
+PYTHONPATH=backend python3 backend/audio_device_scanner.py --json
+
+# Выбрать устройство по имени:
+PYTHONPATH=backend python3 backend/audio_device_scanner.py --prefer soundgrid
+
+# Выбрать по протоколу:
+PYTHONPATH=backend python3 backend/audio_device_scanner.py --protocol dante
 ```
 
+Система распознаёт следующие типы аудиоустройств:
+
+| Протокол | Примеры устройств | Приоритет |
+|----------|------------------|-----------|
+| SoundGrid | Waves SoundGrid, SG Driver | Высший |
+| Dante | Dante Virtual Soundcard, DVS, Audinate | Высокий |
+| MADI | RME MADIface, Digiface | Высокий |
+| AVB | PreSonus AVB, MOTU AVB | Средний |
+| Thunderbolt | Universal Audio Apollo | Средний |
+| USB | Focusrite, MOTU, Behringer UMC, dLive USB | Обычный |
+| ASIO | ASIO4ALL | Обычный |
+| CoreAudio | Built-in Microphone | Низкий |
+
 Убедитесь, что:
-- Waves SoundGrid Studio запущена
-- SoundGrid-драйвер установлен и виден в System Preferences → Sound
+- Waves SoundGrid Studio запущена (для SoundGrid)
+- Dante Controller и DVS установлены (для Dante)
+- Драйвер аудиоустройства установлен и виден в System Preferences → Sound
 - Устройство не захвачено другим приложением
 
 ### Ошибки импорта модулей
