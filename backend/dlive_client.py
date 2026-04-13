@@ -563,6 +563,42 @@ class DLiveClient(MixerClientBase):
         payload = bytes([midi_ch, 0x05, channel - 1, col_val])
         self._send_raw(build_sysex(payload))
 
+    # ── Channel reset (set processing to neutral) ────────────────
+
+    def reset_channel_eq(self, channel: int):
+        """Reset PEQ to flat: all 4 bands gain=0, default freq/Q."""
+        default_freqs = [200.0, 800.0, 2500.0, 8000.0]
+        for band in range(1, 5):
+            self.set_eq_band(channel, band, default_freqs[band - 1], 0.0, 1.0)
+        logger.debug(f"Ch {channel}: EQ reset to flat")
+
+    def reset_channel_hpf(self, channel: int):
+        """Reset HPF to off / minimum frequency."""
+        self.set_hpf(channel, 20.0, enabled=False)
+        logger.debug(f"Ch {channel}: HPF reset to off")
+
+    def reset_channel_processing(self, channel: int):
+        """Reset all channel processing to neutral (flat EQ, HPF off, gain 0)."""
+        self.reset_channel_eq(channel)
+        self.reset_channel_hpf(channel)
+        logger.info(f"Ch {channel}: processing reset to neutral")
+
+    def get_channel_settings(self, channel: int) -> Dict[str, Any]:
+        """Read current channel settings from cached state.
+
+        Returns whatever the receiver has captured (fader, mute, EQ params, etc.).
+        Note: dLive does not provide a bulk query, so this returns what we've
+        received via NRPN/SysEx since connect.
+        """
+        prefix = f"fader/{channel}"
+        settings: Dict[str, Any] = {
+            "channel": channel,
+            "name": self.get_channel_name(channel),
+            "fader_db": self.get_fader(channel),
+            "muted": self.get_mute(channel),
+        }
+        return settings
+
     # ── Find snap by name (not directly available via MIDI) ────
 
     def find_snap_by_name(self, name: str) -> Optional[int]:

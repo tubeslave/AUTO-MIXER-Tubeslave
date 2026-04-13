@@ -47,12 +47,28 @@ class EngineState(Enum):
     CONNECTING = "connecting"
     SCANNING_AUDIO = "scanning_audio"
     SCANNING_CHANNELS = "scanning_channels"
+    READING_STATE = "reading_state"
+    RESETTING = "resetting"
     WAITING_FOR_SIGNAL = "waiting_for_signal"
     ANALYZING = "analyzing"
     APPLYING = "applying"
     RUNNING = "running"
     ERROR = "error"
     STOPPED = "stopped"
+
+
+@dataclass
+class ChannelSnapshot:
+    """Backup of a channel's settings before reset."""
+    channel: int
+    fader_db: float = -100.0
+    muted: bool = False
+    eq_bands: Optional[List[Tuple[float, float, float]]] = None
+    hpf_freq: float = 20.0
+    hpf_enabled: bool = False
+    gain_db: float = 0.0
+    had_processing: bool = False
+    raw_settings: Optional[Dict] = None
 
 
 @dataclass
@@ -71,6 +87,8 @@ class ChannelInfo:
     compressor_applied: bool = False
     fader_db: float = -100.0
     spectral_centroid: float = 0.0
+    was_reset: bool = False
+    original_snapshot: Optional[ChannelSnapshot] = None
 
 
 # Instrument-specific EQ presets: (freq_hz, gain_db, q)
@@ -561,6 +579,100 @@ class AutoSoundcheckEngine:
         recognized = sum(1 for c in self.channels.values() if c.recognized)
         logger.info(f"Channel scan complete: {recognized}/{self.num_channels} recognized")
 
+    # ── 3b. Read existing channel settings from mixer ────────────
+
+    def _read_channel_state(self):
+        """Read current processing settings for all channels.
+
+        Determines which channels already have non-default settings
+        (EQ, HPF, fader, gain) so we can back them up before resetting.
+        """
+        self._set_state(
+            EngineState.READING_STATE,
+            "Reading existing channel settings from mixer..."
+        )
+
+        channels_with_processing = 0
+
+        for ch in range(1, self.num_channels + 1):
+            info = self.channels.get(ch)
+            if info is None:
+                continue
+
+            try:
+                raw_settings = self.mixer_client.get_channel_settings(ch)
+            except Exception as e:
+                logger.debug(f"Ch {ch}: could not read settings: {e}")
+                raw_settings = {}
+
+            fader_db = raw_settings.get("fader_db", -100.0)
+            muted = raw_settings.get("muted", False)
+
+            # Detect if channel has non-default processing
+            has_processing = False
+            if fader_db > -90.0:
+                has_processing = True
+            if not muted and fader_db > -50.0:
+                has_processing = True
+
+            snapshot = ChannelSnapshot(
+                channel=ch,
+                fader_db=fader_db,
+                muted=muted,
+                had_processing=has_processing,
+                raw_settings=raw_settings,
+            )
+            info.original_snapshot = snapshot
+
+            if has_processing:
+                channels_with_processing += 1
+                logger.debug(
+                    f"Ch {ch} '{info.name}': existing settings detected "
+                    f"(fader={fader_db:.1f}dB, muted={muted})"
+                )
+
+        logger.info(
+            f"Channel state read: {channels_with_processing}/{self.num_channels} "
+            f"channels have existing settings"
+        )
+
+    # ── 3c. Reset channels to neutral before analysis ────────────
+
+    def _reset_channels(self):
+        """Reset all channel processing to flat/neutral.
+
+        This ensures that the audio we analyze is the raw unprocessed
+        signal from the stage. After analysis, new settings will be
+        applied from scratch.
+        """
+        self._set_state(
+            EngineState.RESETTING,
+            "Resetting channel processing to neutral..."
+        )
+
+        reset_count = 0
+
+        for ch in range(1, self.num_channels + 1):
+            info = self.channels.get(ch)
+            if info is None:
+                continue
+
+            try:
+                self.mixer_client.reset_channel_processing(ch)
+                info.was_reset = True
+                reset_count += 1
+            except Exception as e:
+                logger.warning(f"Ch {ch}: reset failed: {e}")
+
+            # Small delay between channels to avoid overwhelming the mixer
+            if reset_count % 8 == 0:
+                time.sleep(0.05)
+
+        # Wait for resets to take effect on mixer DSP
+        time.sleep(0.5)
+
+        logger.info(f"Reset complete: {reset_count} channels set to neutral")
+
     # ── 4. Wait for signal and analyze ───────────────────────────
 
     def _wait_and_analyze(self):
@@ -663,8 +775,12 @@ class AutoSoundcheckEngine:
     # ── 5. Apply corrections ─────────────────────────────────────
 
     def _apply_corrections(self):
-        """Apply gain, EQ, compressor, and fader to all active channels."""
-        self._set_state(EngineState.APPLYING, "Applying corrections...")
+        """Apply gain, EQ, compressor, and fader to all active channels.
+
+        Channels have been reset to neutral before analysis, so all
+        settings are applied from scratch to clean channels.
+        """
+        self._set_state(EngineState.APPLYING, "Applying corrections to clean channels...")
 
         for ch, info in self.channels.items():
             if not info.has_signal:
@@ -673,7 +789,13 @@ class AutoSoundcheckEngine:
                 continue
 
             preset = info.preset or "custom"
-            logger.info(f"Ch {ch} '{info.name}' (preset={preset}): applying corrections...")
+            had_proc = ""
+            if info.original_snapshot and info.original_snapshot.had_processing:
+                had_proc = " (previous settings cleared)"
+            logger.info(
+                f"Ch {ch} '{info.name}' (preset={preset}): "
+                f"applying corrections{had_proc}..."
+            )
 
             try:
                 self._apply_hpf(ch, preset)
@@ -816,12 +938,20 @@ class AutoSoundcheckEngine:
             time.sleep(0.1)
 
     def _apply_corrections_single(self, ch: int):
-        """Apply corrections for a single newly detected channel."""
+        """Apply corrections for a single newly detected channel.
+
+        Resets the channel first to ensure we apply to a clean state.
+        """
         info = self.channels[ch]
         if ch in self._applied_channels:
             return
         preset = info.preset or "custom"
         try:
+            # Reset this channel before applying new settings
+            self.mixer_client.reset_channel_processing(ch)
+            info.was_reset = True
+            time.sleep(0.1)
+
             self._apply_hpf(ch, preset)
             self._apply_eq(ch, preset)
             self._apply_gain_correction(ch, info, preset)
@@ -855,20 +985,46 @@ class AutoSoundcheckEngine:
     # ── Main run ─────────────────────────────────────────────────
 
     def run(self):
-        """Run the full auto-soundcheck pipeline (blocking)."""
+        """Run the full auto-soundcheck pipeline (blocking).
+
+        Pipeline:
+        1. Discover mixer on network (OSC/MIDI scan)
+        2. Connect to mixer
+        3. Scan audio devices, select best multichannel input
+        4. Start audio capture
+        5. Read channel names → recognize instruments
+        6. Read existing channel settings (backup)
+        7. Reset all channels to neutral (flat EQ, HPF off)
+        8. Wait for audio signals (now receiving clean/raw audio)
+        9. Analyze signals (LUFS, peak, spectrum)
+        10. Apply new corrections (HPF, EQ, gain, fader)
+        11. Enter monitoring mode (feedback detection, new channels)
+        """
         self._stop_event.clear()
 
+        # Steps 1-2: Discover and connect mixer
         if not self._connect_mixer():
             self._set_state(EngineState.ERROR, "Mixer connection failed")
             return False
 
+        # Steps 3-4: Scan and start audio
         if not self._start_audio():
             self._set_state(EngineState.ERROR, "Audio capture failed")
             return False
 
+        # Step 5: Scan channel names and recognize instruments
         self._scan_channels()
+
+        # Step 6: Read existing settings from mixer
+        self._read_channel_state()
+
+        # Step 7: Reset all channels to neutral before analysis
+        self._reset_channels()
+
+        # Steps 8-9: Wait for clean audio signals and analyze
         self._wait_and_analyze()
 
+        # Step 10: Apply new corrections from scratch
         if self.auto_apply:
             self._apply_corrections()
 
@@ -892,6 +1048,34 @@ class AutoSoundcheckEngine:
         """Start engine in background thread."""
         self._engine_thread = threading.Thread(target=self.run, daemon=True)
         self._engine_thread.start()
+
+    def restore_original_settings(self):
+        """Restore channels to their original fader positions (before reset).
+
+        This is a safety fallback: if the auto-soundcheck results are
+        unacceptable, calling this method restores the fader levels
+        that were captured before the reset step.
+        """
+        if not self.mixer_client:
+            logger.warning("No mixer client — cannot restore settings")
+            return
+
+        restored = 0
+        for ch, info in self.channels.items():
+            snap = info.original_snapshot
+            if snap is None or not snap.had_processing:
+                continue
+            try:
+                if snap.fader_db > -90.0:
+                    self.mixer_client.set_fader(ch, snap.fader_db)
+                if snap.muted:
+                    self.mixer_client.set_mute(ch, True)
+                restored += 1
+                logger.info(f"Ch {ch} '{info.name}': restored fader={snap.fader_db:.1f}dB")
+            except Exception as e:
+                logger.warning(f"Ch {ch}: restore failed: {e}")
+
+        logger.info(f"Restored original settings for {restored} channel(s)")
 
     def stop(self):
         """Stop the engine."""
