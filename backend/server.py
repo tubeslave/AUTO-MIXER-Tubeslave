@@ -45,6 +45,7 @@ from audio_capture import (
 )
 from feedback_detector import FeedbackDetector
 from auto_soundcheck_engine import AutoSoundcheckEngine
+from mixer_discovery import discover_mixers, discover_mixer_auto, DiscoveredMixer
 from handlers import register_all_handlers
 
 logging.basicConfig(level=logging.INFO)

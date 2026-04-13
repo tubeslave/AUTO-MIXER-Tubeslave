@@ -30,12 +30,16 @@ from channel_recognizer import (
     scan_and_recognize, AVAILABLE_PRESETS,
 )
 from feedback_detector import FeedbackDetector, FeedbackEvent
+from mixer_discovery import (
+    discover_mixer_auto, discover_mixers, DiscoveredMixer,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class EngineState(Enum):
     IDLE = "idle"
+    DISCOVERING = "discovering"
     CONNECTING = "connecting"
     SCANNING_CHANNELS = "scanning_channels"
     WAITING_FOR_SIGNAL = "waiting_for_signal"
@@ -235,6 +239,7 @@ class AutoSoundcheckEngine:
     Fully automatic soundcheck engine.
 
     Workflow:
+    0. Auto-discover mixer on the network (WING broadcast / dLive TCP scan)
     1. Connect to mixer (dLive / WING)
     2. Detect audio device (SoundGrid / Dante)
     3. Start audio capture
@@ -250,9 +255,9 @@ class AutoSoundcheckEngine:
 
     def __init__(
         self,
-        mixer_type: str = "dlive",
-        mixer_ip: str = "192.168.3.70",
-        mixer_port: int = 51328,
+        mixer_type: Optional[str] = None,
+        mixer_ip: Optional[str] = None,
+        mixer_port: Optional[int] = None,
         mixer_tls: bool = False,
         midi_base_channel: int = 0,
         audio_device_name: Optional[str] = None,
@@ -261,6 +266,8 @@ class AutoSoundcheckEngine:
         block_size: int = 1024,
         buffer_seconds: float = 5.0,
         auto_apply: bool = True,
+        auto_discover: bool = True,
+        scan_subnet: bool = True,
         on_state_change: Optional[Callable] = None,
         on_channel_update: Optional[Callable] = None,
     ):
@@ -275,10 +282,13 @@ class AutoSoundcheckEngine:
         self.block_size = block_size
         self.buffer_seconds = buffer_seconds
         self.auto_apply = auto_apply
+        self.auto_discover = auto_discover
+        self.scan_subnet = scan_subnet
 
         self.mixer_client = None
         self.audio_capture: Optional[AudioCapture] = None
         self.feedback_detector: Optional[FeedbackDetector] = None
+        self.discovered_mixer: Optional[DiscoveredMixer] = None
 
         self.state = EngineState.IDLE
         self.channels: Dict[int, ChannelInfo] = {}
@@ -291,8 +301,10 @@ class AutoSoundcheckEngine:
 
         self._applied_channels: set = set()
 
+        mode = "auto-discover" if auto_discover and not mixer_ip else "manual"
+        target = f"{mixer_type or '?'}@{mixer_ip or 'auto'}:{mixer_port or 'auto'}"
         logger.info(
-            f"AutoSoundcheckEngine: mixer={mixer_type}@{mixer_ip}:{mixer_port}, "
+            f"AutoSoundcheckEngine: {mode}, target={target}, "
             f"channels={num_channels}, sr={sample_rate}"
         )
 
@@ -306,11 +318,90 @@ class AutoSoundcheckEngine:
             except Exception:
                 pass
 
+    # ── 0. Auto-discover mixer ───────────────────────────────────
+
+    def _discover_mixer(self) -> bool:
+        """Scan the network for available mixers and select the best one."""
+        self._set_state(EngineState.DISCOVERING, "Scanning network for mixers...")
+
+        discovered = discover_mixer_auto(
+            preferred_type=self.mixer_type,
+            preferred_ip=self.mixer_ip,
+            scan_subnet=self.scan_subnet,
+            timeout=2.0,
+        )
+
+        if discovered is None:
+            logger.warning("No mixer found on the network")
+            return False
+
+        self.discovered_mixer = discovered
+        self.mixer_type = discovered.mixer_type
+        self.mixer_ip = discovered.ip
+        self.mixer_port = discovered.port
+        self.mixer_tls = discovered.tls
+
+        logger.info(
+            f"Auto-discovered: {discovered.mixer_type.upper()} "
+            f"@ {discovered.ip}:{discovered.port} "
+            f"('{discovered.name}', {discovered.discovery_method}, "
+            f"{discovered.response_time_ms:.0f}ms)"
+        )
+        return True
+
     # ── 1. Connect to mixer ──────────────────────────────────────
 
     def _connect_mixer(self) -> bool:
-        """Connect to the mixer console."""
-        self._set_state(EngineState.CONNECTING, f"Connecting to {self.mixer_type}...")
+        """Connect to the mixer console.
+
+        If auto_discover is True and no IP is specified, runs network
+        discovery first to find the mixer automatically.
+        """
+        need_discovery = self.auto_discover and (
+            self.mixer_ip is None or self.mixer_type is None
+        )
+
+        if need_discovery:
+            if not self._discover_mixer():
+                # Discovery failed — try known defaults as last resort
+                if self.mixer_ip is None:
+                    self._set_state(
+                        EngineState.ERROR,
+                        "No mixer found on the network and no IP specified",
+                    )
+                    return False
+        elif self.auto_discover and self.mixer_ip:
+            # Have a preferred IP but still try discovery to confirm type
+            self._set_state(EngineState.DISCOVERING, f"Probing {self.mixer_ip}...")
+            discovered = discover_mixer_auto(
+                preferred_type=self.mixer_type,
+                preferred_ip=self.mixer_ip,
+                scan_subnet=False,
+                timeout=2.0,
+            )
+            if discovered:
+                self.discovered_mixer = discovered
+                self.mixer_type = discovered.mixer_type
+                self.mixer_ip = discovered.ip
+                self.mixer_port = discovered.port
+                self.mixer_tls = discovered.tls
+                logger.info(f"Confirmed mixer at {discovered.ip}: {discovered.mixer_type.upper()}")
+            else:
+                logger.info(
+                    f"Preferred IP {self.mixer_ip} not responding to probes, "
+                    f"trying direct connect..."
+                )
+
+        # Ensure we have a type and port
+        if self.mixer_type is None:
+            self.mixer_type = "dlive"
+        if self.mixer_port is None:
+            self.mixer_port = 51328 if self.mixer_type == "dlive" else 2223
+
+        self._set_state(
+            EngineState.CONNECTING,
+            f"Connecting to {self.mixer_type.upper()} @ {self.mixer_ip}:{self.mixer_port}...",
+        )
 
         try:
             if self.mixer_type == "dlive":
@@ -333,10 +424,10 @@ class AutoSoundcheckEngine:
 
             success = self.mixer_client.connect(timeout=10.0)
             if success:
-                logger.info(f"Connected to {self.mixer_type} at {self.mixer_ip}:{self.mixer_port}")
+                logger.info(f"Connected to {self.mixer_type.upper()} at {self.mixer_ip}:{self.mixer_port}")
                 return True
             else:
-                logger.error(f"Failed to connect to {self.mixer_type}")
+                logger.error(f"Failed to connect to {self.mixer_type.upper()}")
                 return False
 
         except Exception as e:
@@ -783,6 +874,17 @@ class AutoSoundcheckEngine:
                 "fader_db": round(info.fader_db, 1),
             }
 
+        discovery_info = None
+        if self.discovered_mixer:
+            discovery_info = {
+                "mixer_type": self.discovered_mixer.mixer_type,
+                "ip": self.discovered_mixer.ip,
+                "port": self.discovered_mixer.port,
+                "name": self.discovered_mixer.name,
+                "method": self.discovered_mixer.discovery_method,
+                "response_ms": round(self.discovered_mixer.response_time_ms, 0),
+            }
+
         return {
             "state": self.state.value,
             "mixer_type": self.mixer_type,
@@ -792,6 +894,7 @@ class AutoSoundcheckEngine:
             "total_channels": self.num_channels,
             "channels_with_signal": sum(1 for c in self.channels.values() if c.has_signal),
             "channels_recognized": sum(1 for c in self.channels.values() if c.recognized),
+            "discovered": discovery_info,
             "channels": channels_info,
         }
 
@@ -805,14 +908,18 @@ def main():
     parser = argparse.ArgumentParser(
         description="AUTO-MIXER Tubeslave — Automatic Soundcheck Engine"
     )
-    parser.add_argument("--mixer", default="dlive", choices=["dlive", "wing"],
-                        help="Mixer type (default: dlive)")
-    parser.add_argument("--ip", default="192.168.3.70",
-                        help="Mixer IP address (default: 192.168.3.70)")
+    parser.add_argument("--mixer", default=None, choices=["dlive", "wing"],
+                        help="Mixer type (default: auto-detect)")
+    parser.add_argument("--ip", default=None,
+                        help="Mixer IP address (default: auto-discover)")
     parser.add_argument("--port", type=int, default=None,
-                        help="Mixer port (default: 51328 for dLive, 2222 for WING)")
+                        help="Mixer port (default: auto)")
     parser.add_argument("--tls", action="store_true",
                         help="Use TLS for dLive connection")
+    parser.add_argument("--no-discover", action="store_true",
+                        help="Skip auto-discovery, use --ip directly")
+    parser.add_argument("--full-scan", action="store_true",
+                        help="Full /24 subnet scan (slower but thorough)")
     parser.add_argument("--audio-device", default=None,
                         help="Audio device name pattern (e.g. 'soundgrid', 'dante')")
     parser.add_argument("--channels", type=int, default=48,
@@ -823,6 +930,8 @@ def main():
                         help="Analyze only, do not apply corrections")
     parser.add_argument("--log-level", default="INFO",
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"])
+    parser.add_argument("--scan-only", action="store_true",
+                        help="Only scan for mixers, do not connect")
 
     args = parser.parse_args()
 
@@ -831,9 +940,13 @@ def main():
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    port = args.port
-    if port is None:
-        port = 51328 if args.mixer == "dlive" else 2222
+    # Scan-only mode
+    if args.scan_only:
+        from mixer_discovery import main as discovery_main
+        discovery_main()
+        return
+
+    auto_discover = not args.no_discover
 
     def on_state(state, msg):
         print(f"\n>>> [{state}] {msg}")
@@ -847,22 +960,29 @@ def main():
     engine = AutoSoundcheckEngine(
         mixer_type=args.mixer,
         mixer_ip=args.ip,
-        mixer_port=port,
+        mixer_port=args.port,
         mixer_tls=args.tls,
         audio_device_name=args.audio_device,
         num_channels=args.channels,
         sample_rate=args.sample_rate,
         auto_apply=not args.no_apply,
+        auto_discover=auto_discover,
+        scan_subnet=args.full_scan,
         on_state_change=on_state,
         on_channel_update=on_channel,
     )
 
     print("=" * 60)
     print("  AUTO-MIXER Tubeslave — Automatic Soundcheck")
-    print(f"  Mixer: {args.mixer.upper()} @ {args.ip}:{port}")
+    if args.ip:
+        mixer_desc = f"{(args.mixer or 'auto').upper()} @ {args.ip}:{args.port or 'auto'}"
+    else:
+        mixer_desc = "Auto-discover on network"
+    print(f"  Mixer: {mixer_desc}")
     print(f"  Audio: {args.audio_device or 'auto-detect'}")
     print(f"  Channels: {args.channels}")
     print(f"  Auto-apply: {not args.no_apply}")
+    print(f"  Auto-discover: {auto_discover}")
     print("=" * 60)
     print()
 
