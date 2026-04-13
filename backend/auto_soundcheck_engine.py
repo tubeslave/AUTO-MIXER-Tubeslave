@@ -37,6 +37,10 @@ from audio_device_scanner import (
     scan_audio_devices, select_best_device, detect_and_report,
     AudioDevice, AudioProtocol,
 )
+from signal_metrics import (
+    SignalAnalyzer, ChannelMetrics, compare_channels,
+    InterChannelMetrics, LevelMetrics, DynamicsMetrics, SpectralMetrics,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +93,8 @@ class ChannelInfo:
     spectral_centroid: float = 0.0
     was_reset: bool = False
     original_snapshot: Optional[ChannelSnapshot] = None
+    metrics: Optional[ChannelMetrics] = None
+    analyzer: Optional[Any] = None
 
 
 # Instrument-specific EQ presets: (freq_hz, gain_db, q)
@@ -389,6 +395,7 @@ class AutoSoundcheckEngine:
         self.on_channel_update = on_channel_update
 
         self._applied_channels: set = set()
+        self._analyzers: Dict[int, SignalAnalyzer] = {}
 
         mode = "auto-discover" if auto_discover and not mixer_ip else "manual"
         target = f"{mixer_type or '?'}@{mixer_ip or 'auto'}:{mixer_port or 'auto'}"
@@ -740,7 +747,14 @@ class AutoSoundcheckEngine:
     # ── 4. Wait for signal and analyze ───────────────────────────
 
     def _wait_and_analyze(self):
-        """Wait for audio signals and classify unrecognized channels by spectrum."""
+        """Wait for audio signals, then run full multi-metric analysis.
+
+        Phase 1 (WAITING): detect signal presence on each channel.
+        Phase 2 (ANALYZING): feed 3+ seconds of audio through SignalAnalyzer
+        to compute momentary/short-term/integrated LUFS, true peak, RMS,
+        crest factor, ADSR envelope, transient metrics, and full spectral
+        analysis per channel.
+        """
         self._set_state(EngineState.WAITING_FOR_SIGNAL, "Waiting for audio signals...")
 
         warmup = 2.0
@@ -761,20 +775,18 @@ class AutoSoundcheckEngine:
                     continue
 
                 peak = self.audio_capture.get_peak(ch, self.sample_rate)
-                rms = self.audio_capture.get_rms(ch, self.sample_rate)
-                lufs = self.audio_capture.get_lufs(ch, 0.4)
-
-                info.peak_db = peak
-                info.rms_db = rms
-                info.lufs = lufs
 
                 if peak > SIGNAL_THRESHOLD_DB:
                     info.has_signal = True
+                    info.peak_db = peak
                     any_new = True
-                    logger.info(
-                        f"Ch {ch} '{info.name}': signal detected "
-                        f"(peak={peak:.1f}dB, rms={rms:.1f}dB, lufs={lufs:.1f})"
-                    )
+
+                    # Create analyzer for this channel
+                    analyzer = SignalAnalyzer(ch, self.sample_rate, self.block_size)
+                    self._analyzers[ch] = analyzer
+                    info.analyzer = analyzer
+
+                    logger.info(f"Ch {ch} '{info.name}': signal detected (peak={peak:.1f}dB)")
 
                     if not info.recognized:
                         self._classify_by_spectrum(ch, info)
@@ -786,22 +798,64 @@ class AutoSoundcheckEngine:
 
             time.sleep(0.5)
 
-        self._set_state(EngineState.ANALYZING, "Analyzing signals...")
-        time.sleep(SIGNAL_ANALYSIS_SECONDS)
+        # ── Phase 2: Full multi-metric analysis ──────────────────
+        self._set_state(EngineState.ANALYZING, "Running full signal analysis...")
 
+        analysis_duration = max(SIGNAL_ANALYSIS_SECONDS, 3.0)
+        analysis_blocks = int(analysis_duration * self.sample_rate / self.block_size)
+        block_interval = self.block_size / self.sample_rate
+
+        for block_i in range(analysis_blocks):
+            if self._stop_event.is_set():
+                break
+
+            for ch, info in self.channels.items():
+                if not info.has_signal:
+                    continue
+                analyzer = self._analyzers.get(ch)
+                if analyzer is None:
+                    continue
+
+                samples = self.audio_capture.get_buffer(ch, self.block_size)
+                if len(samples) >= self.block_size:
+                    analyzer.process(samples)
+
+            time.sleep(block_interval)
+
+        # ── Collect metrics ──────────────────────────────────────
         for ch, info in self.channels.items():
-            if info.has_signal:
-                info.peak_db = self.audio_capture.get_peak(ch, self.sample_rate)
-                info.rms_db = self.audio_capture.get_rms(ch, self.sample_rate)
-                info.lufs = self.audio_capture.get_lufs(ch, 3.0)
+            if not info.has_signal:
+                continue
 
-                spec = self.audio_capture.get_spectrum(ch, 4096)
-                freqs = spec["frequencies"]
-                mags = spec["magnitude_db"]
-                if len(freqs) > 0 and len(mags) > 0:
-                    linear = 10 ** (mags / 20.0)
-                    total = np.sum(linear) + 1e-10
-                    info.spectral_centroid = float(np.sum(freqs * linear) / total)
+            analyzer = self._analyzers.get(ch)
+            if analyzer:
+                m = analyzer.get_metrics()
+                info.metrics = m
+
+                info.peak_db = m.level.peak_db
+                info.rms_db = m.level.rms_db
+                info.lufs = m.level.lufs_integrated if m.level.lufs_integrated > -90 else m.level.lufs_short_term
+                info.spectral_centroid = m.spectral.centroid_hz
+
+                logger.info(
+                    f"Ch {ch} '{info.name}' metrics: "
+                    f"LUFS M={m.level.lufs_momentary:.1f} S={m.level.lufs_short_term:.1f} "
+                    f"I={m.level.lufs_integrated:.1f} | "
+                    f"TP={m.level.true_peak_dbtp:.1f}dBTP | "
+                    f"RMS={m.level.rms_db:.1f} | "
+                    f"Crest={m.level.crest_factor_db:.1f} | "
+                    f"DR={m.dynamics.dynamic_range_db:.1f}dB | "
+                    f"Atk={m.dynamics.attack_time_ms:.0f}ms "
+                    f"Dec={m.dynamics.decay_time_ms:.0f}ms "
+                    f"Sus={m.dynamics.sustain_level_db:.1f}dB "
+                    f"Rel={m.dynamics.release_time_ms:.0f}ms | "
+                    f"Trans={m.dynamics.transient_density:.1f}/s "
+                    f"Str={m.dynamics.transient_strength_db:.1f}dB | "
+                    f"Centroid={m.spectral.centroid_hz:.0f}Hz "
+                    f"Bright={m.spectral.brightness:.3f} "
+                    f"Mud={m.spectral.mud_ratio:.3f} "
+                    f"Pres={m.spectral.presence_ratio:.3f}"
+                )
 
     def _classify_by_spectrum(self, ch: int, info: ChannelInfo):
         """Classify an unrecognized channel by spectral characteristics."""
@@ -1329,11 +1383,11 @@ class AutoSoundcheckEngine:
     # ── 5g. Compressor ───────────────────────────────────────────
 
     def _apply_compressor(self, ch: int, info: ChannelInfo, preset: str):
-        """Analyze signal dynamics and apply adapted compressor settings.
+        """Apply compressor adapted to measured signal dynamics.
 
-        Measures crest factor (peak/RMS ratio) and dynamic range to
-        determine how much compression is needed, then adjusts the
-        preset threshold and ratio accordingly.
+        Uses full metrics from SignalAnalyzer: crest factor, dynamic range,
+        ADSR envelope, transient density/strength, and spectral flux to
+        precisely adapt threshold, ratio, attack, and release.
         """
         if not hasattr(self.mixer_client, 'set_compressor'):
             return
@@ -1343,65 +1397,61 @@ class AutoSoundcheckEngine:
             return
 
         base_threshold, base_ratio, base_attack, base_release = comp_params
-
-        # Analyze dynamics from audio buffer
-        samples = self.audio_capture.get_buffer(ch, self.sample_rate * 3)
         threshold = base_threshold
         ratio = base_ratio
         attack = base_attack
         release = base_release
 
-        if len(samples) >= 4096:
-            peak = float(np.max(np.abs(samples)))
-            rms = float(np.sqrt(np.mean(samples ** 2) + 1e-12))
+        m = info.metrics
+        if m and m.level.rms_db > -80:
+            rms_db = m.level.rms_db
+            crest_factor = m.level.crest_factor_db
+            dynamic_range = m.dynamics.dynamic_range_db
+            measured_attack = m.dynamics.attack_time_ms
+            measured_release = m.dynamics.release_time_ms
+            transient_density = m.dynamics.transient_density
+            spectral_flux = m.spectral.flux
 
-            if rms > 1e-8 and peak > 1e-8:
-                peak_db = 20.0 * np.log10(peak + 1e-10)
-                rms_db = 20.0 * np.log10(rms + 1e-10)
-                crest_factor = peak_db - rms_db
+            # Threshold: ~6dB above measured RMS, bounded by preset ±6
+            threshold = rms_db + 6.0
+            threshold = max(base_threshold - 6.0, min(base_threshold + 6.0, threshold))
+            threshold = max(-50.0, min(-5.0, threshold))
 
-                # Compute dynamic range using block-wise RMS
-                block_len = 2048
-                n_blocks = max(1, len(samples) // block_len)
-                block_rms = []
-                for i in range(n_blocks):
-                    blk = samples[i * block_len:(i + 1) * block_len]
-                    br = np.sqrt(np.mean(blk ** 2) + 1e-12)
-                    if br > 1e-8:
-                        block_rms.append(20.0 * np.log10(br))
-                dynamic_range = max(block_rms) - min(block_rms) if len(block_rms) > 1 else 0.0
+            # Ratio: scale by crest factor
+            if crest_factor > 20.0:
+                ratio = min(base_ratio * 1.3, 10.0)
+            elif crest_factor < 8.0:
+                ratio = max(base_ratio * 0.7, 1.5)
 
-                # Adapt threshold: set so compression starts at ~6dB above RMS
-                threshold = rms_db + 6.0
-                threshold = max(base_threshold - 6.0, min(base_threshold + 6.0, threshold))
-                threshold = max(-50.0, min(-5.0, threshold))
+            # Attack: use measured attack time as guide
+            if measured_attack > 0 and measured_attack < 100:
+                attack = max(1.0, measured_attack * 0.5)
+            elif crest_factor > 15.0:
+                attack = max(base_attack, 5.0)
+            elif crest_factor < 6.0:
+                attack = max(1.0, base_attack * 0.7)
 
-                # Adapt ratio based on crest factor
-                if crest_factor > 20.0:
-                    # Very peaky (drums) → higher ratio
-                    ratio = min(base_ratio * 1.3, 10.0)
-                elif crest_factor < 8.0:
-                    # Already compressed/flat → gentler ratio
-                    ratio = max(base_ratio * 0.7, 1.5)
+            # If high transient density (drums), preserve transients
+            if transient_density > 4.0:
+                attack = max(attack, 3.0)
 
-                # Adapt attack based on transient content
-                if crest_factor > 15.0:
-                    # Fast transients → let them through with slower attack
-                    attack = max(base_attack, 5.0)
-                elif crest_factor < 6.0:
-                    # Sustained signal → faster attack ok
-                    attack = max(1.0, base_attack * 0.7)
+            # Release: use measured release or adapt by dynamic range
+            if measured_release > 10 and measured_release < 2000:
+                release = max(30.0, measured_release * 0.7)
+            elif dynamic_range > 15.0:
+                release = min(base_release * 1.3, 500.0)
+            elif dynamic_range < 6.0:
+                release = max(base_release * 0.7, 30.0)
 
-                # Adapt release based on dynamic range
-                if dynamic_range > 15.0:
-                    release = min(base_release * 1.3, 500.0)
-                elif dynamic_range < 6.0:
-                    release = max(base_release * 0.7, 30.0)
+            # High spectral flux → more dynamic signal → longer release
+            if spectral_flux > 0.5:
+                release = min(release * 1.2, 600.0)
 
-                logger.debug(
-                    f"Ch {ch}: dynamics analysis: crest={crest_factor:.1f}dB, "
-                    f"range={dynamic_range:.1f}dB, rms={rms_db:.1f}dB"
-                )
+            logger.debug(
+                f"Ch {ch}: comp adaptation: crest={crest_factor:.1f}dB "
+                f"DR={dynamic_range:.1f}dB atk_measured={measured_attack:.0f}ms "
+                f"trans_density={transient_density:.1f}/s flux={spectral_flux:.3f}"
+            )
 
         try:
             self.mixer_client.set_compressor(
