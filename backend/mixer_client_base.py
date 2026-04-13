@@ -69,6 +69,16 @@ class MixerClientBase(ABC):
     def set_eq_band(self, channel: int, band: int, freq: float, gain: float, q: float):
         ...
 
+    # ── HPF ─────────────────────────────────────────────────────
+    def set_hpf(self, channel: int, freq: float, enabled: bool = True):
+        """Set high-pass filter. Optional — not all mixers support this."""
+        ...
+
+    # ── Channel names ──────────────────────────────────────────
+    def get_channel_name(self, channel: int) -> str:
+        """Get channel name. Returns generic name if not available."""
+        return f"Ch {channel}"
+
     # ── Scene / Snap ────────────────────────────────────────────
     @abstractmethod
     def recall_scene(self, scene_number: int):

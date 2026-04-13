@@ -329,6 +329,8 @@ class DLiveClient(MixerClientBase):
                 end = data.find(b'\xF7', i)
                 if end == -1:
                     break
+                sysex_body = data[i + 1:end]
+                self._handle_sysex(sysex_body)
                 i = end + 1
             elif status & 0xF0 == 0xB0:
                 # CC / NRPN — 3 bytes
@@ -349,11 +351,34 @@ class DLiveClient(MixerClientBase):
     def _handle_cc(self, channel: int, cc: int, value: int):
         key = f"cc/{channel}/{cc}"
         self.state[key] = value
+
+        # Track NRPN state machine to reconstruct fader values
+        if cc == 0x63:  # NRPN MSB
+            self.state[f"_nrpn_msb/{channel}"] = value
+        elif cc == 0x62:  # NRPN LSB
+            self.state[f"_nrpn_lsb/{channel}"] = value
+        elif cc == 0x06:  # Data Entry MSB
+            self.state[f"_data_msb/{channel}"] = value
+        elif cc == 0x26:  # Data Entry LSB
+            data_msb = self.state.get(f"_data_msb/{channel}", 0)
+            nrpn_msb = self.state.get(f"_nrpn_msb/{channel}", 0)
+            nrpn_lsb = self.state.get(f"_nrpn_lsb/{channel}", 0)
+            full_value = (data_msb << 7) | value
+
+            # NRPN MSB 0x00 = fader level for input channels
+            if nrpn_msb == 0x00:
+                ch_1based = nrpn_lsb + 1
+                self.state[f"fader/{ch_1based}"] = full_value
+                self._notify(f"fader/{ch_1based}", fader_value_to_db(full_value))
+
         self._notify(key, value)
 
     def _handle_note(self, channel: int, note: int, velocity: int):
         key = f"note/{channel}/{note}"
         self.state[key] = velocity
+        # Track mute state: note number = channel-1, velocity >= 0x40 = muted
+        ch_1based = note + 1
+        self.state[f"mute/{ch_1based}"] = velocity >= 0x40
         self._notify(key, velocity)
 
     def _handle_pitchbend(self, channel: int, lsb: int, msb: int):
@@ -361,6 +386,28 @@ class DLiveClient(MixerClientBase):
         key = f"pitchbend/{channel}"
         self.state[key] = value
         self._notify(key, value)
+
+    def _handle_sysex(self, body: bytes):
+        """Parse dLive SysEx messages for channel names and other data."""
+        # dLive SysEx header: 00 00 1A 50 10 01 00
+        header = bytes([0x00, 0x00, 0x1A, 0x50, 0x10, 0x01, 0x00])
+        if not body.startswith(header):
+            return
+        payload = body[len(header):]
+        if len(payload) < 3:
+            return
+        midi_ch = payload[0]
+        msg_type = payload[1]
+        ch_idx = payload[2]
+        ch_1based = ch_idx + 1
+
+        if msg_type == 0x03:
+            # Channel name
+            name_bytes = payload[3:]
+            name = name_bytes.decode("ascii", errors="replace").rstrip('\x00').strip()
+            self._channel_names[ch_1based] = name
+            self.state[f"name/{ch_1based}"] = name
+            logger.debug(f"dLive ch {ch_1based} name: '{name}'")
 
     def _notify(self, address: str, *args):
         for pattern, cbs in list(self.callbacks.items()):
@@ -486,7 +533,27 @@ class DLiveClient(MixerClientBase):
         self._send_raw(build_sysex(payload))
 
     def get_channel_name(self, channel: int) -> str:
-        return self._channel_names.get(channel, f"Ch {channel}")
+        """Get cached channel name, or request it from dLive."""
+        cached = self._channel_names.get(channel)
+        if cached:
+            return cached
+        # Also check state (populated by SysEx parse)
+        state_name = self.state.get(f"name/{channel}")
+        if state_name:
+            return state_name
+        return f"Ch {channel}"
+
+    def request_channel_names(self, num_channels: int = 48):
+        """Request channel names from dLive via SysEx.
+
+        The dLive may respond with SysEx messages containing channel names.
+        Results are cached in ``_channel_names`` as they arrive.
+        """
+        midi_ch = self._midi_channel("input")
+        for ch in range(1, num_channels + 1):
+            payload = bytes([midi_ch, 0x13, ch - 1])
+            self._send_raw(build_sysex(payload))
+        logger.info(f"Requested names for channels 1-{num_channels}")
 
     # ── Channel Colour (SysEx) ─────────────────────────────────
 

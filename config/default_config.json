@@ -10,6 +10,20 @@
     ],
     "firmware": "3.0.5"
   },
+  "dlive": {
+    "default_ip": "192.168.3.70",
+    "port": 51328,
+    "tls": false,
+    "midi_base_channel": 0,
+    "models": [
+      "dLive S3000",
+      "dLive S5000",
+      "dLive S7000",
+      "dLive C1500",
+      "dLive C2500",
+      "dLive C3500"
+    ]
+  },
   "ableton": {
     "default_ip": "127.0.0.1",
     "send_port": 11000,
