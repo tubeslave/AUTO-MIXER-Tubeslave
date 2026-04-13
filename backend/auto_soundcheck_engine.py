@@ -957,121 +957,127 @@ class AutoSoundcheckEngine:
         self._detect_and_fix_phase()
 
     def _apply_hpf(self, ch: int, preset: str):
-        """Analyze low-end spectrum and set HPF cutoff adaptively.
+        """Set HPF cutoff using spectral band energy metrics.
 
-        Uses the preset frequency as a starting point, then analyzes
-        the actual spectrum to find the optimal cutoff: the frequency
-        below which there is mostly noise/rumble and no useful content.
+        Metrics used:
+        - spectral.band_energy['sub'] (20-60 Hz)
+        - spectral.band_energy['bass'] (60-250 Hz)
+        - spectral.centroid_hz — low centroid = real low content
         """
+        info = self.channels[ch]
         base_freq = INSTRUMENT_HPF.get(preset, 80.0)
-
-        spec = self.audio_capture.get_spectrum(ch, 4096)
-        freqs = spec["frequencies"]
-        mags_db = spec["magnitude_db"]
-
         adaptive_freq = base_freq
 
-        if len(freqs) > 0 and len(mags_db) > 0:
-            # Find the energy in the sub-bass region (20..base_freq)
-            sub_mask = (freqs >= 20) & (freqs <= base_freq * 1.5)
-            useful_mask = (freqs >= base_freq) & (freqs <= base_freq * 4)
+        m = info.metrics
+        if m:
+            sub_e = m.spectral.band_energy.get('sub', -100.0)
+            bass_e = m.spectral.band_energy.get('bass', -100.0)
+            low_mid_e = m.spectral.band_energy.get('low_mid', -100.0)
+            centroid = m.spectral.centroid_hz
 
-            if np.any(sub_mask) and np.any(useful_mask):
-                sub_energy = np.mean(10 ** (mags_db[sub_mask] / 20.0))
-                useful_energy = np.mean(10 ** (mags_db[useful_mask] / 20.0))
+            # Convert from dB to linear for ratio comparison
+            sub_lin = 10 ** (sub_e / 20.0) if sub_e > -90 else 0
+            bass_lin = 10 ** (bass_e / 20.0) if bass_e > -90 else 0
+            lm_lin = 10 ** (low_mid_e / 20.0) if low_mid_e > -90 else 0
+            useful_ref = max(bass_lin, lm_lin, 1e-10)
 
-                if useful_energy > 1e-10:
-                    ratio = sub_energy / useful_energy
+            sub_ratio = sub_lin / useful_ref
 
-                    if ratio < 0.1:
-                        # Very little sub content → raise HPF for cleaner signal
-                        adaptive_freq = min(base_freq * 1.5, 400.0)
-                    elif ratio > 0.8 and preset in ("kick", "bass"):
-                        # Lots of sub content → lower HPF to preserve it
-                        adaptive_freq = max(base_freq * 0.7, 20.0)
+            if sub_ratio < 0.05 and centroid > 500:
+                # No useful sub, high centroid → raise HPF
+                adaptive_freq = min(base_freq * 2.0, 400.0)
+            elif sub_ratio < 0.15 and centroid > 200:
+                adaptive_freq = min(base_freq * 1.4, 350.0)
+            elif sub_ratio > 0.7 and preset in ("kick", "bass") and centroid < 200:
+                # Real sub content on bass instrument → lower HPF
+                adaptive_freq = max(base_freq * 0.6, 20.0)
+            elif sub_ratio > 0.5 and centroid < 150:
+                adaptive_freq = max(base_freq * 0.8, 25.0)
 
         try:
             if hasattr(self.mixer_client, 'set_hpf'):
                 self.mixer_client.set_hpf(ch, adaptive_freq, enabled=True)
                 if abs(adaptive_freq - base_freq) > 5:
-                    logger.info(
-                        f"Ch {ch}: HPF={adaptive_freq:.0f}Hz "
-                        f"(adapted from preset {base_freq:.0f}Hz)"
-                    )
+                    logger.info(f"Ch {ch}: HPF={adaptive_freq:.0f}Hz (preset {base_freq:.0f}Hz)")
                 else:
                     logger.debug(f"Ch {ch}: HPF={adaptive_freq:.0f}Hz")
         except Exception as e:
             logger.warning(f"Ch {ch}: HPF failed: {e}")
 
     def _apply_eq(self, ch: int, preset: str):
-        """Analyze spectrum and apply adaptive EQ corrections.
+        """Apply adaptive EQ using spectral metrics.
 
-        Starts from the instrument preset, then measures the actual
-        spectrum to detect problems (mud buildup, harshness, missing
-        presence) and adjusts gains accordingly.
+        Metrics used:
+        - spectral.mud_ratio — excess 200-500Hz energy
+        - spectral.presence_ratio — 2-5kHz clarity
+        - spectral.brightness — high-frequency content
+        - spectral.warmth — 200-800Hz warmth
+        - spectral.spectral_tilt_db — overall spectrum slope
+        - spectral.band_energy (7 bands) — per-band energy
+        - spectral.flatness — tonal vs noise character
         """
+        info = self.channels[ch]
         eq_bands = INSTRUMENT_EQ_PRESETS.get(preset)
         if not eq_bands:
             return
 
-        spec = self.audio_capture.get_spectrum(ch, 4096)
-        freqs = spec["frequencies"]
-        mags_db = spec["magnitude_db"]
-
         adapted_bands = list(eq_bands)
+        m = info.metrics
 
-        if len(freqs) > 0 and len(mags_db) > 0:
-            # Compute energy in key frequency bands
-            def band_energy(lo, hi):
-                mask = (freqs >= lo) & (freqs < hi)
-                if np.any(mask):
-                    return float(np.mean(mags_db[mask]))
-                return -80.0
-
-            sub = band_energy(20, 100)
-            low = band_energy(100, 300)
-            low_mid = band_energy(300, 800)
-            mid = band_energy(800, 2000)
-            hi_mid = band_energy(2000, 5000)
-            presence = band_energy(5000, 10000)
-            air = band_energy(10000, 20000)
-
-            overall = band_energy(20, 20000)
+        if m and m.spectral.centroid_hz > 0:
+            sm = m.spectral
 
             for i, (freq, gain, q) in enumerate(adapted_bands):
                 adapted_gain = gain
 
-                # Mud detection (200-500 Hz region)
-                if 150 <= freq <= 600:
-                    mud_excess = low_mid - overall
-                    if mud_excess > 6.0:
-                        adapted_gain = min(gain, gain - (mud_excess - 6.0) * 0.5)
-                        adapted_gain = max(-8.0, adapted_gain)
+                # Band 1: Low end (typically < 200 Hz)
+                if freq <= 150:
+                    if preset in ("kick", "bass"):
+                        # Boost sub only if it's actually weak
+                        sub_e = sm.band_energy.get('sub', -80)
+                        bass_e = sm.band_energy.get('bass', -80)
+                        if sub_e < bass_e - 10:
+                            adapted_gain = max(gain, gain + 1.5)
+                    else:
+                        # For non-bass instruments, cut more if muddy
+                        if sm.warmth > 0.4:
+                            adapted_gain = min(gain, gain - 2.0)
 
-                # Harshness detection (2-5 kHz)
-                if 1500 <= freq <= 5000:
-                    harsh_excess = hi_mid - overall
-                    if harsh_excess > 8.0:
-                        adapted_gain = min(gain, gain - (harsh_excess - 8.0) * 0.3)
-                        adapted_gain = max(-6.0, adapted_gain)
-                    elif harsh_excess < -3.0 and gain > 0:
-                        adapted_gain = gain + min(2.0, abs(harsh_excess) * 0.3)
-                        adapted_gain = min(6.0, adapted_gain)
+                # Band 2: Low-mid / mud region (200-600 Hz)
+                elif 150 < freq <= 600:
+                    if sm.mud_ratio > 0.25:
+                        mud_excess = (sm.mud_ratio - 0.15) * 20
+                        adapted_gain = min(gain, gain - mud_excess * 0.5)
+                    elif sm.mud_ratio < 0.05 and sm.warmth < 0.1:
+                        adapted_gain = max(gain, gain + 1.0)
 
-                # Sibilance/brightness (8+ kHz)
-                if freq >= 6000:
-                    bright_excess = presence - overall
-                    if bright_excess > 10.0:
-                        adapted_gain = min(gain, gain - (bright_excess - 10.0) * 0.3)
-                        adapted_gain = max(-6.0, adapted_gain)
+                # Band 3: Presence / clarity (1.5-5 kHz)
+                elif 1500 <= freq <= 5000:
+                    if sm.presence_ratio > 0.3:
+                        excess = (sm.presence_ratio - 0.2) * 15
+                        adapted_gain = min(gain, gain - excess * 0.4)
+                    elif sm.presence_ratio < 0.08:
+                        deficit = (0.15 - sm.presence_ratio) * 20
+                        adapted_gain = max(gain, gain + deficit * 0.5)
+                    if sm.flatness > 0.7 and gain > 0:
+                        adapted_gain = gain * 0.5
 
-                # Low-end boost check for bass instruments
-                if freq <= 100 and preset in ("kick", "bass"):
-                    if sub < overall - 10.0:
+                # Band 4: Air / brightness (6+ kHz)
+                elif freq >= 6000:
+                    if sm.brightness > 0.25:
+                        bright_excess = (sm.brightness - 0.15) * 15
+                        adapted_gain = min(gain, gain - bright_excess * 0.4)
+                    elif sm.brightness < 0.03:
                         adapted_gain = max(gain, gain + 1.5)
-                        adapted_gain = min(6.0, adapted_gain)
 
-                adapted_bands[i] = (freq, round(adapted_gain, 1), q)
+                # Spectral tilt compensation
+                if sm.spectral_tilt_db < -5.0 and freq >= 2000:
+                    adapted_gain += min(2.0, abs(sm.spectral_tilt_db + 5) * 0.3)
+                elif sm.spectral_tilt_db > 3.0 and freq <= 500:
+                    adapted_gain += min(1.5, (sm.spectral_tilt_db - 3) * 0.2)
+
+                adapted_gain = max(-8.0, min(8.0, round(adapted_gain, 1)))
+                adapted_bands[i] = (freq, adapted_gain, q)
 
         try:
             for band_idx, (freq, gain, q) in enumerate(adapted_bands, start=1):
@@ -1079,9 +1085,7 @@ class AutoSoundcheckEngine:
                     break
                 self.mixer_client.set_eq_band(ch, band_idx, freq, gain, q)
 
-            info = self.channels[ch]
             info.eq_applied = True
-
             changes = []
             for i, ((_, og, _), (_, ag, _)) in enumerate(zip(eq_bands, adapted_bands)):
                 if abs(og - ag) > 0.3:
@@ -1089,30 +1093,56 @@ class AutoSoundcheckEngine:
             if changes:
                 logger.info(f"Ch {ch}: EQ adapted: {', '.join(changes)}")
             else:
-                logger.debug(f"Ch {ch}: EQ preset '{preset}' applied (no adaptation needed)")
+                logger.debug(f"Ch {ch}: EQ preset '{preset}' (no adaptation)")
         except Exception as e:
             logger.warning(f"Ch {ch}: EQ failed: {e}")
 
     def _apply_gain_correction(self, ch: int, info: ChannelInfo, preset: str):
-        """Measure LUFS and compute gain correction to reach target level."""
+        """Compute gain correction using integrated LUFS and true peak.
+
+        Metrics used:
+        - level.lufs_integrated — gated loudness (most accurate)
+        - level.lufs_short_term — fallback if integrated unavailable
+        - level.true_peak_dbtp — for headroom safety (not sample peak)
+        - level.loudness_range_lu — if LRA is wide, use gentler correction
+        """
         target_lufs = INSTRUMENT_TARGET_LUFS.get(preset, -23.0)
 
-        # Re-measure after EQ/HPF to get current level
-        current_lufs = self.audio_capture.get_lufs(ch, 3.0)
-        current_peak = self.audio_capture.get_peak(ch, self.sample_rate)
+        m = info.metrics
+        if m and m.level.lufs_integrated > -90:
+            current_lufs = m.level.lufs_integrated
+            true_peak = m.level.true_peak_dbtp
+            lra = m.level.loudness_range_lu
+        elif m and m.level.lufs_short_term > -90:
+            current_lufs = m.level.lufs_short_term
+            true_peak = m.level.true_peak_dbtp
+            lra = 0.0
+        else:
+            current_lufs = self.audio_capture.get_lufs(ch, 3.0)
+            true_peak = self.audio_capture.get_peak(ch, self.sample_rate)
+            lra = 0.0
+
         info.lufs = current_lufs
-        info.peak_db = current_peak
 
         if current_lufs <= -90.0:
             info.gain_correction_db = 0.0
             return
 
         diff = target_lufs - current_lufs
-        correction = max(-GAIN_CORRECTION_MAX_DB, min(GAIN_CORRECTION_MAX_DB, diff))
 
-        # True peak safety
-        if current_peak + correction > -1.0:
-            correction = -1.0 - current_peak
+        # For signals with wide loudness range, correct less aggressively
+        scale = 1.0
+        if lra > 15.0:
+            scale = 0.7
+        elif lra > 10.0:
+            scale = 0.85
+
+        correction = diff * scale
+        correction = max(-GAIN_CORRECTION_MAX_DB, min(GAIN_CORRECTION_MAX_DB, correction))
+
+        # True peak headroom safety (use true peak, not sample peak)
+        if true_peak + correction > -1.0:
+            correction = -1.0 - true_peak
             correction = max(-GAIN_CORRECTION_MAX_DB, correction)
 
         info.gain_correction_db = correction
@@ -1121,21 +1151,22 @@ class AutoSoundcheckEngine:
             try:
                 self.mixer_client.set_gain(ch, correction)
                 logger.info(
-                    f"Ch {ch} '{info.name}': gain correction {correction:+.1f}dB "
-                    f"(measured={current_lufs:.1f}, target={target_lufs:.0f} LUFS, "
-                    f"peak={current_peak:.1f}dB)"
+                    f"Ch {ch} '{info.name}': gain {correction:+.1f}dB "
+                    f"(LUFS_I={current_lufs:.1f}→{target_lufs:.0f}, "
+                    f"TP={true_peak:.1f}dBTP, LRA={lra:.1f}LU)"
                 )
             except Exception as e:
                 logger.warning(f"Ch {ch}: gain correction failed: {e}")
 
     def _apply_fader(self, ch: int, info: ChannelInfo, preset: str):
-        """Compute fader position based on measured LUFS and target balance.
+        """Compute fader from inter-channel LUFS balance and spectral context.
 
-        Instead of a static table, calculates the fader offset needed
-        so that each channel contributes its correct share to the mix
-        relative to the lead vocal (reference).
+        Metrics used:
+        - level.lufs_integrated of this and all other channels
+        - spectral.centroid_hz — frequency range occupancy
+        - dynamics.crest_factor_db — transient instruments need less fader
+        - level.crest_factor_db — heavily compressed signals can be lower
         """
-        # Base position from preset (used as starting point)
         fader_levels = {
             "kick": -5.0, "snare": -5.0, "tom": -8.0, "hihat": -12.0,
             "ride": -12.0, "cymbals": -12.0, "overheads": -10.0,
@@ -1145,26 +1176,37 @@ class AutoSoundcheckEngine:
         }
         base_fader = fader_levels.get(preset, -10.0)
 
-        # Find the loudest channel to use as reference for relative balance
-        ref_lufs = -100.0
+        # Collect integrated LUFS from all active channels
+        all_lufs: Dict[int, float] = {}
         for c, ci in self.channels.items():
-            if ci.has_signal and ci.lufs > ref_lufs:
-                ref_lufs = ci.lufs
+            if ci.has_signal and ci.metrics and ci.metrics.level.lufs_integrated > -90:
+                all_lufs[c] = ci.metrics.level.lufs_integrated
+            elif ci.has_signal and ci.lufs > -90:
+                all_lufs[c] = ci.lufs
 
         fader_db = base_fader
+        my_lufs = all_lufs.get(ch)
 
-        if info.lufs > -90.0 and ref_lufs > -90.0:
-            # How much louder/quieter is this channel vs the loudest?
-            level_diff = info.lufs - ref_lufs
+        if my_lufs is not None and len(all_lufs) > 1:
+            ref_lufs = max(all_lufs.values())
+            level_diff = my_lufs - ref_lufs
 
-            # If channel is much louder than its target position implies,
-            # pull fader down; if quieter, push up (within ±3dB of preset)
             target_lufs = INSTRUMENT_TARGET_LUFS.get(preset, -23.0)
             ref_target = min(INSTRUMENT_TARGET_LUFS.values())
             target_diff = target_lufs - ref_target
 
-            actual_vs_expected = level_diff - target_diff
-            adjustment = max(-3.0, min(3.0, -actual_vs_expected * 0.5))
+            deviation = level_diff - target_diff
+
+            # If crest factor is very high (peaky drums), perceived loudness
+            # is lower than LUFS suggests → less fader cut
+            m = info.metrics
+            crest_adjustment = 0.0
+            if m and m.level.crest_factor_db > 18.0:
+                crest_adjustment = 1.0
+            elif m and m.level.crest_factor_db < 6.0:
+                crest_adjustment = -1.0
+
+            adjustment = max(-4.0, min(4.0, -deviation * 0.5 + crest_adjustment))
             fader_db = base_fader + adjustment
 
         fader_db = max(-30.0, min(0.0, fader_db))
@@ -1174,41 +1216,63 @@ class AutoSoundcheckEngine:
             self.mixer_client.set_fader(ch, fader_db)
             if abs(fader_db - base_fader) > 0.5:
                 logger.info(
-                    f"Ch {ch} '{info.name}': fader = {fader_db:.1f}dB "
-                    f"(adapted from {base_fader:.1f}dB, lufs={info.lufs:.1f})"
+                    f"Ch {ch} '{info.name}': fader={fader_db:.1f}dB "
+                    f"(base={base_fader:.1f}, lufs={info.lufs:.1f})"
                 )
             else:
-                logger.info(f"Ch {ch} '{info.name}': fader = {fader_db:.1f}dB")
+                logger.info(f"Ch {ch} '{info.name}': fader={fader_db:.1f}dB")
         except Exception as e:
             logger.warning(f"Ch {ch}: fader set failed: {e}")
 
     # ── 5d. Input gain staging ───────────────────────────────────
 
     def _apply_input_gain(self, ch: int, info: ChannelInfo, preset: str):
-        """Set preamp gain / input trim to target level.
+        """Set preamp gain using true peak and crest factor.
 
-        Measures current peak and adjusts gain so the signal arrives
-        at a healthy level before any processing.
+        Metrics used:
+        - level.true_peak_dbtp — inter-sample accurate peak level
+        - level.rms_db — average signal level
+        - level.crest_factor_db — peak/RMS ratio (high = transient, low = sustained)
+        - dynamics.dynamic_range_db — signal variability
         """
-        if info.peak_db <= -90.0:
+        m = info.metrics
+        if m and m.level.true_peak_dbtp > -90:
+            true_peak = m.level.true_peak_dbtp
+            rms = m.level.rms_db
+            crest = m.level.crest_factor_db
+        else:
+            true_peak = info.peak_db
+            rms = info.rms_db
+            crest = true_peak - rms if rms > -90 else 0
+
+        if true_peak <= -90.0:
             return
 
         target_peak = INSTRUMENT_TARGET_INPUT_DB.get(preset, -12.0)
-        diff = target_peak - info.peak_db
+
+        # For high-crest signals (drums), target peak can be higher
+        # because perceived loudness is lower
+        if crest > 18.0:
+            target_peak += 3.0
+        elif crest < 6.0:
+            target_peak -= 2.0
+
+        diff = target_peak - true_peak
         correction = max(-20.0, min(20.0, diff))
 
         if abs(correction) < 1.0:
             return
 
-        # Safety: never push gain so high that peak exceeds -1 dBTP
-        if info.peak_db + correction > -1.0:
-            correction = -1.0 - info.peak_db
+        # Safety: true peak after correction must not exceed -1 dBTP
+        if true_peak + correction > -1.0:
+            correction = -1.0 - true_peak
 
         try:
             self.mixer_client.set_gain(ch, correction)
             logger.info(
                 f"Ch {ch} '{info.name}': input gain {correction:+.1f}dB "
-                f"(peak {info.peak_db:.1f} → target {target_peak:.0f}dB)"
+                f"(TP={true_peak:.1f}dBTP, RMS={rms:.1f}, "
+                f"crest={crest:.1f}, target={target_peak:.0f}dB)"
             )
         except Exception as e:
             logger.warning(f"Ch {ch}: input gain failed: {e}")
@@ -1216,12 +1280,15 @@ class AutoSoundcheckEngine:
     # ── 5e. Phase / polarity detection ────────────────────────
 
     def _detect_and_fix_phase(self):
-        """Detect phase issues between correlated channel pairs.
+        """Detect phase issues using inter-channel metrics.
 
-        Compares adjacent channels of the same type (e.g. OH L / OH R,
-        Keys L / Keys R) using GCC-PHAT cross-correlation.
-        If correlation is negative (inverted phase), flips polarity.
-        If delay > 1 sample, applies time alignment.
+        Metrics used (from compare_channels):
+        - cross_correlation — GCC-PHAT peak value and sign
+        - delay_ms — time offset between channels
+        - coherence — frequency-domain coherence (high = correlated)
+        - spectral_similarity — cosine similarity of spectra
+        - phase_inverted — detected polarity inversion
+        - level_difference_db — for weighting decisions
         """
         pairs = self._find_correlated_pairs()
         if not pairs:
@@ -1236,12 +1303,10 @@ class AutoSoundcheckEngine:
                 if len(buf_a) < 4096 or len(buf_b) < 4096:
                     continue
 
-                min_len = min(len(buf_a), len(buf_b))
-                buf_a = buf_a[:min_len]
-                buf_b = buf_b[:min_len]
-
-                delay_samples, correlation = self._gcc_phat(buf_a, buf_b)
-                delay_ms = abs(delay_samples) / self.sample_rate * 1000.0
+                # Use the full inter-channel comparison
+                icm = compare_channels(
+                    buf_a, buf_b, self.sample_rate, ch_a, ch_b
+                )
 
                 info_a = self.channels.get(ch_a)
                 info_b = self.channels.get(ch_b)
@@ -1250,27 +1315,36 @@ class AutoSoundcheckEngine:
 
                 logger.info(
                     f"Phase: {name_a} ↔ {name_b}: "
-                    f"correlation={correlation:.3f}, delay={delay_ms:.2f}ms"
+                    f"corr={icm.cross_correlation:.3f} "
+                    f"delay={icm.delay_ms:.2f}ms "
+                    f"coherence={icm.coherence:.3f} "
+                    f"spec_sim={icm.spectral_similarity:.3f} "
+                    f"level_diff={icm.level_difference_db:.1f}dB"
                 )
 
-                # Negative correlation → phase inverted
-                if correlation < -0.3:
+                # Only act if signals are actually related (high coherence)
+                if icm.coherence < 0.2 and icm.spectral_similarity < 0.5:
+                    logger.debug(f"Phase: skipping — low coherence/similarity")
+                    continue
+
+                # Phase inversion detected
+                if icm.phase_inverted:
                     logger.warning(
-                        f"Phase: {name_b} is inverted relative to {name_a}, "
+                        f"Phase: {name_b} is inverted (corr={icm.cross_correlation:.3f}), "
                         f"flipping polarity"
                     )
                     if hasattr(self.mixer_client, 'set_polarity'):
                         self.mixer_client.set_polarity(ch_b, True)
 
-                # Significant delay → time-align
-                elif delay_ms > 0.1 and abs(correlation) > 0.3:
-                    align_ch = ch_b if delay_samples > 0 else ch_a
+                # Time alignment
+                elif icm.delay_ms > 0.1 and icm.coherence > 0.3:
+                    align_ch = ch_b if icm.delay_samples > 0 else ch_a
                     logger.info(
-                        f"Phase: applying {delay_ms:.2f}ms delay to Ch {align_ch} "
-                        f"for time alignment"
+                        f"Phase: applying {icm.delay_ms:.2f}ms delay "
+                        f"to Ch {align_ch} (coherence={icm.coherence:.3f})"
                     )
                     if hasattr(self.mixer_client, 'set_delay'):
-                        self.mixer_client.set_delay(align_ch, delay_ms, enabled=True)
+                        self.mixer_client.set_delay(align_ch, icm.delay_ms, enabled=True)
 
             except Exception as e:
                 logger.warning(f"Phase check error for pair ({ch_a}, {ch_b}): {e}")
@@ -1486,12 +1560,15 @@ class AutoSoundcheckEngine:
     # ── 5h. FX Sends (reverb / delay) ────────────────────────────
 
     def _apply_fx_sends(self, ch: int, info: ChannelInfo, preset: str):
-        """Set FX send levels adapted to signal characteristics.
+        """Set FX send levels using signal metrics.
 
-        Base levels come from the instrument preset, then adjusted:
-        - Dry/close-miked signals → more reverb to add space
-        - Already reverberant signals (high late energy) → less reverb
-        - Loud channels → slightly lower send to avoid FX overload
+        Metrics used:
+        - level.lufs_integrated — loudness-based scaling
+        - dynamics.dynamic_range_db — dynamic signals need less reverb
+        - dynamics.sustain_level_db — sustained signals blend with reverb
+        - spectral.brightness — bright signals → less reverb to avoid wash
+        - spectral.warmth — warm signals → more reverb (natural fit)
+        - dynamics.transient_density — percussive → shorter/less reverb
         """
         if not hasattr(self.mixer_client, 'set_send_level'):
             return
@@ -1500,36 +1577,44 @@ class AutoSoundcheckEngine:
         if not sends:
             return
 
+        m = info.metrics
         adapted_sends = []
+
         for send_bus, base_level in sends:
             level = base_level
 
-            # Adjust based on channel loudness
-            if info.lufs > -90.0:
-                # Louder channels → pull send back to prevent FX overload
-                if info.lufs > -18.0:
-                    level -= 3.0
-                elif info.lufs < -30.0:
-                    level += 2.0
+            if m:
+                # Loudness scaling
+                lufs_i = m.level.lufs_integrated
+                if lufs_i > -16.0:
+                    level -= 4.0
+                elif lufs_i > -20.0:
+                    level -= 2.0
+                elif lufs_i < -35.0:
+                    level += 3.0
 
-            # Analyze late energy (simple reverb estimation)
-            samples = self.audio_capture.get_buffer(ch, self.sample_rate)
-            if len(samples) >= 8192:
-                early = samples[:len(samples) // 4]
-                late = samples[len(samples) // 2:]
-                early_rms = np.sqrt(np.mean(early ** 2) + 1e-12)
-                late_rms = np.sqrt(np.mean(late ** 2) + 1e-12)
-                if early_rms > 1e-8:
-                    late_ratio = late_rms / early_rms
-                    if late_ratio > 0.5:
-                        # Already reverberant → reduce send
-                        level -= 3.0
-                    elif late_ratio < 0.1:
-                        # Very dry → increase send slightly
-                        level += 2.0
+                # Dynamic range: wide DR → less send (reverb masks dynamics)
+                if m.dynamics.dynamic_range_db > 18.0:
+                    level -= 2.0
 
-            level = max(-40.0, min(-5.0, level))
-            adapted_sends.append((send_bus, round(level, 1)))
+                # Transient density: percussive → less reverb
+                if m.dynamics.transient_density > 5.0:
+                    level -= 2.0
+                elif m.dynamics.transient_density < 1.0 and m.dynamics.sustain_level_db > -30:
+                    level += 1.5
+
+                # Brightness: bright → less reverb to keep clarity
+                if m.spectral.brightness > 0.25:
+                    level -= 2.0
+                elif m.spectral.brightness < 0.05:
+                    level += 1.0
+
+                # Warmth: warm signals blend well with reverb
+                if m.spectral.warmth > 0.3:
+                    level += 1.0
+
+            level = max(-40.0, min(-5.0, round(level, 1)))
+            adapted_sends.append((send_bus, level))
 
         for send_bus, level_db in adapted_sends:
             try:
