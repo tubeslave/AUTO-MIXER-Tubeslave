@@ -252,6 +252,70 @@ INSTRUMENT_COMPRESSOR: Dict[str, Tuple[float, float, float, float]] = {
     "backVocal": (-18.0, 3.0, 5.0, 80.0),
 }
 
+# Default pan positions per instrument (-100=L, 0=C, +100=R)
+INSTRUMENT_PAN: Dict[str, float] = {
+    "kick": 0.0,
+    "snare": 0.0,
+    "tom": -15.0,       # Slightly left (Tom 1 default; engine adjusts per Tom number)
+    "hihat": 30.0,      # Slightly right (audience perspective)
+    "ride": -30.0,      # Slightly left
+    "cymbals": 0.0,
+    "overheads": 0.0,   # Handled as stereo pair: L=-60, R=+60
+    "room": 0.0,
+    "bass": 0.0,
+    "electricGuitar": -25.0,
+    "acousticGuitar": 25.0,
+    "accordion": 15.0,
+    "synth": 0.0,       # Stereo pair: L=-40, R=+40
+    "playback": 0.0,
+    "leadVocal": 0.0,
+    "backVocal": 0.0,   # Spread: BVox1=-30, BVox2=+30
+}
+
+# Target input gain (preamp trim) in dB per instrument
+INSTRUMENT_TARGET_INPUT_DB: Dict[str, float] = {
+    "kick": -10.0,
+    "snare": -10.0,
+    "tom": -10.0,
+    "hihat": -15.0,
+    "ride": -15.0,
+    "cymbals": -15.0,
+    "overheads": -15.0,
+    "room": -10.0,
+    "bass": -10.0,
+    "electricGuitar": -10.0,
+    "acousticGuitar": -10.0,
+    "accordion": -10.0,
+    "synth": -15.0,
+    "playback": -15.0,
+    "leadVocal": -8.0,
+    "backVocal": -10.0,
+}
+
+# FX send presets: reverb bus, delay bus (send_bus_number, level_db)
+# Assumes: Bus 1 = Reverb (plate/hall), Bus 2 = Delay
+INSTRUMENT_FX_SENDS: Dict[str, List[Tuple[int, float]]] = {
+    "kick": [],
+    "snare": [(1, -20.0)],            # Light reverb
+    "tom": [(1, -22.0)],
+    "hihat": [],
+    "ride": [],
+    "cymbals": [],
+    "overheads": [(1, -25.0)],
+    "room": [],
+    "bass": [],
+    "electricGuitar": [(1, -18.0), (2, -25.0)],   # Reverb + delay
+    "acousticGuitar": [(1, -15.0)],
+    "accordion": [(1, -18.0)],
+    "synth": [(1, -20.0), (2, -22.0)],
+    "playback": [],
+    "leadVocal": [(1, -12.0), (2, -18.0)],         # More reverb + delay
+    "backVocal": [(1, -15.0), (2, -20.0)],
+}
+
+# Channels that typically come in correlated pairs (for phase check)
+STEREO_PAIR_PRESETS = ["overheads", "synth", "playback"]
+
 SIGNAL_THRESHOLD_DB = -50.0
 SIGNAL_ANALYSIS_SECONDS = 3.0
 GAIN_CORRECTION_MAX_DB = 12.0
@@ -775,12 +839,15 @@ class AutoSoundcheckEngine:
     # ── 5. Apply corrections ─────────────────────────────────────
 
     def _apply_corrections(self):
-        """Apply gain, EQ, compressor, and fader to all active channels.
+        """Apply full channel strip processing to all active channels.
+
+        Order: input gain → HPF → EQ → compressor → pan → fader → FX sends.
+        Then: phase/polarity check across correlated pairs.
 
         Channels have been reset to neutral before analysis, so all
         settings are applied from scratch to clean channels.
         """
-        self._set_state(EngineState.APPLYING, "Applying corrections to clean channels...")
+        self._set_state(EngineState.APPLYING, "Applying full processing chain...")
 
         for ch, info in self.channels.items():
             if not info.has_signal:
@@ -794,14 +861,27 @@ class AutoSoundcheckEngine:
                 had_proc = " (previous settings cleared)"
             logger.info(
                 f"Ch {ch} '{info.name}' (preset={preset}): "
-                f"applying corrections{had_proc}..."
+                f"applying full processing chain{had_proc}..."
             )
 
             try:
+                # 1. Input gain staging (preamp trim)
+                self._apply_input_gain(ch, info, preset)
+                # 2. HPF
                 self._apply_hpf(ch, preset)
+                # 3. Parametric EQ (4-band)
                 self._apply_eq(ch, preset)
+                # 4. Compressor
+                self._apply_compressor(ch, info, preset)
+                # 5. Pan
+                self._apply_pan(ch, info, preset)
+                # 6. Gain correction (output-side, LUFS-based)
                 self._apply_gain_correction(ch, info, preset)
+                # 7. Fader
                 self._apply_fader(ch, info, preset)
+                # 8. FX sends (reverb/delay)
+                self._apply_fx_sends(ch, info, preset)
+
                 self._applied_channels.add(ch)
 
                 if self.on_channel_update:
@@ -812,11 +892,15 @@ class AutoSoundcheckEngine:
                         "lufs": info.lufs,
                         "gain_correction_db": info.gain_correction_db,
                         "eq_applied": info.eq_applied,
+                        "compressor_applied": info.compressor_applied,
                         "fader_db": info.fader_db,
                     })
 
             except Exception as e:
                 logger.error(f"Ch {ch}: error applying corrections: {e}")
+
+        # 9. Phase / polarity check across correlated channel pairs
+        self._detect_and_fix_phase()
 
     def _apply_hpf(self, ch: int, preset: str):
         """Apply HPF based on instrument type."""
@@ -901,6 +985,253 @@ class AutoSoundcheckEngine:
         except Exception as e:
             logger.warning(f"Ch {ch}: fader set failed: {e}")
 
+    # ── 5d. Input gain staging ───────────────────────────────────
+
+    def _apply_input_gain(self, ch: int, info: ChannelInfo, preset: str):
+        """Set preamp gain / input trim to target level.
+
+        Measures current peak and adjusts gain so the signal arrives
+        at a healthy level before any processing.
+        """
+        if info.peak_db <= -90.0:
+            return
+
+        target_peak = INSTRUMENT_TARGET_INPUT_DB.get(preset, -12.0)
+        diff = target_peak - info.peak_db
+        correction = max(-20.0, min(20.0, diff))
+
+        if abs(correction) < 1.0:
+            return
+
+        # Safety: never push gain so high that peak exceeds -1 dBTP
+        if info.peak_db + correction > -1.0:
+            correction = -1.0 - info.peak_db
+
+        try:
+            self.mixer_client.set_gain(ch, correction)
+            logger.info(
+                f"Ch {ch} '{info.name}': input gain {correction:+.1f}dB "
+                f"(peak {info.peak_db:.1f} → target {target_peak:.0f}dB)"
+            )
+        except Exception as e:
+            logger.warning(f"Ch {ch}: input gain failed: {e}")
+
+    # ── 5e. Phase / polarity detection ────────────────────────
+
+    def _detect_and_fix_phase(self):
+        """Detect phase issues between correlated channel pairs.
+
+        Compares adjacent channels of the same type (e.g. OH L / OH R,
+        Keys L / Keys R) using GCC-PHAT cross-correlation.
+        If correlation is negative (inverted phase), flips polarity.
+        If delay > 1 sample, applies time alignment.
+        """
+        pairs = self._find_correlated_pairs()
+        if not pairs:
+            logger.info("Phase check: no correlated pairs found")
+            return
+
+        for ch_a, ch_b, pair_type in pairs:
+            try:
+                buf_a = self.audio_capture.get_buffer(ch_a, self.sample_rate * 2)
+                buf_b = self.audio_capture.get_buffer(ch_b, self.sample_rate * 2)
+
+                if len(buf_a) < 4096 or len(buf_b) < 4096:
+                    continue
+
+                min_len = min(len(buf_a), len(buf_b))
+                buf_a = buf_a[:min_len]
+                buf_b = buf_b[:min_len]
+
+                delay_samples, correlation = self._gcc_phat(buf_a, buf_b)
+                delay_ms = abs(delay_samples) / self.sample_rate * 1000.0
+
+                info_a = self.channels.get(ch_a)
+                info_b = self.channels.get(ch_b)
+                name_a = info_a.name if info_a else f"Ch {ch_a}"
+                name_b = info_b.name if info_b else f"Ch {ch_b}"
+
+                logger.info(
+                    f"Phase: {name_a} ↔ {name_b}: "
+                    f"correlation={correlation:.3f}, delay={delay_ms:.2f}ms"
+                )
+
+                # Negative correlation → phase inverted
+                if correlation < -0.3:
+                    logger.warning(
+                        f"Phase: {name_b} is inverted relative to {name_a}, "
+                        f"flipping polarity"
+                    )
+                    if hasattr(self.mixer_client, 'set_polarity'):
+                        self.mixer_client.set_polarity(ch_b, True)
+
+                # Significant delay → time-align
+                elif delay_ms > 0.1 and abs(correlation) > 0.3:
+                    align_ch = ch_b if delay_samples > 0 else ch_a
+                    logger.info(
+                        f"Phase: applying {delay_ms:.2f}ms delay to Ch {align_ch} "
+                        f"for time alignment"
+                    )
+                    if hasattr(self.mixer_client, 'set_delay'):
+                        self.mixer_client.set_delay(align_ch, delay_ms, enabled=True)
+
+            except Exception as e:
+                logger.warning(f"Phase check error for pair ({ch_a}, {ch_b}): {e}")
+
+    def _find_correlated_pairs(self) -> List[Tuple[int, int, str]]:
+        """Find channel pairs that should be phase-correlated.
+
+        Looks for adjacent channels with the same preset type
+        (e.g. two 'overheads', two 'synth', etc.).
+        """
+        pairs = []
+        preset_channels: Dict[str, List[int]] = {}
+
+        for ch, info in self.channels.items():
+            if info.has_signal and info.preset:
+                preset_channels.setdefault(info.preset, []).append(ch)
+
+        for preset, channels in preset_channels.items():
+            if len(channels) < 2:
+                continue
+            channels.sort()
+            # Pair adjacent channels
+            for i in range(0, len(channels) - 1, 2):
+                pairs.append((channels[i], channels[i + 1], preset))
+
+        return pairs
+
+    def _gcc_phat(
+        self, sig_target: np.ndarray, sig_reference: np.ndarray
+    ) -> Tuple[int, float]:
+        """GCC-PHAT cross-correlation. Returns (delay_samples, peak_value).
+
+        Positive delay = target is delayed relative to reference.
+        Negative peak = phase inverted.
+        """
+        n = len(sig_target)
+        fft_size = 1
+        while fft_size < 2 * n:
+            fft_size *= 2
+
+        X1 = np.fft.rfft(sig_target, n=fft_size)
+        X2 = np.fft.rfft(sig_reference, n=fft_size)
+
+        cross = np.conj(X2) * X1
+        magnitude = np.abs(cross) + 1e-10
+        phat = cross / magnitude
+
+        gcc = np.fft.irfft(phat, n=fft_size)
+        gcc = np.real(gcc)
+
+        max_delay = int(self.sample_rate * 0.020)  # ±20ms window
+        center = fft_size // 2
+        gcc_shifted = np.concatenate([gcc[fft_size - center:], gcc[:center + 1]])
+        search_start = max(0, center - max_delay)
+        search_end = min(len(gcc_shifted), center + max_delay + 1)
+        search_region = gcc_shifted[search_start:search_end]
+
+        peak_idx = np.argmax(np.abs(search_region))
+        peak_value = float(search_region[peak_idx])
+        delay_samples = peak_idx - (center - search_start)
+
+        return delay_samples, peak_value
+
+    # ── 5f. Pan positioning ──────────────────────────────────────
+
+    def _apply_pan(self, ch: int, info: ChannelInfo, preset: str):
+        """Set pan position based on instrument type."""
+        if not hasattr(self.mixer_client, 'set_pan'):
+            return
+
+        pan = INSTRUMENT_PAN.get(preset, 0.0)
+
+        # Smart panning for stereo pairs and multiple instruments
+        preset_channels = [
+            c for c, i in self.channels.items()
+            if i.preset == preset and i.has_signal
+        ]
+        preset_channels.sort()
+
+        if len(preset_channels) >= 2:
+            idx = preset_channels.index(ch)
+            if preset in STEREO_PAIR_PRESETS:
+                # Hard stereo pair: L/R
+                pan = -60.0 if idx % 2 == 0 else 60.0
+            elif preset == "tom":
+                # Spread toms L to R
+                spread = 50.0
+                n = len(preset_channels)
+                if n > 1:
+                    pan = -spread + (2.0 * spread * idx / (n - 1))
+                else:
+                    pan = 0.0
+            elif preset == "backVocal":
+                # Spread backing vocals
+                if len(preset_channels) == 2:
+                    pan = -30.0 if idx == 0 else 30.0
+                elif len(preset_channels) == 3:
+                    pan = [-30.0, 0.0, 30.0][idx]
+                else:
+                    spread = 40.0
+                    n = len(preset_channels)
+                    pan = -spread + (2.0 * spread * idx / max(1, n - 1))
+
+        try:
+            self.mixer_client.set_pan(ch, pan)
+            logger.info(f"Ch {ch} '{info.name}': pan = {pan:+.0f}")
+        except Exception as e:
+            logger.warning(f"Ch {ch}: pan set failed: {e}")
+
+    # ── 5g. Compressor ───────────────────────────────────────────
+
+    def _apply_compressor(self, ch: int, info: ChannelInfo, preset: str):
+        """Apply compressor preset based on instrument type."""
+        if not hasattr(self.mixer_client, 'set_compressor'):
+            return
+
+        comp_params = INSTRUMENT_COMPRESSOR.get(preset)
+        if not comp_params:
+            return
+
+        threshold, ratio, attack, release = comp_params
+        try:
+            self.mixer_client.set_compressor(
+                ch,
+                threshold_db=threshold,
+                ratio=ratio,
+                attack_ms=attack,
+                release_ms=release,
+                makeup_db=0.0,
+                enabled=True,
+            )
+            info.compressor_applied = True
+            logger.info(
+                f"Ch {ch} '{info.name}': compressor thr={threshold:.0f}dB "
+                f"ratio={ratio:.1f}:1 atk={attack:.0f}ms rel={release:.0f}ms"
+            )
+        except Exception as e:
+            logger.warning(f"Ch {ch}: compressor failed: {e}")
+
+    # ── 5h. FX Sends (reverb / delay) ────────────────────────────
+
+    def _apply_fx_sends(self, ch: int, info: ChannelInfo, preset: str):
+        """Set FX send levels based on instrument type."""
+        if not hasattr(self.mixer_client, 'set_send_level'):
+            return
+
+        sends = INSTRUMENT_FX_SENDS.get(preset, [])
+        for send_bus, level_db in sends:
+            try:
+                self.mixer_client.set_send_level(ch, send_bus, level_db)
+                logger.debug(f"Ch {ch}: send bus {send_bus} = {level_db:.0f}dB")
+            except Exception as e:
+                logger.warning(f"Ch {ch}: send bus {send_bus} failed: {e}")
+
+        if sends:
+            bus_desc = ", ".join(f"bus{b}={l:.0f}dB" for b, l in sends)
+            logger.info(f"Ch {ch} '{info.name}': FX sends: {bus_desc}")
+
     # ── 6. Continuous monitoring ─────────────────────────────────
 
     def _monitor_loop(self):
@@ -938,7 +1269,7 @@ class AutoSoundcheckEngine:
             time.sleep(0.1)
 
     def _apply_corrections_single(self, ch: int):
-        """Apply corrections for a single newly detected channel.
+        """Apply full processing chain for a single newly detected channel.
 
         Resets the channel first to ensure we apply to a clean state.
         """
@@ -947,15 +1278,18 @@ class AutoSoundcheckEngine:
             return
         preset = info.preset or "custom"
         try:
-            # Reset this channel before applying new settings
             self.mixer_client.reset_channel_processing(ch)
             info.was_reset = True
             time.sleep(0.1)
 
+            self._apply_input_gain(ch, info, preset)
             self._apply_hpf(ch, preset)
             self._apply_eq(ch, preset)
+            self._apply_compressor(ch, info, preset)
+            self._apply_pan(ch, info, preset)
             self._apply_gain_correction(ch, info, preset)
             self._apply_fader(ch, info, preset)
+            self._apply_fx_sends(ch, info, preset)
             self._applied_channels.add(ch)
         except Exception as e:
             logger.error(f"Ch {ch}: single-channel correction error: {e}")
