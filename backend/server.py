@@ -39,6 +39,13 @@ from auto_compressor import AutoCompressorController
 from backup_channels import backup_channel
 from restore_channels import restore_from_backup_using_client
 from bleed_service import BleedService
+from audio_capture import (
+    AudioCapture, AudioSourceType, AudioDeviceType,
+    detect_audio_device, find_device_by_name, list_audio_devices,
+)
+from feedback_detector import FeedbackDetector
+from auto_soundcheck_engine import AutoSoundcheckEngine
+from mixer_discovery import discover_mixers, discover_mixer_auto, DiscoveredMixer
 from handlers import register_all_handlers
 
 logging.basicConfig(level=logging.INFO)
@@ -133,6 +140,15 @@ class AutoMixerServer:
         # Centralized bleed detection service
         self.bleed_service = BleedService(self.config)
         
+        # Unified audio capture service
+        self.audio_capture: Optional[AudioCapture] = None
+        
+        # Feedback detector
+        self.feedback_detector: Optional[FeedbackDetector] = None
+        
+        # Auto soundcheck engine (headless auto-mixing)
+        self.auto_soundcheck_engine: Optional[AutoSoundcheckEngine] = None
+        
         # Live concert mode: stricter limits, emergency stop
         self.live_mode = False
         
@@ -226,6 +242,24 @@ class AutoMixerServer:
             except Exception as e:
                 logger.error(f"Error stopping Auto Compressor: {e}")
             self.auto_compressor_controller = None
+        
+        # Stop audio capture
+        if self.audio_capture:
+            try:
+                self.audio_capture.stop()
+                logger.info("Audio capture stopped")
+            except Exception as e:
+                logger.error(f"Error stopping audio capture: {e}")
+            self.audio_capture = None
+        
+        # Stop auto soundcheck engine
+        if self.auto_soundcheck_engine:
+            try:
+                self.auto_soundcheck_engine.stop()
+                logger.info("Auto soundcheck engine stopped")
+            except Exception as e:
+                logger.error(f"Error stopping auto soundcheck engine: {e}")
+            self.auto_soundcheck_engine = None
         
         # Disconnect mixer
         if self.mixer_client:
@@ -494,7 +528,7 @@ class AutoMixerServer:
                 "error": str(e)
             })
 
-    async def connect_dlive(self, ip: str = "192.168.1.70", port: int = 51328,
+    async def connect_dlive(self, ip: str = "192.168.3.70", port: int = 51328,
                             tls: bool = False, midi_base_channel: int = 0):
         """Connect to Allen & Heath dLive mixer via MIDI over TCP."""
         await self.disconnect_mixer()
@@ -506,6 +540,12 @@ class AutoMixerServer:
             if success:
                 self.mixer_client = client
                 self.connection_mode = 'dlive'
+
+                # Request channel names from dLive
+                try:
+                    client.request_channel_names(48)
+                except Exception as e:
+                    logger.warning(f"Could not request channel names: {e}")
 
                 await self.broadcast({
                     "type": "connection_status",

@@ -120,11 +120,26 @@ class TestMixingAgent:
             'mode', 'is_running', 'cycle_count', 'last_cycle_time_ms',
             'pending_actions', 'applied_actions', 'total_actions_history',
             'channels_tracked', 'confidence_threshold', 'cycle_interval_ms',
-            'recent_errors',
+            'recent_errors', 'kb_first',
         }
         assert expected_keys.issubset(set(status.keys()))
         assert status['mode'] == 'suggest'
         assert status['is_running'] is False
+        assert status['kb_first'] is False
+
+    def test_kb_first_skips_rule_engine_init(self):
+        mock_kb = MagicMock()
+        mock_kb.search.return_value = []
+        agent = MixingAgent(
+            knowledge_base=mock_kb,
+            rule_engine=None,
+            llm_client=None,
+            mixer_client=None,
+            mode=AgentMode.SUGGEST,
+            kb_first=True,
+        )
+        assert agent.rules is None
+        assert agent.kb_first is True
 
     def test_dismiss_pending_actions(self):
         """Pending actions can be dismissed individually and in bulk."""

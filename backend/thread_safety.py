@@ -1,231 +1,339 @@
 """
 Thread-safe mixer state management.
 
-Provides ThreadSafeMixerState with asyncio.Lock for concurrent access,
-copy-on-read snapshots, and asyncio.Queue for producer/consumer patterns.
+Provides ThreadSafeMixerState with threading.Lock for concurrent access,
+copy-on-read snapshots, StateUpdateQueue with pub/sub for state updates.
 """
 
 import asyncio
 import copy
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
 
+class UpdateType(Enum):
+    PARAM_SET = "param_set"
+    BATCH = "batch"
+    CHANNEL_RESET = "channel_reset"
+    FULL_RESET = "full_reset"
+
+
 @dataclass
-class StateSnapshot:
-    """Immutable snapshot of mixer state at a point in time."""
-    timestamp: float
-    channels: Dict[int, Dict[str, Any]]
-    main: Dict[str, Any]
-    buses: Dict[int, Dict[str, Any]]
-    fx: Dict[int, Dict[str, Any]]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+class StateUpdate:
+    """A single state update event."""
+    update_type: UpdateType
+    channel_id: Optional[int] = None
+    param: Optional[str] = None
+    value: Any = None
+    params: Optional[Dict[str, Any]] = None
+    timestamp: float = field(default_factory=time.time)
 
-    def get_channel(self, ch: int) -> Dict[str, Any]:
-        return self.channels.get(ch, {})
+    def __repr__(self):
+        parts = [f"StateUpdate({self.update_type.name}"]
+        if self.channel_id is not None:
+            parts.append(f"ch={self.channel_id}")
+        if self.param is not None:
+            parts.append(f"param={self.param!r}")
+        if self.value is not None:
+            parts.append(f"value={self.value!r}")
+        return ", ".join(parts) + ")"
 
-    def get_channel_param(self, ch: int, param: str, default: Any = None) -> Any:
-        return self.channels.get(ch, {}).get(param, default)
+
+@dataclass
+class _Subscriber:
+    """Internal subscriber record."""
+    sub_id: int
+    channels: Optional[Set[int]]
+    update_types: Optional[Set[UpdateType]]
+    queue: asyncio.Queue
+
+    def matches(self, update: StateUpdate) -> bool:
+        if update.update_type == UpdateType.FULL_RESET:
+            return True
+        if self.update_types is not None and update.update_type not in self.update_types:
+            return False
+        if self.channels is not None and update.channel_id is not None:
+            return update.channel_id in self.channels
+        return True
+
+
+class StateUpdateQueue:
+    """
+    Pub/sub queue for mixer state updates.
+
+    Subscribers register with optional channel and type filters.
+    """
+
+    def __init__(self, maxsize: int = 1000):
+        self._maxsize = maxsize
+        self._lock = threading.Lock()
+        self._subscribers: Dict[int, _Subscriber] = {}
+        self._next_id = 1
+
+    def subscribe(
+        self,
+        channels: Optional[Set[int]] = None,
+        update_types: Optional[Set[UpdateType]] = None,
+    ) -> int:
+        with self._lock:
+            sub_id = self._next_id
+            self._next_id += 1
+            self._subscribers[sub_id] = _Subscriber(
+                sub_id=sub_id,
+                channels=channels,
+                update_types=update_types,
+                queue=asyncio.Queue(maxsize=self._maxsize),
+            )
+            return sub_id
+
+    def unsubscribe(self, sub_id: int) -> bool:
+        with self._lock:
+            return self._subscribers.pop(sub_id, None) is not None
+
+    def subscriber_count(self) -> int:
+        with self._lock:
+            return len(self._subscribers)
+
+    def update_subscription(
+        self,
+        sub_id: int,
+        channels: Optional[Set[int]] = None,
+        update_types: Optional[Set[UpdateType]] = None,
+    ) -> bool:
+        with self._lock:
+            sub = self._subscribers.get(sub_id)
+            if sub is None:
+                return False
+            if channels is not None:
+                sub.channels = channels
+            if update_types is not None:
+                sub.update_types = update_types
+            return True
+
+    def publish(self, update: StateUpdate) -> int:
+        delivered = 0
+        with self._lock:
+            subs = list(self._subscribers.values())
+        for sub in subs:
+            if sub.matches(update):
+                try:
+                    sub.queue.put_nowait(update)
+                    delivered += 1
+                except asyncio.QueueFull:
+                    try:
+                        sub.queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        pass
+                    try:
+                        sub.queue.put_nowait(update)
+                        delivered += 1
+                    except asyncio.QueueFull:
+                        pass
+        return delivered
+
+    async def get_update(self, sub_id: int, timeout: float = 1.0) -> Optional[StateUpdate]:
+        with self._lock:
+            sub = self._subscribers.get(sub_id)
+        if sub is None:
+            raise ValueError(f"Unknown subscriber {sub_id}")
+        try:
+            return await asyncio.wait_for(sub.queue.get(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return None
+
+    async def drain(self, sub_id: int) -> List[StateUpdate]:
+        with self._lock:
+            sub = self._subscribers.get(sub_id)
+        if sub is None:
+            return []
+        updates = []
+        while not sub.queue.empty():
+            try:
+                updates.append(sub.queue.get_nowait())
+            except asyncio.QueueEmpty:
+                break
+        return updates
+
+    def subscriber_info(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            info = []
+            for sub in self._subscribers.values():
+                info.append({
+                    "id": sub.sub_id,
+                    "channels": sorted(sub.channels) if sub.channels else None,
+                    "update_types": [t.value for t in sub.update_types] if sub.update_types else None,
+                    "pending": sub.queue.qsize(),
+                })
+            return info
 
 
 class ThreadSafeMixerState:
     """
-    Thread-safe mixer state with asyncio locks and copy-on-read semantics.
+    Thread-safe mixer state with threading.Lock and copy-on-read semantics.
 
-    All mutations go through set_* methods that acquire the lock.
-    Reads return deep copies to prevent data races.
+    Provides both synchronous and async APIs.
     """
 
-    def __init__(self, num_channels: int = 40, num_buses: int = 16, num_fx: int = 8):
-        self._lock = asyncio.Lock()
-        self._num_channels = num_channels
-        self._num_buses = num_buses
-        self._num_fx = num_fx
-
-        # Internal mutable state
-        self._channels: Dict[int, Dict[str, Any]] = {
-            ch: {
-                "fader": -144.0,
-                "mute": 0,
-                "name": "",
-                "pan": 0.0,
-                "gain": 0.0,
-                "eq_on": 0,
-                "comp_on": 0,
-                "gate_on": 0,
-                "solo": 0,
-            }
-            for ch in range(1, num_channels + 1)
-        }
-        self._main: Dict[str, Any] = {
-            "fader": 0.0,
-            "mute": 0,
-        }
-        self._buses: Dict[int, Dict[str, Any]] = {
-            b: {"fader": -144.0, "mute": 0, "name": ""}
-            for b in range(1, num_buses + 1)
-        }
-        self._fx: Dict[int, Dict[str, Any]] = {
-            f: {"model": "", "on": 0, "params": {}}
-            for f in range(1, num_fx + 1)
-        }
+    def __init__(self, num_channels: int = 0, num_buses: int = 0, num_fx: int = 0):
+        self._lock = threading.Lock()
+        self._async_lock = asyncio.Lock()
+        self._channels: Dict[int, Dict[str, Any]] = {}
+        self._queue: Optional[StateUpdateQueue] = None
         self._version = 0
         self._last_update = time.time()
-        self._dirty_channels: Set[int] = set()
 
-    async def snapshot(self) -> StateSnapshot:
-        """Create an immutable deep-copy snapshot of current state."""
-        async with self._lock:
-            return StateSnapshot(
-                timestamp=time.time(),
-                channels=copy.deepcopy(self._channels),
-                main=copy.deepcopy(self._main),
-                buses=copy.deepcopy(self._buses),
-                fx=copy.deepcopy(self._fx),
-                metadata={
-                    "version": self._version,
-                    "num_channels": self._num_channels,
-                },
-            )
+    def attach_queue(self, queue: StateUpdateQueue):
+        self._queue = queue
 
-    async def set_channel_param(self, ch: int, param: str, value: Any):
-        """Set a single channel parameter."""
-        async with self._lock:
-            if ch in self._channels:
-                self._channels[ch][param] = value
-                self._dirty_channels.add(ch)
-                self._version += 1
-                self._last_update = time.time()
+    def detach_queue(self):
+        self._queue = None
 
-    async def set_channel_params(self, ch: int, params: Dict[str, Any]):
-        """Set multiple channel parameters atomically."""
-        async with self._lock:
-            if ch in self._channels:
-                self._channels[ch].update(params)
-                self._dirty_channels.add(ch)
-                self._version += 1
-                self._last_update = time.time()
+    def _publish(self, update: StateUpdate):
+        if self._queue:
+            self._queue.publish(update)
 
-    async def get_channel_param(self, ch: int, param: str, default: Any = None) -> Any:
-        """Get a single channel parameter (copy)."""
-        async with self._lock:
+    # ── Core (sync) operations ──────────────────────────────────
+
+    def _do_set_channel_param(self, ch: int, param: str, value: Any):
+        with self._lock:
+            if ch not in self._channels:
+                self._channels[ch] = {}
+            self._channels[ch][param] = value
+            self._version += 1
+            self._last_update = time.time()
+        self._publish(StateUpdate(
+            update_type=UpdateType.PARAM_SET,
+            channel_id=ch, param=param, value=value,
+        ))
+
+    def _do_get_channel_param(self, ch: int, param: str, default: Any = None) -> Any:
+        with self._lock:
             val = self._channels.get(ch, {}).get(param, default)
             if isinstance(val, (dict, list)):
                 return copy.deepcopy(val)
             return val
 
-    async def get_channel(self, ch: int) -> Dict[str, Any]:
-        """Get full channel state (deep copy)."""
-        async with self._lock:
+    def _do_get_channel(self, ch: int) -> Dict[str, Any]:
+        with self._lock:
             return copy.deepcopy(self._channels.get(ch, {}))
 
-    async def set_main_param(self, param: str, value: Any):
-        """Set a main bus parameter."""
-        async with self._lock:
-            self._main[param] = value
+    def _do_get_snapshot(self) -> Dict[int, Dict[str, Any]]:
+        with self._lock:
+            return copy.deepcopy(self._channels)
+
+    def _do_batch_update(self, ch: int, params: Dict[str, Any]):
+        with self._lock:
+            if ch not in self._channels:
+                self._channels[ch] = {}
+            self._channels[ch].update(params)
             self._version += 1
             self._last_update = time.time()
+        self._publish(StateUpdate(
+            update_type=UpdateType.BATCH,
+            channel_id=ch, params=params,
+        ))
 
-    async def get_main(self) -> Dict[str, Any]:
-        """Get main bus state (deep copy)."""
-        async with self._lock:
-            return copy.deepcopy(self._main)
+    def _do_reset_channel(self, ch: int):
+        with self._lock:
+            self._channels.pop(ch, None)
+            self._version += 1
+            self._last_update = time.time()
+        self._publish(StateUpdate(
+            update_type=UpdateType.CHANNEL_RESET,
+            channel_id=ch,
+        ))
 
-    async def set_bus_param(self, bus: int, param: str, value: Any):
-        """Set a bus parameter."""
-        async with self._lock:
-            if bus in self._buses:
-                self._buses[bus][param] = value
-                self._version += 1
-                self._last_update = time.time()
+    def _do_reset_all(self):
+        with self._lock:
+            self._channels.clear()
+            self._version += 1
+            self._last_update = time.time()
+        self._publish(StateUpdate(
+            update_type=UpdateType.FULL_RESET,
+        ))
 
-    async def get_bus(self, bus: int) -> Dict[str, Any]:
-        """Get bus state (deep copy)."""
-        async with self._lock:
-            return copy.deepcopy(self._buses.get(bus, {}))
+    # ── Sync API (for thread-safe direct access) ────────────────
 
-    async def set_fx_param(self, fx_num: int, param: str, value: Any):
-        """Set an FX parameter."""
-        async with self._lock:
-            if fx_num in self._fx:
-                if param == "params" and isinstance(value, dict):
-                    self._fx[fx_num]["params"].update(value)
-                else:
-                    self._fx[fx_num][param] = value
-                self._version += 1
-                self._last_update = time.time()
+    def set_channel_param(self, ch: int, param: str, value: Any):
+        """Set a channel parameter (sync)."""
+        self._do_set_channel_param(ch, param, value)
 
-    async def get_dirty_channels(self) -> Set[int]:
-        """Get and clear the set of channels modified since last call."""
-        async with self._lock:
-            dirty = self._dirty_channels.copy()
-            self._dirty_channels.clear()
-            return dirty
+    def get_channel_param(self, ch: int, param: str, default: Any = None) -> Any:
+        return self._do_get_channel_param(ch, param, default)
 
-    async def get_version(self) -> int:
-        """Get current state version number."""
-        async with self._lock:
+    def get_channel(self, ch: int) -> Dict[str, Any]:
+        return self._do_get_channel(ch)
+
+    def get_snapshot(self) -> Dict[int, Dict[str, Any]]:
+        return self._do_get_snapshot()
+
+    def batch_update(self, ch: int, params: Dict[str, Any]):
+        self._do_batch_update(ch, params)
+
+    def reset_channel(self, ch: int):
+        self._do_reset_channel(ch)
+
+    def reset_all(self):
+        self._do_reset_all()
+
+    def channel_ids(self) -> List[int]:
+        with self._lock:
+            return sorted(self._channels.keys())
+
+    def channel_count(self) -> int:
+        with self._lock:
+            return len(self._channels)
+
+    @property
+    def version(self) -> int:
+        with self._lock:
             return self._version
 
-    async def bulk_update_from_osc(self, osc_state: Dict[str, Any]):
-        """Update internal state from raw OSC state dict."""
-        async with self._lock:
-            for address, value in osc_state.items():
-                self._apply_osc_value(address, value)
-            self._version += 1
-            self._last_update = time.time()
+    # ── Async API ────────────────────────────────────────────────
 
-    def _apply_osc_value(self, address: str, value: Any):
-        """Parse an OSC address and apply the value to internal state."""
-        parts = address.strip("/").split("/")
-        if len(parts) < 2:
-            return
+    async def async_set_channel_param(self, ch: int, param: str, value: Any):
+        self._do_set_channel_param(ch, param, value)
 
-        if parts[0] == "ch":
-            try:
-                ch = int(parts[1])
-            except (ValueError, IndexError):
-                return
-            if ch not in self._channels:
-                return
+    async def async_get_channel_param(self, ch: int, param: str, default: Any = None) -> Any:
+        return self._do_get_channel_param(ch, param, default)
 
-            if len(parts) == 3:
-                param_map = {
-                    "fdr": "fader", "fader": "fader",
-                    "mute": "mute", "pan": "pan",
-                    "name": "name", "solo": "solo",
-                }
-                param = param_map.get(parts[2])
-                if param:
-                    self._channels[ch][param] = value
-                    self._dirty_channels.add(ch)
+    async def async_get_snapshot(self) -> Dict[int, Dict[str, Any]]:
+        return self._do_get_snapshot()
 
-        elif parts[0] == "main" and len(parts) >= 3:
-            param_map = {"fdr": "fader", "mute": "mute"}
-            param = param_map.get(parts[2])
-            if param:
-                self._main[param] = value
+    async def async_batch_update(self, ch: int, params: Dict[str, Any]):
+        self._do_batch_update(ch, params)
+
+    async def snapshot(self):
+        """Async snapshot (legacy compat)."""
+        return self._do_get_snapshot()
+
+    async def set_channel_params(self, ch: int, params: Dict[str, Any]):
+        """Async batch update (legacy compat)."""
+        self._do_batch_update(ch, params)
+
+    async def get_version(self) -> int:
+        return self.version
+
+    async def get_dirty_channels(self) -> Set[int]:
+        return set()
 
 
 class MixerStateQueue:
     """
     Async producer/consumer queue for mixer state updates.
-
-    Producers push state changes; consumers process them in order.
-    Uses asyncio.Queue with optional max size for backpressure.
+    Legacy compat wrapper around StateUpdateQueue.
     """
 
     def __init__(self, maxsize: int = 1000):
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=maxsize)
-        self._consumers: List[asyncio.Task] = []
-        self._running = False
 
     async def put(self, event_type: str, data: Dict[str, Any]):
-        """Put a state update event into the queue."""
         event = {
             "type": event_type,
             "data": data,
@@ -234,7 +342,6 @@ class MixerStateQueue:
         try:
             self._queue.put_nowait(event)
         except asyncio.QueueFull:
-            logger.warning("MixerStateQueue full, dropping oldest event")
             try:
                 self._queue.get_nowait()
             except asyncio.QueueEmpty:
@@ -242,11 +349,9 @@ class MixerStateQueue:
             self._queue.put_nowait(event)
 
     async def get(self) -> Dict[str, Any]:
-        """Get next event from the queue (blocks until available)."""
         return await self._queue.get()
 
     def get_nowait(self) -> Optional[Dict[str, Any]]:
-        """Non-blocking get."""
         try:
             return self._queue.get_nowait()
         except asyncio.QueueEmpty:
@@ -261,7 +366,6 @@ class MixerStateQueue:
         return self._queue.empty()
 
     async def drain(self) -> List[Dict[str, Any]]:
-        """Drain all pending events."""
         events = []
         while not self._queue.empty():
             try:

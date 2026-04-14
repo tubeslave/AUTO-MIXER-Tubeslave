@@ -44,6 +44,32 @@ PEQ_BANDS = {
 HPF_FREQ_MSB = 0x50
 HPF_ON_MSB = 0x51
 
+# Pan / Balance (NRPN MSB)
+PAN_MSB = 0x30
+
+# Compressor / Dynamics (NRPN MSBs)
+COMP_ON_MSB = 0x54
+COMP_THRESHOLD_MSB = 0x55
+COMP_RATIO_MSB = 0x56
+COMP_ATTACK_MSB = 0x57
+COMP_RELEASE_MSB = 0x58
+COMP_KNEE_MSB = 0x59
+COMP_MAKEUP_MSB = 0x5A
+
+# Gate (NRPN MSBs)
+GATE_ON_MSB = 0x5C
+GATE_THRESHOLD_MSB = 0x5D
+
+# Input delay (NRPN MSBs)
+DELAY_TIME_MSB = 0x20
+DELAY_ON_MSB = 0x21
+
+# Polarity / Phase invert (NRPN MSB)
+POLARITY_MSB = 0x0F
+
+# FX Send levels: NRPN MSB = 0x60 + (send_bus - 1)
+FX_SEND_BASE_MSB = 0x60
+
 # Channel type → MIDI channel offset from base
 CHANNEL_TYPE_OFFSET = {
     "input": 0,
@@ -131,6 +157,42 @@ def q_to_nrpn(q: float) -> int:
     """Convert Q value (0.3 – 35) to 14-bit NRPN value (log scale)."""
     q = max(0.3, min(35.0, q))
     log_ratio = math.log10(q / 0.3) / math.log10(35.0 / 0.3)
+    return max(0, min(FADER_MAX, int(log_ratio * FADER_MAX)))
+
+
+def pan_to_nrpn(pan: float) -> int:
+    """Convert pan (-100..+100, 0=center) to 14-bit NRPN.
+
+    0x0000=hard left, 0x2000=center, 0x3FFF=hard right.
+    """
+    pan = max(-100.0, min(100.0, pan))
+    ratio = (pan + 100.0) / 200.0
+    return max(0, min(FADER_MAX, int(ratio * FADER_MAX)))
+
+
+def ms_to_delay_nrpn(ms: float, max_ms: float = 500.0) -> int:
+    """Convert delay time in ms to 14-bit NRPN value."""
+    ms = max(0.0, min(max_ms, ms))
+    return max(0, min(FADER_MAX, int((ms / max_ms) * FADER_MAX)))
+
+
+def comp_threshold_to_nrpn(db: float) -> int:
+    """Convert compressor threshold (-60..0 dB) to 14-bit NRPN."""
+    db = max(-60.0, min(0.0, db))
+    ratio = (db + 60.0) / 60.0
+    return max(0, min(FADER_MAX, int(ratio * FADER_MAX)))
+
+
+def comp_ratio_to_nrpn(ratio: float) -> int:
+    """Convert compressor ratio (1:1 .. 20:1) to 14-bit NRPN."""
+    ratio = max(1.0, min(20.0, ratio))
+    return max(0, min(FADER_MAX, int(((ratio - 1.0) / 19.0) * FADER_MAX)))
+
+
+def comp_time_to_nrpn(ms: float, max_ms: float = 500.0) -> int:
+    """Convert attack/release time in ms to 14-bit NRPN (log scale)."""
+    ms = max(0.1, min(max_ms, ms))
+    log_ratio = math.log10(ms / 0.1) / math.log10(max_ms / 0.1)
     return max(0, min(FADER_MAX, int(log_ratio * FADER_MAX)))
 
 
@@ -329,6 +391,8 @@ class DLiveClient(MixerClientBase):
                 end = data.find(b'\xF7', i)
                 if end == -1:
                     break
+                sysex_body = data[i + 1:end]
+                self._handle_sysex(sysex_body)
                 i = end + 1
             elif status & 0xF0 == 0xB0:
                 # CC / NRPN — 3 bytes
@@ -349,11 +413,34 @@ class DLiveClient(MixerClientBase):
     def _handle_cc(self, channel: int, cc: int, value: int):
         key = f"cc/{channel}/{cc}"
         self.state[key] = value
+
+        # Track NRPN state machine to reconstruct fader values
+        if cc == 0x63:  # NRPN MSB
+            self.state[f"_nrpn_msb/{channel}"] = value
+        elif cc == 0x62:  # NRPN LSB
+            self.state[f"_nrpn_lsb/{channel}"] = value
+        elif cc == 0x06:  # Data Entry MSB
+            self.state[f"_data_msb/{channel}"] = value
+        elif cc == 0x26:  # Data Entry LSB
+            data_msb = self.state.get(f"_data_msb/{channel}", 0)
+            nrpn_msb = self.state.get(f"_nrpn_msb/{channel}", 0)
+            nrpn_lsb = self.state.get(f"_nrpn_lsb/{channel}", 0)
+            full_value = (data_msb << 7) | value
+
+            # NRPN MSB 0x00 = fader level for input channels
+            if nrpn_msb == 0x00:
+                ch_1based = nrpn_lsb + 1
+                self.state[f"fader/{ch_1based}"] = full_value
+                self._notify(f"fader/{ch_1based}", fader_value_to_db(full_value))
+
         self._notify(key, value)
 
     def _handle_note(self, channel: int, note: int, velocity: int):
         key = f"note/{channel}/{note}"
         self.state[key] = velocity
+        # Track mute state: note number = channel-1, velocity >= 0x40 = muted
+        ch_1based = note + 1
+        self.state[f"mute/{ch_1based}"] = velocity >= 0x40
         self._notify(key, velocity)
 
     def _handle_pitchbend(self, channel: int, lsb: int, msb: int):
@@ -361,6 +448,28 @@ class DLiveClient(MixerClientBase):
         key = f"pitchbend/{channel}"
         self.state[key] = value
         self._notify(key, value)
+
+    def _handle_sysex(self, body: bytes):
+        """Parse dLive SysEx messages for channel names and other data."""
+        # dLive SysEx header: 00 00 1A 50 10 01 00
+        header = bytes([0x00, 0x00, 0x1A, 0x50, 0x10, 0x01, 0x00])
+        if not body.startswith(header):
+            return
+        payload = body[len(header):]
+        if len(payload) < 3:
+            return
+        midi_ch = payload[0]
+        msg_type = payload[1]
+        ch_idx = payload[2]
+        ch_1based = ch_idx + 1
+
+        if msg_type == 0x03:
+            # Channel name
+            name_bytes = payload[3:]
+            name = name_bytes.decode("ascii", errors="replace").rstrip('\x00').strip()
+            self._channel_names[ch_1based] = name
+            self.state[f"name/{ch_1based}"] = name
+            logger.debug(f"dLive ch {ch_1based} name: '{name}'")
 
     def _notify(self, address: str, *args):
         for pattern, cbs in list(self.callbacks.items()):
@@ -486,7 +595,27 @@ class DLiveClient(MixerClientBase):
         self._send_raw(build_sysex(payload))
 
     def get_channel_name(self, channel: int) -> str:
-        return self._channel_names.get(channel, f"Ch {channel}")
+        """Get cached channel name, or request it from dLive."""
+        cached = self._channel_names.get(channel)
+        if cached:
+            return cached
+        # Also check state (populated by SysEx parse)
+        state_name = self.state.get(f"name/{channel}")
+        if state_name:
+            return state_name
+        return f"Ch {channel}"
+
+    def request_channel_names(self, num_channels: int = 48):
+        """Request channel names from dLive via SysEx.
+
+        The dLive may respond with SysEx messages containing channel names.
+        Results are cached in ``_channel_names`` as they arrive.
+        """
+        midi_ch = self._midi_channel("input")
+        for ch in range(1, num_channels + 1):
+            payload = bytes([midi_ch, 0x13, ch - 1])
+            self._send_raw(build_sysex(payload))
+        logger.info(f"Requested names for channels 1-{num_channels}")
 
     # ── Channel Colour (SysEx) ─────────────────────────────────
 
@@ -495,6 +624,137 @@ class DLiveClient(MixerClientBase):
         col_val = COLOURS.get(colour, 0x00)
         payload = bytes([midi_ch, 0x05, channel - 1, col_val])
         self._send_raw(build_sysex(payload))
+
+    # ── Pan / Balance (NRPN) ─────────────────────────────────────
+
+    def set_pan(self, channel: int, pan: float, channel_type: str = "input"):
+        """Set pan position. pan: -100 (L) .. 0 (C) .. +100 (R)."""
+        midi_ch = self._midi_channel(channel_type)
+        msg = build_nrpn(midi_ch, PAN_MSB, channel - 1, pan_to_nrpn(pan))
+        self._send_raw(msg)
+
+    # ── Polarity / Phase Invert (NRPN) ────────────────────────
+
+    def set_polarity(self, channel: int, inverted: bool):
+        """Set input polarity (phase invert)."""
+        midi_ch = self._midi_channel("input")
+        val = FADER_MAX if inverted else 0
+        msg = build_nrpn(midi_ch, POLARITY_MSB, channel - 1, val)
+        self._send_raw(msg)
+
+    # ── Input Delay (NRPN) ────────────────────────────────────
+
+    def set_delay(self, channel: int, delay_ms: float, enabled: bool = True):
+        """Set input delay in milliseconds (0..500ms)."""
+        midi_ch = self._midi_channel("input")
+        msgs = build_nrpn(midi_ch, DELAY_TIME_MSB, channel - 1,
+                          ms_to_delay_nrpn(delay_ms))
+        on_val = FADER_MAX if enabled else 0
+        msgs += build_nrpn(midi_ch, DELAY_ON_MSB, channel - 1, on_val)
+        self._send_raw(msgs)
+
+    # ── Compressor / Dynamics (NRPN) ──────────────────────────
+
+    def set_compressor(
+        self, channel: int,
+        threshold_db: float = -20.0,
+        ratio: float = 4.0,
+        attack_ms: float = 10.0,
+        release_ms: float = 100.0,
+        makeup_db: float = 0.0,
+        enabled: bool = True,
+    ):
+        """Set compressor parameters for a channel."""
+        midi_ch = self._midi_channel("input")
+        ch_idx = channel - 1
+        msgs = b""
+        msgs += build_nrpn(midi_ch, COMP_ON_MSB, ch_idx,
+                           FADER_MAX if enabled else 0)
+        msgs += build_nrpn(midi_ch, COMP_THRESHOLD_MSB, ch_idx,
+                           comp_threshold_to_nrpn(threshold_db))
+        msgs += build_nrpn(midi_ch, COMP_RATIO_MSB, ch_idx,
+                           comp_ratio_to_nrpn(ratio))
+        msgs += build_nrpn(midi_ch, COMP_ATTACK_MSB, ch_idx,
+                           comp_time_to_nrpn(attack_ms, 300.0))
+        msgs += build_nrpn(midi_ch, COMP_RELEASE_MSB, ch_idx,
+                           comp_time_to_nrpn(release_ms, 2000.0))
+        msgs += build_nrpn(midi_ch, COMP_MAKEUP_MSB, ch_idx,
+                           db_to_eq_gain(max(-15.0, min(15.0, makeup_db))))
+        self._send_raw(msgs)
+        logger.debug(
+            f"Ch {channel}: comp thr={threshold_db:.0f}dB ratio={ratio:.1f}:1 "
+            f"atk={attack_ms:.0f}ms rel={release_ms:.0f}ms makeup={makeup_db:.1f}dB"
+        )
+
+    def set_compressor_on(self, channel: int, enabled: bool):
+        midi_ch = self._midi_channel("input")
+        msg = build_nrpn(midi_ch, COMP_ON_MSB, channel - 1,
+                         FADER_MAX if enabled else 0)
+        self._send_raw(msg)
+
+    # ── Gate (NRPN) ───────────────────────────────────────────
+
+    def set_gate(self, channel: int, threshold_db: float = -40.0,
+                 enabled: bool = True):
+        midi_ch = self._midi_channel("input")
+        ch_idx = channel - 1
+        msgs = build_nrpn(midi_ch, GATE_ON_MSB, ch_idx,
+                          FADER_MAX if enabled else 0)
+        msgs += build_nrpn(midi_ch, GATE_THRESHOLD_MSB, ch_idx,
+                           comp_threshold_to_nrpn(threshold_db))
+        self._send_raw(msgs)
+
+    # ── FX / Aux Sends (NRPN) ────────────────────────────────
+
+    def set_send_level(self, channel: int, send_bus: int,
+                       level_db: float, channel_type: str = "input"):
+        """Set send level to a mix bus (aux/FX send).
+
+        send_bus: 1-based bus number.
+        level_db: send level in dB (-inf .. +10).
+        """
+        midi_ch = self._midi_channel(channel_type)
+        msb = FX_SEND_BASE_MSB + (send_bus - 1)
+        msg = build_nrpn(midi_ch, msb, channel - 1, db_to_fader_value(level_db))
+        self._send_raw(msg)
+
+    # ── Channel reset (set processing to neutral) ────────────────
+
+    def reset_channel_eq(self, channel: int):
+        """Reset PEQ to flat: all 4 bands gain=0, default freq/Q."""
+        default_freqs = [200.0, 800.0, 2500.0, 8000.0]
+        for band in range(1, 5):
+            self.set_eq_band(channel, band, default_freqs[band - 1], 0.0, 1.0)
+        logger.debug(f"Ch {channel}: EQ reset to flat")
+
+    def reset_channel_hpf(self, channel: int):
+        """Reset HPF to off / minimum frequency."""
+        self.set_hpf(channel, 20.0, enabled=False)
+        logger.debug(f"Ch {channel}: HPF reset to off")
+
+    def reset_channel_dynamics(self, channel: int):
+        """Reset compressor and gate to off."""
+        self.set_compressor_on(channel, False)
+        self.set_gate(channel, enabled=False)
+        logger.debug(f"Ch {channel}: dynamics reset to off")
+
+    def reset_channel_processing(self, channel: int):
+        """Reset all channel processing to neutral."""
+        self.reset_channel_eq(channel)
+        self.reset_channel_hpf(channel)
+        self.reset_channel_dynamics(channel)
+        self.set_polarity(channel, False)
+        self.set_delay(channel, 0.0, enabled=False)
+        logger.info(f"Ch {channel}: processing reset to neutral")
+
+    def get_channel_settings(self, channel: int) -> Dict[str, Any]:
+        """Read current channel settings from cached state."""
+        return {
+            "channel": channel,
+            "name": self.get_channel_name(channel),
+            "fader_db": self.get_fader(channel),
+            "muted": self.get_mute(channel),
+        }
 
     # ── Find snap by name (not directly available via MIDI) ────
 

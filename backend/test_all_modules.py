@@ -14,12 +14,22 @@ import traceback
 import numpy as np
 from datetime import datetime
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE_DIR)
+
+if __name__ != "__main__":
+    import pytest
+    pytest.skip("Standalone diagnostic script; excluded from pytest collection.", allow_module_level=True)
 
 results = []
 PASS = "✅ PASS"
 FAIL = "❌ FAIL"
 WARN = "⚠️  WARN"
+
+
+def read_backend_file(filename):
+    with open(os.path.join(BASE_DIR, filename), encoding="utf-8") as f:
+        return f.read()
 
 def test(name, condition, detail=""):
     status = PASS if condition else FAIL
@@ -103,7 +113,7 @@ if "lufs_gain_staging" in imported:
              f"LUFS тишины = {silent_lufs}")
         
         # 2.4: Проверка наличия relative gate (-10 LU) — C-03 fix
-        source = open("lufs_gain_staging.py").read()
+        source = read_backend_file("lufs_gain_staging.py")
         has_relative_gate = "-10" in source or "relative" in source.lower() or "10 * np.log10" in source
         test("LUFS: relative gate (-10 LU) по ITU-R BS.1770-4 (C-03 fix)",
              has_relative_gate,
@@ -143,7 +153,7 @@ if "auto_eq" in imported:
         test("InstrumentProfiles загружен", True)
         
         # 3.2: Проверяем что HPF присутствует (обязательно для live)
-        source_eq = open("auto_eq.py").read()
+        source_eq = read_backend_file("auto_eq.py")
         has_hpf = "hpf" in source_eq.lower() or "high_pass" in source_eq.lower() or "highpass" in source_eq.lower() or "low_cut" in source_eq.lower() or "lowcut" in source_eq.lower()
         test("Auto EQ: HPF / low cut filter реализован", has_hpf,
              "HPF обязателен на всём кроме kick/bass")
@@ -182,8 +192,8 @@ if "auto_compressor" in imported and "auto_compressor_cf" in imported:
     auto_comp_cf = imported["auto_compressor_cf"]
     
     try:
-        source_comp = open("auto_compressor.py").read()
-        source_cf = open("auto_compressor_cf.py").read()
+        source_comp = read_backend_file("auto_compressor.py")
+        source_cf = read_backend_file("auto_compressor_cf.py")
         
         # 4.1: Crest Factor формула — C-05 fix
         # Высокий CF (перкуссия) → высокий ratio
@@ -228,7 +238,7 @@ if "auto_gate_caig" in imported:
     gate_mod = imported["auto_gate_caig"]
     
     try:
-        source_gate = open("auto_gate_caig.py").read()
+        source_gate = read_backend_file("auto_gate_caig.py")
         
         # 5.1: Hysteresis applied — C-02 fix
         has_hysteresis_applied = "close_threshold" in source_gate or "hysteresis_db" in source_gate
@@ -299,7 +309,7 @@ if "auto_phase_gcc_phat" in imported:
     phase_mod = imported["auto_phase_gcc_phat"]
     
     try:
-        source_phase = open("auto_phase_gcc_phat.py").read()
+        source_phase = read_backend_file("auto_phase_gcc_phat.py")
         
         # 6.1: Правильный порядок ref/tgt — C-07 fix
         test("Phase: ref/tgt порядок (C-07 fix)",
@@ -365,8 +375,8 @@ print("="*70)
 
 if "auto_fader" in imported:
     try:
-        source_fader = open("auto_fader.py").read()
-        source_hybrid = open("auto_fader_hybrid.py").read()
+        source_fader = read_backend_file("auto_fader.py")
+        source_hybrid = read_backend_file("auto_fader_hybrid.py")
         
         # 7.1: Return type fix — C-06
         test("Fader Hybrid: return type Tuple[float,float,float] (C-06)",
@@ -404,7 +414,7 @@ print("="*70)
 
 if "auto_effects" in imported:
     try:
-        source_fx = open("auto_effects.py").read()
+        source_fx = read_backend_file("auto_effects.py")
         
         # 8.1: Нормализация энергий — C-01 fix
         has_normalized = "energy_sum" in source_fx or "_energy_sum" in source_fx or "energy_low + energy_mid" in source_fx
@@ -432,7 +442,7 @@ print("="*70)
 
 if "wing_client" in imported:
     try:
-        source_wing = open("wing_client.py").read()
+        source_wing = read_backend_file("wing_client.py")
         
         # 9.1: find_snap_by_name без GO — C-04 fix
         has_safe_snap = "$name" in source_wing or "name" in source_wing
@@ -491,7 +501,7 @@ if "channel_recognizer" in imported:
 # Bleed Service — компенсация bleed
 if "bleed_service" in imported:
     try:
-        source_bleed = open("bleed_service.py").read()
+        source_bleed = read_backend_file("bleed_service.py")
         has_compensation = "compensation" in source_bleed.lower()
         test("Bleed Service: compensation factor", has_compensation)
     except Exception as e:
@@ -500,7 +510,7 @@ if "bleed_service" in imported:
 # Cross-Adaptive EQ (IMP метод)
 if "cross_adaptive_eq" in imported:
     try:
-        source_xeq = open("cross_adaptive_eq.py").read()
+        source_xeq = read_backend_file("cross_adaptive_eq.py")
         has_cross_channel = "cross" in source_xeq.lower() or "mask" in source_xeq.lower()
         test("Cross-Adaptive EQ: кросс-канальная обработка", has_cross_channel,
              "Метод IMP (De Man, Reiss & Stables)")
@@ -510,7 +520,7 @@ if "cross_adaptive_eq" in imported:
 # Auto Panner — панорама
 if "auto_panner" in imported:
     try:
-        source_pan = open("auto_panner.py").read()
+        source_pan = read_backend_file("auto_panner.py")
         # Центр для kick, snare, bass, vocal (по стандарту)
         has_center = "center" in source_pan.lower() or "pan" in source_pan.lower()
         test("Auto Panner: панорамирование каналов", has_center)
@@ -520,7 +530,7 @@ if "auto_panner" in imported:
 # Auto Reverb
 if "auto_reverb" in imported:
     try:
-        source_rev = open("auto_reverb.py").read()
+        source_rev = read_backend_file("auto_reverb.py")
         has_decay = "decay" in source_rev.lower() or "rt60" in source_rev.lower() or "time" in source_rev.lower()
         test("Auto Reverb: параметры decay/time", has_decay)
         
@@ -561,10 +571,11 @@ report = {
     "results": results
 }
 
-with open("test_results.json", "w") as f:
+with open(os.path.join(BASE_DIR, "test_results.json"), "w", encoding="utf-8") as f:
     json.dump(report, f, indent=2, ensure_ascii=False)
 
 print(f"\n  Результаты сохранены в test_results.json")
 
 # Exit code
-sys.exit(0 if failed == 0 else 1)
+if __name__ == "__main__":
+    sys.exit(0 if failed == 0 else 1)

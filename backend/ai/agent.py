@@ -58,8 +58,10 @@ class MixingAgent:
                  llm_client=None,
                  mixer_client=None,
                  mode: AgentMode = AgentMode.SUGGEST,
-                 cycle_interval: float = 0.5):
-        # Lazy imports to avoid circular deps
+                 cycle_interval: float = 0.5,
+                 kb_first: bool = False):
+        self.kb_first = kb_first
+
         if knowledge_base is None:
             try:
                 from .knowledge_base import KnowledgeBase
@@ -67,7 +69,7 @@ class MixingAgent:
             except Exception as e:
                 logger.warning(f"Could not init knowledge base: {e}")
 
-        if rule_engine is None:
+        if rule_engine is None and not kb_first:
             try:
                 from .rule_engine import RuleEngine
                 rule_engine = RuleEngine()
@@ -225,44 +227,66 @@ class MixingAgent:
         return actions[:self._max_actions_per_cycle]
 
     async def _act(self, actions: List[AgentAction]):
-        """Execute decided actions on the mixer."""
+        """Execute decided actions on the mixer.
+
+        Uses method names available on both WingClient and DLiveClient
+        (DLiveClient provides compatibility aliases).
+        """
         for action in actions:
             try:
                 applied = False
                 if self.mixer:
                     if action.action_type == 'reduce_gain':
                         amount = action.parameters.get('amount_db', -3)
-                        self.mixer.set_channel_fader_db(action.channel, amount)
+                        current = self._safe_get_fader(action.channel)
+                        target = max(-100.0, current + amount)
+                        self._safe_set_fader(action.channel, target)
                         applied = True
                     elif action.action_type == 'adjust_gain':
                         adj = action.parameters.get('adjustment_db', 0)
-                        self.mixer.adjust_channel_fader(action.channel, adj)
+                        current = self._safe_get_fader(action.channel)
+                        target = max(-100.0, min(10.0, current + adj))
+                        self._safe_set_fader(action.channel, target)
                         applied = True
                     elif action.action_type == 'mute_channel':
-                        self.mixer.set_channel_mute(action.channel, True)
+                        self.mixer.set_mute(action.channel, True)
                         applied = True
                     elif action.action_type == 'unmute_channel':
-                        self.mixer.set_channel_mute(action.channel, False)
+                        self.mixer.set_mute(action.channel, False)
                         applied = True
                     elif action.action_type == 'apply_hpf':
                         freq = action.parameters.get('frequency', 80)
-                        self.mixer.set_channel_hpf(action.channel, freq)
+                        if hasattr(self.mixer, 'set_channel_hpf'):
+                            self.mixer.set_channel_hpf(action.channel, freq)
+                        elif hasattr(self.mixer, 'set_hpf'):
+                            self.mixer.set_hpf(action.channel, freq)
                         applied = True
                     elif action.action_type == 'adjust_compressor':
-                        self.mixer.set_channel_compressor(
-                            action.channel,
-                            threshold=action.parameters.get('threshold_db', -18),
-                            ratio=action.parameters.get('ratio', 3.0),
-                            attack=action.parameters.get('attack_ms', 10),
-                            release=action.parameters.get('release_ms', 100),
-                        )
+                        if hasattr(self.mixer, 'set_channel_compressor'):
+                            self.mixer.set_channel_compressor(
+                                action.channel,
+                                threshold=action.parameters.get('threshold_db', -18),
+                                ratio=action.parameters.get('ratio', 3.0),
+                                attack=action.parameters.get('attack_ms', 10),
+                                release=action.parameters.get('release_ms', 100),
+                            )
                         applied = True
                     elif action.action_type == 'adjust_deesser':
-                        self.mixer.set_channel_deesser(
-                            action.channel,
-                            frequency=action.parameters.get('frequency', 6500),
-                            threshold=action.parameters.get('threshold_db', -20),
-                            ratio=action.parameters.get('ratio', 4.0),
+                        if hasattr(self.mixer, 'set_channel_deesser'):
+                            self.mixer.set_channel_deesser(
+                                action.channel,
+                                frequency=action.parameters.get('frequency', 6500),
+                                threshold=action.parameters.get('threshold_db', -20),
+                                ratio=action.parameters.get('ratio', 4.0),
+                            )
+                        applied = True
+                    elif action.action_type == 'set_eq':
+                        band = action.parameters.get('band', 1)
+                        self.mixer.set_eq_band(
+                            action.channel, band,
+                            freq=action.parameters.get('freq', 1000.0),
+                            gain=action.parameters.get('gain', 0.0),
+                            q=action.parameters.get('q', 1.0),
                         )
                         applied = True
 
@@ -270,7 +294,6 @@ class MixingAgent:
                     self._action_history.append(action)
                     self.state.applied_actions.append(action)
 
-                    # Trim history to prevent memory growth
                     if len(self._action_history) > 1000:
                         self._action_history = self._action_history[-500:]
                     if len(self.state.applied_actions) > 100:
@@ -284,6 +307,20 @@ class MixingAgent:
                 error_msg = f"Action error: {action.action_type} ch{action.channel}: {e}"
                 logger.error(error_msg)
                 self.state.errors.append(error_msg)
+
+    def _safe_set_fader(self, channel: int, value_db: float):
+        """Set fader using whichever method the mixer client provides."""
+        value_db = max(-100.0, min(0.0, value_db))
+        if hasattr(self.mixer, 'set_channel_fader_db'):
+            self.mixer.set_channel_fader_db(channel, value_db)
+        elif hasattr(self.mixer, 'set_fader'):
+            self.mixer.set_fader(channel, value_db)
+
+    def _safe_get_fader(self, channel: int) -> float:
+        """Get fader value using whichever method the mixer client provides."""
+        if hasattr(self.mixer, 'get_fader'):
+            return self.mixer.get_fader(channel)
+        return -100.0
 
     def update_channel_state(self, channel_id: int, state: Dict):
         """Update observed state for a channel. Called by the metering subsystem."""
@@ -361,6 +398,7 @@ class MixingAgent:
             'confidence_threshold': self._confidence_threshold,
             'cycle_interval_ms': round(self.cycle_interval * 1000, 2),
             'recent_errors': self.state.errors[-5:] if self.state.errors else [],
+            'kb_first': self.kb_first,
         }
 
     def get_pending_actions(self) -> List[Dict]:
