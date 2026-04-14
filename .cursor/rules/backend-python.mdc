@@ -1,0 +1,30 @@
+---
+description: Backend Python — архитектура, безопасность эфира, handlers
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# AUTO-MIXER backend
+
+## Архитектура
+
+- Точка координации — `server.py`. Новую бизнес-логику по WebSocket кладите в `handlers/`, регистрируйте в `handlers/__init__.py` (`register_handlers` → общий `_dispatch`).
+- Состояние микшера — только через `ThreadSafeMixerState` / снимки; не мутируйте общий state из разных потоков без lock.
+
+## Безопасность LIVE
+
+- Команды на пульт: соблюдайте потолки (fader ≤ 0 dBFS там, где это правило проекта; gain в допустимых пределах). Перед повышением gain — true peak < -1.0 dBTP где применимо.
+- Экстренное снижение фейдера из‑за обратной связи — **только** `feedback_detector.py`. Остальные модули не обходят этот приоритет.
+- `find_snap_by_name()` — только метаданные/кэш имён; не загружать снапшот без явного сценария оператора.
+
+## Аудио
+
+- Захват — единый `audio_capture.py` (subscribe). Не создавайте отдельные PyAudio-потоки в модулях.
+
+## DSP
+
+- Константы осмысленно именовать; для формул и единиц сверяться с `docs/CONVENTIONS.md`. GCC-PHAT: `gcc_phat(target, reference)`.
+
+## Тесты
+
+- Новый модуль → тесты в `tests/` (`PYTHONPATH=backend pytest`). NumPy в JSON: `convert_numpy_types()` перед сериализацией.

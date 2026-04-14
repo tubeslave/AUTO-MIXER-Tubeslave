@@ -1,0 +1,207 @@
+{
+  "timestamp": "2026-04-13T13:28:57.736957",
+  "summary": {
+    "total": 39,
+    "passed": 27,
+    "failed": 12,
+    "warnings": 0,
+    "success_rate": "69%"
+  },
+  "results": [
+    {
+      "name": "import wing_client",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import lufs_gain_staging",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_eq",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_compressor",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_compressor_cf",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_gate_caig",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_fader",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_fader_hybrid",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_effects",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_phase_gcc_phat",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_panner",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_panner_adaptive",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_reverb",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import channel_recognizer",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import bleed_service",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import cross_adaptive_eq",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import compressor_adaptation",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import phase_alignment",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import backup_channels",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "import auto_eq_processing",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "LUFSMeter инициализация (48kHz)",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "LUFS 1kHz синус: значение корректно",
+      "status": "✅ PASS",
+      "detail": "LUFS = -9.1 (ожидается ~-9 LUFS для -6dBFS синуса)"
+    },
+    {
+      "name": "LUFS тишина: нет NaN/Inf",
+      "status": "✅ PASS",
+      "detail": "LUFS тишины = -100.691"
+    },
+    {
+      "name": "LUFS модуль",
+      "status": "❌ FAIL",
+      "detail": "Ошибка: Traceback (most recent call last):\n  File \"/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/test_all_modules.py\", line 106, in <module>\n    source = open(\"lufs_gain_staging.py\").read()\n         "
+    },
+    {
+      "name": "Gain Staging: модуль доступен",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "InstrumentProfiles загружен",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Auto EQ модуль",
+      "status": "❌ FAIL",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/test_all_modules.py\", line 146, in <module>\n    source_eq = open(\"auto_eq.py\").read()\n                "
+    },
+    {
+      "name": "Auto Compressor",
+      "status": "❌ FAIL",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/test_all_modules.py\", line 185, in <module>\n    source_comp = open(\"auto_compressor.py\").read()\n      "
+    },
+    {
+      "name": "Auto Gate",
+      "status": "❌ FAIL",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/test_all_modules.py\", line 231, in <module>\n    source_gate = open(\"auto_gate_caig.py\").read()\n       "
+    },
+    {
+      "name": "Phase Alignment",
+      "status": "❌ FAIL",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/test_all_modules.py\", line 302, in <module>\n    source_phase = open(\"auto_phase_gcc_phat.py\").read()\n "
+    },
+    {
+      "name": "Auto Fader",
+      "status": "❌ FAIL",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/test_all_modules.py\", line 368, in <module>\n    source_fader = open(\"auto_fader.py\").read()\n          "
+    },
+    {
+      "name": "Auto Effects",
+      "status": "❌ FAIL",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/test_all_modules.py\", line 407, in <module>\n    source_fx = open(\"auto_effects.py\").read()\n           "
+    },
+    {
+      "name": "Wing Client",
+      "status": "❌ FAIL",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/test_all_modules.py\", line 435, in <module>\n    source_wing = open(\"wing_client.py\").read()\n          "
+    },
+    {
+      "name": "Channel Recognizer: пресеты инструментов доступны",
+      "status": "✅ PASS",
+      "detail": ""
+    },
+    {
+      "name": "Channel Recognizer: количество пресетов",
+      "status": "✅ PASS",
+      "detail": "20 пресетов: ['kick', 'snare', 'tom', 'hihat', 'ride', 'cymbals', 'overheads', 'room', 'bass', 'electricGuitar', 'acousticGuitar', 'accordion', 'synth', 'playback', 'leadVocal', 'backVocal', 'drums_bus', 'vocal_bus', 'instrument_bus', 'custom']"
+    },
+    {
+      "name": "Bleed Service",
+      "status": "❌ FAIL",
+      "detail": "[Errno 2] No such file or directory: 'bleed_service.py'"
+    },
+    {
+      "name": "Cross-Adaptive EQ",
+      "status": "❌ FAIL",
+      "detail": "[Errno 2] No such file or directory: 'cross_adaptive_eq.py'"
+    },
+    {
+      "name": "Auto Panner",
+      "status": "❌ FAIL",
+      "detail": "[Errno 2] No such file or directory: 'auto_panner.py'"
+    },
+    {
+      "name": "Auto Reverb",
+      "status": "❌ FAIL",
+      "detail": "[Errno 2] No such file or directory: 'auto_reverb.py'"
+    }
+  ]
+}
