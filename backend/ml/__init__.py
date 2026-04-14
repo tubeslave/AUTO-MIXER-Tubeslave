@@ -15,5 +15,7 @@ try:
     from .differentiable_console import DifferentiableMixingConsole
     from .channel_classifier import ChannelClassifier, ChannelClassifierNet, INSTRUMENT_CLASSES
     from .gain_pan_predictor import GainPanPredictor, GainPanPredictorNet
+    from .mix_training_buffer import MixSample, MixTrainingBuffer
+    from .mix_training_agent import MixTrainingAgent, MixTrainingConfig
 except ImportError:
     pass

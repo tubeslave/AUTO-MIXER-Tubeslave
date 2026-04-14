@@ -59,6 +59,9 @@ presets/*.json
 # Config overrides
 config/user_config.json
 
+# Downloaded audio / ML datasets (large; keep local only)
+data/datasets/
+
 # Temporary files
 *.tmp
 *.temp

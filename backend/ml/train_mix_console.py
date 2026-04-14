@@ -16,6 +16,18 @@ from .losses import MultiResolutionSTFTLoss, LoudnessLoss, MixConsistencyLoss
 logger = logging.getLogger(__name__)
 
 
+def _mix_to_mono_reference_shape(mix: torch.Tensor) -> torch.Tensor:
+    """Collapse stereo (or accidental extra dim) bus to (1, T) for mono reference."""
+    x = mix
+    if x.dim() == 1:
+        return x.unsqueeze(0)
+    if x.dim() == 2:
+        return x.mean(dim=0, keepdim=True)
+    if x.dim() == 3:
+        return x.mean(dim=(0, 1), keepdim=False).unsqueeze(0)
+    raise ValueError(f"Unexpected mix tensor shape {tuple(x.shape)}")
+
+
 def generate_synthetic_multitracks(n_samples: int, n_channels: int,
                                    audio_len: int,
                                    sample_rate: int = 48000):
@@ -132,8 +144,7 @@ def train_mix_console(
 
             mix, processed = console(channel_list)
 
-            # Compute losses
-            mix_for_loss = mix if mix.dim() == 2 else mix.unsqueeze(0)
+            mix_for_loss = _mix_to_mono_reference_shape(mix)
             loss_stft = stft_loss(mix_for_loss, ref_tensor)
             loss_loud = loudness_loss(mix_for_loss, ref_tensor)
             loss_consist = consistency_loss(processed, mix)
@@ -163,7 +174,7 @@ def train_mix_console(
                 ref_tensor = torch.from_numpy(ref_np).unsqueeze(0).to(device)
 
                 mix, processed = console(channel_list)
-                mix_for_loss = mix if mix.dim() == 2 else mix.unsqueeze(0)
+                mix_for_loss = _mix_to_mono_reference_shape(mix)
                 loss_stft = stft_loss(mix_for_loss, ref_tensor)
                 val_loss_total += loss_stft.item()
 
