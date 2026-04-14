@@ -774,7 +774,7 @@ class AutoSoundcheckEngine:
                 if info.has_signal:
                     continue
 
-                peak = self.audio_capture.get_peak(ch, self.sample_rate)
+                peak = self.audio_capture.get_peak(ch, self.block_size * 4)
 
                 if peak > SIGNAL_THRESHOLD_DB:
                     info.has_signal = True
@@ -1098,13 +1098,18 @@ class AutoSoundcheckEngine:
             logger.warning(f"Ch {ch}: EQ failed: {e}")
 
     def _apply_gain_correction(self, ch: int, info: ChannelInfo, preset: str):
-        """Compute gain correction using integrated LUFS and true peak.
+        """Compute LUFS-based gain correction and fold it into fader offset.
+
+        NOTE: This does NOT call set_gain() — that's used by input gain
+        staging (preamp trim). Calling set_gain() twice would overwrite
+        the preamp setting. Instead, the LUFS correction is stored in
+        info.gain_correction_db and applied via the fader position.
 
         Metrics used:
         - level.lufs_integrated — gated loudness (most accurate)
-        - level.lufs_short_term — fallback if integrated unavailable
-        - level.true_peak_dbtp — for headroom safety (not sample peak)
-        - level.loudness_range_lu — if LRA is wide, use gentler correction
+        - level.lufs_short_term — fallback
+        - level.true_peak_dbtp — headroom check
+        - level.loudness_range_lu — wide LRA → gentler correction
         """
         target_lufs = INSTRUMENT_TARGET_LUFS.get(preset, -23.0)
 
@@ -1118,8 +1123,8 @@ class AutoSoundcheckEngine:
             true_peak = m.level.true_peak_dbtp
             lra = 0.0
         else:
-            current_lufs = self.audio_capture.get_lufs(ch, 3.0)
-            true_peak = self.audio_capture.get_peak(ch, self.sample_rate)
+            current_lufs = self.audio_capture.get_lufs(ch, 48000)
+            true_peak = info.peak_db
             lra = 0.0
 
         info.lufs = current_lufs
@@ -1130,7 +1135,6 @@ class AutoSoundcheckEngine:
 
         diff = target_lufs - current_lufs
 
-        # For signals with wide loudness range, correct less aggressively
         scale = 1.0
         if lra > 15.0:
             scale = 0.7
@@ -1140,7 +1144,6 @@ class AutoSoundcheckEngine:
         correction = diff * scale
         correction = max(-GAIN_CORRECTION_MAX_DB, min(GAIN_CORRECTION_MAX_DB, correction))
 
-        # True peak headroom safety (use true peak, not sample peak)
         if true_peak + correction > -1.0:
             correction = -1.0 - true_peak
             correction = max(-GAIN_CORRECTION_MAX_DB, correction)
@@ -1148,24 +1151,26 @@ class AutoSoundcheckEngine:
         info.gain_correction_db = correction
 
         if abs(correction) > 0.5:
-            try:
-                self.mixer_client.set_gain(ch, correction)
-                logger.info(
-                    f"Ch {ch} '{info.name}': gain {correction:+.1f}dB "
-                    f"(LUFS_I={current_lufs:.1f}→{target_lufs:.0f}, "
-                    f"TP={true_peak:.1f}dBTP, LRA={lra:.1f}LU)"
-                )
-            except Exception as e:
-                logger.warning(f"Ch {ch}: gain correction failed: {e}")
+            logger.info(
+                f"Ch {ch} '{info.name}': LUFS correction {correction:+.1f}dB "
+                f"(LUFS_I={current_lufs:.1f}→{target_lufs:.0f}, "
+                f"TP={true_peak:.1f}dBTP, LRA={lra:.1f}LU) "
+                f"→ applied via fader"
+            )
 
     def _apply_fader(self, ch: int, info: ChannelInfo, preset: str):
-        """Compute fader from inter-channel LUFS balance and spectral context.
+        """Compute fader from LUFS balance, gain correction, and crest factor.
+
+        The fader incorporates two components:
+        1. Base position from instrument preset
+        2. LUFS gain correction (computed by _apply_gain_correction)
+        3. Inter-channel balance adjustment based on measured LUFS
+        4. Crest factor compensation (peaky signals sound quieter)
 
         Metrics used:
-        - level.lufs_integrated of this and all other channels
-        - spectral.centroid_hz — frequency range occupancy
-        - dynamics.crest_factor_db — transient instruments need less fader
-        - level.crest_factor_db — heavily compressed signals can be lower
+        - level.lufs_integrated of all channels — relative balance
+        - level.crest_factor_db — perceptual loudness compensation
+        - gain_correction_db — LUFS-based correction folded into fader
         """
         fader_levels = {
             "kick": -5.0, "snare": -5.0, "tom": -8.0, "hihat": -12.0,
@@ -1176,48 +1181,58 @@ class AutoSoundcheckEngine:
         }
         base_fader = fader_levels.get(preset, -10.0)
 
-        # Collect integrated LUFS from all active channels
-        all_lufs: Dict[int, float] = {}
+        # Start with base + LUFS gain correction (from _apply_gain_correction)
+        fader_db = base_fader + info.gain_correction_db
+
+        # Collect LUFS from all active channels for relative balance
+        all_lufs: Dict[int, Tuple[float, str]] = {}
         for c, ci in self.channels.items():
-            if ci.has_signal and ci.metrics and ci.metrics.level.lufs_integrated > -90:
-                all_lufs[c] = ci.metrics.level.lufs_integrated
-            elif ci.has_signal and ci.lufs > -90:
-                all_lufs[c] = ci.lufs
+            if ci.has_signal:
+                ci_lufs = -100.0
+                if ci.metrics and ci.metrics.level.lufs_integrated > -90:
+                    ci_lufs = ci.metrics.level.lufs_integrated
+                elif ci.lufs > -90:
+                    ci_lufs = ci.lufs
+                if ci_lufs > -90:
+                    all_lufs[c] = (ci_lufs, ci.preset or "custom")
 
-        fader_db = base_fader
-        my_lufs = all_lufs.get(ch)
+        my_entry = all_lufs.get(ch)
+        if my_entry is not None and len(all_lufs) > 1:
+            my_lufs = my_entry[0]
 
-        if my_lufs is not None and len(all_lufs) > 1:
-            ref_lufs = max(all_lufs.values())
-            level_diff = my_lufs - ref_lufs
+            # Find reference: the loudest channel's LUFS and its target
+            ref_ch = max(all_lufs, key=lambda c: all_lufs[c][0])
+            ref_lufs, ref_preset = all_lufs[ref_ch]
+            ref_target = INSTRUMENT_TARGET_LUFS.get(ref_preset, -23.0)
 
-            target_lufs = INSTRUMENT_TARGET_LUFS.get(preset, -23.0)
-            ref_target = min(INSTRUMENT_TARGET_LUFS.values())
-            target_diff = target_lufs - ref_target
+            # How far is this channel from where it should be relative to ref?
+            my_target = INSTRUMENT_TARGET_LUFS.get(preset, -23.0)
+            expected_diff = my_target - ref_target
+            actual_diff = my_lufs - ref_lufs
+            deviation = actual_diff - expected_diff
 
-            deviation = level_diff - target_diff
-
-            # If crest factor is very high (peaky drums), perceived loudness
-            # is lower than LUFS suggests → less fader cut
+            # Crest factor compensation
             m = info.metrics
-            crest_adjustment = 0.0
+            crest_adj = 0.0
             if m and m.level.crest_factor_db > 18.0:
-                crest_adjustment = 1.0
+                crest_adj = 1.0
             elif m and m.level.crest_factor_db < 6.0:
-                crest_adjustment = -1.0
+                crest_adj = -1.0
 
-            adjustment = max(-4.0, min(4.0, -deviation * 0.5 + crest_adjustment))
-            fader_db = base_fader + adjustment
+            balance_adj = max(-4.0, min(4.0, -deviation * 0.5 + crest_adj))
+            fader_db += balance_adj
 
         fader_db = max(-30.0, min(0.0, fader_db))
         info.fader_db = fader_db
 
         try:
             self.mixer_client.set_fader(ch, fader_db)
-            if abs(fader_db - base_fader) > 0.5:
+            total_adj = fader_db - base_fader
+            if abs(total_adj) > 0.5:
                 logger.info(
                     f"Ch {ch} '{info.name}': fader={fader_db:.1f}dB "
-                    f"(base={base_fader:.1f}, lufs={info.lufs:.1f})"
+                    f"(base={base_fader:.1f}, lufs_corr={info.gain_correction_db:+.1f}, "
+                    f"lufs={info.lufs:.1f})"
                 )
             else:
                 logger.info(f"Ch {ch} '{info.name}': fader={fader_db:.1f}dB")
@@ -1266,6 +1281,10 @@ class AutoSoundcheckEngine:
         # Safety: true peak after correction must not exceed -1 dBTP
         if true_peak + correction > -1.0:
             correction = -1.0 - true_peak
+
+        # Absolute gain safety clamp (per .cursorrules: gain ≤ +60 dB)
+        SAFE_MAX_GAIN_DB = 12.0
+        correction = max(-SAFE_MAX_GAIN_DB, min(SAFE_MAX_GAIN_DB, correction))
 
         try:
             self.mixer_client.set_gain(ch, correction)
@@ -1372,42 +1391,6 @@ class AutoSoundcheckEngine:
 
         return pairs
 
-    def _gcc_phat(
-        self, sig_target: np.ndarray, sig_reference: np.ndarray
-    ) -> Tuple[int, float]:
-        """GCC-PHAT cross-correlation. Returns (delay_samples, peak_value).
-
-        Positive delay = target is delayed relative to reference.
-        Negative peak = phase inverted.
-        """
-        n = len(sig_target)
-        fft_size = 1
-        while fft_size < 2 * n:
-            fft_size *= 2
-
-        X1 = np.fft.rfft(sig_target, n=fft_size)
-        X2 = np.fft.rfft(sig_reference, n=fft_size)
-
-        cross = np.conj(X2) * X1
-        magnitude = np.abs(cross) + 1e-10
-        phat = cross / magnitude
-
-        gcc = np.fft.irfft(phat, n=fft_size)
-        gcc = np.real(gcc)
-
-        max_delay = int(self.sample_rate * 0.020)  # ±20ms window
-        center = fft_size // 2
-        gcc_shifted = np.concatenate([gcc[fft_size - center:], gcc[:center + 1]])
-        search_start = max(0, center - max_delay)
-        search_end = min(len(gcc_shifted), center + max_delay + 1)
-        search_region = gcc_shifted[search_start:search_end]
-
-        peak_idx = np.argmax(np.abs(search_region))
-        peak_value = float(search_region[peak_idx])
-        delay_samples = peak_idx - (center - search_start)
-
-        return delay_samples, peak_value
-
     # ── 5f. Pan positioning ──────────────────────────────────────
 
     def _apply_pan(self, ch: int, info: ChannelInfo, preset: str):
@@ -1438,14 +1421,11 @@ class AutoSoundcheckEngine:
                 else:
                     pan = 0.0
             elif preset == "backVocal":
-                # Spread backing vocals
-                if len(preset_channels) == 2:
-                    pan = -30.0 if idx == 0 else 30.0
-                elif len(preset_channels) == 3:
-                    pan = [-30.0, 0.0, 30.0][idx]
+                spread = 35.0
+                n = len(preset_channels)
+                if n == 2:
+                    pan = -spread if idx == 0 else spread
                 else:
-                    spread = 40.0
-                    n = len(preset_channels)
                     pan = -spread + (2.0 * spread * idx / max(1, n - 1))
 
         try:
@@ -1638,12 +1618,12 @@ class AutoSoundcheckEngine:
             try:
                 for ch, info in self.channels.items():
                     if not info.has_signal:
-                        peak = self.audio_capture.get_peak(ch, self.sample_rate)
+                        peak = self.audio_capture.get_peak(ch, self.block_size * 4)
                         if peak > SIGNAL_THRESHOLD_DB:
                             info.has_signal = True
                             info.peak_db = peak
-                            info.rms_db = self.audio_capture.get_rms(ch, self.sample_rate)
-                            info.lufs = self.audio_capture.get_lufs(ch, 3.0)
+                            info.rms_db = self.audio_capture.get_rms(ch, self.block_size * 4)
+                            info.lufs = self.audio_capture.get_lufs(ch, 0.4)
                             if not info.recognized:
                                 self._classify_by_spectrum(ch, info)
                             logger.info(f"Monitor: new signal on Ch {ch} '{info.name}'")
@@ -1664,16 +1644,28 @@ class AutoSoundcheckEngine:
     def _apply_corrections_single(self, ch: int):
         """Apply full processing chain for a single newly detected channel.
 
-        Resets the channel first to ensure we apply to a clean state.
+        Resets the channel, runs a short analysis pass for fresh metrics,
+        then applies the full processing chain.
         """
-        info = self.channels[ch]
-        if ch in self._applied_channels:
+        info = self.channels.get(ch)
+        if info is None or ch in self._applied_channels:
             return
         preset = info.preset or "custom"
         try:
             self.mixer_client.reset_channel_processing(ch)
             info.was_reset = True
-            time.sleep(0.1)
+            time.sleep(0.3)
+
+            # Quick analysis pass (1.5s) for fresh metrics
+            analyzer = SignalAnalyzer(ch, self.sample_rate, self.block_size)
+            analysis_blocks = int(1.5 * self.sample_rate / self.block_size)
+            interval = self.block_size / self.sample_rate
+            for _ in range(analysis_blocks):
+                samples = self.audio_capture.get_buffer(ch, self.block_size)
+                if len(samples) >= self.block_size:
+                    analyzer.process(samples)
+                time.sleep(interval)
+            info.metrics = analyzer.get_metrics()
 
             self._apply_input_gain(ch, info, preset)
             self._apply_hpf(ch, preset)
@@ -1701,10 +1693,13 @@ class AutoSoundcheckEngine:
                 pass
         elif event.action == "fader_reduce":
             try:
-                current = self.channels[ch].fader_db
-                new_fader = current - 3.0
+                info = self.channels.get(ch)
+                if info is None:
+                    return
+                current = info.fader_db
+                new_fader = max(-30.0, current - 3.0)
                 self.mixer_client.set_fader(ch, new_fader)
-                self.channels[ch].fader_db = new_fader
+                info.fader_db = new_fader
                 logger.warning(f"FEEDBACK: Ch {ch} fader reduced to {new_fader:.1f}dB")
             except Exception:
                 pass
@@ -1805,9 +1800,13 @@ class AutoSoundcheckEngine:
         logger.info(f"Restored original settings for {restored} channel(s)")
 
     def stop(self):
-        """Stop the engine."""
+        """Stop the engine, joining threads before releasing resources."""
         self._stop_event.set()
         self._set_state(EngineState.STOPPED, "Engine stopped")
+
+        # Join monitor thread first so it stops accessing audio/mixer
+        if self._monitor_thread and self._monitor_thread.is_alive():
+            self._monitor_thread.join(timeout=3.0)
 
         if self.audio_capture:
             try:
