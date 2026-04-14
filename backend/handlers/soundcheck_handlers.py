@@ -1,6 +1,11 @@
 """Auto soundcheck message handlers."""
 
+import asyncio
+import logging
+
 from auto_soundcheck_engine import AutoSoundcheckEngine
+
+logger = logging.getLogger(__name__)
 
 
 def register_handlers(server):
@@ -21,8 +26,10 @@ def register_handlers(server):
         await server.send_to_client(websocket, {
             "type": "auto_soundcheck_status",
             "is_running": server.auto_soundcheck_running,
+            "running": server.auto_soundcheck_running,
             "current_step": None,
             "step_progress": 0,
+            "progress": 0,
             "step_time_remaining": 0,
             "message": "Idle" if not server.auto_soundcheck_running else "Running"
         })
@@ -36,21 +43,52 @@ def register_handlers(server):
             })
             return
 
-        mixer_type = data.get("mixer_type", "dlive")
-        mixer_ip = data.get("mixer_ip", "192.168.3.70")
-        mixer_port = data.get("mixer_port", 51328 if mixer_type == "dlive" else 2222)
-        audio_device = data.get("audio_device", "soundgrid")
-        num_channels = data.get("channels", 48)
+        mixer_config = server.config.get("mixer", {})
+        audio_config = server.config.get("audio", {})
 
-        async def on_state(state, msg):
-            await server.broadcast({
+        mixer_type = data.get("mixer_type", mixer_config.get("type", "dlive"))
+        mixer_ip = data.get("mixer_ip", mixer_config.get("ip", "192.168.3.70"))
+        mixer_port = data.get(
+            "mixer_port",
+            mixer_config.get("port", 51328 if mixer_type == "dlive" else 2223)
+        )
+        audio_device = data.get("audio_device", audio_config.get("device_name", "soundgrid"))
+        num_channels = data.get("channels", 48)
+        loop = asyncio.get_running_loop()
+
+        def _schedule_broadcast(payload):
+            try:
+                running_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                running_loop = None
+
+            if running_loop is loop:
+                task = loop.create_task(server.broadcast(payload))
+                task.add_done_callback(
+                    lambda t: logger.warning(
+                        "Auto engine broadcast failed: %s",
+                        t.exception(),
+                    ) if t.exception() else None
+                )
+                return
+
+            future = asyncio.run_coroutine_threadsafe(server.broadcast(payload), loop)
+            future.add_done_callback(
+                lambda f: logger.warning(
+                    "Auto engine broadcast failed: %s",
+                    f.exception(),
+                ) if f.exception() else None
+            )
+
+        def on_state(state, msg):
+            _schedule_broadcast({
                 "type": "auto_engine_state",
                 "state": state,
                 "message": msg
             })
 
-        async def on_channel(ch, ch_data):
-            await server.broadcast({
+        def on_channel(ch, ch_data):
+            _schedule_broadcast({
                 "type": "auto_engine_channel",
                 "channel": ch,
                 "data": ch_data
@@ -63,6 +101,8 @@ def register_handlers(server):
             audio_device_name=audio_device,
             num_channels=num_channels,
             auto_apply=True,
+            on_state_change=on_state,
+            on_channel_update=on_channel,
         )
         server.auto_soundcheck_engine = engine
         engine.start_async()

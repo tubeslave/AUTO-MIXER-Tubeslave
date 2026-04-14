@@ -26,14 +26,22 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
 
   useEffect(() => {
     const handle = (data) => {
-      if (data.running !== undefined) setRunning(data.running);
+      if (data.is_running !== undefined) {
+        setRunning(data.is_running);
+      } else if (data.running !== undefined) {
+        setRunning(data.running);
+      }
       if (data.message) {
         setStatusMessage(data.message);
         setLog(prev => [...prev.slice(-20), data.message]);
       }
       if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
       if (data.current_step) setCurrentStep(data.current_step);
-      if (data.progress !== undefined) setProgress(data.progress);
+      if (data.step_progress !== undefined) {
+        setProgress(data.step_progress);
+      } else if (data.progress !== undefined) {
+        setProgress(data.progress);
+      }
     };
     websocketService.on('auto_soundcheck_status', handle);
     websocketService.getAutoSoundcheckStatus();
@@ -44,8 +52,14 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
     if (!selectedDevice || !selectedChannels?.length) { setStatusMessage('Выберите устройство и каналы'); return; }
     const mapping = {}; selectedChannels.forEach(ch => { mapping[ch] = ch; });
     const chSettings = {}; selectedChannels.forEach(ch => { chSettings[ch] = { preset: 'custom' }; });
+    const backendTimings = {
+      gain_staging: timings.gainDuration,
+      phase_alignment: timings.phaseDuration,
+      auto_eq: timings.eqDuration,
+      auto_fader: timings.faderDuration,
+    };
     setLog([]);
-    websocketService.startAutoSoundcheck(selectedDevice, selectedChannels, chSettings, mapping, timings);
+    websocketService.startAutoSoundcheck(selectedDevice, selectedChannels, chSettings, mapping, backendTimings);
   };
   const handleStop = () => websocketService.stopAutoSoundcheck();
 

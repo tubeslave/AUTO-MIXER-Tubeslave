@@ -4184,8 +4184,10 @@ class AutoMixerServer:
             status_data = {
                 "type": "auto_soundcheck_status",
                 "is_running": self.auto_soundcheck_running and not complete,
+                "running": self.auto_soundcheck_running and not complete,
                 "current_step": current_step,
                 "step_progress": step_progress,
+                "progress": step_progress,
                 "step_time_remaining": step_time_remaining,
                 "message": message,
                 "error": error,
