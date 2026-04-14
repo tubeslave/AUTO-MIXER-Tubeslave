@@ -1,10 +1,13 @@
 # AUTO-MIXER-Tubeslave Configuration
-# Copy this file and adjust for your setup
+# Target setup: Allen & Heath dLive + Waves SoundGrid on macOS (M3 Max)
 
 mixer:
-  ip: "192.168.1.1"
-  port: 2222
-  protocol: "osc"
+  type: "dlive"
+  ip: "192.168.3.70"
+  port: 51328
+  protocol: "midi_tcp"
+  tls: false
+  midi_base_channel: 0
   keepalive_interval: 5.0
   command_rate_limit: 10.0
   connection_timeout: 10.0
@@ -12,9 +15,9 @@ mixer:
 audio:
   sample_rate: 48000
   block_size: 1024
-  channels: 40
-  source: "dante"  # dante, sounddevice, test_sine, test_pink_noise, silence
-  device_name: ""
+  channels: 48
+  source: "soundgrid"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
+  device_name: "soundgrid"  # pattern to match (e.g. "Waves SoundGrid", "soundgrid")
   buffer_seconds: 5.0
 
 websocket:
@@ -24,7 +27,7 @@ websocket:
 
 agent:
   enabled: true
-  mode: "suggest"  # auto, suggest, manual
+  mode: "auto"  # auto = apply without confirmation; suggest, manual
   cycle_interval: 0.5
   confidence_threshold: 0.6
   max_actions_per_cycle: 5
@@ -38,7 +41,7 @@ ai:
 
 safety:
   feedback_detection: true
-  max_gain_db: 10.0
+  max_gain_db: 12.0
   true_peak_limit: -1.0
   max_notch_filters: 8
   max_notch_depth_db: -12.0
@@ -56,3 +59,11 @@ session:
   auto_save: true
   save_interval: 300
   session_dir: "sessions"
+
+# Auto Soundcheck Engine settings
+soundcheck:
+  auto_apply: true
+  signal_threshold_db: -50.0
+  analysis_seconds: 3.0
+  analysis_timeout_seconds: 30.0
+  gain_correction_max_db: 12.0

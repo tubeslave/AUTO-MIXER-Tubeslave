@@ -16,14 +16,14 @@ class TestThreadSafeMixerState:
     @pytest.mark.asyncio
     async def test_set_and_get_channel_param(self):
         state = ThreadSafeMixerState()
-        await state.set_channel_param(1, 'gain', -6.0)
-        val = await state.get_channel_param(1, 'gain')
+        await state.async_set_channel_param(1, 'gain', -6.0)
+        val = await state.async_get_channel_param(1, 'gain')
         assert val == -6.0
 
     @pytest.mark.asyncio
     async def test_snapshot(self):
         state = ThreadSafeMixerState()
-        await state.set_channel_param(1, 'fader', 0.75)
+        await state.async_set_channel_param(1, 'fader', 0.75)
         snap1 = await state.snapshot()
         snap2 = await state.snapshot()
         # Should be different objects (copy-on-read)
@@ -33,7 +33,7 @@ class TestThreadSafeMixerState:
     async def test_version_increments(self):
         state = ThreadSafeMixerState()
         v1 = await state.get_version()
-        await state.set_channel_param(1, 'gain', -3.0)
+        await state.async_set_channel_param(1, 'gain', -3.0)
         v2 = await state.get_version()
         assert v2 > v1
 
