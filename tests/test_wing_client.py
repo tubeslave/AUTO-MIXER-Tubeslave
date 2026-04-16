@@ -264,3 +264,64 @@ class TestConnectionLifecycle:
 
             client.send("/ch/1/fdr", 0.75)
             assert client.state.get("/ch/1/fdr") == 0.75
+
+
+class TestAutoSoundcheckBridge:
+    """Tests for the generic control methods used by AutoSoundcheckEngine."""
+
+    def test_compressor_accepts_engine_aliases(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client._osc_throttle_enabled = False
+
+            with patch("wing_client.time.sleep", return_value=None):
+                client.set_compressor(
+                    1,
+                    threshold_db=-18.0,
+                    ratio=4,
+                    attack_ms=12.0,
+                    release_ms=120.0,
+                    makeup_db=3.0,
+                    enabled=True,
+                )
+
+            assert client.state["/ch/1/dyn/on"] == 1
+            assert client.state["/ch/1/dyn/thr"] == -18.0
+            assert client.state["/ch/1/dyn/ratio"] == "4.0"
+            assert client.state["/ch/1/dyn/att"] == 12.0
+            assert client.state["/ch/1/dyn/rel"] == 120.0
+            assert client.state["/ch/1/dyn/gain"] == 3.0
+
+    def test_generic_engine_methods_map_to_wing_commands(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client._osc_throttle_enabled = False
+
+            client.set_hpf(2, 90.0, enabled=True)
+            client.set_polarity(2, True)
+            client.set_delay(2, 2.5, enabled=False)
+
+            assert client.state["/ch/2/flt/lc"] == 1
+            assert client.state["/ch/2/flt/lcf"] == 90.0
+            assert client.state["/ch/2/in/set/inv"] == 1
+            assert client.state["/ch/2/in/set/dlyon"] == 0

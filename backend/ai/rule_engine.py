@@ -103,7 +103,8 @@ class RuleEngine:
             priority=RulePriority.HIGH,
             condition=lambda state: (
                 state.get('instrument') == 'lead_vocal' and
-                state.get('lufs_momentary', -100) < state.get('mix_lufs', -100) - 2
+                _has_strong_signal(state) and
+                state.get('lufs_momentary', -100) < _vocal_target_lufs(state) - 0.5
             ),
             action=lambda state: RuleResult(
                 rule_name='vocal_presence',
@@ -111,11 +112,15 @@ class RuleEngine:
                 action='adjust_gain',
                 parameters={
                     'channel': state.get('channel_id', 0),
-                    'target_relative_db': 0.0,
+                    'adjustment_db': _vocal_presence_adjustment_db(state),
+                    'target_lufs': _vocal_target_lufs(state),
                 },
                 priority=RulePriority.HIGH,
                 confidence=0.8,
-                reason='Lead vocal below mix level by more than 2dB LUFS'
+                reason=(
+                    f"Lead vocal at {state.get('lufs_momentary', -100):.1f} LUFS "
+                    f"is below target {_vocal_target_lufs(state):.1f} LUFS"
+                )
             )
         ))
 
@@ -148,7 +153,10 @@ class RuleEngine:
             name='dynamic_range',
             description='Apply compression when dynamic range exceeds 24dB',
             priority=RulePriority.MEDIUM,
-            condition=lambda state: state.get('dynamic_range_db', 0) > 24,
+            condition=lambda state: (
+                _has_strong_signal(state) and
+                state.get('dynamic_range_db', 0) > 24
+            ),
             action=lambda state: RuleResult(
                 rule_name='dynamic_range',
                 triggered=True,
@@ -172,8 +180,13 @@ class RuleEngine:
             description='Ensure proper gain staging with -12dB peak target',
             priority=RulePriority.HIGH,
             condition=lambda state: (
-                state.get('peak_db', -100) > -6 or
-                state.get('peak_db', -100) < -30
+                (
+                    state.get('peak_db', -100) > -6 or
+                    (
+                        _has_strong_signal(state) and
+                        state.get('peak_db', -100) < -30
+                    )
+                )
             ),
             action=lambda state: RuleResult(
                 rule_name='gain_staging',
@@ -373,3 +386,64 @@ def _hpf_frequency_for_instrument(instrument: str) -> int:
         'cello': 50,
     }
     return hpf_map.get(instrument, 100)
+
+
+def _has_actionable_signal(state: Dict) -> bool:
+    """Guard non-safety rules from reacting to digital silence."""
+    if state.get('feedback_detected', False):
+        return True
+    if state.get('channel_armed', False):
+        return True
+    try:
+        peak_db = float(state.get('peak_db', -200.0))
+    except (TypeError, ValueError):
+        peak_db = -200.0
+    try:
+        rms_db = float(state.get('rms_db', -200.0))
+    except (TypeError, ValueError):
+        rms_db = -200.0
+    return peak_db > -45.0 or rms_db > -50.0
+
+
+def _has_strong_signal(state: Dict) -> bool:
+    """Return True when the source is clearly present, not just leakage/noise."""
+    try:
+        peak_db = float(state.get('peak_db', -200.0))
+    except (TypeError, ValueError):
+        peak_db = -200.0
+    try:
+        rms_db = float(state.get('rms_db', -200.0))
+    except (TypeError, ValueError):
+        rms_db = -200.0
+    return peak_db > -45.0 and rms_db > -65.0
+
+
+def _vocal_target_lufs(state: Dict) -> float:
+    """Target lead-vocal loudness relative to the current instrument bed."""
+    if state.get('vocal_target_lufs') is not None:
+        try:
+            return float(state['vocal_target_lufs'])
+        except (TypeError, ValueError):
+            pass
+
+    try:
+        mix_lufs = float(state.get('mix_lufs', -100.0))
+    except (TypeError, ValueError):
+        mix_lufs = -100.0
+    try:
+        target_delta_db = float(state.get('vocal_target_delta_db', 2.0))
+    except (TypeError, ValueError):
+        target_delta_db = 2.0
+    return mix_lufs + target_delta_db
+
+
+def _vocal_presence_adjustment_db(state: Dict) -> float:
+    """Return a bounded upward move for vocal presence automation."""
+    try:
+        vocal_lufs = float(state.get('lufs_momentary', -100.0))
+    except (TypeError, ValueError):
+        vocal_lufs = -100.0
+    needed = _vocal_target_lufs(state) - vocal_lufs
+    if needed <= 0:
+        return 0.0
+    return max(0.5, min(3.0, needed))

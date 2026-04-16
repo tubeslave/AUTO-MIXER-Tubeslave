@@ -1,13 +1,16 @@
 """AI MixingAgent WebSocket handlers."""
 
-import json
-
 
 def register_handlers(server):
-    async def handle_get_agent_status(websocket, data):
-        if server.mixing_agent:
-            status = server.mixing_agent.get_status()
-            status["channel_summary"] = server.mixing_agent.get_channel_summary()
+    def _agent():
+        return getattr(server, "mixing_agent", None)
+
+    async def _send_agent_status(websocket):
+        agent = _agent()
+        if agent:
+            status = agent.get_status()
+            status["channel_summary"] = agent.get_channel_summary()
+            status["auto_apply_enabled"] = getattr(server, "agent_auto_apply_enabled", False)
             await server.send_to_client(websocket, {
                 "type": "agent_status",
                 **status,
@@ -16,67 +19,142 @@ def register_handlers(server):
             await server.send_to_client(websocket, {
                 "type": "agent_status",
                 "is_running": False,
+                "auto_apply_enabled": False,
                 "error": "Agent not initialized",
             })
 
+    async def handle_get_agent_status(websocket, data):
+        await _send_agent_status(websocket)
+
+    async def handle_start_agent(websocket, data):
+        agent = await server.init_mixing_agent(
+            mode=data.get("mode", "auto"),
+            channels=data.get("channels"),
+            use_llm=data.get("use_llm", True),
+            allow_auto_apply=data.get("allow_auto_apply", True),
+            start=True,
+        )
+        await server.send_to_client(websocket, {
+            "type": "agent_started",
+            **agent.get_status(),
+            "auto_apply_enabled": getattr(server, "agent_auto_apply_enabled", False),
+        })
+
+    async def handle_stop_agent(websocket, data):
+        await server.stop_mixing_agent()
+        await server.send_to_client(websocket, {
+            "type": "agent_stopped",
+            "is_running": False,
+        })
+
+    async def handle_emergency_stop_agent(websocket, data):
+        agent = _agent()
+        if agent:
+            agent.emergency_stop()
+        await server.stop_mixing_agent()
+        await server.send_to_client(websocket, {
+            "type": "agent_emergency_stopped",
+            "is_running": False,
+            "emergency_stop": True,
+        })
+
     async def handle_set_agent_mode(websocket, data):
-        mode = data.get("mode", "suggest")
-        if server.mixing_agent:
-            await server.init_mixing_agent(mode=mode)
-            await server.send_to_client(websocket, {
-                "type": "agent_mode_changed",
-                "mode": mode,
-            })
+        mode = data.get("mode", "auto")
+        agent = await server.init_mixing_agent(
+            mode=mode,
+            channels=data.get("channels"),
+            use_llm=data.get("use_llm", True),
+            allow_auto_apply=data.get("allow_auto_apply", True),
+            start=data.get("start", False),
+        )
+        await server.send_to_client(websocket, {
+            "type": "agent_mode_changed",
+            "mode": agent.state.mode.value,
+            "auto_apply_enabled": getattr(server, "agent_auto_apply_enabled", False),
+        })
 
     async def handle_get_pending_actions(websocket, data):
-        if server.mixing_agent:
+        agent = _agent()
+        if agent:
             await server.send_to_client(websocket, {
                 "type": "pending_actions",
-                "actions": server.mixing_agent.get_pending_actions(),
+                "actions": agent.get_pending_actions(),
             })
+        else:
+            await server.send_to_client(websocket, {"type": "pending_actions", "actions": []})
 
     async def handle_approve_action(websocket, data):
         idx = data.get("index", -1)
-        if server.mixing_agent:
-            ok = server.mixing_agent.approve_action(idx)
+        agent = _agent()
+        if agent:
+            ok = agent.approve_action(idx)
             await server.send_to_client(websocket, {
                 "type": "action_approved",
                 "index": idx,
                 "success": ok,
             })
+            await handle_get_pending_actions(websocket, data)
 
     async def handle_approve_all(websocket, data):
-        if server.mixing_agent:
-            count = server.mixing_agent.approve_all_pending()
+        agent = _agent()
+        if agent:
+            count = agent.approve_all_pending()
             await server.send_to_client(websocket, {
                 "type": "all_actions_approved",
                 "count": count,
             })
+            await handle_get_pending_actions(websocket, data)
 
     async def handle_dismiss_action(websocket, data):
         idx = data.get("index", -1)
-        if server.mixing_agent:
-            ok = server.mixing_agent.dismiss_action(idx)
+        agent = _agent()
+        if agent:
+            ok = agent.dismiss_action(idx)
             await server.send_to_client(websocket, {
                 "type": "action_dismissed",
                 "index": idx,
                 "success": ok,
             })
+            await handle_get_pending_actions(websocket, data)
 
     async def handle_dismiss_all(websocket, data):
-        if server.mixing_agent:
-            server.mixing_agent.dismiss_all_pending()
+        agent = _agent()
+        if agent:
+            agent.dismiss_all_pending()
             await server.send_to_client(websocket, {
                 "type": "all_actions_dismissed",
             })
+            await handle_get_pending_actions(websocket, data)
 
     async def handle_get_action_history(websocket, data):
         limit = data.get("limit", 50)
-        if server.mixing_agent:
+        agent = _agent()
+        if agent:
             await server.send_to_client(websocket, {
                 "type": "action_history",
-                "history": server.mixing_agent.get_action_history(limit),
+                "history": agent.get_action_history(limit),
+                "audit": agent.get_action_audit_log(limit),
             })
+        else:
+            await server.send_to_client(websocket, {"type": "action_history", "history": [], "audit": []})
+
+    async def handle_update_agent_state(websocket, data):
+        agent = _agent()
+        if agent is None:
+            agent = await server.init_mixing_agent(
+                mode=data.get("mode", "auto"),
+                channels=data.get("channels"),
+                use_llm=data.get("use_llm", True),
+                allow_auto_apply=data.get("allow_auto_apply", True),
+                start=False,
+            )
+        states = data.get("channel_states")
+        if states:
+            normalized = {int(ch): state for ch, state in states.items()}
+            agent.update_channel_states_batch(normalized)
+        else:
+            agent.update_channel_states_batch(server.collect_agent_channel_states(data.get("channels")))
+        await _send_agent_status(websocket)
 
     async def handle_get_audio_status(websocket, data):
         if server.audio_capture:
@@ -113,8 +191,12 @@ def register_handlers(server):
         })
 
     return {
+        "start_agent": handle_start_agent,
+        "stop_agent": handle_stop_agent,
+        "emergency_stop_agent": handle_emergency_stop_agent,
         "get_agent_status": handle_get_agent_status,
         "set_agent_mode": handle_set_agent_mode,
+        "update_agent_state": handle_update_agent_state,
         "get_pending_actions": handle_get_pending_actions,
         "approve_action": handle_approve_action,
         "approve_all_actions": handle_approve_all,

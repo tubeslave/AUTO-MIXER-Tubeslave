@@ -45,8 +45,36 @@ from audio_capture import (
 )
 from feedback_detector import FeedbackDetector
 from auto_soundcheck_engine import AutoSoundcheckEngine
+from observation_mixer import ObservationMixerClient
 from mixer_discovery import discover_mixers, discover_mixer_auto, DiscoveredMixer
 from handlers import register_all_handlers
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
+def _load_repo_dotenv() -> None:
+    """Load optional repo-root `.env` into ``os.environ`` (does not override existing vars)."""
+    path = os.path.join(_REPO_ROOT, ".env")
+    if not os.path.isfile(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                key = key.strip()
+                val = val.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = val
+    except OSError as exc:
+        logging.getLogger(__name__).warning("Could not read .env: %s", exc)
+
+
+_load_repo_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -131,8 +159,10 @@ class AutoMixerServer:
         
         # Auto Soundcheck state
         self.auto_soundcheck_running = False
+        self.auto_soundcheck_observe_only = False
         self.auto_soundcheck_task: Optional[asyncio.Task] = None
         self.auto_soundcheck_websocket: Optional[WebSocketServerProtocol] = None
+        self._observation_mixer_client: Optional[ObservationMixerClient] = None
         
         # Auto Compressor controller
         self.auto_compressor_controller: Optional[AutoCompressorController] = None
@@ -148,6 +178,11 @@ class AutoMixerServer:
         
         # Auto soundcheck engine (headless auto-mixing)
         self.auto_soundcheck_engine: Optional[AutoSoundcheckEngine] = None
+
+        # AI Mixing Agent (rules + optional LLM, suggest-first by default)
+        self.mixing_agent = None
+        self.mixing_agent_task: Optional[asyncio.Task] = None
+        self.agent_auto_apply_enabled = False
         
         # Live concert mode: stricter limits, emergency stop
         self.live_mode = False
@@ -226,6 +261,7 @@ class AutoMixerServer:
         if self.auto_soundcheck_running:
             try:
                 self.auto_soundcheck_running = False
+                self.auto_soundcheck_observe_only = False
                 if self.auto_soundcheck_task:
                     self.auto_soundcheck_task.cancel()
                 logger.info("Auto Soundcheck stopped")
@@ -260,6 +296,19 @@ class AutoMixerServer:
             except Exception as e:
                 logger.error(f"Error stopping auto soundcheck engine: {e}")
             self.auto_soundcheck_engine = None
+            self.auto_soundcheck_running = False
+            self.auto_soundcheck_observe_only = False
+
+        # Stop AI mixing agent
+        if self.mixing_agent:
+            try:
+                self.mixing_agent.stop()
+                if self.mixing_agent_task:
+                    self.mixing_agent_task.cancel()
+                logger.info("AI mixing agent stopped")
+            except Exception as e:
+                logger.error(f"Error stopping AI mixing agent: {e}")
+            self.mixing_agent_task = None
         
         # Disconnect mixer
         if self.mixer_client:
@@ -299,29 +348,83 @@ class AutoMixerServer:
         
         logger.info("Graceful shutdown complete")
     
-    def _load_config(self) -> dict:
-        """Load configuration from default_config.json"""
-        import os
-        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
-                                  'config', 'default_config.json')
+    def _merge_automixer_yaml(self, config: dict) -> dict:
+        """Overlay ``ai``, ``agent``, ``audio``, ``mixer``, ``websocket``, ``safety`` from automixer.yaml."""
+        yaml_path = os.path.join(_REPO_ROOT, "config", "automixer.yaml")
+        if not os.path.isfile(yaml_path):
+            return config
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                logger.info(f"Configuration loaded from {config_path}")
+            import yaml
+            with open(yaml_path, encoding="utf-8") as f:
+                yml = yaml.safe_load(f)
+            if not isinstance(yml, dict):
                 return config
+            for key in ("ai", "agent", "audio", "mixer", "websocket", "safety"):
+                if key not in yml or not isinstance(yml[key], dict):
+                    continue
+                if key not in config or not isinstance(config[key], dict):
+                    config[key] = {}
+                config[key].update(yml[key])
+            logger.info("Merged settings from %s (ai/agent/audio/mixer/websocket/safety)", yaml_path)
         except Exception as e:
-            logger.warning(f"Failed to load config from {config_path}: {e}. Using defaults.")
-            return {
+            logger.warning("automixer.yaml merge skipped: %s", e)
+        return config
+
+    def _apply_env_config_overrides(self, config: dict) -> dict:
+        """Apply runtime env overrides for server-loaded config sections."""
+        ai = config.setdefault("ai", {})
+        env_map = {
+            "AUTOMIXER_LLM_BACKEND": (ai, "llm_backend", str),
+            "AUTOMIXER_LLM_MODEL": (ai, "llm_model", str),
+            "AUTOMIXER_OLLAMA_URL": (ai, "ollama_url", str),
+            "OPENAI_API_KEY": (ai, "openai_api_key", str),
+            "AUTOMIXER_OPENAI_API_KEY": (ai, "openai_api_key", str),
+            "KIMI_CLI_PATH": (ai, "kimi_cli_path", str),
+            "AUTOMIXER_KIMI_CLI": (ai, "kimi_cli_path", str),
+            "AUTOMIXER_KIMI_WORK_DIR": (ai, "kimi_work_dir", str),
+            "AUTOMIXER_KIMI_TIMEOUT": (ai, "kimi_timeout_sec", float),
+            "AUTOMIXER_PERPLEXITY_KEY": (ai, "perplexity_api_key", str),
+        }
+        for env_key, (section, key, converter) in env_map.items():
+            value = os.environ.get(env_key)
+            if value is None:
+                continue
+            try:
+                section[key] = converter(value)
+            except (TypeError, ValueError):
+                logger.warning("Ignoring invalid %s=%r", env_key, value)
+
+        fallbacks = os.environ.get("AUTOMIXER_MODEL_FALLBACKS")
+        if fallbacks is not None:
+            ai["model_fallbacks"] = [
+                item.strip()
+                for item in fallbacks.split(",")
+                if item.strip()
+            ]
+        return config
+
+    def _load_config(self) -> dict:
+        """Load configuration from default_config.json and overlay config/automixer.yaml."""
+        config_path = os.path.join(_REPO_ROOT, "config", "default_config.json")
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                logger.info("Configuration loaded from %s", config_path)
+                return self._apply_env_config_overrides(self._merge_automixer_yaml(config))
+        except Exception as e:
+            logger.warning("Failed to load config from %s: %s. Using defaults.", config_path, e)
+            base = {
                 "automation": {
                     "auto_gain": {
                         "bleeding_rejection": {
                             "enabled": True,
                             "correlation_threshold": 0.7,
-                            "level_difference_threshold_db": 8.0
+                            "level_difference_threshold_db": 8.0,
                         }
                     }
                 }
             }
+            return self._apply_env_config_overrides(self._merge_automixer_yaml(base))
 
     def _get_user_config_path(self) -> str:
         """Get path to user config file."""
@@ -416,6 +519,356 @@ class AutoMixerServer:
             elif isinstance(result, Exception):
                 logger.error("Error broadcasting to client: %s", result)
 
+    def _rebind_controller_mixer_clients(self, client):
+        """Point long-lived controllers at the active mixer client."""
+        for attr_name in (
+            "gain_staging",
+            "safe_gain_calibrator",
+            "auto_eq_controller",
+            "multi_channel_auto_eq_controller",
+            "phase_alignment_controller",
+            "auto_fader_controller",
+            "auto_compressor_controller",
+        ):
+            controller = getattr(self, attr_name, None)
+            if controller is not None and hasattr(controller, "mixer_client"):
+                controller.mixer_client = client
+        if self.mixing_agent is not None:
+            self.mixing_agent.mixer = client
+
+    async def _send_soundcheck_observation(self, websocket, message: str = "", operation: dict = None, summary: dict = None):
+        """Send a dry-run observation event to the initiating client."""
+        if websocket is None:
+            return
+        payload = {
+            "type": "auto_soundcheck_observation",
+            "message": message,
+        }
+        if operation is not None:
+            payload["operation"] = operation
+        if summary is not None:
+            payload["summary"] = summary
+        await self.send_to_client(websocket, payload)
+
+    def _activate_observation_mode(self, websocket, loop):
+        """Wrap the live mixer client with a dry-run proxy for the soundcheck cycle."""
+        if not self.mixer_client:
+            return None
+
+        def emit(coro):
+            try:
+                running_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                running_loop = None
+
+            if running_loop is loop:
+                task = loop.create_task(coro)
+                task.add_done_callback(
+                    lambda t: logger.warning(
+                        "Observation emit failed: %s",
+                        t.exception(),
+                    ) if t.exception() else None
+                )
+                return
+
+            future = asyncio.run_coroutine_threadsafe(coro, loop)
+            future.add_done_callback(
+                lambda f: logger.warning(
+                    "Observation emit failed: %s",
+                    f.exception(),
+                ) if f.exception() else None
+            )
+
+        def on_command(operation: dict):
+            emit(self._send_soundcheck_observation(
+                websocket,
+                message=f"[OBSERVE] {operation['message']}",
+                operation=operation,
+            ))
+
+        original_client = self.mixer_client
+        proxy = ObservationMixerClient(original_client, on_command=on_command)
+        self._observation_mixer_client = proxy
+        self.mixer_client = proxy
+        self._rebind_controller_mixer_clients(proxy)
+        return original_client
+
+    async def _deactivate_observation_mode(self, websocket, original_client):
+        """Restore the real mixer client and emit a final dry-run summary."""
+        proxy = self._observation_mixer_client
+        if proxy is not None:
+            summary = proxy.get_summary()
+            await self._send_soundcheck_observation(
+                websocket,
+                message=(
+                    f"[OBSERVE] Cycle complete. Intercepted "
+                    f"{summary['total_operations']} mixer write operation(s)."
+                ),
+                summary=summary,
+            )
+
+        if original_client is not None:
+            self.mixer_client = original_client
+            self._rebind_controller_mixer_clients(original_client)
+
+        self._observation_mixer_client = None
+
+    def _coerce_agent_mode(self, mode: str = None, allow_auto_apply: bool = True):
+        """Return AgentMode for current run; AUTO is the default test-stage behavior."""
+        from ai.agent import AgentMode
+
+        requested = (mode or self.config.get("agent", {}).get("mode", "auto")).lower()
+        try:
+            agent_mode = AgentMode(requested)
+        except ValueError:
+            agent_mode = AgentMode.AUTO
+
+        if agent_mode == AgentMode.AUTO and not allow_auto_apply:
+            logger.warning("AI agent AUTO mode requested with allow_auto_apply=false; using SUGGEST mode")
+            return AgentMode.SUGGEST
+        return agent_mode
+
+    def _normalize_agent_instrument(self, preset: str = None, name: str = "") -> str:
+        """Normalize project preset names to the AI rule-engine vocabulary."""
+        value = (preset or name or "unknown").strip()
+        mapping = {
+            "leadVocal": "lead_vocal",
+            "backVocal": "backing_vocal",
+            "electricGuitar": "electric_guitar",
+            "acousticGuitar": "acoustic_guitar",
+            "bass": "bass_guitar",
+            "hihat": "hi_hat",
+            "overheads": "overhead",
+            "keys": "keys_piano",
+        }
+        if value in mapping:
+            return mapping[value]
+        normalized = re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower()
+        normalized = re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
+        return mapping.get(normalized, normalized or "unknown")
+
+    def _selected_agent_channels(self, channels=None) -> List[int]:
+        """Choose a bounded channel list for the agent seed pass."""
+        if channels:
+            selected = []
+            for ch in channels:
+                try:
+                    channel = int(ch)
+                except (TypeError, ValueError):
+                    continue
+                if channel > 0:
+                    selected.append(channel)
+            return sorted(set(selected))
+
+        if self.auto_soundcheck_engine:
+            selected = self.auto_soundcheck_engine.get_status().get("selected_channels", [])
+            if selected:
+                return [int(ch) for ch in selected]
+
+        if self.audio_capture and getattr(self.audio_capture, "running", False):
+            return list(range(1, min(self.audio_capture.num_channels, 48) + 1))
+
+        return list(range(1, 9))
+
+    def _agent_channel_state(self, channel: int, name: str = "", preset: str = "", metrics: dict = None) -> dict:
+        """Build one conservative channel observation for MixingAgent."""
+        metrics = metrics or {}
+        peak = metrics.get("peak_db")
+        rms = metrics.get("rms_db")
+        lufs = metrics.get("lufs", metrics.get("lufs_momentary"))
+        has_real_meter = peak is not None or rms is not None or lufs is not None
+
+        peak_db = float(peak if peak is not None else -12.0)
+        rms_db = float(rms if rms is not None else -30.0)
+        lufs_db = float(lufs if lufs is not None else rms_db)
+        instrument = self._normalize_agent_instrument(preset, name)
+
+        muted = False
+        if self.mixer_client and hasattr(self.mixer_client, "get_mute"):
+            try:
+                muted = bool(self.mixer_client.get_mute(channel))
+            except Exception:
+                muted = False
+
+        return {
+            "channel_id": channel,
+            "name": name or f"Ch {channel}",
+            "instrument": instrument,
+            "rms_db": rms_db,
+            "peak_db": peak_db,
+            "true_peak_db": peak_db,
+            "lufs_momentary": lufs_db,
+            "dynamic_range_db": max(0.0, peak_db - rms_db),
+            "is_muted": muted,
+            "channel_armed": bool(has_real_meter and (rms_db > -50.0 or peak_db > -45.0)),
+            "needs_attention": bool(
+                has_real_meter and
+                (rms_db > -50.0 or peak_db > -45.0) and
+                (peak_db > -6.0 or peak_db < -30.0)
+            ),
+        }
+
+    def collect_agent_channel_states(self, channels=None) -> Dict[int, dict]:
+        """Collect current channel observations for the AI MixingAgent."""
+        self._sync_runtime_from_auto_soundcheck()
+        selected_channels = self._selected_agent_channels(channels)
+        names: Dict[int, str] = {}
+
+        for ch in selected_channels:
+            if self.mixer_client and hasattr(self.mixer_client, "get_channel_name"):
+                try:
+                    names[ch] = self.mixer_client.get_channel_name(ch) or f"Ch {ch}"
+                except Exception:
+                    names[ch] = f"Ch {ch}"
+            else:
+                names[ch] = f"Ch {ch}"
+
+        recognized = {}
+        try:
+            recognized = scan_and_recognize(names)
+        except Exception as e:
+            logger.debug("Agent channel recognition failed: %s", e)
+
+        engine_channels = {}
+        if self.auto_soundcheck_engine:
+            try:
+                engine_channels = self.auto_soundcheck_engine.get_status().get("channels", {})
+            except Exception:
+                engine_channels = {}
+
+        states: Dict[int, dict] = {}
+        for ch in selected_channels:
+            metrics = {}
+            engine_info = engine_channels.get(ch) or engine_channels.get(str(ch)) or {}
+            if engine_info:
+                metrics.update({
+                    "peak_db": engine_info.get("peak_db"),
+                    "rms_db": engine_info.get("rms_db"),
+                    "lufs": engine_info.get("lufs"),
+                })
+
+            if self.audio_capture and getattr(self.audio_capture, "running", False):
+                try:
+                    metrics["rms_db"] = self.audio_capture.get_rms(ch)
+                    metrics["peak_db"] = self.audio_capture.get_peak(ch)
+                    metrics["lufs"] = self.audio_capture.get_lufs(ch)
+                except Exception:
+                    pass
+
+            rec = recognized.get(ch, {})
+            preset = engine_info.get("preset") or rec.get("preset") or ""
+            states[ch] = self._agent_channel_state(ch, names.get(ch), preset, metrics)
+
+        return states
+
+    def update_mixing_agent_channel(self, channel: int, data: dict):
+        """Feed one channel update from the soundcheck engine into the AI agent."""
+        if not self.mixing_agent:
+            return
+        self._sync_runtime_from_auto_soundcheck()
+        self.mixing_agent.mixer = self.mixer_client
+        state = self._agent_channel_state(
+            int(channel),
+            name=data.get("name", f"Ch {channel}"),
+            preset=data.get("preset", ""),
+            metrics={
+                "peak_db": data.get("peak_db"),
+                "rms_db": data.get("rms_db"),
+                "lufs": data.get("lufs"),
+            },
+        )
+        self.mixing_agent.update_channel_state(int(channel), state)
+
+    async def init_mixing_agent(self, mode: str = None, channels=None, use_llm: bool = True,
+                                allow_auto_apply: bool = True, start: bool = False):
+        """Create or reconfigure the AI MixingAgent (AUTO apply by default for testing)."""
+        from ai.agent import MixingAgent
+        from ai.knowledge_base import KnowledgeBase
+        from ai.llm_client import LLMClient
+        from ai.rule_engine import RuleEngine
+
+        self._sync_runtime_from_auto_soundcheck()
+        agent_config = self.config.get("agent", {})
+        ai_config = self.config.get("ai", {})
+        agent_mode = self._coerce_agent_mode(mode, allow_auto_apply=allow_auto_apply)
+        self.agent_auto_apply_enabled = bool(allow_auto_apply and agent_mode.value == "auto")
+
+        llm_client = None
+        if use_llm:
+            llm_client = LLMClient(
+                backend=ai_config.get("llm_backend", "auto"),
+                model=ai_config.get("llm_model", "gpt-5.4"),
+                ollama_url=ai_config.get("ollama_url", "http://localhost:11434"),
+                perplexity_api_key=ai_config.get("perplexity_api_key") or None,
+                openai_api_key=ai_config.get("openai_api_key") or None,
+                openai_url=ai_config.get("openai_url", "https://api.openai.com/v1/responses"),
+                model_fallbacks=ai_config.get("model_fallbacks") or None,
+                openai_reasoning_effort=ai_config.get("openai_reasoning_effort", "low"),
+                kimi_cli_path=(ai_config.get("kimi_cli_path") or None),
+                kimi_work_dir=(ai_config.get("kimi_work_dir") or None),
+                kimi_timeout_sec=float(ai_config.get("kimi_timeout_sec", 120)),
+            )
+
+        if self.mixing_agent is None:
+            knowledge_dir = ai_config.get("knowledge_dir") or None
+            self.mixing_agent = MixingAgent(
+                knowledge_base=KnowledgeBase(knowledge_dir=knowledge_dir, use_vector_db=False),
+                rule_engine=RuleEngine(),
+                llm_client=llm_client,
+                mixer_client=self.mixer_client,
+                mode=agent_mode,
+                cycle_interval=float(agent_config.get("cycle_interval", 0.5)),
+            )
+        else:
+            self.mixing_agent.set_mode(agent_mode)
+            self.mixing_agent.llm = llm_client
+            self.mixing_agent.mixer = self.mixer_client
+
+        self.mixing_agent.set_confidence_threshold(float(agent_config.get("confidence_threshold", 0.6)))
+        self.mixing_agent._max_actions_per_cycle = int(agent_config.get("max_actions_per_cycle", 5))
+        self.mixing_agent.configure_safety_limits(
+            max_fader_step_db=agent_config.get("max_fader_step_db", 1.0),
+            max_eq_step_db=agent_config.get("max_eq_step_db", 2.0),
+            max_comp_threshold_step_db=agent_config.get("max_comp_threshold_step_db", 3.0),
+            max_pan_step=agent_config.get("max_pan_step", 0.25),
+        )
+        self.mixing_agent.update_channel_states_batch(self.collect_agent_channel_states(channels))
+
+        if start and not self.mixing_agent.state.is_running:
+            self.mixing_agent_task = asyncio.create_task(self.mixing_agent.start())
+            self.mixing_agent_task.add_done_callback(
+                lambda t: logger.warning("AI mixing agent task failed: %s", t.exception())
+                if not t.cancelled() and t.exception() else None
+            )
+
+        return self.mixing_agent
+
+    def _sync_runtime_from_auto_soundcheck(self):
+        """Expose the active AutoSoundcheckEngine runtime to server-level modules."""
+        engine = getattr(self, "auto_soundcheck_engine", None)
+        if not engine:
+            return
+
+        engine_mixer = getattr(engine, "mixer_client", None)
+        if engine_mixer is not None:
+            self.mixer_client = engine_mixer
+            self.connection_mode = getattr(engine, "mixer_type", None) or self.connection_mode
+            if self.mixing_agent is not None:
+                self.mixing_agent.mixer = engine_mixer
+
+        engine_audio = getattr(engine, "audio_capture", None)
+        if engine_audio is not None:
+            self.audio_capture = engine_audio
+
+    async def stop_mixing_agent(self):
+        """Stop the AI MixingAgent loop while preserving its last status/history."""
+        if self.mixing_agent:
+            self.mixing_agent.stop()
+        if self.mixing_agent_task:
+            self.mixing_agent_task.cancel()
+            self.mixing_agent_task = None
+        self.agent_auto_apply_enabled = False
+
     async def handle_client_message(self, websocket: WebSocketServerProtocol, message: str):
         try:
             logger.info(f"Received message: {message[:200]}...")  # Log first 200 chars
@@ -501,6 +954,8 @@ class AutoMixerServer:
             success = self.mixer_client.connect()
             
             if success:
+                if self.mixing_agent is not None:
+                    self.mixing_agent.mixer = self.mixer_client
                 await self.broadcast({
                     "type": "connection_status",
                     "connected": True,
@@ -540,6 +995,8 @@ class AutoMixerServer:
             if success:
                 self.mixer_client = client
                 self.connection_mode = 'dlive'
+                if self.mixing_agent is not None:
+                    self.mixing_agent.mixer = self.mixer_client
 
                 # Request channel names from dLive
                 try:
@@ -620,6 +1077,8 @@ class AutoMixerServer:
             success = self.mixer_client.connect()
             
             if success:
+                if self.mixing_agent is not None:
+                    self.mixing_agent.mixer = self.mixer_client
                 await self.broadcast({
                     "type": "connection_status",
                     "connected": True,
@@ -675,6 +1134,8 @@ class AutoMixerServer:
         if self.mixer_client:
             self.mixer_client.disconnect()
             self.mixer_client = None
+            if self.mixing_agent is not None:
+                self.mixing_agent.mixer = None
             mode = self.connection_mode
             self.connection_mode = None
             
@@ -3512,13 +3973,14 @@ class AutoMixerServer:
     
     async def start_auto_soundcheck(self, websocket, device_id: str = None, channels: list = None,
                                     channel_settings: dict = None, channel_mapping: dict = None,
-                                    timings: dict = None):
+                                    timings: dict = None, observe_only: bool = False):
         """Start automatic soundcheck cycle."""
         logger.info("=" * 60)
         logger.info("RECEIVED start_auto_soundcheck MESSAGE")
         logger.info(f"device_id: {device_id}")
         logger.info(f"channels: {channels}")
         logger.info(f"timings: {timings}")
+        logger.info(f"observe_only: {observe_only}")
         logger.info("=" * 60)
         
         if self.auto_soundcheck_running:
@@ -3581,6 +4043,7 @@ class AutoMixerServer:
             return
         
         self.auto_soundcheck_running = True
+        self.auto_soundcheck_observe_only = observe_only
         self.auto_soundcheck_websocket = websocket
         
         # Send initial status immediately before starting task
@@ -3592,7 +4055,7 @@ class AutoMixerServer:
         try:
             self.auto_soundcheck_task = asyncio.create_task(
                 self._run_auto_soundcheck_cycle(websocket, device_id, channels, channel_settings, 
-                                               channel_mapping, timings)
+                                               channel_mapping, timings, observe_only=observe_only)
             )
             logger.info("Auto soundcheck cycle task created successfully")
             
@@ -3604,6 +4067,7 @@ class AutoMixerServer:
             import traceback
             logger.error(traceback.format_exc())
             self.auto_soundcheck_running = False
+            self.auto_soundcheck_observe_only = False
             await self.send_to_client(websocket, {
                 "type": "auto_soundcheck_status",
                 "is_running": False,
@@ -3622,6 +4086,7 @@ class AutoMixerServer:
         
         logger.info("Stopping auto soundcheck cycle...")
         self.auto_soundcheck_running = False
+        self.auto_soundcheck_observe_only = False
         
         # Cancel the task
         if self.auto_soundcheck_task:
@@ -3856,15 +4321,31 @@ class AutoMixerServer:
         await self.broadcast({"type": "auto_compressor_status", "manual_applied": ch})
     
     async def _run_auto_soundcheck_cycle(self, websocket, device_id: str, channels: list,
-                                         channel_settings: dict, channel_mapping: dict, timings: dict):
+                                         channel_settings: dict, channel_mapping: dict, timings: dict,
+                                         observe_only: bool = False):
         """Execute the full auto soundcheck cycle."""
+        observation_base_client = None
         try:
             logger.info("=" * 60)
             logger.info("Starting auto soundcheck cycle execution...")
             logger.info(f"device_id: {device_id}")
             logger.info(f"channels: {channels}")
             logger.info(f"timings: {timings}")
+            logger.info(f"observe_only: {observe_only}")
             logger.info("=" * 60)
+
+            if observe_only:
+                observation_base_client = self._activate_observation_mode(
+                    websocket,
+                    asyncio.get_running_loop(),
+                )
+                await self._send_soundcheck_status(
+                    websocket,
+                    None,
+                    0,
+                    0,
+                    "Observation mode active: all mixer writes are intercepted and logged.",
+                )
             
             # Send initial status
             await self._send_soundcheck_status(websocket, None, 0, 0, "Initializing soundcheck cycle...")
@@ -4149,8 +4630,11 @@ class AutoMixerServer:
             logger.error(traceback.format_exc())
             await self._send_soundcheck_status(websocket, None, 0, 0, f"Error: {str(e)}", error=str(e))
         finally:
+            if observation_base_client is not None:
+                await self._deactivate_observation_mode(websocket, observation_base_client)
             logger.info("Auto soundcheck cycle finished, cleaning up...")
             self.auto_soundcheck_running = False
+            self.auto_soundcheck_observe_only = False
             self.auto_soundcheck_task = None
             self.auto_soundcheck_websocket = None
     
@@ -4185,6 +4669,7 @@ class AutoMixerServer:
                 "type": "auto_soundcheck_status",
                 "is_running": self.auto_soundcheck_running and not complete,
                 "running": self.auto_soundcheck_running and not complete,
+                "observe_only": self.auto_soundcheck_observe_only,
                 "current_step": current_step,
                 "step_progress": step_progress,
                 "progress": step_progress,

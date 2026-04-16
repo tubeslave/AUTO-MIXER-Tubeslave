@@ -308,6 +308,79 @@ console.error(`Error in listener for ${eventType}:`, error);
     });
   }
 
+  // AI Mixing Agent commands
+  startAgent(mode = 'auto', channels = [], useLlm = true, allowAutoApply = true) {
+    this.send({
+      type: 'start_agent',
+      mode,
+      channels,
+      use_llm: useLlm,
+      allow_auto_apply: allowAutoApply
+    });
+  }
+
+  stopAgent() {
+    this.send({ type: 'stop_agent' });
+  }
+
+  emergencyStopAgent() {
+    this.send({ type: 'emergency_stop_agent' });
+  }
+
+  getAgentStatus() {
+    this.send({ type: 'get_agent_status' });
+  }
+
+  setAgentMode(mode = 'auto', channels = [], useLlm = true, allowAutoApply = true, start = false) {
+    this.send({
+      type: 'set_agent_mode',
+      mode,
+      channels,
+      use_llm: useLlm,
+      allow_auto_apply: allowAutoApply,
+      start
+    });
+  }
+
+  updateAgentState(channels = []) {
+    this.send({
+      type: 'update_agent_state',
+      channels
+    });
+  }
+
+  getPendingActions() {
+    this.send({ type: 'get_pending_actions' });
+  }
+
+  approveAction(index) {
+    this.send({ type: 'approve_action', index });
+  }
+
+  approveAllActions() {
+    this.send({ type: 'approve_all_actions' });
+  }
+
+  dismissAction(index) {
+    this.send({ type: 'dismiss_action', index });
+  }
+
+  dismissAllActions() {
+    this.send({ type: 'dismiss_all_actions' });
+  }
+
+  getActionHistory(limit = 50) {
+    this.send({ type: 'get_action_history', limit });
+  }
+
+  getAudioCaptureStatus() {
+    this.send({ type: 'get_audio_capture_status' });
+  }
+
+  getChannelMeters() {
+    this.send({ type: 'get_channel_meters' });
+  }
+
   // Real-time Peak Correction commands (only remaining gain staging functionality)
 
   startRealtimeCorrection(deviceId = null, channels = [], channelSettings = {}, channelMapping = {}, options = {}) {
@@ -639,15 +712,16 @@ console.error(`Error in listener for ${eventType}:`, error);
 
   // ========== Auto Soundcheck Commands ==========
 
-  startAutoSoundcheck(deviceId, channels, channelSettings, channelMapping, timings) {
-    console.log('startAutoSoundcheck called with:', { deviceId, channels, timings });
+  startAutoSoundcheck(deviceId, channels, channelSettings, channelMapping, timings, observeOnly = false) {
+    console.log('startAutoSoundcheck called with:', { deviceId, channels, timings, observeOnly });
     this.send({
       type: 'start_auto_soundcheck',
       device_id: deviceId,
       channels: channels,
       channel_settings: channelSettings,
       channel_mapping: channelMapping,
-      timings: timings
+      timings: timings,
+      observe_only: observeOnly
     });
   }
 
@@ -715,120 +789,8 @@ console.error(`Error in listener for ${eventType}:`, error);
     });
   }
 
-  // ========== Auto Panner ==========
-  startAutoPanner(deviceId, channels, instrumentTypes, spectralCentroids, genre = 'rock') {
-    this.send({
-      type: 'start_auto_panner',
-      device_id: deviceId,
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids,
-      genre: genre
-    });
-  }
-  stopAutoPanner() {
-    this.send({ type: 'stop_auto_panner' });
-  }
-  getAutoPannerStatus() {
-    this.send({ type: 'get_auto_panner_status' });
-  }
-  calculateAutoPanning(channels, instrumentTypes, spectralCentroids) {
-    this.send({
-      type: 'calculate_auto_panning',
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids
-    });
-  }
-  applyAutoPanning() {
-    this.send({ type: 'apply_auto_panning' });
-  }
-
-  // ========== Auto Reverb ==========
-  startAutoReverb(deviceId, channels, instrumentTypes, spectralCentroids, spectralFluxes) {
-    this.send({
-      type: 'start_auto_reverb',
-      device_id: deviceId,
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids,
-      spectral_fluxes: spectralFluxes
-    });
-  }
-  stopAutoReverb() {
-    this.send({ type: 'stop_auto_reverb' });
-  }
-  getAutoReverbStatus() {
-    this.send({ type: 'get_auto_reverb_status' });
-  }
-  calculateAutoReverb(channels, instrumentTypes, spectralCentroids, spectralFluxes) {
-    this.send({
-      type: 'calculate_auto_reverb',
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids,
-      spectral_fluxes: spectralFluxes
-    });
-  }
-  applyAutoReverb() {
-    this.send({ type: 'apply_auto_reverb' });
-  }
-
-  // ========== Auto Gate ==========
-  startAutoGate(deviceId, channels, channelConfigs, settings) {
-    this.send({
-      type: 'start_auto_gate',
-      device_id: deviceId,
-      channels: channels,
-      channel_configs: channelConfigs,
-      settings: settings
-    });
-  }
-  stopAutoGate() {
-    this.send({ type: 'stop_auto_gate' });
-  }
-  getAutoGateStatus() {
-    this.send({ type: 'get_auto_gate_status' });
-  }
-  configureGateChannel(channelId, config) {
-    this.send({
-      type: 'configure_gate_channel',
-      channel_id: channelId,
-      config: config
-    });
-  }
-
-  // ========== Auto Effects ==========
-  startAutoEffects(deviceId, channels, settings) {
-    this.send({
-      type: 'start_auto_effects',
-      device_id: deviceId,
-      channels: channels,
-      settings: settings
-    });
-  }
-  stopAutoEffects() {
-    this.send({ type: 'stop_auto_effects' });
-  }
-  getAutoEffectsStatus() {
-    this.send({ type: 'get_auto_effects_status' });
-  }
-
-  // ========== Cross-Adaptive EQ ==========
-  startCrossAdaptiveEQ(deviceId, channels, settings) {
-    this.send({
-      type: 'start_cross_adaptive_eq',
-      device_id: deviceId,
-      channels: channels,
-      settings: settings
-    });
-  }
-  stopCrossAdaptiveEQ() {
-    this.send({ type: 'stop_cross_adaptive_eq' });
-  }
-  getCrossAdaptiveEQStatus() {
-    this.send({ type: 'get_cross_adaptive_eq_status' });
-  }
 }
 
-export default new WebSocketService();
+const websocketService = new WebSocketService();
+
+export default websocketService;

@@ -3,16 +3,8 @@ import websocketService from '../services/websocket';
 import './AutoFaderTab.css';
 import SignalHint from './SignalHint';
 
-const FADER_MODES = [
-  { id: 'off', label: 'Off' },
-  { id: 'manual', label: 'Manual' },
-  { id: 'auto_assist', label: 'Assist' },
-  { id: 'full_auto', label: 'Auto' },
-];
-
 function AutoFaderTab({ selectedChannels, availableChannels, selectedDevice, audioDevices, globalMode }) {
   const [running, setRunning] = useState(false);
-  const [mode, setMode] = useState('off');
   const [statusMessage, setStatusMessage] = useState('');
   const [channelLevels, setChannelLevels] = useState({});
   const [showSettings, setShowSettings] = useState(false);
@@ -24,7 +16,6 @@ function AutoFaderTab({ selectedChannels, availableChannels, selectedDevice, aud
   useEffect(() => {
     const handle = (data) => {
       if (data.running !== undefined) setRunning(data.running);
-      if (data.mode !== undefined) setMode(data.mode);
       if (data.message) setStatusMessage(data.message);
       if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
       if (data.levels) setChannelLevels(data.levels);
@@ -50,11 +41,6 @@ function AutoFaderTab({ selectedChannels, availableChannels, selectedDevice, aud
   };
   const handleStop = () => websocketService.stopRealtimeFader();
 
-  const handleModeChange = (m) => {
-    setMode(m);
-    websocketService.send({ type: 'set_auto_fader_mode', mode: m });
-  };
-
   const channels = selectedChannels || [];
   if (!channels.length) return (<div><SignalHint moduleKey="auto_fader" /><div className="no-channels">Выберите каналы на вкладке Connect</div></div>);
 
@@ -68,14 +54,6 @@ function AutoFaderTab({ selectedChannels, availableChannels, selectedDevice, aud
             disabled={!selectedDevice || !channels.length}>
             {running ? 'Стоп' : 'Старт'}
           </button>
-          <div className="mode-pills">
-            {FADER_MODES.map(m => (
-              <button key={m.id} className={`pill ${mode === m.id ? 'active' : ''}`}
-                onClick={() => handleModeChange(m.id)}>
-                {m.label}
-              </button>
-            ))}
-          </div>
         </div>
         {statusMessage && <div className="module-status">{statusMessage}</div>}
 

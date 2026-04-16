@@ -19,11 +19,13 @@ class DummyServer:
             "audio": {"device_name": "Test Device"},
         }
         self.auto_soundcheck_running = False
+        self.auto_soundcheck_observe_only = False
         self.auto_soundcheck_engine = None
         self.sent_messages = []
         self.broadcast_messages = []
         self.send_to_client = AsyncMock(side_effect=self._capture_send)
         self.broadcast = AsyncMock(side_effect=self._capture_broadcast)
+        self.start_auto_soundcheck = AsyncMock()
 
     async def _capture_send(self, websocket, payload):
         self.sent_messages.append((websocket, payload))
@@ -43,8 +45,41 @@ async def test_get_auto_soundcheck_status_includes_legacy_aliases():
     assert payload["type"] == "auto_soundcheck_status"
     assert payload["is_running"] is False
     assert payload["running"] is False
+    assert payload["observe_only"] is False
     assert payload["step_progress"] == 0
     assert payload["progress"] == 0
+
+
+@pytest.mark.asyncio
+async def test_start_auto_soundcheck_handler_starts_new_engine_with_observe_only(monkeypatch):
+    server = DummyServer()
+    handlers = register_handlers(server)
+    created = {}
+
+    class FakeEngine:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+            self.state = type("State", (), {"value": "idle"})()
+
+        def start_async(self):
+            self.started = True
+
+    monkeypatch.setattr("handlers.soundcheck_handlers.AutoSoundcheckEngine", FakeEngine)
+
+    await handlers["start_auto_soundcheck"]("ws", {
+        "device_id": "dev1",
+        "channels": [1, 2],
+        "channel_settings": {},
+        "channel_mapping": {},
+        "timings": {"gain_staging": 10},
+        "observe_only": True,
+    })
+
+    assert created["selected_channels"] == [1, 2]
+    assert created["num_channels"] == 2
+    assert created["audio_device_name"] == "dev1"
+    assert created["observe_only"] is True
+    assert server.auto_soundcheck_running is True
 
 
 @pytest.mark.asyncio

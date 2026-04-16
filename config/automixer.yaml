@@ -1,11 +1,11 @@
 # AUTO-MIXER-Tubeslave Configuration
-# Target setup: Allen & Heath dLive + Waves SoundGrid on macOS (M3 Max)
+# Target setup: Behringer Wing Rack over OSC
 
 mixer:
-  type: "dlive"
-  ip: "192.168.3.70"
-  port: 51328
-  protocol: "midi_tcp"
+  type: "wing"
+  ip: "192.168.1.102"
+  port: 2223
+  protocol: "osc"
   tls: false
   midi_base_channel: 0
   keepalive_interval: 5.0
@@ -16,8 +16,8 @@ audio:
   sample_rate: 48000
   block_size: 1024
   channels: 64
-  source: "soundgrid"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
-  # Empty = auto; or substring to match (e.g. "Waves SoundGrid", "soundgrid")
+  source: "sounddevice"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
+  # Empty = auto; or substring to match (e.g. "Dante", "Waves SoundGrid")
   device_name: ""
   buffer_seconds: 5.0
 
@@ -34,8 +34,19 @@ agent:
   max_actions_per_cycle: 5
 
 ai:
-  llm_backend: "ollama"  # ollama, perplexity
-  llm_model: "llama3"
+  # Kimi CLI is the first choice; Ollama stays as an optional fallback if running locally.
+  llm_backend: "auto"  # auto, kimi_cli, openai, ollama, perplexity
+  llm_model: "kimi-k2.5:cloud"
+  kimi_cli_path: ""   # optional; default: kimi on PATH (or KIMI_CLI_PATH / AUTOMIXER_KIMI_CLI)
+  kimi_work_dir: ""   # optional; default: .automixer/kimi_work under repo root
+  kimi_timeout_sec: 120
+  model_fallbacks:
+    - "kimi_cli:default"
+    - "ollama:kimi-k2.5:cloud"
+    - "ollama:qwen3:0.6b"
+  openai_api_key: ""  # or set OPENAI_API_KEY in the environment
+  openai_url: "https://api.openai.com/v1/responses"
+  openai_reasoning_effort: "low"
   ollama_url: "http://localhost:11434"
   perplexity_api_key: ""
   knowledge_dir: ""

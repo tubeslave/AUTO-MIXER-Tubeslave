@@ -27,5 +27,5 @@ def test_automixer_yaml_parses_and_has_expected_sections():
     assert isinstance(data, dict)
     assert "mixer" in data
     assert "audio" in data
-    assert data["mixer"].get("type") == "dlive"
+    assert data["mixer"].get("type") in {"dlive", "wing"}
     assert data["audio"].get("sample_rate") == 48000

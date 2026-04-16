@@ -59,6 +59,14 @@ presets/*.json
 # Config overrides
 config/user_config.json
 
+# Secrets (OpenAI etc.) — use .env.example as template
+.env
+.env.local
+backend/.env
+
+# Kimi CLI isolated workdir (created at runtime)
+.automixer/
+
 # Temporary files
 *.tmp
 *.temp

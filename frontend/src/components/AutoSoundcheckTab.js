@@ -14,6 +14,7 @@ const CYCLE_STEPS = [
 
 function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice, audioDevices, globalMode }) {
   const [running, setRunning] = useState(false);
+  const [observeOnly, setObserveOnly] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
   const [currentStep, setCurrentStep] = useState('');
   const [progress, setProgress] = useState(0);
@@ -43,9 +44,18 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
         setProgress(data.progress);
       }
     };
+    const handleObservation = (data) => {
+      if (data.message) {
+        setLog(prev => [...prev.slice(-80), data.message]);
+      }
+    };
     websocketService.on('auto_soundcheck_status', handle);
+    websocketService.on('auto_soundcheck_observation', handleObservation);
     websocketService.getAutoSoundcheckStatus();
-    return () => websocketService.off('auto_soundcheck_status', handle);
+    return () => {
+      websocketService.off('auto_soundcheck_status', handle);
+      websocketService.off('auto_soundcheck_observation', handleObservation);
+    };
   }, []);
 
   const handleStart = () => {
@@ -59,7 +69,14 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
       auto_fader: timings.faderDuration,
     };
     setLog([]);
-    websocketService.startAutoSoundcheck(selectedDevice, selectedChannels, chSettings, mapping, backendTimings);
+    websocketService.startAutoSoundcheck(
+      selectedDevice,
+      selectedChannels,
+      chSettings,
+      mapping,
+      backendTimings,
+      observeOnly
+    );
   };
   const handleStop = () => websocketService.stopAutoSoundcheck();
 
@@ -71,12 +88,24 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
       <SignalHint moduleKey="auto_soundcheck" />
       <div className="module-card">
         <div className="module-actions">
+          <label className="settings-toggle" style={{ cursor: running ? 'default' : 'pointer' }}>
+            <span>Observation Mode</span>
+            <input
+              type="checkbox"
+              checked={observeOnly}
+              disabled={running}
+              onChange={e => setObserveOnly(e.target.checked)}
+            />
+          </label>
           <button className={`btn-start ${running ? 'stop' : 'go'}`}
             onClick={running ? handleStop : handleStart}
             disabled={!selectedDevice || !channels.length}>
             {running ? 'Стоп' : 'Запустить Soundcheck'}
           </button>
         </div>
+        {observeOnly && !running && (
+          <div className="module-status">Режим наблюдения: пульт не изменяется, все команды только логируются.</div>
+        )}
         {statusMessage && <div className="module-status">{statusMessage}</div>}
 
         {running && (

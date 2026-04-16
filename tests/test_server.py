@@ -132,6 +132,8 @@ class TestAutoMixerServerInit:
         assert server.phase_alignment_controller is None
         assert server.auto_fader_controller is None
         assert server.auto_compressor_controller is None
+        assert server.mixing_agent is None
+        assert server.mixing_agent_task is None
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})

@@ -11,8 +11,6 @@ This is the main entry point for fully automatic operation.
 
 import asyncio
 import logging
-import os
-import sys
 import time
 import threading
 import json
@@ -41,6 +39,7 @@ from signal_metrics import (
     SignalAnalyzer, ChannelMetrics, compare_channels,
     InterChannelMetrics, LevelMetrics, DynamicsMetrics, SpectralMetrics,
 )
+from observation_mixer import ObservationMixerClient
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +195,12 @@ INSTRUMENT_EQ_PRESETS: Dict[str, List[Tuple[float, float, float]]] = {
         (2500.0, 1.5, 2.0),    # Clarity
         (6000.0, 1.0, 1.5),    # Air
     ],
+    "custom": [
+        (60.0, 0.0, 1.0),
+        (300.0, -1.0, 1.5),
+        (3000.0, 0.5, 2.0),
+        (10000.0, 0.5, 1.0),
+    ],
 }
 
 # HPF frequencies per instrument type
@@ -216,6 +221,7 @@ INSTRUMENT_HPF: Dict[str, float] = {
     "playback": 30.0,
     "leadVocal": 80.0,
     "backVocal": 100.0,
+    "custom": 80.0,
 }
 
 # Target LUFS per instrument category
@@ -236,6 +242,7 @@ INSTRUMENT_TARGET_LUFS: Dict[str, float] = {
     "playback": -23.0,
     "leadVocal": -20.0,
     "backVocal": -23.0,
+    "custom": -23.0,
 }
 
 # Compressor presets per instrument: (threshold_db, ratio, attack_ms, release_ms)
@@ -256,6 +263,7 @@ INSTRUMENT_COMPRESSOR: Dict[str, Tuple[float, float, float, float]] = {
     "playback": (-20.0, 2.0, 10.0, 100.0),
     "leadVocal": (-15.0, 3.0, 5.0, 80.0),
     "backVocal": (-18.0, 3.0, 5.0, 80.0),
+    "custom": (-20.0, 2.5, 10.0, 100.0),
 }
 
 # Default pan positions per instrument (-100=L, 0=C, +100=R)
@@ -276,6 +284,7 @@ INSTRUMENT_PAN: Dict[str, float] = {
     "playback": 0.0,
     "leadVocal": 0.0,
     "backVocal": 0.0,   # Spread: BVox1=-30, BVox2=+30
+    "custom": 0.0,
 }
 
 # Target input gain (preamp trim) in dB per instrument
@@ -296,6 +305,7 @@ INSTRUMENT_TARGET_INPUT_DB: Dict[str, float] = {
     "playback": -15.0,
     "leadVocal": -8.0,
     "backVocal": -10.0,
+    "custom": -12.0,
 }
 
 # FX send presets: reverb bus, delay bus (send_bus_number, level_db)
@@ -317,6 +327,7 @@ INSTRUMENT_FX_SENDS: Dict[str, List[Tuple[int, float]]] = {
     "playback": [],
     "leadVocal": [(1, -12.0), (2, -18.0)],         # More reverb + delay
     "backVocal": [(1, -15.0), (2, -20.0)],
+    "custom": [],
 }
 
 # Channels that typically come in correlated pairs (for phase check)
@@ -359,10 +370,13 @@ class AutoSoundcheckEngine:
         block_size: int = 1024,
         buffer_seconds: float = 5.0,
         auto_apply: bool = True,
+        observe_only: bool = False,
+        selected_channels: Optional[List[int]] = None,
         auto_discover: bool = True,
         scan_subnet: bool = True,
         on_state_change: Optional[Callable] = None,
         on_channel_update: Optional[Callable] = None,
+        on_observation: Optional[Callable] = None,
     ):
         self.mixer_type = mixer_type
         self.mixer_ip = mixer_ip
@@ -375,10 +389,17 @@ class AutoSoundcheckEngine:
         self.block_size = block_size
         self.buffer_seconds = buffer_seconds
         self.auto_apply = auto_apply
+        self.observe_only = observe_only
         self.auto_discover = auto_discover
         self.scan_subnet = scan_subnet
+        self.selected_channels = sorted({
+            int(ch) for ch in (selected_channels or [])
+            if int(ch) > 0
+        })
 
         self.mixer_client = None
+        self._real_mixer_client = None
+        self._observation_mixer_client: Optional[ObservationMixerClient] = None
         self.audio_capture: Optional[AudioCapture] = None
         self.feedback_detector: Optional[FeedbackDetector] = None
         self.discovered_mixer: Optional[DiscoveredMixer] = None
@@ -393,6 +414,7 @@ class AutoSoundcheckEngine:
 
         self.on_state_change = on_state_change
         self.on_channel_update = on_channel_update
+        self.on_observation = on_observation
 
         self._applied_channels: set = set()
         self._analyzers: Dict[int, SignalAnalyzer] = {}
@@ -401,8 +423,48 @@ class AutoSoundcheckEngine:
         target = f"{mixer_type or '?'}@{mixer_ip or 'auto'}:{mixer_port or 'auto'}"
         logger.info(
             f"AutoSoundcheckEngine: {mode}, target={target}, "
-            f"channels={num_channels}, sr={sample_rate}"
+            f"channels={self._configured_channel_count()}, sr={sample_rate}, "
+            f"observe_only={observe_only}"
         )
+
+    def _configured_channel_count(self) -> int:
+        if self.selected_channels:
+            return len(self.selected_channels)
+        return self.num_channels
+
+    def _iter_channels(self) -> List[int]:
+        if self.selected_channels:
+            return [ch for ch in self.selected_channels if ch <= self.num_channels]
+        return list(range(1, self.num_channels + 1))
+
+    def _emit_observation(self, operation: Dict[str, Any] = None, message: str = "", summary: Dict[str, Any] = None):
+        if not self.on_observation:
+            return
+        payload = {}
+        if message:
+            payload["message"] = message
+        if operation is not None:
+            payload["operation"] = operation
+            payload.setdefault("message", f"[OBSERVE] {operation.get('message', '')}")
+        if summary is not None:
+            payload["summary"] = summary
+        try:
+            self.on_observation(payload)
+        except Exception:
+            pass
+
+    def _activate_observation_mode(self):
+        if not self.observe_only or not self.mixer_client:
+            return
+        if isinstance(self.mixer_client, ObservationMixerClient):
+            return
+        self._real_mixer_client = self.mixer_client
+        self._observation_mixer_client = ObservationMixerClient(
+            self._real_mixer_client,
+            on_command=lambda op: self._emit_observation(operation=op),
+        )
+        self.mixer_client = self._observation_mixer_client
+        self._emit_observation(message="[OBSERVE] Engine observation mode active: mixer writes are intercepted.")
 
     def _set_state(self, new_state: EngineState, message: str = ""):
         old = self.state
@@ -492,7 +554,10 @@ class AutoSoundcheckEngine:
         if self.mixer_type is None:
             self.mixer_type = "dlive"
         if self.mixer_port is None:
-            self.mixer_port = 51328 if self.mixer_type == "dlive" else 2223
+            if self.mixer_type == "dlive":
+                self.mixer_port = 51328
+            else:
+                self.mixer_port = 2223
 
         self._set_state(
             EngineState.CONNECTING,
@@ -521,6 +586,7 @@ class AutoSoundcheckEngine:
             success = self.mixer_client.connect(timeout=10.0)
             if success:
                 logger.info(f"Connected to {self.mixer_type.upper()} at {self.mixer_ip}:{self.mixer_port}")
+                self._activate_observation_mode()
                 return True
             else:
                 logger.error(f"Failed to connect to {self.mixer_type.upper()}")
@@ -580,12 +646,33 @@ class AutoSoundcheckEngine:
                     f"reducing capture from {self.num_channels} to {num_hw_channels}"
                 )
                 self.num_channels = num_hw_channels
+                if self.selected_channels:
+                    before = list(self.selected_channels)
+                    self.selected_channels = [ch for ch in self.selected_channels if ch <= self.num_channels]
+                    removed = sorted(set(before) - set(self.selected_channels))
+                    if removed:
+                        logger.warning(
+                            "Selected channels exceed device channel count and will be skipped: %s",
+                            removed,
+                        )
 
             logger.info(
                 f"Audio device selected: [{best.index}] '{best.name}' "
                 f"({best.max_input_channels}ch, {best.protocol.value}, "
                 f"score={best.score})"
             )
+
+            device_sample_rate = getattr(best, "default_samplerate", None)
+            if device_sample_rate:
+                selected_sample_rate = int(device_sample_rate)
+                if selected_sample_rate != self.sample_rate:
+                    logger.info(
+                        "Using selected audio device sample rate: %sHz "
+                        "(configured %sHz)",
+                        selected_sample_rate,
+                        self.sample_rate,
+                    )
+                    self.sample_rate = selected_sample_rate
         else:
             logger.warning("No suitable audio device found, using system default")
 
@@ -629,7 +716,7 @@ class AutoSoundcheckEngine:
 
         channel_names: Dict[int, str] = {}
 
-        for ch in range(1, self.num_channels + 1):
+        for ch in self._iter_channels():
             try:
                 name = self.mixer_client.get_channel_name(ch)
                 channel_names[ch] = name
@@ -638,7 +725,7 @@ class AutoSoundcheckEngine:
 
         recognition = scan_and_recognize(channel_names)
 
-        for ch in range(1, self.num_channels + 1):
+        for ch in self._iter_channels():
             info = ChannelInfo(channel=ch)
             info.name = channel_names.get(ch, f"Ch {ch}")
 
@@ -648,7 +735,7 @@ class AutoSoundcheckEngine:
             self.channels[ch] = info
 
         recognized = sum(1 for c in self.channels.values() if c.recognized)
-        logger.info(f"Channel scan complete: {recognized}/{self.num_channels} recognized")
+        logger.info(f"Channel scan complete: {recognized}/{len(self.channels)} recognized")
 
     # ── 3b. Read existing channel settings from mixer ────────────
 
@@ -665,7 +752,7 @@ class AutoSoundcheckEngine:
 
         channels_with_processing = 0
 
-        for ch in range(1, self.num_channels + 1):
+        for ch in self._iter_channels():
             info = self.channels.get(ch)
             if info is None:
                 continue
@@ -703,7 +790,7 @@ class AutoSoundcheckEngine:
                 )
 
         logger.info(
-            f"Channel state read: {channels_with_processing}/{self.num_channels} "
+            f"Channel state read: {channels_with_processing}/{len(self.channels)} "
             f"channels have existing settings"
         )
 
@@ -723,7 +810,7 @@ class AutoSoundcheckEngine:
 
         reset_count = 0
 
-        for ch in range(1, self.num_channels + 1):
+        for ch in self._iter_channels():
             info = self.channels.get(ch)
             if info is None:
                 continue
@@ -943,6 +1030,7 @@ class AutoSoundcheckEngine:
                         "name": info.name,
                         "preset": preset,
                         "peak_db": info.peak_db,
+                        "rms_db": info.rms_db,
                         "lufs": info.lufs,
                         "gain_correction_db": info.gain_correction_db,
                         "eq_applied": info.eq_applied,
@@ -1804,6 +1892,16 @@ class AutoSoundcheckEngine:
         self._stop_event.set()
         self._set_state(EngineState.STOPPED, "Engine stopped")
 
+        if self._observation_mixer_client is not None:
+            summary = self._observation_mixer_client.get_summary()
+            self._emit_observation(
+                message=(
+                    f"[OBSERVE] Engine complete. Intercepted "
+                    f"{summary['total_operations']} mixer write operation(s)."
+                ),
+                summary=summary,
+            )
+
         # Join monitor thread first so it stops accessing audio/mixer
         if self._monitor_thread and self._monitor_thread.is_alive():
             self._monitor_thread.join(timeout=3.0)
@@ -1819,6 +1917,10 @@ class AutoSoundcheckEngine:
                 self.mixer_client.disconnect()
             except Exception:
                 pass
+        if self._real_mixer_client is not None:
+            self.mixer_client = self._real_mixer_client
+        self._observation_mixer_client = None
+        self._real_mixer_client = None
 
     def get_status(self) -> Dict:
         """Get engine status."""
@@ -1879,7 +1981,10 @@ class AutoSoundcheckEngine:
             "audio_running": self.audio_capture.running if self.audio_capture else False,
             "audio_device": audio_device_info,
             "audio_devices_available": audio_devices_list,
-            "total_channels": self.num_channels,
+            "total_channels": len(self.channels) if self.channels else self._configured_channel_count(),
+            "selected_channels": self._iter_channels(),
+            "observe_only": self.observe_only,
+            "applied_channel_ids": sorted(self._applied_channels),
             "channels_with_signal": sum(1 for c in self.channels.values() if c.has_signal),
             "channels_recognized": sum(1 for c in self.channels.values() if c.recognized),
             "discovered": discovery_info,

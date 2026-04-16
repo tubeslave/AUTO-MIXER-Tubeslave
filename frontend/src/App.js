@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import websocketService from './services/websocket';
 import VoiceControlTab from './components/VoiceControlTab';
@@ -8,13 +8,8 @@ import PhaseAlignmentTab from './components/PhaseAlignmentTab';
 import AutoFaderTab from './components/AutoFaderTab';
 import AutoSoundcheckTab from './components/AutoSoundcheckTab';
 import AutoCompressorTab from './components/AutoCompressorTab';
-import AutoEffectsTab from './components/AutoEffectsTab';
-import AutoPannerTab from './components/AutoPannerTab';
-import AutoGateTab from './components/AutoGateTab';
-import AutoReverbTab from './components/AutoReverbTab';
-import CrossAdaptiveEQTab from './components/CrossAdaptiveEQTab';
-import SystemMeasurementTab from './components/SystemMeasurementTab';
 import SettingsTab from './components/SettingsTab';
+import AIAgentTab from './components/AIAgentTab';
 
 // Color map for routing roles
 const ROLE_COLORS = {
@@ -36,14 +31,9 @@ const NAV_ITEMS = [
   { id: 'phaseAlignment', icon: '⟳', label: 'Phase' },
   { id: 'autoEQ', icon: '〰', label: 'EQ' },
   { id: 'autoCompressor', icon: '⬇', label: 'Comp' },
-  { id: 'autoGate', icon: '🚪', label: 'Gate' },
   { id: 'autoFader', icon: '🎚', label: 'Fader' },
-  { id: 'autoPanner', icon: '🎧', label: 'Pan' },
-  { id: 'autoReverb', icon: '🌊', label: 'Reverb' },
-  { id: 'autoEffects', icon: '✨', label: 'FX' },
-  { id: 'crossAdaptiveEQ', icon: '🔀', label: 'X-EQ' },
   { id: 'autoSoundcheck', icon: '🎯', label: 'Soundcheck' },
-  { id: 'systemMeasurement', icon: '📐', label: 'Measure' },
+  { id: 'aiAgent', icon: 'AI', label: 'Agent' },
   { id: 'voice', icon: '🎙', label: 'Voice' },
   { id: 'settings', icon: '⚙', label: 'Settings' },
 ];
@@ -64,13 +54,18 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [routingScheme, setRoutingScheme] = useState([]);
   const [routingChannelCount, setRoutingChannelCount] = useState(64);
+  const mixerIpRef = useRef(mixerIp);
+
+  useEffect(() => {
+    mixerIpRef.current = mixerIp;
+  }, [mixerIp]);
 
   useEffect(() => {
     websocketService.on('connection_status', (data) => {
       setConnecting(false);
       setMixerConnected(data.connected);
       if (data.connected) {
-        setStatusMessage(`Wing: ${mixerIp}`);
+        setStatusMessage(`${data.mode || 'wing'}: ${data.ip || data.host || mixerIpRef.current}`);
       } else {
         if (data.error) {
           setStatusMessage(`Ошибка: ${data.error}`);
@@ -332,7 +327,7 @@ function App() {
               <div className="connect-card">
                 <div className="connect-row">
                   <div className="field">
-                    <label>Wing IP</label>
+                    <label>Wing Rack IP</label>
                     <input
                       type="text"
                       value={mixerIp}
@@ -465,15 +460,8 @@ function App() {
           {activeTab === 'autoEQ' && <AutoEQTab {...sharedProps} />}
           {activeTab === 'autoFader' && <AutoFaderTab {...sharedProps} />}
           {activeTab === 'autoSoundcheck' && <AutoSoundcheckTab {...sharedProps} />}
+          {activeTab === 'aiAgent' && <AIAgentTab {...sharedProps} />}
           {activeTab === 'autoCompressor' && <AutoCompressorTab {...sharedProps} />}
-          {activeTab === 'autoEffects' && <AutoEffectsTab {...sharedProps} />}
-          {activeTab === 'autoPanner' && <AutoPannerTab {...sharedProps} />}
-          {activeTab === 'autoGate' && <AutoGateTab {...sharedProps} />}
-          {activeTab === 'autoReverb' && <AutoReverbTab {...sharedProps} />}
-          {activeTab === 'crossAdaptiveEQ' && <CrossAdaptiveEQTab {...sharedProps} />}
-          {activeTab === 'systemMeasurement' && (
-            <SystemMeasurementTab selectedDevice={selectedDevice} mixerClient={null} globalMode={globalMode} />
-          )}
           {activeTab === 'voice' && <VoiceControlTab globalMode={globalMode} />}
           {activeTab === 'settings' && (
             <SettingsTab

@@ -73,9 +73,26 @@ class ConfigManager:
                 'max_actions_per_cycle': 5,
             },
             'ai': {
-                'llm_backend': 'ollama',
-                'llm_model': 'llama3',
+                'llm_backend': 'auto',
+                'llm_model': 'gpt-5.4',
                 'ollama_url': 'http://localhost:11434',
+                'openai_api_key': '',
+                'openai_url': 'https://api.openai.com/v1/responses',
+                'openai_reasoning_effort': 'low',
+                'kimi_cli_path': '',
+                'kimi_work_dir': '',
+                'kimi_timeout_sec': 120,
+                'model_fallbacks': [
+                    'kimi_cli:default',
+                    'openai:gpt-5.4',
+                    'openai:gpt-4o-mini',
+                    'ollama:kimi-k2.5:cloud',
+                    'ollama:qwen3:30b',
+                    'ollama:qwen3:14b',
+                    'ollama:qwen3:8b',
+                    'ollama:qwen3:0.6b',
+                    'ollama:llama3',
+                ],
                 'perplexity_api_key': '',
                 'knowledge_dir': '',
             },
@@ -133,6 +150,12 @@ class ConfigManager:
             'AUTOMIXER_LOG_LEVEL': ('logging', 'level'),
             'AUTOMIXER_AGENT_MODE': ('agent', 'mode'),
             'AUTOMIXER_LLM_BACKEND': ('ai', 'llm_backend'),
+            'AUTOMIXER_LLM_MODEL': ('ai', 'llm_model'),
+            'OPENAI_API_KEY': ('ai', 'openai_api_key'),
+            'AUTOMIXER_OPENAI_API_KEY': ('ai', 'openai_api_key'),
+            'KIMI_CLI_PATH': ('ai', 'kimi_cli_path'),
+            'AUTOMIXER_KIMI_CLI': ('ai', 'kimi_cli_path'),
+            'AUTOMIXER_KIMI_WORK_DIR': ('ai', 'kimi_work_dir'),
             'AUTOMIXER_PERPLEXITY_KEY': ('ai', 'perplexity_api_key'),
             'AUTOMIXER_SAMPLE_RATE': ('audio', 'sample_rate', int),
         }
@@ -146,6 +169,14 @@ class ConfigManager:
                     self._config[section][key] = converter(val)
                 except (ValueError, KeyError):
                     pass
+
+        fallbacks = os.environ.get('AUTOMIXER_MODEL_FALLBACKS')
+        if fallbacks is not None:
+            self._config['ai']['model_fallbacks'] = [
+                item.strip()
+                for item in fallbacks.split(',')
+                if item.strip()
+            ]
 
     def get(self, path: str, default: Any = None) -> Any:
         """Get config value by dot-separated path (e.g., 'mixer.ip')."""

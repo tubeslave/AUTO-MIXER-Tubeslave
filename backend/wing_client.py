@@ -792,7 +792,10 @@ class WingClient(MixerClientBase):
     def set_compressor(self, channel: int, threshold: float = None, ratio: str = None,
                       knee: int = None, attack: float = None, hold: float = None,
                       release: float = None, gain: float = None, mix: float = None,
-                      det: str = None, env: str = None, auto: int = None):
+                      det: str = None, env: str = None, auto: int = None,
+                      threshold_db: float = None, attack_ms: float = None,
+                      release_ms: float = None, makeup_db: float = None,
+                      enabled: bool = None):
         """
         Set compressor/dynamics parameters
         
@@ -812,6 +815,19 @@ class WingClient(MixerClientBase):
             auto: Auto switch (0/1)
         """
         base = f"/ch/{channel}/dyn"
+        if enabled is not None:
+            self.send(f"{base}/on", 1 if enabled else 0)
+            time.sleep(0.01)
+        if threshold is None:
+            threshold = threshold_db
+        if attack is None:
+            attack = attack_ms
+        if release is None:
+            release = release_ms
+        if gain is None:
+            gain = makeup_db
+        if isinstance(ratio, (int, float)):
+            ratio = f"{float(ratio):.1f}"
         # Small delay between OSC commands to ensure mixer processes them
         if threshold is not None:
             self.send(f"{base}/thr", threshold)
@@ -995,6 +1011,38 @@ class WingClient(MixerClientBase):
         """Set FX mix percentage (0-100)"""
         fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
         self.send(f"/fx/{fx_num}/mix", mix)
+
+    def set_fx_return_level(self, bus: int, level_db: float):
+        """Set an FX return bus level in dB when returns are mapped to buses."""
+        self.send(f"/bus/{bus}/fdr", level_db)
+
+    def set_reverb_send(self, channel: int, level_db: float, send_bus: int = 13):
+        """Compatibility wrapper used by AutoReverb/AutoFX planners."""
+        self.set_channel_send(channel, send_bus, level=level_db, on=1, mode="POST")
+
+    def set_reverb_params(
+        self,
+        channel: int,
+        reverb_type: str,
+        decay_time: float,
+        predelay: float,
+        brightness: float,
+        density: float,
+        hpf: float,
+        lpf: float,
+        fx_slot: str = "FX1",
+    ):
+        """Compatibility wrapper for shared reverb FX parameter setup."""
+        model = str(reverb_type).upper()
+        self.set_fx_model(fx_slot, model)
+        self.set_fx_on(fx_slot, 1)
+        self.set_fx_mix(fx_slot, 100.0)
+        self.set_fx_parameter(fx_slot, 1, decay_time)
+        self.set_fx_parameter(fx_slot, 2, predelay)
+        self.set_fx_parameter(fx_slot, 3, density)
+        self.set_fx_parameter(fx_slot, 4, brightness)
+        self.set_fx_parameter(fx_slot, 5, hpf)
+        self.set_fx_parameter(fx_slot, 6, lpf)
     
     def get_fx_parameter(self, fx_slot: str, parameter: int):
         """Get an FX module parameter value"""
@@ -1578,6 +1626,54 @@ class WingClient(MixerClientBase):
 
     def set_gain(self, channel: int, value_db: float):
         self.set_channel_gain(channel, value_db)
+
+    def set_hpf(self, channel: int, freq: float, enabled: bool = True):
+        self.set_low_cut(channel, enabled=1 if enabled else 0, frequency=freq)
+
+    def set_pan(self, channel: int, pan: float):
+        self.set_channel_pan(channel, pan)
+
+    def set_polarity(self, channel: int, inverted: bool):
+        self.set_channel_phase_invert(channel, 1 if inverted else 0)
+
+    def set_delay(self, channel: int, delay_ms: float, enabled: bool = True):
+        if enabled:
+            self.set_channel_delay(channel, delay_ms, mode="MS")
+        else:
+            self.send(f"/ch/{channel}/in/set/dlyon", 0)
+
+    def set_send_level(self, channel: int, send_bus: int, level_db: float, channel_type: str = "input"):
+        self.set_channel_send(channel, send_bus, level=level_db)
+
+    def reset_channel_eq(self, channel: int):
+        self.set_eq_on(channel, 0)
+        self.send(f"/ch/{channel}/eq/lg", 0.0)
+        for band in range(1, 5):
+            self.send(f"/ch/{channel}/eq/{band}g", 0.0)
+        self.send(f"/ch/{channel}/eq/hg", 0.0)
+
+    def reset_channel_hpf(self, channel: int):
+        self.set_low_cut(channel, enabled=0, frequency=20.0)
+
+    def reset_channel_dynamics(self, channel: int):
+        self.set_compressor_on(channel, 0)
+        self.set_gate_on(channel, 0)
+
+    def reset_channel_processing(self, channel: int):
+        self.reset_channel_eq(channel)
+        self.reset_channel_hpf(channel)
+        self.reset_channel_dynamics(channel)
+        self.set_polarity(channel, False)
+        self.set_delay(channel, 0.0, enabled=False)
+
+    def get_channel_settings(self, channel: int) -> Dict[str, Any]:
+        return {
+            "channel": channel,
+            "name": self.get_channel_name(channel),
+            "fader_db": self.get_fader(channel),
+            "muted": self.get_mute(channel),
+            "gain_db": self.get_channel_gain(channel) or 0.0,
+        }
 
     def recall_scene(self, scene_number: int):
         self.load_snap_by_index(scene_number)

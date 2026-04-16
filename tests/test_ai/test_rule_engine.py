@@ -77,6 +77,33 @@ class TestRuleEngine:
         results = engine.evaluate(state)
         assert len(results) == 0
 
+    def test_vocal_presence_emits_actionable_gain_adjustment(self):
+        """vocal_presence emits an adjustment_db that the agent can apply."""
+        engine = RuleEngine()
+        engine.reset_cooldowns()
+        state = {
+            'feedback_detected': False,
+            'true_peak_db': -12.0,
+            'peak_db': -12.0,
+            'rms_db': -23.0,
+            'instrument': 'lead_vocal',
+            'channel_id': 14,
+            'lufs_momentary': -22.0,
+            'mix_lufs': -18.0,
+            'band_energy': {'sub': -30},
+            'dynamic_range_db': 15,
+            'is_muted': False,
+            'channel_armed': True,
+            'stereo_balance': 0.0,
+            'sibilance_ratio': 0.1,
+        }
+        results = engine.evaluate(state)
+        vocal_results = [r for r in results if r.rule_name == 'vocal_presence']
+        assert len(vocal_results) == 1
+        assert vocal_results[0].parameters['channel'] == 14
+        assert vocal_results[0].parameters['target_lufs'] == pytest.approx(-16.0)
+        assert vocal_results[0].parameters['adjustment_db'] == pytest.approx(3.0)
+
     def test_add_and_remove_custom_rule(self):
         """Custom rules can be added and removed by name."""
         engine = RuleEngine()
