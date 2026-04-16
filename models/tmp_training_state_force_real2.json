@@ -1,0 +1,54 @@
+{
+  "version": "1.1",
+  "run_count": 1,
+  "last_run": {
+    "run_id": "d1c58be42771",
+    "reason": "manual-force-real-mixed",
+    "started": "2026-04-16T22:11:19.515561+00:00",
+    "safe_autostart": false,
+    "dry_run": false,
+    "limits": {
+      "max_dataset_bytes": 21474836480,
+      "max_candidates_per_target": 3,
+      "hf_search_limit": 8
+    },
+    "completed": "2026-04-16T22:13:29.599807+00:00",
+    "results": {
+      "channel_classifier": {
+        "skipped": false,
+        "status": "error",
+        "error": "[Errno 2] No such file or directory: '/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/models/channel_classifier_real2.pt.tmp' -> '/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/models/channel_classifier_real2.pt'"
+      },
+      "gain_pan_predictor": {
+        "skipped": false,
+        "status": "ok"
+      },
+      "mix_console": {
+        "skipped": false,
+        "status": "ok"
+      }
+    },
+    "all_ok": false
+  },
+  "safe_autostart_done": false,
+  "last_success": null,
+  "last_error": "see target status",
+  "targets": {
+    "channel_classifier": {
+      "last_status": "error",
+      "last_error": "[Errno 2] No such file or directory: '/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/models/channel_classifier_real2.pt.tmp' -> '/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/models/channel_classifier_real2.pt'"
+    },
+    "gain_pan_predictor": {
+      "last_status": "ok",
+      "dataset_id": "synthetic:gain_pan_predictor",
+      "trained_at": "2026-04-16T22:13:28.675415+00:00",
+      "output_path": "models/gain_pan_predictor_real2.pt"
+    },
+    "mix_console": {
+      "last_status": "ok",
+      "dataset_id": "synthetic:mix_console",
+      "trained_at": "2026-04-16T22:13:29.599580+00:00",
+      "output_path": "models/mix_console_real2.pt"
+    }
+  }
+}

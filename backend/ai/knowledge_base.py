@@ -5,6 +5,7 @@ Uses ChromaDB for vector similarity search, falls back to keyword matching.
 import os
 import logging
 import hashlib
+import re
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
@@ -63,6 +64,12 @@ class KnowledgeBase:
                 with open(filepath, 'r', encoding='utf-8') as f:
                     content = f.read()
                 category = filename.replace('.md', '')
+                first_line_match = re.match(
+                    r"^<!--\s*source_type\s*:\s*([^\s-]+)\s*-->",
+                    content.strip().splitlines()[0] if content.strip() else "",
+                )
+                if first_line_match:
+                    category = f"study_{first_line_match.group(1).strip()}"
                 sections = self._split_sections(content, category)
                 for section in sections:
                     self.add_entry(section)
@@ -70,6 +77,13 @@ class KnowledgeBase:
                 logger.error(f"Error loading {filename}: {e}")
 
         logger.info(f"Loaded {len(self.entries)} knowledge entries from {self.knowledge_dir}")
+
+    def refresh(self) -> None:
+        """Reload knowledge files from disk."""
+        self.entries = []
+        if self._use_vector_db and self._collection is not None:
+            pass
+        self._load_knowledge_files()
 
     def _split_sections(self, content: str, category: str) -> List[KnowledgeEntry]:
         """Split markdown into sections at ## headings."""

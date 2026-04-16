@@ -183,6 +183,10 @@ class AutoMixerServer:
         self.mixing_agent = None
         self.mixing_agent_task: Optional[asyncio.Task] = None
         self.agent_auto_apply_enabled = False
+
+        # Online ML training service for internet-fed datasets
+        self.agent_training_service = None
+        self._init_training_service()
         
         # Live concert mode: stricter limits, emergency stop
         self.live_mode = False
@@ -318,6 +322,25 @@ class AutoMixerServer:
             except Exception as e:
                 logger.error(f"Error disconnecting mixer: {e}")
             self.mixer_client = None
+
+        # Stop online training service
+        if self.agent_training_service:
+            try:
+                service = self.agent_training_service
+                self.agent_training_service = None
+                def _on_training_stop(task: asyncio.Task) -> None:
+                    try:
+                        task.result()
+                    except Exception as exc:
+                        logger.error("Error stopping training service: %s", exc)
+                try:
+                    loop = asyncio.get_running_loop()
+                    stop_task = loop.create_task(service.stop())
+                    stop_task.add_done_callback(_on_training_stop)
+                except RuntimeError:
+                    asyncio.run(service.stop())
+            except Exception as e:
+                logger.error("Error stopping training service: %s", e)
         
         logger.info("All controllers cleaned up")
     
@@ -359,13 +382,16 @@ class AutoMixerServer:
                 yml = yaml.safe_load(f)
             if not isinstance(yml, dict):
                 return config
-            for key in ("ai", "agent", "audio", "mixer", "websocket", "safety"):
+            for key in ("ai", "agent", "audio", "mixer", "websocket", "safety", "training"):
                 if key not in yml or not isinstance(yml[key], dict):
                     continue
                 if key not in config or not isinstance(config[key], dict):
                     config[key] = {}
                 config[key].update(yml[key])
-            logger.info("Merged settings from %s (ai/agent/audio/mixer/websocket/safety)", yaml_path)
+            logger.info(
+                "Merged settings from %s (ai/agent/audio/mixer/websocket/safety/training)",
+                yaml_path,
+            )
         except Exception as e:
             logger.warning("automixer.yaml merge skipped: %s", e)
         return config
@@ -373,6 +399,7 @@ class AutoMixerServer:
     def _apply_env_config_overrides(self, config: dict) -> dict:
         """Apply runtime env overrides for server-loaded config sections."""
         ai = config.setdefault("ai", {})
+        training = config.setdefault("training", {})
         env_map = {
             "AUTOMIXER_LLM_BACKEND": (ai, "llm_backend", str),
             "AUTOMIXER_LLM_MODEL": (ai, "llm_model", str),
@@ -401,7 +428,116 @@ class AutoMixerServer:
                 for item in fallbacks.split(",")
                 if item.strip()
             ]
+        training_enabled = os.environ.get("AUTOMIXER_TRAINING_ENABLED")
+        if training_enabled is not None:
+            training["enabled"] = training_enabled.lower() in {"1", "true", "yes", "on"}
+        training_interval = os.environ.get("AUTOMIXER_TRAINING_INTERVAL_MINUTES")
+        if training_interval is not None:
+            try:
+                training["interval_minutes"] = int(training_interval)
+            except (TypeError, ValueError):
+                logger.warning("Invalid AUTOMIXER_TRAINING_INTERVAL_MINUTES=%r", training_interval)
+        training_manifest = os.environ.get("AUTOMIXER_TRAINING_MANIFEST_URL")
+        if training_manifest is not None:
+            training["manifest_url"] = training_manifest
+        training_max_dataset_bytes = os.environ.get("AUTOMIXER_TRAINING_MAX_DATASET_BYTES")
+        if training_max_dataset_bytes is not None:
+            try:
+                training["max_dataset_bytes"] = int(training_max_dataset_bytes)
+            except (TypeError, ValueError):
+                logger.warning("Invalid AUTOMIXER_TRAINING_MAX_DATASET_BYTES=%r", training_max_dataset_bytes)
+        training_cleanup_downloads = os.environ.get("AUTOMIXER_TRAINING_CLEANUP_DOWNLOADS")
+        if training_cleanup_downloads is not None:
+            training["cleanup_downloads"] = training_cleanup_downloads.lower() in {"1", "true", "yes", "on"}
+        training_safe_autostart = os.environ.get("AUTOMIXER_TRAINING_SAFE_AUTOSTART")
+        if training_safe_autostart is not None:
+            training["safe_autostart"] = training_safe_autostart.lower() in {"1", "true", "yes", "on"}
+        training_study_enabled = os.environ.get("AUTOMIXER_TRAINING_STUDY_ENABLED")
+        if training_study_enabled is not None:
+            training.setdefault("study", {})["enabled"] = training_study_enabled.lower() in {"1", "true", "yes", "on"}
+        training_study_max_resources = os.environ.get("AUTOMIXER_TRAINING_STUDY_MAX_RESOURCES")
+        if training_study_max_resources is not None:
+            try:
+                training.setdefault("study", {})["max_resources_per_run"] = int(training_study_max_resources)
+            except (TypeError, ValueError):
+                logger.warning("Invalid AUTOMIXER_TRAINING_STUDY_MAX_RESOURCES=%r", training_study_max_resources)
+        training_study_max_resources_per_type = os.environ.get("AUTOMIXER_TRAINING_STUDY_MAX_RESOURCES_PER_TYPE")
+        if training_study_max_resources_per_type is not None:
+            try:
+                training.setdefault("study", {})["max_resources_per_type"] = int(training_study_max_resources_per_type)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Invalid AUTOMIXER_TRAINING_STUDY_MAX_RESOURCES_PER_TYPE=%r",
+                    training_study_max_resources_per_type,
+                )
+        training_study_max_bytes = os.environ.get("AUTOMIXER_TRAINING_STUDY_MAX_BYTES")
+        if training_study_max_bytes is not None:
+            try:
+                training.setdefault("study", {})["max_resource_bytes"] = int(training_study_max_bytes)
+            except (TypeError, ValueError):
+                logger.warning("Invalid AUTOMIXER_TRAINING_STUDY_MAX_BYTES=%r", training_study_max_bytes)
+        training_study_timeout = os.environ.get("AUTOMIXER_TRAINING_STUDY_TIMEOUT")
+        if training_study_timeout is not None:
+            try:
+                training.setdefault("study", {})["timeout_sec"] = float(training_study_timeout)
+            except (TypeError, ValueError):
+                logger.warning("Invalid AUTOMIXER_TRAINING_STUDY_TIMEOUT=%r", training_study_timeout)
+        training_study_allowed_domains = os.environ.get("AUTOMIXER_TRAINING_STUDY_ALLOWED_DOMAINS")
+        if training_study_allowed_domains is not None:
+            parsed = [item.strip() for item in training_study_allowed_domains.split(",") if item.strip()]
+            training.setdefault("study", {})["allowed_domains"] = parsed
+
+        discovery = training.setdefault("discovery", {})
+        training_discovery_enabled = os.environ.get("AUTOMIXER_TRAINING_DISCOVERY_ENABLED")
+        if training_discovery_enabled is not None:
+            discovery["enabled"] = training_discovery_enabled.lower() in {"1", "true", "yes", "on"}
+        training_hf_search_limit = os.environ.get("AUTOMIXER_TRAINING_HF_SEARCH_LIMIT")
+        if training_hf_search_limit is not None:
+            try:
+                discovery["hf_search_limit"] = int(training_hf_search_limit)
+            except (TypeError, ValueError):
+                logger.warning("Invalid AUTOMIXER_TRAINING_HF_SEARCH_LIMIT=%r", training_hf_search_limit)
+        training_discovery_candidates = os.environ.get("AUTOMIXER_TRAINING_MAX_CANDIDATES_PER_TARGET")
+        if training_discovery_candidates is not None:
+            try:
+                discovery["max_candidates_per_target"] = int(training_discovery_candidates)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Invalid AUTOMIXER_TRAINING_MAX_CANDIDATES_PER_TARGET=%r",
+                    training_discovery_candidates,
+                )
+        training_discovery_candidate_urls = os.environ.get("AUTOMIXER_TRAINING_DISCOVERY_CANDIDATE_URLS")
+        if training_discovery_candidate_urls is not None:
+            candidate_urls: List[str] = []
+            raw_urls = training_discovery_candidate_urls.strip()
+            if raw_urls:
+                try:
+                    parsed = json.loads(raw_urls)
+                    if isinstance(parsed, list):
+                        for item in parsed:
+                            if isinstance(item, str) and item.strip():
+                                candidate_urls.append(item.strip())
+                    else:
+                        raise ValueError("candidate_urls must be json array")
+                except Exception:
+                    candidate_urls = [item.strip() for item in raw_urls.split(",") if item.strip()]
+            discovery["candidate_urls"] = candidate_urls
         return config
+
+    def _init_training_service(self) -> None:
+        try:
+            from ml.agent_training_service import AgentTrainingService
+        except Exception as exc:
+            logger.warning("Training service module unavailable: %s", exc)
+            return
+        try:
+            self.agent_training_service = AgentTrainingService(
+                self.config.get("training", {}),
+                _REPO_ROOT,
+            )
+        except Exception as exc:
+            logger.error("Failed to initialize training service: %s", exc, exc_info=True)
+            self.agent_training_service = None
 
     def _load_config(self) -> dict:
         """Load configuration from default_config.json and overlay config/automixer.yaml."""
@@ -4962,6 +5098,9 @@ class AutoMixerServer:
             )
             
             logger.info(f"WebSocket server started on {self.ws_host}:{self.ws_port}")
+
+            if self.agent_training_service:
+                await self.agent_training_service.start_scheduler()
             
             # Wait for shutdown signal
             await self._shutdown_event.wait()

@@ -1,0 +1,52 @@
+{
+  "version": "1.1",
+  "run_count": 3,
+  "last_run": {
+    "run_id": "e99634c70540",
+    "reason": "manual-force",
+    "started": "2026-04-16T21:58:30.111658+00:00",
+    "safe_autostart": false,
+    "dry_run": false,
+    "limits": {
+      "max_dataset_bytes": 21474836480,
+      "max_candidates_per_target": 2,
+      "hf_search_limit": 3
+    },
+    "completed": "2026-04-16T21:58:30.484442+00:00",
+    "results": {
+      "channel_classifier": {
+        "skipped": false,
+        "status": "ok"
+      },
+      "gain_pan_predictor": {
+        "skipped": true,
+        "reason": "disabled"
+      },
+      "mix_console": {
+        "skipped": true,
+        "reason": "disabled"
+      }
+    },
+    "all_ok": true
+  },
+  "safe_autostart_done": false,
+  "last_success": "2026-04-16T21:58:30.484442+00:00",
+  "last_error": null,
+  "targets": {
+    "channel_classifier": {
+      "last_status": "ok",
+      "last_error": "Expected more than 1 value per channel when training, got input size torch.Size([1, 64, 1, 1])",
+      "dataset_id": "channel_classifier.jsonl:1848:1776376710",
+      "trained_at": "2026-04-16T21:58:30.484427+00:00",
+      "output_path": "models/channel_classifier_force.pt"
+    },
+    "gain_pan_predictor": {
+      "last_status": "error",
+      "last_error": "Expecting ',' delimiter: line 2 column 1 (char 59)"
+    },
+    "mix_console": {
+      "last_status": "error",
+      "last_error": "Expecting ',' delimiter: line 2 column 1 (char 55)"
+    }
+  }
+}

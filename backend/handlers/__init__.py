@@ -16,6 +16,7 @@ from .channel_scan_handlers import register_handlers as _channel_scan
 from .eq_handlers import register_handlers as _eq
 from .phase_handlers import register_handlers as _phase
 from .fader_handlers import register_handlers as _fader
+from .training_handlers import register_handlers as _training
 from .automation_handlers import register_handlers as _automation
 from .soundcheck_handlers import register_handlers as _soundcheck
 from .compressor_handlers import register_handlers as _compressor
@@ -23,7 +24,7 @@ from .agent_handlers import register_handlers as _agent
 
 _ALL_REGISTRARS = [
     _audio, _connection, _mixer, _routing, _snapshot, _voice,
-    _gain_staging, _channel_scan, _eq, _phase, _fader,
+    _gain_staging, _channel_scan, _eq, _phase, _fader, _training,
     _automation, _soundcheck, _compressor, _agent,
 ]
 
