@@ -15,6 +15,25 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
+def _get_nested(data: Dict[str, Any], path: str, default: Any = None) -> Any:
+    """Read a nested value using dot notation."""
+    current: Any = data
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return default
+        current = current[part]
+    return current
+
+
+def _set_nested(data: Dict[str, Any], path: str, value: Any):
+    """Write a nested value using dot notation."""
+    parts = path.split(".")
+    current = data
+    for part in parts[:-1]:
+        current = current.setdefault(part, {})
+    current[parts[-1]] = value
+
+
 @dataclass
 class SessionConfig:
     """Configuration for a mixing session."""
@@ -58,15 +77,45 @@ class SessionConfig:
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
 
-@dataclass
+@dataclass(init=False)
 class Session:
     """A mixing session with state and history."""
     id: str
-    config: SessionConfig
+    config: Any
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
     active: bool = True
     events: List[Dict[str, Any]] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __init__(
+        self,
+        id: Optional[str] = None,
+        config: Any = None,
+        created_at: Optional[float] = None,
+        updated_at: Optional[float] = None,
+        active: bool = True,
+        events: Optional[List[Dict[str, Any]]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
+        name: Optional[str] = None,
+        state: str = "active",
+    ):
+        resolved_id = id or session_id or f"session_{int(time.time())}"
+        if config is None:
+            config = SessionConfig(name=name or "default")
+        elif isinstance(config, dict):
+            config = dict(config)
+
+        self.id = resolved_id
+        self.config = config
+        self.created_at = created_at or time.time()
+        self.updated_at = updated_at or self.created_at
+        self.active = active if state is None else (state == "active")
+        self.events = list(events or [])
+        self.metadata = dict(metadata or {})
+        if name is not None:
+            self.metadata.setdefault("name", name)
 
     def add_event(self, event_type: str, data: Dict[str, Any] = None):
         self.events.append({
@@ -75,6 +124,53 @@ class Session:
             "timestamp": time.time(),
         })
         self.updated_at = time.time()
+
+    @property
+    def session_id(self) -> str:
+        return self.id
+
+    @property
+    def name(self) -> str:
+        if "name" in self.metadata:
+            return str(self.metadata["name"])
+        if isinstance(self.config, SessionConfig):
+            return self.config.name
+        return "default"
+
+    @property
+    def state(self) -> str:
+        return "active" if self.active else "ended"
+
+    def to_dict(self) -> Dict[str, Any]:
+        config = self.config.to_dict() if isinstance(self.config, SessionConfig) else dict(self.config or {})
+        data = {
+            "session_id": self.session_id,
+            "name": self.name,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "state": self.state,
+            "config": config,
+            "metadata": dict(self.metadata),
+            "events": list(self.events),
+        }
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Session":
+        config = data.get("config", {})
+        if isinstance(config, dict) and {"venue", "genre", "num_channels", "sample_rate", "target_lufs"} & set(config.keys()):
+            config = SessionConfig.from_dict(config)
+        return cls(
+            session_id=data.get("session_id") or data.get("id"),
+            name=data.get("name"),
+            config=config,
+            created_at=data.get("created_at"),
+            updated_at=data.get("updated_at"),
+            state=data.get("state", "active"),
+            metadata=data.get("metadata", {}),
+            events=data.get("events", []),
+            active=data.get("active", data.get("state", "active") == "active"),
+        )
 
 
 class SessionManager:
@@ -147,6 +243,21 @@ class SessionManager:
                 self._current_session = None
             logger.info(f"Ended session '{session.id}'")
 
+    def destroy_session(self, session_id: str) -> bool:
+        """Compatibility alias that removes a session from memory."""
+        session = self._sessions.pop(session_id, None)
+        if session is None:
+            return False
+        if self._current_session and self._current_session.id == session_id:
+            self._current_session = None
+        path = self._sessions_dir / f"{session_id}.json"
+        if path.exists():
+            try:
+                path.unlink()
+            except OSError:
+                pass
+        return True
+
     def list_sessions(self) -> List[Dict]:
         """List all sessions."""
         result = []
@@ -165,13 +276,15 @@ class SessionManager:
         """Save session to disk."""
         filepath = self._sessions_dir / f"{session.id}.json"
         try:
+            config = session.config.to_dict() if isinstance(session.config, SessionConfig) else dict(session.config or {})
             data = {
                 "id": session.id,
-                "config": session.config.to_dict(),
+                "config": config,
                 "created_at": session.created_at,
                 "updated_at": session.updated_at,
                 "active": session.active,
                 "events": session.events[-100:],  # Keep last 100 events
+                "metadata": session.metadata,
             }
             filepath.write_text(json.dumps(data, indent=2))
         except Exception as e:
@@ -182,7 +295,8 @@ class SessionManager:
         for filepath in self._sessions_dir.glob("*.json"):
             try:
                 data = json.loads(filepath.read_text())
-                config = SessionConfig.from_dict(data.get("config", {}))
+                config_data = data.get("config", {})
+                config = SessionConfig.from_dict(config_data) if isinstance(config_data, dict) else config_data
                 session = Session(
                     id=data["id"],
                     config=config,
@@ -190,8 +304,49 @@ class SessionManager:
                     updated_at=data.get("updated_at", 0),
                     active=data.get("active", False),
                     events=data.get("events", []),
+                    metadata=data.get("metadata", {}),
                 )
                 self._sessions[session.id] = session
             except Exception as e:
                 logger.warning(f"Failed to load session {filepath}: {e}")
         logger.info(f"Loaded {len(self._sessions)} sessions")
+
+    def save_session(self, session_id: str, path: str) -> bool:
+        """Save a single session to a specific path."""
+        session = self._sessions.get(session_id)
+        if session is None:
+            return False
+        data = session.to_dict()
+        Path(path).write_text(json.dumps(data, indent=2))
+        return True
+
+    def load_session(self, path: str) -> Optional[Session]:
+        """Load one session from disk and register it."""
+        try:
+            data = json.loads(Path(path).read_text())
+        except OSError:
+            return None
+        session = Session.from_dict(data)
+        self._sessions[session.session_id] = session
+        return session
+
+    def get_config(self, key: str, default: Any = None) -> Any:
+        """Read dot-notated config from the active session."""
+        if not self._current_session:
+            return default
+        config = self._current_session.config
+        if isinstance(config, SessionConfig):
+            config = config.to_dict()
+        return _get_nested(config, key, default)
+
+    def set_config(self, key: str, value: Any) -> bool:
+        """Write dot-notated config into the active session."""
+        if not self._current_session:
+            return False
+        config = self._current_session.config
+        if isinstance(config, SessionConfig):
+            config = config.to_dict()
+            self._current_session.config = config
+        _set_nested(config, key, value)
+        self._current_session.updated_at = time.time()
+        return True

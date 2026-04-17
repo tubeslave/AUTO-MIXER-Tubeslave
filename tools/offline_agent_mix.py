@@ -83,6 +83,11 @@ class ChannelPlan:
     cross_adaptive_eq: list[dict[str, Any]] = field(default_factory=list)
 
 
+def _agent_actions_to_dict(actions: list[AgentAction]) -> list[dict[str, Any]]:
+    """Serialize action objects for report output."""
+    return [action.__dict__ for action in actions]
+
+
 class VirtualConsole:
     """MixerClient-like adapter for MixingAgent offline actions."""
 
@@ -2121,6 +2126,10 @@ def main() -> int:
     parser.add_argument("--kick-presence-boost-db", type=float, default=0.0)
     parser.add_argument("--kick-focus-cymbal-cut-db", type=float, default=0.0)
     parser.add_argument("--codex-correction-pass", action="store_true")
+    parser.add_argument("--codex-orchestrator", action="store_true")
+    parser.add_argument("--codex-orchestrator-dry-run", action="store_true")
+    parser.add_argument("--codex-orchestrator-allow-llm", action="store_true")
+    parser.add_argument("--codex-orchestrator-max-actions", type=int, default=5)
     parser.add_argument("--soft-master", action="store_true")
     parser.add_argument("--master-target-lufs", type=float, default=-16.0)
     args = parser.parse_args()
@@ -2169,8 +2178,9 @@ def main() -> int:
 
     config = yaml.safe_load((REPO_ROOT / "config" / "automixer.yaml").read_text(encoding="utf-8"))
     ai_config = config.get("ai", {})
+    use_llm_in_orchestrator = bool(args.codex_orchestrator_allow_llm and args.codex_orchestrator)
     llm = None
-    if not args.no_llm:
+    if not args.no_llm and (not args.codex_orchestrator or use_llm_in_orchestrator):
         llm = LLMClient(
             backend=ai_config.get("llm_backend", "auto"),
             model=ai_config.get("llm_model", "gpt-5.4"),
@@ -2182,15 +2192,17 @@ def main() -> int:
         )
 
     console = VirtualConsole(plans)
+    agent_mode = AgentMode.SUGGEST if args.codex_orchestrator else AgentMode.AUTO
     agent = MixingAgent(
         knowledge_base=KnowledgeBase(knowledge_dir=ai_config.get("knowledge_dir") or None, use_vector_db=False),
         rule_engine=RuleEngine(),
         llm_client=llm,
         mixer_client=console,
-        mode=AgentMode.AUTO,
+        mode=agent_mode,
         cycle_interval=0.5,
     )
     agent.configure_safety_limits(max_fader_step_db=3.0, max_fader_db=6.0, max_eq_step_db=2.0, max_comp_threshold_step_db=3.0)
+    agent._max_actions_per_cycle = max(1, int(args.codex_orchestrator_max_actions))
     music_bed_lufs = _music_bed_lufs(plans)
 
     states = {}
@@ -2210,9 +2222,43 @@ def main() -> int:
         })
         states[ch] = state
     agent.update_channel_states_batch(states)
+    codex_dry_run = bool(args.codex_orchestrator_dry_run or args.codex_orchestrator)
 
-    actions = agent._prepare_actions(agent._decide({"channels": states}))
-    asyncio.run(agent._act(actions))
+    orchestration_report = {
+        "enabled": bool(args.codex_orchestrator),
+        "dry_run": codex_dry_run,
+        "llm_enabled": llm is not None,
+        "mode": agent.state.mode.value,
+        "max_actions_per_cycle": agent._max_actions_per_cycle,
+    }
+    if args.codex_orchestrator:
+        try:
+            proposed_actions = agent._prepare_actions(agent._decide({"channels": states}))
+            orchestration_report.update({
+                "proposed_actions": _agent_actions_to_dict(proposed_actions),
+                "proposed_count": len(proposed_actions),
+                "applied_count": 0,
+            })
+            if not codex_dry_run and proposed_actions:
+                agent._queue_pending_actions(proposed_actions)
+                orchestration_report["pending_before_approve"] = len(agent.state.pending_actions)
+                approved = agent.approve_all_pending()
+                orchestration_report["applied_count"] = approved
+            else:
+                orchestration_report["pending_before_approve"] = 0
+            orchestration_report["mode"] = "orchestrated"
+        except Exception as e:
+            orchestration_report["error"] = str(e)
+    else:
+        actions = agent._prepare_actions(agent._decide({"channels": states}))
+        asyncio.run(agent._act(actions))
+        orchestration_report.update({
+            "proposed_actions": _agent_actions_to_dict(actions),
+            "proposed_count": len(actions),
+            "applied_count": len(actions),
+            "pending_before_approve": 0,
+            "mode": "direct",
+        })
 
     codex_corrections: dict[str, Any] = {"enabled": False, "actions": []}
     if args.codex_correction_pass:
@@ -2327,6 +2373,7 @@ def main() -> int:
         "input_dir": str(input_dir),
         "output": str(output),
         "sample_rate": sr,
+        "codex_orchestrator": orchestration_report,
         "duration_sec": round(target_len / sr, 3),
         "final_peak_dbfs": round(amp_to_db(float(np.max(np.abs(mix)))), 2),
         "final_lufs": round(final_lufs, 2) if final_lufs is not None and np.isfinite(final_lufs) else None,

@@ -29,7 +29,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from scipy.fft import fft, ifft
-from scipy.signal import convolve, correlate, find_peaks
+from scipy.signal import convolve, correlate, find_peaks, welch, csd, coherence
 from scipy.interpolate import interp1d
 
 logger = logging.getLogger(__name__)
@@ -425,6 +425,108 @@ class SystemMeasurement:
                    f"RT60 {np.mean(rt60_data.rt60) if rt60_data.rt60 else 0:.2f}s")
         
         return result
+
+    def analyze_transfer_function(self, reference_signal: np.ndarray, measured_signal: np.ndarray) -> MeasurementResult:
+        """
+        Analyze a real system using reference-vs-microphone transfer function.
+
+        This path is intended for a live mixer workflow where one Dante/reference
+        channel carries the signal sent to the PA and another channel carries the
+        measurement microphone return.
+        """
+        self.state = MeasurementState.PROCESSING
+
+        ref = np.asarray(reference_signal, dtype=np.float64).flatten()
+        meas = np.asarray(measured_signal, dtype=np.float64).flatten()
+
+        if len(ref) == 0 or len(meas) == 0:
+            self.state = MeasurementState.ERROR
+            raise ValueError("Reference and measured signals must be non-empty")
+
+        length = min(len(ref), len(meas))
+        ref = ref[:length] - np.mean(ref[:length])
+        meas = meas[:length] - np.mean(meas[:length])
+
+        if length < max(2048, self.sample_rate // 2):
+            self.state = MeasurementState.ERROR
+            raise ValueError("Not enough audio for transfer-function analysis")
+
+        freqs, transfer, coherence_vals = self._calculate_transfer_function(ref, meas)
+        magnitude_db = 20 * np.log10(np.abs(transfer) + 1e-10)
+        phase_deg = np.degrees(np.unwrap(np.angle(transfer)))
+
+        impulse_response = np.fft.irfft(transfer, n=self.fft_size)
+        impulse_response /= np.max(np.abs(impulse_response)) + 1e-10
+        rt60_data = self._calculate_rt60(impulse_response)
+
+        result = MeasurementResult()
+        result.magnitude_response = FrequencyResponse(
+            frequencies=freqs,
+            magnitude_db=magnitude_db,
+            phase_deg=phase_deg,
+            coherence=coherence_vals,
+        )
+        result.phase_response = FrequencyResponse(
+            frequencies=freqs,
+            magnitude_db=magnitude_db,
+            phase_deg=phase_deg,
+            coherence=coherence_vals,
+        )
+        result.impulse_response = impulse_response
+        result.rt60 = rt60_data
+        result.timestamp = time.time()
+
+        band_mask = (freqs >= 80.0) & (freqs <= 12000.0)
+        if np.any(band_mask):
+            result.overall_quality = float(np.clip(np.mean(coherence_vals[band_mask]), 0.0, 1.0))
+        else:
+            result.overall_quality = float(np.clip(np.mean(coherence_vals), 0.0, 1.0))
+
+        self.state = MeasurementState.COMPLETE
+        logger.info(
+            "Transfer-function analysis complete: %d bins, quality %.2f",
+            len(freqs),
+            result.overall_quality,
+        )
+        return result
+
+    def _calculate_transfer_function(
+        self,
+        reference_signal: np.ndarray,
+        measured_signal: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Estimate complex transfer function H(f)=Y(f)/X(f) with real coherence."""
+        nperseg = min(8192, len(reference_signal), len(measured_signal))
+        nperseg = max(1024, int(2 ** np.floor(np.log2(nperseg))))
+        noverlap = nperseg // 2
+        eps = 1e-12
+
+        freqs, pxy = csd(
+            measured_signal,
+            reference_signal,
+            fs=self.sample_rate,
+            nperseg=nperseg,
+            noverlap=noverlap,
+            scaling="spectrum",
+        )
+        _, pxx = welch(
+            reference_signal,
+            fs=self.sample_rate,
+            nperseg=nperseg,
+            noverlap=noverlap,
+            scaling="spectrum",
+        )
+        coh_freqs, coh = coherence(
+            reference_signal,
+            measured_signal,
+            fs=self.sample_rate,
+            nperseg=nperseg,
+            noverlap=noverlap,
+        )
+
+        transfer = pxy / (pxx + eps)
+        coherence_interp = np.interp(freqs, coh_freqs, coh, left=0.0, right=0.0)
+        return freqs, transfer, coherence_interp
     
     def _average_responses(self) -> np.ndarray:
         """Average impulse responses from all positions (spatial averaging)."""
@@ -668,9 +770,65 @@ class SystemMeasurementController:
             'num_corrections': len(corrections),
             'corrections': [c.to_dict() for c in corrections],
             'frequencies': result.magnitude_response.frequencies.tolist(),
-            'magnitude': result.magnitude_response.magnitude_db.tolist()
+            'magnitude': result.magnitude_response.magnitude_db.tolist(),
+            'phase': result.phase_response.phase_deg.tolist(),
+            'coherence': result.magnitude_response.coherence.tolist(),
         }
-    
+
+    def analyze_reference_measurement(self, reference_signal: np.ndarray, measurement_signal: np.ndarray) -> Dict[str, Any]:
+        """Analyze live reference-vs-mic capture and calculate corrective EQ."""
+        result = self.measurement.analyze_transfer_function(reference_signal, measurement_signal)
+        self.last_result = result
+
+        corrections = self.correction_calculator.calculate_corrections(result)
+        self.applied_corrections = corrections
+
+        return {
+            'status': 'complete',
+            'quality': result.overall_quality,
+            'rt60': result.rt60.to_dict(),
+            'num_corrections': len(corrections),
+            'corrections': [c.to_dict() for c in corrections],
+            'frequencies': result.magnitude_response.frequencies.tolist(),
+            'magnitude': result.magnitude_response.magnitude_db.tolist(),
+            'phase': result.phase_response.phase_deg.tolist(),
+            'coherence': result.magnitude_response.coherence.tolist(),
+        }
+
+    def reset_corrections(self, target_bus: TargetBus, bus_id: int, num_bands: int = 8) -> bool:
+        """Reset EQ on the target bus to a flat state."""
+        if not self.mixer_client:
+            logger.error("No mixer client available")
+            return False
+
+        target = target_bus.value.lower()
+        try:
+            if target == TargetBus.MASTER.value:
+                if hasattr(self.mixer_client, "set_main_eq_on"):
+                    self.mixer_client.set_main_eq_on(bus_id, 0)
+                setter = getattr(self.mixer_client, "set_main_eq_band", None)
+            elif target == TargetBus.GROUP.value:
+                if hasattr(self.mixer_client, "set_bus_eq_on"):
+                    self.mixer_client.set_bus_eq_on(bus_id, 0)
+                setter = getattr(self.mixer_client, "set_bus_eq_band", None)
+            elif target == TargetBus.MATRIX.value:
+                if hasattr(self.mixer_client, "set_matrix_eq_on"):
+                    self.mixer_client.set_matrix_eq_on(bus_id, 0)
+                setter = getattr(self.mixer_client, "set_matrix_eq_band", None)
+            else:
+                raise ValueError(f"Unsupported target bus: {target_bus}")
+
+            if setter is None:
+                raise AttributeError(f"Mixer client does not support {target} EQ reset")
+
+            for band in range(1, num_bands + 1):
+                setter(bus_id, band, gain=0.0)
+            self.applied_corrections = []
+            return True
+        except Exception as e:
+            logger.error("Failed to reset %s EQ %s: %s", target, bus_id, e)
+            return False
+
     def apply_corrections(self, target_bus: TargetBus, bus_id: int) -> bool:
         """
         Apply calculated corrections to mixer.
@@ -686,20 +844,41 @@ class SystemMeasurementController:
             logger.error("No mixer client available")
             return False
         
+        if not self.applied_corrections:
+            logger.warning("No calculated corrections to apply")
+            return False
+
+        target = target_bus.value.lower()
         try:
-            for i, correction in enumerate(self.applied_corrections):
-                # Send OSC command
-                # Format depends on mixer (e.g., /bus/{id}/eq/{band}/gain)
-                if hasattr(self.mixer_client, 'set_eq_band'):
-                    self.mixer_client.set_eq_band(
-                        bus_id,
-                        band=i,
-                        frequency=correction.frequency,
-                        gain=correction.gain_db,
-                        q=correction.q
-                    )
-            
-            logger.info(f"Applied {len(self.applied_corrections)} corrections to {target_bus.value} {bus_id}")
+            if target == TargetBus.MASTER.value:
+                if hasattr(self.mixer_client, "set_main_eq_on"):
+                    self.mixer_client.set_main_eq_on(bus_id, 1)
+                setter = getattr(self.mixer_client, "set_main_eq_band", None)
+            elif target == TargetBus.GROUP.value:
+                if hasattr(self.mixer_client, "set_bus_eq_on"):
+                    self.mixer_client.set_bus_eq_on(bus_id, 1)
+                setter = getattr(self.mixer_client, "set_bus_eq_band", None)
+            elif target == TargetBus.MATRIX.value:
+                if hasattr(self.mixer_client, "set_matrix_eq_on"):
+                    self.mixer_client.set_matrix_eq_on(bus_id, 1)
+                setter = getattr(self.mixer_client, "set_matrix_eq_band", None)
+            else:
+                raise ValueError(f"Unsupported target bus: {target_bus}")
+
+            if setter is None:
+                raise AttributeError(f"Mixer client does not support {target} EQ application")
+
+            max_bands = 8
+            for band_index, correction in enumerate(self.applied_corrections[:max_bands], start=1):
+                setter(
+                    bus_id,
+                    band=band_index,
+                    freq=correction.frequency,
+                    gain=correction.gain_db,
+                    q=correction.q,
+                )
+
+            logger.info(f"Applied {min(len(self.applied_corrections), max_bands)} corrections to {target_bus.value} {bus_id}")
             return True
             
         except Exception as e:

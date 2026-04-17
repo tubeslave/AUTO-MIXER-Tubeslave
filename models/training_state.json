@@ -1,10 +1,10 @@
 {
   "version": "1.1",
-  "run_count": 6,
+  "run_count": 7,
   "last_run": {
-    "run_id": "9c4d4a8cef27",
-    "reason": "manual_realtime",
-    "started": "2026-04-16T23:15:27.547785+00:00",
+    "run_id": "874ad62386b0",
+    "reason": "scheduler",
+    "started": "2026-04-17T05:14:58.405800+00:00",
     "safe_autostart": false,
     "dry_run": false,
     "limits": {
@@ -351,18 +351,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "AudioRAG: A Challenging Benchmark for Audio Reasoning and Information Retrieval",
-          "url": "http://arxiv.org/abs/2602.10656v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_audiorag_a_challenging_benchmark_for_aud_1af76625da85.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Audio Mamba: Bidirectional State Space Model for Audio Representation Learning",
           "url": "http://arxiv.org/abs/2406.03344v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_audio_mamba_bidirectional_state_space_mo_bc0e656946d2.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "AudioRAG: A Challenging Benchmark for Audio Reasoning and Information Retrieval",
+          "url": "http://arxiv.org/abs/2602.10656v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_audiorag_a_challenging_benchmark_for_aud_1af76625da85.md"
         },
         {
           "source_type": "articles",
@@ -607,18 +607,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Challenge on Sound Scene Synthesis: Evaluating Text-to-Audio Generation",
-          "url": "http://arxiv.org/abs/2410.17589v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_challenge_on_sound_scene_synthesis_evalu_8b2a554a5558.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Can Large Audio-Language Models Truly Hear? Tackling Hallucinations with Multi-Task Assessment and Stepwise Audio Reasoning",
           "url": "http://arxiv.org/abs/2410.16130v2",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_can_large_audio-language_models_truly_he_e9eb1573547e.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Challenge on Sound Scene Synthesis: Evaluating Text-to-Audio Generation",
+          "url": "http://arxiv.org/abs/2410.17589v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_challenge_on_sound_scene_synthesis_evalu_8b2a554a5558.md"
         },
         {
           "source_type": "articles",
@@ -775,18 +775,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Fast Timing-Conditioned Latent Audio Diffusion",
-          "url": "http://arxiv.org/abs/2402.04825v3",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_fast_timing-conditioned_latent_audio_dif_79b1bb3dcf40.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Blind Audio Bandwidth Extension: A Diffusion-Based Zero-Shot Approach",
           "url": "http://arxiv.org/abs/2306.01433v2",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_blind_audio_bandwidth_extension_a_diffus_0f547a6c68b3.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Fast Timing-Conditioned Latent Audio Diffusion",
+          "url": "http://arxiv.org/abs/2402.04825v3",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_fast_timing-conditioned_latent_audio_dif_79b1bb3dcf40.md"
         },
         {
           "source_type": "articles",
@@ -807,18 +807,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Unsupervised Musical Object Discovery from Audio",
-          "url": "http://arxiv.org/abs/2311.07534v2",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_unsupervised_musical_object_discovery_fr_02138e55f97a.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "MMMOS: Multi-domain Multi-axis Audio Quality Assessment",
           "url": "http://arxiv.org/abs/2507.04094v2",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_mmmos_multi-domain_multi-axis_audio_qual_eea8042100c4.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Unsupervised Musical Object Discovery from Audio",
+          "url": "http://arxiv.org/abs/2311.07534v2",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_unsupervised_musical_object_discovery_fr_02138e55f97a.md"
         },
         {
           "source_type": "articles",
@@ -951,18 +951,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "DreamAudio: Customized Text-to-Audio Generation with Diffusion Models",
-          "url": "http://arxiv.org/abs/2509.06027v2",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_dreamaudio_customized_text-to-audio_gene_9b166f49d3f2.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "InSE-NET: A Perceptually Coded Audio Quality Model based on CNN",
           "url": "http://arxiv.org/abs/2108.13087v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_inse-net_a_perceptually_coded_audio_qual_d541f5d1c8e5.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "DreamAudio: Customized Text-to-Audio Generation with Diffusion Models",
+          "url": "http://arxiv.org/abs/2509.06027v2",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_dreamaudio_customized_text-to-audio_gene_9b166f49d3f2.md"
         },
         {
           "source_type": "articles",
@@ -1143,18 +1143,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Sound Adversarial Audio-Visual Navigation",
-          "url": "http://arxiv.org/abs/2202.10910v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_sound_adversarial_audio-visual_navigatio_cdcbff03e591.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "DARAS: Dynamic Audio-Room Acoustic Synthesis for Blind Room Impulse Response Estimation",
           "url": "http://arxiv.org/abs/2507.08135v2",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_daras_dynamic_audio-room_acoustic_synthe_c87dec1860e1.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Sound Adversarial Audio-Visual Navigation",
+          "url": "http://arxiv.org/abs/2202.10910v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_sound_adversarial_audio-visual_navigatio_cdcbff03e591.md"
         },
         {
           "source_type": "articles",
@@ -1511,18 +1511,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "The Shape of RemiXXXes to Come: Audio Texture Synthesis with Time-frequency Scattering",
-          "url": "http://arxiv.org/abs/1906.09334v2",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_the_shape_of_remixxxes_to_come_audio_tex_36f15f44eba0.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Multi-encoder attention-based architectures for sound recognition with partial visual assistance",
           "url": "http://arxiv.org/abs/2209.12826v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_multi-encoder_attention-based_architectu_d3635cf8d6f0.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "The Shape of RemiXXXes to Come: Audio Texture Synthesis with Time-frequency Scattering",
+          "url": "http://arxiv.org/abs/1906.09334v2",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_the_shape_of_remixxxes_to_come_audio_tex_36f15f44eba0.md"
         },
         {
           "source_type": "articles",
@@ -2215,18 +2215,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Compressed Sensing Signal Recovery via Forward-Backward Pursuit",
-          "url": "http://arxiv.org/abs/1210.5626v2",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_compressed_sensing_signal_recovery_via_f_0327e9dc3f97.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Sanidha: A Studio Quality Multi-Modal Dataset for Carnatic Music",
           "url": "http://arxiv.org/abs/2501.06959v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_sanidha_a_studio_quality_multi-modal_dat_a3dab907e512.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Compressed Sensing Signal Recovery via Forward-Backward Pursuit",
+          "url": "http://arxiv.org/abs/1210.5626v2",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_compressed_sensing_signal_recovery_via_f_0327e9dc3f97.md"
         },
         {
           "source_type": "articles",
@@ -2271,18 +2271,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Cross-Laplacians Based Topological Signal Processing over Cell MultiComplexes",
-          "url": "http://arxiv.org/abs/2504.07671v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_cross-laplacians_based_topological_signa_73c71f64e0dc.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Multicarrier ISAC: Advances in Waveform Design, Signal Processing and Learning under Non-Idealities",
           "url": "http://arxiv.org/abs/2406.18476v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_multicarrier_isac_advances_in_waveform_d_29d9a05542f8.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Cross-Laplacians Based Topological Signal Processing over Cell MultiComplexes",
+          "url": "http://arxiv.org/abs/2504.07671v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_cross-laplacians_based_topological_signa_73c71f64e0dc.md"
         },
         {
           "source_type": "articles",
@@ -2943,18 +2943,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Monitoring and Optimization for Power Grids: A Signal Processing Perspective",
-          "url": "http://arxiv.org/abs/1302.0885v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_monitoring_and_optimization_for_power_gr_5c8f21e25407.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Analyzing Byte-Pair Encoding on Monophonic and Polyphonic Symbolic Music: A Focus on Musical Phrase Segmentation",
           "url": "http://arxiv.org/abs/2410.01448v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_analyzing_byte-pair_encoding_on_monophon_359b15282fb8.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Monitoring and Optimization for Power Grids: A Signal Processing Perspective",
+          "url": "http://arxiv.org/abs/1302.0885v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_monitoring_and_optimization_for_power_gr_5c8f21e25407.md"
         },
         {
           "source_type": "articles",
@@ -2991,18 +2991,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Signal Processing on Product Spaces",
-          "url": "http://arxiv.org/abs/2303.10495v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_signal_processing_on_product_spaces_68930d05fec6.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "GANkyoku: a Generative Adversarial Network for Shakuhachi Music",
           "url": "http://arxiv.org/abs/1911.10119v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_gankyoku_a_generative_adversarial_networ_af634d2a0002.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Signal Processing on Product Spaces",
+          "url": "http://arxiv.org/abs/2303.10495v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_signal_processing_on_product_spaces_68930d05fec6.md"
         },
         {
           "source_type": "articles",
@@ -3055,18 +3055,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "The GigaMIDI Dataset with Features for Expressive Music Performance Detection",
-          "url": "http://arxiv.org/abs/2502.17726v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_the_gigamidi_dataset_with_features_for_e_2eef8de93259.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Building Generalized Neo-Riemannian Groups of Musical Transformations as Extensions",
           "url": "http://arxiv.org/abs/1111.4451v4",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_building_generalized_neo-riemannian_grou_229f42842374.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "The GigaMIDI Dataset with Features for Expressive Music Performance Detection",
+          "url": "http://arxiv.org/abs/2502.17726v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_the_gigamidi_dataset_with_features_for_e_2eef8de93259.md"
         },
         {
           "source_type": "articles",
@@ -3095,18 +3095,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "A Novel Signal Processing Strategy for Short-Range Laser Feedback Interferometry Sensors",
-          "url": "http://arxiv.org/abs/2506.10705v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_a_novel_signal_processing_strategy_for_s_91b891ac1a36.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Natural Language Processing for Music Knowledge Discovery",
           "url": "http://arxiv.org/abs/1807.02200v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_natural_language_processing_for_music_kn_1abe8d640441.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "A Novel Signal Processing Strategy for Short-Range Laser Feedback Interferometry Sensors",
+          "url": "http://arxiv.org/abs/2506.10705v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_a_novel_signal_processing_strategy_for_s_91b891ac1a36.md"
         },
         {
           "source_type": "articles",
@@ -3263,18 +3263,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Low-Complexity Memoryless Linearizer for Analog-to-Digital Interfaces",
-          "url": "http://arxiv.org/abs/2304.05849v2",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_low-complexity_memoryless_linearizer_for_a1e9bac7fd4f.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "A Functional Taxonomy of Music Generation Systems",
           "url": "http://arxiv.org/abs/1812.04186v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_a_functional_taxonomy_of_music_generatio_25202f7e3dfc.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Low-Complexity Memoryless Linearizer for Analog-to-Digital Interfaces",
+          "url": "http://arxiv.org/abs/2304.05849v2",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_low-complexity_memoryless_linearizer_for_a1e9bac7fd4f.md"
         },
         {
           "source_type": "articles",
@@ -3343,10 +3343,18 @@
         {
           "source_type": "videos",
           "source": "archive.org",
-          "title": "JeffMACBeats - Victory | Drake type beat | FREE BEAT LINK | Lofi | Dark | Trap",
-          "url": "https://archive.org/details/youtube-O7ZQ07NN-34",
+          "title": "Let's Build Bob's Audio Mixer, Part 2: Drilling and Mounting Parts",
+          "url": "https://archive.org/details/youtube-hMJjq-zxBms",
           "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_jeffmacbeats_-_victory_drake_type_beat_f_10da97dbbf0c.md"
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_let_s_build_bob_s_audio_mixer_part_2_dri_9bf093e444cc.md"
+        },
+        {
+          "source_type": "videos",
+          "source": "archive.org",
+          "title": "Holy Quran Translation Arabic - French News (Reciter Mishary Rashed Alafasy) MP4",
+          "url": "https://archive.org/details/quranarabicfrenchmp4",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_holy_quran_translation_arabic_-_french_n_7f741270d275.md"
         },
         {
           "source_type": "videos",
@@ -3359,10 +3367,18 @@
         {
           "source_type": "videos",
           "source": "archive.org",
-          "title": "Let's Build Bob's Audio Mixer, Part 4: Finishing and Testing",
-          "url": "https://archive.org/details/youtube-gXDFWz7rBqk",
+          "title": "JeffMACBeats - Victory | Drake type beat | FREE BEAT LINK | Lofi | Dark | Trap",
+          "url": "https://archive.org/details/youtube-O7ZQ07NN-34",
           "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_let_s_build_bob_s_audio_mixer_part_4_fin_fe69b8e9bbbd.md"
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_jeffmacbeats_-_victory_drake_type_beat_f_10da97dbbf0c.md"
+        },
+        {
+          "source_type": "videos",
+          "source": "archive.org",
+          "title": "Granular Synthesis with Audio Damage Quanta | Beginner Tutorial | Synths 2019",
+          "url": "https://archive.org/details/youtube-NBPj_bxqbWg",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_granular_synthesis_with_audio_damage_qua_031fe5da6c68.md"
         },
         {
           "source_type": "videos",
@@ -3375,26 +3391,10 @@
         {
           "source_type": "videos",
           "source": "archive.org",
-          "title": "Aux Tip with Pro Tools! When iLok works...",
-          "url": "https://archive.org/details/youtube-v5JaSL8xV_8",
+          "title": "Let's Build Bob's Audio Mixer, Part 4: Finishing and Testing",
+          "url": "https://archive.org/details/youtube-gXDFWz7rBqk",
           "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_aux_tip_with_pro_tools_when_ilok_works.._00a80868eacd.md"
-        },
-        {
-          "source_type": "videos",
-          "source": "archive.org",
-          "title": "Let's Build Bob's Audio Mixer, Part 2: Drilling and Mounting Parts",
-          "url": "https://archive.org/details/youtube-hMJjq-zxBms",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_let_s_build_bob_s_audio_mixer_part_2_dri_9bf093e444cc.md"
-        },
-        {
-          "source_type": "videos",
-          "source": "archive.org",
-          "title": "Granular Synthesis with Audio Damage Quanta | Beginner Tutorial | Synths 2019",
-          "url": "https://archive.org/details/youtube-NBPj_bxqbWg",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_granular_synthesis_with_audio_damage_qua_031fe5da6c68.md"
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_let_s_build_bob_s_audio_mixer_part_4_fin_fe69b8e9bbbd.md"
         },
         {
           "source_type": "videos",
@@ -3415,18 +3415,18 @@
         {
           "source_type": "videos",
           "source": "archive.org",
-          "title": "Mirillis Action! 1.31.5 GÇô Full",
-          "url": "https://archive.org/details/MirillisAction1.31.5GCoFull",
+          "title": "Aux Tip with Pro Tools! When iLok works...",
+          "url": "https://archive.org/details/youtube-v5JaSL8xV_8",
           "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_mirillis_action_1.31.5_g_full_c0f5ab1cbd22.md"
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_aux_tip_with_pro_tools_when_ilok_works.._00a80868eacd.md"
         },
         {
           "source_type": "videos",
           "source": "archive.org",
-          "title": "Holy Quran Translation Arabic - French News (Reciter Mishary Rashed Alafasy) MP4",
-          "url": "https://archive.org/details/quranarabicfrenchmp4",
+          "title": "Mirillis Action! 1.31.5 GÇô Full",
+          "url": "https://archive.org/details/MirillisAction1.31.5GCoFull",
           "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_holy_quran_translation_arabic_-_french_n_7f741270d275.md"
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_mirillis_action_1.31.5_g_full_c0f5ab1cbd22.md"
         },
         {
           "source_type": "videos",
@@ -3785,18 +3785,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "AudioRAG: A Challenging Benchmark for Audio Reasoning and Information Retrieval",
-          "url": "http://arxiv.org/abs/2602.10656v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_audiorag_a_challenging_benchmark_for_aud_1af76625da85.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Audio Mamba: Bidirectional State Space Model for Audio Representation Learning",
           "url": "http://arxiv.org/abs/2406.03344v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_audio_mamba_bidirectional_state_space_mo_bc0e656946d2.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "AudioRAG: A Challenging Benchmark for Audio Reasoning and Information Retrieval",
+          "url": "http://arxiv.org/abs/2602.10656v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_audiorag_a_challenging_benchmark_for_aud_1af76625da85.md"
         },
         {
           "source_type": "articles",
@@ -4041,18 +4041,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Challenge on Sound Scene Synthesis: Evaluating Text-to-Audio Generation",
-          "url": "http://arxiv.org/abs/2410.17589v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_challenge_on_sound_scene_synthesis_evalu_8b2a554a5558.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Can Large Audio-Language Models Truly Hear? Tackling Hallucinations with Multi-Task Assessment and Stepwise Audio Reasoning",
           "url": "http://arxiv.org/abs/2410.16130v2",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_can_large_audio-language_models_truly_he_e9eb1573547e.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Challenge on Sound Scene Synthesis: Evaluating Text-to-Audio Generation",
+          "url": "http://arxiv.org/abs/2410.17589v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_challenge_on_sound_scene_synthesis_evalu_8b2a554a5558.md"
         },
         {
           "source_type": "articles",
@@ -4209,18 +4209,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Fast Timing-Conditioned Latent Audio Diffusion",
-          "url": "http://arxiv.org/abs/2402.04825v3",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_fast_timing-conditioned_latent_audio_dif_79b1bb3dcf40.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Blind Audio Bandwidth Extension: A Diffusion-Based Zero-Shot Approach",
           "url": "http://arxiv.org/abs/2306.01433v2",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_blind_audio_bandwidth_extension_a_diffus_0f547a6c68b3.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Fast Timing-Conditioned Latent Audio Diffusion",
+          "url": "http://arxiv.org/abs/2402.04825v3",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_fast_timing-conditioned_latent_audio_dif_79b1bb3dcf40.md"
         },
         {
           "source_type": "articles",
@@ -4241,18 +4241,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Unsupervised Musical Object Discovery from Audio",
-          "url": "http://arxiv.org/abs/2311.07534v2",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_unsupervised_musical_object_discovery_fr_02138e55f97a.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "MMMOS: Multi-domain Multi-axis Audio Quality Assessment",
           "url": "http://arxiv.org/abs/2507.04094v2",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_mmmos_multi-domain_multi-axis_audio_qual_eea8042100c4.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Unsupervised Musical Object Discovery from Audio",
+          "url": "http://arxiv.org/abs/2311.07534v2",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_unsupervised_musical_object_discovery_fr_02138e55f97a.md"
         },
         {
           "source_type": "articles",
@@ -4385,18 +4385,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "DreamAudio: Customized Text-to-Audio Generation with Diffusion Models",
-          "url": "http://arxiv.org/abs/2509.06027v2",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_dreamaudio_customized_text-to-audio_gene_9b166f49d3f2.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "InSE-NET: A Perceptually Coded Audio Quality Model based on CNN",
           "url": "http://arxiv.org/abs/2108.13087v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_inse-net_a_perceptually_coded_audio_qual_d541f5d1c8e5.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "DreamAudio: Customized Text-to-Audio Generation with Diffusion Models",
+          "url": "http://arxiv.org/abs/2509.06027v2",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_dreamaudio_customized_text-to-audio_gene_9b166f49d3f2.md"
         },
         {
           "source_type": "articles",
@@ -4577,18 +4577,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Sound Adversarial Audio-Visual Navigation",
-          "url": "http://arxiv.org/abs/2202.10910v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_sound_adversarial_audio-visual_navigatio_cdcbff03e591.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "DARAS: Dynamic Audio-Room Acoustic Synthesis for Blind Room Impulse Response Estimation",
           "url": "http://arxiv.org/abs/2507.08135v2",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_daras_dynamic_audio-room_acoustic_synthe_c87dec1860e1.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Sound Adversarial Audio-Visual Navigation",
+          "url": "http://arxiv.org/abs/2202.10910v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_sound_adversarial_audio-visual_navigatio_cdcbff03e591.md"
         },
         {
           "source_type": "articles",
@@ -4945,18 +4945,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "The Shape of RemiXXXes to Come: Audio Texture Synthesis with Time-frequency Scattering",
-          "url": "http://arxiv.org/abs/1906.09334v2",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_the_shape_of_remixxxes_to_come_audio_tex_36f15f44eba0.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Multi-encoder attention-based architectures for sound recognition with partial visual assistance",
           "url": "http://arxiv.org/abs/2209.12826v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_multi-encoder_attention-based_architectu_d3635cf8d6f0.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "The Shape of RemiXXXes to Come: Audio Texture Synthesis with Time-frequency Scattering",
+          "url": "http://arxiv.org/abs/1906.09334v2",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_the_shape_of_remixxxes_to_come_audio_tex_36f15f44eba0.md"
         },
         {
           "source_type": "articles",
@@ -5649,18 +5649,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Compressed Sensing Signal Recovery via Forward-Backward Pursuit",
-          "url": "http://arxiv.org/abs/1210.5626v2",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_compressed_sensing_signal_recovery_via_f_0327e9dc3f97.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Sanidha: A Studio Quality Multi-Modal Dataset for Carnatic Music",
           "url": "http://arxiv.org/abs/2501.06959v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_sanidha_a_studio_quality_multi-modal_dat_a3dab907e512.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Compressed Sensing Signal Recovery via Forward-Backward Pursuit",
+          "url": "http://arxiv.org/abs/1210.5626v2",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_compressed_sensing_signal_recovery_via_f_0327e9dc3f97.md"
         },
         {
           "source_type": "articles",
@@ -5705,18 +5705,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Cross-Laplacians Based Topological Signal Processing over Cell MultiComplexes",
-          "url": "http://arxiv.org/abs/2504.07671v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_cross-laplacians_based_topological_signa_73c71f64e0dc.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Multicarrier ISAC: Advances in Waveform Design, Signal Processing and Learning under Non-Idealities",
           "url": "http://arxiv.org/abs/2406.18476v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_multicarrier_isac_advances_in_waveform_d_29d9a05542f8.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Cross-Laplacians Based Topological Signal Processing over Cell MultiComplexes",
+          "url": "http://arxiv.org/abs/2504.07671v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_cross-laplacians_based_topological_signa_73c71f64e0dc.md"
         },
         {
           "source_type": "articles",
@@ -6377,18 +6377,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Monitoring and Optimization for Power Grids: A Signal Processing Perspective",
-          "url": "http://arxiv.org/abs/1302.0885v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_monitoring_and_optimization_for_power_gr_5c8f21e25407.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Analyzing Byte-Pair Encoding on Monophonic and Polyphonic Symbolic Music: A Focus on Musical Phrase Segmentation",
           "url": "http://arxiv.org/abs/2410.01448v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_analyzing_byte-pair_encoding_on_monophon_359b15282fb8.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Monitoring and Optimization for Power Grids: A Signal Processing Perspective",
+          "url": "http://arxiv.org/abs/1302.0885v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_monitoring_and_optimization_for_power_gr_5c8f21e25407.md"
         },
         {
           "source_type": "articles",
@@ -6425,18 +6425,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Signal Processing on Product Spaces",
-          "url": "http://arxiv.org/abs/2303.10495v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_signal_processing_on_product_spaces_68930d05fec6.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "GANkyoku: a Generative Adversarial Network for Shakuhachi Music",
           "url": "http://arxiv.org/abs/1911.10119v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_gankyoku_a_generative_adversarial_networ_af634d2a0002.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Signal Processing on Product Spaces",
+          "url": "http://arxiv.org/abs/2303.10495v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_signal_processing_on_product_spaces_68930d05fec6.md"
         },
         {
           "source_type": "articles",
@@ -6489,18 +6489,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "The GigaMIDI Dataset with Features for Expressive Music Performance Detection",
-          "url": "http://arxiv.org/abs/2502.17726v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_the_gigamidi_dataset_with_features_for_e_2eef8de93259.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Building Generalized Neo-Riemannian Groups of Musical Transformations as Extensions",
           "url": "http://arxiv.org/abs/1111.4451v4",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_building_generalized_neo-riemannian_grou_229f42842374.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "The GigaMIDI Dataset with Features for Expressive Music Performance Detection",
+          "url": "http://arxiv.org/abs/2502.17726v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_the_gigamidi_dataset_with_features_for_e_2eef8de93259.md"
         },
         {
           "source_type": "articles",
@@ -6529,18 +6529,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "A Novel Signal Processing Strategy for Short-Range Laser Feedback Interferometry Sensors",
-          "url": "http://arxiv.org/abs/2506.10705v1",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_a_novel_signal_processing_strategy_for_s_91b891ac1a36.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "Natural Language Processing for Music Knowledge Discovery",
           "url": "http://arxiv.org/abs/1807.02200v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_natural_language_processing_for_music_kn_1abe8d640441.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "A Novel Signal Processing Strategy for Short-Range Laser Feedback Interferometry Sensors",
+          "url": "http://arxiv.org/abs/2506.10705v1",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_a_novel_signal_processing_strategy_for_s_91b891ac1a36.md"
         },
         {
           "source_type": "articles",
@@ -6697,18 +6697,18 @@
         {
           "source_type": "articles",
           "source": "arxiv",
-          "title": "Low-Complexity Memoryless Linearizer for Analog-to-Digital Interfaces",
-          "url": "http://arxiv.org/abs/2304.05849v2",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_low-complexity_memoryless_linearizer_for_a1e9bac7fd4f.md"
-        },
-        {
-          "source_type": "articles",
-          "source": "arxiv",
           "title": "A Functional Taxonomy of Music Generation Systems",
           "url": "http://arxiv.org/abs/1812.04186v1",
           "status": "selected",
           "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_a_functional_taxonomy_of_music_generatio_25202f7e3dfc.md"
+        },
+        {
+          "source_type": "articles",
+          "source": "arxiv",
+          "title": "Low-Complexity Memoryless Linearizer for Analog-to-Digital Interfaces",
+          "url": "http://arxiv.org/abs/2304.05849v2",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/articles_low-complexity_memoryless_linearizer_for_a1e9bac7fd4f.md"
         },
         {
           "source_type": "articles",
@@ -6777,10 +6777,18 @@
         {
           "source_type": "videos",
           "source": "archive.org",
-          "title": "JeffMACBeats - Victory | Drake type beat | FREE BEAT LINK | Lofi | Dark | Trap",
-          "url": "https://archive.org/details/youtube-O7ZQ07NN-34",
+          "title": "Let's Build Bob's Audio Mixer, Part 2: Drilling and Mounting Parts",
+          "url": "https://archive.org/details/youtube-hMJjq-zxBms",
           "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_jeffmacbeats_-_victory_drake_type_beat_f_10da97dbbf0c.md"
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_let_s_build_bob_s_audio_mixer_part_2_dri_9bf093e444cc.md"
+        },
+        {
+          "source_type": "videos",
+          "source": "archive.org",
+          "title": "Holy Quran Translation Arabic - French News (Reciter Mishary Rashed Alafasy) MP4",
+          "url": "https://archive.org/details/quranarabicfrenchmp4",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_holy_quran_translation_arabic_-_french_n_7f741270d275.md"
         },
         {
           "source_type": "videos",
@@ -6793,10 +6801,18 @@
         {
           "source_type": "videos",
           "source": "archive.org",
-          "title": "Let's Build Bob's Audio Mixer, Part 4: Finishing and Testing",
-          "url": "https://archive.org/details/youtube-gXDFWz7rBqk",
+          "title": "JeffMACBeats - Victory | Drake type beat | FREE BEAT LINK | Lofi | Dark | Trap",
+          "url": "https://archive.org/details/youtube-O7ZQ07NN-34",
           "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_let_s_build_bob_s_audio_mixer_part_4_fin_fe69b8e9bbbd.md"
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_jeffmacbeats_-_victory_drake_type_beat_f_10da97dbbf0c.md"
+        },
+        {
+          "source_type": "videos",
+          "source": "archive.org",
+          "title": "Granular Synthesis with Audio Damage Quanta | Beginner Tutorial | Synths 2019",
+          "url": "https://archive.org/details/youtube-NBPj_bxqbWg",
+          "status": "selected",
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_granular_synthesis_with_audio_damage_qua_031fe5da6c68.md"
         },
         {
           "source_type": "videos",
@@ -6809,26 +6825,10 @@
         {
           "source_type": "videos",
           "source": "archive.org",
-          "title": "Aux Tip with Pro Tools! When iLok works...",
-          "url": "https://archive.org/details/youtube-v5JaSL8xV_8",
+          "title": "Let's Build Bob's Audio Mixer, Part 4: Finishing and Testing",
+          "url": "https://archive.org/details/youtube-gXDFWz7rBqk",
           "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_aux_tip_with_pro_tools_when_ilok_works.._00a80868eacd.md"
-        },
-        {
-          "source_type": "videos",
-          "source": "archive.org",
-          "title": "Let's Build Bob's Audio Mixer, Part 2: Drilling and Mounting Parts",
-          "url": "https://archive.org/details/youtube-hMJjq-zxBms",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_let_s_build_bob_s_audio_mixer_part_2_dri_9bf093e444cc.md"
-        },
-        {
-          "source_type": "videos",
-          "source": "archive.org",
-          "title": "Granular Synthesis with Audio Damage Quanta | Beginner Tutorial | Synths 2019",
-          "url": "https://archive.org/details/youtube-NBPj_bxqbWg",
-          "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_granular_synthesis_with_audio_damage_qua_031fe5da6c68.md"
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_let_s_build_bob_s_audio_mixer_part_4_fin_fe69b8e9bbbd.md"
         },
         {
           "source_type": "videos",
@@ -6849,18 +6849,18 @@
         {
           "source_type": "videos",
           "source": "archive.org",
-          "title": "Mirillis Action! 1.31.5 GÇô Full",
-          "url": "https://archive.org/details/MirillisAction1.31.5GCoFull",
+          "title": "Aux Tip with Pro Tools! When iLok works...",
+          "url": "https://archive.org/details/youtube-v5JaSL8xV_8",
           "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_mirillis_action_1.31.5_g_full_c0f5ab1cbd22.md"
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_aux_tip_with_pro_tools_when_ilok_works.._00a80868eacd.md"
         },
         {
           "source_type": "videos",
           "source": "archive.org",
-          "title": "Holy Quran Translation Arabic - French News (Reciter Mishary Rashed Alafasy) MP4",
-          "url": "https://archive.org/details/quranarabicfrenchmp4",
+          "title": "Mirillis Action! 1.31.5 GÇô Full",
+          "url": "https://archive.org/details/MirillisAction1.31.5GCoFull",
           "status": "selected",
-          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_holy_quran_translation_arabic_-_french_n_7f741270d275.md"
+          "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/backend/ai/knowledge/videos_mirillis_action_1.31.5_g_full_c0f5ab1cbd22.md"
         },
         {
           "source_type": "videos",
@@ -6897,7 +6897,7 @@
       ],
       "max_resources": 0
     },
-    "completed": "2026-04-16T23:19:47.925450+00:00",
+    "completed": "2026-04-17T05:18:05.614496+00:00",
     "results": {
       "channel_classifier": {
         "skipped": true,
@@ -6915,7 +6915,7 @@
     "all_ok": true
   },
   "safe_autostart_done": false,
-  "last_success": "2026-04-16T23:19:47.925450+00:00",
+  "last_success": "2026-04-17T05:18:05.614496+00:00",
   "last_error": null,
   "targets": {
     "channel_classifier": {},

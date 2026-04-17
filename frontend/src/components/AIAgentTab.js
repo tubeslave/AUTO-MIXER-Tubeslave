@@ -25,6 +25,7 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
   const [mode, setMode] = useState('auto');
   const [useLlm, setUseLlm] = useState(true);
   const [allowAutoApply, setAllowAutoApply] = useState(true);
+  const [forceAutoApply, setForceAutoApply] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -101,12 +102,12 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
   const channels = selectedChannels || [];
   const visibleChannels = channels.slice(0, 16);
   const startAgent = () => {
-    websocketService.startAgent(mode, channels, useLlm, allowAutoApply);
+    websocketService.startAgent(mode, channels, useLlm, allowAutoApply, forceAutoApply);
     setMessage('Starting AI Agent...');
   };
   const stopAgent = () => websocketService.stopAgent();
   const refresh = () => {
-    websocketService.updateAgentState(channels);
+    websocketService.updateAgentState(channels, forceAutoApply);
     websocketService.getPendingActions();
     websocketService.getActionHistory(20);
     websocketService.getAudioCaptureStatus();
@@ -114,8 +115,13 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
   };
   const changeMode = (nextMode) => {
     setMode(nextMode);
-    websocketService.setAgentMode(nextMode, channels, useLlm, allowAutoApply, status.is_running);
+    websocketService.setAgentMode(nextMode, channels, useLlm, allowAutoApply, status.is_running, forceAutoApply);
   };
+
+  const autoModeLabel = status.auto_apply_enabled ? 'Enabled' : 'Disabled';
+  const autoModeNote = status.auto_apply_enabled
+    ? 'Real mixer corrections are applied immediately.'
+    : 'Real mixer is in suggest-only mode unless Force Auto Apply is enabled.';
 
   return (
     <div className="ai-agent-tab">
@@ -123,7 +129,7 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
         <div>
           <h3>AI Mixing Agent</h3>
           <p>
-            Rules + LLM recommendations. Test mode default: agent applies corrections to the real mixer immediately.
+            Rules + LLM recommendations. Real mixer remains suggest-only by default. Enable Force Auto Apply for direct action write.
           </p>
         </div>
         <div className={`agent-state ${status.is_running ? 'on' : 'off'}`}>
@@ -131,7 +137,7 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
         </div>
       </div>
 
-      <div className="module-card">
+        <div className="module-card">
         <div className="module-actions">
           <select value={mode} disabled={status.is_running} onChange={e => changeMode(e.target.value)}>
             <option value="suggest">Suggest</option>
@@ -147,8 +153,21 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
             <input
               type="checkbox"
               checked={allowAutoApply}
-              disabled={status.is_running}
+              disabled={status.is_running || forceAutoApply}
               onChange={e => setAllowAutoApply(e.target.checked)}
+            />
+          </label>
+          <label className="agent-toggle danger">
+            <span>Force Auto Apply</span>
+            <input
+              type="checkbox"
+              checked={forceAutoApply}
+              disabled={status.is_running}
+              onChange={e => {
+                const checked = e.target.checked;
+                setForceAutoApply(checked);
+                if (checked) setAllowAutoApply(true);
+              }}
             />
           </label>
           <button className={`btn-start ${status.is_running ? 'stop' : 'go'}`} onClick={status.is_running ? stopAgent : startAgent}>
@@ -161,6 +180,9 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
         </div>
         <div className="module-status">
           Mode: {status.mode || mode} | Channels tracked: {status.channels_tracked || 0} | Pending: {status.pending_actions || pending.length}
+        </div>
+        <div className="module-status">
+          Auto Apply: {autoModeLabel}. {autoModeNote}
         </div>
         {message && <div className="module-status">{message}</div>}
       </div>
@@ -199,12 +221,16 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
       <div className="module-card">
         <div className="agent-section-head">
           <h3>Pending Actions</h3>
-          <div>
-            <button className="btn-sm" onClick={() => websocketService.approveAllActions()} disabled={!pending.length}>Approve All</button>
-            <button className="btn-sm danger" onClick={() => websocketService.dismissAllActions()} disabled={!pending.length}>Dismiss All</button>
-          </div>
+          {!status.auto_apply_enabled && (
+            <div>
+              <button className="btn-sm" onClick={() => websocketService.approveAllActions()} disabled={status.auto_apply_enabled || !pending.length}>Approve All</button>
+              <button className="btn-sm danger" onClick={() => websocketService.dismissAllActions()} disabled={status.auto_apply_enabled || !pending.length}>Dismiss All</button>
+            </div>
+          )}
         </div>
-        {!pending.length && <div className="module-status">No pending actions yet. Refresh state or wait for the next agent cycle.</div>}
+        {status.auto_apply_enabled && <div className="module-status">Auto-apply is active. Pending actions are ignored (already applying in real-time).</div>}
+        {!pending.length && !status.auto_apply_enabled && <div className="module-status">No pending actions yet. Refresh state or wait for the next agent cycle.</div>}
+        {status.auto_apply_enabled && !pending.length && <div className="module-status">No queued pending actions in active mode.</div>}
         {pending.map(action => (
           <div className="agent-action" key={`${action.index}-${action.timestamp}`}>
             <div>
@@ -214,10 +240,12 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
                 {action.source} | confidence {action.confidence} | {formatParams(action.parameters)}
               </div>
             </div>
-            <div className="agent-action-buttons">
-              <button className="btn-sm" onClick={() => websocketService.approveAction(action.index)}>Approve</button>
-              <button className="btn-sm danger" onClick={() => websocketService.dismissAction(action.index)}>Dismiss</button>
-            </div>
+            {!status.auto_apply_enabled && (
+              <div className="agent-action-buttons">
+                <button className="btn-sm" onClick={() => websocketService.approveAction(action.index)}>Approve</button>
+                <button className="btn-sm danger" onClick={() => websocketService.dismissAction(action.index)}>Dismiss</button>
+              </div>
+            )}
           </div>
         ))}
       </div>

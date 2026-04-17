@@ -43,6 +43,37 @@ class WingClient(MixerClientBase):
         
         logger.info(f"WingClient initialized for {ip}:{port}")
 
+    def _normalize_fx_slot(self, fx_slot: str) -> tuple[str, str]:
+        """Return canonical FX slot label and numeric suffix."""
+        slot = str(fx_slot).upper()
+        if slot.startswith("FX"):
+            fx_num = slot[2:]
+            return slot, fx_num
+        return f"FX{slot}", slot
+
+    def _insert_base(self, target_type: str, target: int, position: str) -> str:
+        """Build OSC base path for pre/post inserts on supported target types."""
+        type_map = {
+            "channel": "ch",
+            "ch": "ch",
+            "aux": "aux",
+            "bus": "bus",
+            "main": "main",
+            "matrix": "mtx",
+            "mtx": "mtx",
+        }
+        pos_map = {
+            "pre": "preins",
+            "post": "postins",
+        }
+        target_key = str(target_type).lower()
+        position_key = str(position).lower()
+        if target_key not in type_map:
+            raise ValueError(f"Unsupported insert target type: {target_type}")
+        if position_key not in pos_map:
+            raise ValueError(f"Unsupported insert position: {position}")
+        return f"/{type_map[target_key]}/{int(target)}/{pos_map[position_key]}"
+
     def connect(self, timeout: float = 5.0) -> bool:
         """
         Connect to Wing mixer and validate connection
@@ -382,12 +413,12 @@ class WingClient(MixerClientBase):
     
     def _scan_fx_module(self, fx_slot: str):
         """Scan an FX module to get its model and parameters"""
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
-        
+        _, fx_num = self._normalize_fx_slot(fx_slot)
+
         # Query FX model (most important)
         self.send(f"/fx/{fx_num}/mdl")
         self.send(f"/fx/{fx_num}/on")
-        self.send(f"/fx/{fx_num}/mix")
+        self.send(f"/fx/{fx_num}/fxmix")
         self.send(f"/fx/{fx_num}/")  # Root node
         time.sleep(0.05)
         
@@ -951,9 +982,9 @@ class WingClient(MixerClientBase):
         self.send(f"/bus/{bus}/eq/on", on)
     
     def set_bus_eq_band(self, bus: int, band: int, freq: float = None, gain: float = None, q: float = None):
-        """Set bus EQ band (1-6) parameters"""
-        if band < 1 or band > 6:
-            raise ValueError("Bus EQ band must be 1-6")
+        """Set bus EQ band (1-8) parameters"""
+        if band < 1 or band > 8:
+            raise ValueError("Bus EQ band must be 1-8")
         if freq is not None:
             self.send(f"/bus/{bus}/eq/{band}f", freq)
         if gain is not None:
@@ -974,6 +1005,32 @@ class WingClient(MixerClientBase):
     def set_main_eq_on(self, main: int, on: int):
         """Enable/disable main EQ (0=off, 1=on)"""
         self.send(f"/main/{main}/eq/on", on)
+
+    def set_main_eq_band(self, main: int, band: int, freq: float = None, gain: float = None, q: float = None):
+        """Set main EQ band (1-8) parameters."""
+        if band < 1 or band > 8:
+            raise ValueError("Main EQ band must be 1-8")
+        if freq is not None:
+            self.send(f"/main/{main}/eq/{band}f", freq)
+        if gain is not None:
+            self.send(f"/main/{main}/eq/{band}g", gain)
+        if q is not None:
+            self.send(f"/main/{main}/eq/{band}q", q)
+
+    def set_matrix_eq_on(self, matrix: int, on: int):
+        """Enable/disable matrix EQ (0=off, 1=on)."""
+        self.send(f"/mtx/{matrix}/eq/on", on)
+
+    def set_matrix_eq_band(self, matrix: int, band: int, freq: float = None, gain: float = None, q: float = None):
+        """Set matrix EQ band (1-8) parameters."""
+        if band < 1 or band > 8:
+            raise ValueError("Matrix EQ band must be 1-8")
+        if freq is not None:
+            self.send(f"/mtx/{matrix}/eq/{band}f", freq)
+        if gain is not None:
+            self.send(f"/mtx/{matrix}/eq/{band}g", gain)
+        if q is not None:
+            self.send(f"/mtx/{matrix}/eq/{band}q", q)
     
     # ========== Send Methods ==========
     
@@ -988,7 +1045,7 @@ class WingClient(MixerClientBase):
             parameter: Parameter number (1-32)
             value: Parameter value
         """
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
+        _, fx_num = self._normalize_fx_slot(fx_slot)
         self.send(f"/fx/{fx_num}/{parameter}", value)
     
     def set_fx_model(self, fx_slot: str, model: str):
@@ -999,18 +1056,112 @@ class WingClient(MixerClientBase):
             fx_slot: FX slot (e.g., 'FX1', 'FX13')
             model: FX model name (e.g., 'P-BASS', 'REVERB', 'PCORR')
         """
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
+        _, fx_num = self._normalize_fx_slot(fx_slot)
         self.send(f"/fx/{fx_num}/mdl", model)
     
     def set_fx_on(self, fx_slot: str, on: int):
         """Enable/disable FX module (0=off, 1=on)"""
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
+        _, fx_num = self._normalize_fx_slot(fx_slot)
         self.send(f"/fx/{fx_num}/on", on)
-    
+
     def set_fx_mix(self, fx_slot: str, mix: float):
         """Set FX mix percentage (0-100)"""
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
-        self.send(f"/fx/{fx_num}/mix", mix)
+        _, fx_num = self._normalize_fx_slot(fx_slot)
+        self.send(f"/fx/{fx_num}/fxmix", mix)
+
+    def query_fx_slot(self, fx_slot: str):
+        """Query primary FX slot metadata from the console."""
+        _, fx_num = self._normalize_fx_slot(fx_slot)
+        for suffix in ("mdl", "on", "fxmix", "$esrc", "$emode", "$a_chn", "$a_pos"):
+            self.send(f"/fx/{fx_num}/{suffix}")
+
+    def get_fx_slot_info(self, fx_slot: str) -> Dict[str, Any]:
+        """Return cached FX slot information using official FW 3.1 paths."""
+        slot, fx_num = self._normalize_fx_slot(fx_slot)
+        return {
+            "slot": slot,
+            "model": self.state.get(f"/fx/{fx_num}/mdl"),
+            "on": self.state.get(f"/fx/{fx_num}/on"),
+            "mix": self.state.get(f"/fx/{fx_num}/fxmix"),
+            "source": self.state.get(f"/fx/{fx_num}/$esrc"),
+            "mode": self.state.get(f"/fx/{fx_num}/$emode"),
+            "assigned_channel": self.state.get(f"/fx/{fx_num}/$a_chn"),
+            "assigned_position": self.state.get(f"/fx/{fx_num}/$a_pos"),
+        }
+
+    def set_insert(self, target_type: str, target: int, position: str, slot: str = "NONE", on: Optional[int] = None, mode: Optional[str] = None):
+        """Assign or clear an insert slot on channel/aux/bus/main/matrix."""
+        base = self._insert_base(target_type, target, position)
+        if on is not None:
+            self.send(f"{base}/on", on)
+        if mode is not None and position.lower() == "post":
+            self.send(f"{base}/mode", mode)
+        self.send(f"{base}/ins", str(slot).upper())
+
+    def query_insert(self, target_type: str, target: int, position: str):
+        """Query insert state for supported channel types."""
+        base = self._insert_base(target_type, target, position)
+        self.send(f"{base}/on")
+        if position.lower() == "post":
+            try:
+                self.send(f"{base}/mode")
+            except Exception:
+                pass
+            try:
+                self.send(f"{base}/w")
+            except Exception:
+                pass
+        self.send(f"{base}/ins")
+        self.send(f"{base}/$stat")
+
+    def get_insert(self, target_type: str, target: int, position: str) -> Dict[str, Any]:
+        """Return cached insert state and linked FX metadata."""
+        base = self._insert_base(target_type, target, position)
+        result: Dict[str, Any] = {
+            "target_type": str(target_type).lower(),
+            "target": int(target),
+            "position": str(position).lower(),
+            "on": self.state.get(f"{base}/on"),
+            "slot": self.state.get(f"{base}/ins"),
+            "status": self.state.get(f"{base}/$stat"),
+        }
+        if position.lower() == "post":
+            result["mode"] = self.state.get(f"{base}/mode")
+            weight = self.state.get(f"{base}/w")
+            if weight is not None:
+                result["weight"] = weight
+        slot = result.get("slot")
+        if slot and slot != "NONE":
+            result["fx_module"] = self._get_fx_module_info(slot)
+        else:
+            result["fx_module"] = None
+        return result
+
+    def _active_insert_or_none(self, target_type: str, target: int, position: str):
+        """Preserve legacy semantics: return None when no insert is assigned."""
+        insert = self.get_insert(target_type, target, position)
+        slot = insert.get("slot")
+        if insert.get("on") == 1 and slot and slot != "NONE":
+            return insert
+        return None
+
+    def get_bus_inserts(self, bus: int) -> Dict[str, Any]:
+        return {
+            "pre_insert": self._active_insert_or_none("bus", bus, "pre"),
+            "post_insert": self._active_insert_or_none("bus", bus, "post"),
+        }
+
+    def get_main_inserts(self, main: int) -> Dict[str, Any]:
+        return {
+            "pre_insert": self._active_insert_or_none("main", main, "pre"),
+            "post_insert": self._active_insert_or_none("main", main, "post"),
+        }
+
+    def get_matrix_inserts(self, matrix: int) -> Dict[str, Any]:
+        return {
+            "pre_insert": self._active_insert_or_none("matrix", matrix, "pre"),
+            "post_insert": self._active_insert_or_none("matrix", matrix, "post"),
+        }
 
     def set_fx_return_level(self, bus: int, level_db: float):
         """Set an FX return bus level in dB when returns are mapped to buses."""
@@ -1046,7 +1197,7 @@ class WingClient(MixerClientBase):
     
     def get_fx_parameter(self, fx_slot: str, parameter: int):
         """Get an FX module parameter value"""
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
+        _, fx_num = self._normalize_fx_slot(fx_slot)
         return self.state.get(f'/fx/{fx_num}/{parameter}')
     
     def set_channel_send(self, channel: int, send: int, level: float = None, on: int = None,
@@ -1103,58 +1254,25 @@ class WingClient(MixerClientBase):
         Returns:
             Dict with 'pre_insert' and 'post_insert' info including FX module details
         """
-        ch = channel
-        result = {
-            'pre_insert': None,
-            'post_insert': None
+        return {
+            'pre_insert': self._active_insert_or_none("channel", channel, "pre"),
+            'post_insert': self._active_insert_or_none("channel", channel, "post"),
         }
-        
-        preins_on = self.state.get(f'/ch/{ch}/preins/on')
-        preins_slot = self.state.get(f'/ch/{ch}/preins/ins')
-        preins_stat = self.state.get(f'/ch/{ch}/preins/$stat')
-        
-        if preins_on == 1 and preins_slot and preins_slot != 'NONE':
-            fx_info = self._get_fx_module_info(preins_slot)
-            result['pre_insert'] = {
-                'on': True,
-                'slot': preins_slot,
-                'status': preins_stat,
-                'fx_module': fx_info
-            }
-        
-        postins_on = self.state.get(f'/ch/{ch}/postins/on')
-        postins_slot = self.state.get(f'/ch/{ch}/postins/ins')
-        postins_mode = self.state.get(f'/ch/{ch}/postins/mode')
-        postins_stat = self.state.get(f'/ch/{ch}/postins/$stat')
-        postins_w = self.state.get(f'/ch/{ch}/postins/w')
-        
-        if postins_on == 1 and postins_slot and postins_slot != 'NONE':
-            fx_info = self._get_fx_module_info(postins_slot)
-            result['post_insert'] = {
-                'on': True,
-                'slot': postins_slot,
-                'mode': postins_mode,
-                'status': postins_stat,
-                'weight': postins_w,
-                'fx_module': fx_info
-            }
-        
-        return result
     
     def _get_fx_module_info(self, fx_slot: str) -> Dict[str, Any]:
         """Get FX module information including model and parameters"""
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
-        
+        slot, fx_num = self._normalize_fx_slot(fx_slot)
+
         fx_model = self.state.get(f'/fx/{fx_num}/mdl')
         fx_on = self.state.get(f'/fx/{fx_num}/on')
-        fx_mix = self.state.get(f'/fx/{fx_num}/mix')
+        fx_mix = self.state.get(f'/fx/{fx_num}/fxmix')
         fx_node = self.state.get(f'/fx/{fx_num}/')
         
         # Get all FX parameters
         fx_params = {}
         for key, value in self.state.items():
             if key.startswith(f'/fx/{fx_num}/') and key not in [
-                f'/fx/{fx_num}/mdl', f'/fx/{fx_num}/on', f'/fx/{fx_num}/mix',
+                f'/fx/{fx_num}/mdl', f'/fx/{fx_num}/on', f'/fx/{fx_num}/fxmix',
                 f'/fx/{fx_num}/', f'/fx/{fx_num}/name', f'/fx/{fx_num}/type',
                 f'/fx/{fx_num}/node'
             ]:
@@ -1163,7 +1281,7 @@ class WingClient(MixerClientBase):
                     fx_params[int(param_name)] = value
         
         return {
-            'slot': fx_slot,
+            'slot': slot,
             'model': fx_model,
             'on': fx_on,
             'mix': fx_mix,

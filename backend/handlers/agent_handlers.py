@@ -5,6 +5,48 @@ def register_handlers(server):
     def _agent():
         return getattr(server, "mixing_agent", None)
 
+    def _orchestrator_dry_run():
+        checker = getattr(server, "_is_agent_dry_run", None)
+        if checker is None:
+            return False
+        if callable(checker):
+            return bool(checker())
+        return bool(checker)
+
+    def _resolve_agent_auto_apply(data: dict):
+        force_auto_apply = bool(data.get("force_auto_apply", False))
+        if _orchestrator_dry_run() and not force_auto_apply:
+            return False
+        return bool(data.get("allow_auto_apply", True))
+
+    def _manual_actions_blocked():
+        if getattr(server, "agent_auto_apply_enabled", False):
+            return "auto_apply"
+        if _orchestrator_dry_run():
+            return "dry_run"
+        return None
+
+    def _emit_action_blocked(websocket, action: str):
+        return server.send_to_client(websocket, {
+            "type": "agent_action_blocked",
+            "action": action,
+            "message": "AI action write is blocked: real console is in dry-run mode",
+            "dry_run": True,
+        })
+
+    def _emit_manual_action_blocked(websocket, action: str):
+        reason = _manual_actions_blocked()
+        if reason == "auto_apply":
+            return server.send_to_client(websocket, {
+                "type": "agent_action_blocked",
+                "action": action,
+                "message": "AI action write is blocked: auto-apply mode is active",
+                "dry_run": False,
+            })
+        if reason == "dry_run":
+            return _emit_action_blocked(websocket, action)
+        return None
+
     async def _send_agent_status(websocket):
         agent = _agent()
         if agent:
@@ -27,11 +69,13 @@ def register_handlers(server):
         await _send_agent_status(websocket)
 
     async def handle_start_agent(websocket, data):
+        force_auto_apply = bool(data.get("force_auto_apply", False))
         agent = await server.init_mixing_agent(
             mode=data.get("mode", "auto"),
             channels=data.get("channels"),
             use_llm=data.get("use_llm", True),
-            allow_auto_apply=data.get("allow_auto_apply", True),
+            allow_auto_apply=_resolve_agent_auto_apply(data),
+            force_auto_apply=force_auto_apply,
             start=True,
         )
         await server.send_to_client(websocket, {
@@ -60,11 +104,13 @@ def register_handlers(server):
 
     async def handle_set_agent_mode(websocket, data):
         mode = data.get("mode", "auto")
+        force_auto_apply = bool(data.get("force_auto_apply", False))
         agent = await server.init_mixing_agent(
             mode=mode,
             channels=data.get("channels"),
             use_llm=data.get("use_llm", True),
-            allow_auto_apply=data.get("allow_auto_apply", True),
+            allow_auto_apply=_resolve_agent_auto_apply(data),
+            force_auto_apply=force_auto_apply,
             start=data.get("start", False),
         )
         await server.send_to_client(websocket, {
@@ -84,6 +130,11 @@ def register_handlers(server):
             await server.send_to_client(websocket, {"type": "pending_actions", "actions": []})
 
     async def handle_approve_action(websocket, data):
+        blocked = _emit_manual_action_blocked(websocket, "approve_action")
+        if blocked is not None:
+            await blocked
+            await handle_get_pending_actions(websocket, data)
+            return
         idx = data.get("index", -1)
         agent = _agent()
         if agent:
@@ -96,6 +147,11 @@ def register_handlers(server):
             await handle_get_pending_actions(websocket, data)
 
     async def handle_approve_all(websocket, data):
+        blocked = _emit_manual_action_blocked(websocket, "approve_all_actions")
+        if blocked is not None:
+            await blocked
+            await handle_get_pending_actions(websocket, data)
+            return
         agent = _agent()
         if agent:
             count = agent.approve_all_pending()
@@ -106,6 +162,11 @@ def register_handlers(server):
             await handle_get_pending_actions(websocket, data)
 
     async def handle_dismiss_action(websocket, data):
+        blocked = _emit_manual_action_blocked(websocket, "dismiss_action")
+        if blocked is not None:
+            await blocked
+            await handle_get_pending_actions(websocket, data)
+            return
         idx = data.get("index", -1)
         agent = _agent()
         if agent:
@@ -118,6 +179,11 @@ def register_handlers(server):
             await handle_get_pending_actions(websocket, data)
 
     async def handle_dismiss_all(websocket, data):
+        blocked = _emit_manual_action_blocked(websocket, "dismiss_all_actions")
+        if blocked is not None:
+            await blocked
+            await handle_get_pending_actions(websocket, data)
+            return
         agent = _agent()
         if agent:
             agent.dismiss_all_pending()
@@ -141,11 +207,13 @@ def register_handlers(server):
     async def handle_update_agent_state(websocket, data):
         agent = _agent()
         if agent is None:
+            force_auto_apply = bool(data.get("force_auto_apply", False))
             agent = await server.init_mixing_agent(
                 mode=data.get("mode", "auto"),
                 channels=data.get("channels"),
                 use_llm=data.get("use_llm", True),
-                allow_auto_apply=data.get("allow_auto_apply", True),
+                allow_auto_apply=_resolve_agent_auto_apply(data),
+                force_auto_apply=force_auto_apply,
                 start=False,
             )
         states = data.get("channel_states")

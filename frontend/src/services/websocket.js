@@ -1,125 +1,6 @@
-class WebSocketService {
-  constructor() {
-    this.ws = null;
-    this.url = 'ws://localhost:8765';
-    this.listeners = new Map();
-    this.reconnectInterval = 3000;
-    this.reconnectTimer = null;
-  }
+import { BaseWebSocketTransport } from './websocketCore.mjs';
 
-  connect() {
-    return new Promise((resolve, reject) => {
-      try {
-        this.ws = new WebSocket(this.url);
-
-        this.ws.onopen = () => {
-          console.log('WebSocket connected');
-          if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-          }
-          resolve();
-        };
-
-        this.ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-console.log('WebSocket message received:', data.type, data);
-this.notifyListeners(data.type, data);
-          } catch (error) {
-console.error('Error parsing message:', error);
-          }
-        };
-
-        this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          reject(error);
-        };
-
-        this.ws.onclose = () => {
-          console.log('WebSocket disconnected');
-          this.notifyListeners('disconnected', {});
-          this.scheduleReconnect();
-        };
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  scheduleReconnect() {
-    if (!this.reconnectTimer) {
-      this.reconnectTimer = setTimeout(() => {
-        console.log('Attempting to reconnect...');
-        this.connect().catch(err => console.error('Reconnect failed:', err));
-      }, this.reconnectInterval);
-    }
-  }
-
-  disconnect() {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-  }
-
-  send(message) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('Sending WebSocket message:', message);
-      try {
-        const jsonMessage = JSON.stringify(message);
-        console.log('Sending JSON string:', jsonMessage);
-this.ws.send(jsonMessage);
-} catch (error) {
-console.error('Error sending WebSocket message:', error);
-      }
-    } else {
-      const state = this.ws ? this.ws.readyState : 'null';
-console.error('WebSocket is not connected. ReadyState:', state);
-      console.error('WebSocket object:', this.ws);
-      console.error('Message that failed to send:', message);
-      if (state === 0) {
-        console.warn('WebSocket is still connecting...');
-      } else if (state === 2 || state === 3) {
-        console.warn('WebSocket is closed. Attempting to reconnect...');
-        this.connect().catch(err => console.error('Reconnect failed:', err));
-      }
-    }
-  }
-
-  on(eventType, callback) {
-    if (!this.listeners.has(eventType)) {
-      this.listeners.set(eventType, []);
-    }
-    this.listeners.get(eventType).push(callback);
-  }
-
-  off(eventType, callback) {
-    if (this.listeners.has(eventType)) {
-      const callbacks = this.listeners.get(eventType);
-      const index = callbacks.indexOf(callback);
-      if (index > -1) {
-        callbacks.splice(index, 1);
-      }
-    }
-  }
-
-  notifyListeners(eventType, data) {
-if (this.listeners.has(eventType)) {
-      this.listeners.get(eventType).forEach(callback => {
-        try {
-callback(data);
-        } catch (error) {
-console.error(`Error in listener for ${eventType}:`, error);
-        }
-      });
-    } else {
-}
-  }
+class WebSocketService extends BaseWebSocketTransport {
 
   // Wing direct connection
   connectWing(ip, sendPort = 2223, receivePort = 2223) {
@@ -309,13 +190,14 @@ console.error(`Error in listener for ${eventType}:`, error);
   }
 
   // AI Mixing Agent commands
-  startAgent(mode = 'auto', channels = [], useLlm = true, allowAutoApply = true) {
+  startAgent(mode = 'auto', channels = [], useLlm = true, allowAutoApply = true, forceAutoApply = false) {
     this.send({
       type: 'start_agent',
       mode,
       channels,
       use_llm: useLlm,
-      allow_auto_apply: allowAutoApply
+      allow_auto_apply: allowAutoApply,
+      force_auto_apply: forceAutoApply
     });
   }
 
@@ -331,21 +213,23 @@ console.error(`Error in listener for ${eventType}:`, error);
     this.send({ type: 'get_agent_status' });
   }
 
-  setAgentMode(mode = 'auto', channels = [], useLlm = true, allowAutoApply = true, start = false) {
+  setAgentMode(mode = 'auto', channels = [], useLlm = true, allowAutoApply = true, start = false, forceAutoApply = false) {
     this.send({
       type: 'set_agent_mode',
       mode,
       channels,
       use_llm: useLlm,
       allow_auto_apply: allowAutoApply,
-      start
+      start,
+      force_auto_apply: forceAutoApply
     });
   }
 
-  updateAgentState(channels = []) {
+  updateAgentState(channels = [], forceAutoApply = false) {
     this.send({
       type: 'update_agent_state',
-      channels
+      channels,
+      force_auto_apply: forceAutoApply
     });
   }
 
@@ -591,6 +475,42 @@ console.error(`Error in listener for ${eventType}:`, error);
     this.send({
       type: 'reset_phase_delay',
       channels: channels
+    });
+  }
+
+  // ========== System Measurement / Master EQ ==========
+
+  startSystemMeasurement(deviceId, referenceChannel, measurementChannel, durationSec = 6, targetBus = 'master', targetId = 1) {
+    this.send({
+      type: 'start_system_measurement',
+      device_id: deviceId,
+      reference_channel: referenceChannel,
+      measurement_channel: measurementChannel,
+      duration_sec: durationSec,
+      target_bus: targetBus,
+      target_id: targetId,
+    });
+  }
+
+  applySystemMeasurement(targetBus = 'master', targetId = 1) {
+    this.send({
+      type: 'apply_system_measurement',
+      target_bus: targetBus,
+      target_id: targetId,
+    });
+  }
+
+  resetSystemMeasurement(targetBus = 'master', targetId = 1) {
+    this.send({
+      type: 'reset_system_measurement',
+      target_bus: targetBus,
+      target_id: targetId,
+    });
+  }
+
+  getSystemMeasurementStatus() {
+    this.send({
+      type: 'get_system_measurement_status',
     });
   }
 

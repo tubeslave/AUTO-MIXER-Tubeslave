@@ -1,0 +1,86 @@
+                                                      DAW Translation-Table (20-06-19)
+
+
+MCU Control Name   CUBASE/NUENDO                     ABLETON                LOGIC                 STUDIO ONE              REAPER                    PROTOOLS
+Transport:
+STOP               STOP                            STOP                     STOP         STOP                      STOP                      STOP
+PLAY               PLAY                            PLAY                     PLAY         PLAY                      PLAY                      PLAY
+RECORD             RECORD                          RECORD                  RECORD        RECORD                    RECORD                    RECORD
+REWIND             REWIND                          REWIND                  REWIND        REWIND                    REWIND                    REWIND
+FORWARD            FORWARD                         FORWARD                FORWARD        FORWARD                   FORWARD                   FORWARD
+SCRUB              SCRUB                                 NA                SCRUB                       NA          SCRUB                     SCRUB
+ZOOM               ZOOM                            ZOOM                     ZOOM         ZOOM                      ZOOM                      ZOOM
+MARKER             LEFT                            LEFT (Locator)          MARKER                      NA          MARKER                    IN /RTZ
+NUDGE              RIGHT                           RIGHT (Locator)         NUDGE                       NA          NUDGE                     OUT/END
+CYCLE              CYCLE                           LOOP                     CYCLE                      NA          LOOP ON/OFF               LOOP/PRE
+DROP               PUNCH                           PUNCH IN                 DROP                       NA          RECORD MODE               ONLINE/POST
+REPLACE            PREVIOUS (Marker)               PUNCH OUT              REPLACE                      NA                   NA               TRANNSPORT FUNCTION
+CLICK              ADD (Marker)                    HOME                     CLICK                      NA          METRONOME ON/OFF          CUE MGR
+SOLO               NEXT (Marker)                   END                      SOLO                       NA          SOLO DEFEAT               SUSPEND
+Modifiers:
+SHIFT              UNDO                            UNDO                      SHIFT       SHIFT                     SHIFT                     SHIFT/ALL
+OPTION             REDO                            REDO                     OPTION       OPTION                    OPTION                    OPTION/ALL
+CONTROL            SAVE                            SAVE                    CONTROL       CONTROL                   CONTROL                   CTRL/CLUTCH
+ALT                REVERT                          REVERT                     ALT        ALT                       ALT                       COMMAND/ALT
+Automation:
+READ/OFF           READ                            SESS/ARR               READ/OFF       READ/OFF                  READ/OFF                  FADER
+WRITE              WRITE                           CLIP/FX                  WRITE        WRITE                     WRITE                     MUTE
+TRIM               SENDS                           UNDO                     TRIM         TRIM                      TRIM                      PLUG-IN
+TOUCH              PROJECT                         BROWSER                 TOUCH         TOUCH                     TOUCH                     PAN
+LATCH              MIXER                           DETAIL                  LATCH         LATCH                     LATCH                     SEND
+GROUP              MOTORS                          REDO                    GROUP         GROUP                     GROUP                     SEND MUTE
+Utilities:
+SAVE               INSTRUMENT                      BTA                       SAVE        SAVE                      SAVE                      SAVE
+UNDO               MASTER                          DRAW                     UNDO         UNDO                      UNDO                      UNDO
+CANCEL             SOLO DEFEAT                     MARKER                  CANCEL        CANCEL                    CANCEL                    CANCEL
+ENTER              SHIFT                           FOLLOW                   ENTER        ENTER                     ENTER                     ENTER
+Global View:
+MIDI TRACKS        FB 1                            D3 (Note)             MIDI TRACKS                                          ?              READ/SEND A
+INPUTS             FB 2                            D#3 (Note)              INPUTS                                             ?              WRITE/SEND B
+
+
+                                 FADERBANK
+AUDIO TRACKS       FB 3                            E3 (Note)            AUDIO TRACKS                                          ?              TOUCH/SEND C
+AUDIO INSTRUMENT   FB 4                            F3 (Note)          AUDIO INSTRUMENT                                        ?              LATCH/SEND D
+AUX                FB 5                            F#3 (Note)                AUX                                              ?              TRIM/SEND E
+BUSES              FB 6                            G3 (Note)                BUSES                                             ?              OFF/SHIFT
+OUTPUTS            FB 7                            G#3 (Note)             OUTPUTS                                             ?              AUTO/SEND MUTE
+USER               FB 8                            A3 (Note)                 USER                                             ?              DEFAULT
+Function:                                                                                                          (Markers)
+F1                 F1                              F#2 (Note)                 F1         SHOW INPUTS               Loop to Marker            EDIT
+F2                 F2                              G2 (Note)                  F2         SHOW TRACK                Select Cursor to Marker   MIX
+F3                 F3                              G#2 (Note)                 F3         CONSOLE                   Select Region             TRANSPORT
+F4                 F4                              A2 (Note)                  F4         OPEN CHANNEL              Store Region              MEM LOC
+F5                 F5                              A#2 (Note)                 F5         ADD INSERT                Store Marker              ALT VIEW
+F6                 F6                              B2 (Note)                  F6         ADD SEND                  Store Loop as Region      CUT/PLUG-IN ASSIGN
+F7                 F7                              C3 (Note)                  F7         SHOW CHANNEL EDITOR       Loop Region               SEPARATE/COMPARE
+F8                 F8                              C#3 (Note)                 F8         TOGGLE FLOATING WINDOW    ?                         PASTE/BYPASS
+VPOT:
+Track              FIRST                           I/O                       Track       Track                     Track                     PAN
+Send               LAST                            SENDS                     Send        Send                      Send                      PLUG-IN
+Pan/Surround       PAN                             PAN                   Pan/Surround    Pan/Surround              Pan/Surround              ASSIGN
+PlugIn             PLUG-INS                        PLUG-INS                 PlugIn       V-POT CONTROL LINK MODE   PlugIn                    SEND
+EQ                 EQ                              PAGE LEFT                   EQ        BYPASS INSERTS            EQ                        INPUT
+Instrument         DYN/FX/AUX                      PAGE RIGHT             Instrument                   NA          Instrument                OUTPUT
+
+
+
+
+Bank <             Bank of 8 <                     Bank of 8 <       Bank of 8 <         Bank of 8 <               Bank of 8 <               Bank of 24 <
+Bank >             Bank of 8 >                     Bank of 8 >       Bank of 8 >         Bank of 8 >               Bank of 8 >               Bank of 24 >
+Channel <          Channel <                       Channel <               Channel <     Channel <                 Channel <                 Channel <
+Channel >          Channel >                       Channel >               Channel >     Channel >                 Channel >                 Channel >
+Global View        EDIT                            RETURN                 Global View    Global View               Global View               INSERT
+Flip               FLIP                            FLIP              FLIP                FLIP                      FLIP                      V-SEL
+
+Solo                         ?                            ?                  Solo                      ?                      ?                             ?
+
+SMPTE/Beats        SMPTE/Beats                     BEATS                 SMPTE/Beats     SMPTE/Beats               SMPTE/Beats               CLEAR PEAKS
+NAME/VALUE         NAME/VALUE                      METERS                NAME/VALUE      NAME/VALUE                NAME/VALUE                METERS
+
+
+
+
+                                             *This list was NOT created in cooperation with the respective DAW manufacturers
+                                                                (no warranty for correctness or completeness)
+

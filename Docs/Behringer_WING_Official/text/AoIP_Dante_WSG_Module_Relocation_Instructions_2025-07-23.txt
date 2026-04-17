@@ -1,0 +1,20 @@
+Behringer AoIP (Dante and WSG) module relocation
+
+
+WING firmware 3.1 enables the WING-DANTE expansion card to operate with either a
+Dante or a Waves SoundGrid (WSG) audio-over-IP module.
+
+   1. Install the desired AoIP module in the expansion card slot, then insert the
+      expansion card into the console.
+
+   2. Hold the UTILITY button while powering on the console.
+   3. In the CONSOLE OPTIONS dialog, enter the corresponding string:
+         •   For Dante: CRD-WDANTE
+         •   For WSG: CRD-WDWSG
+   4. Restart the console.
+
+
+
+
+musictribe.com                                                     behringer.com
+

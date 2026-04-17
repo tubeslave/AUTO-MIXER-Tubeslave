@@ -89,6 +89,10 @@ class ObservationMixerClient:
             entry["last_message"] = op["message"]
         return {"total_operations": len(self._operations), "channels": channels}
 
+    def _normalize_fx_slot(self, fx_slot: str) -> str:
+        slot = str(fx_slot).upper()
+        return slot[2:] if slot.startswith("FX") else slot
+
     def send(self, address: str, *args):
         if not args:
             return self._base_client.send(address)
@@ -285,6 +289,80 @@ class ObservationMixerClient:
 
     def set_send_level(self, channel: int, send_bus: int, level_db: float, channel_type: str = "input"):
         return self._record("set_send_level", (channel, send_bus, level_db, channel_type), {})
+
+    def set_main_eq_on(self, main: int, on: int):
+        return self._record("set_main_eq_on", (main, on), {}, {f"/main/{main}/eq/on": on})
+
+    def set_main_eq_band(self, main: int, band: int, freq: float = None, gain: float = None, q: float = None):
+        updates = {}
+        if freq is not None:
+            updates[f"/main/{main}/eq/{band}f"] = freq
+        if gain is not None:
+            updates[f"/main/{main}/eq/{band}g"] = gain
+        if q is not None:
+            updates[f"/main/{main}/eq/{band}q"] = q
+        return self._record("set_main_eq_band", (main, band), {"freq": freq, "gain": gain, "q": q}, updates)
+
+    def set_bus_eq_on(self, bus: int, on: int):
+        return self._record("set_bus_eq_on", (bus, on), {}, {f"/bus/{bus}/eq/on": on})
+
+    def set_bus_eq_band(self, bus: int, band: int, freq: float = None, gain: float = None, q: float = None):
+        updates = {}
+        if freq is not None:
+            updates[f"/bus/{bus}/eq/{band}f"] = freq
+        if gain is not None:
+            updates[f"/bus/{bus}/eq/{band}g"] = gain
+        if q is not None:
+            updates[f"/bus/{bus}/eq/{band}q"] = q
+        return self._record("set_bus_eq_band", (bus, band), {"freq": freq, "gain": gain, "q": q}, updates)
+
+    def set_matrix_eq_on(self, matrix: int, on: int):
+        return self._record("set_matrix_eq_on", (matrix, on), {}, {f"/mtx/{matrix}/eq/on": on})
+
+    def set_matrix_eq_band(self, matrix: int, band: int, freq: float = None, gain: float = None, q: float = None):
+        updates = {}
+        if freq is not None:
+            updates[f"/mtx/{matrix}/eq/{band}f"] = freq
+        if gain is not None:
+            updates[f"/mtx/{matrix}/eq/{band}g"] = gain
+        if q is not None:
+            updates[f"/mtx/{matrix}/eq/{band}q"] = q
+        return self._record("set_matrix_eq_band", (matrix, band), {"freq": freq, "gain": gain, "q": q}, updates)
+
+    def set_fx_model(self, fx_slot: str, model: str):
+        fx_num = self._normalize_fx_slot(fx_slot)
+        return self._record("set_fx_model", (fx_slot, model), {}, {f"/fx/{fx_num}/mdl": model})
+
+    def set_fx_on(self, fx_slot: str, on: int):
+        fx_num = self._normalize_fx_slot(fx_slot)
+        return self._record("set_fx_on", (fx_slot, on), {}, {f"/fx/{fx_num}/on": on})
+
+    def set_fx_mix(self, fx_slot: str, mix: float):
+        fx_num = self._normalize_fx_slot(fx_slot)
+        return self._record("set_fx_mix", (fx_slot, mix), {}, {f"/fx/{fx_num}/fxmix": mix})
+
+    def set_fx_parameter(self, fx_slot: str, parameter: int, value: Any):
+        fx_num = self._normalize_fx_slot(fx_slot)
+        return self._record("set_fx_parameter", (fx_slot, parameter, value), {}, {f"/fx/{fx_num}/{parameter}": value})
+
+    def set_insert(self, target_type: str, target: int, position: str, slot: str = "NONE", on: Optional[int] = None, mode: Optional[str] = None):
+        target_map = {
+            "channel": "ch",
+            "ch": "ch",
+            "aux": "aux",
+            "bus": "bus",
+            "main": "main",
+            "matrix": "mtx",
+            "mtx": "mtx",
+        }
+        pos_map = {"pre": "preins", "post": "postins"}
+        base = f"/{target_map[str(target_type).lower()]}/{int(target)}/{pos_map[str(position).lower()]}"
+        updates: Dict[str, Any] = {f"{base}/ins": str(slot).upper()}
+        if on is not None:
+            updates[f"{base}/on"] = on
+        if mode is not None and str(position).lower() == "post":
+            updates[f"{base}/mode"] = mode
+        return self._record("set_insert", (target_type, target, position, slot), {"on": on, "mode": mode}, updates)
 
     def __getattr__(self, name: str):
         attr = getattr(self._base_client, name)

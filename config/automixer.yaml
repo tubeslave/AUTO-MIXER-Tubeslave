@@ -2,6 +2,8 @@ mixer:
   type: wing
   ip: 192.168.1.102
   port: 2223
+  send_port: 2222
+  receive_port: 2223
   protocol: osc
   tls: false
   midi_base_channel: 0
@@ -27,14 +29,13 @@ agent:
   max_actions_per_cycle: 5
 ai:
   llm_backend: auto
-  llm_model: kimi-k2.5:cloud
+  llm_model: gpt-5.4
   kimi_cli_path: ''
   kimi_work_dir: ''
   kimi_timeout_sec: 120
   model_fallbacks:
-  - kimi_cli:default
-  - ollama:kimi-k2.5:cloud
-  - ollama:qwen3:0.6b
+  - openai:gpt-5.4
+  - openai:gpt-4o-mini
   openai_api_key: ''
   openai_url: https://api.openai.com/v1/responses
   openai_reasoning_effort: low

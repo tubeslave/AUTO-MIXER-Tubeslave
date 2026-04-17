@@ -5,6 +5,7 @@ import VoiceControlTab from './components/VoiceControlTab';
 import GainStagingTab from './components/GainStagingTab';
 import AutoEQTab from './components/AutoEQTab';
 import PhaseAlignmentTab from './components/PhaseAlignmentTab';
+import SystemMeasurementTab from './components/SystemMeasurementTab';
 import AutoFaderTab from './components/AutoFaderTab';
 import AutoSoundcheckTab from './components/AutoSoundcheckTab';
 import AutoCompressorTab from './components/AutoCompressorTab';
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { id: 'mixer', icon: '🔌', label: 'Connect' },
   { id: 'gainStaging', icon: '📊', label: 'Gain' },
   { id: 'phaseAlignment', icon: '⟳', label: 'Phase' },
+  { id: 'systemMeasurement', icon: '📐', label: 'Master' },
   { id: 'autoEQ', icon: '〰', label: 'EQ' },
   { id: 'autoCompressor', icon: '⬇', label: 'Comp' },
   { id: 'autoFader', icon: '🎚', label: 'Fader' },
@@ -61,7 +63,7 @@ function App() {
   }, [mixerIp]);
 
   useEffect(() => {
-    websocketService.on('connection_status', (data) => {
+    const handleConnectionStatus = (data) => {
       setConnecting(false);
       setMixerConnected(data.connected);
       if (data.connected) {
@@ -73,9 +75,9 @@ function App() {
           setStatusMessage('Отключен');
         }
       }
-    });
+    };
 
-    websocketService.on('audio_devices', (data) => {
+    const handleAudioDevices = (data) => {
       setAudioDevices(data.devices || []);
       if (data.devices && data.devices.length > 0) {
         const danteDevice = data.devices.find(device =>
@@ -85,15 +87,15 @@ function App() {
         setSelectedDevice(deviceToSelect.id);
         setAvailableChannels(deviceToSelect.channels || []);
       }
-    });
+    };
 
-    websocketService.on('bypass_result', (data) => {
+    const handleBypassResult = (data) => {
       if (data.error) {
         setStatusMessage(`Bypass: ${data.error}`);
       } else if (data.success) {
         setStatusMessage(`Bypass OK: ${data.success_count}/40`);
       }
-    });
+    };
 
     const isDefaultChannelName = (name) => {
       if (!name || !name.trim()) return true;
@@ -108,7 +110,7 @@ function App() {
       return defaultPatterns.some(pattern => pattern.test(trimmedName));
     };
 
-    websocketService.on('mixer_channel_names', (data) => {
+    const handleMixerChannelNames = (data) => {
       if (data.error) {
         setStatusMessage(`Scan: ${data.error}`);
         return;
@@ -150,26 +152,33 @@ function App() {
           return updatedChannels;
         });
       }
-    });
+    };
 
-    websocketService.on('disconnected', () => {
+    const handleDisconnected = () => {
       setServerConnected(false);
       setMixerConnected(false);
-      setStatusMessage('Переподключение...');
-    });
+      setStatusMessage('Соединение потеряно, переподключение...');
+    };
 
     const handleAllSettingsLoaded = (data) => {
       if (data.settings && data.settings.mixer) {
         const m = data.settings.mixer;
-        if (m.mixerIp) setMixerIp(m.mixerIp);
-        if (m.mixerPort) setMixerPort(m.mixerPort);
+        if (m.mixerIp || m.ip) setMixerIp(m.mixerIp || m.ip);
+        if (m.mixerPort || m.port) setMixerPort(m.mixerPort || m.port);
       }
     };
-    websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
 
-    websocketService.on('dante_routing', (data) => {
+    const handleDanteRouting = (data) => {
       if (data.routing_scheme) setRoutingScheme(data.routing_scheme);
-    });
+    };
+
+    websocketService.on('connection_status', handleConnectionStatus);
+    websocketService.on('audio_devices', handleAudioDevices);
+    websocketService.on('bypass_result', handleBypassResult);
+    websocketService.on('mixer_channel_names', handleMixerChannelNames);
+    websocketService.on('disconnected', handleDisconnected);
+    websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
+    websocketService.on('dante_routing', handleDanteRouting);
 
     websocketService.connect()
       .then(() => {
@@ -185,13 +194,13 @@ function App() {
       });
 
     return () => {
-      websocketService.off('connection_status', () => {});
-      websocketService.off('audio_devices', () => {});
-      websocketService.off('bypass_result', () => {});
-      websocketService.off('mixer_channel_names', () => {});
-      websocketService.off('disconnected', () => {});
+      websocketService.off('connection_status', handleConnectionStatus);
+      websocketService.off('audio_devices', handleAudioDevices);
+      websocketService.off('bypass_result', handleBypassResult);
+      websocketService.off('mixer_channel_names', handleMixerChannelNames);
+      websocketService.off('disconnected', handleDisconnected);
       websocketService.off('all_settings_loaded', handleAllSettingsLoaded);
-      websocketService.off('dante_routing', () => {});
+      websocketService.off('dante_routing', handleDanteRouting);
       websocketService.disconnect();
     };
   }, []);
@@ -457,6 +466,7 @@ function App() {
 
           {activeTab === 'gainStaging' && <GainStagingTab {...sharedProps} />}
           {activeTab === 'phaseAlignment' && <PhaseAlignmentTab {...sharedProps} />}
+          {activeTab === 'systemMeasurement' && <SystemMeasurementTab {...sharedProps} />}
           {activeTab === 'autoEQ' && <AutoEQTab {...sharedProps} />}
           {activeTab === 'autoFader' && <AutoFaderTab {...sharedProps} />}
           {activeTab === 'autoSoundcheck' && <AutoSoundcheckTab {...sharedProps} />}

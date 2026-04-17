@@ -36,6 +36,12 @@ const MODULE_SIGNAL_INFO = {
     description: '\u041f\u043e\u043b\u043d\u044b\u0439 \u0441\u0430\u0443\u043d\u0434\u0447\u0435\u043a \u0441 \u0430\u043d\u0430\u043b\u0438\u0437\u043e\u043c \u0441\u044b\u0440\u044b\u0445 \u0441\u0438\u0433\u043d\u0430\u043b\u043e\u0432. Gain + EQ + Compressor + Fader + AI Agent context.',
     icon: '\ud83c\udfaf',
   },
+  system_measurement: {
+    signal: 'Measurement Mic (Dante 57)\n+ Matrix / Master Ref',
+    tap_point: 'Pre-EQ / Ref compare',
+    description: 'Сравнение reference-шины и measurement mic для оценки АЧХ, фазы и coherence на реальной PA.',
+    icon: '\ud83d\udcd0',
+  },
 };
 
 export default MODULE_SIGNAL_INFO;

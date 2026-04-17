@@ -21,7 +21,7 @@ def get_fx_addresses(fx_slot: str):
     addresses.extend([
         f"/fx/{fx_num}/mdl",      # FX model (P-BASS, REVERB, etc.)
         f"/fx/{fx_num}/on",       # FX on/off
-        f"/fx/{fx_num}/mix",      # FX mix
+        f"/fx/{fx_num}/fxmix",    # FX mix
         f"/fx/{fx_num}/name",     # FX name (if available)
         f"/fx/{fx_num}/type",     # FX type (if available)
     ])
@@ -250,7 +250,7 @@ def print_fx_modules(fx_slots: list, state: dict):
         fx_type = state.get(f'/fx/{fx_num}/type') or state.get(f'/fx/{fx_num}/$type')
         fx_node = state.get(f'/fx/{fx_num}/')  # Node type indicator
         fx_on = state.get(f'/fx/{fx_num}/on')
-        fx_mix = state.get(f'/fx/{fx_num}/mix')
+        fx_mix = state.get(f'/fx/{fx_num}/fxmix')
         
         fx_on_str = "ON" if fx_on == 1 else "OFF" if fx_on == 0 else "Unknown"
         
@@ -274,7 +274,7 @@ def print_fx_modules(fx_slots: list, state: dict):
         excluded_keys = [
             f'/fx/{fx_num}/name', f'/fx/{fx_num}/$name',
             f'/fx/{fx_num}/type', f'/fx/{fx_num}/$type',
-            f'/fx/{fx_num}/on', f'/fx/{fx_num}/mix',
+            f'/fx/{fx_num}/on', f'/fx/{fx_num}/fxmix',
             f'/fx/{fx_num}/mdl',  # Model is shown separately
             f'/fx/{fx_num}/',  # Root node (contains node type)
             f'/fx/{fx_num}/node'

@@ -83,3 +83,17 @@ def test_observation_mixer_summary_groups_operations():
     assert summary["total_operations"] == 3
     assert summary["channels"]["1"]["count"] == 2
     assert summary["channels"]["global"]["count"] == 1
+
+
+def test_observation_mixer_tracks_fx_and_insert_shadow_state():
+    fake = FakeMixer()
+    mixer = ObservationMixerClient(fake)
+
+    assert mixer.set_fx_mix("FX3", 75.0) is True
+    assert mixer.set_fx_model("FX3", "PLATE") is True
+    assert mixer.set_insert("main", 1, "post", slot="FX3", on=1) is True
+
+    assert mixer.state["/fx/3/fxmix"] == 75.0
+    assert mixer.state["/fx/3/mdl"] == "PLATE"
+    assert mixer.state["/main/1/postins/ins"] == "FX3"
+    assert mixer.state["/main/1/postins/on"] == 1

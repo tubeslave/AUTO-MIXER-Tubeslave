@@ -9,14 +9,14 @@ import sys
 import threading
 import time
 from datetime import datetime
-from typing import Set, Optional, Union, List, Dict, Any
+from typing import Set, Optional, Union, List, Dict, Any, TYPE_CHECKING
 import websockets
 import numpy as np
-try:
-    from websockets.server import WebSocketServerProtocol
-except ImportError:
-    # For newer versions of websockets
-    from websockets.legacy.server import WebSocketServerProtocol
+
+if TYPE_CHECKING:
+    from websockets.asyncio.server import ServerConnection as WebSocketServerProtocol
+else:
+    WebSocketServerProtocol = Any
 
 from wing_client import WingClient
 from dlive_client import DLiveClient
@@ -34,6 +34,7 @@ from lufs_gain_staging import LUFSGainStagingController, SafeGainCalibrator
 from channel_recognizer import scan_and_recognize, recognize_instrument_spectral_fallback, AVAILABLE_PRESETS
 from auto_eq import AutoEQController, InstrumentProfiles, MultiChannelAutoEQController
 from phase_alignment import PhaseAlignmentController
+from system_measurement import SystemMeasurementController, TargetBus
 from auto_fader import AutoFaderController
 from auto_compressor import AutoCompressorController
 from backup_channels import backup_channel
@@ -41,13 +42,21 @@ from restore_channels import restore_from_backup_using_client
 from bleed_service import BleedService
 from audio_capture import (
     AudioCapture, AudioSourceType, AudioDeviceType,
-    detect_audio_device, find_device_by_name, list_audio_devices,
+    detect_audio_device, find_device_by_name, list_audio_devices, HAS_SOUNDDEVICE,
 )
 from feedback_detector import FeedbackDetector
 from auto_soundcheck_engine import AutoSoundcheckEngine
 from observation_mixer import ObservationMixerClient
 from mixer_discovery import discover_mixers, discover_mixer_auto, DiscoveredMixer
 from handlers import register_all_handlers
+from user_config_store import (
+    get_user_config_path,
+    load_user_config,
+    normalize_mixer_user_settings,
+    normalize_user_config,
+    save_user_config,
+)
+from ws_transport import broadcast_json, is_connection_closed_error, send_json
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -151,6 +160,9 @@ class AutoMixerServer:
         # Phase alignment controller
         self.phase_alignment_controller: Optional[PhaseAlignmentController] = None
         
+        # Master/system measurement controller
+        self.system_measurement_controller: Optional[SystemMeasurementController] = None
+        
         # Auto Fader controller
         self.auto_fader_controller: Optional[AutoFaderController] = None
         
@@ -183,6 +195,7 @@ class AutoMixerServer:
         self.mixing_agent = None
         self.mixing_agent_task: Optional[asyncio.Task] = None
         self.agent_auto_apply_enabled = False
+        self._agent_force_auto_apply = False
 
         # Online ML training service for internet-fed datasets
         self.agent_training_service = None
@@ -202,6 +215,17 @@ class AutoMixerServer:
         self._dispatch = register_all_handlers(self)
 
         logger.info(f"AutoMixer Server initialized on {ws_host}:{ws_port}")
+
+    def _safe_cleanup_call(self, action, context: str, success_message: Optional[str] = None) -> bool:
+        """Run cleanup logic without letting secondary stop errors break shutdown paths."""
+        try:
+            action()
+            if success_message:
+                logger.info(success_message)
+            return True
+        except Exception as exc:
+            logger.warning("%s: %s", context, exc, exc_info=True)
+            return False
     
     def cleanup_all_controllers(self):
         """Cleanup all active controllers - call before shutdown or on error."""
@@ -209,11 +233,11 @@ class AutoMixerServer:
         
         # Stop gain staging
         if self.gain_staging:
-            try:
-                self.gain_staging.stop()
-                logger.info("Gain staging stopped")
-            except Exception as e:
-                logger.error(f"Error stopping gain staging: {e}")
+            self._safe_cleanup_call(
+                self.gain_staging.stop,
+                "Error stopping gain staging",
+                "Gain staging stopped",
+            )
             self.gain_staging = None
         
         # Stop voice control
@@ -236,29 +260,32 @@ class AutoMixerServer:
         
         # Stop Multi-channel Auto-EQ
         if self.multi_channel_auto_eq_controller:
-            try:
-                self.multi_channel_auto_eq_controller.stop_all()
-                logger.info("Multi-channel Auto-EQ stopped")
-            except Exception as e:
-                logger.error(f"Error stopping multi-channel Auto-EQ: {e}")
+            self._safe_cleanup_call(
+                self.multi_channel_auto_eq_controller.stop_all,
+                "Error stopping multi-channel Auto-EQ",
+                "Multi-channel Auto-EQ stopped",
+            )
             self.multi_channel_auto_eq_controller = None
         
         # Stop Phase alignment
         if self.phase_alignment_controller:
-            try:
-                self.phase_alignment_controller.stop()
-                logger.info("Phase alignment stopped")
-            except Exception as e:
-                logger.error(f"Error stopping phase alignment: {e}")
+            self._safe_cleanup_call(
+                self.phase_alignment_controller.stop,
+                "Error stopping phase alignment",
+                "Phase alignment stopped",
+            )
             self.phase_alignment_controller = None
+
+        if self.system_measurement_controller:
+            self.system_measurement_controller = None
         
         # Stop Auto Fader
         if self.auto_fader_controller:
-            try:
-                self.auto_fader_controller.stop()
-                logger.info("Auto Fader stopped")
-            except Exception as e:
-                logger.error(f"Error stopping Auto Fader: {e}")
+            self._safe_cleanup_call(
+                self.auto_fader_controller.stop,
+                "Error stopping Auto Fader",
+                "Auto Fader stopped",
+            )
             self.auto_fader_controller = None
         
         # Stop Auto Soundcheck
@@ -564,37 +591,24 @@ class AutoMixerServer:
 
     def _get_user_config_path(self) -> str:
         """Get path to user config file."""
-        import os
-        return os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                            'config', 'user_config.json')
+        return get_user_config_path(os.path.dirname(os.path.dirname(__file__)))
 
     def _load_user_config(self) -> dict:
         """Load user-saved settings from user_config.json."""
-        import os
-        path = self._get_user_config_path()
-        if not os.path.exists(path):
-            return {}
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                logger.info(f"User config loaded from {path}")
-                return data
-        except Exception as e:
-            logger.warning(f"Failed to load user config: {e}")
-            return {}
+        return load_user_config(self._get_user_config_path())
+
+    def _normalize_mixer_user_settings(self, settings: dict) -> dict:
+        """Normalize mixer settings so backend and frontend can share one payload."""
+        return normalize_mixer_user_settings(settings)
+
+    def _normalize_user_config(self, data: dict) -> dict:
+        """Normalize persisted user config sections for frontend/backend compatibility."""
+        return normalize_user_config(data)
 
     def _save_user_config(self, section: str, settings: dict):
         """Save user settings to user_config.json under a given section."""
-        import os
-        path = self._get_user_config_path()
-        # Load existing user config
-        existing = self._load_user_config()
-        existing[section] = settings
         try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, 'w', encoding='utf-8') as f:
-                json.dump(existing, f, indent=2, ensure_ascii=False)
-            logger.info(f"User config saved to {path}: section={section}")
+            save_user_config(self._get_user_config_path(), section, settings)
         except Exception as e:
             logger.error(f"Failed to save user config: {e}")
             raise
@@ -617,43 +631,87 @@ class AutoMixerServer:
 
     def _is_connection_closed_error(self, e: Exception) -> bool:
         """True if the exception indicates the client already closed the connection."""
-        msg = str(e).lower()
-        if "1001" in msg or "going away" in msg or "connection closed" in msg:
-            return True
-        try:
-            return getattr(e, "code", None) == 1001
-        except Exception:
-            return False
+        return is_connection_closed_error(e)
 
     async def send_to_client(self, websocket: WebSocketServerProtocol, message: dict):
+        return await send_json(
+            websocket,
+            message,
+            converter=convert_numpy_types,
+            logger_=logger,
+        )
+
+    async def _send_runtime_error(self, websocket: WebSocketServerProtocol, error: Exception, *, payload_type: str = "error") -> None:
+        """Best-effort runtime error reporting that does not mask cancellation or closed sockets."""
         try:
-            # Преобразуем NumPy типы в нативные Python типы перед JSON сериализацией
-            message = convert_numpy_types(message)
-            json_str = json.dumps(message)
-            await websocket.send(json_str)
-        except Exception as e:
-            if self._is_connection_closed_error(e):
-                logger.debug("Send failed (client closed): %s", e)
+            await self.send_to_client(websocket, {
+                "type": payload_type,
+                "error": str(error),
+            })
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if self._is_connection_closed_error(exc):
+                logger.info("Skipped runtime error delivery to closed client: %s", exc)
             else:
-                logger.error(f"Error sending to client: {e}")
+                logger.warning("Failed to deliver runtime error to client: %s", exc, exc_info=True)
+
+    def _handle_external_fader_update(self, address: str, args: tuple[Any, ...]) -> None:
+        """Track manual fader moves and forward them to live controllers when possible."""
+        if not (address.startswith("/ch/") and address.endswith("/fdr") and args):
+            return
+        try:
+            channel_match = re.search(r'/ch/(\d+)/fdr', address)
+            if not channel_match:
+                return
+            channel = int(channel_match.group(1))
+            fader_value = float(args[0])
+        except (TypeError, ValueError, IndexError, AttributeError):
+            return
+
+        self.last_fader_values[channel] = fader_value
+        controller = self.auto_fader_controller
+        if controller and controller.realtime_enabled:
+            try:
+                controller.handle_external_fader_change(channel, fader_value)
+            except Exception as exc:
+                logger.warning(
+                    "Auto Fader external change handler failed for channel %s: %s",
+                    channel,
+                    exc,
+                    exc_info=True,
+                )
+
+    def _schedule_mixer_update_broadcast(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        address: str,
+        args: tuple[Any, ...],
+    ) -> None:
+        """Queue mixer updates back onto the asyncio loop from transport callbacks."""
+        try:
+            loop.call_soon_threadsafe(
+                lambda: asyncio.create_task(self.broadcast({
+                    "type": "mixer_update",
+                    "address": address,
+                    "values": args,
+                }))
+            )
+        except RuntimeError as exc:
+            logger.warning("Dropped mixer update broadcast for %s: %s", address, exc)
 
     async def broadcast(self, message: dict):
         logger.debug("Broadcasting message: %s to %s clients", message.get("type"), len(self.connected_clients))
-        if not self.connected_clients:
-            logger.warning("No connected clients to broadcast to")
-            return
-        clients = list(self.connected_clients)
-        results = await asyncio.gather(
-            *[self.send_to_client(c, message) for c in clients],
-            return_exceptions=True
+        disconnected = await broadcast_json(
+            self.connected_clients,
+            message,
+            sender=self.send_to_client,
+            logger_=logger,
         )
-        # Remove clients that closed the connection so we stop sending to them
-        for client, result in zip(clients, results):
-            if isinstance(result, Exception) and self._is_connection_closed_error(result):
+        for client in disconnected:
+            if client in self.connected_clients:
                 self.connected_clients.discard(client)
                 logger.info("Removed disconnected client from broadcast list. Total clients: %s", len(self.connected_clients))
-            elif isinstance(result, Exception):
-                logger.error("Error broadcasting to client: %s", result)
 
     def _rebind_controller_mixer_clients(self, client):
         """Point long-lived controllers at the active mixer client."""
@@ -685,6 +743,43 @@ class AutoMixerServer:
         if summary is not None:
             payload["summary"] = summary
         await self.send_to_client(websocket, payload)
+
+    def _ensure_audio_capture(
+        self,
+        device_id: Optional[Union[str, int]],
+        *,
+        num_channels: int,
+        sample_rate: int = 48000,
+        buffer_seconds: float = 8.0,
+    ) -> AudioCapture:
+        """Ensure unified AudioCapture is running for the requested input device."""
+        source_type = AudioSourceType.SOUNDDEVICE if HAS_SOUNDDEVICE else AudioSourceType.SILENCE
+        requested_device = None if device_id in (None, "", "default") else device_id
+
+        needs_restart = (
+            self.audio_capture is None or
+            not getattr(self.audio_capture, "running", False) or
+            getattr(self.audio_capture, "device_name", None) != requested_device or
+            getattr(self.audio_capture, "num_channels", 0) < num_channels or
+            getattr(self.audio_capture, "sample_rate", sample_rate) != sample_rate
+        )
+
+        if needs_restart:
+            if self.audio_capture:
+                self._safe_cleanup_call(
+                    self.audio_capture.stop,
+                    "Error stopping audio capture before reconfigure",
+                )
+            self.audio_capture = AudioCapture(
+                num_channels=num_channels,
+                sample_rate=sample_rate,
+                buffer_seconds=buffer_seconds,
+                source_type=source_type,
+                device_name=requested_device,
+            )
+            self.audio_capture.start()
+
+        return self.audio_capture
 
     def _activate_observation_mode(self, websocket, loop):
         """Wrap the live mixer client with a dry-run proxy for the soundcheck cycle."""
@@ -748,6 +843,40 @@ class AutoMixerServer:
             self._rebind_controller_mixer_clients(original_client)
 
         self._observation_mixer_client = None
+
+    def _is_real_mixer_connected(self) -> bool:
+        return bool(
+            self.mixer_client
+            and getattr(self.mixer_client, "is_connected", False)
+            and self.connection_mode in {"wing", "dlive", "mixing_station"}
+        )
+
+    def _is_agent_dry_run(self) -> bool:
+        return bool(self._is_real_mixer_connected() and not self._agent_force_auto_apply)
+
+    def _enforce_agent_dry_run_mode(self):
+        """Keep agent in suggest-only mode while a real mixer is connected."""
+        from ai.agent import AgentMode
+
+        if not self.mixing_agent:
+            return
+        if self._is_agent_dry_run():
+            self.mixing_agent.set_mode(AgentMode.SUGGEST)
+            self.agent_auto_apply_enabled = False
+            logger.info("Real mixer connected: forcing AI agent into SUGGEST (dry-run) mode")
+
+    def _apply_llm_dry_run_overrides(self, mode: str = None, allow_auto_apply: bool = True, force_auto_apply: bool = False):
+        if self._is_real_mixer_connected() and not force_auto_apply:
+            if allow_auto_apply:
+                logger.info(
+                    "Real mixer connected: forcing AI agent to dry-run mode (AUTO disabled)."
+                )
+            allow_auto_apply = False
+            if mode is None:
+                mode = "suggest"
+            elif str(mode).lower() == "auto":
+                mode = "suggest"
+        return mode, allow_auto_apply
 
     def _coerce_agent_mode(self, mode: str = None, allow_auto_apply: bool = True):
         """Return AgentMode for current run; AUTO is the default test-stage behavior."""
@@ -916,7 +1045,8 @@ class AutoMixerServer:
         self.mixing_agent.update_channel_state(int(channel), state)
 
     async def init_mixing_agent(self, mode: str = None, channels=None, use_llm: bool = True,
-                                allow_auto_apply: bool = True, start: bool = False):
+                                allow_auto_apply: bool = True, start: bool = False,
+                                force_auto_apply: bool = False):
         """Create or reconfigure the AI MixingAgent (AUTO apply by default for testing)."""
         from ai.agent import MixingAgent
         from ai.knowledge_base import KnowledgeBase
@@ -924,6 +1054,12 @@ class AutoMixerServer:
         from ai.rule_engine import RuleEngine
 
         self._sync_runtime_from_auto_soundcheck()
+        self._agent_force_auto_apply = bool(force_auto_apply)
+        mode, allow_auto_apply = self._apply_llm_dry_run_overrides(
+            mode=mode,
+            allow_auto_apply=allow_auto_apply,
+            force_auto_apply=self._agent_force_auto_apply,
+        )
         agent_config = self.config.get("agent", {})
         ai_config = self.config.get("ai", {})
         agent_mode = self._coerce_agent_mode(mode, allow_auto_apply=allow_auto_apply)
@@ -977,6 +1113,8 @@ class AutoMixerServer:
                 if not t.cancelled() and t.exception() else None
             )
 
+        self._enforce_agent_dry_run_mode()
+
         return self.mixing_agent
 
     def _sync_runtime_from_auto_soundcheck(self):
@@ -1026,18 +1164,12 @@ class AutoMixerServer:
                 "type": "error",
                 "error": f"Invalid JSON: {e}"
             })
+        except asyncio.CancelledError:
+            logger.info("Client message handling cancelled")
+            raise
         except Exception as e:
             logger.error(f"Error handling message: {e}", exc_info=True)
-            import traceback
-            logger.error(traceback.format_exc())
-            # Try to send error to client
-            try:
-                await self.send_to_client(websocket, {
-                    "type": "error",
-                    "error": str(e)
-                })
-            except:
-                pass
+            await self._send_runtime_error(websocket, e)
 
     async def connect_wing(self, ip: str, send_port: int = 2223, receive_port: int = 2223):
         """
@@ -1049,41 +1181,27 @@ class AutoMixerServer:
         """
         # Disconnect existing connection if any
         await self.disconnect_mixer()
+        self._agent_force_auto_apply = False
         
         try:
-            self.mixer_client = EnhancedOSCClient(ip=ip, port=send_port)
+            osc_port = receive_port or send_port or 2223
+            if send_port and receive_port and send_port != receive_port:
+                logger.info(
+                    "Wing connect requested with send_port=%s receive_port=%s; using OSC port %s",
+                    send_port,
+                    receive_port,
+                    osc_port,
+                )
+
+            self.mixer_client = EnhancedOSCClient(ip=ip, port=osc_port)
             self.connection_mode = 'wing'
             
             # Store the event loop reference for thread-safe callback
             loop = asyncio.get_running_loop()
             
             def on_mixer_update(address: str, *args):
-                try:
-                    # Track fader values for relative volume changes
-                    if address.startswith("/ch/") and address.endswith("/fdr") and args:
-                        try:
-                            channel_match = re.search(r'/ch/(\d+)/fdr', address)
-                            if channel_match:
-                                channel = int(channel_match.group(1))
-                                fader_value = float(args[0]) if args else None
-                                if fader_value is not None:
-                                    self.last_fader_values[channel] = fader_value
-                                    
-                                    # Обработка ручных изменений референсного канала для Auto Fader
-                                    if self.auto_fader_controller and self.auto_fader_controller.realtime_enabled:
-                                        self.auto_fader_controller.handle_external_fader_change(channel, fader_value)
-                        except (ValueError, IndexError, AttributeError):
-                            pass  # Ignore parsing errors
-                    
-                    loop.call_soon_threadsafe(
-                        lambda: asyncio.create_task(self.broadcast({
-                            "type": "mixer_update",
-                            "address": address,
-                            "values": args
-                        }))
-                    )
-                except Exception as e:
-                    logger.error(f"Callback asyncio error: {e}")
+                self._handle_external_fader_update(address, args)
+                self._schedule_mixer_update_broadcast(loop, address, args)
             
             self.mixer_client.subscribe("*", on_mixer_update)
             
@@ -1092,6 +1210,7 @@ class AutoMixerServer:
             if success:
                 if self.mixing_agent is not None:
                     self.mixing_agent.mixer = self.mixer_client
+                self._enforce_agent_dry_run_mode()
                 await self.broadcast({
                     "type": "connection_status",
                     "connected": True,
@@ -1109,6 +1228,10 @@ class AutoMixerServer:
                     "error": "Connection failed - Wing did not respond"
                 })
                 
+        except asyncio.CancelledError:
+            self.mixer_client = None
+            self.connection_mode = None
+            raise
         except Exception as e:
             logger.error(f"Error connecting to Wing: {e}")
             self.mixer_client = None
@@ -1123,6 +1246,7 @@ class AutoMixerServer:
                             tls: bool = False, midi_base_channel: int = 0):
         """Connect to Allen & Heath dLive mixer via MIDI over TCP."""
         await self.disconnect_mixer()
+        self._agent_force_auto_apply = False
 
         try:
             client = DLiveClient(ip=ip, port=port, tls=tls, midi_base_channel=midi_base_channel)
@@ -1133,6 +1257,7 @@ class AutoMixerServer:
                 self.connection_mode = 'dlive'
                 if self.mixing_agent is not None:
                     self.mixing_agent.mixer = self.mixer_client
+                self._enforce_agent_dry_run_mode()
 
                 # Request channel names from dLive
                 try:
@@ -1155,6 +1280,10 @@ class AutoMixerServer:
                     "error": "dLive connection failed"
                 })
 
+        except asyncio.CancelledError:
+            self.mixer_client = None
+            self.connection_mode = None
+            raise
         except Exception as e:
             logger.error(f"Error connecting to dLive: {e}")
             self.mixer_client = None
@@ -1176,6 +1305,7 @@ class AutoMixerServer:
         """
         # Disconnect existing connection if any
         await self.disconnect_mixer()
+        self._agent_force_auto_apply = False
         
         try:
             self.mixer_client = MixingStationClient(host, osc_port, rest_port)
@@ -1185,28 +1315,8 @@ class AutoMixerServer:
             loop = asyncio.get_running_loop()
             
             def on_mixer_update(address: str, *args):
-                try:
-                    # Обработка ручных изменений референсного канала для Auto Fader
-                    if address.startswith("/ch/") and address.endswith("/fdr") and args:
-                        try:
-                            channel_match = re.search(r'/ch/(\d+)/fdr', address)
-                            if channel_match:
-                                channel = int(channel_match.group(1))
-                                fader_value = float(args[0]) if args else None
-                                if fader_value is not None and self.auto_fader_controller and self.auto_fader_controller.realtime_enabled:
-                                    self.auto_fader_controller.handle_external_fader_change(channel, fader_value)
-                        except (ValueError, IndexError, AttributeError):
-                            pass  # Ignore parsing errors
-                    
-                    loop.call_soon_threadsafe(
-                        lambda: asyncio.create_task(self.broadcast({
-                            "type": "mixer_update",
-                            "address": address,
-                            "values": args
-                        }))
-                    )
-                except Exception as e:
-                    logger.error(f"Callback asyncio error: {e}")
+                self._handle_external_fader_update(address, args)
+                self._schedule_mixer_update_broadcast(loop, address, args)
             
             self.mixer_client.subscribe("*", on_mixer_update)
             
@@ -1215,6 +1325,7 @@ class AutoMixerServer:
             if success:
                 if self.mixing_agent is not None:
                     self.mixing_agent.mixer = self.mixer_client
+                self._enforce_agent_dry_run_mode()
                 await self.broadcast({
                     "type": "connection_status",
                     "connected": True,
@@ -1233,6 +1344,10 @@ class AutoMixerServer:
                     "error": "Connection failed - Mixing Station not responding. Ensure API is enabled in settings."
                 })
                 
+        except asyncio.CancelledError:
+            self.mixer_client = None
+            self.connection_mode = None
+            raise
         except Exception as e:
             logger.error(f"Error connecting to Mixing Station: {e}")
             self.mixer_client = None
@@ -1267,6 +1382,7 @@ class AutoMixerServer:
 
     async def disconnect_mixer(self):
         """Disconnect from current mixer (Wing or Mixing Station)"""
+        self._agent_force_auto_apply = False
         if self.mixer_client:
             self.mixer_client.disconnect()
             self.mixer_client = None
@@ -1388,16 +1504,20 @@ class AutoMixerServer:
                 logger.info("Step 3: ✅ Broadcast sent")
             except Exception as e:
                 logger.error(f"Step 3: ❌ Error broadcasting: {e}", exc_info=True)
-                raise
+                logger.warning("Voice control is active, but startup status broadcast failed")
             
             logger.info("=" * 60)
             logger.info("VOICE CONTROL STARTED SUCCESSFULLY")
             logger.info("=" * 60)
             
+        except asyncio.CancelledError:
+            if self.voice_control and not getattr(self.voice_control, "is_listening", False):
+                self.voice_control = None
+            raise
         except Exception as e:
             logger.error(f"Error starting voice control: {e}", exc_info=True)
-            import traceback
-            logger.error(traceback.format_exc())
+            if self.voice_control and not getattr(self.voice_control, "is_listening", False):
+                self.voice_control = None
             await self.broadcast({
                 "type": "voice_control_status",
                 "active": False,
@@ -1519,36 +1639,73 @@ class AutoMixerServer:
         """
         if not self.mixer_client or not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
             logger.warning("Rescan only available for Wing mixer")
+            target = getattr(self, "auto_soundcheck_websocket", None) or next(iter(self.connected_clients), None)
+            if target is not None:
+                await self.send_to_client(target, {
+                    "type": "voice_control_status",
+                    "active": bool(self.voice_control and getattr(self.voice_control, "is_listening", False)),
+                    "error": "Rescan only available for Wing mixer"
+                })
             return
         
         logger.info("Rescanning channel names from Wing...")
-        
-        # Request fresh channel names
-        for ch in range(1, 41):
-            self.mixer_client.send(f"/ch/{ch}/name")
-            await asyncio.sleep(0.01)  # Small delay between requests
-        
-        # Wait for responses
-        await asyncio.sleep(0.5)
-        
-        # Rebuild aliases
-        self._setup_voice_aliases_from_wing()
-        
-        logger.info("Channel names rescanned successfully")
+        try:
+            for ch in range(1, 41):
+                self.mixer_client.send(f"/ch/{ch}/name")
+                await asyncio.sleep(0.01)
+
+            await asyncio.sleep(0.5)
+            self._setup_voice_aliases_from_wing()
+            logger.info("Channel names rescanned successfully")
+
+            target = getattr(self, "auto_soundcheck_websocket", None) or next(iter(self.connected_clients), None)
+            if target is not None:
+                await self.send_to_client(target, {
+                    "type": "voice_control_status",
+                    "active": bool(self.voice_control and getattr(self.voice_control, "is_listening", False)),
+                    "message": "Channel names rescanned successfully"
+                })
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error(f"Error rescanning channel names: {e}", exc_info=True)
+            target = getattr(self, "auto_soundcheck_websocket", None) or next(iter(self.connected_clients), None)
+            if target is not None:
+                await self.send_to_client(target, {
+                    "type": "voice_control_status",
+                    "active": bool(self.voice_control and getattr(self.voice_control, "is_listening", False)),
+                    "error": str(e)
+                })
 
     async def stop_voice_control(self):
         """Stop voice control listening"""
         try:
-            if self.voice_control:
-                self.voice_control.stop_listening()
-                await self.broadcast({
+            if not self.voice_control:
+                await self.send_to_client(getattr(self, "auto_soundcheck_websocket", None) or next(iter(self.connected_clients), None), {
                     "type": "voice_control_status",
                     "active": False,
-                    "message": "Voice control stopped"
+                    "message": "Voice control is not running"
                 })
-                logger.info("Voice control stopped")
+                return
+
+            self.voice_control.stop_listening()
+            await self.broadcast({
+                "type": "voice_control_status",
+                "active": False,
+                "message": "Voice control stopped"
+            })
+            logger.info("Voice control stopped")
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
-            logger.error(f"Error stopping voice control: {e}")
+            logger.error(f"Error stopping voice control: {e}", exc_info=True)
+            target = getattr(self, "auto_soundcheck_websocket", None) or next(iter(self.connected_clients), None)
+            if target is not None:
+                await self.send_to_client(target, {
+                    "type": "voice_control_status",
+                    "active": False,
+                    "error": str(e)
+                })
     
     # ========== Real-time Peak Correction Methods ==========
     
@@ -2198,6 +2355,9 @@ class AutoMixerServer:
         try:
             # Set 5 second timeout to prevent hanging
             await asyncio.wait_for(reset_trim_task(), timeout=5.0)
+        except asyncio.CancelledError:
+            logger.info("Reset TRIM cancelled")
+            raise
         except asyncio.TimeoutError:
             logger.error("Timeout while resetting TRIM")
             await self.send_to_client(websocket, {
@@ -2314,6 +2474,9 @@ class AutoMixerServer:
         # Run bypass task with timeout
         try:
             await asyncio.wait_for(bypass_task(), timeout=30.0)
+        except asyncio.CancelledError:
+            logger.info("Bypass operation cancelled")
+            raise
         except asyncio.TimeoutError:
             logger.error("Bypass operation timed out")
             await self.send_to_client(websocket, {
@@ -2882,7 +3045,182 @@ class AutoMixerServer:
                 "success": False,
                 "error": str(e)
             })
-    
+
+    def get_system_measurement_status(self) -> dict:
+        """Get current system/master measurement state."""
+        controller = self.system_measurement_controller
+        if not controller:
+            return {"active": False}
+
+        result = controller.last_result
+        return {
+            "active": True,
+            "quality": getattr(result, "overall_quality", 0.0) if result else 0.0,
+            "recommended_target": controller.get_recommended_target(),
+            "num_corrections": len(controller.applied_corrections),
+            "has_result": result is not None,
+        }
+
+    def _parse_target_bus(self, target_bus: str) -> TargetBus:
+        normalized = (target_bus or "master").strip().lower()
+        aliases = {
+            "master": TargetBus.MASTER,
+            "main": TargetBus.MASTER,
+            "group": TargetBus.GROUP,
+            "bus": TargetBus.GROUP,
+            "matrix": TargetBus.MATRIX,
+            "mtx": TargetBus.MATRIX,
+        }
+        if normalized not in aliases:
+            raise ValueError(f"Unsupported target bus: {target_bus}")
+        return aliases[normalized]
+
+    async def start_system_measurement(
+        self,
+        websocket,
+        device_id: str = None,
+        reference_channel: int = None,
+        measurement_channel: int = None,
+        duration_sec: float = 6.0,
+        target_bus: str = "master",
+        target_id: int = 1,
+    ):
+        """Capture reference + measurement mic and estimate system transfer function."""
+        if not self.mixer_client or not self.mixer_client.is_connected:
+            await self.send_to_client(websocket, {
+                "type": "system_measurement_result",
+                "success": False,
+                "error": "Mixer not connected",
+            })
+            return
+
+        if reference_channel is None or measurement_channel is None:
+            await self.send_to_client(websocket, {
+                "type": "system_measurement_result",
+                "success": False,
+                "error": "reference_channel and measurement_channel are required",
+            })
+            return
+
+        try:
+            reference_channel = int(reference_channel)
+            measurement_channel = int(measurement_channel)
+            target_id = int(target_id)
+            duration_sec = float(duration_sec)
+            target = self._parse_target_bus(target_bus)
+        except (TypeError, ValueError) as exc:
+            await self.send_to_client(websocket, {
+                "type": "system_measurement_result",
+                "success": False,
+                "error": str(exc),
+            })
+            return
+
+        try:
+            capture = self._ensure_audio_capture(
+                device_id,
+                num_channels=max(reference_channel, measurement_channel),
+                buffer_seconds=max(8.0, duration_sec + 2.0),
+            )
+            await self.broadcast({
+                "type": "system_measurement_status",
+                "active": True,
+                "message": "Capturing reference and measurement mic...",
+            })
+
+            await asyncio.sleep(max(0.5, duration_sec))
+            num_samples = int(capture.sample_rate * duration_sec)
+            reference_signal = capture.get_buffer(reference_channel, num_samples)
+            measurement_signal = capture.get_buffer(measurement_channel, num_samples)
+
+            ref_rms = 20.0 * np.log10(np.sqrt(np.mean(reference_signal ** 2)) + 1e-10)
+            mic_rms = 20.0 * np.log10(np.sqrt(np.mean(measurement_signal ** 2)) + 1e-10)
+            if ref_rms < -50.0:
+                raise RuntimeError("Reference channel level is too low for measurement")
+            if mic_rms < -60.0:
+                raise RuntimeError("Measurement mic level is too low for analysis")
+
+            self.system_measurement_controller = SystemMeasurementController(
+                mixer_client=self.mixer_client,
+                sample_rate=capture.sample_rate,
+            )
+            analysis = self.system_measurement_controller.analyze_reference_measurement(
+                reference_signal,
+                measurement_signal,
+            )
+
+            await self.broadcast({
+                "type": "system_measurement_result",
+                "success": True,
+                "target_bus": target.value,
+                "target_id": target_id,
+                "reference_channel": reference_channel,
+                "measurement_channel": measurement_channel,
+                "recommended_target": self.system_measurement_controller.get_recommended_target(),
+                **analysis,
+            })
+        except Exception as e:
+            logger.error("System measurement failed: %s", e, exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "system_measurement_result",
+                "success": False,
+                "error": str(e),
+            })
+
+    async def apply_system_measurement(self, websocket, target_bus: str = "master", target_id: int = 1):
+        """Apply previously calculated system EQ corrections to the target bus."""
+        if not self.system_measurement_controller:
+            await self.send_to_client(websocket, {
+                "type": "system_measurement_apply_result",
+                "success": False,
+                "error": "No measurement result available",
+            })
+            return
+
+        try:
+            target = self._parse_target_bus(target_bus)
+            target_id = int(target_id)
+            success = self.system_measurement_controller.apply_corrections(target, target_id)
+            await self.broadcast({
+                "type": "system_measurement_apply_result",
+                "success": success,
+                "target_bus": target.value,
+                "target_id": target_id,
+                "corrections": [c.to_dict() for c in self.system_measurement_controller.applied_corrections],
+                "message": "System EQ corrections applied" if success else "Failed to apply system EQ corrections",
+            })
+        except Exception as e:
+            logger.error("Failed to apply system measurement corrections: %s", e, exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "system_measurement_apply_result",
+                "success": False,
+                "error": str(e),
+            })
+
+    async def reset_system_measurement(self, websocket, target_bus: str = "master", target_id: int = 1):
+        """Reset EQ on the target bus used for system measurement."""
+        if not self.system_measurement_controller:
+            self.system_measurement_controller = SystemMeasurementController(mixer_client=self.mixer_client)
+
+        try:
+            target = self._parse_target_bus(target_bus)
+            target_id = int(target_id)
+            success = self.system_measurement_controller.reset_corrections(target, target_id)
+            await self.broadcast({
+                "type": "system_measurement_reset_result",
+                "success": success,
+                "target_bus": target.value,
+                "target_id": target_id,
+                "message": "System EQ reset" if success else "Failed to reset system EQ",
+            })
+        except Exception as e:
+            logger.error("Failed to reset system measurement corrections: %s", e, exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "system_measurement_reset_result",
+                "success": False,
+                "error": str(e),
+            })
+
     def get_phase_alignment_status(self) -> dict:
         """Get current phase alignment status."""
         if not self.phase_alignment_controller:
@@ -3015,11 +3353,12 @@ class AutoMixerServer:
             logger.error("Phase alignment start timed out (audio device may be busy)")
             # Force cleanup if timeout
             if self.phase_alignment_controller and self.phase_alignment_controller.analyzer:
-                try:
-                    self.phase_alignment_controller.analyzer.is_running = False
-                    self.phase_alignment_controller.analyzer = None
-                except:
-                    pass
+                analyzer = self.phase_alignment_controller.analyzer
+                self._safe_cleanup_call(
+                    lambda: setattr(analyzer, "is_running", False),
+                    "Error stopping phase alignment analyzer after timeout",
+                )
+                self.phase_alignment_controller.analyzer = None
                 self.phase_alignment_controller.is_active = False
             await self.send_to_client(websocket, {
                 "type": "phase_alignment_status",
@@ -3336,7 +3675,17 @@ class AutoMixerServer:
         """Checklist: ready for live (all systems calibrated, no clipping)."""
         mixer_connected = bool(self.mixer_client and self.mixer_client.is_connected)
         gain_available = bool(self.gain_staging)
-        fader_available = bool(self.auto_fader_controller)
+        fader_available = False
+        if self.auto_fader_controller:
+            try:
+                fader_status = self.auto_fader_controller.get_status() or {}
+                fader_available = bool(
+                    fader_status.get("active")
+                    or fader_status.get("realtime_enabled")
+                    or fader_status.get("collecting")
+                )
+            except Exception as exc:
+                logger.warning("Failed to read Auto Fader readiness status: %s", exc)
         ready = mixer_connected and gain_available and fader_available
         return {
             "ready": ready,
@@ -3368,12 +3717,29 @@ class AutoMixerServer:
 
             loop = asyncio.get_running_loop()
             backup_data = await loop.run_in_executor(None, do_backup)
+            channel_results = backup_data.get("channels", {})
+            success_channels = [
+                channel for channel, payload in channel_results.items()
+                if isinstance(payload, dict) and "error" not in payload
+            ]
+            failed_channels = [
+                channel for channel, payload in channel_results.items()
+                if not isinstance(payload, dict) or "error" in payload
+            ]
             os.makedirs("presets", exist_ok=True)
             path = os.path.join("presets", f"channel_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(backup_data, f, indent=2, ensure_ascii=False)
-            self._last_snapshot_path = path
-            await self.send_to_client(websocket, {"type": "snapshot_result", "success": True, "path": path})
+            if success_channels:
+                self._last_snapshot_path = path
+            await self.send_to_client(websocket, {
+                "type": "snapshot_result",
+                "success": bool(success_channels),
+                "path": path,
+                "success_count": len(success_channels),
+                "failed_channels": failed_channels,
+                "error": None if success_channels else "Failed to back up any selected channels",
+            })
         except Exception as e:
             logger.error(f"Create snapshot error: {e}", exc_info=True)
             await self.send_to_client(websocket, {"type": "snapshot_result", "success": False, "error": str(e)})
@@ -3388,10 +3754,33 @@ class AutoMixerServer:
             await self.send_to_client(websocket, {"type": "restore_result", "success": False, "error": "Mixer not connected"})
             return
         try:
-            await asyncio.get_running_loop().run_in_executor(
+            with open(path, "r", encoding="utf-8") as f:
+                backup_data = json.load(f)
+
+            channel_entries = backup_data.get("channels", {})
+            restorable_channels = [
+                channel for channel, payload in channel_entries.items()
+                if isinstance(payload, dict) and "error" not in payload
+            ]
+            if not restorable_channels:
+                await self.send_to_client(websocket, {
+                    "type": "restore_result",
+                    "success": False,
+                    "error": "Snapshot does not contain any restorable channels",
+                    "path": path,
+                })
+                return
+
+            success = await asyncio.get_running_loop().run_in_executor(
                 None, lambda: restore_from_backup_using_client(self.mixer_client, path, skip_confirm=True)
             )
-            await self.send_to_client(websocket, {"type": "restore_result", "success": True, "path": path})
+            await self.send_to_client(websocket, {
+                "type": "restore_result",
+                "success": bool(success),
+                "path": path,
+                "restorable_count": len(restorable_channels),
+                "error": None if success else "Restore failed",
+            })
         except Exception as e:
             logger.error(f"Restore snapshot error: {e}", exc_info=True)
             await self.send_to_client(websocket, {"type": "restore_result", "success": False, "error": str(e)})
@@ -3524,6 +3913,11 @@ class AutoMixerServer:
             )
             
             if not success:
+                self._safe_cleanup_call(
+                    self.auto_fader_controller.stop,
+                    "Error stopping Auto Fader after failed audio capture start",
+                )
+                self.auto_fader_controller = None
                 await self.send_to_client(websocket, {
                     "type": "auto_fader_status",
                     "status_type": "error",
@@ -3544,14 +3938,33 @@ class AutoMixerServer:
                     "mode": "realtime"
                 })
             else:
+                self._safe_cleanup_call(
+                    self.auto_fader_controller.stop,
+                    "Error stopping Auto Fader after realtime start failure",
+                )
+                self.auto_fader_controller = None
                 await self.send_to_client(websocket, {
                     "type": "auto_fader_status",
                     "status_type": "error",
                     "error": "Failed to start real-time fader"
                 })
         
+        except asyncio.CancelledError:
+            if self.auto_fader_controller:
+                self._safe_cleanup_call(
+                    self.auto_fader_controller.stop,
+                    "Error stopping Auto Fader after cancellation",
+                )
+                self.auto_fader_controller = None
+            raise
         except Exception as e:
             logger.error(f"Error starting Real-Time Fader: {e}", exc_info=True)
+            if self.auto_fader_controller:
+                self._safe_cleanup_call(
+                    self.auto_fader_controller.stop,
+                    "Error stopping Auto Fader after startup exception",
+                )
+                self.auto_fader_controller = None
             await self.send_to_client(websocket, {
                 "type": "auto_fader_status",
                 "status_type": "error",
@@ -3564,8 +3977,15 @@ class AutoMixerServer:
         logger.info("Stopping Real-Time Fader")
         
         try:
-            if self.auto_fader_controller:
-                self.auto_fader_controller.stop_realtime_fader()
+            if not self.auto_fader_controller:
+                await self.send_to_client(websocket, {
+                    "type": "auto_fader_status",
+                    "status_type": "error",
+                    "error": "Auto Fader controller not initialized"
+                })
+                return
+
+            self.auto_fader_controller.stop_realtime_fader()
             
             await self.broadcast({
                 "type": "auto_fader_status",
@@ -3574,6 +3994,8 @@ class AutoMixerServer:
                 "realtime_enabled": False
             })
         
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.error(f"Error stopping Real-Time Fader: {e}", exc_info=True)
             await self.send_to_client(websocket, {
@@ -3702,6 +4124,11 @@ class AutoMixerServer:
             )
             
             if not success:
+                self._safe_cleanup_call(
+                    self.auto_fader_controller.stop,
+                    "Error stopping Auto Balance after failed audio capture start",
+                )
+                self.auto_fader_controller = None
                 await self.send_to_client(websocket, {
                     "type": "auto_fader_status",
                     "status_type": "error",
@@ -3725,14 +4152,33 @@ class AutoMixerServer:
                     "mode": "static"
                 })
             else:
+                self._safe_cleanup_call(
+                    self.auto_fader_controller.stop,
+                    "Error stopping Auto Balance after learn start failure",
+                )
+                self.auto_fader_controller = None
                 await self.send_to_client(websocket, {
                     "type": "auto_fader_status",
                     "status_type": "error",
                     "error": "Failed to start auto balance collection"
                 })
         
+        except asyncio.CancelledError:
+            if self.auto_fader_controller:
+                self._safe_cleanup_call(
+                    self.auto_fader_controller.stop,
+                    "Error stopping Auto Balance after cancellation",
+                )
+                self.auto_fader_controller = None
+            raise
         except Exception as e:
             logger.error(f"Error starting Auto Balance: {e}", exc_info=True)
+            if self.auto_fader_controller:
+                self._safe_cleanup_call(
+                    self.auto_fader_controller.stop,
+                    "Error stopping Auto Balance after startup exception",
+                )
+                self.auto_fader_controller = None
             await self.send_to_client(websocket, {
                 "type": "auto_fader_status",
                 "status_type": "error",
@@ -3785,14 +4231,23 @@ class AutoMixerServer:
         logger.info("Cancelling Auto Balance")
         
         try:
-            if self.auto_fader_controller:
-                self.auto_fader_controller.cancel_auto_balance()
+            if not self.auto_fader_controller:
+                await self.send_to_client(websocket, {
+                    "type": "auto_fader_status",
+                    "status_type": "error",
+                    "error": "Auto Fader controller not initialized"
+                })
+                return
+
+            self.auto_fader_controller.cancel_auto_balance()
             
             await self.broadcast({
                 "type": "auto_fader_status",
                 "status_type": "auto_balance_cancelled"
             })
         
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.error(f"Error cancelling Auto Balance: {e}", exc_info=True)
             await self.send_to_client(websocket, {
@@ -3813,23 +4268,44 @@ class AutoMixerServer:
                 return
             
             ch = int(channel) if channel is not None else None
-            if ch is not None:
-                success = self.auto_fader_controller.lock_channel(ch)
-                if success:
-                    await self.broadcast({
-                        "type": "auto_fader_status",
-                        "status_type": "channel_lock_changed",
-                        "channel": ch,
-                        "locked": True
-                    })
-                else:
-                    await self.send_to_client(websocket, {
-                        "type": "auto_fader_status",
-                        "status_type": "error",
-                        "error": f"Channel {ch} not found"
-                    })
+            if ch is None:
+                await self.send_to_client(websocket, {
+                    "type": "auto_fader_status",
+                    "status_type": "error",
+                    "error": "Missing channel"
+                })
+                return
+
+            success = self.auto_fader_controller.lock_channel(ch)
+            if success:
+                await self.broadcast({
+                    "type": "auto_fader_status",
+                    "status_type": "channel_lock_changed",
+                    "channel": ch,
+                    "locked": True
+                })
+            else:
+                await self.send_to_client(websocket, {
+                    "type": "auto_fader_status",
+                    "status_type": "error",
+                    "error": f"Channel {ch} not found"
+                })
+        except asyncio.CancelledError:
+            raise
+        except (TypeError, ValueError) as e:
+            logger.error(f"Error locking channel: {e}", exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "auto_fader_status",
+                "status_type": "error",
+                "error": f"Invalid channel: {channel}"
+            })
         except Exception as e:
             logger.error(f"Error locking channel: {e}", exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "auto_fader_status",
+                "status_type": "error",
+                "error": str(e)
+            })
     
     async def unlock_auto_balance_channel(self, websocket, channel):
         """Unlock a channel so it can be changed on subsequent Auto Balance passes."""
@@ -3843,37 +4319,67 @@ class AutoMixerServer:
                 return
             
             ch = int(channel) if channel is not None else None
-            if ch is not None:
-                success = self.auto_fader_controller.unlock_channel(ch)
-                if success:
-                    await self.broadcast({
-                        "type": "auto_fader_status",
-                        "status_type": "channel_lock_changed",
-                        "channel": ch,
-                        "locked": False
-                    })
-                else:
-                    await self.send_to_client(websocket, {
-                        "type": "auto_fader_status",
-                        "status_type": "error",
-                        "error": f"Channel {ch} not found"
-                    })
+            if ch is None:
+                await self.send_to_client(websocket, {
+                    "type": "auto_fader_status",
+                    "status_type": "error",
+                    "error": "Missing channel"
+                })
+                return
+
+            success = self.auto_fader_controller.unlock_channel(ch)
+            if success:
+                await self.broadcast({
+                    "type": "auto_fader_status",
+                    "status_type": "channel_lock_changed",
+                    "channel": ch,
+                    "locked": False
+                })
+            else:
+                await self.send_to_client(websocket, {
+                    "type": "auto_fader_status",
+                    "status_type": "error",
+                    "error": f"Channel {ch} not found"
+                })
+        except asyncio.CancelledError:
+            raise
+        except (TypeError, ValueError) as e:
+            logger.error(f"Error unlocking channel: {e}", exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "auto_fader_status",
+                "status_type": "error",
+                "error": f"Invalid channel: {channel}"
+            })
         except Exception as e:
             logger.error(f"Error unlocking channel: {e}", exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "auto_fader_status",
+                "status_type": "error",
+                "error": str(e)
+            })
     
     async def set_auto_fader_profile(self, websocket, profile: str):
         """Set Auto Fader genre profile."""
         logger.info(f"Setting Auto Fader profile: {profile}")
         
         try:
-            if self.auto_fader_controller:
-                self.auto_fader_controller.set_profile(profile)
+            if not self.auto_fader_controller:
+                await self.send_to_client(websocket, {
+                    "type": "auto_fader_status",
+                    "status_type": "error",
+                    "error": "Auto Fader controller not initialized"
+                })
+                return
+
+            self.auto_fader_controller.set_profile(profile)
             
             await self.send_to_client(websocket, {
                 "type": "auto_fader_status",
                 "message": f"Profile set to: {profile}"
             })
         
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.error(f"Error setting Auto Fader profile: {e}", exc_info=True)
             await self.send_to_client(websocket, {
@@ -3887,21 +4393,30 @@ class AutoMixerServer:
         logger.info(f"Updating Auto Fader settings: {settings}")
         
         try:
-            if self.auto_fader_controller:
-                self.auto_fader_controller.update_settings(
-                    target_lufs=settings.get('targetLufs'),
-                    max_adjustment_db=settings.get('maxAdjustmentDb'),
-                    ratio=settings.get('ratio'),
-                    attack_ms=settings.get('attackMs'),
-                    release_ms=settings.get('releaseMs'),
-                    hold_ms=settings.get('holdMs'),
-                )
+            if not self.auto_fader_controller:
+                await self.send_to_client(websocket, {
+                    "type": "auto_fader_status",
+                    "status_type": "error",
+                    "error": "Auto Fader controller not initialized"
+                })
+                return
+
+            self.auto_fader_controller.update_settings(
+                target_lufs=settings.get('targetLufs'),
+                max_adjustment_db=settings.get('maxAdjustmentDb'),
+                ratio=settings.get('ratio'),
+                attack_ms=settings.get('attackMs'),
+                release_ms=settings.get('releaseMs'),
+                hold_ms=settings.get('holdMs'),
+            )
             
             await self.send_to_client(websocket, {
                 "type": "auto_fader_status",
                 "message": "Settings updated"
             })
         
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.error(f"Error updating Auto Fader settings: {e}", exc_info=True)
             await self.send_to_client(websocket, {
@@ -4235,28 +4750,28 @@ class AutoMixerServer:
         
         # Stop all active controllers
         if self.gain_staging:
-            try:
-                self.gain_staging.stop()
-            except:
-                pass
+            self._safe_cleanup_call(
+                self.gain_staging.stop,
+                "Error stopping gain staging during auto soundcheck shutdown",
+            )
         
         if self.phase_alignment_controller:
-            try:
-                self.phase_alignment_controller.stop()
-            except:
-                pass
+            self._safe_cleanup_call(
+                self.phase_alignment_controller.stop,
+                "Error stopping phase alignment during auto soundcheck shutdown",
+            )
         
         if self.multi_channel_auto_eq_controller:
-            try:
-                self.multi_channel_auto_eq_controller.stop_all()
-            except:
-                pass
+            self._safe_cleanup_call(
+                self.multi_channel_auto_eq_controller.stop_all,
+                "Error stopping multi-channel Auto-EQ during auto soundcheck shutdown",
+            )
         
         if self.auto_fader_controller:
-            try:
-                self.auto_fader_controller.stop()
-            except:
-                pass
+            self._safe_cleanup_call(
+                self.auto_fader_controller.stop,
+                "Error stopping auto fader during auto soundcheck shutdown",
+            )
         
         await self.send_to_client(websocket, {
             "type": "auto_soundcheck_status",
@@ -4505,6 +5020,8 @@ class AutoMixerServer:
                 await self.reset_all_functions_to_defaults(websocket, channels)
                 reset_completed = True
                 logger.info("Step 1 completed: Reset successful")
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 reset_error = str(e)
                 logger.error(f"Error in reset step: {e}", exc_info=True)
@@ -4528,6 +5045,8 @@ class AutoMixerServer:
                     rec = scan_and_recognize(channel_names_for_recognizer)
                     await self.send_to_client(websocket, {"type": "auto_soundcheck_channel_recognizer", "recognition": rec})
                     await asyncio.sleep(0.5)
+                except asyncio.CancelledError:
+                    raise
                 except Exception as e:
                     logger.warning(f"Channel recognizer step: {e}")
             await self._send_soundcheck_status(websocket, "channel_recognizer", 100, 0, "Channel scan complete")
@@ -4555,6 +5074,8 @@ class AutoMixerServer:
                     self.gain_staging.stop()
                     await asyncio.sleep(0.5)  # Wait for cleanup
                     logger.info("Existing gain staging stopped")
+                except asyncio.CancelledError:
+                    raise
                 except Exception as e:
                     logger.warning(f"Error stopping existing gain staging: {e}")
             
@@ -4565,6 +5086,8 @@ class AutoMixerServer:
                 await self.start_realtime_correction(device_id, channels, channel_settings, channel_mapping)
                 logger.info("start_realtime_correction completed successfully")
                 logger.info(f"After start_realtime_correction: gain_staging={self.gain_staging is not None}, is_active={self.gain_staging.is_active if self.gain_staging else False}, is_audio_stream_active={self.gain_staging.is_audio_stream_active if self.gain_staging else False}")
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 logger.error(f"Error starting realtime correction: {e}", exc_info=True)
                 await self._send_soundcheck_status(websocket, "gain_staging", 0, 0, f"Error starting GAIN STAGING: {str(e)}", error=str(e))
@@ -4576,6 +5099,8 @@ class AutoMixerServer:
                 logger.info("Auto soundcheck stopped during GAIN STAGING")
                 try:
                     await self.stop_realtime_correction()
+                except asyncio.CancelledError:
+                    raise
                 except Exception as e:
                     logger.error(f"Error stopping realtime correction: {e}")
                 return
@@ -4596,9 +5121,13 @@ class AutoMixerServer:
                         self.gain_staging.stop()
                         await asyncio.sleep(1.0)  # Wait for audio device to be fully released
                         logger.info("Gain staging controller fully stopped, audio device released")
+                    except asyncio.CancelledError:
+                        raise
                     except Exception as e:
                         logger.warning(f"Error fully stopping gain staging: {e}")
                 
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 logger.error(f"Error stopping realtime correction: {e}", exc_info=True)
                 # Still try to release audio device
@@ -4606,6 +5135,8 @@ class AutoMixerServer:
                     try:
                         self.gain_staging.stop()
                         await asyncio.sleep(1.0)
+                    except asyncio.CancelledError:
+                        raise
                     except Exception as e2:
                         logger.warning(f"Error force-stopping gain staging: {e2}")
             
@@ -4642,6 +5173,8 @@ class AutoMixerServer:
                     await self._send_soundcheck_status(websocket, "phase_alignment", 100, 0, "PHASE ALIGNMENT skipped (start timeout)")
                     await asyncio.sleep(0.5)
                     # Continue to next step
+                except asyncio.CancelledError:
+                    raise
                 except Exception as e:
                     logger.error(f"Error starting phase alignment: {e}", exc_info=True)
                     await self._send_soundcheck_status(websocket, "phase_alignment", 0, duration, f"Phase alignment error: {str(e)}, skipping...", error=str(e))
@@ -4656,7 +5189,11 @@ class AutoMixerServer:
                         logger.info("Auto soundcheck stopped during PHASE ALIGNMENT")
                         try:
                             await asyncio.wait_for(self.stop_phase_alignment(websocket), timeout=10.0)
-                        except (asyncio.TimeoutError, Exception) as e:
+                        except asyncio.CancelledError:
+                            raise
+                        except asyncio.TimeoutError as e:
+                            logger.error(f"Error stopping phase alignment: {e}")
+                        except Exception as e:
                             logger.error(f"Error stopping phase alignment: {e}")
                         return
                     
@@ -4665,6 +5202,8 @@ class AutoMixerServer:
                         await asyncio.wait_for(self.stop_phase_alignment(websocket), timeout=10.0)
                         logger.info("Phase alignment stopped successfully")
                         await self._send_soundcheck_status(websocket, "phase_alignment", 100, 0, "PHASE ALIGNMENT complete")
+                    except asyncio.CancelledError:
+                        raise
                     except asyncio.TimeoutError:
                         logger.warning("Phase alignment stop timed out, continuing...")
                         await self._send_soundcheck_status(websocket, "phase_alignment", 100, 0, "PHASE ALIGNMENT stopped (timeout)")
@@ -4709,6 +5248,8 @@ class AutoMixerServer:
             try:
                 await self.apply_all_corrections(websocket)
                 logger.info("AUTO EQ corrections applied successfully")
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 logger.error(f"Error applying AUTO EQ corrections: {e}", exc_info=True)
                 await self._send_soundcheck_status(websocket, "auto_eq", 100, 0, f"AUTO EQ complete (apply error: {str(e)})")
@@ -4759,11 +5300,22 @@ class AutoMixerServer:
             
         except asyncio.CancelledError:
             logger.info("Auto soundcheck cycle cancelled")
-            await self._send_soundcheck_status(websocket, None, 0, 0, "Auto soundcheck cancelled", error="Cancelled")
+            try:
+                await asyncio.shield(
+                    self._send_soundcheck_status(
+                        websocket,
+                        None,
+                        0,
+                        0,
+                        "Auto soundcheck cancelled",
+                        error="Cancelled",
+                    )
+                )
+            except Exception as exc:
+                logger.warning("Failed to send cancellation status for auto soundcheck: %s", exc)
+            raise
         except Exception as e:
             logger.error(f"Error in auto soundcheck cycle: {e}", exc_info=True)
-            import traceback
-            logger.error(traceback.format_exc())
             await self._send_soundcheck_status(websocket, None, 0, 0, f"Error: {str(e)}", error=str(e))
         finally:
             if observation_base_client is not None:
@@ -4817,6 +5369,8 @@ class AutoMixerServer:
             
             logger.debug(f"Sending soundcheck status: step={current_step}, progress={step_progress:.1f}%, message={message}")
             await self.send_to_client(websocket, status_data)
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.error(f"Error sending soundcheck status: {e}", exc_info=True)
             # Don't raise - we don't want to stop the cycle if status update fails
@@ -5038,6 +5592,9 @@ class AutoMixerServer:
                 logger.info(f"   Channel: {channel}")
             logger.info("=" * 60)
             
+        except asyncio.CancelledError:
+            logger.info("Voice command execution cancelled")
+            raise
         except Exception as e:
             logger.error("=" * 60)
             logger.error(f"❌ ERROR EXECUTING VOICE COMMAND: {e}")
@@ -5056,11 +5613,17 @@ class AutoMixerServer:
             async for message in websocket:
                 try:
                     await self.handle_client_message(websocket, message)
+                except asyncio.CancelledError:
+                    logger.info("WebSocket handler cancelled while processing client message")
+                    raise
                 except Exception as e:
                     logger.error(f"Error handling message: {e}", exc_info=True)
                     # Don't crash the connection - continue listening
         except websockets.exceptions.ConnectionClosed:
             logger.info("Client connection closed")
+        except asyncio.CancelledError:
+            logger.info("WebSocket handler cancelled")
+            raise
         except Exception as e:
             logger.error(f"Handler error: {e}", exc_info=True)
         finally:
