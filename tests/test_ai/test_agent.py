@@ -272,6 +272,10 @@ class TestMixingAgent:
 
         search_queries = [call.args[0] for call in mock_kb.search.call_args_list]
         assert any("auto apply safety" in query for query in search_queries)
+        assert any(
+            tuple(call.kwargs.get("category", ())) == agent.LLM_CONTEXT_CATEGORIES
+            for call in mock_kb.search.call_args_list
+        )
         mock_llm.get_mix_recommendation.assert_called_once()
         context = mock_llm.get_mix_recommendation.call_args.args[1]
         assert "Auto apply protocol" in context[0]

@@ -177,7 +177,11 @@ def run_agent_stage(mixmod, plans: dict[int, Any], ai_config: dict[str, Any], us
     llm = make_llm_client(mixmod, ai_config, use_llm)
     console = mixmod.VirtualConsole(plans)
     agent = mixmod.MixingAgent(
-        knowledge_base=mixmod.KnowledgeBase(knowledge_dir=ai_config.get("knowledge_dir") or None, use_vector_db=False),
+        knowledge_base=mixmod.KnowledgeBase(
+            knowledge_dir=ai_config.get("knowledge_dir") or None,
+            use_vector_db=False,
+            allowed_categories=mixmod.KnowledgeBase.AGENT_RUNTIME_CATEGORIES,
+        ),
         rule_engine=mixmod.RuleEngine(),
         llm_client=llm,
         mixer_client=console,

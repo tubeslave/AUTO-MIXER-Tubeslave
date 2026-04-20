@@ -151,27 +151,10 @@ class RuleEngine:
         # Rule: Dynamic range control — compress when range too wide
         self.rules.append(Rule(
             name='dynamic_range',
-            description='Apply compression when dynamic range exceeds 24dB',
+            description='Apply instrument-aware compression when dynamic range exceeds the source target',
             priority=RulePriority.MEDIUM,
-            condition=lambda state: (
-                _has_strong_signal(state) and
-                state.get('dynamic_range_db', 0) > 24
-            ),
-            action=lambda state: RuleResult(
-                rule_name='dynamic_range',
-                triggered=True,
-                action='adjust_compressor',
-                parameters={
-                    'channel': state.get('channel_id', 0),
-                    'threshold_db': state.get('lufs_momentary', -20) + 6,
-                    'ratio': 3.0,
-                    'attack_ms': 10.0,
-                    'release_ms': 100.0,
-                },
-                priority=RulePriority.MEDIUM,
-                confidence=0.7,
-                reason=f"Dynamic range {state.get('dynamic_range_db', 0):.1f}dB exceeds 24dB target"
-            )
+            condition=lambda state: _needs_dynamic_range_control(state),
+            action=lambda state: _dynamic_range_action(state),
         ))
 
         # Rule: Gain staging — maintain proper headroom
@@ -206,44 +189,20 @@ class RuleEngine:
         # Rule: Mute unused channels to reduce noise floor
         self.rules.append(Rule(
             name='mute_unused',
-            description='Mute channels with no signal to reduce noise floor',
+            description='Mute only close-mic sources that are safe to auto-mute when idle',
             priority=RulePriority.LOW,
-            condition=lambda state: (
-                state.get('rms_db', -100) < -60 and
-                not state.get('is_muted', False) and
-                state.get('channel_armed', True)
-            ),
-            action=lambda state: RuleResult(
-                rule_name='mute_unused',
-                triggered=True,
-                action='mute_channel',
-                parameters={'channel': state.get('channel_id', 0)},
-                priority=RulePriority.LOW,
-                confidence=0.6,
-                reason='No signal detected (RMS < -60dB), muting to reduce noise'
-            ),
+            condition=lambda state: _should_auto_mute_idle_channel(state),
+            action=lambda state: _mute_unused_action(state),
             cooldown_sec=5.0,
         ))
 
         # Rule: Unmute when signal returns
         self.rules.append(Rule(
             name='unmute_active',
-            description='Unmute channels when signal returns above threshold',
+            description='Unmute only channels that were auto-muted and are safe for auto-mute',
             priority=RulePriority.HIGH,
-            condition=lambda state: (
-                state.get('rms_db', -100) > -40 and
-                state.get('is_muted', False) and
-                state.get('auto_muted', False)
-            ),
-            action=lambda state: RuleResult(
-                rule_name='unmute_active',
-                triggered=True,
-                action='unmute_channel',
-                parameters={'channel': state.get('channel_id', 0)},
-                priority=RulePriority.HIGH,
-                confidence=0.8,
-                reason=f"Signal returned (RMS: {state.get('rms_db', 0):.1f}dB), unmuting channel"
-            ),
+            condition=lambda state: _should_auto_unmute_channel(state),
+            action=lambda state: _unmute_active_action(state),
             cooldown_sec=0.5,
         ))
 
@@ -386,6 +345,201 @@ def _hpf_frequency_for_instrument(instrument: str) -> int:
         'cello': 50,
     }
     return hpf_map.get(instrument, 100)
+
+
+def _dynamic_range_profile_for_instrument(instrument: str) -> Optional[Dict[str, float]]:
+    instrument = (instrument or '').lower()
+    profiles: Dict[str, Dict[str, float]] = {
+        'lead_vocal': {
+            'max_dynamic_range_db': 24.0,
+            'threshold_offset_db': 6.0,
+            'ratio': 3.0,
+            'attack_ms': 10.0,
+            'release_ms': 100.0,
+        },
+        'backing_vocal': {
+            'max_dynamic_range_db': 22.0,
+            'threshold_offset_db': 5.0,
+            'ratio': 3.0,
+            'attack_ms': 10.0,
+            'release_ms': 100.0,
+        },
+        'kick': {
+            'max_dynamic_range_db': 24.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 4.0,
+            'attack_ms': 20.0,
+            'release_ms': 60.0,
+        },
+        'snare': {
+            'max_dynamic_range_db': 24.0,
+            'threshold_offset_db': 6.0,
+            'ratio': 3.0,
+            'attack_ms': 8.0,
+            'release_ms': 100.0,
+        },
+        'bass_guitar': {
+            'max_dynamic_range_db': 20.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 3.5,
+            'attack_ms': 15.0,
+            'release_ms': 150.0,
+        },
+        'acoustic_guitar': {
+            'max_dynamic_range_db': 22.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 2.5,
+            'attack_ms': 20.0,
+            'release_ms': 150.0,
+        },
+        'electric_guitar': {
+            'max_dynamic_range_db': 26.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 2.0,
+            'attack_ms': 25.0,
+            'release_ms': 140.0,
+        },
+        'keys_piano': {
+            'max_dynamic_range_db': 26.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 2.5,
+            'attack_ms': 20.0,
+            'release_ms': 150.0,
+        },
+        'organ': {
+            'max_dynamic_range_db': 22.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 2.0,
+            'attack_ms': 20.0,
+            'release_ms': 150.0,
+        },
+        'rack_tom': {
+            'max_dynamic_range_db': 24.0,
+            'threshold_offset_db': 8.0,
+            'ratio': 3.0,
+            'attack_ms': 15.0,
+            'release_ms': 80.0,
+        },
+        'floor_tom': {
+            'max_dynamic_range_db': 24.0,
+            'threshold_offset_db': 8.0,
+            'ratio': 3.0,
+            'attack_ms': 15.0,
+            'release_ms': 80.0,
+        },
+    }
+    return profiles.get(instrument)
+
+
+def _needs_dynamic_range_control(state: Dict) -> bool:
+    profile = _dynamic_range_profile_for_instrument(state.get('instrument', ''))
+    if not profile or not _has_strong_signal(state):
+        return False
+    return state.get('dynamic_range_db', 0) > profile['max_dynamic_range_db']
+
+
+def _dynamic_range_action(state: Dict) -> RuleResult:
+    profile = _dynamic_range_profile_for_instrument(state.get('instrument', '')) or {
+        'max_dynamic_range_db': 24.0,
+        'threshold_offset_db': 6.0,
+        'ratio': 3.0,
+        'attack_ms': 10.0,
+        'release_ms': 100.0,
+    }
+    threshold_db = float(state.get('lufs_momentary', -20.0)) + profile['threshold_offset_db']
+    return RuleResult(
+        rule_name='dynamic_range',
+        triggered=True,
+        action='adjust_compressor',
+        parameters={
+            'channel': state.get('channel_id', 0),
+            'threshold_db': threshold_db,
+            'ratio': profile['ratio'],
+            'attack_ms': profile['attack_ms'],
+            'release_ms': profile['release_ms'],
+        },
+        priority=RulePriority.MEDIUM,
+        confidence=0.72,
+        reason=(
+            f"{state.get('instrument', 'source')} dynamic range "
+            f"{state.get('dynamic_range_db', 0):.1f}dB exceeds "
+            f"{profile['max_dynamic_range_db']:.1f}dB target"
+        ),
+    )
+
+
+def _auto_mute_profile_for_state(state: Dict) -> Optional[Dict[str, float]]:
+    instrument = (state.get('instrument') or '').lower()
+    allow_override = state.get('allow_auto_mute')
+    if allow_override is False:
+        return None
+
+    profiles: Dict[str, Dict[str, float]] = {
+        'kick': {'mute_below_db': -60.0, 'unmute_above_db': -40.0},
+        'snare': {'mute_below_db': -60.0, 'unmute_above_db': -40.0},
+        'rack_tom': {'mute_below_db': -60.0, 'unmute_above_db': -40.0},
+        'floor_tom': {'mute_below_db': -60.0, 'unmute_above_db': -40.0},
+        'percussion': {'mute_below_db': -62.0, 'unmute_above_db': -42.0},
+    }
+    if instrument in profiles:
+        return profiles[instrument]
+    if allow_override is True:
+        return {'mute_below_db': -60.0, 'unmute_above_db': -40.0}
+    return None
+
+
+def _should_auto_mute_idle_channel(state: Dict) -> bool:
+    profile = _auto_mute_profile_for_state(state)
+    if not profile:
+        return False
+    return (
+        state.get('rms_db', -100) < profile['mute_below_db'] and
+        not state.get('is_muted', False) and
+        state.get('channel_armed', True)
+    )
+
+
+def _should_auto_unmute_channel(state: Dict) -> bool:
+    profile = _auto_mute_profile_for_state(state)
+    if not profile:
+        return False
+    return (
+        state.get('rms_db', -100) > profile['unmute_above_db'] and
+        state.get('is_muted', False) and
+        state.get('auto_muted', False)
+    )
+
+
+def _mute_unused_action(state: Dict) -> RuleResult:
+    profile = _auto_mute_profile_for_state(state) or {'mute_below_db': -60.0}
+    return RuleResult(
+        rule_name='mute_unused',
+        triggered=True,
+        action='mute_channel',
+        parameters={'channel': state.get('channel_id', 0)},
+        priority=RulePriority.LOW,
+        confidence=0.7,
+        reason=(
+            f"{state.get('instrument', 'source')} is below "
+            f"{profile['mute_below_db']:.0f}dB RMS and is safe to auto-mute while idle"
+        ),
+    )
+
+
+def _unmute_active_action(state: Dict) -> RuleResult:
+    profile = _auto_mute_profile_for_state(state) or {'unmute_above_db': -40.0}
+    return RuleResult(
+        rule_name='unmute_active',
+        triggered=True,
+        action='unmute_channel',
+        parameters={'channel': state.get('channel_id', 0)},
+        priority=RulePriority.HIGH,
+        confidence=0.8,
+        reason=(
+            f"{state.get('instrument', 'source')} returned above "
+            f"{profile['unmute_above_db']:.0f}dB RMS, unmuting channel"
+        ),
+    )
 
 
 def _has_actionable_signal(state: Dict) -> bool:

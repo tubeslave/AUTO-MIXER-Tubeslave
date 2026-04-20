@@ -280,3 +280,31 @@ def test_ambient_mics_do_not_get_event_based_expander():
     assert metrics["analysis_mode"] == "windowed_full_track"
     assert summary["enabled"] is False
     assert report["enabled"] is False
+
+
+def test_ride_event_detection_survives_single_clipped_peak():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 6.0
+    audio = np.zeros(int(sr * duration_sec), dtype=np.float32)
+
+    audio[10] = 1.0
+
+    for start_sec in (2.0, 2.8, 3.6):
+        start = int(start_sec * sr)
+        length = int(0.42 * sr)
+        t = np.arange(length, dtype=np.float32) / sr
+        env = np.hanning(length).astype(np.float32)
+        burst = (
+            0.11 * np.sin(2.0 * np.pi * 3200.0 * t)
+            + 0.09 * np.sin(2.0 * np.pi * 6400.0 * t)
+            + 0.06 * np.sin(2.0 * np.pi * 8800.0 * t)
+        ).astype(np.float32)
+        audio[start:start + length] += burst * env
+
+    activity = mod._event_activity_ranges(audio, sr, "ride")
+
+    assert activity is not None
+    assert activity["ranges"]
+    first_start_sec = activity["ranges"][0][0] / sr
+    assert 1.7 < first_start_sec < 2.3

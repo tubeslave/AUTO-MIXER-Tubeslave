@@ -1084,7 +1084,11 @@ class AutoMixerServer:
         if self.mixing_agent is None:
             knowledge_dir = ai_config.get("knowledge_dir") or None
             self.mixing_agent = MixingAgent(
-                knowledge_base=KnowledgeBase(knowledge_dir=knowledge_dir, use_vector_db=False),
+                knowledge_base=KnowledgeBase(
+                    knowledge_dir=knowledge_dir,
+                    use_vector_db=False,
+                    allowed_categories=KnowledgeBase.AGENT_RUNTIME_CATEGORIES,
+                ),
                 rule_engine=RuleEngine(),
                 llm_client=llm_client,
                 mixer_client=self.mixer_client,

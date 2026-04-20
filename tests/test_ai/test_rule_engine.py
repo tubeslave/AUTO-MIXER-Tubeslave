@@ -104,6 +104,83 @@ class TestRuleEngine:
         assert vocal_results[0].parameters['target_lufs'] == pytest.approx(-16.0)
         assert vocal_results[0].parameters['adjustment_db'] == pytest.approx(3.0)
 
+    def test_dynamic_range_uses_instrument_specific_kick_settings(self):
+        """dynamic_range uses kick-oriented compressor settings instead of the old generic vocal profile."""
+        engine = RuleEngine()
+        engine.reset_cooldowns()
+        state = {
+            'instrument': 'kick',
+            'channel_id': 5,
+            'peak_db': -6.0,
+            'rms_db': -18.0,
+            'lufs_momentary': -18.0,
+            'dynamic_range_db': 28.0,
+            'channel_armed': True,
+        }
+
+        results = engine.evaluate(state)
+        dynamic = [r for r in results if r.rule_name == 'dynamic_range']
+
+        assert len(dynamic) == 1
+        assert dynamic[0].parameters['ratio'] == pytest.approx(4.0)
+        assert dynamic[0].parameters['attack_ms'] == pytest.approx(20.0)
+        assert dynamic[0].parameters['release_ms'] == pytest.approx(60.0)
+        assert dynamic[0].parameters['threshold_db'] == pytest.approx(-14.0)
+
+    def test_dynamic_range_skips_playback_sources(self):
+        """Playback sources should not get generic dynamic-range compression from the rule engine."""
+        engine = RuleEngine()
+        engine.reset_cooldowns()
+        state = {
+            'instrument': 'playback',
+            'channel_id': 9,
+            'peak_db': -4.0,
+            'rms_db': -12.0,
+            'lufs_momentary': -12.0,
+            'dynamic_range_db': 30.0,
+            'channel_armed': True,
+        }
+
+        results = engine.evaluate(state)
+
+        assert all(r.rule_name != 'dynamic_range' for r in results)
+
+    def test_mute_unused_skips_lead_vocal(self):
+        """Lead vocals should not be hard-muted by the generic idle-noise rule."""
+        engine = RuleEngine()
+        engine.reset_cooldowns()
+        state = {
+            'instrument': 'lead_vocal',
+            'channel_id': 1,
+            'rms_db': -70.0,
+            'peak_db': -50.0,
+            'is_muted': False,
+            'channel_armed': True,
+        }
+
+        results = engine.evaluate(state)
+
+        assert all(r.rule_name != 'mute_unused' for r in results)
+
+    def test_mute_unused_allows_close_tom_mics(self):
+        """Close tom mics remain eligible for idle auto-mute."""
+        engine = RuleEngine()
+        engine.reset_cooldowns()
+        state = {
+            'instrument': 'rack_tom',
+            'channel_id': 12,
+            'rms_db': -70.0,
+            'peak_db': -50.0,
+            'is_muted': False,
+            'channel_armed': True,
+        }
+
+        results = engine.evaluate(state)
+        muted = [r for r in results if r.rule_name == 'mute_unused']
+
+        assert len(muted) == 1
+        assert muted[0].parameters['channel'] == 12
+
     def test_add_and_remove_custom_rule(self):
         """Custom rules can be added and removed by name."""
         engine = RuleEngine()

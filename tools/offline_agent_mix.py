@@ -287,13 +287,38 @@ def _event_metric_config(instrument: str) -> dict[str, float] | None:
             "floor_margin_db": 9.0,
             "min_threshold_db": -38.0,
         }
-    if instrument in {"hi_hat", "ride", "percussion"}:
+    if instrument == "hi_hat":
         return {
             "frame_ms": 160.0,
             "hop_ms": 40.0,
             "pad_ms": 110.0,
             "detect_hpf_hz": 1800.0,
             "detect_lpf_hz": 14000.0,
+            "percentile": 92.0,
+            "peak_offset_db": 16.0,
+            "floor_margin_db": 6.0,
+            "min_threshold_db": -44.0,
+        }
+    if instrument == "ride":
+        return {
+            "frame_ms": 170.0,
+            "hop_ms": 40.0,
+            "pad_ms": 120.0,
+            "detect_hpf_hz": 1200.0,
+            "detect_lpf_hz": 12000.0,
+            "percentile": 94.0,
+            "peak_offset_db": 18.0,
+            "peak_percentile": 99.9,
+            "floor_margin_db": 5.0,
+            "min_threshold_db": -50.0,
+        }
+    if instrument == "percussion":
+        return {
+            "frame_ms": 160.0,
+            "hop_ms": 40.0,
+            "pad_ms": 110.0,
+            "detect_hpf_hz": 1200.0,
+            "detect_lpf_hz": 12000.0,
             "percentile": 92.0,
             "peak_offset_db": 16.0,
             "floor_margin_db": 6.0,
@@ -1131,7 +1156,15 @@ def _event_activity_ranges(x: np.ndarray, sr: int, instrument: str | None) -> di
             "active_samples": 0,
         }
 
-    detect_peak_db = amp_to_db(float(np.max(np.abs(detect))) if len(detect) else 0.0)
+    peak_percentile = float(config.get("peak_percentile", 100.0))
+    if len(detect):
+        if peak_percentile >= 100.0:
+            detect_peak = float(np.max(np.abs(detect)))
+        else:
+            detect_peak = float(np.percentile(np.abs(detect), peak_percentile))
+    else:
+        detect_peak = 0.0
+    detect_peak_db = amp_to_db(detect_peak)
     noise_floor_db = float(np.percentile(rms_db, 50))
     threshold_db = max(
         float(np.percentile(rms_db, config["percentile"])),
@@ -2194,7 +2227,11 @@ def main() -> int:
     console = VirtualConsole(plans)
     agent_mode = AgentMode.SUGGEST if args.codex_orchestrator else AgentMode.AUTO
     agent = MixingAgent(
-        knowledge_base=KnowledgeBase(knowledge_dir=ai_config.get("knowledge_dir") or None, use_vector_db=False),
+        knowledge_base=KnowledgeBase(
+            knowledge_dir=ai_config.get("knowledge_dir") or None,
+            use_vector_db=False,
+            allowed_categories=KnowledgeBase.AGENT_RUNTIME_CATEGORIES,
+        ),
         rule_engine=RuleEngine(),
         llm_client=llm,
         mixer_client=console,

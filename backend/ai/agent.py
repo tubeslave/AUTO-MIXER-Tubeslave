@@ -55,6 +55,14 @@ class MixingAgent:
     mixing adjustments depending on mode.
     """
 
+    LLM_CONTEXT_CATEGORIES = (
+        'agent_auto_apply_protocol',
+        'instrument_profiles',
+        'live_sound_checklist',
+        'mixing_rules',
+        'troubleshooting',
+    )
+
     def __init__(self,
                  knowledge_base=None,
                  rule_engine=None,
@@ -68,7 +76,7 @@ class MixingAgent:
         if knowledge_base is None:
             try:
                 from .knowledge_base import KnowledgeBase
-                knowledge_base = KnowledgeBase()
+                knowledge_base = KnowledgeBase(allowed_categories=KnowledgeBase.AGENT_RUNTIME_CATEGORIES)
             except Exception as e:
                 logger.warning(f"Could not init knowledge base: {e}")
 
@@ -95,6 +103,7 @@ class MixingAgent:
         self._dismissed_action_cooldown_sec = 30.0
         self._max_pending_actions = 50
         self._emergency_stop = False
+        self._llm_context_categories = tuple(self.LLM_CONTEXT_CATEGORIES)
         self._max_fader_step_db = 1.0
         self._max_fader_db = 0.0
         self._max_eq_step_db = 2.0
@@ -247,7 +256,8 @@ class MixingAgent:
                                 f"{ch_state.get('instrument', '')} live mixing issue "
                                 "auto apply safety gain EQ compressor decision protocol"
                             ),
-                            n_results=3
+                            n_results=3,
+                            category=self._llm_context_categories,
                         )
                         context_entries = [e.content for e in kb_hits]
                     rec = self.llm.get_mix_recommendation(ch_state, context_entries)
