@@ -51,6 +51,28 @@ async def test_get_auto_soundcheck_status_includes_legacy_aliases():
 
 
 @pytest.mark.asyncio
+async def test_get_auto_soundcheck_status_forwards_session_report_summary():
+    server = DummyServer()
+
+    class FakeEngine:
+        def get_status(self):
+            return {
+                "state": "running",
+                "autofoh_session_report_summary": "AutoFOH session report: events=4; sent=1; blocked=3; guard_blocks=2",
+            }
+
+    server.auto_soundcheck_engine = FakeEngine()
+    server.auto_soundcheck_running = True
+    handlers = register_handlers(server)
+
+    await handlers["get_auto_soundcheck_status"]("ws", {})
+
+    _, payload = server.sent_messages[-1]
+    assert payload["type"] == "auto_soundcheck_status"
+    assert payload["autofoh_session_report_summary"].startswith("AutoFOH session report:")
+
+
+@pytest.mark.asyncio
 async def test_start_auto_soundcheck_handler_starts_new_engine_with_observe_only(monkeypatch):
     server = DummyServer()
     handlers = register_handlers(server)

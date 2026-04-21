@@ -160,14 +160,14 @@ class RuleEngine:
         # Rule: Gain staging — maintain proper headroom
         self.rules.append(Rule(
             name='gain_staging',
-            description='Ensure proper gain staging with -12dB peak target',
+            description='Ensure proper instrument-aware gain staging headroom',
             priority=RulePriority.HIGH,
             condition=lambda state: (
                 (
-                    state.get('peak_db', -100) > -6 or
+                    state.get('peak_db', -100) > _gain_staging_hot_threshold_db(state) or
                     (
                         _has_strong_signal(state) and
-                        state.get('peak_db', -100) < -30
+                        state.get('peak_db', -100) < _gain_staging_cold_threshold_db(state)
                     )
                 )
             ),
@@ -177,12 +177,18 @@ class RuleEngine:
                 action='adjust_gain',
                 parameters={
                     'channel': state.get('channel_id', 0),
-                    'target_peak_db': -12.0,
-                    'adjustment_db': -12.0 - state.get('peak_db', -12),
+                    'target_peak_db': _gain_staging_target_peak_db(state),
+                    'adjustment_db': _gain_staging_target_peak_db(state) - state.get(
+                        'peak_db',
+                        _gain_staging_target_peak_db(state),
+                    ),
                 },
                 priority=RulePriority.HIGH,
                 confidence=0.85,
-                reason=f"Peak level at {state.get('peak_db', 0):.1f}dB (target: -12dB)"
+                reason=(
+                    f"Peak level at {state.get('peak_db', 0):.1f}dB "
+                    f"(target: {_gain_staging_target_peak_db(state):.1f}dB)"
+                )
             )
         ))
 
@@ -601,3 +607,38 @@ def _vocal_presence_adjustment_db(state: Dict) -> float:
     if needed <= 0:
         return 0.0
     return max(0.5, min(3.0, needed))
+
+
+def _gain_staging_target_peak_db(state: Dict) -> float:
+    instrument = str(state.get('instrument', '') or '').lower()
+    targets = {
+        'kick': -8.0,
+        'snare': -9.0,
+        'rack_tom': -9.5,
+        'floor_tom': -9.5,
+        'bass_guitar': -8.5,
+        'synth_bass': -8.5,
+        'playback': -10.0,
+        'lead_vocal': -11.0,
+        'backing_vocal': -11.0,
+    }
+    return float(targets.get(instrument, -12.0))
+
+
+def _gain_staging_hot_threshold_db(state: Dict) -> float:
+    instrument = str(state.get('instrument', '') or '').lower()
+    target = _gain_staging_target_peak_db(state)
+    margins = {
+        'kick': 3.0,
+        'snare': 3.5,
+        'rack_tom': 4.0,
+        'floor_tom': 4.0,
+        'bass_guitar': 3.0,
+        'synth_bass': 3.0,
+        'playback': 4.0,
+    }
+    return float(target + margins.get(instrument, 6.0))
+
+
+def _gain_staging_cold_threshold_db(state: Dict) -> float:
+    return float(_gain_staging_target_peak_db(state) - 18.0)

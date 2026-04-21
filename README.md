@@ -120,6 +120,31 @@ npm start
 
 ## Настройка конфигурации
 
+### AutoFOH session artifacts
+
+Если включен `autofoh.logging.enabled`, движок пишет:
+
+- JSONL event log: `sessions/autofoh_actions.jsonl`
+- session summary report: `sessions/autofoh_session_report.json`
+
+Пути можно переопределить через `config/automixer.yaml`:
+
+```yaml
+autofoh:
+  logging:
+    enabled: true
+    path: "sessions/autofoh_actions.jsonl"
+    write_session_report_on_stop: true
+    report_path: "sessions/autofoh_session_report.json"
+```
+
+После завершения soundcheck краткая человекочитаемая summary также доступна:
+
+- в `AutoSoundcheckEngine.get_status()` как `autofoh_session_report_summary`
+- в WebSocket `auto_soundcheck_status` payload
+
+Это позволяет быстро увидеть, сколько коррекций было отправлено, сколько заблокировано, и сколько действий система не применила из-за `phase_target_guard`, не открывая JSON report вручную.
+
 ### Автообучение агентов через интернет
 
 Включается через секцию `training` в `config/automixer.yaml` (по умолчанию выключено).

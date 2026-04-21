@@ -34,9 +34,10 @@ def test_build_channel_analysis_timeline_reaches_target_before_last_range_end():
 
     assert timeline["detection_mode"] == "cached_event_activity"
     assert timeline["trigger_start_sec"] == 1.0
-    assert timeline["analysis_ready_sec"] > 5.0
+    assert 3.4 < timeline["analysis_ready_sec"] < 4.1
     assert timeline["apply_start_sec"] > timeline["analysis_ready_sec"]
     assert timeline["target_active_sec"] > 0.0
+    assert timeline["base_target_active_sec"] >= timeline["target_active_sec"]
     assert timeline["detected_active_sec"] == 2.7
 
 
@@ -82,3 +83,25 @@ def test_ride_detector_ignores_single_clipped_peak():
     assert report["ranges"]
     first_start_sec = report["ranges"][0][0] / sr
     assert 1.7 < first_start_sec < 2.3
+
+
+def test_sparse_lead_uses_adaptive_target_and_applies_before_last_phrase():
+    mod = load_channel_triggered_module()
+    sr = 48_000
+    ranges_report = {
+        "mode": "cached_event_activity",
+        "ranges": [
+            (int(32.14 * sr), int(33.32 * sr)),
+            (int(35.98 * sr), int(36.56 * sr)),
+            (int(42.88 * sr), int(43.70 * sr)),
+            (int(101.98 * sr), int(103.28 * sr)),
+        ],
+        "threshold_db": -17.5,
+        "active_samples": int(3.88 * sr),
+    }
+
+    timeline = mod.build_channel_analysis_timeline(ranges_report, "lead_vocal", 148.5, sr)
+
+    assert timeline["base_target_active_sec"] == 1.6
+    assert timeline["target_active_sec"] <= timeline["base_target_active_sec"]
+    assert timeline["apply_start_sec"] < 45.0

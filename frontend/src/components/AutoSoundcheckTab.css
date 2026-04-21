@@ -4,6 +4,120 @@
 .progress-bar {
   height: 6px; background: #21262d; border-radius: 3px; overflow: hidden; margin-bottom: 8px;
 }
+.autofoh-session-card {
+  margin: 12px 0;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 212, 255, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(0, 212, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.02));
+}
+.autofoh-session-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.autofoh-session-kicker {
+  margin-bottom: 4px;
+  color: #8b949e;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.autofoh-session-title {
+  color: #e6edf3;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.autofoh-session-toggle {
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 212, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(0, 212, 255, 0.08);
+  color: #8ee9ff;
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.autofoh-session-toggle:hover {
+  background: rgba(0, 212, 255, 0.13);
+  border-color: rgba(0, 212, 255, 0.34);
+}
+.autofoh-session-summary {
+  margin-top: 8px;
+  color: #c9d1d9;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.autofoh-session-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.autofoh-session-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+}
+.autofoh-session-chip-label {
+  color: #8b949e;
+  font-size: 0.78rem;
+}
+.autofoh-session-chip-value {
+  color: #e6edf3;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.autofoh-session-details {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.autofoh-session-detail {
+  color: #8b949e;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+.autofoh-session-report {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+.autofoh-session-report-section {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.autofoh-session-report-title {
+  margin-bottom: 6px;
+  color: #e6edf3;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.autofoh-session-report-items {
+  display: grid;
+  gap: 4px;
+}
+.autofoh-session-report-item {
+  color: #8b949e;
+  font-size: 0.79rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+@media (max-width: 640px) {
+  .autofoh-session-head {
+    flex-direction: column;
+  }
+}
 .progress-fill {
   height: 100%; background: #00d4ff; border-radius: 3px; transition: width 0.3s ease;
 }

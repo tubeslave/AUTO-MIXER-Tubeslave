@@ -436,9 +436,9 @@ def detect_relevant_signal_ranges(mixmod, x: np.ndarray, sr: int, instrument: st
 
 def analysis_target_active_sec(instrument: str, duration_sec: float) -> float:
     defaults = {
-        "lead_vocal": 2.8,
-        "backing_vocal": 2.2,
-        "kick": 0.22,
+        "lead_vocal": 1.6,
+        "backing_vocal": 1.4,
+        "kick": 0.18,
         "snare": 0.3,
         "rack_tom": 0.22,
         "floor_tom": 0.28,
@@ -457,6 +457,23 @@ def analysis_target_active_sec(instrument: str, duration_sec: float) -> float:
     }
     default = defaults.get(instrument, 1.8)
     return float(min(default, max(0.2, duration_sec * 0.08)))
+
+
+def adaptive_analysis_target_active_sec(
+    instrument: str,
+    base_target_sec: float,
+    detected_active_sec: float,
+) -> float:
+    if detected_active_sec <= 0.0:
+        return float(base_target_sec)
+
+    if instrument in {"lead_vocal", "backing_vocal"}:
+        return float(min(base_target_sec, max(0.9, min(1.6, detected_active_sec * 0.45))))
+    if instrument == "kick":
+        return float(min(base_target_sec, max(0.12, min(0.18, detected_active_sec * 0.35))))
+    if instrument in {"snare", "rack_tom", "floor_tom"}:
+        return float(min(base_target_sec, max(0.16, min(0.24, detected_active_sec * 0.35))))
+    return float(base_target_sec)
 
 
 def analysis_compute_latency_sec(instrument: str) -> float:
@@ -479,9 +496,15 @@ def correction_fade_sec(instrument: str) -> float:
 
 def build_channel_analysis_timeline(ranges_report: dict[str, Any], instrument: str, duration_sec: float, sr: int) -> dict[str, Any]:
     ranges = list(ranges_report.get("ranges", []))
-    target_active_sec = analysis_target_active_sec(instrument, duration_sec)
+    base_target_active_sec = analysis_target_active_sec(instrument, duration_sec)
     compute_latency_sec = analysis_compute_latency_sec(instrument)
     fade_sec = correction_fade_sec(instrument)
+    detected_active_sec = float(ranges_report.get("active_samples", 0)) / sr
+    target_active_sec = adaptive_analysis_target_active_sec(
+        instrument,
+        base_target_active_sec,
+        detected_active_sec,
+    )
 
     if not ranges:
         apply_sec = min(duration_sec - 0.25, max(0.0, compute_latency_sec))
@@ -492,6 +515,7 @@ def build_channel_analysis_timeline(ranges_report: dict[str, Any], instrument: s
             "apply_start_sec": round(apply_sec, 3),
             "fade_sec": round(fade_sec, 3),
             "target_active_sec": round(target_active_sec, 3),
+            "base_target_active_sec": round(base_target_active_sec, 3),
             "detected_active_sec": 0.0,
             "threshold_db": ranges_report.get("threshold_db"),
             "ranges_count": 0,
@@ -510,7 +534,6 @@ def build_channel_analysis_timeline(ranges_report: dict[str, Any], instrument: s
 
     trigger_start_sec = float(ranges[0][0]) / sr
     ready_sec = float(ready_sample) / sr
-    detected_active_sec = float(ranges_report.get("active_samples", 0)) / sr
     return {
         "detection_mode": ranges_report.get("mode", "unknown"),
         "trigger_start_sec": round(trigger_start_sec, 3),
@@ -518,6 +541,7 @@ def build_channel_analysis_timeline(ranges_report: dict[str, Any], instrument: s
         "apply_start_sec": round(min(duration_sec, ready_sec + compute_latency_sec), 3),
         "fade_sec": round(fade_sec, 3),
         "target_active_sec": round(target_active_sec, 3),
+        "base_target_active_sec": round(base_target_active_sec, 3),
         "detected_active_sec": round(detected_active_sec, 3),
         "threshold_db": ranges_report.get("threshold_db"),
         "ranges_count": len(ranges),
@@ -614,6 +638,7 @@ def main() -> int:
 
     config = yaml.safe_load((REPO_ROOT / "config" / "automixer.yaml").read_text(encoding="utf-8"))
     ai_config = config.get("ai", {})
+    autofoh_config = config.get("autofoh", {})
 
     baseline_plans = clone_plans(initial_plans)
     working_plans = clone_plans(initial_plans)
@@ -622,22 +647,34 @@ def main() -> int:
     drum_pan_rule = mixmod.apply_overhead_anchored_drum_panning(working_plans, sr)
     console, agent, actions = run_agent_stage(mixmod, working_plans, ai_config, use_llm=args.use_llm)
 
-    codex_corrections = {"enabled": False, "actions": []}
-    if not args.no_codex_correction_pass:
-        raw_codex_actions = mixmod.codex_correction_actions(working_plans)
-        prepared_codex_actions = agent._prepare_actions(raw_codex_actions)
-        asyncio.run(agent._act(prepared_codex_actions))
-        codex_corrections = {
-            "enabled": True,
-            "actions": [action.__dict__ for action in prepared_codex_actions],
-            "notes": [
-                "Codex correction pass was applied after the rule engine for channel-triggered soundcheck rendering.",
-            ],
-        }
-
-    codex_bleed_control = mixmod.apply_codex_bleed_control(working_plans) if not args.no_codex_correction_pass else {"enabled": False}
+    codex_corrections = {
+        "enabled": False,
+        "actions": [],
+        "requested_disable_flag": bool(args.no_codex_correction_pass),
+        "notes": [
+            "Legacy codex heuristic corrections are disabled in analyzer-only mode.",
+        ],
+    }
+    codex_bleed_control = {
+        "enabled": False,
+        "requested_disable_flag": bool(args.no_codex_correction_pass),
+        "notes": [
+            "Legacy codex bleed-control heuristics are disabled in analyzer-only mode.",
+        ],
+    }
     event_based_dynamics = mixmod.apply_event_based_dynamics(working_plans)
-    vocal_bed_balance = mixmod.apply_vocal_bed_balance(working_plans)
+    autofoh_analyzer_pass = (
+        {"enabled": False, "notes": ["AutoFOH analyzer pass disabled via legacy --no-codex-correction-pass flag."]}
+        if args.no_codex_correction_pass
+        else mixmod.apply_autofoh_analyzer_pass(working_plans, target_len, sr, autofoh_config)
+    )
+    vocal_bed_balance = {
+        "enabled": False,
+        "notes": [
+            "Static vocal bed attenuation is disabled.",
+            "Vocal space must come from priority EQ and measured analyzer corrections.",
+        ],
+    }
     cross_adaptive_eq = mixmod.apply_cross_adaptive_eq(working_plans, target_len, sr)
     final_plans = clone_plans(working_plans)
 
@@ -674,7 +711,13 @@ def main() -> int:
         sr,
     )
 
-    dynamic_vocal_priority = mixmod.apply_dynamic_vocal_priority(blended_channels, final_plans, sr)
+    dynamic_vocal_priority = {
+        "enabled": False,
+        "notes": [
+            "Vocal ducking is disabled.",
+            "Vocal space must be created by priority EQ and measured analyzer corrections.",
+        ],
+    }
     fx_returns, fx_report = mixmod.apply_offline_fx_plan(blended_channels, final_plans, sr, tempo_bpm=args.tempo_bpm)
 
     mix = np.zeros((target_len, 2), dtype=np.float32)
@@ -721,6 +764,7 @@ def main() -> int:
         "agent_actions": agent.get_action_history(100),
         "agent_audit": agent.get_action_audit_log(100),
         "virtual_console_calls": console.calls,
+        "autofoh_analyzer_pass": autofoh_analyzer_pass,
         "codex_corrections": codex_corrections,
         "codex_bleed_control": codex_bleed_control,
         "event_based_dynamics": event_based_dynamics,

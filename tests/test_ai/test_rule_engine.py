@@ -127,6 +127,23 @@ class TestRuleEngine:
         assert dynamic[0].parameters['release_ms'] == pytest.approx(60.0)
         assert dynamic[0].parameters['threshold_db'] == pytest.approx(-14.0)
 
+    def test_gain_staging_keeps_normal_kick_peaks(self):
+        """Kick peaks around -6 dBFS should not be forced toward the generic -12 dB target."""
+        engine = RuleEngine()
+        engine.reset_cooldowns()
+        state = {
+            'instrument': 'kick',
+            'channel_id': 8,
+            'peak_db': -5.8,
+            'rms_db': -18.0,
+            'lufs_momentary': -18.5,
+            'channel_armed': True,
+        }
+
+        results = engine.evaluate(state)
+
+        assert all(r.rule_name != 'gain_staging' for r in results)
+
     def test_dynamic_range_skips_playback_sources(self):
         """Playback sources should not get generic dynamic-range compression from the rule engine."""
         engine = RuleEngine()

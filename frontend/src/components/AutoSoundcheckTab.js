@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import websocketService from '../services/websocket';
 import './AutoSoundcheckTab.css';
 import SignalHint from './SignalHint';
+import { buildAutofohSessionSummary } from './autoSoundcheckSummary.mjs';
 
 const CYCLE_STEPS = [
   { id: 'gain', label: 'Gain Staging' },
@@ -20,6 +21,8 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
   const [progress, setProgress] = useState(0);
   const [log, setLog] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSessionDetails, setShowSessionDetails] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState({});
   const [timings, setTimings] = useState({
     gainDuration: 30, phaseDuration: 15, eqDuration: 20,
     compDuration: 15, gateDuration: 10, faderDuration: 15,
@@ -27,6 +30,7 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
 
   useEffect(() => {
     const handle = (data) => {
+      setSessionStatus(prev => ({ ...prev, ...data }));
       if (data.is_running !== undefined) {
         setRunning(data.is_running);
       } else if (data.running !== undefined) {
@@ -69,6 +73,8 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
       auto_fader: timings.faderDuration,
     };
     setLog([]);
+    setShowSessionDetails(false);
+    setSessionStatus({});
     websocketService.startAutoSoundcheck(
       selectedDevice,
       selectedChannels,
@@ -81,6 +87,7 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
   const handleStop = () => websocketService.stopAutoSoundcheck();
 
   const channels = selectedChannels || [];
+  const sessionSummary = buildAutofohSessionSummary(sessionStatus);
   if (!channels.length) return (<div><SignalHint moduleKey="auto_soundcheck" /><div className="no-channels">Выберите каналы на вкладке Connect</div></div>);
 
   return (
@@ -107,6 +114,57 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
           <div className="module-status">Режим наблюдения: пульт не изменяется, все команды только логируются.</div>
         )}
         {statusMessage && <div className="module-status">{statusMessage}</div>}
+        {!running && sessionSummary && (
+          <div className="autofoh-session-card">
+            <div className="autofoh-session-head">
+              <div>
+                <div className="autofoh-session-kicker">AutoFOH</div>
+                <div className="autofoh-session-title">{sessionSummary.title}</div>
+              </div>
+              {sessionSummary.hasExpandableDetails && (
+                <button
+                  type="button"
+                  className="autofoh-session-toggle"
+                  onClick={() => setShowSessionDetails(open => !open)}
+                >
+                  {showSessionDetails ? 'Скрыть детали' : 'Показать детали'}
+                </button>
+              )}
+            </div>
+            <div className="autofoh-session-summary">{sessionSummary.summaryText}</div>
+            {sessionSummary.chips.length > 0 && (
+              <div className="autofoh-session-chips">
+                {sessionSummary.chips.map(chip => (
+                  <div key={chip.label} className="autofoh-session-chip">
+                    <span className="autofoh-session-chip-label">{chip.label}</span>
+                    <span className="autofoh-session-chip-value">{chip.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!showSessionDetails && sessionSummary.detailLines.length > 0 && (
+              <div className="autofoh-session-details">
+                {sessionSummary.detailLines.slice(0, 2).map((line, index) => (
+                  <div key={`${line}-${index}`} className="autofoh-session-detail">{line}</div>
+                ))}
+              </div>
+            )}
+            {showSessionDetails && sessionSummary.sections.length > 0 && (
+              <div className="autofoh-session-report">
+                {sessionSummary.sections.map(section => (
+                  <div key={section.title} className="autofoh-session-report-section">
+                    <div className="autofoh-session-report-title">{section.title}</div>
+                    <div className="autofoh-session-report-items">
+                      {section.items.map((item, index) => (
+                        <div key={`${section.title}-${index}`} className="autofoh-session-report-item">{item}</div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {running && (
           <div className="progress-section">

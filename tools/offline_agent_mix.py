@@ -34,8 +34,27 @@ from ai.knowledge_base import KnowledgeBase  # noqa: E402
 from ai.llm_client import LLMClient  # noqa: E402
 from ai.rule_engine import RuleEngine  # noqa: E402
 from auto_phase_gcc_phat import GCCPHATAnalyzer  # noqa: E402
-from cross_adaptive_eq import CrossAdaptiveEQ  # noqa: E402
+from autofoh_analysis import build_stem_contribution_matrix, extract_analysis_features  # noqa: E402
+from autofoh_detectors import (  # noqa: E402
+    HarshnessExcessDetector,
+    LeadMaskingAnalyzer,
+    LowEndAnalyzer,
+    MudExcessDetector,
+    SibilanceExcessDetector,
+    aggregate_stem_features,
+)
+from autofoh_models import ConfidenceRisk, DetectedProblem, RuntimeState  # noqa: E402
+from autofoh_safety import (  # noqa: E402
+    AutoFOHSafetyConfig,
+    AutoFOHSafetyController,
+    ChannelGainMove,
+    ChannelEQMove,
+    ChannelFaderMove,
+    TypedCorrectionAction,
+)
 from auto_fx import AutoFXPlanner, FXBusDecision, FXPlan  # noqa: E402
+from channel_recognizer import classification_from_legacy_preset  # noqa: E402
+from cross_adaptive_eq import CrossAdaptiveEQ  # noqa: E402
 
 
 DRUM_INSTRUMENTS = {
@@ -81,6 +100,7 @@ class ChannelPlan:
     phase_notes: list[dict[str, Any]] = field(default_factory=list)
     pan_notes: list[dict[str, Any]] = field(default_factory=list)
     cross_adaptive_eq: list[dict[str, Any]] = field(default_factory=list)
+    autofoh_actions: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _agent_actions_to_dict(actions: list[AgentAction]) -> list[dict[str, Any]]:
@@ -99,7 +119,7 @@ class VirtualConsole:
         return self.plans[channel].fader_db
 
     def set_fader(self, channel: int, value_db: float):
-        self.plans[channel].fader_db = float(np.clip(value_db, -100.0, 10.0))
+        self.plans[channel].fader_db = float(np.clip(value_db, -30.0, 0.0))
         self.calls.append({"cmd": "set_fader", "channel": channel, "value_db": self.plans[channel].fader_db})
 
     def get_mute(self, channel: int) -> bool:
@@ -150,6 +170,73 @@ class VirtualConsole:
             "ratio": ratio,
             "attack_ms": attack_ms,
             "release_ms": release_ms,
+        })
+
+
+class OfflineAutoFOHConsole:
+    """Minimal mixer adapter so offline analyzer actions use the same safety layer."""
+
+    def __init__(self, plans: dict[int, ChannelPlan]):
+        self.plans = plans
+        self.calls: list[dict[str, Any]] = []
+
+    def get_fader(self, channel: int) -> float:
+        return float(self.plans[channel].fader_db)
+
+    def set_fader(self, channel: int, value_db: float):
+        plan = self.plans[channel]
+        before = float(plan.fader_db)
+        plan.fader_db = float(np.clip(value_db, -30.0, 0.0))
+        self.calls.append({
+            "cmd": "set_fader",
+            "channel": channel,
+            "before_db": round(before, 2),
+            "after_db": round(plan.fader_db, 2),
+        })
+
+    def get_gain(self, channel: int) -> float:
+        return float(self.plans[channel].trim_db)
+
+    def set_gain(self, channel: int, value_db: float):
+        plan = self.plans[channel]
+        before = float(plan.trim_db)
+        plan.trim_db = float(np.clip(value_db, -30.0, 12.0))
+        self.calls.append({
+            "cmd": "set_gain",
+            "channel": channel,
+            "before_db": round(before, 2),
+            "after_db": round(plan.trim_db, 2),
+        })
+
+    @staticmethod
+    def _band_index(band: int | str) -> int:
+        token = str(band).strip().lower().rstrip("g")
+        return max(1, int(token)) - 1
+
+    def get_eq_band_gain(self, channel: int, band: int | str) -> float:
+        plan = self.plans[channel]
+        band_idx = self._band_index(band)
+        if 0 <= band_idx < len(plan.eq_bands):
+            return float(plan.eq_bands[band_idx][1])
+        return 0.0
+
+    def set_eq_band(self, channel: int, band: int, freq: float, gain: float, q: float):
+        plan = self.plans[channel]
+        band_idx = self._band_index(band)
+        while len(plan.eq_bands) <= band_idx:
+            plan.eq_bands.append((1000.0, 0.0, 1.0))
+        before = plan.eq_bands[band_idx]
+        plan.eq_bands[band_idx] = (float(freq), float(gain), float(q))
+        self.calls.append({
+            "cmd": "set_eq_band",
+            "channel": channel,
+            "band": band_idx + 1,
+            "before": tuple(round(float(v), 2) for v in before),
+            "after": (
+                round(float(freq), 2),
+                round(float(gain), 2),
+                round(float(q), 2),
+            ),
         })
 
 
@@ -270,10 +357,10 @@ def _event_metric_config(instrument: str) -> dict[str, float] | None:
             "pad_ms": 80.0,
             "detect_hpf_hz": 28.0,
             "detect_lpf_hz": 220.0,
-            "percentile": 98.0,
-            "peak_offset_db": 12.0,
-            "floor_margin_db": 9.0,
-            "min_threshold_db": -38.0,
+            "percentile": 95.0,
+            "peak_offset_db": 14.0,
+            "floor_margin_db": 6.0,
+            "min_threshold_db": -44.0,
         }
     if instrument == "snare":
         return {
@@ -777,10 +864,601 @@ def _music_bed_lufs(plans: dict[int, ChannelPlan]) -> float:
     return float(np.mean(top_music)) if top_music else -20.0
 
 
+LEGACY_PRESET_BY_INSTRUMENT = {
+    "kick": "kick",
+    "snare": "snare",
+    "rack_tom": "tom",
+    "floor_tom": "tom",
+    "hi_hat": "hihat",
+    "ride": "ride",
+    "overhead": "overheads",
+    "room": "room",
+    "bass_guitar": "bass",
+    "electric_guitar": "electricGuitar",
+    "acoustic_guitar": "acousticGuitar",
+    "accordion": "accordion",
+    "synth": "synth",
+    "playback": "playback",
+    "lead_vocal": "leadVocal",
+    "backing_vocal": "backVocal",
+    "custom": "custom",
+}
+
+
+def _legacy_preset_for_instrument(instrument: str) -> str:
+    return LEGACY_PRESET_BY_INSTRUMENT.get(str(instrument or "").strip().lower(), "custom")
+
+
+def _measurement_window_for_instrument(instrument: str) -> float:
+    if instrument in {"kick", "snare", "rack_tom", "floor_tom"}:
+        return 0.55
+    if instrument in {"hi_hat", "ride", "percussion"}:
+        return 0.8
+    if instrument in {"lead_vocal", "backing_vocal"}:
+        return 1.2
+    if instrument in {"bass_guitar", "electric_guitar", "acoustic_guitar", "accordion", "playback", "synth"}:
+        return 1.5
+    return 1.0
+
+
+def _focused_fft_measurement_block(
+    x: np.ndarray,
+    sr: int,
+    instrument: str,
+    *,
+    fft_size: int = 4096,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    analysis_signal, analysis_meta = _analysis_signal_for_metrics(x, sr, instrument)
+    search_window = _analysis_block(
+        analysis_signal,
+        sr,
+        window_sec=_measurement_window_for_instrument(instrument),
+    )
+    if len(search_window) == 0:
+        return search_window.astype(np.float32), {
+            **analysis_meta,
+            "measurement_block_sec": 0.0,
+            "measurement_block_samples": 0,
+        }
+
+    if len(search_window) <= fft_size:
+        block = search_window
+    else:
+        hop = max(256, fft_size // 4)
+        best_start = 0
+        best_energy = -1.0
+        for start in range(0, len(search_window) - fft_size + 1, hop):
+            energy = float(np.mean(np.square(search_window[start:start + fft_size])))
+            if energy > best_energy:
+                best_energy = energy
+                best_start = start
+        block = search_window[best_start:best_start + fft_size]
+
+    return block.astype(np.float32), {
+        **analysis_meta,
+        "measurement_block_sec": round(len(block) / sr, 4) if sr else 0.0,
+        "measurement_block_samples": int(len(block)),
+    }
+
+
+def _typed_action_to_dict(action: TypedCorrectionAction) -> dict[str, Any]:
+    payload = {
+        "action_type": action.action_type,
+        "reason": action.reason,
+    }
+    payload.update(action.__dict__)
+    return payload
+
+
+def _problem_to_dict(problem: Any) -> dict[str, Any]:
+    if problem is None:
+        return {}
+    confidence = getattr(problem, "confidence_risk", None)
+    return {
+        "problem_type": getattr(problem, "problem_type", ""),
+        "description": getattr(problem, "description", ""),
+        "channel_id": getattr(problem, "channel_id", None),
+        "stem": getattr(problem, "stem", None),
+        "band_name": getattr(problem, "band_name", None),
+        "persistence_sec": getattr(problem, "persistence_sec", 0.0),
+        "expected_effect": getattr(problem, "expected_effect", ""),
+        "confidence_risk": {
+            "problem_confidence": round(float(getattr(confidence, "problem_confidence", 0.0)), 3),
+            "culprit_confidence": round(float(getattr(confidence, "culprit_confidence", 0.0)), 3),
+            "action_confidence": round(float(getattr(confidence, "action_confidence", 0.0)), 3),
+            "risk_score": round(float(getattr(confidence, "risk_score", 0.0)), 3),
+        },
+    }
+
+
+def _build_autofoh_measurement_snapshot(
+    rendered_channels: dict[int, np.ndarray],
+    plans: dict[int, ChannelPlan],
+    sr: int,
+    autofoh_config: dict[str, Any] | None = None,
+):
+    autofoh_config = autofoh_config or {}
+    analysis_config = autofoh_config.get("analysis", {})
+    fft_size = int(analysis_config.get("fft_size", 4096))
+    octave_fraction = int(analysis_config.get("octave_fraction", 3))
+    slope_db = float(analysis_config.get("slope_compensation_db_per_octave", 4.5))
+
+    channel_features = {}
+    channel_stems = {}
+    channel_priorities = {}
+    channel_measurements = {}
+
+    for channel, audio in rendered_channels.items():
+        plan = plans.get(channel)
+        if plan is None or plan.muted:
+            continue
+        mono = mono_sum(audio)
+        block, measurement_meta = _focused_fft_measurement_block(
+            mono,
+            sr,
+            plan.instrument,
+            fft_size=fft_size,
+        )
+        if len(block) == 0:
+            continue
+        features = extract_analysis_features(
+            block,
+            sample_rate=sr,
+            fft_size=fft_size,
+            octave_fraction=octave_fraction,
+            slope_compensation_db_per_octave=slope_db,
+        )
+        if features.confidence <= 0.0:
+            continue
+
+        classification = classification_from_legacy_preset(
+            _legacy_preset_for_instrument(plan.instrument),
+            channel_name=plan.name,
+            confidence=1.0,
+            match_type="offline_measurement",
+        )
+        stems = [stem.value for stem in classification.stem_roles if stem.value != "MASTER"]
+        if not stems:
+            stems = ["LEAD"] if plan.instrument == "lead_vocal" else ["UNKNOWN"]
+
+        channel_features[channel] = features
+        channel_stems[channel] = stems
+        channel_priorities[channel] = float(classification.priority)
+        channel_measurements[channel] = {
+            "file": plan.path.name,
+            "instrument": plan.instrument,
+            "source_role": classification.source_role.value,
+            "stem_roles": stems,
+            "priority": round(float(classification.priority), 3),
+            **measurement_meta,
+        }
+
+    if not channel_features:
+        return {}, {}, None, {}, {}, {}
+
+    stem_features = aggregate_stem_features(channel_features, channel_stems)
+    contribution_matrix = build_stem_contribution_matrix(
+        {
+            stem_name: features
+            for stem_name, features in stem_features.items()
+            if stem_name != "MASTER"
+        }
+    )
+    return (
+        channel_features,
+        stem_features,
+        contribution_matrix,
+        channel_stems,
+        channel_priorities,
+        channel_measurements,
+    )
+
+
+def _measured_channel_level_db(plan: ChannelPlan, features: Any) -> float:
+    return float(getattr(features, "rms_db", -100.0) + plan.trim_db + plan.fader_db)
+
+
+def _lead_handoff_balance_recommendations(
+    plans: dict[int, ChannelPlan],
+    channel_features: dict[int, Any],
+    lead_channels: list[int],
+) -> list[tuple[str, Any, list[TypedCorrectionAction]]]:
+    measured_leads: list[tuple[int, float, float]] = []
+    for channel in lead_channels:
+        plan = plans.get(channel)
+        features = channel_features.get(channel)
+        if plan is None or features is None or plan.muted:
+            continue
+        active_ratio = float(plan.metrics.get("analysis_active_ratio") or 0.0)
+        if active_ratio < 0.015:
+            continue
+        measured_leads.append((channel, _measured_channel_level_db(plan, features), active_ratio))
+
+    if len(measured_leads) < 2:
+        return []
+
+    anchor_channel, anchor_level_db, _ = max(measured_leads, key=lambda item: item[1])
+    anchor_target_db = anchor_level_db - 0.8
+    recommendations: list[tuple[str, Any, list[TypedCorrectionAction]]] = []
+
+    for channel, level_db, active_ratio in measured_leads:
+        if channel == anchor_channel:
+            continue
+        shortfall_db = anchor_target_db - level_db
+        if shortfall_db < 0.75:
+            continue
+
+        plan = plans[channel]
+        boost_db = float(min(1.5, shortfall_db))
+        if plan.fader_db <= -0.25:
+            action: TypedCorrectionAction = ChannelFaderMove(
+                channel_id=channel,
+                target_db=min(0.0, float(plan.fader_db + boost_db)),
+                delta_db=boost_db,
+                is_lead=True,
+                reason=f"Measured lead handoff balance vs {plans[anchor_channel].path.name}",
+            )
+        else:
+            action = ChannelGainMove(
+                channel_id=channel,
+                target_db=float(np.clip(plan.trim_db + boost_db, -12.0, 12.0)),
+                reason=f"Measured lead handoff balance vs {plans[anchor_channel].path.name}",
+            )
+
+        confidence = min(1.0, 0.55 + shortfall_db / 3.0)
+        recommendations.append((
+            "lead_handoff_balance",
+            DetectedProblem(
+                problem_type="lead_handoff_balance",
+                description="Measured secondary lead sits below the anchor lead level",
+                channel_id=channel,
+                stem="LEAD",
+                band_name="RMS",
+                persistence_sec=max(0.5, float(active_ratio * 10.0)),
+                features=channel_features[channel],
+                confidence_risk=ConfidenceRisk(
+                    problem_confidence=confidence,
+                    culprit_confidence=1.0,
+                    action_confidence=min(1.0, confidence * 0.92),
+                    risk_score=0.18,
+                ),
+                expected_effect="Bring quieter lead handoffs closer to the anchor lead without flattening the vocal hierarchy.",
+            ),
+            [action],
+        ))
+
+    return recommendations
+
+
+def _cymbal_buildup_recommendations(
+    plans: dict[int, ChannelPlan],
+    channel_features: dict[int, Any],
+    master_features: Any | None,
+) -> list[tuple[str, Any, list[TypedCorrectionAction]]]:
+    if master_features is None:
+        return []
+
+    harshness_excess = max(0.0, float(master_features.mix_indexes.harshness_index))
+    sibilance_excess = max(0.0, float(master_features.mix_indexes.sibilance_index))
+    if max(harshness_excess, sibilance_excess) < 1.75:
+        return []
+
+    direct_candidates: list[tuple[int, float]] = []
+    ambient_candidates: list[tuple[int, float]] = []
+    for channel, features in channel_features.items():
+        plan = plans.get(channel)
+        if plan is None or plan.muted:
+            continue
+        if plan.instrument not in {"hi_hat", "ride", "overhead", "room"}:
+            continue
+        score = (
+            max(0.0, float(features.mix_indexes.harshness_index)) * 0.8
+            + max(0.0, float(features.mix_indexes.sibilance_index)) * 1.2
+            + max(0.0, float(features.mix_indexes.air_index)) * 0.4
+        )
+        if plan.instrument in {"hi_hat", "ride"}:
+            score *= 1.15
+            direct_candidates.append((channel, score))
+        else:
+            ambient_candidates.append((channel, score))
+
+    recommendations: list[tuple[str, Any, list[TypedCorrectionAction]]] = []
+    dominant_band = "SIBILANCE" if sibilance_excess >= harshness_excess else "HARSHNESS"
+    dominant_freq = 7500.0 if dominant_band == "SIBILANCE" else 4200.0
+    dominant_q = 2.0 if dominant_band == "SIBILANCE" else 1.8
+
+    if direct_candidates:
+        direct_channel, direct_score = max(direct_candidates, key=lambda item: item[1])
+        if direct_score >= 0.7:
+            plan = plans[direct_channel]
+            cut_db = float(min(1.5, 0.75 + 0.2 * max(harshness_excess, sibilance_excess)))
+            target_db = max(-30.0, float(plan.fader_db - cut_db))
+            recommendations.append((
+                "cymbal_buildup",
+                DetectedProblem(
+                    problem_type="cymbal_buildup",
+                    description="Measured direct cymbal energy is dominating the upper bands",
+                    channel_id=direct_channel,
+                    stem="DRUMS",
+                    band_name=dominant_band,
+                    persistence_sec=max(1.0, direct_score),
+                    features=channel_features[direct_channel],
+                    confidence_risk=ConfidenceRisk(
+                        problem_confidence=min(1.0, 0.5 + direct_score / 3.0),
+                        culprit_confidence=min(1.0, direct_score / 3.0),
+                        action_confidence=0.82,
+                        risk_score=0.22,
+                    ),
+                    expected_effect="Reduce direct cymbal dominance while preserving the drum image.",
+                ),
+                [ChannelFaderMove(
+                    channel_id=direct_channel,
+                    target_db=target_db,
+                    delta_db=target_db - float(plan.fader_db),
+                    reason=f"Measured cymbal buildup on {plan.path.name}",
+                )],
+            ))
+
+    if ambient_candidates:
+        ambient_channel, ambient_score = max(ambient_candidates, key=lambda item: item[1])
+        if ambient_score >= 0.55:
+            plan = plans[ambient_channel]
+            recommendations.append((
+                "cymbal_buildup",
+                DetectedProblem(
+                    problem_type="cymbal_buildup",
+                    description="Measured overhead or room cymbal wash is dominating the upper bands",
+                    channel_id=ambient_channel,
+                    stem="DRUMS",
+                    band_name=dominant_band,
+                    persistence_sec=max(1.0, ambient_score),
+                    features=channel_features[ambient_channel],
+                    confidence_risk=ConfidenceRisk(
+                        problem_confidence=min(1.0, 0.48 + ambient_score / 3.5),
+                        culprit_confidence=min(1.0, ambient_score / 3.5),
+                        action_confidence=0.76,
+                        risk_score=0.24,
+                    ),
+                    expected_effect="Reduce cymbal wash in the ambient drum capture without collapsing width.",
+                ),
+                [ChannelEQMove(
+                    channel_id=ambient_channel,
+                    band=4 if dominant_band == "SIBILANCE" else 3,
+                    freq_hz=dominant_freq,
+                    gain_db=-1.0,
+                    q=dominant_q,
+                    reason=f"Measured cymbal wash cleanup on {plan.path.name}",
+                )],
+            ))
+
+    return recommendations
+
+
+def apply_autofoh_measurement_corrections(
+    plans: dict[int, ChannelPlan],
+    rendered_channels: dict[int, np.ndarray],
+    sr: int,
+    autofoh_config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    autofoh_config = autofoh_config or {}
+    detector_config = autofoh_config.get("detectors", {})
+    safety_config = AutoFOHSafetyConfig.from_config(
+        autofoh_config.get("safety", {}).get("action_limits", {})
+    )
+    (
+        channel_features,
+        stem_features,
+        contribution_matrix,
+        channel_stems,
+        channel_priorities,
+        channel_measurements,
+    ) = _build_autofoh_measurement_snapshot(rendered_channels, plans, sr, autofoh_config)
+
+    if not channel_features or contribution_matrix is None:
+        return {
+            "enabled": False,
+            "reason": "no_measurement_snapshot",
+            "applied_actions": [],
+            "detected_problems": [],
+            "measurement_channels": channel_measurements,
+        }
+
+    lead_masking_config = detector_config.get("lead_masking", {})
+    mud_config = detector_config.get("mud_excess", {})
+    harshness_config = detector_config.get("harshness_excess", {})
+    sibilance_config = detector_config.get("sibilance_excess", {})
+    low_end_config = detector_config.get("low_end", {})
+
+    lead_channels = [
+        channel for channel, stems in channel_stems.items()
+        if "LEAD" in stems or plans[channel].instrument == "lead_vocal"
+    ]
+    current_faders = {
+        channel: float(plans[channel].fader_db)
+        for channel in channel_features
+    }
+
+    analyzers = {
+        "lead_masking": (
+            bool(lead_masking_config.get("enabled", True)) and bool(lead_channels),
+            LeadMaskingAnalyzer(
+                masking_threshold_db=float(lead_masking_config.get("masking_threshold_db", 3.0)),
+                culprit_share_threshold=float(lead_masking_config.get("min_culprit_contribution", 0.35)),
+                persistence_required_cycles=1,
+                lead_boost_db=float(lead_masking_config.get("lead_boost_db", 0.5)),
+            ),
+        ),
+        "mud_excess": (
+            bool(mud_config.get("enabled", True)),
+            MudExcessDetector(
+                threshold_db=float(mud_config.get("threshold_db", 2.5)),
+                persistence_required_cycles=1,
+                hysteresis_db=float(mud_config.get("hysteresis_db", 0.75)),
+            ),
+        ),
+        "harshness_excess": (
+            bool(harshness_config.get("enabled", True)),
+            HarshnessExcessDetector(
+                threshold_db=float(harshness_config.get("threshold_db", 2.5)),
+                persistence_required_cycles=1,
+                hysteresis_db=float(harshness_config.get("hysteresis_db", 0.75)),
+            ),
+        ),
+        "sibilance_excess": (
+            bool(sibilance_config.get("enabled", True)),
+            SibilanceExcessDetector(
+                threshold_db=float(sibilance_config.get("threshold_db", 2.5)),
+                persistence_required_cycles=1,
+                hysteresis_db=float(sibilance_config.get("hysteresis_db", 0.75)),
+            ),
+        ),
+        "low_end": (
+            bool(low_end_config.get("enabled", True)),
+            LowEndAnalyzer(
+                sub_threshold_db=float(low_end_config.get("sub_threshold_db", 4.0)),
+                bass_threshold_db=float(low_end_config.get("bass_threshold_db", 3.0)),
+                body_threshold_db=float(low_end_config.get("body_threshold_db", 2.5)),
+                culprit_share_threshold=float(low_end_config.get("min_culprit_contribution", 0.35)),
+                persistence_required_cycles=1,
+                hysteresis_db=float(low_end_config.get("hysteresis_db", 0.75)),
+            ),
+        ),
+    }
+
+    recommendations: list[tuple[str, Any, list[TypedCorrectionAction]]] = []
+    if analyzers["lead_masking"][0]:
+        lead_result = analyzers["lead_masking"][1].analyze(
+            channel_features=channel_features,
+            channel_stems=channel_stems,
+            stem_features=stem_features,
+            contribution_matrix=contribution_matrix,
+            lead_channel_ids=lead_channels,
+            current_faders_db=current_faders,
+            lead_priorities=channel_priorities,
+            runtime_state=RuntimeState.PRE_SHOW_CHECK,
+        )
+        if lead_result.problem:
+            recommendations.append(("lead_masking", lead_result.problem, lead_result.candidate_actions))
+
+    recommendations.extend(
+        _lead_handoff_balance_recommendations(
+            plans,
+            channel_features,
+            lead_channels,
+        )
+    )
+
+    master_features = stem_features.get("MASTER")
+    if master_features is not None:
+        if analyzers["low_end"][0]:
+            low_end_result = analyzers["low_end"][1].analyze(
+                master_features=master_features,
+                contribution_matrix=contribution_matrix,
+                channel_features=channel_features,
+                channel_stems=channel_stems,
+            )
+            if low_end_result.problem:
+                recommendations.append(("low_end", low_end_result.problem, low_end_result.candidate_actions))
+
+        for label in ("mud_excess", "harshness_excess", "sibilance_excess"):
+            enabled, detector = analyzers[label]
+            if not enabled:
+                continue
+            recommendation = detector.observe(
+                master_features=master_features,
+                contribution_matrix=contribution_matrix,
+                channel_features=channel_features,
+                channel_stems=channel_stems,
+            )
+            if recommendation.problem:
+                recommendations.append((label, recommendation.problem, recommendation.candidate_actions))
+
+        recommendations.extend(
+            _cymbal_buildup_recommendations(
+                plans,
+                channel_features,
+                master_features,
+            )
+        )
+
+    adapter = OfflineAutoFOHConsole(plans)
+    safety_controller = AutoFOHSafetyController(adapter, config=safety_config)
+    applied_actions = []
+    detected_problems = []
+    for label, problem, actions in recommendations:
+        detected_problems.append({
+            "label": label,
+            "problem": _problem_to_dict(problem),
+            "candidate_actions": [_typed_action_to_dict(action) for action in actions],
+        })
+        if not actions:
+            continue
+        action = actions[0]
+        decision = safety_controller.execute(action, RuntimeState.PRE_SHOW_CHECK)
+        action_report = {
+            "label": label,
+            "requested_action": _typed_action_to_dict(action),
+            "applied_action": _typed_action_to_dict(decision.action),
+            "sent": bool(decision.sent),
+            "bounded": bool(decision.bounded),
+            "allowed": bool(decision.allowed),
+            "supported": bool(decision.supported),
+            "message": decision.message,
+            "problem": _problem_to_dict(problem),
+        }
+        applied_actions.append(action_report)
+        if decision.sent:
+            channel_id = getattr(decision.action, "channel_id", None)
+            if channel_id in plans:
+                plans[channel_id].autofoh_actions.append(action_report)
+
+    master_indexes = {}
+    if master_features is not None:
+        master_indexes = {
+            key: round(float(value), 3)
+            for key, value in master_features.mix_indexes.as_dict().items()
+        }
+
+    return {
+        "enabled": True,
+        "measurement_mode": "autofoh_analyzers",
+        "measurement_channels": channel_measurements,
+        "master_indexes": master_indexes,
+        "detected_problems": detected_problems,
+        "applied_actions": applied_actions,
+        "virtual_console_calls": adapter.calls,
+        "notes": [
+            "All additional offline correction moves in this pass come from measured AutoFOH detector outputs.",
+            "Lead handoff and cymbal buildup decisions are derived from the same measured analyzer snapshot.",
+            "Legacy codex heuristic correction layers are disabled in analyzer-only mode.",
+        ],
+    }
+
+
+def apply_autofoh_analyzer_pass(
+    plans: dict[int, ChannelPlan],
+    target_len: int,
+    sr: int,
+    autofoh_config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    rendered_channels = {
+        channel: render_channel(plan.path, plan, target_len, sr)
+        for channel, plan in plans.items()
+        if not plan.muted
+    }
+    return apply_autofoh_measurement_corrections(
+        plans,
+        rendered_channels,
+        sr,
+        autofoh_config=autofoh_config,
+    )
+
+
 def apply_vocal_bed_balance(
     plans: dict[int, ChannelPlan],
     desired_vocal_delta_db: float = 6.5,
     max_bed_attenuation_db: float = 3.0,
+    protected_instruments: tuple[str, ...] = ("kick", "snare", "bass_guitar"),
 ) -> dict[str, Any]:
     """Lower the whole music bed when vocal cannot safely move far enough up."""
     vocal_plans = [
@@ -801,7 +1479,11 @@ def apply_vocal_bed_balance(
     adjusted_channels = []
     if attenuation >= 0.25:
         for channel, plan in plans.items():
-            if plan.instrument == "lead_vocal" or plan.muted:
+            if (
+                plan.instrument == "lead_vocal"
+                or plan.muted
+                or plan.instrument in protected_instruments
+            ):
                 continue
             plan.fader_db = float(np.clip(plan.fader_db - attenuation, -100.0, 10.0))
             adjusted_channels.append(channel)
@@ -816,6 +1498,7 @@ def apply_vocal_bed_balance(
         "after_vocal_lufs": round(_post_fader_lufs(vocal_plan), 2),
         "after_music_bed_lufs": round(_music_bed_lufs(plans), 2),
         "after_delta_db": round(_post_fader_lufs(vocal_plan) - _music_bed_lufs(plans), 2),
+        "protected_instruments": list(protected_instruments),
         "adjusted_channels": adjusted_channels,
     }
 
@@ -1493,6 +2176,10 @@ def apply_cross_adaptive_eq(
             str(channel): priority
             for channel, priority in sorted(channel_priorities.items())
         },
+        "notes": [
+            "Cross-adaptive EQ is priority-driven: lower numeric priority means the channel is protected first.",
+            "Lead vocals keep highest EQ priority, while competing accompaniment receives most anti-mask cuts.",
+        ],
         "applied": applied,
     }
 
@@ -1580,7 +2267,16 @@ def peaking_eq(x: np.ndarray, sr: int, freq: float, gain_db: float, q: float) ->
     return lfilter(b, aa, x).astype(np.float32)
 
 
-def compressor(x: np.ndarray, sr: int, threshold_db: float, ratio: float, attack_ms: float, release_ms: float, makeup_db: float = 0.0) -> np.ndarray:
+def compressor(
+    x: np.ndarray,
+    sr: int,
+    threshold_db: float,
+    ratio: float,
+    attack_ms: float,
+    release_ms: float,
+    makeup_db: float = 0.0,
+    auto_makeup: bool = True,
+) -> np.ndarray:
     abs_x = np.maximum(np.abs(x), 1e-8)
     level_db = 20.0 * np.log10(abs_x)
     over = level_db - threshold_db
@@ -1593,8 +2289,19 @@ def compressor(x: np.ndarray, sr: int, threshold_db: float, ratio: float, attack
         coeff = attack if gr > last else release
         last = coeff * last + (1.0 - coeff) * float(gr)
         smoothed[i] = last
-    gain = 10.0 ** ((makeup_db - smoothed) / 20.0)
-    return (x * gain).astype(np.float32)
+    gain = 10.0 ** (-smoothed / 20.0)
+    compressed = (x * gain).astype(np.float32)
+
+    total_makeup_db = float(makeup_db)
+    if auto_makeup and len(compressed):
+        input_rms = float(np.sqrt(np.mean(np.square(x))) + 1e-12)
+        output_rms = float(np.sqrt(np.mean(np.square(compressed))) + 1e-12)
+        suppressed_db = max(0.0, amp_to_db(input_rms) - amp_to_db(output_rms))
+        total_makeup_db += suppressed_db
+
+    if abs(total_makeup_db) > 1e-4:
+        compressed = (compressed * db_to_amp(total_makeup_db)).astype(np.float32)
+    return compressed
 
 
 def pan_mono(x: np.ndarray, pan: float) -> np.ndarray:
@@ -1706,10 +2413,11 @@ def render_channel(path: Path, plan: ChannelPlan, target_len: int, sr: int) -> n
         mono = np.pad(mono, (0, target_len - len(mono)))
     mono = mono[:target_len]
     mono = declick_start(mono, sr, plan.input_fade_ms)
+    mono = mono * db_to_amp(plan.trim_db)
     if plan.phase_invert:
         mono = -mono
     mono = delay_signal(mono, sr, plan.delay_ms)
-    x = mono * db_to_amp(plan.trim_db + plan.fader_db)
+    x = mono
     x = highpass(x, sr, plan.hpf)
     if plan.lpf > 0.0:
         x = lowpass(x, sr, plan.lpf)
@@ -1725,7 +2433,8 @@ def render_channel(path: Path, plan: ChannelPlan, target_len: int, sr: int) -> n
         release_ms=plan.comp_release_ms,
         makeup_db=0.0,
     )
-    return pan_mono(x, plan.pan)
+    stereo = pan_mono(x, plan.pan)
+    return (stereo * db_to_amp(plan.fader_db)).astype(np.float32)
 
 
 def apply_live_channel_peak_headroom(
@@ -2158,6 +2867,7 @@ def main() -> int:
     parser.add_argument("--bass-drum-boost-db", type=float, default=0.0)
     parser.add_argument("--kick-presence-boost-db", type=float, default=0.0)
     parser.add_argument("--kick-focus-cymbal-cut-db", type=float, default=0.0)
+    parser.add_argument("--no-autofoh-analyzer-pass", action="store_true")
     parser.add_argument("--codex-correction-pass", action="store_true")
     parser.add_argument("--codex-orchestrator", action="store_true")
     parser.add_argument("--codex-orchestrator-dry-run", action="store_true")
@@ -2211,6 +2921,7 @@ def main() -> int:
 
     config = yaml.safe_load((REPO_ROOT / "config" / "automixer.yaml").read_text(encoding="utf-8"))
     ai_config = config.get("ai", {})
+    autofoh_config = config.get("autofoh", {})
     use_llm_in_orchestrator = bool(args.codex_orchestrator_allow_llm and args.codex_orchestrator)
     llm = None
     if not args.no_llm and (not args.codex_orchestrator or use_llm_in_orchestrator):
@@ -2297,26 +3008,39 @@ def main() -> int:
             "mode": "direct",
         })
 
-    codex_corrections: dict[str, Any] = {"enabled": False, "actions": []}
-    if args.codex_correction_pass:
-        raw_codex_actions = codex_correction_actions(plans)
-        prepared_codex_actions = agent._prepare_actions(raw_codex_actions)
-        asyncio.run(agent._act(prepared_codex_actions))
-        codex_corrections = {
-            "enabled": True,
-            "actions": [action.__dict__ for action in prepared_codex_actions],
-            "notes": [
-                "External LLM recommendations were not used for this correction pass.",
-                "Codex applied deterministic balance/clarity decisions after the rule engine.",
-            ],
-        }
-
-    codex_bleed_control = apply_codex_bleed_control(plans) if args.codex_correction_pass else {"enabled": False}
+    codex_corrections: dict[str, Any] = {
+        "enabled": False,
+        "actions": [],
+        "requested": bool(args.codex_correction_pass),
+        "notes": [
+            "Legacy codex heuristic correction passes are disabled.",
+            "Analyzer-only policy is active: additional corrections must come from measured AutoFOH detectors.",
+        ] if args.codex_correction_pass else [],
+    }
+    codex_bleed_control = {
+        "enabled": False,
+        "requested": bool(args.codex_correction_pass),
+        "notes": [
+            "Legacy codex bleed-control heuristics are disabled.",
+            "Use the AutoFOH analyzer pass and measured event-based dynamics instead.",
+        ] if args.codex_correction_pass else [],
+    }
     event_based_dynamics = apply_event_based_dynamics(plans)
+    autofoh_analyzer_pass = (
+        {"enabled": False, "notes": ["AutoFOH analyzer pass explicitly disabled by CLI flag."]}
+        if args.no_autofoh_analyzer_pass
+        else apply_autofoh_analyzer_pass(plans, target_len, sr, autofoh_config)
+    )
     bass_drum_push = apply_bass_drum_push(plans, args.bass_drum_boost_db)
     kick_presence_boost = apply_kick_presence_boost(plans, args.kick_presence_boost_db)
     cymbal_focus_cleanup = apply_cymbal_cleanup_for_kick_focus(plans, args.kick_focus_cymbal_cut_db)
-    vocal_bed_balance = apply_vocal_bed_balance(plans)
+    vocal_bed_balance = {
+        "enabled": False,
+        "notes": [
+            "Static vocal bed attenuation is disabled.",
+            "Vocal space must come from priority EQ and measured analyzer corrections.",
+        ],
+    }
     cross_adaptive_eq = apply_cross_adaptive_eq(plans, target_len, sr)
     live_channel_headroom = (
         apply_live_channel_peak_headroom(plans, target_len, sr, args.live_channel_peak_ceiling_db)
@@ -2352,6 +3076,7 @@ def main() -> int:
             "event_expander": plan.expander_report,
             "phase_notes": plan.phase_notes,
             "pan_notes": plan.pan_notes,
+            "autofoh_actions": plan.autofoh_actions,
             "cross_adaptive_eq": plan.cross_adaptive_eq,
             "peak_db": round(plan.metrics["peak_db"], 2),
             "rms_db": round(plan.metrics["rms_db"], 2),
@@ -2361,12 +3086,14 @@ def main() -> int:
             "analysis_threshold_db": plan.metrics.get("analysis_threshold_db"),
         })
 
-    dynamic_vocal_priority = apply_dynamic_vocal_priority(
-        rendered_channels,
-        plans,
-        sr,
-        duck_drum_instruments=not args.no_drum_vocal_duck,
-    )
+    dynamic_vocal_priority = {
+        "enabled": False,
+        "requested_disable_flag": bool(args.no_drum_vocal_duck),
+        "notes": [
+            "Vocal ducking is disabled.",
+            "Vocal space must be created by priority EQ and measured analyzer corrections.",
+        ],
+    }
     fx_returns, fx_report = (
         ({}, {"enabled": False})
         if args.disable_fx
@@ -2423,6 +3150,7 @@ def main() -> int:
         "kick_focus_cymbal_cut": cymbal_focus_cleanup,
         "soft_master": args.soft_master,
         "master_target_lufs": round(args.master_target_lufs, 2),
+        "autofoh_analyzer_pass": autofoh_analyzer_pass,
         "codex_corrections": codex_corrections,
         "codex_bleed_control": codex_bleed_control,
         "event_based_dynamics": event_based_dynamics,

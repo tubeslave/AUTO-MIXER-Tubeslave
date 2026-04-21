@@ -48,6 +48,91 @@ safety:
   true_peak_limit: -1.0
   max_notch_filters: 8
   max_notch_depth_db: -12.0
+autofoh:
+  classifier:
+    name_overrides: []
+    role_overrides:
+      lead_vocal:
+        priority: 1.0
+      unknown:
+        allowed_controls:
+        - feedback_notch
+        - emergency_fader
+  analysis:
+    fft_size: 4096
+    octave_fraction: 3
+    slope_compensation_db_per_octave: 4.5
+  detectors:
+    monitor_cycle_interval_sec: 1.0
+    lead_masking:
+      enabled: true
+      masking_threshold_db: 3.0
+      persistence_cycles: 3
+      min_culprit_contribution: 0.35
+      lead_boost_db: 0.5
+    mud_excess:
+      enabled: true
+      threshold_db: 2.5
+      persistence_cycles: 3
+      hysteresis_db: 0.75
+    harshness_excess:
+      enabled: true
+      threshold_db: 2.5
+      persistence_cycles: 3
+      hysteresis_db: 0.75
+    sibilance_excess:
+      enabled: true
+      threshold_db: 2.5
+      persistence_cycles: 3
+      hysteresis_db: 0.75
+    low_end:
+      enabled: true
+      sub_threshold_db: 4.0
+      bass_threshold_db: 3.0
+      body_threshold_db: 2.5
+      persistence_cycles: 3
+      hysteresis_db: 0.75
+      min_culprit_contribution: 0.35
+  evaluation:
+    enabled: true
+    evaluation_window_sec: 2.0
+    allow_proxy_audio_evaluation_for_testing: false
+    allow_proxy_audio_rollback_for_testing: false
+    min_band_improvement_db: 0.25
+    min_rms_response_db: 0.1
+    worsening_tolerance_db: 0.5
+  logging:
+    enabled: false
+    path: ''
+    queue_maxsize: 1024
+    write_session_report_on_stop: true
+    report_path: ''
+  soundcheck_profile:
+    enabled: true
+    auto_save_after_analysis: true
+    auto_load_on_start: true
+    capture_multiphase_learning: true
+    silence_capture_duration_sec: 0.75
+    path: ''
+    use_loaded_target_corridor: true
+    use_phase_target_action_guards: true
+    replace_live_target_with_learned_corridor: true
+  safety:
+    minimum_auto_apply_classification_confidence: 0.75
+    new_or_unknown_channel_auto_corrections_enabled: false
+    action_limits:
+      channel_fader_max_step_db: 1.0
+      channel_fader_min_interval_sec: 3.0
+      lead_fader_max_step_db: 0.5
+      lead_fader_min_interval_sec: 2.0
+      gain_max_abs_db: 12.0
+      gain_min_interval_sec: 3.0
+      broad_eq_max_step_db: 1.0
+      broad_eq_max_total_db_from_snapshot: 3.0
+      broad_eq_min_interval_sec: 5.0
+      feedback_notch_max_cut_db: -6.0
+      feedback_notch_min_q: 8.0
+      feedback_notch_ttl_sec: 120.0
 logging:
   level: INFO
   json_output: false

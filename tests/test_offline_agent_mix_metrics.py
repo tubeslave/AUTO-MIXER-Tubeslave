@@ -1,8 +1,10 @@
 import importlib.util
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
+import soundfile as sf
 
 
 def load_offline_agent_mix():
@@ -308,3 +310,281 @@ def test_ride_event_detection_survives_single_clipped_peak():
     assert activity["ranges"]
     first_start_sec = activity["ranges"][0][0] / sr
     assert 1.7 < first_start_sec < 2.3
+
+
+def test_autofoh_measurement_corrections_reduce_presence_masking_by_guitar():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 0.6
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+
+    lead = (0.2 * np.sin(2.0 * np.pi * 2200.0 * t)).astype(np.float32)
+    guitar = (0.9 * np.sin(2.0 * np.pi * 2800.0 * t)).astype(np.float32)
+
+    plans = {
+        1: mod.ChannelPlan(
+            path=Path("Lead.wav"),
+            name="Lead",
+            instrument="lead_vocal",
+            pan=0.0,
+            hpf=90.0,
+            target_rms_db=-20.0,
+        ),
+        2: mod.ChannelPlan(
+            path=Path("Guitar.wav"),
+            name="Guitar",
+            instrument="electric_guitar",
+            pan=0.0,
+            hpf=90.0,
+            target_rms_db=-24.0,
+        ),
+    }
+    rendered = {
+        1: mod.pan_mono(lead, 0.0),
+        2: mod.pan_mono(guitar, 0.0),
+    }
+
+    report = mod.apply_autofoh_measurement_corrections(plans, rendered, sr)
+
+    assert report["enabled"] is True
+    assert any(item["label"] == "lead_masking" for item in report["detected_problems"])
+    assert any(item["label"] == "lead_masking" and item["sent"] for item in report["applied_actions"])
+    assert len(plans[2].eq_bands) >= 3
+    assert plans[2].eq_bands[2][1] < 0.0
+
+
+def test_autofoh_measurement_corrections_control_excess_sub_from_bass():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 0.6
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+
+    bass = (0.95 * np.sin(2.0 * np.pi * 45.0 * t)).astype(np.float32)
+    lead = (0.12 * np.sin(2.0 * np.pi * 2200.0 * t)).astype(np.float32)
+
+    plans = {
+        1: mod.ChannelPlan(
+            path=Path("Bass.wav"),
+            name="Bass",
+            instrument="bass_guitar",
+            pan=0.0,
+            hpf=35.0,
+            target_rms_db=-21.0,
+        ),
+        2: mod.ChannelPlan(
+            path=Path("Lead.wav"),
+            name="Lead",
+            instrument="lead_vocal",
+            pan=0.0,
+            hpf=90.0,
+            target_rms_db=-20.0,
+        ),
+    }
+    rendered = {
+        1: mod.pan_mono(bass, 0.0),
+        2: mod.pan_mono(lead, 0.0),
+    }
+
+    report = mod.apply_autofoh_measurement_corrections(plans, rendered, sr)
+
+    assert report["enabled"] is True
+    assert any(item["label"] == "low_end" for item in report["detected_problems"])
+    assert any(item["label"] == "low_end" and item["sent"] for item in report["applied_actions"])
+    assert plans[1].eq_bands
+    assert plans[1].eq_bands[0][1] < 0.0
+
+
+def test_autofoh_measurement_corrections_raise_quieter_secondary_lead():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 0.8
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+
+    anchor = (
+        0.22 * np.sin(2.0 * np.pi * 220.0 * t)
+        + 0.08 * np.sin(2.0 * np.pi * 2200.0 * t)
+    ).astype(np.float32)
+    quiet = (
+        0.10 * np.sin(2.0 * np.pi * 240.0 * t)
+        + 0.04 * np.sin(2.0 * np.pi * 2500.0 * t)
+    ).astype(np.float32)
+
+    plans = {
+        1: mod.ChannelPlan(
+            path=Path("Anchor.wav"),
+            name="Anchor",
+            instrument="lead_vocal",
+            pan=0.0,
+            hpf=90.0,
+            target_rms_db=-20.0,
+            trim_db=-4.0,
+            fader_db=0.0,
+            metrics={"analysis_active_ratio": 0.2},
+        ),
+        2: mod.ChannelPlan(
+            path=Path("Secondary.wav"),
+            name="Secondary",
+            instrument="lead_vocal",
+            pan=0.0,
+            hpf=90.0,
+            target_rms_db=-20.0,
+            trim_db=-6.5,
+            fader_db=0.0,
+            metrics={"analysis_active_ratio": 0.15},
+        ),
+    }
+    rendered = {
+        1: mod.pan_mono(anchor, 0.0),
+        2: mod.pan_mono(quiet, 0.0),
+    }
+
+    report = mod.apply_autofoh_measurement_corrections(plans, rendered, sr)
+
+    assert any(item["label"] == "lead_handoff_balance" for item in report["detected_problems"])
+    assert any(item["label"] == "lead_handoff_balance" and item["sent"] for item in report["applied_actions"])
+    assert plans[2].trim_db > -6.5
+
+
+def test_autofoh_measurement_corrections_tame_cymbal_buildup():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 0.8
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+
+    lead = (
+        0.05 * np.sin(2.0 * np.pi * 220.0 * t)
+        + 0.02 * np.sin(2.0 * np.pi * 2400.0 * t)
+    ).astype(np.float32)
+    hihat = (
+        0.16 * np.sin(2.0 * np.pi * 6500.0 * t)
+        + 0.14 * np.sin(2.0 * np.pi * 9200.0 * t)
+    ).astype(np.float32)
+    overhead = (
+        0.08 * np.sin(2.0 * np.pi * 5400.0 * t)
+        + 0.08 * np.sin(2.0 * np.pi * 9800.0 * t)
+    ).astype(np.float32)
+
+    plans = {
+        1: mod.ChannelPlan(
+            path=Path("Lead.wav"),
+            name="Lead",
+            instrument="lead_vocal",
+            pan=0.0,
+            hpf=90.0,
+            target_rms_db=-20.0,
+        ),
+        2: mod.ChannelPlan(
+            path=Path("HiHat.wav"),
+            name="HiHat",
+            instrument="hi_hat",
+            pan=0.0,
+            hpf=180.0,
+            target_rms_db=-24.0,
+            fader_db=-2.0,
+        ),
+        3: mod.ChannelPlan(
+            path=Path("OH.wav"),
+            name="OH",
+            instrument="overhead",
+            pan=0.0,
+            hpf=150.0,
+            target_rms_db=-24.0,
+            fader_db=-2.0,
+        ),
+    }
+    rendered = {
+        1: mod.pan_mono(lead, 0.0),
+        2: mod.pan_mono(hihat, 0.0),
+        3: mod.pan_mono(overhead, 0.0),
+    }
+
+    report = mod.apply_autofoh_measurement_corrections(plans, rendered, sr)
+
+    assert any(item["label"] == "cymbal_buildup" for item in report["detected_problems"])
+    assert any(item["label"] == "cymbal_buildup" and item["sent"] for item in report["applied_actions"])
+    assert plans[2].fader_db < -2.0 or any(band[1] < 0.0 for band in plans[3].eq_bands)
+
+
+def test_compressor_auto_makeup_restores_sustained_signal_rms():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 0.8
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+    x = (0.8 * np.sin(2.0 * np.pi * 220.0 * t)).astype(np.float32)
+
+    without_makeup = mod.compressor(
+        x,
+        sr,
+        threshold_db=-24.0,
+        ratio=4.0,
+        attack_ms=5.0,
+        release_ms=90.0,
+        auto_makeup=False,
+    )
+    with_makeup = mod.compressor(
+        x,
+        sr,
+        threshold_db=-24.0,
+        ratio=4.0,
+        attack_ms=5.0,
+        release_ms=90.0,
+        auto_makeup=True,
+    )
+
+    input_rms_db = mod.amp_to_db(float(np.sqrt(np.mean(np.square(x))) + 1e-12))
+    without_makeup_rms_db = mod.amp_to_db(float(np.sqrt(np.mean(np.square(without_makeup))) + 1e-12))
+    with_makeup_rms_db = mod.amp_to_db(float(np.sqrt(np.mean(np.square(with_makeup))) + 1e-12))
+
+    assert abs(with_makeup_rms_db - input_rms_db) < abs(without_makeup_rms_db - input_rms_db)
+    assert abs(with_makeup_rms_db - input_rms_db) < 0.75
+
+
+def test_render_channel_uses_trim_pre_processing_and_fader_post_pan():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 0.7
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+    mono = (0.78 * np.sin(2.0 * np.pi * 220.0 * t)).astype(np.float32)
+
+    with TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "Tone.wav"
+        sf.write(path, mono, sr, subtype="PCM_24")
+
+        plan = mod.ChannelPlan(
+            path=path,
+            name="Tone",
+            instrument="lead_vocal",
+            pan=0.35,
+            hpf=90.0,
+            target_rms_db=-20.0,
+            trim_db=-3.0,
+            fader_db=-6.0,
+            phase_invert=True,
+            delay_ms=1.2,
+            comp_threshold_db=-24.0,
+            comp_ratio=4.0,
+            comp_attack_ms=5.0,
+            comp_release_ms=90.0,
+        )
+
+        rendered = mod.render_channel(path, plan, len(mono), sr)
+
+        expected = mono.copy()
+        expected = mod.declick_start(expected, sr, plan.input_fade_ms)
+        expected = expected * mod.db_to_amp(plan.trim_db)
+        expected = -expected
+        expected = mod.delay_signal(expected, sr, plan.delay_ms)
+        expected = mod.highpass(expected, sr, plan.hpf)
+        expected, _ = mod.apply_event_based_expander(expected, sr, plan)
+        expected = mod.compressor(
+            expected,
+            sr,
+            threshold_db=plan.comp_threshold_db,
+            ratio=plan.comp_ratio,
+            attack_ms=plan.comp_attack_ms,
+            release_ms=plan.comp_release_ms,
+            makeup_db=0.0,
+        )
+        expected = mod.pan_mono(expected, plan.pan) * mod.db_to_amp(plan.fader_db)
+
+        assert np.allclose(rendered, expected.astype(np.float32), atol=1e-5)

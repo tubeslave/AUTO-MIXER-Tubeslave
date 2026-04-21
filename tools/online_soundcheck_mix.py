@@ -211,11 +211,14 @@ def render_stage_mix(
             continue
         rendered_channels[channel] = mixmod.render_channel(plan.path, plan, target_len, sr)
 
-    dynamic_vocal_priority = (
-        mixmod.apply_dynamic_vocal_priority(rendered_channels, plans, sr)
-        if enable_dynamic_vocal_priority
-        else {"enabled": False}
-    )
+    dynamic_vocal_priority = {
+        "enabled": False,
+        "requested": bool(enable_dynamic_vocal_priority),
+        "notes": [
+            "Vocal ducking is disabled.",
+            "Vocal space must be created by priority EQ and measured analyzer corrections.",
+        ],
+    }
     fx_returns, fx_report = (
         mixmod.apply_offline_fx_plan(rendered_channels, plans, sr, tempo_bpm=tempo_bpm)
         if enable_fx
@@ -289,6 +292,7 @@ def main() -> int:
 
     config = yaml.safe_load((REPO_ROOT / "config" / "automixer.yaml").read_text(encoding="utf-8"))
     ai_config = config.get("ai", {})
+    autofoh_config = config.get("autofoh", {})
 
     baseline_plans = clone_plans(initial_plans)
 
@@ -298,22 +302,34 @@ def main() -> int:
     console, agent, actions = run_agent_stage(mixmod, working_plans, ai_config, use_llm=args.use_llm)
     gain_phase_agent_plans = clone_plans(working_plans)
 
-    codex_corrections = {"enabled": False, "actions": []}
-    if not args.no_codex_correction_pass:
-        raw_codex_actions = mixmod.codex_correction_actions(working_plans)
-        prepared_codex_actions = agent._prepare_actions(raw_codex_actions)
-        asyncio.run(agent._act(prepared_codex_actions))
-        codex_corrections = {
-            "enabled": True,
-            "actions": [action.__dict__ for action in prepared_codex_actions],
-            "notes": [
-                "Codex correction pass was applied after the rule engine to emulate online AI refinement.",
-            ],
-        }
-
-    codex_bleed_control = mixmod.apply_codex_bleed_control(working_plans) if not args.no_codex_correction_pass else {"enabled": False}
+    codex_corrections = {
+        "enabled": False,
+        "actions": [],
+        "requested_disable_flag": bool(args.no_codex_correction_pass),
+        "notes": [
+            "Legacy codex heuristic corrections are disabled in analyzer-only mode.",
+        ],
+    }
+    codex_bleed_control = {
+        "enabled": False,
+        "requested_disable_flag": bool(args.no_codex_correction_pass),
+        "notes": [
+            "Legacy codex bleed-control heuristics are disabled in analyzer-only mode.",
+        ],
+    }
     event_based_dynamics = mixmod.apply_event_based_dynamics(working_plans)
-    vocal_bed_balance = mixmod.apply_vocal_bed_balance(working_plans)
+    autofoh_analyzer_pass = (
+        {"enabled": False, "notes": ["AutoFOH analyzer pass disabled via legacy --no-codex-correction-pass flag."]}
+        if args.no_codex_correction_pass
+        else mixmod.apply_autofoh_analyzer_pass(working_plans, target_len, sr, autofoh_config)
+    )
+    vocal_bed_balance = {
+        "enabled": False,
+        "notes": [
+            "Static vocal bed attenuation is disabled.",
+            "Vocal space must come from priority EQ and measured analyzer corrections.",
+        ],
+    }
     cross_adaptive_eq = mixmod.apply_cross_adaptive_eq(working_plans, target_len, sr)
     adaptive_cleanup_plans = clone_plans(working_plans)
 
@@ -363,7 +379,7 @@ def main() -> int:
         target_len,
         sr,
         args.tempo_bpm,
-        enable_dynamic_vocal_priority=True,
+        enable_dynamic_vocal_priority=False,
         enable_fx=True,
     )
     stage_mixes.append(final_stage_mix)
@@ -410,6 +426,7 @@ def main() -> int:
         "agent_actions": agent.get_action_history(100),
         "agent_audit": agent.get_action_audit_log(100),
         "virtual_console_calls": console.calls,
+        "autofoh_analyzer_pass": autofoh_analyzer_pass,
         "codex_corrections": codex_corrections,
         "codex_bleed_control": codex_bleed_control,
         "event_based_dynamics": event_based_dynamics,
