@@ -685,7 +685,7 @@ def main() -> int:
         working_plans,
         target_len,
         sr,
-        desired_kick_advantage_db=1.8 if str(args.genre).strip().lower() == "rock" else 1.5,
+        desired_kick_advantage_db=1.8 if str(args.genre).strip().lower() == "rock" else 0.85,
     )
     stem_mix_verification = mixmod.apply_stem_mix_verification(
         working_plans,

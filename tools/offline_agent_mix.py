@@ -1838,6 +1838,156 @@ def _lead_handoff_balance_recommendations(
     return recommendations
 
 
+def _lead_background_hierarchy_recommendations(
+    plans: dict[int, ChannelPlan],
+    channel_features: dict[int, Any],
+    lead_channels: list[int],
+) -> list[tuple[str, Any, list[TypedCorrectionAction]]]:
+    if not lead_channels:
+        return []
+
+    backing_channels = [
+        channel
+        for channel, features in channel_features.items()
+        if channel in plans and not plans[channel].muted and plans[channel].instrument == "backing_vocal"
+    ]
+    if not backing_channels:
+        return []
+
+    anchor_channel = max(
+        lead_channels,
+        key=lambda channel: (
+            float(channel_features[channel].named_band_levels_db.get("PRESENCE", -100.0)),
+            float(channel_features[channel].rms_db),
+        ),
+    )
+    anchor_features = channel_features[anchor_channel]
+    anchor_presence_db = float(anchor_features.named_band_levels_db.get("PRESENCE", -100.0))
+    anchor_rms_db = float(anchor_features.rms_db)
+    target_presence_gap_db = 4.0
+    target_rms_gap_db = 5.5
+
+    recommendations: list[tuple[str, Any, list[TypedCorrectionAction]]] = []
+    for channel in backing_channels:
+        features = channel_features[channel]
+        plan = plans[channel]
+        bgv_presence_db = float(features.named_band_levels_db.get("PRESENCE", -100.0))
+        bgv_rms_db = float(features.rms_db)
+        presence_gap_db = anchor_presence_db - bgv_presence_db
+        rms_gap_db = anchor_rms_db - bgv_rms_db
+        shortfall_db = max(
+            target_presence_gap_db - presence_gap_db,
+            target_rms_gap_db - rms_gap_db,
+        )
+        if shortfall_db <= 0.9:
+            continue
+
+        cut_db = float(np.clip(0.8 + shortfall_db * 0.45, 0.8, 2.4))
+        target_db = max(-6.0, float(plan.fader_db - cut_db))
+        confidence = min(1.0, 0.58 + shortfall_db / 4.0)
+        recommendations.append((
+            "lead_background_hierarchy",
+            DetectedProblem(
+                problem_type="lead_background_hierarchy",
+                description="Measured backing vocal sits too close to the lead vocal foreground",
+                channel_id=channel,
+                stem="BGV",
+                band_name="PRESENCE",
+                persistence_sec=max(1.0, float(plan.metrics.get("analysis_active_ratio") or 0.0) * 8.0),
+                features=features,
+                confidence_risk=ConfidenceRisk(
+                    problem_confidence=confidence,
+                    culprit_confidence=min(1.0, 0.55 + shortfall_db / 5.0),
+                    action_confidence=min(1.0, 0.62 + shortfall_db / 5.0),
+                    risk_score=0.16,
+                ),
+                expected_effect="Pull backing vocals behind the lead vocal image instead of letting the stack flatten the vocal hierarchy.",
+            ),
+            [ChannelFaderMove(
+                channel_id=channel,
+                target_db=target_db,
+                delta_db=target_db - float(plan.fader_db),
+                is_lead=False,
+                reason=f"Measured lead-vs-BGV hierarchy on {plan.path.name}",
+            )],
+        ))
+
+    return recommendations
+
+
+def _lead_foreground_balance_recommendations(
+    plans: dict[int, ChannelPlan],
+    channel_features: dict[int, Any],
+    stem_features: dict[str, Any],
+    lead_channels: list[int],
+) -> list[tuple[str, Any, list[TypedCorrectionAction]]]:
+    if not lead_channels:
+        return []
+
+    lead_features = stem_features.get("LEAD")
+    if lead_features is None:
+        return []
+
+    accompaniment_presence_power = 0.0
+    for stem_name, feature in stem_features.items():
+        if stem_name in {"MASTER", "LEAD"}:
+            continue
+        accompaniment_presence_power += 10.0 ** (
+            float(feature.named_band_levels_db.get("PRESENCE", -100.0)) / 10.0
+        )
+    accompaniment_presence_db = 10.0 * np.log10(accompaniment_presence_power + 1e-10)
+    lead_presence_db = float(lead_features.named_band_levels_db.get("PRESENCE", -100.0))
+    shortfall_db = accompaniment_presence_db - lead_presence_db - 2.5
+    if shortfall_db <= 0.9:
+        return []
+
+    boost_db = float(np.clip(0.45 + shortfall_db * 0.16, 0.45, 1.1))
+    confidence = min(1.0, 0.58 + shortfall_db / 6.0)
+    recommendations: list[tuple[str, Any, list[TypedCorrectionAction]]] = []
+    for channel in lead_channels:
+        plan = plans.get(channel)
+        features = channel_features.get(channel)
+        if plan is None or features is None or plan.muted:
+            continue
+        action: TypedCorrectionAction
+        if plan.fader_db <= -0.25:
+            action = ChannelFaderMove(
+                channel_id=channel,
+                target_db=min(0.0, float(plan.fader_db + boost_db)),
+                delta_db=boost_db,
+                is_lead=True,
+                reason=f"Measured lead foreground balance on {plan.path.name}",
+            )
+        else:
+            action = ChannelGainMove(
+                channel_id=channel,
+                target_db=float(np.clip(plan.trim_db + boost_db, -12.0, 12.0)),
+                reason=f"Measured lead foreground balance on {plan.path.name}",
+            )
+        recommendations.append((
+            "lead_foreground_balance",
+            DetectedProblem(
+                problem_type="lead_foreground_balance",
+                description="Measured lead stem still sits behind the accompaniment foreground",
+                channel_id=channel,
+                stem="LEAD",
+                band_name="PRESENCE",
+                persistence_sec=max(1.0, float(plan.metrics.get("analysis_active_ratio") or 0.0) * 10.0),
+                features=features,
+                confidence_risk=ConfidenceRisk(
+                    problem_confidence=confidence,
+                    culprit_confidence=1.0,
+                    action_confidence=min(1.0, confidence * 0.95),
+                    risk_score=0.18,
+                ),
+                expected_effect="Lift the lead stem back in front of the accompaniment without flattening internal lead handoffs.",
+            ),
+            [action],
+        ))
+
+    return recommendations
+
+
 def _cymbal_buildup_recommendations(
     plans: dict[int, ChannelPlan],
     channel_features: dict[int, Any],
@@ -1875,11 +2025,10 @@ def _cymbal_buildup_recommendations(
     dominant_freq = 7500.0 if dominant_band == "SIBILANCE" else 4200.0
     dominant_q = 2.0 if dominant_band == "SIBILANCE" else 1.8
 
-    if direct_candidates:
-        direct_channel, direct_score = max(direct_candidates, key=lambda item: item[1])
-        if direct_score >= 0.7:
+    for direct_channel, direct_score in sorted(direct_candidates, key=lambda item: item[1], reverse=True)[:2]:
+        if direct_score >= 0.65:
             plan = plans[direct_channel]
-            cut_db = float(min(1.5, 0.75 + 0.2 * max(harshness_excess, sibilance_excess)))
+            cut_db = float(min(2.25, 0.9 + 0.28 * max(harshness_excess, sibilance_excess)))
             target_db = max(-30.0, float(plan.fader_db - cut_db))
             recommendations.append((
                 "cymbal_buildup",
@@ -1907,10 +2056,10 @@ def _cymbal_buildup_recommendations(
                 )],
             ))
 
-    if ambient_candidates:
-        ambient_channel, ambient_score = max(ambient_candidates, key=lambda item: item[1])
-        if ambient_score >= 0.55:
+    for ambient_channel, ambient_score in sorted(ambient_candidates, key=lambda item: item[1], reverse=True)[:2]:
+        if ambient_score >= 0.52:
             plan = plans[ambient_channel]
+            ambient_cut_db = float(min(0.9, 0.45 + ambient_score * 0.08))
             recommendations.append((
                 "cymbal_buildup",
                 DetectedProblem(
@@ -1929,12 +2078,11 @@ def _cymbal_buildup_recommendations(
                     ),
                     expected_effect="Reduce cymbal wash in the ambient drum capture without collapsing width.",
                 ),
-                [ChannelEQMove(
+                [ChannelFaderMove(
                     channel_id=ambient_channel,
-                    band=4 if dominant_band == "SIBILANCE" else 3,
-                    freq_hz=dominant_freq,
-                    gain_db=-1.0,
-                    q=dominant_q,
+                    target_db=max(-6.0, float(plan.fader_db - ambient_cut_db)),
+                    delta_db=-ambient_cut_db,
+                    is_lead=False,
                     reason=f"Measured cymbal wash cleanup on {plan.path.name}",
                 )],
             ))
@@ -2049,7 +2197,22 @@ def apply_autofoh_measurement_corrections(
             recommendations.append(("lead_masking", lead_result.problem, lead_result.candidate_actions))
 
     recommendations.extend(
+        _lead_foreground_balance_recommendations(
+            plans,
+            channel_features,
+            stem_features,
+            lead_channels,
+        )
+    )
+    recommendations.extend(
         _lead_handoff_balance_recommendations(
+            plans,
+            channel_features,
+            lead_channels,
+        )
+    )
+    recommendations.extend(
+        _lead_background_hierarchy_recommendations(
             plans,
             channel_features,
             lead_channels,
@@ -2149,17 +2312,54 @@ def apply_autofoh_analyzer_pass(
     sr: int,
     autofoh_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    rendered_channels = {
-        channel: render_channel(plan.path, plan, target_len, sr)
-        for channel, plan in plans.items()
-        if not plan.muted
-    }
-    return apply_autofoh_measurement_corrections(
-        plans,
-        rendered_channels,
-        sr,
-        autofoh_config=autofoh_config,
-    )
+    rounds: list[dict[str, Any]] = []
+    max_rounds = 3
+    for round_index in range(1, max_rounds + 1):
+        rendered_channels = {
+            channel: render_channel(plan.path, plan, target_len, sr)
+            for channel, plan in plans.items()
+            if not plan.muted
+        }
+        round_report = apply_autofoh_measurement_corrections(
+            plans,
+            rendered_channels,
+            sr,
+            autofoh_config=autofoh_config,
+        )
+        round_report["round"] = round_index
+        rounds.append(round_report)
+        if not any(action.get("sent") for action in round_report.get("applied_actions", [])):
+            break
+
+    if not rounds:
+        return {
+            "enabled": False,
+            "reason": "no_rounds_executed",
+            "rounds": [],
+        }
+
+    combined_detected = []
+    combined_actions = []
+    for round_report in rounds:
+        for item in round_report.get("detected_problems", []):
+            enriched = dict(item)
+            enriched["round"] = round_report["round"]
+            combined_detected.append(enriched)
+        for item in round_report.get("applied_actions", []):
+            enriched = dict(item)
+            enriched["round"] = round_report["round"]
+            combined_actions.append(enriched)
+
+    final_report = dict(rounds[-1])
+    final_report["measurement_mode"] = "autofoh_analyzers_iterative"
+    final_report["round_count"] = len(rounds)
+    final_report["rounds"] = rounds
+    final_report["detected_problems"] = combined_detected
+    final_report["applied_actions"] = combined_actions
+    final_report["notes"] = list(final_report.get("notes", [])) + [
+        "Offline analyzer mode runs up to three bounded measurement rounds so small safety-limited actions can converge audibly.",
+    ]
+    return final_report
 
 
 def apply_vocal_bed_balance(
@@ -3638,10 +3838,10 @@ def apply_stem_mix_verification(
         }
 
     _, kick_plan = kick_entry
-    desired_click_share_in_drums = 0.14 if genre_token == "rock" else 0.09
-    desired_click_share_in_master = 0.045 if genre_token == "rock" else 0.03
+    desired_click_share_in_drums = 0.14 if genre_token == "rock" else 0.075
+    desired_click_share_in_master = 0.045 if genre_token == "rock" else 0.022
     desired_dynamic_range_max_db = 16.5 if genre_token == "rock" else 18.0
-    desired_click_minus_punch_db = -17.0 if genre_token == "rock" else -19.0
+    desired_click_minus_punch_db = -17.0 if genre_token == "rock" else -20.0
     desired_box_minus_click_db = -1.5 if genre_token == "rock" else 1.5
     slope_before = snapshot_before.get("slope_conformity") or {}
     master_mix_indexes_before = slope_before.get("master_mix_indexes") or {}
@@ -3666,7 +3866,7 @@ def apply_stem_mix_verification(
         (-bass_index_before) - (0.6 if genre_token == "rock" else 0.9),
         (-body_index_before) - (0.35 if genre_token == "rock" else 0.6),
     )
-    target_weight_vs_plateau_db = 2.0 if genre_token == "rock" else 1.0
+    target_weight_vs_plateau_db = 2.0 if genre_token == "rock" else 0.35
     target_sub_vs_plateau_db = 0.5 if genre_token == "rock" else -0.25
     tilt_weight_shortage = max(0.0, target_weight_vs_plateau_db - weight_vs_plateau_db)
     tilt_sub_shortage = max(0.0, target_sub_vs_plateau_db - sub_vs_plateau_db)
@@ -3707,7 +3907,13 @@ def apply_stem_mix_verification(
         })
 
     if click_shortage > 0.0 or click_tone_shortage > 0.0:
-        click_gain_db = float(np.clip(0.8 + click_shortage * 12.0 + click_tone_shortage * 0.08, 0.8, 2.1))
+        click_gain_db = float(
+            np.clip(
+                0.8 + click_shortage * 12.0 + click_tone_shortage * 0.08,
+                0.8,
+                2.1 if genre_token == "rock" else 1.45,
+            )
+        )
         action = _merge_reference_eq_adjustment(
             kick_plan,
             freq=3500.0,
@@ -3722,7 +3928,7 @@ def apply_stem_mix_verification(
                 "reason": "Kick click share inside the drum and master stems is too low.",
             })
 
-    if click_shortage > 0.015:
+    if genre_token == "rock" and click_shortage > 0.015:
         action = _merge_reference_eq_adjustment(
             kick_plan,
             freq=2200.0,
@@ -3755,7 +3961,7 @@ def apply_stem_mix_verification(
 
     if low_end_deficit > 0.0 or tilt_weight_shortage > 0.0 or tilt_sub_shortage > 0.0:
         low_end_support = max(low_end_deficit * 0.12, tilt_weight_shortage * 0.35, tilt_sub_shortage * 0.25)
-        kick_low_gain_db = float(np.clip(0.75 + low_end_support, 0.75, 2.4))
+        kick_low_gain_db = float(np.clip(0.75 + low_end_support, 0.75, 2.4 if genre_token == "rock" else 1.45))
         action = _merge_reference_eq_adjustment(
             kick_plan,
             freq=62.0,
@@ -3801,7 +4007,7 @@ def apply_stem_mix_verification(
                         "reason": "Kick remains the low-end leader, but the bass fader recovers a little because the master slope still lacks weight.",
                     })
 
-        if max(low_end_deficit, tilt_weight_shortage, tilt_sub_shortage) > 4.0 and kick_plan.trim_db < 3.0:
+        if genre_token == "rock" and max(low_end_deficit, tilt_weight_shortage, tilt_sub_shortage) > 4.0 and kick_plan.trim_db < 3.0:
             before_trim = float(kick_plan.trim_db)
             kick_plan.trim_db = float(np.clip(kick_plan.trim_db + 0.6, -18.0, 12.0))
             if kick_plan.trim_db != before_trim:
@@ -3891,7 +4097,7 @@ def apply_kick_bass_hierarchy(
     target_len: int,
     sr: int,
     *,
-    desired_kick_advantage_db: float = 1.5,
+    desired_kick_advantage_db: float = 1.0,
 ) -> dict[str, Any]:
     kick_entry = next(
         ((channel, plan) for channel, plan in plans.items() if not plan.muted and plan.instrument == "kick"),
@@ -4582,7 +4788,7 @@ def main() -> int:
         plans,
         target_len,
         sr,
-        desired_kick_advantage_db=1.8 if str(args.genre).strip().lower() == "rock" else 1.5,
+        desired_kick_advantage_db=1.8 if str(args.genre).strip().lower() == "rock" else 0.85,
     )
     stem_mix_verification = apply_stem_mix_verification(
         plans,
