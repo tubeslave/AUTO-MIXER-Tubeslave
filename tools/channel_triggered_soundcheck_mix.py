@@ -629,6 +629,8 @@ def main() -> int:
     parser.add_argument("--use-llm", action="store_true")
     parser.add_argument("--no-codex-correction-pass", action="store_true")
     parser.add_argument("--no-final-limiter", action="store_true")
+    parser.add_argument("--reference", default="", help="Path to an external reference track or saved style preset JSON")
+    parser.add_argument("--genre", default="", help="Optional genre focus for bounded mix voicing, for example 'rock'")
     args = parser.parse_args()
 
     mixmod = load_offline_mix_module()
@@ -639,6 +641,7 @@ def main() -> int:
     config = yaml.safe_load((REPO_ROOT / "config" / "automixer.yaml").read_text(encoding="utf-8"))
     ai_config = config.get("ai", {})
     autofoh_config = config.get("autofoh", {})
+    reference_context = mixmod.prepare_reference_mix_context(args.reference)
 
     baseline_plans = clone_plans(initial_plans)
     working_plans = clone_plans(initial_plans)
@@ -676,6 +679,20 @@ def main() -> int:
         ],
     }
     cross_adaptive_eq = mixmod.apply_cross_adaptive_eq(working_plans, target_len, sr)
+    reference_mix_guidance = mixmod.apply_reference_mix_guidance(working_plans, sr, reference_context)
+    genre_mix_profile = mixmod.apply_genre_mix_profile(working_plans, args.genre)
+    kick_bass_hierarchy = mixmod.apply_kick_bass_hierarchy(
+        working_plans,
+        target_len,
+        sr,
+        desired_kick_advantage_db=1.8 if str(args.genre).strip().lower() == "rock" else 1.5,
+    )
+    stem_mix_verification = mixmod.apply_stem_mix_verification(
+        working_plans,
+        target_len,
+        sr,
+        genre=args.genre,
+    )
     final_plans = clone_plans(working_plans)
 
     baseline_rendered = render_channels(mixmod, baseline_plans, target_len, sr)
@@ -731,6 +748,7 @@ def main() -> int:
         sr,
         final_limiter=not args.no_final_limiter,
         live_peak_ceiling_db=-3.0,
+        reference_context=reference_context,
     )
 
     output = Path(args.output)
@@ -746,6 +764,9 @@ def main() -> int:
     report = {
         "input_dir": str(input_dir),
         "output": str(output),
+        "reference": str(reference_context.path) if reference_context is not None else "",
+        "reference_sources": [str(path) for path in reference_context.source_paths] if reference_context is not None else [],
+        "genre": str(args.genre or ""),
         "sample_rate": sr,
         "duration_sec": round(duration_sec, 3),
         "channel_triggered_soundcheck": {
@@ -770,6 +791,10 @@ def main() -> int:
         "event_based_dynamics": event_based_dynamics,
         "vocal_bed_balance": vocal_bed_balance,
         "cross_adaptive_eq": cross_adaptive_eq,
+        "reference_mix_guidance": reference_mix_guidance,
+        "genre_mix_profile": genre_mix_profile,
+        "kick_bass_hierarchy": kick_bass_hierarchy,
+        "stem_mix_verification": stem_mix_verification,
         "dynamic_vocal_priority": dynamic_vocal_priority,
         "fx": fx_report,
         "channel_analysis": channel_analysis_reports,

@@ -2,6 +2,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 import numpy as np
 import soundfile as sf
@@ -588,3 +589,440 @@ def test_render_channel_uses_trim_pre_processing_and_fader_post_pan():
         expected = mod.pan_mono(expected, plan.pan) * mod.db_to_amp(plan.fader_db)
 
         assert np.allclose(rendered, expected.astype(np.float32), atol=1e-5)
+
+
+def test_reference_mix_guidance_applies_bounded_channel_adjustments():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 1.0
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+    vocal = (
+        0.07 * np.sin(2.0 * np.pi * 220.0 * t)
+        + 0.03 * np.sin(2.0 * np.pi * 880.0 * t)
+    ).astype(np.float32)
+    guitar = (0.08 * np.sin(2.0 * np.pi * 1100.0 * t)).astype(np.float32)
+    reference = np.column_stack([
+        (0.4 * np.sin(2.0 * np.pi * 220.0 * t)).astype(np.float32),
+        (0.25 * np.sin(2.0 * np.pi * 660.0 * t)).astype(np.float32),
+    ])
+
+    with TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        vocal_path = tmpdir_path / "Lead.wav"
+        guitar_path = tmpdir_path / "Guitar.wav"
+        reference_path = tmpdir_path / "Reference.wav"
+        sf.write(vocal_path, vocal, sr, subtype="PCM_24")
+        sf.write(guitar_path, guitar, sr, subtype="PCM_24")
+        sf.write(reference_path, reference, sr, subtype="PCM_24")
+
+        plans = {
+            1: mod.ChannelPlan(
+                path=vocal_path,
+                name="Lead",
+                instrument="lead_vocal",
+                pan=0.0,
+                hpf=90.0,
+                target_rms_db=-20.0,
+                fader_db=-6.0,
+                comp_threshold_db=-20.0,
+                comp_ratio=2.5,
+                metrics=mod.metrics_for(vocal, sr, instrument="lead_vocal"),
+            ),
+            2: mod.ChannelPlan(
+                path=guitar_path,
+                name="Guitar",
+                instrument="guitar",
+                pan=-0.2,
+                hpf=100.0,
+                target_rms_db=-24.0,
+                fader_db=-8.0,
+                comp_threshold_db=-18.0,
+                comp_ratio=2.0,
+                metrics=mod.metrics_for(guitar, sr, instrument="guitar"),
+            ),
+        }
+
+        context = mod.prepare_reference_mix_context(reference_path)
+        report = mod.apply_reference_mix_guidance(plans, sr, context)
+
+        assert report["enabled"] is True
+        assert report["reference_path"] == str(reference_path.resolve())
+        assert report["applied_channel_count"] >= 1
+        assert plans[1].fader_db >= -7.5
+        assert plans[1].fader_db <= -4.5
+        assert plans[2].fader_db >= -9.5
+        assert plans[2].fader_db <= -6.5
+
+
+def test_prepare_reference_mix_context_merges_audio_directory():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 1.0
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+    ref_a = np.column_stack([
+        (0.4 * np.sin(2.0 * np.pi * 220.0 * t)).astype(np.float32),
+        (0.3 * np.sin(2.0 * np.pi * 330.0 * t)).astype(np.float32),
+    ])
+    ref_b = np.column_stack([
+        (0.35 * np.sin(2.0 * np.pi * 110.0 * t)).astype(np.float32),
+        (0.25 * np.sin(2.0 * np.pi * 550.0 * t)).astype(np.float32),
+    ])
+
+    with TemporaryDirectory() as tmpdir:
+        ref_dir = Path(tmpdir) / "reference"
+        ref_dir.mkdir()
+        sf.write(ref_dir / "A.wav", ref_a, sr, subtype="PCM_24")
+        sf.write(ref_dir / "B.wav", ref_b, sr, subtype="PCM_24")
+
+        context = mod.prepare_reference_mix_context(ref_dir)
+
+    assert context is not None
+    assert context.source_type == "audio_directory"
+    assert context.sample_rate == sr
+    assert len(context.source_paths) == 2
+    assert context.audio is not None
+    assert context.audio.ndim == 2
+    assert len(context.audio) >= len(ref_a) * 2
+
+
+def test_rock_genre_profile_tightens_vocals_and_centers_snare_layers():
+    mod = load_offline_agent_mix()
+    plans = {
+        1: mod.ChannelPlan(
+            path=Path("Vocal.wav"),
+            name="Vocal",
+            instrument="lead_vocal",
+            pan=0.0,
+            hpf=90.0,
+            target_rms_db=-20.0,
+            trim_db=0.5,
+            comp_threshold_db=-23.0,
+            comp_ratio=3.2,
+            comp_attack_ms=5.0,
+            comp_release_ms=120.0,
+            expander_enabled=True,
+            expander_range_db=4.5,
+            expander_open_ms=18.0,
+            expander_close_ms=140.0,
+            expander_hold_ms=180.0,
+            expander_threshold_db=-42.0,
+        ),
+        2: mod.ChannelPlan(
+            path=Path("SNARE T.wav"),
+            name="SNARE T",
+            instrument="snare",
+            pan=-0.02,
+            hpf=90.0,
+            target_rms_db=-22.0,
+            comp_threshold_db=-20.0,
+            comp_ratio=3.4,
+        ),
+        3: mod.ChannelPlan(
+            path=Path("Snare B.wav"),
+            name="Snare B",
+            instrument="snare",
+            pan=0.02,
+            hpf=120.0,
+            target_rms_db=-27.0,
+            comp_threshold_db=-22.0,
+            comp_ratio=3.5,
+        ),
+    }
+
+    report = mod.apply_genre_mix_profile(plans, "rock")
+
+    assert report["enabled"] is True
+    assert sorted(report["snare_layers"]) == ["SNARE T.wav", "Snare B.wav"]
+    assert plans[1].trim_db > 0.5
+    assert plans[1].comp_ratio >= 4.8
+    assert plans[1].comp_threshold_db <= -26.0
+    assert plans[1].expander_close_ms >= 240.0
+    assert plans[1].expander_hold_ms >= 300.0
+    assert plans[2].pan == 0.0
+    assert plans[3].pan == 0.0
+
+
+def test_cross_adaptive_eq_protects_kick_low_band_and_cuts_bass(monkeypatch):
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    target_len = 2048
+
+    class DummyProcessor:
+        BAND_CENTERS = mod.CrossAdaptiveEQ.BAND_CENTERS
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def calculate_corrections(self, channel_band_energy, channel_priorities):
+            return [
+                SimpleNamespace(channel_id=1, frequency_hz=120.0, gain_db=-1.0, q_factor=4.0),
+                SimpleNamespace(channel_id=2, frequency_hz=120.0, gain_db=-1.0, q_factor=4.0),
+            ]
+
+    monkeypatch.setattr(mod, "CrossAdaptiveEQ", DummyProcessor)
+    monkeypatch.setattr(
+        mod,
+        "render_channel",
+        lambda path, plan, target_len, sr: np.column_stack([
+            np.full(target_len, 0.01, dtype=np.float32),
+            np.full(target_len, 0.01, dtype=np.float32),
+        ]),
+    )
+
+    plans = {
+        1: mod.ChannelPlan(
+            path=Path("KICK.wav"),
+            name="KICK",
+            instrument="kick",
+            pan=0.0,
+            hpf=35.0,
+            target_rms_db=-20.0,
+        ),
+        2: mod.ChannelPlan(
+            path=Path("Bass.wav"),
+            name="Bass",
+            instrument="bass_guitar",
+            pan=0.0,
+            hpf=35.0,
+            target_rms_db=-21.0,
+        ),
+    }
+
+    report = mod.apply_cross_adaptive_eq(plans, target_len, sr)
+
+    assert report["enabled"] is True
+    assert not any(item["channel"] == 1 for item in report["applied"])
+    bass_actions = [item for item in report["applied"] if item["channel"] == 2]
+    assert len(bass_actions) == 1
+    assert bass_actions[0]["gain_db"] < 0.0
+
+
+def test_kick_bass_hierarchy_boosts_kick_when_bass_overwhelms():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 3.0
+    length = int(sr * duration_sec)
+    t = np.arange(length, dtype=np.float32) / sr
+
+    bass = (0.24 * np.sin(2.0 * np.pi * 72.0 * t)).astype(np.float32)
+    kick = np.zeros_like(bass)
+    for start_sec in (0.4, 1.0, 1.6, 2.2):
+        start = int(start_sec * sr)
+        hit_len = int(0.12 * sr)
+        hit_t = np.arange(hit_len, dtype=np.float32) / sr
+        env = np.hanning(hit_len).astype(np.float32)
+        hit = (
+            0.14 * np.sin(2.0 * np.pi * 64.0 * hit_t)
+            + 0.03 * np.sin(2.0 * np.pi * 3200.0 * hit_t)
+        ).astype(np.float32)
+        kick[start:start + hit_len] += hit * env
+
+    with TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        kick_path = tmpdir_path / "KICK.wav"
+        bass_path = tmpdir_path / "Bass.wav"
+        sf.write(kick_path, kick, sr, subtype="PCM_24")
+        sf.write(bass_path, bass, sr, subtype="PCM_24")
+
+        kick_plan = mod.ChannelPlan(
+            path=kick_path,
+            name="KICK",
+            instrument="kick",
+            pan=0.0,
+            hpf=35.0,
+            target_rms_db=-20.0,
+            fader_db=-2.0,
+            eq_bands=[],
+            comp_threshold_db=0.0,
+            comp_ratio=1.0,
+            metrics=mod.metrics_for(kick, sr, instrument="kick"),
+        )
+        bass_plan = mod.ChannelPlan(
+            path=bass_path,
+            name="Bass",
+            instrument="bass_guitar",
+            pan=0.0,
+            hpf=35.0,
+            target_rms_db=-21.0,
+            fader_db=-1.0,
+            eq_bands=[],
+            comp_threshold_db=0.0,
+            comp_ratio=1.0,
+            metrics=mod.metrics_for(bass, sr, instrument="bass_guitar"),
+        )
+
+        report = mod.apply_kick_bass_hierarchy({1: kick_plan, 2: bass_plan}, length, sr, desired_kick_advantage_db=1.5)
+
+    assert report["enabled"] is True
+    assert report["measured_advantage_db"] < report["desired_kick_advantage_db"]
+    assert report["kick_fader_after_db"] > report["kick_fader_before_db"]
+    assert report["bass_fader_after_db"] < report["bass_fader_before_db"]
+    assert report["kick_eq_added"]
+    assert report["bass_eq_added"]
+
+
+def test_stem_mix_verification_checks_slope_and_reseats_kick():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 3.0
+    length = int(sr * duration_sec)
+    t = np.arange(length, dtype=np.float32) / sr
+
+    kick = np.zeros(length, dtype=np.float32)
+    for start_sec in (0.35, 0.95, 1.55, 2.15):
+        start = int(start_sec * sr)
+        hit_len = int(0.12 * sr)
+        hit_t = np.arange(hit_len, dtype=np.float32) / sr
+        env = np.hanning(hit_len).astype(np.float32)
+        hit = (
+            0.12 * np.sin(2.0 * np.pi * 64.0 * hit_t)
+            + 0.006 * np.sin(2.0 * np.pi * 3200.0 * hit_t)
+        ).astype(np.float32)
+        kick[start:start + hit_len] += hit * env
+
+    bass = (0.04 * np.sin(2.0 * np.pi * 72.0 * t)).astype(np.float32)
+    overhead = (0.14 * np.sin(2.0 * np.pi * 3500.0 * t)).astype(np.float32)
+
+    with TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        kick_path = tmpdir_path / "KICK.wav"
+        bass_path = tmpdir_path / "Bass.wav"
+        overhead_path = tmpdir_path / "OH L.wav"
+        sf.write(kick_path, kick, sr, subtype="PCM_24")
+        sf.write(bass_path, bass, sr, subtype="PCM_24")
+        sf.write(overhead_path, overhead, sr, subtype="PCM_24")
+
+        plans = {
+            1: mod.ChannelPlan(
+                path=kick_path,
+                name="KICK",
+                instrument="kick",
+                pan=0.0,
+                hpf=35.0,
+                target_rms_db=-20.0,
+                eq_bands=[],
+                comp_threshold_db=-18.0,
+                comp_ratio=4.0,
+                comp_attack_ms=8.0,
+                comp_release_ms=90.0,
+                metrics=mod.metrics_for(kick, sr, instrument="kick"),
+                event_activity=mod._event_activity_ranges(kick, sr, "kick") or {},
+            ),
+            2: mod.ChannelPlan(
+                path=bass_path,
+                name="Bass",
+                instrument="bass_guitar",
+                pan=0.0,
+                hpf=35.0,
+                target_rms_db=-21.0,
+                eq_bands=[],
+                comp_threshold_db=-22.0,
+                comp_ratio=3.2,
+                comp_attack_ms=18.0,
+                comp_release_ms=180.0,
+                metrics=mod.metrics_for(bass, sr, instrument="bass_guitar"),
+            ),
+            3: mod.ChannelPlan(
+                path=overhead_path,
+                name="OH L",
+                instrument="overhead",
+                pan=-0.7,
+                hpf=150.0,
+                target_rms_db=-27.0,
+                eq_bands=[],
+                comp_threshold_db=-18.0,
+                comp_ratio=1.6,
+                comp_attack_ms=25.0,
+                comp_release_ms=300.0,
+                metrics=mod.metrics_for(overhead, sr, instrument="overhead"),
+            ),
+        }
+
+        report = mod.apply_stem_mix_verification(plans, length, sr, genre="rock")
+
+    assert report["enabled"] is True
+    assert report["applied"] is True
+    assert report["before"]["stems"]
+    assert report["before"]["band_hierarchy"]
+    assert report["before"]["slope_conformity"]["reference_tilt_db_per_octave"] == 4.5
+    assert report["before"]["tilt_conformity"]["MASTER"]["compensation_db_per_octave"] == 4.5
+    assert report["before"]["slope_conformity"]["bass_deficit_db"] >= 0.0
+    assert any(action["type"] == "kick_click_boost" for action in report["actions"])
+    assert any(action["type"].startswith("master_slope_low_end_support") for action in report["actions"])
+    assert plans[1].comp_ratio >= 5.4
+    assert plans[1].comp_threshold_db <= -23.5
+    assert report["after"]["kick_focus"]["kick_click_share_in_drums"] >= report["before"]["kick_focus"]["kick_click_share_in_drums"]
+
+
+def test_master_process_uses_reference_mastering_when_reference_audio_present(monkeypatch):
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    mix = np.full((48_000, 2), 0.05, dtype=np.float32)
+    reference = np.full((48_000, 2), 0.08, dtype=np.float32)
+    captured = {}
+
+    class DummyAutoMaster:
+        def __init__(self, sample_rate, target_lufs, true_peak_limit):
+            captured["init"] = {
+                "sample_rate": sample_rate,
+                "target_lufs": target_lufs,
+                "true_peak_limit": true_peak_limit,
+            }
+
+        def master(self, audio, reference=None, sample_rate=None):
+            captured["call"] = {
+                "audio_shape": tuple(audio.shape),
+                "reference_shape": tuple(reference.shape),
+                "sample_rate": sample_rate,
+            }
+            return (audio * 1.4).astype(np.float32)
+
+    monkeypatch.setattr(mod, "AutoMaster", DummyAutoMaster)
+    context = mod.ReferenceMixContext(
+        path=Path("/tmp/reference.wav"),
+        source_type="audio",
+        style_profile=mod.StyleProfile(name="ref", loudness_lufs=-60.0),
+        audio=reference,
+        sample_rate=sr,
+    )
+
+    mastered, report = mod.master_process(mix, sr, reference_context=context)
+
+    assert mastered.shape == mix.shape
+    assert report["reference_mastering"]["enabled"] is True
+    assert report["reference_mastering"]["backend"] == "reference_audio_fallback"
+    assert captured["call"]["reference_shape"] == tuple(reference.shape)
+
+
+def test_master_process_rejects_reference_mastering_when_output_goes_too_quiet(monkeypatch):
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    mix = np.full((4096, 2), 0.08, dtype=np.float32)
+    reference = np.full((4096, 2), 0.12, dtype=np.float32)
+
+    class DummyAutoMaster:
+        def __init__(self, sample_rate, target_lufs, true_peak_limit):
+            pass
+
+        def master(self, audio, reference=None, sample_rate=None):
+            broken = np.zeros_like(audio, dtype=np.float32)
+            broken[0, :] = 0.85
+            return broken
+
+    monkeypatch.setattr(mod, "AutoMaster", DummyAutoMaster)
+    context = mod.ReferenceMixContext(
+        path=Path("/tmp/reference-folder"),
+        source_type="audio_directory",
+        style_profile=mod.StyleProfile(name="ref", loudness_lufs=-13.0),
+        audio=reference,
+        sample_rate=sr,
+        source_paths=[Path("/tmp/reference-a.wav"), Path("/tmp/reference-b.wav")],
+    )
+
+    mastered, report = mod.master_process(mix, sr, reference_context=context)
+
+    assert mastered.shape == mix.shape
+    assert report["reference_mastering"]["enabled"] is False
+    assert report["reference_mastering"]["reason"] == "reference_mastering_rejected_low_loudness"
+    assert np.count_nonzero(np.abs(mastered) > 1e-6) > 10
+    assert not np.array_equal(mastered[0], np.array([0.85, 0.85], dtype=np.float32))

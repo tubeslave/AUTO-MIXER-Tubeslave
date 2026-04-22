@@ -15,6 +15,7 @@ import math
 import os
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -33,8 +34,9 @@ from ai.agent import AgentAction, AgentMode, MixingAgent  # noqa: E402
 from ai.knowledge_base import KnowledgeBase  # noqa: E402
 from ai.llm_client import LLMClient  # noqa: E402
 from ai.rule_engine import RuleEngine  # noqa: E402
+from auto_mastering import AutoMaster, MasteringResult  # noqa: E402
 from auto_phase_gcc_phat import GCCPHATAnalyzer  # noqa: E402
-from autofoh_analysis import build_stem_contribution_matrix, extract_analysis_features  # noqa: E402
+from autofoh_analysis import build_fractional_octave_bands, build_stem_contribution_matrix, extract_analysis_features  # noqa: E402
 from autofoh_detectors import (  # noqa: E402
     HarshnessExcessDetector,
     LeadMaskingAnalyzer,
@@ -55,6 +57,7 @@ from autofoh_safety import (  # noqa: E402
 from auto_fx import AutoFXPlanner, FXBusDecision, FXPlan  # noqa: E402
 from channel_recognizer import classification_from_legacy_preset  # noqa: E402
 from cross_adaptive_eq import CrossAdaptiveEQ  # noqa: E402
+from ml.style_transfer import InstrumentStyle, StyleProfile, StyleTransfer  # noqa: E402
 
 
 DRUM_INSTRUMENTS = {
@@ -65,6 +68,68 @@ DRUM_INSTRUMENTS = {
     "hi_hat",
     "ride",
     "percussion",
+}
+
+REFERENCE_STYLE_INSTRUMENTS = {
+    "lead_vocal": "vocals",
+    "backing_vocal": "vocals",
+    "kick": "kick",
+    "snare": "snare",
+    "rack_tom": "toms",
+    "floor_tom": "toms",
+    "hi_hat": "hihat",
+    "ride": "hihat",
+    "overhead": "overheads",
+    "oh_l": "overheads",
+    "oh_r": "overheads",
+    "cymbals": "overheads",
+    "bass": "bass",
+    "bass_di": "bass",
+    "bass_mic": "bass",
+    "synth_bass": "bass",
+    "guitar": "electric_guitar",
+    "electric_guitar": "electric_guitar",
+    "lead_guitar": "electric_guitar",
+    "rhythm_guitar": "electric_guitar",
+    "acoustic_guitar": "acoustic_guitar",
+    "keys": "keys",
+    "piano": "keys",
+    "organ": "keys",
+    "synth": "keys",
+    "pad": "keys",
+    "lead_synth": "keys",
+    "percussion": "percussion",
+}
+
+REFERENCE_COMPRESSOR_SKIP = {
+    "hi_hat",
+    "ride",
+    "overhead",
+    "oh_l",
+    "oh_r",
+    "cymbals",
+    "playback",
+    "tracks",
+    "music",
+    "fx_return",
+    "reverb_return",
+    "delay_return",
+    "room",
+}
+
+REFERENCE_AUDIO_SUFFIXES = {
+    ".wav",
+    ".wave",
+    ".aif",
+    ".aiff",
+    ".flac",
+    ".mp3",
+    ".m4a",
+    ".ogg",
+}
+
+REFERENCE_PRESET_SUFFIXES = {
+    ".json",
 }
 
 
@@ -101,6 +166,16 @@ class ChannelPlan:
     pan_notes: list[dict[str, Any]] = field(default_factory=list)
     cross_adaptive_eq: list[dict[str, Any]] = field(default_factory=list)
     autofoh_actions: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
+class ReferenceMixContext:
+    path: Path
+    source_type: str
+    style_profile: StyleProfile
+    audio: np.ndarray | None = None
+    sample_rate: int | None = None
+    source_paths: list[Path] = field(default_factory=list)
 
 
 def _agent_actions_to_dict(actions: list[AgentAction]) -> list[dict[str, Any]]:
@@ -259,11 +334,644 @@ def read_mono(path: Path) -> tuple[np.ndarray, int]:
     return mono_sum(audio), int(sr)
 
 
+def normalize_audio_shape(audio: np.ndarray) -> np.ndarray:
+    arr = np.asarray(audio, dtype=np.float32)
+    if arr.ndim <= 1:
+        return arr
+    if arr.ndim == 2 and arr.shape[0] <= 4 and arr.shape[1] > arr.shape[0]:
+        return arr.T.astype(np.float32, copy=False)
+    return arr.astype(np.float32, copy=False)
+
+
+def read_audio_file(path: Path) -> tuple[np.ndarray, int]:
+    """Read audio with a small ffmpeg fallback so MP3 references work too."""
+    try:
+        audio, sr = sf.read(str(path), dtype="float32", always_2d=False)
+        return normalize_audio_shape(audio), int(sr)
+    except Exception:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            decoded = Path(tmpdir) / "decoded_reference.wav"
+            cmd = [
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(path),
+                str(decoded),
+            ]
+            subprocess.run(cmd, check=True)
+            audio, sr = sf.read(str(decoded), dtype="float32", always_2d=False)
+            return normalize_audio_shape(audio), int(sr)
+
+
+def resample_audio(audio: np.ndarray, src_sr: int, dst_sr: int) -> np.ndarray:
+    arr = normalize_audio_shape(audio)
+    if src_sr == dst_sr or len(arr) == 0:
+        return arr.astype(np.float32, copy=True)
+
+    dst_len = max(1, int(round(len(arr) * float(dst_sr) / float(src_sr))))
+    src_pos = np.linspace(0.0, 1.0, num=len(arr), endpoint=False, dtype=np.float64)
+    dst_pos = np.linspace(0.0, 1.0, num=dst_len, endpoint=False, dtype=np.float64)
+
+    if arr.ndim == 1:
+        return np.interp(dst_pos, src_pos, arr.astype(np.float64)).astype(np.float32)
+
+    channels = [
+        np.interp(dst_pos, src_pos, arr[:, idx].astype(np.float64)).astype(np.float32)
+        for idx in range(arr.shape[1])
+    ]
+    return np.column_stack(channels).astype(np.float32)
+
+
+def _reference_channel_count(audio: np.ndarray) -> int:
+    arr = normalize_audio_shape(audio)
+    return 1 if arr.ndim == 1 else int(arr.shape[1])
+
+
+def _match_reference_channels(audio: np.ndarray, channels: int) -> np.ndarray:
+    arr = normalize_audio_shape(audio)
+    if channels <= 1:
+        return mono_sum(arr).astype(np.float32, copy=False)
+    if arr.ndim == 1:
+        return np.column_stack([arr] * channels).astype(np.float32)
+    if arr.shape[1] == channels:
+        return arr.astype(np.float32, copy=False)
+    if arr.shape[1] > channels:
+        return arr[:, :channels].astype(np.float32, copy=False)
+    last = arr[:, -1:]
+    pads = [last] * (channels - arr.shape[1])
+    return np.concatenate([arr, *pads], axis=1).astype(np.float32)
+
+
+def _reference_excerpt(audio: np.ndarray, sr: int, max_duration_sec: float = 45.0) -> np.ndarray:
+    arr = normalize_audio_shape(audio)
+    max_samples = max(1, int(round(float(sr) * max_duration_sec)))
+    if len(arr) <= max_samples:
+        return arr.astype(np.float32, copy=True)
+    start = max(0, (len(arr) - max_samples) // 2)
+    return arr[start:start + max_samples].astype(np.float32, copy=True)
+
+
+def _median_value(values: list[float], default: float = 0.0) -> float:
+    usable: list[float] = []
+    for value in values:
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(numeric):
+            usable.append(numeric)
+    if not usable:
+        return float(default)
+    return float(np.median(np.asarray(usable, dtype=np.float64)))
+
+
+def _merge_style_profiles(style_profiles: list[StyleProfile], name: str) -> StyleProfile:
+    if not style_profiles:
+        raise ValueError("Cannot merge an empty style profile collection")
+    if len(style_profiles) == 1:
+        profile = style_profiles[0]
+        return StyleProfile(
+            name=name,
+            spectral_balance=dict(profile.spectral_balance),
+            dynamic_range=float(profile.dynamic_range),
+            stereo_width=float(profile.stereo_width),
+            loudness_lufs=float(profile.loudness_lufs),
+            crest_factor=float(profile.crest_factor),
+            per_instrument_settings=dict(profile.per_instrument_settings),
+        )
+
+    merged = StyleProfile(name=name)
+    spectral_keys = sorted({
+        band
+        for profile in style_profiles
+        for band in profile.spectral_balance.keys()
+    })
+    merged.spectral_balance = {
+        band: round(
+            _median_value(
+                [profile.spectral_balance.get(band, -80.0) for profile in style_profiles],
+                default=-80.0,
+            ),
+            4,
+        )
+        for band in spectral_keys
+    }
+    merged.dynamic_range = round(_median_value([p.dynamic_range for p in style_profiles], default=0.0), 4)
+    merged.stereo_width = round(_median_value([p.stereo_width for p in style_profiles], default=0.0), 4)
+    merged.loudness_lufs = round(_median_value([p.loudness_lufs for p in style_profiles], default=-14.0), 4)
+    merged.crest_factor = round(_median_value([p.crest_factor for p in style_profiles], default=10.0), 4)
+
+    instrument_names = sorted({
+        instrument
+        for profile in style_profiles
+        for instrument in profile.per_instrument_settings.keys()
+    })
+    for instrument in instrument_names:
+        variants = [
+            profile.per_instrument_settings[instrument]
+            for profile in style_profiles
+            if instrument in profile.per_instrument_settings
+        ]
+        if not variants:
+            continue
+        merged.per_instrument_settings[instrument] = InstrumentStyle(
+            instrument_type=variants[0].instrument_type,
+            gain_db=round(_median_value([item.gain_db for item in variants], default=0.0), 4),
+            eq_low_shelf_db=round(_median_value([item.eq_low_shelf_db for item in variants], default=0.0), 4),
+            eq_low_mid_db=round(_median_value([item.eq_low_mid_db for item in variants], default=0.0), 4),
+            eq_mid_db=round(_median_value([item.eq_mid_db for item in variants], default=0.0), 4),
+            eq_high_mid_db=round(_median_value([item.eq_high_mid_db for item in variants], default=0.0), 4),
+            eq_high_shelf_db=round(_median_value([item.eq_high_shelf_db for item in variants], default=0.0), 4),
+            compression_ratio=round(_median_value([item.compression_ratio for item in variants], default=1.0), 4),
+            compression_threshold_db=round(_median_value([item.compression_threshold_db for item in variants], default=-10.0), 4),
+            gate_threshold_db=round(_median_value([item.gate_threshold_db for item in variants], default=-60.0), 4),
+            pan=round(_median_value([item.pan for item in variants], default=0.0), 4),
+            bus_send_level=round(_median_value([item.bus_send_level for item in variants], default=-96.0), 4),
+        )
+    return merged
+
+
+def _iter_reference_sources(path: Path) -> list[Path]:
+    candidates = [
+        candidate.resolve()
+        for candidate in sorted(path.rglob("*"))
+        if candidate.is_file() and candidate.suffix.lower() in (REFERENCE_AUDIO_SUFFIXES | REFERENCE_PRESET_SUFFIXES)
+    ]
+    if not candidates:
+        raise FileNotFoundError(f"No supported reference files found in: {path}")
+    return candidates
+
+
+def prepare_reference_mix_context(reference_path: str | Path | None) -> ReferenceMixContext | None:
+    if not reference_path:
+        return None
+
+    path = Path(reference_path).expanduser().resolve()
+    if not path.exists():
+        raise FileNotFoundError(f"Reference track not found: {path}")
+
+    transfer = StyleTransfer(fft_size=4096, hop_size=1024)
+    if path.is_file() and path.suffix.lower() == ".json":
+        style_profile = transfer.load_preset(str(path))
+        return ReferenceMixContext(
+            path=path,
+            source_type="style_preset",
+            style_profile=style_profile,
+            source_paths=[path],
+        )
+    if path.is_file():
+        audio, ref_sr = read_audio_file(path)
+        style_profile = transfer.extract_style(audio, sr=ref_sr, name=path.stem)
+        return ReferenceMixContext(
+            path=path,
+            source_type="audio",
+            style_profile=style_profile,
+            audio=audio,
+            sample_rate=ref_sr,
+            source_paths=[path],
+        )
+
+    source_paths = _iter_reference_sources(path)
+    style_profiles: list[StyleProfile] = []
+    audio_sources: list[tuple[np.ndarray, int]] = []
+    has_audio = False
+    has_preset = False
+
+    for source in source_paths:
+        if source.suffix.lower() in REFERENCE_PRESET_SUFFIXES:
+            style_profiles.append(transfer.load_preset(str(source)))
+            has_preset = True
+            continue
+        audio, ref_sr = read_audio_file(source)
+        style_profiles.append(transfer.extract_style(audio, sr=ref_sr, name=source.stem))
+        audio_sources.append((audio, ref_sr))
+        has_audio = True
+
+    if not style_profiles:
+        raise FileNotFoundError(f"No usable reference profiles could be loaded from: {path}")
+
+    merged_profile = _merge_style_profiles(style_profiles, name=path.name)
+    combined_audio = None
+    target_sr = None
+    if audio_sources:
+        target_sr = int(audio_sources[0][1])
+        target_channels = max(_reference_channel_count(audio) for audio, _ in audio_sources)
+        excerpts: list[np.ndarray] = []
+        for audio, ref_sr in audio_sources:
+            prepared = audio
+            if ref_sr != target_sr:
+                prepared = resample_audio(prepared, ref_sr, target_sr)
+            prepared = _reference_excerpt(prepared, target_sr)
+            prepared = _match_reference_channels(prepared, target_channels)
+            peak = float(np.max(np.abs(prepared))) if len(prepared) else 0.0
+            if peak > 1e-6:
+                prepared = (prepared / peak * 0.92).astype(np.float32)
+            excerpts.append(prepared.astype(np.float32, copy=False))
+        if excerpts:
+            combined_audio = np.concatenate(excerpts, axis=0).astype(np.float32, copy=False)
+
+    if has_audio and has_preset:
+        source_type = "mixed_reference_directory"
+    elif has_audio:
+        source_type = "audio_directory"
+    else:
+        source_type = "style_preset_directory"
+
+    return ReferenceMixContext(
+        path=path,
+        source_type=source_type,
+        style_profile=merged_profile,
+        audio=combined_audio,
+        sample_rate=target_sr,
+        source_paths=source_paths,
+    )
+
+
+def _reference_style_instrument(instrument: str) -> str:
+    return REFERENCE_STYLE_INSTRUMENTS.get(instrument, "other")
+
+
+def _reference_fader_scale(instrument: str) -> float:
+    if instrument in {"lead_vocal", "backing_vocal"}:
+        return 0.22
+    if instrument in {"kick", "snare", "bass", "bass_guitar", "bass_di", "bass_mic", "synth_bass"}:
+        return 0.18
+    if instrument in {"hi_hat", "ride", "overhead", "oh_l", "oh_r", "cymbals"}:
+        return 0.12
+    return 0.15
+
+
+def _reference_eq_scale(instrument: str) -> float:
+    if instrument in {"lead_vocal", "backing_vocal"}:
+        return 0.25
+    if instrument in {"hi_hat", "ride", "overhead", "oh_l", "oh_r", "cymbals"}:
+        return 0.18
+    return 0.22
+
+
+def _reference_comp_scale(instrument: str) -> float:
+    if instrument in {"lead_vocal", "backing_vocal"}:
+        return 0.3
+    if instrument in {"kick", "snare", "bass", "bass_guitar", "bass_di", "bass_mic", "synth_bass"}:
+        return 0.25
+    return 0.18
+
+
+def _merge_reference_eq_adjustment(
+    plan: ChannelPlan,
+    *,
+    freq: float,
+    gain_db: float,
+    q: float,
+) -> dict[str, Any] | None:
+    if abs(gain_db) < 0.15:
+        return None
+
+    target_idx = None
+    best_distance = float("inf")
+    for idx, (band_freq, _, _) in enumerate(plan.eq_bands):
+        distance = abs(math.log2(max(freq, 20.0) / max(float(band_freq), 20.0)))
+        if distance < 0.45 and distance < best_distance:
+            best_distance = distance
+            target_idx = idx
+
+    if target_idx is None:
+        band = (
+            float(freq),
+            float(np.clip(gain_db, -6.0, 6.0)),
+            float(np.clip(q, 0.5, 2.5)),
+        )
+        plan.eq_bands.append(band)
+        return {
+            "mode": "append",
+            "after": {
+                "freq_hz": round(band[0], 2),
+                "gain_db": round(band[1], 2),
+                "q": round(band[2], 2),
+            },
+        }
+
+    before = plan.eq_bands[target_idx]
+    after = (
+        float(before[0]),
+        float(np.clip(before[1] + gain_db, -6.0, 6.0)),
+        float(np.clip((before[2] + q) * 0.5, 0.5, 2.5)),
+    )
+    plan.eq_bands[target_idx] = after
+    return {
+        "mode": "merge",
+        "before": {
+            "freq_hz": round(float(before[0]), 2),
+            "gain_db": round(float(before[1]), 2),
+            "q": round(float(before[2]), 2),
+        },
+        "after": {
+            "freq_hz": round(float(after[0]), 2),
+            "gain_db": round(float(after[1]), 2),
+            "q": round(float(after[2]), 2),
+        },
+    }
+
+
+def apply_reference_mix_guidance(
+    plans: dict[int, ChannelPlan],
+    sr: int,
+    reference_context: ReferenceMixContext | None,
+) -> dict[str, Any]:
+    if reference_context is None:
+        return {"enabled": False, "reason": "no_reference_supplied"}
+
+    transfer = StyleTransfer(fft_size=4096, hop_size=1024)
+    channel_audios: dict[str, np.ndarray] = {}
+    channel_types: dict[str, str] = {}
+    skipped_channels: list[dict[str, Any]] = []
+
+    for channel, plan in plans.items():
+        try:
+            mono, file_sr = read_mono(plan.path)
+            if file_sr != sr:
+                raise ValueError(f"sample rate mismatch {file_sr} != {sr}")
+            analysis_audio, _ = _analysis_signal_for_metrics(mono, sr, plan.instrument)
+            channel_audios[f"ch{channel}"] = analysis_audio.astype(np.float32, copy=False)
+            channel_types[f"ch{channel}"] = _reference_style_instrument(plan.instrument)
+        except Exception as exc:
+            skipped_channels.append({
+                "channel": channel,
+                "file": plan.path.name,
+                "reason": str(exc),
+            })
+
+    if not channel_audios:
+        return {
+            "enabled": False,
+            "reason": "no_channels_available",
+            "reference_path": str(reference_context.path),
+            "source_type": reference_context.source_type,
+            "reference_sources": [str(path) for path in reference_context.source_paths],
+            "skipped_channels": skipped_channels,
+        }
+
+    mixing_params = transfer.apply_style(
+        reference_context.style_profile,
+        channel_audios,
+        channel_types,
+        sr=sr,
+    )
+
+    actions: list[dict[str, Any]] = []
+    for channel, plan in plans.items():
+        params = mixing_params.get(f"ch{channel}")
+        if not params:
+            continue
+
+        action = {
+            "channel": channel,
+            "file": plan.path.name,
+            "instrument": plan.instrument,
+            "reference_type": channel_types.get(f"ch{channel}", "other"),
+            "fader": None,
+            "eq": [],
+            "compressor": None,
+        }
+
+        fader_step = float(
+            np.clip(
+                float(params.get("fader_db", 0.0)) * _reference_fader_scale(plan.instrument),
+                -1.5,
+                1.5,
+            )
+        )
+        if abs(fader_step) >= 0.12:
+            before = float(plan.fader_db)
+            plan.fader_db = float(np.clip(plan.fader_db + fader_step, -30.0, 0.0))
+            action["fader"] = {
+                "before_db": round(before, 2),
+                "delta_db": round(plan.fader_db - before, 2),
+                "after_db": round(plan.fader_db, 2),
+            }
+
+        eq_candidates = sorted(
+            params.get("eq_bands", []),
+            key=lambda item: abs(float(item.get("gain_db", 0.0))),
+            reverse=True,
+        )[:3]
+        eq_scale = _reference_eq_scale(plan.instrument)
+        for band in eq_candidates:
+            scaled_gain = float(np.clip(float(band.get("gain_db", 0.0)) * eq_scale, -1.25, 1.25))
+            if abs(scaled_gain) < 0.2:
+                continue
+            q = 0.75 if band.get("type") in {"low_shelf", "high_shelf"} else float(band.get("q", 1.2))
+            merged = _merge_reference_eq_adjustment(
+                plan,
+                freq=float(band.get("frequency", 1000.0)),
+                gain_db=scaled_gain,
+                q=q,
+            )
+            if merged is not None:
+                merged["requested_gain_db"] = round(float(band.get("gain_db", 0.0)), 2)
+                action["eq"].append(merged)
+
+        if plan.instrument not in REFERENCE_COMPRESSOR_SKIP:
+            comp = params.get("compression") or {}
+            if comp:
+                comp_scale = _reference_comp_scale(plan.instrument)
+                ratio_before = float(plan.comp_ratio)
+                threshold_before = float(plan.comp_threshold_db)
+                ratio_step = float(np.clip((float(comp.get("ratio", ratio_before)) - ratio_before) * comp_scale, -0.6, 0.6))
+                threshold_step = float(np.clip((float(comp.get("threshold_db", threshold_before)) - threshold_before) * comp_scale, -2.0, 2.0))
+                if abs(ratio_step) >= 0.05 or abs(threshold_step) >= 0.1:
+                    plan.comp_ratio = float(np.clip(ratio_before + ratio_step, 1.0, 8.0))
+                    plan.comp_threshold_db = float(np.clip(threshold_before + threshold_step, -40.0, 0.0))
+                    action["compressor"] = {
+                        "ratio_before": round(ratio_before, 2),
+                        "ratio_after": round(plan.comp_ratio, 2),
+                        "threshold_before_db": round(threshold_before, 2),
+                        "threshold_after_db": round(plan.comp_threshold_db, 2),
+                    }
+
+        if action["fader"] or action["eq"] or action["compressor"]:
+            actions.append(action)
+
+    style = reference_context.style_profile
+    return {
+        "enabled": True,
+        "reference_path": str(reference_context.path),
+        "source_type": reference_context.source_type,
+        "reference_sources": [str(path) for path in reference_context.source_paths],
+        "applied_channel_count": len(actions),
+        "style_profile": {
+            "name": style.name,
+            "loudness_lufs": round(float(style.loudness_lufs), 2),
+            "dynamic_range_db": round(float(style.dynamic_range), 2),
+            "stereo_width": round(float(style.stereo_width), 3),
+            "crest_factor_db": round(float(style.crest_factor), 2),
+            "spectral_balance": {
+                key: round(float(value), 2)
+                for key, value in style.spectral_balance.items()
+            },
+        },
+        "actions": actions,
+        "skipped_channels": skipped_channels,
+    }
+
+
 def delay_signal(x: np.ndarray, sr: int, delay_ms: float) -> np.ndarray:
     delay_samples = int(round(max(0.0, delay_ms) * sr / 1000.0))
     if delay_samples <= 0:
         return x
     return np.pad(x, (delay_samples, 0))[:len(x)].astype(np.float32)
+
+
+def apply_genre_mix_profile(
+    plans: dict[int, ChannelPlan],
+    genre: str | None,
+) -> dict[str, Any]:
+    genre_token = str(genre or "").strip().lower()
+    if not genre_token:
+        return {"enabled": False, "reason": "no_genre_supplied"}
+    if genre_token != "rock":
+        return {
+            "enabled": False,
+            "requested_genre": genre_token,
+            "reason": "unsupported_genre",
+        }
+
+    actions: list[dict[str, Any]] = []
+    snare_layers = [
+        plan.path.name
+        for plan in plans.values()
+        if plan.instrument == "snare"
+    ]
+
+    for channel, plan in plans.items():
+        changes: list[dict[str, Any]] = []
+
+        if plan.instrument == "lead_vocal":
+            before = {
+                "trim_db": float(plan.trim_db),
+                "target_rms_db": float(plan.target_rms_db),
+                "threshold_db": float(plan.comp_threshold_db),
+                "ratio": float(plan.comp_ratio),
+                "attack_ms": float(plan.comp_attack_ms),
+                "release_ms": float(plan.comp_release_ms),
+            }
+            plan.target_rms_db = max(plan.target_rms_db, -18.5)
+            plan.trim_db = float(np.clip(plan.trim_db + 1.4, -18.0, 12.0))
+            plan.comp_threshold_db = float(min(plan.comp_threshold_db, -26.0))
+            plan.comp_ratio = float(max(plan.comp_ratio, 4.8))
+            plan.comp_attack_ms = float(min(plan.comp_attack_ms, 4.0))
+            plan.comp_release_ms = float(np.clip(plan.comp_release_ms, 105.0, 125.0))
+            changes.append({
+                "type": "lead_vocal_glue",
+                "before": {key: round(value, 2) for key, value in before.items()},
+                "after": {
+                    "trim_db": round(float(plan.trim_db), 2),
+                    "target_rms_db": round(float(plan.target_rms_db), 2),
+                    "threshold_db": round(float(plan.comp_threshold_db), 2),
+                    "ratio": round(float(plan.comp_ratio), 2),
+                    "attack_ms": round(float(plan.comp_attack_ms), 2),
+                    "release_ms": round(float(plan.comp_release_ms), 2),
+                },
+            })
+            if plan.expander_enabled:
+                before_expander = {
+                    "range_db": float(plan.expander_range_db),
+                    "threshold_db": float(plan.expander_threshold_db or 0.0),
+                    "open_ms": float(plan.expander_open_ms),
+                    "close_ms": float(plan.expander_close_ms),
+                    "hold_ms": float(plan.expander_hold_ms),
+                }
+                plan.expander_range_db = float(min(plan.expander_range_db, 3.2))
+                if plan.expander_threshold_db is not None:
+                    plan.expander_threshold_db = float(plan.expander_threshold_db - 1.0)
+                plan.expander_open_ms = float(max(plan.expander_open_ms, 22.0))
+                plan.expander_close_ms = float(max(plan.expander_close_ms, 240.0))
+                plan.expander_hold_ms = float(max(plan.expander_hold_ms, 300.0))
+                changes.append({
+                    "type": "lead_vocal_phrase_stability",
+                    "before": {key: round(value, 2) for key, value in before_expander.items()},
+                    "after": {
+                        "range_db": round(float(plan.expander_range_db), 2),
+                        "threshold_db": round(float(plan.expander_threshold_db or 0.0), 2),
+                        "open_ms": round(float(plan.expander_open_ms), 2),
+                        "close_ms": round(float(plan.expander_close_ms), 2),
+                        "hold_ms": round(float(plan.expander_hold_ms), 2),
+                    },
+                })
+
+        elif plan.instrument == "backing_vocal":
+            before = {
+                "threshold_db": float(plan.comp_threshold_db),
+                "ratio": float(plan.comp_ratio),
+                "attack_ms": float(plan.comp_attack_ms),
+                "release_ms": float(plan.comp_release_ms),
+            }
+            plan.comp_threshold_db = float(min(plan.comp_threshold_db, -24.0))
+            plan.comp_ratio = float(max(plan.comp_ratio, 3.3))
+            plan.comp_attack_ms = float(min(plan.comp_attack_ms, 6.0))
+            plan.comp_release_ms = float(np.clip(plan.comp_release_ms, 115.0, 145.0))
+            changes.append({
+                "type": "backing_vocal_tighten",
+                "before": {key: round(value, 2) for key, value in before.items()},
+                "after": {
+                    "threshold_db": round(float(plan.comp_threshold_db), 2),
+                    "ratio": round(float(plan.comp_ratio), 2),
+                    "attack_ms": round(float(plan.comp_attack_ms), 2),
+                    "release_ms": round(float(plan.comp_release_ms), 2),
+                },
+            })
+
+        elif plan.instrument == "snare":
+            before = {
+                "pan": float(plan.pan),
+                "threshold_db": float(plan.comp_threshold_db),
+                "ratio": float(plan.comp_ratio),
+            }
+            plan.pan = 0.0
+            plan.comp_threshold_db = float(min(plan.comp_threshold_db, -23.0))
+            plan.comp_ratio = float(max(plan.comp_ratio, 4.0))
+            changes.append({
+                "type": "rock_snare_center",
+                "before": {key: round(value, 2) for key, value in before.items()},
+                "after": {
+                    "pan": round(float(plan.pan), 2),
+                    "threshold_db": round(float(plan.comp_threshold_db), 2),
+                    "ratio": round(float(plan.comp_ratio), 2),
+                },
+            })
+
+        elif plan.instrument == "kick":
+            before = {
+                "threshold_db": float(plan.comp_threshold_db),
+                "ratio": float(plan.comp_ratio),
+            }
+            plan.comp_threshold_db = float(min(plan.comp_threshold_db, -20.0))
+            plan.comp_ratio = float(max(plan.comp_ratio, 4.2))
+            changes.append({
+                "type": "rock_kick_anchor",
+                "before": {key: round(value, 2) for key, value in before.items()},
+                "after": {
+                    "threshold_db": round(float(plan.comp_threshold_db), 2),
+                    "ratio": round(float(plan.comp_ratio), 2),
+                },
+            })
+
+        if changes:
+            actions.append({
+                "channel": channel,
+                "file": plan.path.name,
+                "instrument": plan.instrument,
+                "changes": changes,
+            })
+
+    return {
+        "enabled": bool(actions),
+        "genre": genre_token,
+        "notes": [
+            "Rock mode tightens lead vocal glue with stronger compression and steadier between-phrase behavior.",
+            "Snare layers stay treated as one center snare voice when both top and bottom mics are present.",
+        ],
+        "snare_layers": snare_layers,
+        "actions": actions,
+    }
 
 
 def declick_start(x: np.ndarray, sr: int, fade_ms: float, threshold_db: float = -70.0) -> np.ndarray:
@@ -1795,13 +2503,15 @@ def _priority_for_instrument(instrument: str) -> int:
     """Lower number means the channel is more important in mirror EQ."""
     if instrument == "lead_vocal":
         return 1
-    if instrument in {"kick", "snare", "bass_guitar"}:
+    if instrument == "kick":
         return 2
-    if instrument in {"electric_guitar", "accordion", "playback", "backing_vocal"}:
+    if instrument in {"snare", "bass_guitar"}:
         return 3
-    if instrument in {"overhead", "room", "rack_tom", "floor_tom", "hi_hat", "ride", "percussion"}:
+    if instrument in {"electric_guitar", "accordion", "playback", "backing_vocal"}:
         return 4
-    return 3
+    if instrument in {"overhead", "room", "rack_tom", "floor_tom", "hi_hat", "ride", "percussion"}:
+        return 5
+    return 4
 
 
 def _analysis_block(x: np.ndarray, sr: int, window_sec: float = 18.0) -> np.ndarray:
@@ -1933,19 +2643,19 @@ def _event_expander_profile(instrument: str, metrics: dict[str, Any]) -> dict[st
 
     if instrument == "lead_vocal":
         return {
-            "range_db": 5.5 if active_ratio < 0.3 else 4.5,
-            "open_ms": 18.0,
-            "close_ms": 140.0,
-            "hold_ms": 180.0,
-            "threshold_db": float(threshold_db),
+            "range_db": 5.8 if active_ratio < 0.3 else 4.8,
+            "open_ms": 22.0,
+            "close_ms": 200.0,
+            "hold_ms": 240.0,
+            "threshold_db": float(threshold_db) - 1.5,
         }
     if instrument == "backing_vocal":
         return {
-            "range_db": 6.0 if active_ratio < 0.35 else 5.0,
-            "open_ms": 20.0,
-            "close_ms": 150.0,
-            "hold_ms": 150.0,
-            "threshold_db": float(threshold_db),
+            "range_db": 5.0 if active_ratio < 0.35 else 4.2,
+            "open_ms": 22.0,
+            "close_ms": 180.0,
+            "hold_ms": 210.0,
+            "threshold_db": float(threshold_db) - 0.8,
         }
     if instrument in {"rack_tom", "floor_tom"}:
         return {
@@ -2099,6 +2809,9 @@ def apply_cross_adaptive_eq(
         if band == "air":
             skipped += 1
             continue
+        if plan.instrument == "kick" and gain < 0.0 and band in {"sub", "bass", "low_mid"}:
+            skipped += 1
+            continue
         if gain < 0.0 and priority == 1:
             skipped += 1
             continue
@@ -2115,6 +2828,8 @@ def apply_cross_adaptive_eq(
             scale = 0.24 if gain < 0.0 else 0.20
         else:
             scale = 0.20
+        if plan.instrument == "bass_guitar" and band in {"sub", "bass"} and gain < 0.0:
+            scale = 0.36
 
         key = (channel, float(adj.frequency_hz))
         existing = aggregated.setdefault(key, {
@@ -2138,7 +2853,10 @@ def apply_cross_adaptive_eq(
         priority = int(item["priority"])
         gain = float(item["gain_db"])
         if gain < 0.0:
-            lower = -2.5 if priority >= 4 else (-2.0 if priority == 3 else -1.0)
+            if plans[channel].instrument == "bass_guitar" and item["band"] in {"sub", "bass"}:
+                lower = -1.8
+            else:
+                lower = -2.5 if priority >= 4 else (-2.0 if priority == 3 else -1.0)
             gain = max(lower, gain)
         else:
             gain = min(0.9, gain)
@@ -2225,13 +2943,13 @@ def classify_track(path: Path) -> tuple[str, float, float, float, list[tuple[flo
     if "playbacks r" in name or "playback r" in name:
         return "playback", 0.78, 30.0, -23.0, [(180, -0.8, 1.0), (3500, 0.8, 1.0)], (-16, 1.5, 25, 250), False
     if "back vox l" in name or "back vocal l" in name or "bvox l" in name or name in {"backs l", "back l", "bgv l"}:
-        return "backing_vocal", -0.32, 110.0, -25.5, [(240, -2.0, 1.3), (2800, 1.5, 1.0), (9000, 1.0, 0.8)], (-23, 2.5, 8, 140), False
+        return "backing_vocal", -0.32, 110.0, -24.5, [(240, -2.0, 1.3), (2800, 1.5, 1.0), (9000, 1.0, 0.8)], (-24, 3.1, 6, 135), False
     if "back vox r" in name or "back vocal r" in name or "bvox r" in name or name in {"backs r", "back r", "bgv r"}:
-        return "backing_vocal", 0.32, 110.0, -25.5, [(240, -2.0, 1.3), (2800, 1.5, 1.0), (9000, 1.0, 0.8)], (-23, 2.5, 8, 140), False
+        return "backing_vocal", 0.32, 110.0, -24.5, [(240, -2.0, 1.3), (2800, 1.5, 1.0), (9000, 1.0, 0.8)], (-24, 3.1, 6, 135), False
     if "back vox" in name or "back vocal" in name or "bvox" in name or "backs" in name or "bgv" in name:
-        return "backing_vocal", 0.0, 110.0, -25.5, [(240, -2.0, 1.3), (2800, 1.5, 1.0), (9000, 1.0, 0.8)], (-23, 2.5, 8, 140), False
+        return "backing_vocal", 0.0, 110.0, -24.5, [(240, -2.0, 1.3), (2800, 1.5, 1.0), (9000, 1.0, 0.8)], (-24, 3.1, 6, 135), False
     if "vox" in name or "vocal" in name:
-        return "lead_vocal", 0.0, 90.0, -20.0, [(250, -2.5, 1.4), (3100, 2.5, 1.0), (10500, 1.5, 0.8)], (-22, 3.2, 5, 120), False
+        return "lead_vocal", 0.0, 90.0, -18.8, [(250, -2.5, 1.4), (3100, 2.5, 1.0), (10500, 1.5, 0.8)], (-25, 4.4, 4, 115), False
     return "custom", 0.0, 80.0, -24.0, [(300, -1.0, 1.2), (3000, 0.8, 1.0)], (-20, 2.0, 10, 150), False
 
 
@@ -2552,6 +3270,721 @@ def apply_kick_presence_boost(plans: dict[int, ChannelPlan], boost_db: float) ->
     }
 
 
+def _band_rms_db(audio: np.ndarray, sr: int, low_hz: float, high_hz: float) -> float:
+    mono = mono_sum(audio)
+    block = _analysis_block(mono, sr)
+    if len(block) < 256:
+        return -100.0
+    windowed = block * np.hanning(len(block))
+    spec = np.abs(np.fft.rfft(windowed)) + 1e-12
+    freqs = np.fft.rfftfreq(len(windowed), 1.0 / sr)
+    idx = (freqs >= low_hz) & (freqs < high_hz)
+    if not np.any(idx):
+        return -100.0
+    band_rms = float(np.sqrt(np.mean(np.square(spec[idx]))) + 1e-12)
+    return amp_to_db(band_rms)
+
+
+def _band_power(audio: np.ndarray, sr: int, low_hz: float, high_hz: float) -> float:
+    mono = mono_sum(audio)
+    if len(mono) < 256:
+        return 1e-12
+    windowed = mono * np.hanning(len(mono))
+    spec = np.abs(np.fft.rfft(windowed)) + 1e-12
+    power = np.square(spec)
+    freqs = np.fft.rfftfreq(len(windowed), 1.0 / sr)
+    idx = (freqs >= low_hz) & (freqs < high_hz)
+    if not np.any(idx):
+        return 1e-12
+    return float(np.sum(power[idx]) + 1e-12)
+
+
+def _stem_roles_for_plan(plan: ChannelPlan) -> list[str]:
+    classification = classification_from_legacy_preset(
+        _legacy_preset_for_instrument(plan.instrument),
+        channel_name=plan.name,
+        confidence=1.0,
+        match_type="offline_measurement",
+    )
+    stems = [stem.value for stem in classification.stem_roles if stem.value != "MASTER"]
+    if not stems:
+        stems = ["LEAD"] if plan.instrument == "lead_vocal" else ["UNKNOWN"]
+    return stems
+
+
+def _build_rendered_stem_groups(
+    rendered_channels: dict[int, np.ndarray],
+    plans: dict[int, ChannelPlan],
+) -> tuple[dict[str, np.ndarray], dict[str, list[int]], dict[str, list[str]]]:
+    stem_audio: dict[str, np.ndarray] = {}
+    stem_channels: dict[str, list[int]] = {}
+    stem_files: dict[str, list[str]] = {}
+
+    for channel, audio in rendered_channels.items():
+        plan = plans.get(channel)
+        if plan is None or plan.muted:
+            continue
+        for stem in _stem_roles_for_plan(plan):
+            if stem not in stem_audio:
+                stem_audio[stem] = np.zeros_like(audio)
+                stem_channels[stem] = []
+                stem_files[stem] = []
+            stem_audio[stem] += audio
+            stem_channels[stem].append(channel)
+            stem_files[stem].append(plan.path.name)
+
+    if rendered_channels:
+        first_audio = next(iter(rendered_channels.values()))
+        master_audio = np.zeros_like(first_audio)
+        for audio in rendered_channels.values():
+            master_audio += audio
+        stem_audio["MASTER"] = master_audio
+        stem_channels["MASTER"] = sorted(rendered_channels)
+        stem_files["MASTER"] = [plans[channel].path.name for channel in sorted(rendered_channels) if channel in plans]
+
+    return stem_audio, stem_channels, stem_files
+
+
+def _activity_window_audio(
+    audio: np.ndarray,
+    ranges: list[tuple[int, int]] | None,
+    sr: int,
+    *,
+    max_total_sec: float = 4.0,
+) -> np.ndarray:
+    mono = mono_sum(audio)
+    if len(mono) == 0:
+        return mono.astype(np.float32)
+    if not ranges:
+        return _analysis_block(mono, sr, window_sec=min(max_total_sec, 3.0))
+
+    total_limit = max(1024, int(max_total_sec * sr))
+    parts: list[np.ndarray] = []
+    collected = 0
+    for start, end in ranges:
+        start_i = max(0, int(start))
+        end_i = min(len(mono), int(end))
+        if end_i <= start_i:
+            continue
+        segment = mono[start_i:end_i]
+        if len(segment) == 0:
+            continue
+        remaining = total_limit - collected
+        if remaining <= 0:
+            break
+        if len(segment) > remaining:
+            segment = segment[:remaining]
+        parts.append(segment.astype(np.float32))
+        collected += len(segment)
+    if not parts:
+        return _analysis_block(mono, sr, window_sec=min(max_total_sec, 3.0))
+    return np.concatenate(parts, axis=0).astype(np.float32)
+
+
+def _ltas_tilt_profile(
+    audio: np.ndarray,
+    sr: int,
+    *,
+    compensation_db_per_octave: float = 4.5,
+    window_sec: float = 3.0,
+    segments: int = 6,
+    smoothing_fraction: int = 3,
+) -> dict[str, Any]:
+    mono = mono_sum(audio)
+    if len(mono) == 0:
+        return {
+            "compensation_db_per_octave": compensation_db_per_octave,
+            "window_sec": window_sec,
+            "segments": 0,
+            "smoothing": f"1/{smoothing_fraction} octave",
+            "regions_db": {},
+            "weight_60_120_vs_plateau_db": 0.0,
+            "sub_35_60_vs_plateau_db": 0.0,
+            "high_4k5_12k_vs_plateau_db": 0.0,
+            "plateau_spread_db": 0.0,
+            "curve": [],
+        }
+
+    window = max(2048, int(window_sec * sr))
+    starts = _active_segment_starts(mono, sr, window_sec=window_sec, count=segments)
+    if not starts:
+        starts = [0]
+
+    spectra = []
+    for start in starts:
+        end = min(len(mono), start + window)
+        block = mono[start:end]
+        if len(block) < window:
+            block = np.pad(block, (0, window - len(block)))
+        block = block.astype(np.float32) * np.hanning(len(block)).astype(np.float32)
+        spec = np.abs(np.fft.rfft(block)) + 1e-12
+        spectra.append(np.square(spec))
+    avg_power = np.mean(np.stack(spectra, axis=0), axis=0)
+    freqs = np.fft.rfftfreq(window, 1.0 / sr)
+    bands = build_fractional_octave_bands(fraction=smoothing_fraction, start_hz=20.0, stop_hz=20000.0)
+
+    curve = []
+    levels = {}
+    for band in bands:
+        mask = (freqs >= band.low_hz) & (freqs < band.high_hz)
+        if not np.any(mask):
+            continue
+        raw_level_db = 10.0 * np.log10(float(np.sum(avg_power[mask])) + 1e-12)
+        compensated_level_db = raw_level_db + compensation_db_per_octave * math.log2(max(band.center_hz, 20.0) / 100.0)
+        entry = {
+            "center_hz": round(float(band.center_hz), 2),
+            "raw_db": round(float(raw_level_db), 2),
+            "compensated_db": round(float(compensated_level_db), 2),
+        }
+        curve.append(entry)
+        levels[band.center_hz] = float(compensated_level_db)
+
+    def region(lo: float, hi: float) -> float:
+        values = [level for hz, level in levels.items() if lo <= hz < hi]
+        if not values:
+            return -100.0
+        return float(np.mean(values))
+
+    plateau_values = [level for hz, level in levels.items() if 90.0 <= hz < 4500.0]
+    plateau_db = float(np.mean(plateau_values)) if plateau_values else -100.0
+    regions_db = {
+        "infra_20_35": round(region(20.0, 35.0), 2),
+        "sub_35_60": round(region(35.0, 60.0), 2),
+        "weight_60_120": round(region(60.0, 120.0), 2),
+        "plateau_90_4500": round(plateau_db, 2),
+        "high_4500_12000": round(region(4500.0, 12000.0), 2),
+        "air_12000_20000": round(region(12000.0, 20000.0), 2),
+    }
+
+    return {
+        "compensation_db_per_octave": compensation_db_per_octave,
+        "window_sec": round(window_sec, 2),
+        "segments": len(starts),
+        "smoothing": f"1/{smoothing_fraction} octave",
+        "regions_db": regions_db,
+        "weight_60_120_vs_plateau_db": round(regions_db["weight_60_120"] - regions_db["plateau_90_4500"], 2),
+        "sub_35_60_vs_plateau_db": round(regions_db["sub_35_60"] - regions_db["plateau_90_4500"], 2),
+        "high_4500_12000_vs_plateau_db": round(regions_db["high_4500_12000"] - regions_db["plateau_90_4500"], 2),
+        "plateau_spread_db": round(
+            float(max(plateau_values) - min(plateau_values)) if plateau_values else 0.0,
+            2,
+        ),
+        "curve": curve,
+    }
+
+
+def _stem_mix_snapshot(
+    plans: dict[int, ChannelPlan],
+    target_len: int,
+    sr: int,
+) -> dict[str, Any]:
+    rendered_channels = {
+        channel: render_channel(plan.path, plan, target_len, sr)
+        for channel, plan in plans.items()
+        if not plan.muted
+    }
+    stem_audio, stem_channels, stem_files = _build_rendered_stem_groups(rendered_channels, plans)
+    (
+        channel_features,
+        stem_features,
+        contribution_matrix,
+        _channel_stems,
+        _channel_priorities,
+        _channel_measurements,
+    ) = _build_autofoh_measurement_snapshot(rendered_channels, plans, sr)
+
+    stems_report = []
+    for stem_name in sorted(stem_audio):
+        audio = stem_audio[stem_name]
+        mono = mono_sum(audio)
+        basic_metrics = metrics_for(mono, sr, instrument="custom")
+        features = stem_features.get(stem_name)
+        mix_indexes = getattr(features, "mix_indexes", None)
+        stems_report.append({
+            "stem": stem_name,
+            "channel_count": len(stem_channels.get(stem_name, [])),
+            "channels": stem_channels.get(stem_name, []),
+            "files": stem_files.get(stem_name, []),
+            "rms_db": round(float(basic_metrics.get("rms_db", -100.0)), 2),
+            "dynamic_range_db": round(float(basic_metrics.get("dynamic_range_db", 0.0)), 2),
+            "crest_factor_db": round(float(getattr(features, "crest_factor_db", basic_metrics.get("dynamic_range_db", 0.0))), 2),
+            "band_energy": {
+                band_name: round(float(level_db), 2)
+                for band_name, level_db in basic_metrics.get("band_energy", {}).items()
+            },
+            "mix_indexes": {
+                "sub_index": round(float(getattr(mix_indexes, "sub_index", 0.0)), 2),
+                "bass_index": round(float(getattr(mix_indexes, "bass_index", 0.0)), 2),
+                "body_index": round(float(getattr(mix_indexes, "body_index", 0.0)), 2),
+                "mud_index": round(float(getattr(mix_indexes, "mud_index", 0.0)), 2),
+                "presence_index": round(float(getattr(mix_indexes, "presence_index", 0.0)), 2),
+                "harshness_index": round(float(getattr(mix_indexes, "harshness_index", 0.0)), 2),
+                "sibilance_index": round(float(getattr(mix_indexes, "sibilance_index", 0.0)), 2),
+                "air_index": round(float(getattr(mix_indexes, "air_index", 0.0)), 2),
+            } if mix_indexes is not None else {},
+        })
+
+    band_hierarchy = []
+    if contribution_matrix is not None:
+        for band_name, row in sorted(contribution_matrix.band_contributions.items()):
+            ordered = sorted(row.items(), key=lambda item: item[1], reverse=True)
+            dominant_stem, dominant_share = ordered[0] if ordered else ("", 0.0)
+            runner_up_stem, runner_up_share = ordered[1] if len(ordered) > 1 else ("", 0.0)
+            band_hierarchy.append({
+                "band": band_name,
+                "dominant_stem": dominant_stem,
+                "dominant_share": round(float(dominant_share), 4),
+                "runner_up_stem": runner_up_stem,
+                "runner_up_share": round(float(runner_up_share), 4),
+            })
+
+    master_mix_indexes = {}
+    for item in stems_report:
+        if item["stem"] == "MASTER":
+            master_mix_indexes = dict(item.get("mix_indexes", {}))
+            break
+
+    slope_conformity = {
+        "reference_tilt_db_per_octave": 4.5,
+        "master_mix_indexes": master_mix_indexes,
+        "sub_deficit_db": round(max(0.0, -float(master_mix_indexes.get("sub_index", 0.0))), 2),
+        "bass_deficit_db": round(max(0.0, -float(master_mix_indexes.get("bass_index", 0.0))), 2),
+        "body_deficit_db": round(max(0.0, -float(master_mix_indexes.get("body_index", 0.0))), 2),
+    }
+
+    kick_focus = {}
+    kick_entry = next(
+        ((channel, plan) for channel, plan in plans.items() if not plan.muted and plan.instrument == "kick"),
+        None,
+    )
+    if kick_entry:
+        kick_channel, kick_plan = kick_entry
+        kick_audio = rendered_channels.get(kick_channel)
+        drums_audio = stem_audio.get("DRUMS")
+        master_audio = stem_audio.get("MASTER")
+        if kick_audio is not None and drums_audio is not None and master_audio is not None:
+            activity = kick_plan.event_activity or _event_activity_ranges(mono_sum(kick_audio), sr, "kick") or {}
+            ranges = activity.get("ranges") or []
+            kick_focus_audio = _activity_window_audio(kick_audio, ranges, sr)
+            drums_focus_audio = _activity_window_audio(drums_audio, ranges, sr)
+            master_focus_audio = _activity_window_audio(master_audio, ranges, sr)
+            kick_metrics = metrics_for(kick_focus_audio, sr, instrument="kick")
+            kick_punch_power = _band_power(kick_focus_audio, sr, 55.0, 95.0)
+            kick_click_power = _band_power(kick_focus_audio, sr, 2500.0, 4500.0)
+            drums_punch_power = _band_power(drums_focus_audio, sr, 55.0, 95.0)
+            drums_click_power = _band_power(drums_focus_audio, sr, 2500.0, 4500.0)
+            master_click_power = _band_power(master_focus_audio, sr, 2500.0, 4500.0)
+            kick_focus = {
+                "channel": kick_channel,
+                "file": kick_plan.path.name,
+                "analysis_ranges": len(ranges),
+                "active_sec": round(float((activity.get("active_samples") or 0) / sr), 3) if sr else 0.0,
+                "kick_dynamic_range_db": round(float(kick_metrics.get("dynamic_range_db", 0.0)), 2),
+                "kick_punch_db": round(_band_rms_db(kick_focus_audio, sr, 55.0, 95.0), 2),
+                "kick_click_db": round(_band_rms_db(kick_focus_audio, sr, 2500.0, 4500.0), 2),
+                "kick_box_db": round(_band_rms_db(kick_focus_audio, sr, 220.0, 420.0), 2),
+                "kick_click_minus_punch_db": round(
+                    _band_rms_db(kick_focus_audio, sr, 2500.0, 4500.0)
+                    - _band_rms_db(kick_focus_audio, sr, 55.0, 95.0),
+                    2,
+                ),
+                "kick_click_share_in_drums": round(float(kick_click_power / max(drums_click_power, 1e-12)), 4),
+                "kick_punch_share_in_drums": round(float(kick_punch_power / max(drums_punch_power, 1e-12)), 4),
+                "kick_click_share_in_master": round(float(kick_click_power / max(master_click_power, 1e-12)), 4),
+            }
+
+    tilt_conformity = {
+        stem_name: _ltas_tilt_profile(audio, sr)
+        for stem_name, audio in stem_audio.items()
+        if stem_name in {"MASTER", "DRUMS", "MUSIC", "LEAD", "BASS", "KICK"}
+    }
+
+    return {
+        "rendered_channels": rendered_channels,
+        "stem_audio": stem_audio,
+        "stems": stems_report,
+        "band_hierarchy": band_hierarchy,
+        "slope_conformity": slope_conformity,
+        "tilt_conformity": tilt_conformity,
+        "kick_focus": kick_focus,
+    }
+
+
+def apply_stem_mix_verification(
+    plans: dict[int, ChannelPlan],
+    target_len: int,
+    sr: int,
+    *,
+    genre: str | None = None,
+) -> dict[str, Any]:
+    snapshot_before = _stem_mix_snapshot(plans, target_len, sr)
+    genre_token = str(genre or "").strip().lower()
+    kick_focus_before = snapshot_before.get("kick_focus") or {}
+    kick_entry = next(
+        ((channel, plan) for channel, plan in plans.items() if not plan.muted and plan.instrument == "kick"),
+        None,
+    )
+    if not kick_entry:
+        return {
+            "enabled": False,
+            "reason": "kick_missing",
+            "before": {
+                "stems": snapshot_before["stems"],
+                "band_hierarchy": snapshot_before["band_hierarchy"],
+                "slope_conformity": snapshot_before["slope_conformity"],
+                "tilt_conformity": snapshot_before["tilt_conformity"],
+                "kick_focus": kick_focus_before,
+            },
+        }
+
+    _, kick_plan = kick_entry
+    desired_click_share_in_drums = 0.14 if genre_token == "rock" else 0.09
+    desired_click_share_in_master = 0.045 if genre_token == "rock" else 0.03
+    desired_dynamic_range_max_db = 16.5 if genre_token == "rock" else 18.0
+    desired_click_minus_punch_db = -17.0 if genre_token == "rock" else -19.0
+    desired_box_minus_click_db = -1.5 if genre_token == "rock" else 1.5
+    slope_before = snapshot_before.get("slope_conformity") or {}
+    master_mix_indexes_before = slope_before.get("master_mix_indexes") or {}
+    master_tilt_before = (snapshot_before.get("tilt_conformity") or {}).get("MASTER", {})
+    master_tilt_regions_before = master_tilt_before.get("regions_db") or {}
+
+    click_share_drums = float(kick_focus_before.get("kick_click_share_in_drums", 0.0))
+    click_share_master = float(kick_focus_before.get("kick_click_share_in_master", 0.0))
+    kick_dynamic_range_db = float(kick_focus_before.get("kick_dynamic_range_db", 0.0))
+    click_minus_punch_db = float(kick_focus_before.get("kick_click_minus_punch_db", -100.0))
+    box_minus_click_db = float(kick_focus_before.get("kick_box_db", -100.0) - kick_focus_before.get("kick_click_db", -100.0))
+    weight_vs_plateau_db = float(master_tilt_before.get("weight_60_120_vs_plateau_db", 0.0))
+    sub_vs_plateau_db = float(master_tilt_before.get("sub_35_60_vs_plateau_db", 0.0))
+    high_vs_plateau_db = float(master_tilt_before.get("high_4500_12000_vs_plateau_db", 0.0))
+    plateau_spread_db = float(master_tilt_before.get("plateau_spread_db", 0.0))
+    sub_index_before = float(master_mix_indexes_before.get("sub_index", 0.0))
+    bass_index_before = float(master_mix_indexes_before.get("bass_index", 0.0))
+    body_index_before = float(master_mix_indexes_before.get("body_index", 0.0))
+    low_end_deficit = max(
+        0.0,
+        (-sub_index_before) - (0.8 if genre_token == "rock" else 1.1),
+        (-bass_index_before) - (0.6 if genre_token == "rock" else 0.9),
+        (-body_index_before) - (0.35 if genre_token == "rock" else 0.6),
+    )
+    target_weight_vs_plateau_db = 2.0 if genre_token == "rock" else 1.0
+    target_sub_vs_plateau_db = 0.5 if genre_token == "rock" else -0.25
+    tilt_weight_shortage = max(0.0, target_weight_vs_plateau_db - weight_vs_plateau_db)
+    tilt_sub_shortage = max(0.0, target_sub_vs_plateau_db - sub_vs_plateau_db)
+    tilt_brightness_excess = max(0.0, high_vs_plateau_db + 1.5)
+    plateau_unevenness = max(0.0, plateau_spread_db - 6.0)
+
+    click_shortage = max(
+        0.0,
+        desired_click_share_in_drums - click_share_drums,
+        (desired_click_share_in_master - click_share_master) * 1.8,
+    )
+    dynamic_shortage = max(0.0, kick_dynamic_range_db - desired_dynamic_range_max_db)
+    click_tone_shortage = max(0.0, desired_click_minus_punch_db - click_minus_punch_db)
+    box_excess = max(0.0, box_minus_click_db - desired_box_minus_click_db)
+
+    actions: list[dict[str, Any]] = []
+    if click_shortage > 0.0 or dynamic_shortage > 0.0 or click_tone_shortage > 0.0 or box_excess > 0.0:
+        before_comp = {
+            "threshold_db": round(float(kick_plan.comp_threshold_db), 2),
+            "ratio": round(float(kick_plan.comp_ratio), 2),
+            "attack_ms": round(float(kick_plan.comp_attack_ms), 2),
+            "release_ms": round(float(kick_plan.comp_release_ms), 2),
+        }
+        kick_plan.comp_threshold_db = float(min(kick_plan.comp_threshold_db, -23.5 if genre_token == "rock" else -22.0))
+        kick_plan.comp_ratio = float(max(kick_plan.comp_ratio, 5.4 if genre_token == "rock" else 4.8))
+        kick_plan.comp_attack_ms = float(np.clip(max(kick_plan.comp_attack_ms, 10.0), 10.0, 12.0))
+        kick_plan.comp_release_ms = float(np.clip(kick_plan.comp_release_ms, 80.0, 95.0))
+        actions.append({
+            "type": "kick_compressor_reseat",
+            "before": before_comp,
+            "after": {
+                "threshold_db": round(float(kick_plan.comp_threshold_db), 2),
+                "ratio": round(float(kick_plan.comp_ratio), 2),
+                "attack_ms": round(float(kick_plan.comp_attack_ms), 2),
+                "release_ms": round(float(kick_plan.comp_release_ms), 2),
+            },
+            "reason": "Kick stem stays too spiky relative to the drum/master stems and needs firmer body control without choking the click.",
+        })
+
+    if click_shortage > 0.0 or click_tone_shortage > 0.0:
+        click_gain_db = float(np.clip(0.8 + click_shortage * 12.0 + click_tone_shortage * 0.08, 0.8, 2.1))
+        action = _merge_reference_eq_adjustment(
+            kick_plan,
+            freq=3500.0,
+            gain_db=click_gain_db,
+            q=1.6,
+        )
+        if action is not None:
+            actions.append({
+                "type": "kick_click_boost",
+                "target": {"freq_hz": 3500.0, "gain_db": round(click_gain_db, 2), "q": 1.6},
+                "result": action,
+                "reason": "Kick click share inside the drum and master stems is too low.",
+            })
+
+    if click_shortage > 0.015:
+        action = _merge_reference_eq_adjustment(
+            kick_plan,
+            freq=2200.0,
+            gain_db=0.6,
+            q=1.4,
+        )
+        if action is not None:
+            actions.append({
+                "type": "kick_upper_attack_support",
+                "target": {"freq_hz": 2200.0, "gain_db": 0.6, "q": 1.4},
+                "result": action,
+                "reason": "Kick needs more upper attack definition so the beater survives inside the drum stem.",
+            })
+
+    if box_excess > 0.0:
+        box_cut_db = float(np.clip(-0.6 - box_excess * 0.15, -1.4, -0.6))
+        action = _merge_reference_eq_adjustment(
+            kick_plan,
+            freq=320.0,
+            gain_db=box_cut_db,
+            q=1.25,
+        )
+        if action is not None:
+            actions.append({
+                "type": "kick_box_cleanup",
+                "target": {"freq_hz": 320.0, "gain_db": round(box_cut_db, 2), "q": 1.25},
+                "result": action,
+                "reason": "Kick box energy is overtaking the click band and keeps the drum from sitting forward in the mix.",
+            })
+
+    if low_end_deficit > 0.0 or tilt_weight_shortage > 0.0 or tilt_sub_shortage > 0.0:
+        low_end_support = max(low_end_deficit * 0.12, tilt_weight_shortage * 0.35, tilt_sub_shortage * 0.25)
+        kick_low_gain_db = float(np.clip(0.75 + low_end_support, 0.75, 2.4))
+        action = _merge_reference_eq_adjustment(
+            kick_plan,
+            freq=62.0,
+            gain_db=kick_low_gain_db,
+            q=0.95,
+        )
+        if action is not None:
+            actions.append({
+                "type": "master_slope_low_end_support_kick",
+                "target": {"freq_hz": 62.0, "gain_db": round(kick_low_gain_db, 2), "q": 0.95},
+                "result": action,
+                "reason": "AutoFOH slope-conformity check found a low-end deficit versus the -4.5 dB/oct target line.",
+            })
+
+        bass_entry = next(
+            ((channel, plan) for channel, plan in plans.items() if not plan.muted and plan.instrument == "bass_guitar"),
+            None,
+        )
+        if bass_entry is not None:
+            _, bass_plan = bass_entry
+            bass_low_gain_db = float(np.clip(0.55 + max(low_end_deficit * 0.08, tilt_weight_shortage * 0.25), 0.55, 1.8))
+            action = _merge_reference_eq_adjustment(
+                bass_plan,
+                freq=78.0,
+                gain_db=bass_low_gain_db,
+                q=1.0,
+            )
+            if action is not None:
+                actions.append({
+                    "type": "master_slope_low_end_support_bass",
+                    "target": {"freq_hz": 78.0, "gain_db": round(bass_low_gain_db, 2), "q": 1.0},
+                    "result": action,
+                    "reason": "Bass stem gets bounded support so the final mix better conforms to the -4.5 dB/oct slope target without giving away kick priority.",
+                })
+            if max(low_end_deficit, tilt_weight_shortage) > 4.0 and bass_plan.fader_db < -0.6:
+                before_fader = float(bass_plan.fader_db)
+                bass_plan.fader_db = float(np.clip(bass_plan.fader_db + 0.55, -30.0, 0.0))
+                if bass_plan.fader_db != before_fader:
+                    actions.append({
+                        "type": "master_slope_bass_fader_recovery",
+                        "before": {"fader_db": round(before_fader, 2)},
+                        "after": {"fader_db": round(float(bass_plan.fader_db), 2)},
+                        "reason": "Kick remains the low-end leader, but the bass fader recovers a little because the master slope still lacks weight.",
+                    })
+
+        if max(low_end_deficit, tilt_weight_shortage, tilt_sub_shortage) > 4.0 and kick_plan.trim_db < 3.0:
+            before_trim = float(kick_plan.trim_db)
+            kick_plan.trim_db = float(np.clip(kick_plan.trim_db + 0.6, -18.0, 12.0))
+            if kick_plan.trim_db != before_trim:
+                actions.append({
+                    "type": "master_slope_kick_trim_support",
+                    "before": {"trim_db": round(before_trim, 2)},
+                    "after": {"trim_db": round(float(kick_plan.trim_db), 2)},
+                    "reason": "Kick gets a small pre-compression lift because the master still sits below the target low-end slope.",
+                })
+
+    if tilt_brightness_excess > 0.0 or plateau_unevenness > 0.0:
+        cymbal_cut_db = float(np.clip(0.45 + tilt_brightness_excess * 0.18 + plateau_unevenness * 0.05, 0.45, 1.2))
+        for channel, plan in plans.items():
+            if plan.muted or plan.instrument not in {"overhead", "hi_hat", "ride"}:
+                continue
+            action = _merge_reference_eq_adjustment(
+                plan,
+                freq=8500.0,
+                gain_db=-cymbal_cut_db,
+                q=1.0,
+            )
+            if action is None:
+                continue
+            actions.append({
+                "type": "tilt_high_band_trim",
+                "channel": channel,
+                "target": {"freq_hz": 8500.0, "gain_db": round(-cymbal_cut_db, 2), "q": 1.0},
+                "result": action,
+                "reason": "The compensated LTAS stays too bright above 4.5 kHz, so cymbal/top-end stems are trimmed to restore the intended post-5 kHz roll-off.",
+            })
+
+    if not actions:
+        return {
+            "enabled": True,
+            "genre": genre_token,
+            "applied": False,
+            "notes": [
+                "Stem mix verification assembled the mix by stems and checked spectral balance, dynamics, and band hierarchy.",
+                "Kick stem already has enough click share and controlled dynamics inside the drum/master stems.",
+            ],
+            "before": {
+                "stems": snapshot_before["stems"],
+                "band_hierarchy": snapshot_before["band_hierarchy"],
+                "slope_conformity": snapshot_before["slope_conformity"],
+                "tilt_conformity": snapshot_before["tilt_conformity"],
+                "kick_focus": kick_focus_before,
+            },
+            "after": {
+                "stems": snapshot_before["stems"],
+                "band_hierarchy": snapshot_before["band_hierarchy"],
+                "slope_conformity": snapshot_before["slope_conformity"],
+                "tilt_conformity": snapshot_before["tilt_conformity"],
+                "kick_focus": kick_focus_before,
+            },
+            "actions": [],
+        }
+
+    snapshot_after = _stem_mix_snapshot(plans, target_len, sr)
+    return {
+        "enabled": True,
+        "genre": genre_token,
+        "applied": True,
+        "notes": [
+            "Stem mix verification assembles rendered channels into stems before the final print.",
+            "The pass checks stem AChH, dynamics, and band hierarchy, then reseats the kick only if its click/dynamics are weak inside the drum or master stems.",
+        ],
+        "before": {
+            "stems": snapshot_before["stems"],
+            "band_hierarchy": snapshot_before["band_hierarchy"],
+            "slope_conformity": snapshot_before["slope_conformity"],
+            "tilt_conformity": snapshot_before["tilt_conformity"],
+            "kick_focus": kick_focus_before,
+        },
+        "after": {
+            "stems": snapshot_after["stems"],
+            "band_hierarchy": snapshot_after["band_hierarchy"],
+            "slope_conformity": snapshot_after["slope_conformity"],
+            "tilt_conformity": snapshot_after["tilt_conformity"],
+            "kick_focus": snapshot_after["kick_focus"],
+        },
+        "actions": actions,
+    }
+
+
+def apply_kick_bass_hierarchy(
+    plans: dict[int, ChannelPlan],
+    target_len: int,
+    sr: int,
+    *,
+    desired_kick_advantage_db: float = 1.5,
+) -> dict[str, Any]:
+    kick_entry = next(
+        ((channel, plan) for channel, plan in plans.items() if not plan.muted and plan.instrument == "kick"),
+        None,
+    )
+    bass_entry = next(
+        ((channel, plan) for channel, plan in plans.items() if not plan.muted and plan.instrument == "bass_guitar"),
+        None,
+    )
+    if not kick_entry or not bass_entry:
+        return {"enabled": False, "reason": "kick_or_bass_missing"}
+
+    kick_channel, kick_plan = kick_entry
+    bass_channel, bass_plan = bass_entry
+    kick_audio = render_channel(kick_plan.path, kick_plan, target_len, sr)
+    bass_audio = render_channel(bass_plan.path, bass_plan, target_len, sr)
+
+    kick_block, kick_meta = _analysis_signal_for_metrics(mono_sum(kick_audio), sr, "kick")
+    bass_block, bass_meta = _analysis_signal_for_metrics(mono_sum(bass_audio), sr, "bass_guitar")
+    kick_anchor_db = _band_rms_db(kick_block, sr, 55.0, 95.0)
+    bass_anchor_db = _band_rms_db(bass_block, sr, 55.0, 95.0)
+    kick_click_db = _band_rms_db(kick_block, sr, 2500.0, 4500.0)
+    bass_low_mid_db = _band_rms_db(bass_block, sr, 90.0, 160.0)
+    measured_advantage = kick_anchor_db - bass_anchor_db
+    shortage_db = desired_kick_advantage_db - measured_advantage
+
+    if shortage_db <= 0.25:
+        return {
+            "enabled": False,
+            "reason": "hierarchy_already_satisfied",
+            "kick_channel": kick_channel,
+            "bass_channel": bass_channel,
+            "kick_anchor_db": round(kick_anchor_db, 2),
+            "bass_anchor_db": round(bass_anchor_db, 2),
+            "measured_advantage_db": round(measured_advantage, 2),
+            "desired_kick_advantage_db": round(desired_kick_advantage_db, 2),
+        }
+
+    kick_fader_before = float(kick_plan.fader_db)
+    bass_fader_before = float(bass_plan.fader_db)
+    kick_boost_db = float(np.clip(0.8 + shortage_db * 0.45, 0.75, 1.8))
+    bass_cut_db = float(np.clip(0.45 + shortage_db * 0.4, 0.35, 1.4))
+    kick_plan.fader_db = float(np.clip(kick_plan.fader_db + kick_boost_db, -30.0, 0.0))
+    bass_plan.fader_db = float(np.clip(bass_plan.fader_db - bass_cut_db, -30.0, 0.0))
+
+    kick_eq_changes: list[tuple[float, float, float]] = []
+    bass_eq_changes: list[tuple[float, float, float]] = []
+
+    if kick_anchor_db < bass_anchor_db + desired_kick_advantage_db:
+        kick_eq_changes.append((68.0, float(np.clip(0.8 + shortage_db * 0.35, 0.8, 1.6)), 0.95))
+        kick_eq_changes.append((3200.0, 0.6, 1.6))
+    bass_overlap_db = max(bass_anchor_db, bass_low_mid_db)
+    if shortage_db > 0.5 or bass_overlap_db > kick_anchor_db - 1.0:
+        bass_eq_changes.append((82.0, float(np.clip(-0.7 - shortage_db * 0.2, -1.3, -0.7)), 1.0))
+        bass_eq_changes.append((125.0, -0.6, 1.1))
+
+    kick_plan.eq_bands.extend(kick_eq_changes)
+    bass_plan.eq_bands.extend(bass_eq_changes)
+
+    return {
+        "enabled": True,
+        "kick_channel": kick_channel,
+        "bass_channel": bass_channel,
+        "kick_file": kick_plan.path.name,
+        "bass_file": bass_plan.path.name,
+        "kick_analysis_mode": kick_meta.get("analysis_mode"),
+        "bass_analysis_mode": bass_meta.get("analysis_mode"),
+        "kick_anchor_db": round(kick_anchor_db, 2),
+        "bass_anchor_db": round(bass_anchor_db, 2),
+        "kick_click_db": round(kick_click_db, 2),
+        "bass_low_mid_db": round(bass_low_mid_db, 2),
+        "measured_advantage_db": round(measured_advantage, 2),
+        "desired_kick_advantage_db": round(desired_kick_advantage_db, 2),
+        "shortage_db": round(shortage_db, 2),
+        "kick_fader_before_db": round(kick_fader_before, 2),
+        "kick_fader_after_db": round(float(kick_plan.fader_db), 2),
+        "bass_fader_before_db": round(bass_fader_before, 2),
+        "bass_fader_after_db": round(float(bass_plan.fader_db), 2),
+        "kick_eq_added": [
+            {"freq_hz": round(freq, 2), "gain_db": round(gain, 2), "q": round(q, 2)}
+            for freq, gain, q in kick_eq_changes
+        ],
+        "bass_eq_added": [
+            {"freq_hz": round(freq, 2), "gain_db": round(gain, 2), "q": round(q, 2)}
+            for freq, gain, q in bass_eq_changes
+        ],
+        "notes": [
+            "Kick is protected as the low-end anchor and must stay ahead of bass in the punch band.",
+            "Bass is trimmed only in the overlapping 55-125 Hz area so the groove stays intact while the kick leads.",
+        ],
+    }
+
+
 def apply_cymbal_cleanup_for_kick_focus(plans: dict[int, ChannelPlan], cymbal_atten_db: float) -> dict[str, Any]:
     """Reduce cymbal stems slightly so kick body is easier to hear."""
     if cymbal_atten_db <= 0.0:
@@ -2772,6 +4205,7 @@ def master_process(
     target_lufs: float = -16.0,
     final_limiter: bool = True,
     live_peak_ceiling_db: float = -3.0,
+    reference_context: ReferenceMixContext | None = None,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     # Console-like 2-bus cleanup and glue.
     for ch in range(2):
@@ -2780,14 +4214,19 @@ def master_process(
 
     meter = pyln.Meter(sr)
     peak = float(np.max(np.abs(mix))) if len(mix) else 0.0
+    peak_db = amp_to_db(peak)
     pre_lufs = None
     try:
         pre_lufs = float(meter.integrated_loudness(mix))
     except Exception:
         pass
 
+    reference_mastering: dict[str, Any] = {
+        "requested": bool(reference_context is not None),
+        "enabled": False,
+    }
+
     if not final_limiter:
-        peak_db = amp_to_db(peak)
         target_gain_db = 0.0
         if pre_lufs is not None and np.isfinite(pre_lufs):
             target_gain_db = float(np.clip(target_lufs - pre_lufs, -6.0, 6.0))
@@ -2799,6 +4238,13 @@ def master_process(
             post_lufs = float(meter.integrated_loudness(mix))
         except Exception:
             pass
+        if reference_context is not None:
+            reference_mastering.update({
+                "reason": "final_limiter_disabled",
+                "reference_path": str(reference_context.path),
+                "source_type": reference_context.source_type,
+                "reference_sources": [str(path) for path in reference_context.source_paths],
+            })
         return np.asarray(mix, dtype=np.float32), {
             "final_limiter": False,
             "soft_limiter": False,
@@ -2807,8 +4253,92 @@ def master_process(
             "pre_master_peak_dbfs": round(peak_db, 2),
             "pre_master_lufs": round(pre_lufs, 2) if pre_lufs is not None and np.isfinite(pre_lufs) else None,
             "post_master_lufs": round(post_lufs, 2) if post_lufs is not None and np.isfinite(post_lufs) else None,
+            "reference_mastering": reference_mastering,
             "note": "No final limiting or clipping stage; only static master trim is used for live-style headroom.",
         }
+
+    if reference_context is not None:
+        reference_input_mix = np.asarray(mix, dtype=np.float32).copy()
+        reference_mastering.update({
+            "reference_path": str(reference_context.path),
+            "source_type": reference_context.source_type,
+            "reference_sources": [str(path) for path in reference_context.source_paths],
+        })
+        if reference_context.audio is None or reference_context.sample_rate is None:
+            reference_mastering["reason"] = "reference_has_no_audio_stream"
+        else:
+            ref_audio = reference_context.audio
+            ref_sr = int(reference_context.sample_rate)
+            if ref_sr != sr:
+                ref_audio = resample_audio(ref_audio, ref_sr, sr)
+            auto_master = AutoMaster(sample_rate=sr, target_lufs=target_lufs, true_peak_limit=-1.0)
+            try:
+                mastered = auto_master.master(mix, reference=ref_audio, sample_rate=sr)
+                if isinstance(mastered, MasteringResult):
+                    mastered_audio = np.asarray(mastered.audio, dtype=np.float32)
+                    reference_mastering.update({
+                        "enabled": bool(mastered.success),
+                        "backend": "matchering_result",
+                        "peak_dbfs": round(float(mastered.peak_db), 2),
+                        "lufs": round(float(mastered.lufs), 2),
+                        "gain_applied_db": round(float(mastered.gain_applied_db), 2),
+                        "limiter_reduction_db": round(float(mastered.limiter_reduction_db), 2),
+                        "error": mastered.error,
+                    })
+                else:
+                    mastered_audio = np.asarray(mastered, dtype=np.float32)
+                    post_lufs = None
+                    try:
+                        post_lufs = float(meter.integrated_loudness(mastered_audio))
+                    except Exception:
+                        pass
+                    reference_mastering.update({
+                        "enabled": True,
+                        "backend": "reference_audio_fallback",
+                        "peak_dbfs": round(amp_to_db(float(np.max(np.abs(mastered_audio))) if len(mastered_audio) else 0.0), 2),
+                        "lufs": round(post_lufs, 2) if post_lufs is not None and np.isfinite(post_lufs) else None,
+                    })
+                post_lufs = None
+                try:
+                    post_lufs = float(meter.integrated_loudness(mastered_audio))
+                except Exception:
+                    pass
+                expected_floor = None
+                style_lufs = float(reference_context.style_profile.loudness_lufs)
+                if post_lufs is not None and np.isfinite(post_lufs):
+                    comparison_points = [style_lufs, target_lufs]
+                    if pre_lufs is not None and np.isfinite(pre_lufs):
+                        comparison_points.append(float(pre_lufs))
+                    expected_floor = min(comparison_points) - 8.0
+                if (
+                    post_lufs is None
+                    or not np.isfinite(post_lufs)
+                    or (expected_floor is not None and post_lufs < expected_floor)
+                ):
+                    reference_mastering.update({
+                        "enabled": False,
+                        "reason": "reference_mastering_rejected_low_loudness",
+                        "rejected_post_master_lufs": round(post_lufs, 2) if post_lufs is not None and np.isfinite(post_lufs) else None,
+                        "expected_floor_lufs": round(expected_floor, 2) if expected_floor is not None else None,
+                    })
+                    mix = reference_input_mix
+                else:
+                    mix = mastered_audio
+                    return np.asarray(mix, dtype=np.float32), {
+                        "final_limiter": True,
+                        "soft_limiter": False,
+                        "ceiling_dbfs": -1.0,
+                        "pre_master_peak_dbfs": round(peak_db, 2),
+                        "pre_master_lufs": round(pre_lufs, 2) if pre_lufs is not None and np.isfinite(pre_lufs) else None,
+                        "post_master_lufs": round(post_lufs, 2) if post_lufs is not None and np.isfinite(post_lufs) else None,
+                        "reference_mastering": reference_mastering,
+                    }
+            except Exception as exc:
+                reference_mastering.update({
+                    "enabled": False,
+                    "reason": "reference_mastering_failed",
+                    "error": str(exc),
+                })
 
     ceiling = db_to_amp(-1.0)
     if peak > 0.95:
@@ -2845,9 +4375,10 @@ def master_process(
         "final_limiter": True,
         "soft_limiter": True,
         "ceiling_dbfs": -1.0,
-        "pre_master_peak_dbfs": round(amp_to_db(peak), 2),
+        "pre_master_peak_dbfs": round(peak_db, 2),
         "pre_master_lufs": round(pre_lufs, 2) if pre_lufs is not None and np.isfinite(pre_lufs) else None,
         "post_master_lufs": round(post_lufs, 2) if post_lufs is not None and np.isfinite(post_lufs) else None,
+        "reference_mastering": reference_mastering,
     }
 
 
@@ -2875,6 +4406,8 @@ def main() -> int:
     parser.add_argument("--codex-orchestrator-max-actions", type=int, default=5)
     parser.add_argument("--soft-master", action="store_true")
     parser.add_argument("--master-target-lufs", type=float, default=-16.0)
+    parser.add_argument("--reference", default="", help="Path to an external reference track or saved style preset JSON")
+    parser.add_argument("--genre", default="", help="Optional genre focus for bounded mix voicing, for example 'rock'")
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
@@ -2922,6 +4455,7 @@ def main() -> int:
     config = yaml.safe_load((REPO_ROOT / "config" / "automixer.yaml").read_text(encoding="utf-8"))
     ai_config = config.get("ai", {})
     autofoh_config = config.get("autofoh", {})
+    reference_context = prepare_reference_mix_context(args.reference)
     use_llm_in_orchestrator = bool(args.codex_orchestrator_allow_llm and args.codex_orchestrator)
     llm = None
     if not args.no_llm and (not args.codex_orchestrator or use_llm_in_orchestrator):
@@ -2966,7 +4500,7 @@ def main() -> int:
             "instrument": plan.instrument,
             "is_muted": False,
             "mix_lufs": music_bed_lufs,
-            "vocal_target_delta_db": 6.0,
+            "vocal_target_delta_db": 7.0 if str(args.genre).strip().lower() == "rock" else 6.0,
         })
         states[ch] = state
     agent.update_channel_states_batch(states)
@@ -3042,6 +4576,20 @@ def main() -> int:
         ],
     }
     cross_adaptive_eq = apply_cross_adaptive_eq(plans, target_len, sr)
+    reference_mix_guidance = apply_reference_mix_guidance(plans, sr, reference_context)
+    genre_mix_profile = apply_genre_mix_profile(plans, args.genre)
+    kick_bass_hierarchy = apply_kick_bass_hierarchy(
+        plans,
+        target_len,
+        sr,
+        desired_kick_advantage_db=1.8 if str(args.genre).strip().lower() == "rock" else 1.5,
+    )
+    stem_mix_verification = apply_stem_mix_verification(
+        plans,
+        target_len,
+        sr,
+        genre=args.genre,
+    )
     live_channel_headroom = (
         apply_live_channel_peak_headroom(plans, target_len, sr, args.live_channel_peak_ceiling_db)
         if args.no_final_limiter
@@ -3112,6 +4660,7 @@ def main() -> int:
         target_lufs=args.master_target_lufs,
         final_limiter=final_limiter,
         live_peak_ceiling_db=args.live_peak_ceiling_db,
+        reference_context=reference_context,
     )
 
     tmp_wav = Path(args.output).with_suffix(".wav")
@@ -3136,6 +4685,9 @@ def main() -> int:
     report = {
         "input_dir": str(input_dir),
         "output": str(output),
+        "reference": str(reference_context.path) if reference_context is not None else "",
+        "reference_sources": [str(path) for path in reference_context.source_paths] if reference_context is not None else [],
+        "genre": str(args.genre or ""),
         "sample_rate": sr,
         "codex_orchestrator": orchestration_report,
         "duration_sec": round(target_len / sr, 3),
@@ -3145,6 +4697,10 @@ def main() -> int:
         "vocal_bed_balance": vocal_bed_balance,
         "bass_drum_boost": bass_drum_push,
         "cross_adaptive_eq": cross_adaptive_eq,
+        "reference_mix_guidance": reference_mix_guidance,
+        "genre_mix_profile": genre_mix_profile,
+        "kick_bass_hierarchy": kick_bass_hierarchy,
+        "stem_mix_verification": stem_mix_verification,
         "dynamic_vocal_priority": dynamic_vocal_priority,
         "kick_presence_boost": kick_presence_boost,
         "kick_focus_cymbal_cut": cymbal_focus_cleanup,

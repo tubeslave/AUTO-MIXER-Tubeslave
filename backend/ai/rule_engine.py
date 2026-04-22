@@ -357,18 +357,18 @@ def _dynamic_range_profile_for_instrument(instrument: str) -> Optional[Dict[str,
     instrument = (instrument or '').lower()
     profiles: Dict[str, Dict[str, float]] = {
         'lead_vocal': {
-            'max_dynamic_range_db': 24.0,
-            'threshold_offset_db': 6.0,
-            'ratio': 3.0,
-            'attack_ms': 10.0,
-            'release_ms': 100.0,
+            'max_dynamic_range_db': 18.0,
+            'threshold_offset_db': 4.5,
+            'ratio': 4.0,
+            'attack_ms': 6.0,
+            'release_ms': 95.0,
         },
         'backing_vocal': {
-            'max_dynamic_range_db': 22.0,
-            'threshold_offset_db': 5.0,
-            'ratio': 3.0,
-            'attack_ms': 10.0,
-            'release_ms': 100.0,
+            'max_dynamic_range_db': 20.0,
+            'threshold_offset_db': 4.5,
+            'ratio': 3.2,
+            'attack_ms': 8.0,
+            'release_ms': 105.0,
         },
         'kick': {
             'max_dynamic_range_db': 24.0,

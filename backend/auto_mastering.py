@@ -65,19 +65,71 @@ class AutoMaster:
                                    gain_applied_db=0, limiter_reduction_db=0,
                                    eq_applied=False, success=False, error="Empty audio")
 
-        audio = audio.astype(np.float32)
+        audio = self._normalize_audio_shape(audio.astype(np.float32))
 
         if reference is not None:
-            return self._master_fallback(audio, reference.astype(np.float32), self.sample_rate)
-
-        if reference is not None and self._matchering_available:
-            return self._master_with_reference(audio, reference)
+            reference = self._normalize_audio_shape(reference.astype(np.float32))
+            if self._matchering_available:
+                result = self._master_with_reference(audio, reference)
+                if result.success and result.audio is not None:
+                    return self._match_output_shape(result.audio.astype(np.float32), audio)
+            return self._master_fallback(audio, reference, self.sample_rate)
 
         return self._builtin_master(audio)
 
+    @staticmethod
+    def _normalize_audio_shape(audio: np.ndarray) -> np.ndarray:
+        """Normalize stereo arrays to (samples, channels) for processing."""
+        arr = np.asarray(audio, dtype=np.float32)
+        if arr.ndim <= 1:
+            return arr
+        if arr.ndim == 2 and arr.shape[0] <= 4 and arr.shape[1] > arr.shape[0]:
+            return arr.T.astype(np.float32, copy=False)
+        return arr.astype(np.float32, copy=False)
+
+    @classmethod
+    def _monitor_signal(cls, audio: np.ndarray) -> np.ndarray:
+        """Return a mono monitor signal for loudness and sidechain decisions."""
+        arr = cls._normalize_audio_shape(audio)
+        if arr.ndim == 1:
+            return arr.astype(np.float32, copy=False)
+        return np.mean(arr, axis=1).astype(np.float32, copy=False)
+
+    @classmethod
+    def _match_output_shape(cls, audio: np.ndarray, template: np.ndarray) -> np.ndarray:
+        """Keep reference-mastered output aligned with the caller's input layout."""
+        arr = cls._normalize_audio_shape(audio)
+        ref = cls._normalize_audio_shape(template)
+
+        if ref.ndim == 2 and arr.ndim == 1:
+            arr = np.column_stack([arr for _ in range(ref.shape[1])]).astype(np.float32)
+        elif ref.ndim == 1 and arr.ndim == 2:
+            arr = np.mean(arr, axis=1).astype(np.float32)
+
+        if len(arr) != len(ref) and len(arr) > 0 and len(ref) > 0:
+            src_pos = np.linspace(0.0, 1.0, num=len(arr), endpoint=False, dtype=np.float64)
+            dst_pos = np.linspace(0.0, 1.0, num=len(ref), endpoint=False, dtype=np.float64)
+            if arr.ndim == 1:
+                arr = np.interp(dst_pos, src_pos, arr.astype(np.float64)).astype(np.float32)
+            else:
+                channels = [
+                    np.interp(dst_pos, src_pos, arr[:, idx].astype(np.float64)).astype(np.float32)
+                    for idx in range(arr.shape[1])
+                ]
+                arr = np.column_stack(channels).astype(np.float32)
+
+        if ref.ndim == 2 and arr.ndim == 2 and arr.shape[1] != ref.shape[1]:
+            if arr.shape[1] > ref.shape[1]:
+                arr = arr[:, :ref.shape[1]]
+            else:
+                while arr.shape[1] < ref.shape[1]:
+                    arr = np.column_stack([arr, arr[:, -1]]).astype(np.float32)
+
+        return arr.astype(np.float32, copy=False)
+
     def _builtin_master(self, audio: np.ndarray) -> MasteringResult:
         """Built-in mastering chain: EQ -> Compression -> Limiting -> Normalization."""
-        processed = audio.copy()
+        processed = self._normalize_audio_shape(audio).copy()
 
         # 1. Gentle high-pass filter at 30Hz
         processed = self._apply_hpf(processed, 30.0)
@@ -89,7 +141,7 @@ class AutoMaster:
         )
 
         # 3. Loudness normalization
-        current_rms = np.sqrt(np.mean(processed ** 2) + 1e-12)
+        current_rms = np.sqrt(np.mean(self._monitor_signal(processed) ** 2) + 1e-12)
         current_db = 20 * np.log10(current_rms)
         gain_db = self.target_lufs - current_db
         gain_db = max(-12.0, min(12.0, gain_db))
@@ -127,7 +179,8 @@ class AutoMaster:
     def _master_fallback(self, audio: np.ndarray, reference: np.ndarray, sample_rate: int) -> np.ndarray:
         """Reference-guided fallback mastering without external dependencies."""
         self.sample_rate = sample_rate
-        working = audio.astype(np.float32, copy=True)
+        working = self._normalize_audio_shape(audio).astype(np.float32, copy=True)
+        reference = self._normalize_audio_shape(reference).astype(np.float32, copy=False)
 
         target_lufs = self._estimate_lufs(reference)
         current_lufs = self._estimate_lufs(working)
@@ -135,12 +188,18 @@ class AutoMaster:
         working *= np.float32(10.0 ** (gain_db / 20.0))
 
         working = self._apply_eq_match(working.astype(np.float64), reference.astype(np.float64), sample_rate).astype(np.float32)
+        post_eq_lufs = self._estimate_lufs(working)
+        correction_db = np.clip(target_lufs - post_eq_lufs, -18.0, 18.0)
+        working *= np.float32(10.0 ** (correction_db / 20.0))
         return self._limit(working)
 
     def _apply_eq_match(self, audio: np.ndarray, reference: np.ndarray, sample_rate: int) -> np.ndarray:
         """Very lightweight spectral tilt matching."""
         if not HAS_SCIPY:
             return audio
+
+        audio = self._normalize_audio_shape(audio)
+        reference = self._normalize_audio_shape(reference)
 
         min_len = min(len(audio), len(reference))
         if min_len == 0:
@@ -149,13 +208,24 @@ class AutoMaster:
         audio = audio[:min_len]
         reference = reference[:min_len]
 
-        fft_audio = np.fft.rfft(audio)
-        fft_ref = np.fft.rfft(reference)
-        mag_audio = np.abs(fft_audio) + 1e-9
+        ref_monitor = self._monitor_signal(reference)
+        audio_monitor = self._monitor_signal(audio)
+        fft_ref = np.fft.rfft(ref_monitor)
+        fft_audio_monitor = np.fft.rfft(audio_monitor)
+        mag_audio = np.abs(fft_audio_monitor) + 1e-9
         mag_ref = np.abs(fft_ref) + 1e-9
         ratio = np.clip(mag_ref / mag_audio, 0.5, 2.0)
-        matched = np.fft.irfft(fft_audio * ratio, n=min_len)
-        return matched.astype(audio.dtype, copy=False)
+
+        if audio.ndim == 1:
+            matched = np.fft.irfft(np.fft.rfft(audio) * ratio, n=min_len)
+            return matched.astype(audio.dtype, copy=False)
+
+        matched_channels = []
+        for channel_idx in range(audio.shape[1]):
+            fft_audio = np.fft.rfft(audio[:, channel_idx])
+            matched_channel = np.fft.irfft(fft_audio * ratio, n=min_len)
+            matched_channels.append(matched_channel.astype(audio.dtype, copy=False))
+        return np.column_stack(matched_channels).astype(audio.dtype, copy=False)
 
     def _write_wav(self, path: str, audio: np.ndarray, sample_rate: int):
         """Write PCM16 WAV when scipy is available."""
@@ -187,8 +257,7 @@ class AutoMaster:
             try:
                 import soundfile as sf
             except ImportError:
-                logger.warning("soundfile not available for matchering I/O")
-                return self._builtin_master(audio)
+                raise RuntimeError("soundfile not available for matchering I/O")
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 target_path = os.path.join(tmpdir, 'target.wav')
@@ -216,15 +285,24 @@ class AutoMaster:
                     eq_applied=True, success=True
                 )
         except Exception as e:
-            logger.error(f"Matchering error: {e}, falling back to built-in")
-            return self._builtin_master(audio)
+            logger.error(f"Matchering error: {e}, falling back to reference-guided fallback")
+            return MasteringResult(
+                audio=self._normalize_audio_shape(audio).astype(np.float32, copy=False),
+                peak_db=float(20 * np.log10(np.max(np.abs(audio)) + 1e-10)) if np.size(audio) else -100.0,
+                lufs=self._estimate_lufs(audio),
+                gain_applied_db=0.0,
+                limiter_reduction_db=0.0,
+                eq_applied=False,
+                success=False,
+                error=str(e),
+            )
 
     def _apply_hpf(self, audio: np.ndarray, cutoff_hz: float) -> np.ndarray:
         """Apply simple high-pass filter."""
         try:
             from scipy.signal import butter, sosfilt
             sos = butter(2, cutoff_hz, btype='high', fs=self.sample_rate, output='sos')
-            return sosfilt(sos, audio).astype(np.float32)
+            return sosfilt(sos, self._normalize_audio_shape(audio), axis=0).astype(np.float32)
         except ImportError:
             return audio
 
@@ -236,12 +314,13 @@ class AutoMaster:
         release_coeff = np.exp(-1.0 / (release_ms * self.sample_rate / 1000))
 
         threshold_lin = 10 ** (threshold_db / 20.0)
-        output = np.copy(audio)
+        output = np.copy(self._normalize_audio_shape(audio))
+        monitor = np.abs(self._monitor_signal(output))
         envelope = 0.0
         max_reduction = 0.0
 
-        for i in range(len(audio)):
-            level = abs(audio[i])
+        for i in range(len(output)):
+            level = float(monitor[i])
             if level > envelope:
                 envelope = attack_coeff * envelope + (1 - attack_coeff) * level
             else:
@@ -249,7 +328,7 @@ class AutoMaster:
 
             if envelope > threshold_lin:
                 gain_reduction = (envelope / threshold_lin) ** (1 - 1/ratio)
-                output[i] = audio[i] / (gain_reduction + eps)
+                output[i] = output[i] / (gain_reduction + eps)
                 reduction_db = 20 * np.log10(gain_reduction + eps)
                 max_reduction = max(max_reduction, reduction_db)
 
@@ -257,6 +336,7 @@ class AutoMaster:
 
     def _apply_limiter(self, audio: np.ndarray, ceiling_db: float) -> Tuple[np.ndarray, float]:
         """Apply brick-wall limiter."""
+        audio = self._normalize_audio_shape(audio)
         ceiling_lin = 10 ** (ceiling_db / 20.0)
         peak = np.max(np.abs(audio))
         reduction_db = 0.0

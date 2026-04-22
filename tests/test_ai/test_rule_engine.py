@@ -127,6 +127,29 @@ class TestRuleEngine:
         assert dynamic[0].parameters['release_ms'] == pytest.approx(60.0)
         assert dynamic[0].parameters['threshold_db'] == pytest.approx(-14.0)
 
+    def test_dynamic_range_uses_tighter_lead_vocal_settings(self):
+        """Lead vocals should trigger a firmer compressor profile when phrase dynamics get too wide."""
+        engine = RuleEngine()
+        engine.reset_cooldowns()
+        state = {
+            'instrument': 'lead_vocal',
+            'channel_id': 11,
+            'peak_db': -7.0,
+            'rms_db': -20.5,
+            'lufs_momentary': -18.0,
+            'dynamic_range_db': 21.0,
+            'channel_armed': True,
+        }
+
+        results = engine.evaluate(state)
+        dynamic = [r for r in results if r.rule_name == 'dynamic_range']
+
+        assert len(dynamic) == 1
+        assert dynamic[0].parameters['ratio'] == pytest.approx(4.0)
+        assert dynamic[0].parameters['attack_ms'] == pytest.approx(6.0)
+        assert dynamic[0].parameters['release_ms'] == pytest.approx(95.0)
+        assert dynamic[0].parameters['threshold_db'] == pytest.approx(-13.5)
+
     def test_gain_staging_keeps_normal_kick_peaks(self):
         """Kick peaks around -6 dBFS should not be forced toward the generic -12 dB target."""
         engine = RuleEngine()

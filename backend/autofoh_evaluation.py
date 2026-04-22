@@ -162,25 +162,55 @@ def evaluate_pending_action(
     outcome.observable = True
 
     if isinstance(pending.action, ChannelEQMove) and pending.evaluation_band_name:
-        index_name = INDEX_ATTR_LOOKUP[pending.evaluation_band_name]
+        band_name = pending.evaluation_band_name
+        index_name = INDEX_ATTR_LOOKUP[band_name]
         pre_error = abs(float(getattr(pending.pre_features.mix_indexes, index_name)))
         post_error = abs(float(getattr(post_features.mix_indexes, index_name)))
         delta_db = pre_error - post_error
+        pre_band_level = float(
+            pending.pre_features.slope_compensated_band_levels_db.get(
+                band_name,
+                pending.pre_features.named_band_levels_db.get(band_name, -100.0),
+            )
+        )
+        post_band_level = float(
+            post_features.slope_compensated_band_levels_db.get(
+                band_name,
+                post_features.named_band_levels_db.get(band_name, -100.0),
+            )
+        )
+        band_level_delta_db = post_band_level - pre_band_level
+        expected_direction = 0.0
+        if pending.action.gain_db > 0.0:
+            expected_direction = 1.0
+        elif pending.action.gain_db < 0.0:
+            expected_direction = -1.0
+        directional_response_db = expected_direction * band_level_delta_db
         outcome.metrics = {
             "pre_error_db": pre_error,
             "post_error_db": post_error,
             "error_delta_db": delta_db,
+            "pre_band_level_db": pre_band_level,
+            "post_band_level_db": post_band_level,
+            "band_level_delta_db": band_level_delta_db,
+            "directional_response_db": directional_response_db,
         }
-        outcome.improved = delta_db >= policy.min_band_improvement_db
-        outcome.worsened = delta_db <= -policy.worsening_tolerance_db
+        outcome.improved = (
+            delta_db >= policy.min_band_improvement_db
+            or directional_response_db >= policy.min_band_improvement_db
+        )
+        outcome.worsened = (
+            delta_db <= -policy.worsening_tolerance_db
+            or directional_response_db <= -policy.worsening_tolerance_db
+        )
         outcome.should_rollback = (
             outcome.worsened
             and pending.rollback_action is not None
             and policy.allow_proxy_audio_rollback_for_testing
         )
         outcome.measured_effect = (
-            f"{pending.evaluation_band_name} error {pre_error:.2f}dB -> "
-            f"{post_error:.2f}dB"
+            f"{band_name} proxy level {pre_band_level:.2f}dB -> "
+            f"{post_band_level:.2f}dB; error {pre_error:.2f}dB -> {post_error:.2f}dB"
         )
         return outcome
 
