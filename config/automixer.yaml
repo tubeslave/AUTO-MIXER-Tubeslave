@@ -15,21 +15,9 @@ mixer:
 audio:
   sample_rate: 48000
   block_size: 1024
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-  channels: 64
-  source: "soundgrid"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
-  device_name: ""
-=======
   channels: 48
   source: "soundgrid"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
   device_name: "soundgrid"  # pattern to match (e.g. "Waves SoundGrid", "soundgrid")
->>>>>>> Incoming (Background Agent changes)
-=======
-  channels: 48
-  source: "soundgrid"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
-  device_name: "soundgrid"  # pattern to match (e.g. "Waves SoundGrid", "soundgrid")
->>>>>>> Incoming (Background Agent changes)
   buffer_seconds: 5.0
 
 websocket:
