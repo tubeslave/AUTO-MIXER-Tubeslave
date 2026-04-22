@@ -13,10 +13,11 @@ import asyncio
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -132,6 +133,99 @@ REFERENCE_PRESET_SUFFIXES = {
     ".json",
 }
 
+BASS_INSTRUMENTS = {
+    "bass",
+    "bass_guitar",
+    "bass_di",
+    "bass_mic",
+    "synth_bass",
+}
+
+CYMBAL_INSTRUMENTS = {
+    "hi_hat",
+    "ride",
+    "overhead",
+    "oh_l",
+    "oh_r",
+    "cymbals",
+}
+
+WINDOW_SPACE_COMPETITOR_INSTRUMENTS = {
+    "accordion",
+    "backing_vocal",
+    "guitar",
+    "electric_guitar",
+    "lead_guitar",
+    "rhythm_guitar",
+    "acoustic_guitar",
+    "keys",
+    "piano",
+    "organ",
+    "synth",
+    "pad",
+    "lead_synth",
+    "playback",
+}
+
+FREQUENCY_WINDOW_DEFINITIONS: tuple[dict[str, Any], ...] = (
+    {
+        "id": "low_end_foundation",
+        "label": "Low End Foundation",
+        "low_hz": 20.0,
+        "high_hz": 120.0,
+        "focus": "kick, bass, sub stability, mono foundation",
+        "action_mode": "report_only",
+    },
+    {
+        "id": "warmth_mud",
+        "label": "Warmth / Mud",
+        "low_hz": 120.0,
+        "high_hz": 500.0,
+        "focus": "body, mud, room build-up, low-mid masking",
+        "action_mode": "cleanup_music",
+        "center_hz": 320.0,
+        "q": 1.15,
+    },
+    {
+        "id": "core_mids",
+        "label": "Core Mids",
+        "low_hz": 500.0,
+        "high_hz": 1000.0,
+        "focus": "musical skeleton, note readability, center integrity",
+        "action_mode": "report_only",
+    },
+    {
+        "id": "vocal_conflict",
+        "label": "Vocal Conflict",
+        "low_hz": 700.0,
+        "high_hz": 1500.0,
+        "focus": "lead vocal against guitars, keys, playback, backing stack",
+        "action_mode": "clear_vocal_space",
+        "center_hz": 1100.0,
+        "q": 1.3,
+    },
+    {
+        "id": "presence_harshness",
+        "label": "Presence / Harshness",
+        "low_hz": 1500.0,
+        "high_hz": 6000.0,
+        "focus": "presence, attack, intelligibility, harshness buildup",
+        "action_mode": "clear_vocal_space",
+        "center_hz": 2900.0,
+        "q": 1.45,
+    },
+    {
+        "id": "air_sibilance",
+        "label": "Air / Sibilance",
+        "low_hz": 6000.0,
+        "high_hz": 16000.0,
+        "focus": "hats, cymbals, sibilance, air integration",
+        "action_mode": "cymbal_control",
+        "center_hz": 8500.0,
+        "q": 1.2,
+    },
+)
+
 
 @dataclass
 class ChannelPlan:
@@ -166,6 +260,8 @@ class ChannelPlan:
     pan_notes: list[dict[str, Any]] = field(default_factory=list)
     cross_adaptive_eq: list[dict[str, Any]] = field(default_factory=list)
     autofoh_actions: list[dict[str, Any]] = field(default_factory=list)
+    fx_send_db: float | None = None
+    fx_bus_send_db: dict[int, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -176,6 +272,8 @@ class ReferenceMixContext:
     audio: np.ndarray | None = None
     sample_rate: int | None = None
     source_paths: list[Path] = field(default_factory=list)
+    sections: list[dict[str, Any]] = field(default_factory=list)
+    targets: dict[str, Any] = field(default_factory=dict)
 
 
 def _agent_actions_to_dict(actions: list[AgentAction]) -> list[dict[str, Any]]:
@@ -458,6 +556,8 @@ def _merge_style_profiles(style_profiles: list[StyleProfile], name: str) -> Styl
     merged.stereo_width = round(_median_value([p.stereo_width for p in style_profiles], default=0.0), 4)
     merged.loudness_lufs = round(_median_value([p.loudness_lufs for p in style_profiles], default=-14.0), 4)
     merged.crest_factor = round(_median_value([p.crest_factor for p in style_profiles], default=10.0), 4)
+    if any(getattr(profile, "instrument_settings_mode", "absolute") == "relative" for profile in style_profiles):
+        merged.instrument_settings_mode = "relative"
 
     instrument_names = sorted({
         instrument
@@ -500,6 +600,155 @@ def _iter_reference_sources(path: Path) -> list[Path]:
     return candidates
 
 
+def _aggregate_reference_sections(
+    audio: np.ndarray | None,
+    sr: int | None,
+    *,
+    count: int = 4,
+    window_sec: float = 12.0,
+) -> list[dict[str, Any]]:
+    if audio is None or sr is None or sr <= 0:
+        return []
+
+    mono = mono_sum(audio)
+    if len(mono) == 0:
+        return []
+
+    actual_window_sec = float(min(window_sec, max(3.0, len(mono) / sr)))
+    window = max(1024, int(actual_window_sec * sr))
+    starts = sorted(set(_active_segment_starts(mono, sr, window_sec=actual_window_sec, count=count)))
+    if not starts:
+        starts = [0]
+
+    sections: list[dict[str, Any]] = []
+    meter = pyln.Meter(sr)
+    for start in starts:
+        end = min(len(mono), start + window)
+        block = audio[start:end]
+        if len(block) == 0:
+            continue
+        block_mono = mono[start:end]
+        try:
+            loudness = float(meter.integrated_loudness(_match_reference_channels(block, 2)))
+        except Exception:
+            loudness = float(StyleTransfer()._estimate_lufs(block_mono, sr))
+
+        peak = float(np.max(np.abs(block))) if len(block) else 0.0
+        rms = float(np.sqrt(np.mean(np.square(block_mono)))) if len(block_mono) else 0.0
+        crest = amp_to_db(peak) - amp_to_db(rms) if rms > 1e-9 and peak > 1e-9 else 0.0
+        sections.append({
+            "start_sec": round(float(start / sr), 3),
+            "end_sec": round(float(end / sr), 3),
+            "lufs": round(loudness, 2),
+            "crest_factor_db": round(float(crest), 2),
+            "tilt": _ltas_tilt_profile(block, sr, window_sec=min(3.0, actual_window_sec), segments=3),
+        })
+    return sections
+
+
+def _reference_target_pan(instrument: str, current_pan: float, width: float) -> float:
+    width = float(np.clip(width, 0.0, 1.0))
+    if instrument in {"lead_vocal", "kick", "snare", "bass_guitar", "bass", "bass_di", "bass_mic", "synth_bass"}:
+        return 0.0
+    if instrument in {"overhead", "oh_l", "oh_r", "room_l", "room_r"}:
+        magnitude = float(np.clip(0.42 + width * 0.34, 0.32, 0.92))
+    elif instrument in {"hi_hat", "ride", "electric_guitar", "acoustic_guitar", "keys", "strings", "backing_vocal"}:
+        magnitude = float(np.clip(0.22 + width * 0.28, 0.12, 0.78))
+    else:
+        magnitude = float(np.clip(0.12 + width * 0.18, 0.0, 0.58))
+    sign = -1.0 if current_pan < 0.0 else 1.0
+    if abs(current_pan) < 0.05 and instrument in {"backing_vocal", "electric_guitar", "acoustic_guitar", "keys", "strings"}:
+        sign = 1.0
+    return sign * magnitude
+
+
+def _reference_supports_expander(instrument: str) -> bool:
+    return instrument not in {
+        "overhead",
+        "oh_l",
+        "oh_r",
+        "room",
+        "room_l",
+        "room_r",
+        "cymbals",
+        "reverb_return",
+        "delay_return",
+    }
+
+
+def _reference_targets_from_context(reference_context: ReferenceMixContext | None) -> dict[str, Any]:
+    if reference_context is None:
+        return {}
+    if reference_context.targets:
+        return reference_context.targets
+
+    style = reference_context.style_profile
+    sections = _aggregate_reference_sections(reference_context.audio, reference_context.sample_rate)
+    if sections:
+        weight_target = float(np.median([item["tilt"]["weight_60_120_vs_plateau_db"] for item in sections]))
+        sub_target = float(np.median([item["tilt"]["sub_35_60_vs_plateau_db"] for item in sections]))
+        high_target = float(np.median([item["tilt"]["high_4500_12000_vs_plateau_db"] for item in sections]))
+        plateau_target = float(np.median([item["tilt"]["plateau_spread_db"] for item in sections]))
+    else:
+        spectral = style.spectral_balance
+        weight_target = float(np.clip((spectral.get("bass", -12.0) - spectral.get("mid", -11.5)) * 0.7 + 0.5, -1.0, 5.5))
+        sub_target = float(np.clip((spectral.get("sub_bass", -24.0) - spectral.get("mid", -11.5)) * 0.5 - 0.5, -3.0, 3.0))
+        high_target = float(np.clip((spectral.get("presence", -19.5) - spectral.get("mid", -11.5)) * 0.8 - 1.0, -6.0, 2.5))
+        plateau_target = 5.5
+
+    kick_style = style.per_instrument_settings.get("kick", InstrumentStyle("kick"))
+    bass_style = style.per_instrument_settings.get("bass", InstrumentStyle("bass"))
+    vocal_style = style.per_instrument_settings.get("vocals", InstrumentStyle("vocals"))
+    kick_advantage = float(np.clip(
+        0.9
+        + (kick_style.gain_db - bass_style.gain_db) * 0.45
+        + (kick_style.eq_low_shelf_db - bass_style.eq_low_shelf_db) * 0.30
+        + kick_style.eq_high_mid_db * 0.18,
+        0.5,
+        2.8,
+    ))
+    lead_gap = float(np.clip(
+        3.6
+        + vocal_style.eq_high_mid_db * 0.35
+        + vocal_style.gain_db * 0.45
+        + max(0.0, 0.35 - style.stereo_width) * 1.6,
+        2.8,
+        6.5,
+    ))
+    click_share_master = float(np.clip(0.022 + max(0.0, kick_style.eq_high_mid_db) * 0.006, 0.02, 0.06))
+    click_share_drums = float(np.clip(0.075 + max(0.0, kick_style.eq_high_mid_db) * 0.012, 0.07, 0.18))
+    kick_dynamic_range_max = float(np.clip(17.5 - (kick_style.compression_ratio - 3.0) * 1.15, 11.0, 18.5))
+    click_minus_punch = float(np.clip(-20.0 + kick_style.eq_high_mid_db * 2.3, -21.0, -12.5))
+    box_minus_click = float(np.clip(0.5 - kick_style.eq_high_mid_db * 0.6, -2.5, 2.0))
+
+    reference_context.sections = sections
+    reference_context.targets = {
+        "tilt": {
+            "weight_60_120_vs_plateau_db": round(weight_target, 3),
+            "sub_35_60_vs_plateau_db": round(sub_target, 3),
+            "high_4500_12000_vs_plateau_db": round(high_target, 3),
+            "plateau_spread_db": round(plateau_target, 3),
+        },
+        "hierarchy": {
+            "lead_over_bgv_rms_db": round(lead_gap, 3),
+            "kick_over_bass_55_95_db": round(kick_advantage, 3),
+        },
+        "kick": {
+            "click_share_in_master": round(click_share_master, 4),
+            "click_share_in_drums": round(click_share_drums, 4),
+            "dynamic_range_max_db": round(kick_dynamic_range_max, 3),
+            "click_minus_punch_db": round(click_minus_punch, 3),
+            "box_minus_click_db": round(box_minus_click, 3),
+        },
+        "style_summary": {
+            "dynamic_range_db": round(float(style.dynamic_range), 3),
+            "stereo_width": round(float(style.stereo_width), 3),
+            "crest_factor_db": round(float(style.crest_factor), 3),
+        },
+    }
+    return reference_context.targets
+
+
 def prepare_reference_mix_context(reference_path: str | Path | None) -> ReferenceMixContext | None:
     if not reference_path:
         return None
@@ -511,16 +760,18 @@ def prepare_reference_mix_context(reference_path: str | Path | None) -> Referenc
     transfer = StyleTransfer(fft_size=4096, hop_size=1024)
     if path.is_file() and path.suffix.lower() == ".json":
         style_profile = transfer.load_preset(str(path))
-        return ReferenceMixContext(
+        context = ReferenceMixContext(
             path=path,
             source_type="style_preset",
             style_profile=style_profile,
             source_paths=[path],
         )
+        _reference_targets_from_context(context)
+        return context
     if path.is_file():
         audio, ref_sr = read_audio_file(path)
         style_profile = transfer.extract_style(audio, sr=ref_sr, name=path.stem)
-        return ReferenceMixContext(
+        context = ReferenceMixContext(
             path=path,
             source_type="audio",
             style_profile=style_profile,
@@ -528,6 +779,8 @@ def prepare_reference_mix_context(reference_path: str | Path | None) -> Referenc
             sample_rate=ref_sr,
             source_paths=[path],
         )
+        _reference_targets_from_context(context)
+        return context
 
     source_paths = _iter_reference_sources(path)
     style_profiles: list[StyleProfile] = []
@@ -575,7 +828,7 @@ def prepare_reference_mix_context(reference_path: str | Path | None) -> Referenc
     else:
         source_type = "style_preset_directory"
 
-    return ReferenceMixContext(
+    context = ReferenceMixContext(
         path=path,
         source_type=source_type,
         style_profile=merged_profile,
@@ -583,6 +836,8 @@ def prepare_reference_mix_context(reference_path: str | Path | None) -> Referenc
         sample_rate=target_sr,
         source_paths=source_paths,
     )
+    _reference_targets_from_context(context)
+    return context
 
 
 def _reference_style_instrument(instrument: str) -> str:
@@ -714,6 +969,7 @@ def apply_reference_mix_guidance(
         channel_audios,
         channel_types,
         sr=sr,
+        blend_instrument_settings=reference_context.style_profile.instrument_settings_mode == "relative",
     )
 
     actions: list[dict[str, Any]] = []
@@ -730,6 +986,9 @@ def apply_reference_mix_guidance(
             "fader": None,
             "eq": [],
             "compressor": None,
+            "pan": None,
+            "expander": None,
+            "fx_send": None,
         }
 
         fader_step = float(
@@ -746,6 +1005,40 @@ def apply_reference_mix_guidance(
                 "before_db": round(before, 2),
                 "delta_db": round(plan.fader_db - before, 2),
                 "after_db": round(plan.fader_db, 2),
+            }
+
+        style_width = float(reference_context.style_profile.stereo_width)
+        target_pan = _reference_target_pan(
+            plan.instrument,
+            float(plan.pan),
+            float(params.get("pan", style_width)),
+        )
+        if plan.instrument in {"lead_vocal", "kick", "snare", "bass_guitar", "bass", "bass_di", "bass_mic", "synth_bass"}:
+            target_pan = 0.0
+        if style_width < 0.18 and plan.instrument in {
+            "backing_vocal",
+            "electric_guitar",
+            "acoustic_guitar",
+            "guitar",
+            "keys",
+            "strings",
+            "playback",
+            "accordion",
+            "overhead",
+            "oh_l",
+            "oh_r",
+        }:
+            pan_blend = 0.82 if abs(plan.pan) > 0.05 else 0.7
+        else:
+            pan_blend = 0.55 if abs(plan.pan) > 0.05 else 0.42
+        desired_pan = float(np.clip(plan.pan + (target_pan - plan.pan) * pan_blend, -1.0, 1.0))
+        if abs(desired_pan - float(plan.pan)) >= 0.04:
+            before_pan = float(plan.pan)
+            plan.pan = desired_pan
+            action["pan"] = {
+                "before": round(before_pan, 3),
+                "target": round(target_pan, 3),
+                "after": round(float(plan.pan), 3),
             }
 
         eq_candidates = sorted(
@@ -787,10 +1080,71 @@ def apply_reference_mix_guidance(
                         "threshold_after_db": round(plan.comp_threshold_db, 2),
                     }
 
-        if action["fader"] or action["eq"] or action["compressor"]:
+        gate_threshold = float(params.get("gate_threshold", -60.0))
+        if _reference_supports_expander(plan.instrument) and gate_threshold > -59.0:
+            before_enabled = bool(plan.expander_enabled)
+            before_threshold = plan.expander_threshold_db
+            before_range = float(plan.expander_range_db)
+            target_threshold = float(np.clip(gate_threshold, -58.0, -32.0))
+            range_db = 4.0 if plan.instrument in {"lead_vocal", "backing_vocal"} else 6.0
+            if plan.instrument in {"kick", "snare", "toms", "rack_tom", "floor_tom"}:
+                range_db = 8.0
+            plan.expander_enabled = True
+            plan.expander_threshold_db = target_threshold
+            plan.expander_range_db = max(before_range, range_db)
+            if plan.instrument in {"lead_vocal", "backing_vocal"}:
+                plan.expander_open_ms = min(plan.expander_open_ms, 16.0)
+                plan.expander_close_ms = max(plan.expander_close_ms, 180.0)
+                plan.expander_hold_ms = max(plan.expander_hold_ms, 140.0)
+            elif plan.instrument in {"kick", "snare", "toms", "rack_tom", "floor_tom"}:
+                plan.expander_open_ms = min(plan.expander_open_ms, 8.0)
+                plan.expander_close_ms = max(plan.expander_close_ms, 120.0)
+                plan.expander_hold_ms = max(plan.expander_hold_ms, 40.0)
+            if (not before_enabled) or before_threshold != plan.expander_threshold_db or abs(plan.expander_range_db - before_range) >= 0.1:
+                action["expander"] = {
+                    "enabled_before": before_enabled,
+                    "threshold_before_db": None if before_threshold is None else round(float(before_threshold), 2),
+                    "threshold_after_db": round(float(plan.expander_threshold_db), 2),
+                    "range_before_db": round(before_range, 2),
+                    "range_after_db": round(float(plan.expander_range_db), 2),
+                }
+
+        bus_send = params.get("bus_send") or {}
+        if bus_send:
+            send_levels = []
+            bus_targets: dict[int, float] = {}
+            for value in bus_send.values():
+                try:
+                    send_levels.append(float(value))
+                except (TypeError, ValueError):
+                    continue
+            for bus_name, value in bus_send.items():
+                try:
+                    bus_id = int(bus_name)
+                    bus_targets[bus_id] = float(np.clip(float(value), -96.0, 0.0))
+                except (TypeError, ValueError):
+                    continue
+            if send_levels:
+                target_send = float(np.clip(np.median(send_levels), -96.0, 0.0))
+                before_send = plan.fx_send_db
+                if before_send is None:
+                    plan.fx_send_db = target_send
+                else:
+                    plan.fx_send_db = float(np.clip(before_send + (target_send - before_send) * 0.55, -96.0, 0.0))
+                if before_send != plan.fx_send_db:
+                    action["fx_send"] = {
+                        "before_db": None if before_send is None else round(float(before_send), 2),
+                        "target_db": round(target_send, 2),
+                        "after_db": round(float(plan.fx_send_db), 2),
+                    }
+            if bus_targets:
+                plan.fx_bus_send_db.update(bus_targets)
+
+        if action["fader"] or action["eq"] or action["compressor"] or action["pan"] or action["expander"] or action["fx_send"]:
             actions.append(action)
 
     style = reference_context.style_profile
+    targets = _reference_targets_from_context(reference_context)
     return {
         "enabled": True,
         "reference_path": str(reference_context.path),
@@ -807,7 +1161,10 @@ def apply_reference_mix_guidance(
                 key: round(float(value), 2)
                 for key, value in style.spectral_balance.items()
             },
+            "instrument_settings_mode": style.instrument_settings_mode,
         },
+        "targets": targets,
+        "sections": reference_context.sections,
         "actions": actions,
         "skipped_channels": skipped_channels,
     }
@@ -2613,6 +2970,171 @@ def _frame_rms_db(x: np.ndarray, frame: int, hop: int) -> tuple[np.ndarray, np.n
     return starts.astype(np.float32), np.asarray(values, dtype=np.float32)
 
 
+def _rolling_percentile(
+    values: np.ndarray,
+    radius: int,
+    percentile: float = 60.0,
+    active_mask: np.ndarray | None = None,
+) -> np.ndarray:
+    out = np.zeros_like(values, dtype=np.float32)
+    for index in range(len(values)):
+        start = max(0, index - radius)
+        end = min(len(values), index + radius + 1)
+        window = values[start:end]
+        if active_mask is not None:
+            active_window = window[active_mask[start:end]]
+            if len(active_window) >= max(3, len(window) // 4):
+                window = active_window
+        out[index] = float(np.percentile(window, percentile)) if len(window) else float(values[index])
+    return out
+
+
+def _frame_gain_to_samples(gain_db: np.ndarray, starts: np.ndarray, frame: int, total_len: int) -> np.ndarray:
+    if total_len <= 0:
+        return np.zeros(0, dtype=np.float32)
+    if len(gain_db) == 0:
+        return np.ones(total_len, dtype=np.float32)
+    sample_points = np.clip(starts + frame // 2, 0, total_len - 1)
+    full_points = np.concatenate(([0.0], sample_points.astype(np.float32), [float(total_len - 1)]))
+    full_gain = np.concatenate(([gain_db[0]], gain_db, [gain_db[-1]])).astype(np.float32)
+    envelope_db = np.interp(np.arange(total_len, dtype=np.float32), full_points, full_gain).astype(np.float32)
+    return np.power(10.0, envelope_db / 20.0, dtype=np.float32)
+
+
+def _reference_dynamics_tightness(reference_context: ReferenceMixContext | None) -> float:
+    if reference_context is None:
+        return 0.0
+    style = reference_context.style_profile
+    style_tightness = float(np.clip((15.5 - float(style.dynamic_range)) / 8.0, 0.0, 1.0))
+    section_lufs = [float(section.get("lufs")) for section in reference_context.sections if "lufs" in section]
+    if len(section_lufs) >= 2:
+        section_span = max(section_lufs) - min(section_lufs)
+        macro_tightness = float(np.clip((5.5 - section_span) / 4.5, 0.0, 1.0))
+        return float(np.clip(style_tightness * 0.75 + macro_tightness * 0.25, 0.0, 1.0))
+    return style_tightness
+
+
+def _reference_fx_space_lift(reference_context: ReferenceMixContext | None) -> float:
+    if reference_context is None:
+        return 0.0
+    style = reference_context.style_profile
+    width = float(np.clip(style.stereo_width, 0.0, 1.0))
+    tightness = float(np.clip((8.0 - float(style.dynamic_range)) / 8.0, 0.0, 1.0))
+    darkness = float(np.clip(
+        (float(style.spectral_balance.get("mid", -11.5)) - float(style.spectral_balance.get("presence", -19.5))) / 10.0,
+        0.0,
+        1.4,
+    ))
+    wetness = 0.24 + width * 0.82 + darkness * 0.34 + tightness * 0.28
+    return float(np.clip(wetness, 0.18, 1.55))
+
+
+def _channel_family_for_dynamics(plan: ChannelPlan) -> str | None:
+    if plan.instrument == "lead_vocal":
+        return "lead_vocals"
+    if plan.instrument == "backing_vocal":
+        return "backing_vocals"
+    if plan.instrument in DRUM_INSTRUMENTS or plan.instrument in {"overhead", "room"}:
+        return "drums"
+    if plan.instrument in {"bass", "bass_di", "bass_mic", "bass_guitar", "synth_bass"}:
+        return "bass"
+    if plan.instrument in {
+        "electric_guitar",
+        "guitar",
+        "acoustic_guitar",
+        "keys",
+        "piano",
+        "organ",
+        "synth",
+        "pad",
+        "lead_guitar",
+        "rhythm_guitar",
+        "accordion",
+        "playback",
+        "tracks",
+        "music",
+    }:
+        return "music"
+    return None
+
+
+def _dynamics_profile_for_family(family: str, tightness: float) -> dict[str, float]:
+    if family == "lead_vocals":
+        return {
+            "frame_sec": 0.30,
+            "hop_sec": 0.08,
+            "window_sec": 8.0,
+            "active_margin_db": 16.0,
+            "percentile": 56.0,
+            "cut_strength": 0.54 + tightness * 0.14,
+            "boost_strength": 0.18 + tightness * 0.07,
+            "peak_shave_db": 0.8 + tightness * 0.7,
+            "max_cut_db": 2.8 + tightness * 1.0,
+            "max_boost_db": 0.9 + tightness * 0.45,
+            "attack_ms": 140.0,
+            "release_ms": 980.0,
+        }
+    if family == "backing_vocals":
+        return {
+            "frame_sec": 0.34,
+            "hop_sec": 0.10,
+            "window_sec": 8.5,
+            "active_margin_db": 16.0,
+            "percentile": 58.0,
+            "cut_strength": 0.46 + tightness * 0.12,
+            "boost_strength": 0.12 + tightness * 0.05,
+            "peak_shave_db": 0.55 + tightness * 0.45,
+            "max_cut_db": 2.2 + tightness * 0.8,
+            "max_boost_db": 0.7 + tightness * 0.3,
+            "attack_ms": 180.0,
+            "release_ms": 1200.0,
+        }
+    if family == "drums":
+        return {
+            "frame_sec": 0.26,
+            "hop_sec": 0.07,
+            "window_sec": 6.5,
+            "active_margin_db": 18.0,
+            "percentile": 54.0,
+            "cut_strength": 0.28 + tightness * 0.10,
+            "boost_strength": 0.07 + tightness * 0.03,
+            "peak_shave_db": 0.4 + tightness * 0.35,
+            "max_cut_db": 1.8 + tightness * 0.6,
+            "max_boost_db": 0.45 + tightness * 0.2,
+            "attack_ms": 90.0,
+            "release_ms": 720.0,
+        }
+    if family == "bass":
+        return {
+            "frame_sec": 0.32,
+            "hop_sec": 0.09,
+            "window_sec": 7.0,
+            "active_margin_db": 16.0,
+            "percentile": 55.0,
+            "cut_strength": 0.22 + tightness * 0.08,
+            "boost_strength": 0.08 + tightness * 0.03,
+            "peak_shave_db": 0.3 + tightness * 0.2,
+            "max_cut_db": 1.5 + tightness * 0.4,
+            "max_boost_db": 0.35 + tightness * 0.15,
+            "attack_ms": 120.0,
+            "release_ms": 900.0,
+        }
+    return {
+        "frame_sec": 0.36,
+        "hop_sec": 0.10,
+        "window_sec": 8.5,
+        "active_margin_db": 16.0,
+        "percentile": 57.0,
+        "cut_strength": 0.3 + tightness * 0.08,
+        "boost_strength": 0.09 + tightness * 0.03,
+        "peak_shave_db": 0.35 + tightness * 0.2,
+        "max_cut_db": 1.7 + tightness * 0.5,
+        "max_boost_db": 0.45 + tightness * 0.18,
+        "attack_ms": 160.0,
+        "release_ms": 980.0,
+    }
+
+
 def _smooth_gain_db(target_db: np.ndarray, sr: int, hop: int, attack_ms: float = 180.0, release_ms: float = 900.0) -> np.ndarray:
     attack = math.exp(-hop / max(1.0, attack_ms * 0.001 * sr))
     release = math.exp(-hop / max(1.0, release_ms * 0.001 * sr))
@@ -2696,6 +3218,123 @@ def apply_dynamic_vocal_priority(
         "active_vocal_sec": round(float(np.sum(active) * hop / sr), 2),
         "bed_mid_db": round(bed_mid, 2),
         "bed_loud_db": round(bed_loud, 2),
+    }
+
+
+def apply_reference_dynamics_ride(
+    rendered_channels: dict[int, np.ndarray],
+    plans: dict[int, ChannelPlan],
+    sr: int,
+    reference_context: ReferenceMixContext | None,
+) -> dict[str, Any]:
+    if reference_context is None:
+        return {"enabled": False, "reason": "no_reference_supplied"}
+    if not rendered_channels:
+        return {"enabled": False, "reason": "no_rendered_channels"}
+
+    tightness = _reference_dynamics_tightness(reference_context)
+    if tightness <= 0.02:
+        return {
+            "enabled": False,
+            "reason": "reference_is_not_tight_enough_for_extra_rides",
+            "tightness": round(tightness, 3),
+        }
+
+    first_audio = next(iter(rendered_channels.values()))
+    group_channels: dict[str, list[int]] = {}
+    for channel, audio in rendered_channels.items():
+        if len(audio) == 0:
+            continue
+        plan = plans.get(channel)
+        if plan is None or plan.muted:
+            continue
+        family = _channel_family_for_dynamics(plan)
+        if family is None:
+            continue
+        group_channels.setdefault(family, []).append(channel)
+
+    groups_report = []
+    adjusted_channel_count = 0
+    for family, channels in sorted(group_channels.items()):
+        profile = _dynamics_profile_for_family(family, tightness)
+        group_audio = sum((rendered_channels[channel] for channel in channels), np.zeros_like(first_audio))
+        frame = max(1024, int(profile["frame_sec"] * sr))
+        hop = max(256, int(profile["hop_sec"] * sr))
+        starts, rms_db = _frame_rms_db(group_audio, frame, hop)
+        if len(rms_db) < 4:
+            continue
+
+        p90 = float(np.percentile(rms_db, 90))
+        p60 = float(np.percentile(rms_db, 60))
+        active_threshold = max(-54.0, min(p60 - 5.0, p90 - profile["active_margin_db"]))
+        active = rms_db > active_threshold
+        if int(np.sum(active)) < max(6, len(rms_db) // 10):
+            continue
+
+        radius = max(2, int(profile["window_sec"] * sr / max(hop, 1) / 2.0))
+        local_target = _rolling_percentile(rms_db, radius, percentile=profile["percentile"], active_mask=active)
+        diff_db = local_target - rms_db
+        gain_target = np.where(diff_db < 0.0, diff_db * profile["cut_strength"], diff_db * profile["boost_strength"]).astype(np.float32)
+
+        loud_anchor = float(np.percentile(rms_db[active], 82))
+        loud_excess = np.clip((rms_db - loud_anchor) / max(1.4, 3.0 - tightness * 0.7), 0.0, 1.0).astype(np.float32)
+        gain_target -= loud_excess * profile["peak_shave_db"]
+
+        gain_target = np.where(active, gain_target, 0.0).astype(np.float32)
+        gain_target = np.clip(gain_target, -profile["max_cut_db"], profile["max_boost_db"]).astype(np.float32)
+        gain_smoothed = _smooth_gain_db(
+            gain_target,
+            sr,
+            hop,
+            attack_ms=profile["attack_ms"],
+            release_ms=profile["release_ms"],
+        )
+        gain = _frame_gain_to_samples(gain_smoothed, starts, frame, len(group_audio))
+        if len(gain) == 0:
+            continue
+
+        for channel in channels:
+            rendered_channels[channel] = (rendered_channels[channel] * gain[:, None]).astype(np.float32)
+        adjusted_channel_count += len(channels)
+
+        active_gain = gain_smoothed[active]
+        cut_frames = gain_smoothed < -0.2
+        boost_frames = gain_smoothed > 0.2
+        groups_report.append({
+            "family": family,
+            "channels": channels,
+            "files": [plans[channel].path.name for channel in channels if channel in plans],
+            "active_threshold_db": round(active_threshold, 2),
+            "active_sec": round(float(np.sum(active) * hop / sr), 2),
+            "max_cut_db": round(abs(float(np.min(gain_smoothed))), 2),
+            "max_boost_db": round(float(np.max(gain_smoothed)), 2),
+            "mean_gain_when_active_db": round(float(np.mean(active_gain)) if len(active_gain) else 0.0, 2),
+            "cut_sec": round(float(np.sum(cut_frames) * hop / sr), 2),
+            "boost_sec": round(float(np.sum(boost_frames) * hop / sr), 2),
+            "profile": {
+                "cut_strength": round(profile["cut_strength"], 3),
+                "boost_strength": round(profile["boost_strength"], 3),
+                "peak_shave_db": round(profile["peak_shave_db"], 3),
+                "window_sec": round(profile["window_sec"], 2),
+            },
+        })
+
+    if not groups_report:
+        return {
+            "enabled": False,
+            "reason": "no_groups_adjusted",
+            "tightness": round(tightness, 3),
+        }
+
+    return {
+        "enabled": True,
+        "tightness": round(tightness, 3),
+        "adjusted_channel_count": adjusted_channel_count,
+        "groups": groups_report,
+        "notes": [
+            "This pass rides stem families toward a tighter local loudness window derived from the reference style.",
+            "Lead vocals react fastest, drums are shaved more gently, and quiet gaps are not lifted.",
+        ],
     }
 
 
@@ -3104,6 +3743,28 @@ def apply_cross_adaptive_eq(
 
 def classify_track(path: Path) -> tuple[str, float, float, float, list[tuple[float, float, float]], tuple[float, float, float, float], bool]:
     name = path.stem.lower()
+    if "leadvoxdt" in name or "lead vox dt" in name:
+        dt_idx = 1
+        match = re.search(r"leadvoxdt(\d+)", name) or re.search(r"lead vox dt(\d+)", name)
+        if match:
+            dt_idx = int(match.group(1))
+        pan = -0.14 if dt_idx % 2 == 1 else 0.14
+        return "backing_vocal", pan, 110.0, -22.8, [(240, -2.0, 1.3), (2800, 1.5, 1.0), (9000, 1.0, 0.8)], (-24, 3.0, 6, 135), False
+    if "backingvox" in name or "backing vox" in name:
+        match = re.search(r"backingvox(\d+)", name) or re.search(r"backing vox(\d+)", name)
+        bgv_idx = int(match.group(1)) if match else 1
+        pan_map = {
+            1: -0.52,
+            2: 0.52,
+            3: -0.28,
+            4: 0.28,
+            5: -0.66,
+            6: 0.66,
+        }
+        pan = pan_map.get(bgv_idx, 0.0)
+        if "dt" in name:
+            pan = float(np.clip(-pan * 0.72 if abs(pan) > 0.01 else 0.22, -0.72, 0.72))
+        return "backing_vocal", pan, 110.0, -24.5, [(240, -2.0, 1.3), (2800, 1.5, 1.0), (9000, 1.0, 0.8)], (-24, 3.1, 6, 135), False
     if "kick" in name:
         return "kick", 0.0, 35.0, -20.0, [(60, 3.0, 0.9), (320, -3.0, 1.3), (4200, 2.0, 1.2)], (-18, 4.0, 8, 90), False
     if "snare bottom" in name or "snare b" in name:
@@ -3120,6 +3781,8 @@ def classify_track(path: Path) -> tuple[str, float, float, float, list[tuple[flo
         return "hi_hat", 0.0, 180.0, -28.0, [(450, -1.5, 1.2), (6500, 1.5, 1.0), (9500, 1.0, 0.8)], (-18, 1.8, 18, 180), False
     if "ride" in name:
         return "ride", 0.0, 170.0, -28.5, [(420, -1.2, 1.2), (4800, 1.2, 1.0), (9000, 1.0, 0.8)], (-18, 1.8, 20, 200), False
+    if "overheads" in name or name == "overheads":
+        return "overhead", 0.0, 150.0, -27.0, [(350, -1.5, 1.2), (3500, -1.0, 1.5), (10500, 1.5, 0.8)], (-18, 1.6, 25, 300), False
     if "overhead l" in name or name in {"oh l", "ohl"} or name.endswith(" oh l"):
         return "overhead", -0.72, 150.0, -27.0, [(350, -1.5, 1.2), (3500, -1.0, 1.5), (10500, 1.5, 0.8)], (-18, 1.6, 25, 300), False
     if "overhead r" in name or name in {"oh r", "ohr"} or name.endswith(" oh r"):
@@ -3132,6 +3795,20 @@ def classify_track(path: Path) -> tuple[str, float, float, float, list[tuple[flo
         return "room", 0.0, 80.0, -31.0, [(250, -1.5, 1.2), (2500, -1.0, 1.4), (8500, 0.8, 1.0)], (-20, 2.0, 20, 220), False
     if "bass" in name:
         return "bass_guitar", 0.0, 35.0, -21.0, [(80, 2.0, 0.9), (250, -2.5, 1.2), (750, 1.2, 1.0)], (-24, 4.0, 18, 180), False
+    if "elecgtr" in name or "eelcgtr" in name or "elec gtr" in name:
+        match = re.search(r"(?:elecgtr|eelcgtr|elec gtr)(\d+)", name)
+        gtr_idx = int(match.group(1)) if match else 1
+        pan_map = {
+            1: -0.68,
+            2: 0.68,
+            3: -0.38,
+            4: 0.38,
+            5: -0.18,
+        }
+        pan = pan_map.get(gtr_idx, -0.35 if gtr_idx % 2 else 0.35)
+        if "dt" in name:
+            pan = float(np.clip(-pan * 0.82 if abs(pan) > 0.01 else 0.22, -0.82, 0.82))
+        return "electric_guitar", pan, 90.0, -25.5, [(250, -2.0, 1.2), (2500, 1.5, 1.0), (6200, -1.0, 1.0)], (-20, 2.0, 12, 140), False
     if "guitar l" in name:
         return "electric_guitar", -0.65, 90.0, -25.5, [(250, -2.0, 1.2), (2500, 1.5, 1.0), (6200, -1.0, 1.0)], (-20, 2.0, 12, 140), False
     if "guitar r" in name:
@@ -3326,6 +4003,42 @@ def render_channel(path: Path, plan: ChannelPlan, target_len: int, sr: int) -> n
     audio, file_sr = sf.read(path, dtype="float32", always_2d=False)
     if file_sr != sr:
         raise ValueError(f"{path.name}: expected {sr} Hz, got {file_sr} Hz")
+    if isinstance(audio, np.ndarray) and audio.ndim == 2 and audio.shape[1] == 2 and plan.instrument in {"overhead", "playback", "room"}:
+        stereo = audio.astype(np.float32)
+        if len(stereo) < target_len:
+            stereo = np.pad(stereo, ((0, target_len - len(stereo)), (0, 0)))
+        stereo = stereo[:target_len]
+        stereo = np.column_stack([
+            declick_start(stereo[:, 0], sr, plan.input_fade_ms),
+            declick_start(stereo[:, 1], sr, plan.input_fade_ms),
+        ]).astype(np.float32)
+        stereo = (stereo * db_to_amp(plan.trim_db)).astype(np.float32)
+        if plan.phase_invert:
+            stereo = (-stereo).astype(np.float32)
+        if abs(plan.delay_ms) > 1e-4:
+            stereo = np.column_stack([
+                delay_signal(stereo[:, 0], sr, plan.delay_ms),
+                delay_signal(stereo[:, 1], sr, plan.delay_ms),
+            ]).astype(np.float32)
+        for channel_index in range(2):
+            lane = stereo[:, channel_index]
+            lane = highpass(lane, sr, plan.hpf)
+            if plan.lpf > 0.0:
+                lane = lowpass(lane, sr, plan.lpf)
+            for freq, gain, q in plan.eq_bands:
+                lane = peaking_eq(lane, sr, freq, gain, q)
+            lane = compressor(
+                lane,
+                sr,
+                threshold_db=plan.comp_threshold_db,
+                ratio=plan.comp_ratio,
+                attack_ms=plan.comp_attack_ms,
+                release_ms=plan.comp_release_ms,
+                makeup_db=0.0,
+            )
+            stereo[:, channel_index] = lane.astype(np.float32)
+        plan.expander_report = {"enabled": False, "reason": "stereo_source_preserved"}
+        return (stereo * db_to_amp(plan.fader_db)).astype(np.float32)
     mono = mono_sum(audio)
     if len(mono) < target_len:
         mono = np.pad(mono, (0, target_len - len(mono)))
@@ -3497,6 +4210,131 @@ def _band_power(audio: np.ndarray, sr: int, low_hz: float, high_hz: float) -> fl
     if not np.any(idx):
         return 1e-12
     return float(np.sum(power[idx]) + 1e-12)
+
+
+def _sampled_band_dynamic_range_db(
+    audio: np.ndarray,
+    sr: int,
+    low_hz: float,
+    high_hz: float,
+    *,
+    window_sec: float = 0.35,
+    segments: int = 8,
+) -> float:
+    mono = mono_sum(audio)
+    if len(mono) < 1024:
+        return 0.0
+    starts = _active_segment_starts(mono, sr, window_sec=window_sec, count=segments)
+    if not starts:
+        starts = [0]
+    values = []
+    block_len = max(1024, int(window_sec * sr))
+    for start in starts:
+        end = min(len(mono), start + block_len)
+        block = mono[start:end]
+        if len(block) < 512:
+            continue
+        values.append(_band_rms_db(block, sr, low_hz, high_hz))
+    if len(values) < 2:
+        return 0.0
+    return float(np.percentile(values, 90.0) - np.percentile(values, 20.0))
+
+
+def _frequency_window_family(plan: ChannelPlan) -> str:
+    instrument = plan.instrument
+    if instrument == "lead_vocal":
+        return "lead_vocal"
+    if instrument == "backing_vocal":
+        return "backing_vocal"
+    if instrument in BASS_INSTRUMENTS:
+        return "bass"
+    if instrument == "kick":
+        return "kick"
+    if instrument in CYMBAL_INSTRUMENTS:
+        return "cymbals"
+    if instrument in DRUM_INSTRUMENTS:
+        return "drums"
+    return "music"
+
+
+def _frequency_window_snapshot(
+    rendered_channels: dict[int, np.ndarray],
+    plans: dict[int, ChannelPlan],
+    sr: int,
+) -> dict[str, Any]:
+    if not rendered_channels:
+        return {"windows": [], "by_id": {}}
+
+    family_audio: dict[str, np.ndarray] = {}
+    for channel, audio in rendered_channels.items():
+        plan = plans.get(channel)
+        if plan is None or plan.muted:
+            continue
+        family = _frequency_window_family(plan)
+        if family not in family_audio:
+            family_audio[family] = np.zeros_like(audio)
+        family_audio[family] += audio
+
+    windows: list[dict[str, Any]] = []
+    by_id: dict[str, dict[str, Any]] = {}
+    for config in FREQUENCY_WINDOW_DEFINITIONS:
+        low_hz = float(config["low_hz"])
+        high_hz = float(config["high_hz"])
+        total_power = sum(_band_power(audio, sr, low_hz, high_hz) for audio in rendered_channels.values())
+        total_power = max(total_power, 1e-12)
+
+        top_channels = []
+        for channel, audio in rendered_channels.items():
+            plan = plans.get(channel)
+            if plan is None or plan.muted:
+                continue
+            power = _band_power(audio, sr, low_hz, high_hz)
+            top_channels.append({
+                "channel": channel,
+                "file": plan.path.name,
+                "instrument": plan.instrument,
+                "family": _frequency_window_family(plan),
+                "band_db": round(_band_rms_db(audio, sr, low_hz, high_hz), 2),
+                "share": round(float(power / total_power), 4),
+                "dynamic_range_db": round(_sampled_band_dynamic_range_db(audio, sr, low_hz, high_hz), 2),
+            })
+        top_channels.sort(key=lambda item: item["share"], reverse=True)
+
+        family_metrics = []
+        family_shares: dict[str, float] = {}
+        for family, audio in family_audio.items():
+            power = _band_power(audio, sr, low_hz, high_hz)
+            share = float(power / total_power)
+            family_shares[family] = round(share, 4)
+            family_metrics.append({
+                "family": family,
+                "band_db": round(_band_rms_db(audio, sr, low_hz, high_hz), 2),
+                "share": round(share, 4),
+                "dynamic_range_db": round(_sampled_band_dynamic_range_db(audio, sr, low_hz, high_hz), 2),
+            })
+        family_metrics.sort(key=lambda item: item["share"], reverse=True)
+
+        dominant_family = family_metrics[0]["family"] if family_metrics else ""
+        runner_up_family = family_metrics[1]["family"] if len(family_metrics) > 1 else ""
+        report = {
+            "id": config["id"],
+            "label": config["label"],
+            "range_hz": [round(low_hz, 1), round(high_hz, 1)],
+            "focus": config["focus"],
+            "action_mode": config["action_mode"],
+            "family_shares": family_shares,
+            "dominant_family": dominant_family,
+            "runner_up_family": runner_up_family,
+            "families": family_metrics[:6],
+            "channels": top_channels[:8],
+        }
+        windows.append(report)
+        by_id[config["id"]] = report
+
+    return {
+        "windows": windows,
+        "by_id": by_id,
+    }
 
 
 def _stem_roles_for_plan(plan: ChannelPlan) -> list[str]:
@@ -3799,6 +4637,49 @@ def _stem_mix_snapshot(
         if stem_name in {"MASTER", "DRUMS", "MUSIC", "LEAD", "BASS", "KICK"}
     }
 
+    def _sum_rendered_by_instrument(instruments: set[str]) -> np.ndarray | None:
+        selected = [
+            rendered_channels[channel]
+            for channel, plan in plans.items()
+            if channel in rendered_channels and not plan.muted and plan.instrument in instruments
+        ]
+        if not selected:
+            return None
+        return sum(selected, np.zeros_like(selected[0]))
+
+    hierarchy_metrics: dict[str, float] = {}
+    lead_audio = _sum_rendered_by_instrument({"lead_vocal"})
+    bgv_audio = _sum_rendered_by_instrument({"backing_vocal"})
+    if lead_audio is not None and bgv_audio is not None:
+        hierarchy_metrics["lead_over_bgv_rms_db"] = round(
+            metrics_for(mono_sum(lead_audio), sr, instrument="lead_vocal").get("rms_db", -100.0)
+            - metrics_for(mono_sum(bgv_audio), sr, instrument="backing_vocal").get("rms_db", -100.0),
+            2,
+        )
+        hierarchy_metrics["lead_over_bgv_presence_db"] = round(
+            _band_rms_db(lead_audio, sr, 2200.0, 5200.0) - _band_rms_db(bgv_audio, sr, 2200.0, 5200.0),
+            2,
+        )
+
+    kick_audio = _sum_rendered_by_instrument({"kick"})
+    bass_audio = _sum_rendered_by_instrument({"bass_guitar", "bass", "bass_di", "bass_mic", "synth_bass"})
+    if kick_audio is not None and bass_audio is not None:
+        hierarchy_metrics["kick_over_bass_55_95_db"] = round(
+            _band_rms_db(kick_audio, sr, 55.0, 95.0) - _band_rms_db(bass_audio, sr, 55.0, 95.0),
+            2,
+        )
+        hierarchy_metrics["kick_click_over_bass_2k5_4k5_db"] = round(
+            _band_rms_db(kick_audio, sr, 2500.0, 4500.0) - _band_rms_db(bass_audio, sr, 2500.0, 4500.0),
+            2,
+        )
+
+    cymbal_audio = _sum_rendered_by_instrument({"overhead", "hi_hat", "ride", "oh_l", "oh_r"})
+    master_audio = stem_audio.get("MASTER")
+    if cymbal_audio is not None and master_audio is not None:
+        cymbal_high_power = _band_power(cymbal_audio, sr, 4500.0, 12000.0)
+        master_high_power = _band_power(master_audio, sr, 4500.0, 12000.0)
+        hierarchy_metrics["cymbal_high_share_in_master"] = round(float(cymbal_high_power / max(master_high_power, 1e-12)), 4)
+
     return {
         "rendered_channels": rendered_channels,
         "stem_audio": stem_audio,
@@ -3807,6 +4688,226 @@ def _stem_mix_snapshot(
         "slope_conformity": slope_conformity,
         "tilt_conformity": tilt_conformity,
         "kick_focus": kick_focus,
+        "hierarchy_metrics": hierarchy_metrics,
+    }
+
+
+def _reference_distance_from_snapshot(snapshot: dict[str, Any], reference_context: ReferenceMixContext | None) -> dict[str, Any]:
+    targets = _reference_targets_from_context(reference_context)
+    if not targets:
+        return {"enabled": False}
+
+    current_tilt = (snapshot.get("tilt_conformity") or {}).get("MASTER", {})
+    current_hierarchy = snapshot.get("hierarchy_metrics") or {}
+    current_kick = snapshot.get("kick_focus") or {}
+    components: dict[str, float] = {}
+    current: dict[str, float] = {}
+    target: dict[str, float] = {}
+
+    tilt_targets = targets.get("tilt") or {}
+    for key in ("weight_60_120_vs_plateau_db", "sub_35_60_vs_plateau_db", "high_4500_12000_vs_plateau_db", "plateau_spread_db"):
+        if key not in tilt_targets:
+            continue
+        current_value = float(current_tilt.get(key, 0.0))
+        target_value = float(tilt_targets[key])
+        components[key] = abs(current_value - target_value)
+        current[key] = round(current_value, 3)
+        target[key] = round(target_value, 3)
+
+    hierarchy_targets = targets.get("hierarchy") or {}
+    if "lead_over_bgv_rms_db" in hierarchy_targets and "lead_over_bgv_rms_db" in current_hierarchy:
+        current_value = float(current_hierarchy["lead_over_bgv_rms_db"])
+        target_value = float(hierarchy_targets["lead_over_bgv_rms_db"])
+        components["lead_over_bgv_rms_db"] = abs(current_value - target_value)
+        current["lead_over_bgv_rms_db"] = round(current_value, 3)
+        target["lead_over_bgv_rms_db"] = round(target_value, 3)
+    if "kick_over_bass_55_95_db" in hierarchy_targets and "kick_over_bass_55_95_db" in current_hierarchy:
+        current_value = float(current_hierarchy["kick_over_bass_55_95_db"])
+        target_value = float(hierarchy_targets["kick_over_bass_55_95_db"])
+        components["kick_over_bass_55_95_db"] = abs(current_value - target_value)
+        current["kick_over_bass_55_95_db"] = round(current_value, 3)
+        target["kick_over_bass_55_95_db"] = round(target_value, 3)
+
+    kick_targets = targets.get("kick") or {}
+    if "dynamic_range_max_db" in kick_targets and "kick_dynamic_range_db" in current_kick:
+        current_value = float(current_kick["kick_dynamic_range_db"])
+        target_value = float(kick_targets["dynamic_range_max_db"])
+        components["kick_dynamic_range_db"] = abs(current_value - target_value)
+        current["kick_dynamic_range_db"] = round(current_value, 3)
+        target["kick_dynamic_range_db"] = round(target_value, 3)
+    if "click_share_in_master" in kick_targets and "kick_click_share_in_master" in current_kick:
+        current_value = float(current_kick["kick_click_share_in_master"])
+        target_value = float(kick_targets["click_share_in_master"])
+        components["kick_click_share_in_master"] = abs(current_value - target_value) * 100.0
+        current["kick_click_share_in_master"] = round(current_value, 4)
+        target["kick_click_share_in_master"] = round(target_value, 4)
+    if "click_share_in_drums" in kick_targets and "kick_click_share_in_drums" in current_kick:
+        current_value = float(current_kick["kick_click_share_in_drums"])
+        target_value = float(kick_targets["click_share_in_drums"])
+        components["kick_click_share_in_drums"] = abs(current_value - target_value) * 100.0
+        current["kick_click_share_in_drums"] = round(current_value, 4)
+        target["kick_click_share_in_drums"] = round(target_value, 4)
+
+    overall = float(np.mean(list(components.values()))) if components else 0.0
+    return {
+        "enabled": True,
+        "overall_distance": round(overall, 4),
+        "components": {key: round(value, 4) for key, value in components.items()},
+        "current": current,
+        "target": target,
+    }
+
+
+def apply_frequency_window_balance(
+    plans: dict[int, ChannelPlan],
+    target_len: int,
+    sr: int,
+) -> dict[str, Any]:
+    rendered_before = {
+        channel: render_channel(plan.path, plan, target_len, sr)
+        for channel, plan in plans.items()
+        if not plan.muted
+    }
+    snapshot_before = _frequency_window_snapshot(rendered_before, plans, sr)
+    by_id = snapshot_before.get("by_id") or {}
+    config_by_id = {item["id"]: item for item in FREQUENCY_WINDOW_DEFINITIONS}
+    actions: list[dict[str, Any]] = []
+
+    def _candidate_channels(
+        window_id: str,
+        *,
+        instruments: set[str],
+        min_share: float = 0.06,
+    ) -> list[dict[str, Any]]:
+        window = by_id.get(window_id) or {}
+        return [
+            item for item in (window.get("channels") or [])
+            if item.get("instrument") in instruments and float(item.get("share", 0.0)) >= min_share
+        ]
+
+    def _apply_window_cut(
+        window_id: str,
+        *,
+        channels: list[dict[str, Any]],
+        base_cut_db: float,
+        reason: str,
+    ) -> None:
+        if not channels:
+            return
+        config = config_by_id.get(window_id) or {}
+        center_hz = float(config.get("center_hz", 1000.0))
+        q = float(config.get("q", 1.2))
+        strongest_share = max(float(channels[0].get("share", 0.0)), 1e-6)
+        for item in channels[:3]:
+            channel = int(item["channel"])
+            plan = plans.get(channel)
+            if plan is None or plan.muted:
+                continue
+            scale = math.sqrt(max(float(item.get("share", 0.0)), 1e-6) / strongest_share)
+            cut_db = float(np.clip(base_cut_db * scale, 0.25, base_cut_db))
+            plan.eq_bands.append((center_hz, -cut_db, q))
+            actions.append({
+                "type": "frequency_window_eq_cut",
+                "window": window_id,
+                "channel": channel,
+                "file": plan.path.name,
+                "instrument": plan.instrument,
+                "frequency_hz": round(center_hz, 1),
+                "gain_db": round(-cut_db, 2),
+                "q": round(q, 2),
+                "share_before": round(float(item.get("share", 0.0)), 4),
+                "reason": reason,
+            })
+
+    warmth = by_id.get("warmth_mud") or {}
+    warmth_shares = warmth.get("family_shares") or {}
+    warmth_music_share = float(warmth_shares.get("music", 0.0) + warmth_shares.get("backing_vocal", 0.0))
+    warmth_lead_share = float(warmth_shares.get("lead_vocal", 0.0))
+    if warmth_music_share > 0.58 and warmth_lead_share < 0.24:
+        warmth_cut_db = float(np.clip(0.35 + (warmth_music_share - max(warmth_lead_share, 0.16)) * 0.85, 0.35, 0.95))
+        _apply_window_cut(
+            "warmth_mud",
+            channels=_candidate_channels("warmth_mud", instruments=WINDOW_SPACE_COMPETITOR_INSTRUMENTS),
+            base_cut_db=warmth_cut_db,
+            reason="120-500 Hz window is crowded by accompaniment body; broad low-mid cleanup restores depth without thinning the full mix.",
+        )
+
+    vocal_conflict = by_id.get("vocal_conflict") or {}
+    vocal_shares = vocal_conflict.get("family_shares") or {}
+    vocal_competition_share = float(vocal_shares.get("music", 0.0) + vocal_shares.get("backing_vocal", 0.0))
+    vocal_lead_share = float(vocal_shares.get("lead_vocal", 0.0))
+    vocal_window_advantage = vocal_competition_share - vocal_lead_share
+    if (
+        vocal_competition_share > 0.54
+        and (
+            vocal_lead_share < 0.26
+            or str(vocal_conflict.get("dominant_family") or "") != "lead_vocal"
+            or vocal_window_advantage > 0.045
+        )
+    ):
+        vocal_cut_db = float(np.clip(0.4 + max(vocal_window_advantage, 0.0) * 1.55, 0.4, 1.2))
+        _apply_window_cut(
+            "vocal_conflict",
+            channels=_candidate_channels("vocal_conflict", instruments=WINDOW_SPACE_COMPETITOR_INSTRUMENTS),
+            base_cut_db=vocal_cut_db,
+            reason="700-1500 Hz window hides the lead behind accompaniment; this carve clears the speaking range instead of just raising the vocal.",
+        )
+
+    presence = by_id.get("presence_harshness") or {}
+    presence_shares = presence.get("family_shares") or {}
+    presence_competition_share = float(presence_shares.get("music", 0.0) + presence_shares.get("backing_vocal", 0.0))
+    presence_lead_share = float(presence_shares.get("lead_vocal", 0.0))
+    if presence_competition_share > 0.52 and presence_lead_share < 0.24:
+        presence_cut_db = float(np.clip(0.35 + (presence_competition_share - max(presence_lead_share, 0.18)) * 0.95, 0.35, 1.0))
+        _apply_window_cut(
+            "presence_harshness",
+            channels=_candidate_channels("presence_harshness", instruments=WINDOW_SPACE_COMPETITOR_INSTRUMENTS, min_share=0.05),
+            base_cut_db=presence_cut_db,
+            reason="1.5-6 kHz window is overfilled by accompaniment presence; broad presence carving helps lyric intelligibility without global brightening.",
+        )
+
+    air = by_id.get("air_sibilance") or {}
+    air_shares = air.get("family_shares") or {}
+    cymbal_share = float(air_shares.get("cymbals", 0.0))
+    if cymbal_share > 0.30:
+        air_cut_db = float(np.clip(0.35 + (cymbal_share - 0.30) * 2.0, 0.35, 1.15))
+        _apply_window_cut(
+            "air_sibilance",
+            channels=_candidate_channels("air_sibilance", instruments=CYMBAL_INSTRUMENTS, min_share=0.05),
+            base_cut_db=air_cut_db,
+            reason="6-16 kHz window is dominated by cymbal wash; a narrow upper-air trim preserves sparkle while reducing constant hiss.",
+        )
+
+    if not actions:
+        return {
+            "enabled": True,
+            "applied": False,
+            "actions": [],
+            "notes": [
+                "Frequency-window balancing analyses broad musical windows rather than chasing narrow resonances.",
+                "Use these windows as a diagnostic magnifier: low end, warmth, core mids, vocal conflict, presence, and air.",
+            ],
+            "before": snapshot_before["windows"],
+            "after": snapshot_before["windows"],
+        }
+
+    rendered_after = {
+        channel: render_channel(plan.path, plan, target_len, sr)
+        for channel, plan in plans.items()
+        if not plan.muted
+    }
+    snapshot_after = _frequency_window_snapshot(rendered_after, plans, sr)
+    return {
+        "enabled": True,
+        "applied": True,
+        "actions": actions,
+        "notes": [
+            "Frequency-window balancing analyses broad musical windows rather than chasing narrow resonances.",
+            "Each corrective move is a bounded wide-band carve applied only to the competing sources inside the overloaded window.",
+            "Low end stays report-only here because kick/bass hierarchy already has its own dedicated measurement pass.",
+        ],
+        "before": snapshot_before["windows"],
+        "after": snapshot_after["windows"],
     }
 
 
@@ -3816,9 +4917,12 @@ def apply_stem_mix_verification(
     sr: int,
     *,
     genre: str | None = None,
+    reference_context: ReferenceMixContext | None = None,
 ) -> dict[str, Any]:
     snapshot_before = _stem_mix_snapshot(plans, target_len, sr)
+    reference_distance_before = _reference_distance_from_snapshot(snapshot_before, reference_context)
     genre_token = str(genre or "").strip().lower()
+    reference_targets = _reference_targets_from_context(reference_context)
     kick_focus_before = snapshot_before.get("kick_focus") or {}
     kick_entry = next(
         ((channel, plan) for channel, plan in plans.items() if not plan.muted and plan.instrument == "kick"),
@@ -3843,10 +4947,18 @@ def apply_stem_mix_verification(
     desired_dynamic_range_max_db = 16.5 if genre_token == "rock" else 18.0
     desired_click_minus_punch_db = -17.0 if genre_token == "rock" else -20.0
     desired_box_minus_click_db = -1.5 if genre_token == "rock" else 1.5
+    if reference_targets:
+        kick_targets = reference_targets.get("kick") or {}
+        desired_click_share_in_drums = float(kick_targets.get("click_share_in_drums", desired_click_share_in_drums))
+        desired_click_share_in_master = float(kick_targets.get("click_share_in_master", desired_click_share_in_master))
+        desired_dynamic_range_max_db = float(kick_targets.get("dynamic_range_max_db", desired_dynamic_range_max_db))
+        desired_click_minus_punch_db = float(kick_targets.get("click_minus_punch_db", desired_click_minus_punch_db))
+        desired_box_minus_click_db = float(kick_targets.get("box_minus_click_db", desired_box_minus_click_db))
     slope_before = snapshot_before.get("slope_conformity") or {}
     master_mix_indexes_before = slope_before.get("master_mix_indexes") or {}
     master_tilt_before = (snapshot_before.get("tilt_conformity") or {}).get("MASTER", {})
     master_tilt_regions_before = master_tilt_before.get("regions_db") or {}
+    hierarchy_before = snapshot_before.get("hierarchy_metrics") or {}
 
     click_share_drums = float(kick_focus_before.get("kick_click_share_in_drums", 0.0))
     click_share_master = float(kick_focus_before.get("kick_click_share_in_master", 0.0))
@@ -3868,10 +4980,18 @@ def apply_stem_mix_verification(
     )
     target_weight_vs_plateau_db = 2.0 if genre_token == "rock" else 0.35
     target_sub_vs_plateau_db = 0.5 if genre_token == "rock" else -0.25
+    target_high_vs_plateau_db = -1.5
+    target_plateau_spread_db = 6.0
+    if reference_targets:
+        tilt_targets = reference_targets.get("tilt") or {}
+        target_weight_vs_plateau_db = float(tilt_targets.get("weight_60_120_vs_plateau_db", target_weight_vs_plateau_db))
+        target_sub_vs_plateau_db = float(tilt_targets.get("sub_35_60_vs_plateau_db", target_sub_vs_plateau_db))
+        target_high_vs_plateau_db = float(tilt_targets.get("high_4500_12000_vs_plateau_db", target_high_vs_plateau_db))
+        target_plateau_spread_db = float(tilt_targets.get("plateau_spread_db", target_plateau_spread_db))
     tilt_weight_shortage = max(0.0, target_weight_vs_plateau_db - weight_vs_plateau_db)
     tilt_sub_shortage = max(0.0, target_sub_vs_plateau_db - sub_vs_plateau_db)
-    tilt_brightness_excess = max(0.0, high_vs_plateau_db + 1.5)
-    plateau_unevenness = max(0.0, plateau_spread_db - 6.0)
+    tilt_brightness_excess = max(0.0, high_vs_plateau_db - target_high_vs_plateau_db)
+    plateau_unevenness = max(0.0, plateau_spread_db - target_plateau_spread_db)
 
     click_shortage = max(
         0.0,
@@ -3883,6 +5003,86 @@ def apply_stem_mix_verification(
     box_excess = max(0.0, box_minus_click_db - desired_box_minus_click_db)
 
     actions: list[dict[str, Any]] = []
+    hierarchy_targets = reference_targets.get("hierarchy") or {}
+    lead_gap_target = float(hierarchy_targets.get("lead_over_bgv_rms_db", 4.2))
+    lead_gap_before = float(hierarchy_before.get("lead_over_bgv_rms_db", 0.0))
+    lead_gap_shortage = max(0.0, lead_gap_target - lead_gap_before)
+    lead_gap_excess = max(0.0, lead_gap_before - (lead_gap_target + 0.9))
+    if lead_gap_shortage > 0.7:
+        lead_channels = [
+            channel for channel, plan in plans.items()
+            if not plan.muted and plan.instrument == "lead_vocal"
+        ]
+        bgv_channels = [
+            channel for channel, plan in plans.items()
+            if not plan.muted and plan.instrument == "backing_vocal"
+        ]
+        if lead_channels:
+            lift_db = float(np.clip(0.35 + lead_gap_shortage * 0.22, 0.35, 1.0))
+            for channel in lead_channels:
+                plan = plans[channel]
+                before = float(plan.fader_db)
+                plan.fader_db = float(np.clip(plan.fader_db + lift_db, -30.0, 0.0))
+                if plan.fader_db != before:
+                    actions.append({
+                        "type": "reference_lead_foreground",
+                        "channel": channel,
+                        "before": {"fader_db": round(before, 2)},
+                        "after": {"fader_db": round(float(plan.fader_db), 2)},
+                        "reason": "Reference hierarchy expects lead vocals to sit further ahead of the backing stack.",
+                    })
+        if bgv_channels:
+            bgv_cut_db = float(np.clip(0.45 + lead_gap_shortage * 0.28, 0.45, 1.4))
+            for channel in bgv_channels:
+                plan = plans[channel]
+                before = float(plan.fader_db)
+                plan.fader_db = float(np.clip(plan.fader_db - bgv_cut_db, -30.0, 0.0))
+                if plan.fader_db != before:
+                    actions.append({
+                        "type": "reference_bgv_depth",
+                        "channel": channel,
+                        "before": {"fader_db": round(before, 2)},
+                        "after": {"fader_db": round(float(plan.fader_db), 2)},
+                        "reason": "Reference hierarchy keeps backing vocals behind the lead image instead of flattening the vocal stack.",
+                    })
+    elif lead_gap_excess > 0.7:
+        lead_channels = [
+            channel for channel, plan in plans.items()
+            if not plan.muted and plan.instrument == "lead_vocal"
+        ]
+        bgv_channels = [
+            channel for channel, plan in plans.items()
+            if not plan.muted and plan.instrument == "backing_vocal"
+        ]
+        if bgv_channels:
+            bgv_lift_db = float(np.clip(0.55 + lead_gap_excess * 0.26, 0.55, 1.8))
+            for channel in bgv_channels:
+                plan = plans[channel]
+                before = float(plan.fader_db)
+                plan.fader_db = float(np.clip(plan.fader_db + bgv_lift_db, -30.0, 0.0))
+                if plan.fader_db != before:
+                    actions.append({
+                        "type": "reference_bgv_pull_forward",
+                        "channel": channel,
+                        "before": {"fader_db": round(before, 2)},
+                        "after": {"fader_db": round(float(plan.fader_db), 2)},
+                        "reason": "Reference hierarchy keeps the lead closer to the backing stack than the current mix.",
+                    })
+        if lead_channels:
+            lead_trim_db = float(np.clip(0.35 + lead_gap_excess * 0.14, 0.35, 1.0))
+            for channel in lead_channels:
+                plan = plans[channel]
+                before = float(plan.fader_db)
+                plan.fader_db = float(np.clip(plan.fader_db - lead_trim_db, -30.0, 0.0))
+                if plan.fader_db != before:
+                    actions.append({
+                        "type": "reference_lead_relax",
+                        "channel": channel,
+                        "before": {"fader_db": round(before, 2)},
+                        "after": {"fader_db": round(float(plan.fader_db), 2)},
+                        "reason": "Reference hierarchy does not want the lead so detached from the backing image.",
+                    })
+
     if click_shortage > 0.0 or dynamic_shortage > 0.0 or click_tone_shortage > 0.0 or box_excess > 0.0:
         before_comp = {
             "threshold_db": round(float(kick_plan.comp_threshold_db), 2),
@@ -4043,6 +5243,11 @@ def apply_stem_mix_verification(
         return {
             "enabled": True,
             "genre": genre_token,
+            "reference_targets": reference_targets,
+            "reference_distance": {
+                "before": reference_distance_before,
+                "after": reference_distance_before,
+            },
             "applied": False,
             "notes": [
                 "Stem mix verification assembled the mix by stems and checked spectral balance, dynamics, and band hierarchy.",
@@ -4054,6 +5259,7 @@ def apply_stem_mix_verification(
                 "slope_conformity": snapshot_before["slope_conformity"],
                 "tilt_conformity": snapshot_before["tilt_conformity"],
                 "kick_focus": kick_focus_before,
+                "hierarchy_metrics": snapshot_before["hierarchy_metrics"],
             },
             "after": {
                 "stems": snapshot_before["stems"],
@@ -4061,18 +5267,26 @@ def apply_stem_mix_verification(
                 "slope_conformity": snapshot_before["slope_conformity"],
                 "tilt_conformity": snapshot_before["tilt_conformity"],
                 "kick_focus": kick_focus_before,
+                "hierarchy_metrics": snapshot_before["hierarchy_metrics"],
             },
             "actions": [],
         }
 
     snapshot_after = _stem_mix_snapshot(plans, target_len, sr)
+    reference_distance_after = _reference_distance_from_snapshot(snapshot_after, reference_context)
     return {
         "enabled": True,
         "genre": genre_token,
+        "reference_targets": reference_targets,
+        "reference_distance": {
+            "before": reference_distance_before,
+            "after": reference_distance_after,
+        },
         "applied": True,
         "notes": [
             "Stem mix verification assembles rendered channels into stems before the final print.",
             "The pass checks stem AChH, dynamics, and band hierarchy, then reseats the kick only if its click/dynamics are weak inside the drum or master stems.",
+            "When a reference is present, the same verification also measures distance to the reference hierarchy and tilt targets.",
         ],
         "before": {
             "stems": snapshot_before["stems"],
@@ -4080,6 +5294,7 @@ def apply_stem_mix_verification(
             "slope_conformity": snapshot_before["slope_conformity"],
             "tilt_conformity": snapshot_before["tilt_conformity"],
             "kick_focus": kick_focus_before,
+            "hierarchy_metrics": snapshot_before["hierarchy_metrics"],
         },
         "after": {
             "stems": snapshot_after["stems"],
@@ -4087,6 +5302,7 @@ def apply_stem_mix_verification(
             "slope_conformity": snapshot_after["slope_conformity"],
             "tilt_conformity": snapshot_after["tilt_conformity"],
             "kick_focus": snapshot_after["kick_focus"],
+            "hierarchy_metrics": snapshot_after["hierarchy_metrics"],
         },
         "actions": actions,
     }
@@ -4187,6 +5403,226 @@ def apply_kick_bass_hierarchy(
         "notes": [
             "Kick is protected as the low-end anchor and must stay ahead of bass in the punch band.",
             "Bass is trimmed only in the overlapping 55-125 Hz area so the groove stays intact while the kick leads.",
+        ],
+    }
+
+
+def desired_kick_advantage_from_reference(
+    reference_context: ReferenceMixContext | None,
+    *,
+    genre: str | None = None,
+) -> float:
+    default = 1.8 if str(genre or "").strip().lower() == "rock" else 0.85
+    targets = _reference_targets_from_context(reference_context)
+    hierarchy = targets.get("hierarchy") or {}
+    if "kick_over_bass_55_95_db" not in hierarchy:
+        return float(default)
+    target = float(hierarchy["kick_over_bass_55_95_db"])
+    return float(np.clip(default * 0.55 + target * 0.45, 0.5, 2.8))
+
+
+def apply_reference_vocal_fx_focus(
+    plans: dict[int, ChannelPlan],
+    target_len: int,
+    sr: int,
+    reference_context: ReferenceMixContext | None,
+) -> dict[str, Any]:
+    targets = _reference_targets_from_context(reference_context)
+    if not targets:
+        return {"enabled": False, "reason": "no_reference_targets"}
+
+    lead_entries = [
+        (channel, plan)
+        for channel, plan in plans.items()
+        if not plan.muted and plan.instrument == "lead_vocal"
+    ]
+    bgv_entries = [
+        (channel, plan)
+        for channel, plan in plans.items()
+        if not plan.muted and plan.instrument == "backing_vocal"
+    ]
+    if not lead_entries or not bgv_entries:
+        return {"enabled": False, "reason": "lead_or_bgv_missing"}
+
+    def _sum_render(entries: list[tuple[int, ChannelPlan]]) -> np.ndarray:
+        rendered = [
+            render_channel(plan.path, plan, target_len, sr)
+            for _, plan in entries
+        ]
+        return sum(rendered, np.zeros_like(rendered[0]))
+
+    def _measure_gap() -> dict[str, float]:
+        lead_audio = _sum_render(lead_entries)
+        bgv_audio = _sum_render(bgv_entries)
+        lead_rms = float(metrics_for(mono_sum(lead_audio), sr, instrument="lead_vocal").get("rms_db", -100.0))
+        bgv_rms = float(metrics_for(mono_sum(bgv_audio), sr, instrument="backing_vocal").get("rms_db", -100.0))
+        lead_presence = _band_rms_db(lead_audio, sr, 2200.0, 5200.0)
+        bgv_presence = _band_rms_db(bgv_audio, sr, 2200.0, 5200.0)
+        return {
+            "lead_over_bgv_rms_db": lead_rms - bgv_rms,
+            "lead_over_bgv_presence_db": lead_presence - bgv_presence,
+        }
+
+    def _append_bus_action(
+        *,
+        action_type: str,
+        channel: int,
+        bus_id: int,
+        before_db: float,
+        after_db: float,
+    ) -> None:
+        if abs(after_db - before_db) < 0.2:
+            return
+        actions.append({
+            "type": action_type,
+            "channel": channel,
+            "bus_id": bus_id,
+            "before_db": round(before_db, 2),
+            "after_db": round(after_db, 2),
+        })
+
+    before_metrics = _measure_gap()
+
+    hierarchy = targets.get("hierarchy") or {}
+    target_gap = float(hierarchy.get("lead_over_bgv_rms_db", 4.2))
+    target_presence_gap = float(hierarchy.get("lead_over_bgv_presence_db", target_gap))
+    style_width = float(targets.get("style_summary", {}).get("stereo_width", 0.18))
+    base_bgv_pan_cap = float(np.clip(0.11 + style_width * 0.26, 0.11, 0.20))
+    space_lift = _reference_fx_space_lift(reference_context)
+
+    actions: list[dict[str, Any]] = []
+    rounds = 0
+    for _ in range(3):
+        current = _measure_gap()
+        excess_gap = max(
+            0.0,
+            current["lead_over_bgv_rms_db"] - target_gap,
+            (current["lead_over_bgv_presence_db"] - target_presence_gap) * 0.88,
+        )
+        shortage_gap = max(0.0, target_gap - current["lead_over_bgv_rms_db"])
+        if excess_gap <= 0.35 and shortage_gap <= 0.35:
+            break
+
+        rounds += 1
+        if excess_gap > 0.35:
+            lead_cut = float(np.clip(0.28 + excess_gap * 0.16, 0.28, 0.95))
+            bgv_lift = float(np.clip(0.12 + excess_gap * 0.06, 0.0, 0.38))
+            bgv_pan_cap = float(np.clip(base_bgv_pan_cap - min(0.07, excess_gap * 0.022), 0.10, base_bgv_pan_cap))
+            for channel, plan in lead_entries:
+                before = float(plan.fader_db)
+                plan.fader_db = float(np.clip(plan.fader_db - lead_cut, -30.0, 0.0))
+                if plan.fader_db != before:
+                    actions.append({
+                        "type": "lead_trim_to_reference_space",
+                        "channel": channel,
+                        "before_db": round(before, 2),
+                        "after_db": round(float(plan.fader_db), 2),
+                    })
+                lead_plate = float(plan.fx_bus_send_db.get(13, plan.fx_send_db if plan.fx_send_db is not None else -18.0))
+                lead_delay = float(plan.fx_bus_send_db.get(15, lead_plate - 6.0))
+                after_plate = float(np.clip(lead_plate + (0.18 + excess_gap * 0.08 + space_lift * 0.14), -96.0, 0.0))
+                after_delay = float(np.clip(lead_delay + (0.45 + excess_gap * 0.12 + space_lift * 0.25), -96.0, 0.0))
+                plan.fx_bus_send_db[13] = after_plate
+                plan.fx_bus_send_db[15] = after_delay
+                _append_bus_action(
+                    action_type="lead_fx_send_wet_to_reference_space",
+                    channel=channel,
+                    bus_id=13,
+                    before_db=lead_plate,
+                    after_db=after_plate,
+                )
+                _append_bus_action(
+                    action_type="lead_fx_send_wet_to_reference_space",
+                    channel=channel,
+                    bus_id=15,
+                    before_db=lead_delay,
+                    after_db=after_delay,
+                )
+            for idx, (channel, plan) in enumerate(bgv_entries):
+                before = float(plan.fader_db)
+                plan.fader_db = float(np.clip(plan.fader_db + bgv_lift, -30.0, 0.0))
+                if plan.fader_db != before:
+                    actions.append({
+                        "type": "bgv_lift_to_reference_space",
+                        "channel": channel,
+                        "before_db": round(before, 2),
+                        "after_db": round(float(plan.fader_db), 2),
+                    })
+                before_pan = float(plan.pan)
+                sign = np.sign(plan.pan) if abs(plan.pan) > 1e-4 else (-1.0 if idx == 0 else 1.0)
+                plan.pan = float(sign * min(abs(plan.pan) if abs(plan.pan) > 1e-4 else bgv_pan_cap, bgv_pan_cap))
+                if abs(plan.pan - before_pan) >= 0.01:
+                    actions.append({
+                        "type": "bgv_pan_narrow_to_reference_space",
+                        "channel": channel,
+                        "before": round(before_pan, 3),
+                        "after": round(float(plan.pan), 3),
+                    })
+                bgv_plate = float(plan.fx_bus_send_db.get(13, plan.fx_send_db if plan.fx_send_db is not None else -16.0))
+                bgv_doubler = float(plan.fx_bus_send_db.get(16, bgv_plate - 8.0))
+                after_plate = float(np.clip(bgv_plate + (0.25 + excess_gap * 0.09 + space_lift * 0.18), -96.0, 0.0))
+                after_doubler = float(np.clip(bgv_doubler + (0.7 + excess_gap * 0.16 + space_lift * 0.30), -96.0, 0.0))
+                plan.fx_bus_send_db[13] = after_plate
+                plan.fx_bus_send_db[16] = after_doubler
+                _append_bus_action(
+                    action_type="bgv_fx_send_wet_to_reference_space",
+                    channel=channel,
+                    bus_id=13,
+                    before_db=bgv_plate,
+                    after_db=after_plate,
+                )
+                _append_bus_action(
+                    action_type="bgv_fx_send_wet_to_reference_space",
+                    channel=channel,
+                    bus_id=16,
+                    before_db=bgv_doubler,
+                    after_db=after_doubler,
+                )
+            continue
+
+        lead_lift = float(np.clip(0.2 + shortage_gap * 0.10, 0.2, 0.7))
+        bgv_trim = float(np.clip(0.2 + shortage_gap * 0.08, 0.2, 0.6))
+        for channel, plan in lead_entries:
+            before = float(plan.fader_db)
+            plan.fader_db = float(np.clip(plan.fader_db + lead_lift, -30.0, 0.0))
+            if plan.fader_db != before:
+                actions.append({
+                    "type": "lead_lift_to_reference_space",
+                    "channel": channel,
+                    "before_db": round(before, 2),
+                    "after_db": round(float(plan.fader_db), 2),
+                })
+        for channel, plan in bgv_entries:
+            before = float(plan.fader_db)
+            plan.fader_db = float(np.clip(plan.fader_db - bgv_trim, -30.0, 0.0))
+            if plan.fader_db != before:
+                actions.append({
+                    "type": "bgv_trim_to_reference_space",
+                    "channel": channel,
+                    "before_db": round(before, 2),
+                    "after_db": round(float(plan.fader_db), 2),
+                })
+
+    after_metrics = _measure_gap()
+
+    return {
+        "enabled": True,
+        "applied": bool(actions),
+        "rounds": rounds,
+        "target_lead_over_bgv_rms_db": round(target_gap, 3),
+        "target_lead_over_bgv_presence_db": round(target_presence_gap, 3),
+        "before": {
+            "lead_over_bgv_rms_db": round(before_metrics["lead_over_bgv_rms_db"], 3),
+            "lead_over_bgv_presence_db": round(before_metrics["lead_over_bgv_presence_db"], 3),
+        },
+        "after": {
+            "lead_over_bgv_rms_db": round(after_metrics["lead_over_bgv_rms_db"], 3),
+            "lead_over_bgv_presence_db": round(after_metrics["lead_over_bgv_presence_db"], 3),
+        },
+        "actions": actions,
+        "notes": [
+            "This focused pass only adjusts lead, backing vocals, and their FX space.",
+            "Low end, kick/bass hierarchy, cymbals, and drum balance stay untouched in this pass.",
         ],
     }
 
@@ -4338,6 +5774,7 @@ def apply_offline_fx_plan(
     plans: dict[int, ChannelPlan],
     sr: int,
     tempo_bpm: float = 120.0,
+    reference_context: ReferenceMixContext | None = None,
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
     """Render shared stereo FX returns from the rule-based FX plan."""
     planner = AutoFXPlanner(tempo_bpm=tempo_bpm, vocal_priority=True)
@@ -4346,6 +5783,151 @@ def apply_offline_fx_plan(
         for channel, plan in plans.items()
         if channel in rendered_channels and not plan.muted
     })
+    reference_fx_overrides: dict[str, Any] = {
+        "enabled": False,
+        "bus_adjustments": [],
+        "send_adjustments": [],
+    }
+    if reference_context is not None:
+        style = reference_context.style_profile
+        width = float(np.clip(style.stereo_width, 0.0, 1.0))
+        narrowness = float(np.clip(0.28 - width, 0.0, 0.28) / 0.28)
+        tightness = float(np.clip(8.0 - float(style.dynamic_range), 0.0, 8.0) / 8.0)
+        space_lift = _reference_fx_space_lift(reference_context)
+        darkness = float(np.clip(
+            (float(style.spectral_balance.get("mid", -11.5)) - float(style.spectral_balance.get("presence", -19.5))) / 10.0,
+            0.0,
+            1.4,
+        ))
+        buses = []
+        for bus in fx_plan.buses:
+            params = dict(bus.params)
+            return_level_db = float(bus.return_level_db)
+            lpf_hz = float(bus.lpf_hz)
+            duck_depth_db = float(bus.duck_depth_db)
+            changed = {}
+            if bus.fx_type == "reverb":
+                return_level_db += 0.2 + space_lift * 0.75 - narrowness * 0.25
+                decay_scale = float(np.clip(0.92 + space_lift * 0.10 - tightness * 0.04, 0.78, 1.15))
+                params["decay_s"] = max(0.45, float(params.get("decay_s", 1.0)) * decay_scale)
+                params["predelay_ms"] = float(params.get("predelay_ms", 30.0)) * (0.96 + width * 0.14)
+                params["brightness"] = float(np.clip(float(params.get("brightness", 0.5)) - darkness * 0.12 - narrowness * 0.05 + space_lift * 0.04, 0.12, 0.78))
+                lpf_hz = float(np.clip(lpf_hz - 700.0 * darkness - 450.0 * narrowness, 3400.0, bus.lpf_hz))
+                duck_depth_db = max(0.0, duck_depth_db - (0.2 + space_lift * 0.25))
+                changed = {
+                    "return_before_db": round(float(bus.return_level_db), 2),
+                    "return_after_db": round(return_level_db, 2),
+                    "decay_after_s": round(float(params["decay_s"]), 3),
+                    "brightness_after": round(float(params["brightness"]), 3),
+                    "lpf_after_hz": round(lpf_hz, 1),
+                    "duck_after_db": round(float(duck_depth_db), 3),
+                }
+            elif bus.fx_type == "delay":
+                return_level_db += 0.35 + space_lift * 1.0 - narrowness * 0.35
+                feedback_scale = float(np.clip(0.88 + space_lift * 0.12 - tightness * 0.05, 0.82, 1.18))
+                params["feedback"] = float(np.clip(float(params.get("feedback", 0.2)) * feedback_scale, 0.10, 0.38))
+                params["width"] = float(np.clip(float(params.get("width", 0.8)) * (0.78 + width * 0.28 + space_lift * 0.10), 0.35, 0.95))
+                lpf_hz = float(np.clip(lpf_hz - 550.0 * darkness - 650.0 * narrowness, 2800.0, bus.lpf_hz))
+                duck_depth_db = max(0.0, duck_depth_db - (0.45 + space_lift * 0.35))
+                changed = {
+                    "return_before_db": round(float(bus.return_level_db), 2),
+                    "return_after_db": round(return_level_db, 2),
+                    "feedback_after": round(float(params["feedback"]), 3),
+                    "width_after": round(float(params["width"]), 3),
+                    "lpf_after_hz": round(lpf_hz, 1),
+                    "duck_after_db": round(float(duck_depth_db), 3),
+                }
+            elif bus.fx_type == "chorus":
+                return_level_db += 0.5 + space_lift * 1.3 - narrowness * 0.9
+                params["depth"] = float(np.clip(float(params.get("depth", 0.16)) * (0.74 + width * 0.42 + space_lift * 0.16), 0.08, 0.22))
+                params["left_delay_ms"] = float(params.get("left_delay_ms", 11.0)) * (0.9 + width * 0.08)
+                params["right_delay_ms"] = float(params.get("right_delay_ms", 17.0)) * (0.9 + width * 0.08)
+                lpf_hz = float(np.clip(lpf_hz - 800.0 * darkness - 800.0 * narrowness, 3200.0, bus.lpf_hz))
+                changed = {
+                    "return_before_db": round(float(bus.return_level_db), 2),
+                    "return_after_db": round(return_level_db, 2),
+                    "depth_after": round(float(params["depth"]), 3),
+                    "lpf_after_hz": round(lpf_hz, 1),
+                }
+            new_bus = replace(
+                bus,
+                return_level_db=float(return_level_db),
+                params=params,
+                lpf_hz=float(lpf_hz),
+                duck_depth_db=float(duck_depth_db),
+            )
+            buses.append(new_bus)
+            if changed:
+                reference_fx_overrides["bus_adjustments"].append({
+                    "bus_id": bus.bus_id,
+                    "name": bus.name,
+                    "fx_type": bus.fx_type,
+                    **changed,
+                })
+
+        sends = []
+        for send in fx_plan.sends:
+            send_db = float(send.send_db)
+            before = send_db
+            if send.bus_id == 16:
+                send_db += 0.7 + space_lift * 1.15 - narrowness * 0.9
+            elif send.bus_id == 15:
+                send_db += 0.45 + space_lift * 1.05 - narrowness * 0.55
+            elif send.bus_id == 13:
+                send_db += 0.3 + space_lift * 0.7 - narrowness * 0.35
+            elif send.bus_id == 14:
+                send_db += 0.2 + space_lift * 0.55 - narrowness * 0.3
+            send_db = float(np.clip(send_db, -96.0, 12.0))
+            new_send = replace(send, send_db=send_db)
+            sends.append(new_send)
+            if abs(send_db - before) >= 0.1:
+                reference_fx_overrides["send_adjustments"].append({
+                    "channel": send.channel_id,
+                    "instrument": send.instrument,
+                    "bus_id": send.bus_id,
+                    "before_db": round(before, 2),
+                    "after_db": round(send_db, 2),
+                })
+        fx_plan = FXPlan(buses=buses, sends=sends, notes=fx_plan.notes)
+        reference_fx_overrides["enabled"] = bool(reference_fx_overrides["bus_adjustments"] or reference_fx_overrides["send_adjustments"])
+        reference_fx_overrides["style_summary"] = {
+            "stereo_width": round(width, 3),
+            "dynamic_range_db": round(float(style.dynamic_range), 3),
+            "narrowness": round(narrowness, 3),
+            "tightness": round(tightness, 3),
+            "darkness": round(darkness, 3),
+            "space_lift": round(space_lift, 3),
+        }
+
+    adjusted_sends = []
+    if fx_plan.sends:
+        sends = []
+        for send in fx_plan.sends:
+            plan = plans.get(send.channel_id)
+            if plan is None:
+                sends.append(send)
+                continue
+            raw_target = plan.fx_bus_send_db.get(send.bus_id)
+            if raw_target is None:
+                raw_target = plan.fx_send_db
+            if raw_target is None:
+                sends.append(send)
+                continue
+            target_send = float(np.clip(raw_target, -96.0, 0.0))
+            blended_send = float(np.clip(send.send_db + (target_send - send.send_db) * 0.55, -96.0, 12.0))
+            if abs(blended_send - send.send_db) < 0.1:
+                sends.append(send)
+                continue
+            sends.append(replace(send, send_db=blended_send))
+            adjusted_sends.append({
+                "channel": send.channel_id,
+                "file": plan.path.name,
+                "instrument": plan.instrument,
+                "before_db": round(float(send.send_db), 2),
+                "target_db": round(target_send, 2),
+                "after_db": round(blended_send, 2),
+            })
+        fx_plan = FXPlan(buses=fx_plan.buses, sends=sends, notes=fx_plan.notes)
 
     target_len = len(next(iter(rendered_channels.values()))) if rendered_channels else 0
     returns: dict[str, np.ndarray] = {}
@@ -4392,6 +5974,8 @@ def apply_offline_fx_plan(
         "plan": fx_plan.to_dict(),
         "returns": return_reports,
         "sends_by_bus": sends_by_bus,
+        "reference_send_overrides": adjusted_sends,
+        "reference_fx_overrides": reference_fx_overrides,
     }
 
 
@@ -4405,6 +5989,56 @@ def _soft_limiter(mix: np.ndarray, drive_db: float, ceiling_db: float = -1.0) ->
     return shaped.astype(np.float32)
 
 
+def _conform_master_to_target_lufs(
+    mix: np.ndarray,
+    meter: pyln.Meter,
+    target_lufs: float,
+    ceiling_dbfs: float = -1.0,
+) -> tuple[np.ndarray, float | None, bool]:
+    """Bring the final stereo mix toward the requested integrated loudness target."""
+    conformed = np.asarray(mix, dtype=np.float32).copy()
+    ceiling = db_to_amp(ceiling_dbfs)
+    soft_limiter_used = False
+
+    peak = float(np.max(np.abs(conformed))) if len(conformed) else 0.0
+    if peak > 0.95:
+        conformed = conformed / peak * 0.95
+
+    for _ in range(4):
+        try:
+            loudness = float(meter.integrated_loudness(conformed))
+        except Exception:
+            return conformed.astype(np.float32), None, soft_limiter_used
+        if not np.isfinite(loudness):
+            return conformed.astype(np.float32), None, soft_limiter_used
+
+        needed = float(target_lufs - loudness)
+        if abs(needed) < 0.4:
+            break
+
+        conformed = conformed * db_to_amp(min(max(needed, -6.0), 6.0))
+        peak = float(np.max(np.abs(conformed))) if len(conformed) else 0.0
+        if peak > ceiling:
+            over_db = amp_to_db(peak / ceiling)
+            conformed = _soft_limiter(
+                conformed / max(peak, 1e-9),
+                drive_db=min(12.0, max(3.0, over_db + 3.0)),
+                ceiling_db=ceiling_dbfs,
+            )
+            soft_limiter_used = True
+
+    peak = float(np.max(np.abs(conformed))) if len(conformed) else 0.0
+    if peak > ceiling:
+        conformed = conformed / peak * ceiling
+
+    post_lufs = None
+    try:
+        post_lufs = float(meter.integrated_loudness(conformed))
+    except Exception:
+        pass
+    return conformed.astype(np.float32), post_lufs, soft_limiter_used
+
+
 def master_process(
     mix: np.ndarray,
     sr: int,
@@ -4414,9 +6048,26 @@ def master_process(
     reference_context: ReferenceMixContext | None = None,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     # Console-like 2-bus cleanup and glue.
+    bus_threshold_db = -11.0
+    bus_ratio = 1.6
+    bus_attack_ms = 25.0
+    bus_release_ms = 250.0
+    reference_tightness = _reference_dynamics_tightness(reference_context)
+    if reference_context is not None and reference_tightness > 0.02:
+        bus_threshold_db -= 1.6 * reference_tightness
+        bus_ratio += 0.85 * reference_tightness
+        bus_attack_ms = float(np.clip(bus_attack_ms - reference_tightness * 8.0, 12.0, 25.0))
+        bus_release_ms = float(np.clip(bus_release_ms - reference_tightness * 70.0, 150.0, 250.0))
     for ch in range(2):
         mix[:, ch] = highpass(mix[:, ch], sr, 28.0)
-        mix[:, ch] = compressor(mix[:, ch], sr, threshold_db=-11.0, ratio=1.6, attack_ms=25, release_ms=250)
+        mix[:, ch] = compressor(
+            mix[:, ch],
+            sr,
+            threshold_db=bus_threshold_db,
+            ratio=bus_ratio,
+            attack_ms=bus_attack_ms,
+            release_ms=bus_release_ms,
+        )
 
     meter = pyln.Meter(sr)
     peak = float(np.max(np.abs(mix))) if len(mix) else 0.0
@@ -4430,6 +6081,13 @@ def master_process(
     reference_mastering: dict[str, Any] = {
         "requested": bool(reference_context is not None),
         "enabled": False,
+    }
+    bus_compressor_report = {
+        "threshold_db": round(float(bus_threshold_db), 2),
+        "ratio": round(float(bus_ratio), 2),
+        "attack_ms": round(float(bus_attack_ms), 2),
+        "release_ms": round(float(bus_release_ms), 2),
+        "reference_tightness": round(float(reference_tightness), 3),
     }
 
     if not final_limiter:
@@ -4459,6 +6117,7 @@ def master_process(
             "pre_master_peak_dbfs": round(peak_db, 2),
             "pre_master_lufs": round(pre_lufs, 2) if pre_lufs is not None and np.isfinite(pre_lufs) else None,
             "post_master_lufs": round(post_lufs, 2) if post_lufs is not None and np.isfinite(post_lufs) else None,
+            "bus_compressor": bus_compressor_report,
             "reference_mastering": reference_mastering,
             "note": "No final limiting or clipping stage; only static master trim is used for live-style headroom.",
         }
@@ -4529,14 +6188,29 @@ def master_process(
                     })
                     mix = reference_input_mix
                 else:
-                    mix = mastered_audio
+                    reference_post_lufs = post_lufs
+                    mix, post_lufs, soft_limiter_used = _conform_master_to_target_lufs(
+                        mastered_audio,
+                        meter,
+                        target_lufs,
+                        ceiling_dbfs=-1.0,
+                    )
+                    reference_mastering.update({
+                        "pre_target_conform_lufs": round(float(reference_post_lufs), 2)
+                        if reference_post_lufs is not None and np.isfinite(reference_post_lufs)
+                        else reference_mastering.get("lufs"),
+                        "target_lufs": round(float(target_lufs), 2),
+                    })
+                    if post_lufs is not None and np.isfinite(post_lufs):
+                        reference_mastering["lufs"] = round(float(post_lufs), 2)
                     return np.asarray(mix, dtype=np.float32), {
                         "final_limiter": True,
-                        "soft_limiter": False,
+                        "soft_limiter": soft_limiter_used,
                         "ceiling_dbfs": -1.0,
                         "pre_master_peak_dbfs": round(peak_db, 2),
                         "pre_master_lufs": round(pre_lufs, 2) if pre_lufs is not None and np.isfinite(pre_lufs) else None,
                         "post_master_lufs": round(post_lufs, 2) if post_lufs is not None and np.isfinite(post_lufs) else None,
+                        "bus_compressor": bus_compressor_report,
                         "reference_mastering": reference_mastering,
                     }
             except Exception as exc:
@@ -4546,44 +6220,20 @@ def master_process(
                     "error": str(exc),
                 })
 
-    ceiling = db_to_amp(-1.0)
-    if peak > 0.95:
-        mix = mix / peak * 0.95
-
-    # Iterative loudness lift with soft limiting, similar to pushing a console
-    # into a gentle final limiter. This keeps the MP3 listenable without letting
-    # short drum transients dictate the whole mix level.
-    for _ in range(4):
-        try:
-            loudness = meter.integrated_loudness(mix)
-        except Exception:
-            break
-        if not np.isfinite(loudness):
-            break
-        needed = target_lufs - loudness
-        if abs(needed) < 0.4:
-            break
-        mix = mix * db_to_amp(min(max(needed, -6.0), 6.0))
-        peak = np.max(np.abs(mix))
-        if peak > ceiling:
-            over_db = amp_to_db(peak / ceiling)
-            mix = _soft_limiter(mix / max(peak, 1e-9), drive_db=min(12.0, max(3.0, over_db + 3.0)), ceiling_db=-1.0)
-
-    peak = np.max(np.abs(mix))
-    if peak > ceiling:
-        mix = mix / peak * ceiling
-    post_lufs = None
-    try:
-        post_lufs = float(meter.integrated_loudness(mix))
-    except Exception:
-        pass
+    mix, post_lufs, soft_limiter_used = _conform_master_to_target_lufs(
+        mix,
+        meter,
+        target_lufs,
+        ceiling_dbfs=-1.0,
+    )
     return np.asarray(mix, dtype=np.float32), {
         "final_limiter": True,
-        "soft_limiter": True,
+        "soft_limiter": soft_limiter_used,
         "ceiling_dbfs": -1.0,
         "pre_master_peak_dbfs": round(peak_db, 2),
         "pre_master_lufs": round(pre_lufs, 2) if pre_lufs is not None and np.isfinite(pre_lufs) else None,
         "post_master_lufs": round(post_lufs, 2) if post_lufs is not None and np.isfinite(post_lufs) else None,
+        "bus_compressor": bus_compressor_report,
         "reference_mastering": reference_mastering,
     }
 
@@ -4614,6 +6264,8 @@ def main() -> int:
     parser.add_argument("--master-target-lufs", type=float, default=-16.0)
     parser.add_argument("--reference", default="", help="Path to an external reference track or saved style preset JSON")
     parser.add_argument("--genre", default="", help="Optional genre focus for bounded mix voicing, for example 'rock'")
+    parser.add_argument("--reference-dynamics-ride", action="store_true", help="Apply reference-guided stem loudness rides after channel rendering")
+    parser.add_argument("--reference-vocal-fx-focus", action="store_true", help="Apply an extra narrow pass that only adjusts lead/BGV/fx space toward the reference")
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
@@ -4788,13 +6440,23 @@ def main() -> int:
         plans,
         target_len,
         sr,
-        desired_kick_advantage_db=1.8 if str(args.genre).strip().lower() == "rock" else 0.85,
+        desired_kick_advantage_db=desired_kick_advantage_from_reference(
+            reference_context,
+            genre=args.genre,
+        ),
     )
+    frequency_window_balance = apply_frequency_window_balance(plans, target_len, sr)
     stem_mix_verification = apply_stem_mix_verification(
         plans,
         target_len,
         sr,
         genre=args.genre,
+        reference_context=reference_context,
+    )
+    reference_vocal_fx_focus = (
+        apply_reference_vocal_fx_focus(plans, target_len, sr, reference_context)
+        if args.reference_vocal_fx_focus
+        else {"enabled": False, "reason": "disabled_by_flag"}
     )
     live_channel_headroom = (
         apply_live_channel_peak_headroom(plans, target_len, sr, args.live_channel_peak_ceiling_db)
@@ -4848,10 +6510,21 @@ def main() -> int:
             "Vocal space must be created by priority EQ and measured analyzer corrections.",
         ],
     }
+    reference_dynamics_ride = (
+        apply_reference_dynamics_ride(rendered_channels, plans, sr, reference_context)
+        if args.reference_dynamics_ride
+        else {"enabled": False, "reason": "disabled_by_flag"}
+    )
     fx_returns, fx_report = (
         ({}, {"enabled": False})
         if args.disable_fx
-        else apply_offline_fx_plan(rendered_channels, plans, sr, tempo_bpm=args.tempo_bpm)
+        else apply_offline_fx_plan(
+            rendered_channels,
+            plans,
+            sr,
+            tempo_bpm=args.tempo_bpm,
+            reference_context=reference_context,
+        )
     )
     mix = np.zeros((target_len, 2), dtype=np.float32)
     for rendered in rendered_channels.values():
@@ -4906,7 +6579,10 @@ def main() -> int:
         "reference_mix_guidance": reference_mix_guidance,
         "genre_mix_profile": genre_mix_profile,
         "kick_bass_hierarchy": kick_bass_hierarchy,
+        "frequency_window_balance": frequency_window_balance,
         "stem_mix_verification": stem_mix_verification,
+        "reference_vocal_fx_focus": reference_vocal_fx_focus,
+        "reference_dynamics_ride": reference_dynamics_ride,
         "dynamic_vocal_priority": dynamic_vocal_priority,
         "kick_presence_boost": kick_presence_boost,
         "kick_focus_cymbal_cut": cymbal_focus_cleanup,

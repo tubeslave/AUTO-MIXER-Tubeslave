@@ -648,10 +648,16 @@ def test_reference_mix_guidance_applies_bounded_channel_adjustments():
         assert report["enabled"] is True
         assert report["reference_path"] == str(reference_path.resolve())
         assert report["applied_channel_count"] >= 1
+        assert report["targets"]["tilt"]
+        assert report["sections"]
         assert plans[1].fader_db >= -7.5
         assert plans[1].fader_db <= -4.5
         assert plans[2].fader_db >= -9.5
         assert plans[2].fader_db <= -6.5
+        assert plans[1].expander_enabled is True
+        assert plans[1].expander_threshold_db is not None
+        assert plans[2].fx_send_db is not None
+        assert any(action["pan"] is not None or action["fx_send"] is not None for action in report["actions"])
 
 
 def test_prepare_reference_mix_context_merges_audio_directory():
@@ -683,6 +689,8 @@ def test_prepare_reference_mix_context_merges_audio_directory():
     assert context.audio is not None
     assert context.audio.ndim == 2
     assert len(context.audio) >= len(ref_a) * 2
+    assert context.targets["tilt"]
+    assert context.sections
 
 
 def test_rock_genre_profile_tightens_vocals_and_centers_snare_layers():
@@ -1026,3 +1034,257 @@ def test_master_process_rejects_reference_mastering_when_output_goes_too_quiet(m
     assert report["reference_mastering"]["reason"] == "reference_mastering_rejected_low_loudness"
     assert np.count_nonzero(np.abs(mastered) > 1e-6) > 10
     assert not np.array_equal(mastered[0], np.array([0.85, 0.85], dtype=np.float32))
+
+
+def test_master_process_conforms_reference_mastering_to_target_lufs(monkeypatch):
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    t = np.arange(48_000, dtype=np.float32) / sr
+    mono_mix = (0.16 * np.sin(2.0 * np.pi * 110.0 * t)).astype(np.float32)
+    mono_reference = (0.2 * np.sin(2.0 * np.pi * 220.0 * t)).astype(np.float32)
+    mix = np.column_stack([mono_mix, mono_mix]).astype(np.float32)
+    reference = np.column_stack([mono_reference, mono_reference]).astype(np.float32)
+
+    class DummyAutoMaster:
+        def __init__(self, sample_rate, target_lufs, true_peak_limit):
+            self.target_lufs = target_lufs
+
+        def master(self, audio, reference=None, sample_rate=None):
+            return (audio * 3.0).astype(np.float32)
+
+    monkeypatch.setattr(mod, "AutoMaster", DummyAutoMaster)
+    context = mod.ReferenceMixContext(
+        path=Path("/tmp/reference-folder"),
+        source_type="audio_directory",
+        style_profile=mod.StyleProfile(name="ref", loudness_lufs=-11.0),
+        audio=reference,
+        sample_rate=sr,
+        source_paths=[Path("/tmp/reference-a.wav"), Path("/tmp/reference-b.wav")],
+    )
+
+    mastered, report = mod.master_process(mix, sr, target_lufs=-16.0, reference_context=context)
+
+    assert mastered.shape == mix.shape
+    assert report["reference_mastering"]["enabled"] is True
+    assert report["reference_mastering"]["backend"] == "reference_audio_fallback"
+    assert report["reference_mastering"]["target_lufs"] == -16.0
+    assert report["reference_mastering"]["pre_target_conform_lufs"] != report["reference_mastering"]["lufs"]
+    assert abs(report["post_master_lufs"] - (-16.0)) < 0.7
+
+
+def test_apply_offline_fx_plan_uses_reference_send_override():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    t = np.linspace(0, 1.0, sr, endpoint=False, dtype=np.float32)
+    mono = (0.08 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+    signal = np.column_stack([mono, mono]).astype(np.float32)
+    reference = np.column_stack([
+        (0.14 * np.sin(2 * np.pi * 220 * t)).astype(np.float32),
+        (0.04 * np.sin(2 * np.pi * 220 * t)).astype(np.float32),
+    ]).astype(np.float32)
+    plans = {
+        1: mod.ChannelPlan(
+            path=Path("Lead.wav"),
+            name="Lead",
+            instrument="lead_vocal",
+            pan=0.0,
+            hpf=90.0,
+            target_rms_db=-20.0,
+            fx_send_db=-10.0,
+        ),
+    }
+    context = mod.ReferenceMixContext(
+        path=Path("/tmp/ref.wav"),
+        source_type="audio",
+        style_profile=mod.StyleTransfer().extract_style(reference, sr, name="ref"),
+        audio=reference,
+        sample_rate=sr,
+    )
+    mod._reference_targets_from_context(context)
+
+    returns, report = mod.apply_offline_fx_plan({1: signal}, plans, sr, reference_context=context)
+
+    assert report["enabled"] is True
+    assert returns
+    assert report["reference_send_overrides"]
+    assert report["reference_send_overrides"][0]["target_db"] == -10.0
+    assert report["reference_fx_overrides"]["enabled"] is True
+    assert report["reference_fx_overrides"]["bus_adjustments"]
+
+
+def test_stem_mix_verification_reports_reference_distance():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 1.4
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+    lead = (0.06 * np.sin(2.0 * np.pi * 220.0 * t) + 0.02 * np.sin(2.0 * np.pi * 2600.0 * t)).astype(np.float32)
+    bgv = (0.08 * np.sin(2.0 * np.pi * 330.0 * t) + 0.03 * np.sin(2.0 * np.pi * 1800.0 * t)).astype(np.float32)
+    kick = (0.14 * np.sin(2.0 * np.pi * 62.0 * t) + 0.01 * np.sin(2.0 * np.pi * 3200.0 * t)).astype(np.float32)
+    bass = (0.15 * np.sin(2.0 * np.pi * 72.0 * t)).astype(np.float32)
+    reference = np.column_stack([
+        (0.42 * np.sin(2.0 * np.pi * 220.0 * t) + 0.18 * np.sin(2.0 * np.pi * 3100.0 * t)).astype(np.float32),
+        (0.24 * np.sin(2.0 * np.pi * 72.0 * t) + 0.07 * np.sin(2.0 * np.pi * 5200.0 * t)).astype(np.float32),
+    ])
+
+    with TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        lead_path = tmp / "Lead.wav"
+        bgv_path = tmp / "BGV.wav"
+        kick_path = tmp / "Kick.wav"
+        bass_path = tmp / "Bass.wav"
+        reference_path = tmp / "Reference.wav"
+        sf.write(lead_path, lead, sr, subtype="PCM_24")
+        sf.write(bgv_path, bgv, sr, subtype="PCM_24")
+        sf.write(kick_path, kick, sr, subtype="PCM_24")
+        sf.write(bass_path, bass, sr, subtype="PCM_24")
+        sf.write(reference_path, reference, sr, subtype="PCM_24")
+
+        plans = {
+            1: mod.ChannelPlan(
+                path=lead_path,
+                name="Lead",
+                instrument="lead_vocal",
+                pan=0.0,
+                hpf=90.0,
+                target_rms_db=-20.0,
+                fader_db=-6.0,
+                metrics=mod.metrics_for(lead, sr, instrument="lead_vocal"),
+            ),
+            2: mod.ChannelPlan(
+                path=bgv_path,
+                name="BGV",
+                instrument="backing_vocal",
+                pan=0.2,
+                hpf=100.0,
+                target_rms_db=-22.0,
+                fader_db=-3.5,
+                metrics=mod.metrics_for(bgv, sr, instrument="backing_vocal"),
+            ),
+            3: mod.ChannelPlan(
+                path=kick_path,
+                name="Kick",
+                instrument="kick",
+                pan=0.0,
+                hpf=35.0,
+                target_rms_db=-20.0,
+                metrics=mod.metrics_for(kick, sr, instrument="kick"),
+                event_activity=mod._event_activity_ranges(kick, sr, "kick") or {},
+            ),
+            4: mod.ChannelPlan(
+                path=bass_path,
+                name="Bass",
+                instrument="bass_guitar",
+                pan=0.0,
+                hpf=35.0,
+                target_rms_db=-21.0,
+                metrics=mod.metrics_for(bass, sr, instrument="bass_guitar"),
+            ),
+        }
+        context = mod.prepare_reference_mix_context(reference_path)
+        report = mod.apply_stem_mix_verification(plans, len(lead), sr, genre="rock", reference_context=context)
+
+    assert report["enabled"] is True
+    assert report["reference_targets"]["hierarchy"]
+    assert report["reference_distance"]["before"]["enabled"] is True
+    assert "overall_distance" in report["reference_distance"]["after"]
+    assert report["before"]["hierarchy_metrics"]
+    assert report["after"]["hierarchy_metrics"]
+
+
+def test_reference_vocal_fx_focus_only_adjusts_vocal_space():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 1.2
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+    lead = (0.10 * np.sin(2.0 * np.pi * 220.0 * t) + 0.04 * np.sin(2.0 * np.pi * 2800.0 * t)).astype(np.float32)
+    bgv = (0.035 * np.sin(2.0 * np.pi * 330.0 * t) + 0.01 * np.sin(2.0 * np.pi * 2200.0 * t)).astype(np.float32)
+    reference = np.column_stack([
+        (0.12 * np.sin(2.0 * np.pi * 220.0 * t)).astype(np.float32),
+        (0.05 * np.sin(2.0 * np.pi * 220.0 * t)).astype(np.float32),
+    ])
+
+    with TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        lead_path = tmp / "Lead.wav"
+        bgv_path = tmp / "BGV.wav"
+        kick_path = tmp / "Kick.wav"
+        ref_path = tmp / "Ref.wav"
+        sf.write(lead_path, lead, sr, subtype="PCM_24")
+        sf.write(bgv_path, bgv, sr, subtype="PCM_24")
+        sf.write(kick_path, 0.08 * np.sin(2.0 * np.pi * 60.0 * t).astype(np.float32), sr, subtype="PCM_24")
+        sf.write(ref_path, reference, sr, subtype="PCM_24")
+
+        plans = {
+            1: mod.ChannelPlan(path=lead_path, name="Lead", instrument="lead_vocal", pan=0.0, hpf=90.0, target_rms_db=-20.0, fader_db=0.0),
+            2: mod.ChannelPlan(path=bgv_path, name="BGV", instrument="backing_vocal", pan=0.3, hpf=100.0, target_rms_db=-24.0, fader_db=-4.0),
+            3: mod.ChannelPlan(path=kick_path, name="Kick", instrument="kick", pan=0.0, hpf=35.0, target_rms_db=-20.0, fader_db=-1.0),
+        }
+        context = mod.prepare_reference_mix_context(ref_path)
+        before_kick_fader = plans[3].fader_db
+        report = mod.apply_reference_vocal_fx_focus(plans, len(lead), sr, context)
+
+    assert report["enabled"] is True
+    assert report["applied"] is True
+    assert plans[3].fader_db == before_kick_fader
+    assert plans[1].fx_bus_send_db
+    assert report["after"]["lead_over_bgv_rms_db"] < report["before"]["lead_over_bgv_rms_db"]
+
+
+def test_frequency_window_balance_clears_vocal_window_and_keeps_kick_untouched():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 1.6
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+
+    lead = (
+        0.035 * np.sin(2.0 * np.pi * 220.0 * t)
+        + 0.03 * np.sin(2.0 * np.pi * 980.0 * t)
+        + 0.02 * np.sin(2.0 * np.pi * 2900.0 * t)
+    ).astype(np.float32)
+    guitar = (
+        0.06 * np.sin(2.0 * np.pi * 320.0 * t)
+        + 0.08 * np.sin(2.0 * np.pi * 1100.0 * t)
+        + 0.07 * np.sin(2.0 * np.pi * 3000.0 * t)
+    ).astype(np.float32)
+    bgv = (
+        0.03 * np.sin(2.0 * np.pi * 260.0 * t)
+        + 0.045 * np.sin(2.0 * np.pi * 1020.0 * t)
+        + 0.03 * np.sin(2.0 * np.pi * 3100.0 * t)
+    ).astype(np.float32)
+    hat = (
+        0.04 * np.sin(2.0 * np.pi * 7600.0 * t)
+        + 0.05 * np.sin(2.0 * np.pi * 9800.0 * t)
+    ).astype(np.float32)
+    kick = (0.08 * np.sin(2.0 * np.pi * 62.0 * t)).astype(np.float32)
+
+    with TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        lead_path = tmp / "Lead.wav"
+        guitar_path = tmp / "Guitar.wav"
+        bgv_path = tmp / "BGV.wav"
+        hat_path = tmp / "Hat.wav"
+        kick_path = tmp / "Kick.wav"
+        sf.write(lead_path, lead, sr, subtype="PCM_24")
+        sf.write(guitar_path, guitar, sr, subtype="PCM_24")
+        sf.write(bgv_path, bgv, sr, subtype="PCM_24")
+        sf.write(hat_path, hat, sr, subtype="PCM_24")
+        sf.write(kick_path, kick, sr, subtype="PCM_24")
+
+        plans = {
+            1: mod.ChannelPlan(path=lead_path, name="Lead", instrument="lead_vocal", pan=0.0, hpf=90.0, target_rms_db=-20.0),
+            2: mod.ChannelPlan(path=guitar_path, name="Guitar", instrument="electric_guitar", pan=-0.25, hpf=90.0, target_rms_db=-22.0),
+            3: mod.ChannelPlan(path=bgv_path, name="BGV", instrument="backing_vocal", pan=0.25, hpf=100.0, target_rms_db=-23.0),
+            4: mod.ChannelPlan(path=hat_path, name="Hat", instrument="hi_hat", pan=0.35, hpf=300.0, target_rms_db=-28.0),
+            5: mod.ChannelPlan(path=kick_path, name="Kick", instrument="kick", pan=0.0, hpf=35.0, target_rms_db=-20.0),
+        }
+        kick_eq_before = list(plans[5].eq_bands)
+        report = mod.apply_frequency_window_balance(plans, len(lead), sr)
+
+    assert report["enabled"] is True
+    assert report["applied"] is True
+    action_windows = {item["window"] for item in report["actions"]}
+    assert "vocal_conflict" in action_windows
+    assert "air_sibilance" in action_windows
+    assert plans[2].eq_bands
+    assert plans[4].eq_bands
+    assert plans[5].eq_bands == kick_eq_before

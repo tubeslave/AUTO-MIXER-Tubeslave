@@ -181,6 +181,19 @@ class TestMasterFallback:
         attenuated = (input_audio * 0.03).astype(np.float32)
         assert AutoMaster._estimate_lufs(result) > AutoMaster._estimate_lufs(attenuated) + 8.0
 
+    def test_fallback_uses_master_target_lufs_instead_of_reference_loudness(self):
+        master = AutoMaster(target_lufs=-18.0, true_peak_limit=-1.0, sample_rate=48000)
+        input_audio = _make_sine(amplitude=0.08)
+        ref_audio = _make_sine(amplitude=0.95, freq_hz=880.0)
+
+        result = master._master_fallback(input_audio, ref_audio, 48000)
+
+        result_lufs = AutoMaster._estimate_lufs(result)
+        reference_lufs = AutoMaster._estimate_lufs(ref_audio)
+
+        assert abs(result_lufs - master.target_lufs) < 3.0
+        assert abs(result_lufs - master.target_lufs) < abs(result_lufs - reference_lufs)
+
 
 # ---------------------------------------------------------------------------
 # _apply_eq_match tests

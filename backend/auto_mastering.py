@@ -176,22 +176,37 @@ class AutoMaster:
         limited, _ = self._apply_limiter(audio.astype(np.float32), self.true_peak_limit)
         return limited.astype(np.float32)
 
+    def _match_target_loudness(self, audio: np.ndarray, target_lufs: Optional[float] = None) -> np.ndarray:
+        """Bring audio toward the configured loudness target while honoring the peak limit."""
+        working = self._normalize_audio_shape(audio).astype(np.float32, copy=True)
+        desired_lufs = float(self.target_lufs if target_lufs is None else target_lufs)
+
+        current_lufs = self._estimate_lufs(working)
+        if np.isfinite(current_lufs):
+            gain_db = np.clip(desired_lufs - current_lufs, -18.0, 18.0)
+            working *= np.float32(10.0 ** (gain_db / 20.0))
+
+        working = self._limit(working)
+
+        post_limit_lufs = self._estimate_lufs(working)
+        if np.isfinite(post_limit_lufs):
+            correction_db = np.clip(desired_lufs - post_limit_lufs, -6.0, 6.0)
+            if abs(correction_db) >= 0.1:
+                working *= np.float32(10.0 ** (correction_db / 20.0))
+                working = self._limit(working)
+
+        return working.astype(np.float32, copy=False)
+
     def _master_fallback(self, audio: np.ndarray, reference: np.ndarray, sample_rate: int) -> np.ndarray:
         """Reference-guided fallback mastering without external dependencies."""
         self.sample_rate = sample_rate
         working = self._normalize_audio_shape(audio).astype(np.float32, copy=True)
         reference = self._normalize_audio_shape(reference).astype(np.float32, copy=False)
 
-        target_lufs = self._estimate_lufs(reference)
-        current_lufs = self._estimate_lufs(working)
-        gain_db = np.clip(target_lufs - current_lufs, -12.0, 12.0)
-        working *= np.float32(10.0 ** (gain_db / 20.0))
+        working = self._match_target_loudness(working, self.target_lufs)
 
         working = self._apply_eq_match(working.astype(np.float64), reference.astype(np.float64), sample_rate).astype(np.float32)
-        post_eq_lufs = self._estimate_lufs(working)
-        correction_db = np.clip(target_lufs - post_eq_lufs, -18.0, 18.0)
-        working *= np.float32(10.0 ** (correction_db / 20.0))
-        return self._limit(working)
+        return self._match_target_loudness(working, self.target_lufs)
 
     def _apply_eq_match(self, audio: np.ndarray, reference: np.ndarray, sample_rate: int) -> np.ndarray:
         """Very lightweight spectral tilt matching."""

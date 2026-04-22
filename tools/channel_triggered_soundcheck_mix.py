@@ -685,13 +685,18 @@ def main() -> int:
         working_plans,
         target_len,
         sr,
-        desired_kick_advantage_db=1.8 if str(args.genre).strip().lower() == "rock" else 0.85,
+        desired_kick_advantage_db=mixmod.desired_kick_advantage_from_reference(
+            reference_context,
+            genre=args.genre,
+        ),
     )
+    frequency_window_balance = mixmod.apply_frequency_window_balance(working_plans, target_len, sr)
     stem_mix_verification = mixmod.apply_stem_mix_verification(
         working_plans,
         target_len,
         sr,
         genre=args.genre,
+        reference_context=reference_context,
     )
     final_plans = clone_plans(working_plans)
 
@@ -735,7 +740,13 @@ def main() -> int:
             "Vocal space must be created by priority EQ and measured analyzer corrections.",
         ],
     }
-    fx_returns, fx_report = mixmod.apply_offline_fx_plan(blended_channels, final_plans, sr, tempo_bpm=args.tempo_bpm)
+    fx_returns, fx_report = mixmod.apply_offline_fx_plan(
+        blended_channels,
+        final_plans,
+        sr,
+        tempo_bpm=args.tempo_bpm,
+        reference_context=reference_context,
+    )
 
     mix = np.zeros((target_len, 2), dtype=np.float32)
     for rendered in blended_channels.values():
@@ -794,6 +805,7 @@ def main() -> int:
         "reference_mix_guidance": reference_mix_guidance,
         "genre_mix_profile": genre_mix_profile,
         "kick_bass_hierarchy": kick_bass_hierarchy,
+        "frequency_window_balance": frequency_window_balance,
         "stem_mix_verification": stem_mix_verification,
         "dynamic_vocal_priority": dynamic_vocal_priority,
         "fx": fx_report,

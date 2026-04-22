@@ -134,7 +134,7 @@ class AutoFXPlanner:
                 fx_type="reverb",
                 fx_slot="FX1",
                 model="PLATE",
-                return_level_db=-4.0,
+                return_level_db=-3.6,
                 params={"decay_s": 1.55, "predelay_ms": 42.0, "density": 0.72, "brightness": 0.58},
                 hpf_hz=220.0,
                 lpf_hz=7800.0,
@@ -148,7 +148,7 @@ class AutoFXPlanner:
                 fx_type="reverb",
                 fx_slot="FX2",
                 model="ROOM",
-                return_level_db=-4.0,
+                return_level_db=-3.6,
                 params={"decay_s": 0.72, "predelay_ms": 10.0, "density": 0.86, "brightness": 0.42},
                 hpf_hz=180.0,
                 lpf_hz=5600.0,
@@ -160,7 +160,7 @@ class AutoFXPlanner:
                 fx_type="delay",
                 fx_slot="FX3",
                 model="STEREO_DELAY",
-                return_level_db=-0.5,
+                return_level_db=-0.2,
                 params={
                     "left_delay_ms": dotted_eighth_ms,
                     "right_delay_ms": quarter_ms,
@@ -179,7 +179,7 @@ class AutoFXPlanner:
                 fx_type="chorus",
                 fx_slot="FX4",
                 model="CHORUS",
-                return_level_db=-11.0,
+                return_level_db=-10.0,
                 params={"left_delay_ms": 11.0, "right_delay_ms": 17.0, "depth": 0.16, "rate_hz": 0.45},
                 hpf_hz=220.0,
                 lpf_hz=8500.0,
@@ -190,21 +190,21 @@ class AutoFXPlanner:
     def _sends_for_instrument(self, channel_id: int, instrument: str) -> list[FXSendDecision]:
         send_map: dict[str, list[tuple[int, float, str]]] = {
             "lead_vocal": [
-                (13, -18.0, "lead vocal plate depth"),
-                (15, -24.0, "ducked tempo delay for vocal phrases"),
+                (13, -17.2, "lead vocal plate depth"),
+                (15, -23.0, "ducked tempo delay for vocal phrases"),
             ],
             "backing_vocal": [
-                (13, -15.5, "backing vocals sit behind lead"),
-                (16, -23.0, "subtle width for backing vocals"),
+                (13, -15.0, "backing vocals sit behind lead"),
+                (16, -22.0, "subtle width for backing vocals"),
             ],
             "snare": [
-                (14, -17.0, "short drum room/plate support"),
+                (14, -16.5, "short drum room/plate support"),
             ],
             "rack_tom": [
-                (14, -19.0, "tom depth follows drum room"),
+                (14, -18.5, "tom depth follows drum room"),
             ],
             "floor_tom": [
-                (14, -19.0, "floor tom depth follows drum room"),
+                (14, -18.5, "floor tom depth follows drum room"),
             ],
             "overhead": [
                 (14, -30.0, "tiny cohesion only; overheads already contain room"),
@@ -216,15 +216,15 @@ class AutoFXPlanner:
                 (14, -31.0, "very low room only to avoid harsh wash"),
             ],
             "electric_guitar": [
-                (13, -25.0, "small shared plate to place guitars behind vocal"),
-                (16, -26.0, "subtle width without hard center masking"),
+                (13, -24.0, "small shared plate to place guitars behind vocal"),
+                (16, -25.0, "subtle width without hard center masking"),
             ],
             "accordion": [
-                (13, -23.5, "shared plate for melodic depth"),
-                (15, -29.0, "low tempo echo for phrase tails"),
+                (13, -22.8, "shared plate for melodic depth"),
+                (15, -28.0, "low tempo echo for phrase tails"),
             ],
             "playback": [
-                (13, -30.0, "minimal glue; playback likely already processed"),
+                (13, -29.0, "minimal glue; playback likely already processed"),
             ],
         }
         return [

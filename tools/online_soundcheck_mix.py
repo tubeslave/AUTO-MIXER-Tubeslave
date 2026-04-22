@@ -220,7 +220,7 @@ def render_stage_mix(
         ],
     }
     fx_returns, fx_report = (
-        mixmod.apply_offline_fx_plan(rendered_channels, plans, sr, tempo_bpm=tempo_bpm)
+        mixmod.apply_offline_fx_plan(rendered_channels, plans, sr, tempo_bpm=tempo_bpm, reference_context=None)
         if enable_fx
         else ({}, {"enabled": False})
     )
