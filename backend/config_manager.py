@@ -86,6 +86,7 @@ class ConfigManager:
                 'kimi_timeout_sec': 120,
                 'model_fallbacks': [
                     'openai:gpt-5.4',
+                    'kimi_cli:default',
                     'openai:gpt-4o-mini',
                 ],
                 'perplexity_api_key': '',

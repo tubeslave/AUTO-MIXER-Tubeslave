@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import copy
 import json
 import math
 import os
@@ -225,6 +226,340 @@ FREQUENCY_WINDOW_DEFINITIONS: tuple[dict[str, Any], ...] = (
         "q": 1.2,
     },
 )
+
+GENRE_REFERENCE_ALIASES = {
+    "edm": "electronic",
+    "dance": "electronic",
+    "dance_pop": "electronic",
+    "house": "electronic",
+    "club": "electronic",
+    "synthpop": "synth_pop",
+    "synth_pop": "synth_pop",
+    "electropop": "synth_pop",
+    "alt_pop": "pop",
+    "hiphop": "hip_hop",
+    "hip_hop": "hip_hop",
+    "rap": "hip_hop",
+    "trap": "hip_hop",
+    "trap_pop": "hip_hop",
+    "rnb": "r_and_b",
+    "r_b": "r_and_b",
+    "r_and_b": "r_and_b",
+    "neo_soul": "r_and_b",
+    "pop_rock": "rock",
+    "alt_rock": "rock",
+    "alternative": "rock",
+    "indie_rock": "rock",
+}
+
+GENRE_REFERENCE_STARTS: dict[str, dict[str, Any]] = {
+    "pop": {
+        "label": "Modern Pop",
+        "notes": [
+            "Internet-curated seed built from modern reference-track recommendations by iZotope and Mastering The Mix.",
+            "Use this as a starting balance target when no local audio reference is supplied, or as a prior before a song-specific reference overrides it.",
+        ],
+        "references": [
+            {
+                "song": "Anti-Hero",
+                "artist": "Taylor Swift",
+                "mix_engineer": "Serban Ghenea",
+                "source_url": "https://www.izotope.com/en/learn/mixing-reference-tracks.html",
+                "why": "Current chart-pop vocal depth, synth-pop width, and modern top-end gloss.",
+            },
+            {
+                "song": "New Rules",
+                "artist": "Dua Lipa",
+                "source_url": "https://www.masteringthemix.com/blogs/learn/best-reference-track-for-all-genres",
+                "why": "Huge but controlled bass with wide midrange musical elements.",
+            },
+            {
+                "song": "Get Lucky",
+                "artist": "Daft Punk feat. Nile Rodgers and Pharrell Williams",
+                "mix_engineer": "Mick Guzauski",
+                "source_url": "https://www.izotope.com/en/learn/4-popular-mixing-reference-tracks-and-why-they-work",
+                "why": "Low-end definition, depth of field, and wide-but-stable imaging.",
+            },
+        ],
+        "tilt": {
+            "weight_60_120_vs_plateau_db": 0.2,
+            "sub_35_60_vs_plateau_db": -2.8,
+            "high_4500_12000_vs_plateau_db": -0.2,
+            "plateau_spread_db": 5.4,
+        },
+        "hierarchy": {
+            "lead_over_bgv_rms_db": 5.8,
+            "lead_over_bgv_presence_db": 5.4,
+            "kick_over_bass_55_95_db": 0.8,
+        },
+        "kick": {
+            "click_share_in_master": 0.03,
+            "click_share_in_drums": 0.1,
+            "dynamic_range_max_db": 16.8,
+            "click_minus_punch_db": -17.8,
+            "box_minus_click_db": -0.4,
+        },
+        "style_summary": {
+            "dynamic_range_db": 7.2,
+            "stereo_width": 0.46,
+            "crest_factor_db": 11.4,
+        },
+    },
+    "synth_pop": {
+        "label": "Synth Pop / Alt Pop",
+        "notes": [
+            "Internet-curated seed built around modern synth-pop references with glossy vocals, stable low end, and a flatter compensated plateau.",
+        ],
+        "references": [
+            {
+                "song": "Anti-Hero",
+                "artist": "Taylor Swift",
+                "mix_engineer": "Serban Ghenea",
+                "source_url": "https://www.izotope.com/en/learn/mixing-reference-tracks.html",
+                "why": "Modern synth/vocal/percussion balance with front vocal and controlled width.",
+            },
+            {
+                "song": "Get Lucky",
+                "artist": "Daft Punk feat. Nile Rodgers and Pharrell Williams",
+                "mix_engineer": "Mick Guzauski",
+                "source_url": "https://www.izotope.com/en/learn/4-popular-mixing-reference-tracks-and-why-they-work",
+                "why": "Wide and deep imaging with excellent low-end definition.",
+            },
+            {
+                "song": "demon time (with BAYLI)",
+                "artist": "Mura Masa",
+                "mix_engineer": "Nathan Boddy",
+                "source_url": "https://www.izotope.com/en/learn/mixing-reference-tracks.html",
+                "why": "Active stereo motion and contemporary electronic textures around the vocal.",
+            },
+        ],
+        "tilt": {
+            "weight_60_120_vs_plateau_db": 0.0,
+            "sub_35_60_vs_plateau_db": -2.5,
+            "high_4500_12000_vs_plateau_db": 0.0,
+            "plateau_spread_db": 5.1,
+        },
+        "hierarchy": {
+            "lead_over_bgv_rms_db": 5.4,
+            "lead_over_bgv_presence_db": 5.2,
+            "kick_over_bass_55_95_db": 0.7,
+        },
+        "kick": {
+            "click_share_in_master": 0.028,
+            "click_share_in_drums": 0.092,
+            "dynamic_range_max_db": 17.0,
+            "click_minus_punch_db": -18.0,
+            "box_minus_click_db": -0.3,
+        },
+        "style_summary": {
+            "dynamic_range_db": 6.6,
+            "stereo_width": 0.5,
+            "crest_factor_db": 11.0,
+        },
+    },
+    "electronic": {
+        "label": "Electronic / EDM",
+        "notes": [
+            "Internet-curated seed built from modern electronic reference picks that stress kick/sub trading, sidechain groove, and wide but uncluttered tops.",
+        ],
+        "references": [
+            {
+                "song": "Riptide",
+                "artist": "The Chainsmokers",
+                "source_url": "https://www.izotope.com/en/learn/10-great-reference-mixes-for-electronic-music",
+                "why": "Mainstream electronic low-end trading between kick and synth bass across sections.",
+            },
+            {
+                "song": "Spacetrippy",
+                "artist": "Black Hertz",
+                "source_url": "https://www.izotope.com/en/learn/10-great-reference-mixes-for-electronic-music",
+                "why": "Clear sidechain groove, deep bass, and sparkling but controlled highs.",
+            },
+            {
+                "song": "Get Lucky",
+                "artist": "Daft Punk feat. Nile Rodgers and Pharrell Williams",
+                "mix_engineer": "Mick Guzauski",
+                "source_url": "https://www.izotope.com/en/learn/4-popular-mixing-reference-tracks-and-why-they-work",
+                "why": "Benchmark for frequency extension, stereo imaging, and depth of field.",
+            },
+        ],
+        "tilt": {
+            "weight_60_120_vs_plateau_db": 1.2,
+            "sub_35_60_vs_plateau_db": -1.0,
+            "high_4500_12000_vs_plateau_db": -0.3,
+            "plateau_spread_db": 5.8,
+        },
+        "hierarchy": {
+            "lead_over_bgv_rms_db": 4.6,
+            "lead_over_bgv_presence_db": 4.4,
+            "kick_over_bass_55_95_db": 1.3,
+        },
+        "kick": {
+            "click_share_in_master": 0.04,
+            "click_share_in_drums": 0.13,
+            "dynamic_range_max_db": 15.8,
+            "click_minus_punch_db": -16.2,
+            "box_minus_click_db": -0.8,
+        },
+        "style_summary": {
+            "dynamic_range_db": 6.0,
+            "stereo_width": 0.58,
+            "crest_factor_db": 10.8,
+        },
+    },
+    "hip_hop": {
+        "label": "Hip-Hop / Rap",
+        "notes": [
+            "Internet-curated seed built from hip-hop references that prioritize mono-safe low end, vocal pocket clarity, and modern but not washy ambience.",
+        ],
+        "references": [
+            {
+                "song": "rockstar",
+                "artist": "Post Malone feat. 21 Savage",
+                "mix_engineer": "Manny Marroquin",
+                "source_url": "https://www.izotope.com/en/learn/4-popular-mixing-reference-tracks-and-why-they-work",
+                "why": "Great space and dynamics with a modern crossover vocal picture.",
+            },
+            {
+                "song": "KOD",
+                "artist": "J. Cole",
+                "mix_engineer": "Juro Davis",
+                "source_url": "https://www.izotope.com/en/learn/8-killer-reference-mixes-for-hip-hop.html",
+                "why": "Clean, modern, heavy low end with clear centered lead vocal.",
+            },
+            {
+                "song": "King's Dead",
+                "artist": "Jay Rock, Kendrick Lamar, Future, James Blake",
+                "mix_engineer": "Matt Schaeffer",
+                "source_url": "https://www.izotope.com/en/learn/8-killer-reference-mixes-for-hip-hop.html",
+                "why": "Complex kick patterns, aggressive bass, and managed upper-mid harshness.",
+            },
+        ],
+        "tilt": {
+            "weight_60_120_vs_plateau_db": 1.7,
+            "sub_35_60_vs_plateau_db": -0.4,
+            "high_4500_12000_vs_plateau_db": -1.2,
+            "plateau_spread_db": 5.6,
+        },
+        "hierarchy": {
+            "lead_over_bgv_rms_db": 5.0,
+            "lead_over_bgv_presence_db": 4.8,
+            "kick_over_bass_55_95_db": 0.9,
+        },
+        "kick": {
+            "click_share_in_master": 0.026,
+            "click_share_in_drums": 0.088,
+            "dynamic_range_max_db": 16.0,
+            "click_minus_punch_db": -18.5,
+            "box_minus_click_db": -0.2,
+        },
+        "style_summary": {
+            "dynamic_range_db": 6.4,
+            "stereo_width": 0.34,
+            "crest_factor_db": 11.2,
+        },
+    },
+    "r_and_b": {
+        "label": "Modern R&B",
+        "notes": [
+            "Internet-curated seed built from contemporary crossover R&B references with roomy vocal production, softer low-end ownership, and smoother top-end density.",
+        ],
+        "references": [
+            {
+                "song": "Wild Thoughts",
+                "artist": "DJ Khaled feat. Rihanna and Bryson Tiller",
+                "source_url": "https://www.masteringthemix.com/blogs/learn/best-reference-track-for-all-genres",
+                "why": "Consistent full-spectrum tonal balance and polished vocal production.",
+            },
+            {
+                "song": "All The Stars",
+                "artist": "Kendrick Lamar and SZA",
+                "source_url": "https://www.masteringthemix.com/blogs/learn/best-reference-track-for-all-genres",
+                "why": "Detailed vocals without harshness and an even full-range balance.",
+            },
+            {
+                "song": "Anti-Hero",
+                "artist": "Taylor Swift",
+                "mix_engineer": "Serban Ghenea",
+                "source_url": "https://www.izotope.com/en/learn/mixing-reference-tracks.html",
+                "why": "Useful modern vocal-depth anchor when the R&B production leans pop.",
+            },
+        ],
+        "tilt": {
+            "weight_60_120_vs_plateau_db": 0.5,
+            "sub_35_60_vs_plateau_db": -1.8,
+            "high_4500_12000_vs_plateau_db": -0.6,
+            "plateau_spread_db": 5.0,
+        },
+        "hierarchy": {
+            "lead_over_bgv_rms_db": 5.4,
+            "lead_over_bgv_presence_db": 5.1,
+            "kick_over_bass_55_95_db": 0.6,
+        },
+        "kick": {
+            "click_share_in_master": 0.024,
+            "click_share_in_drums": 0.082,
+            "dynamic_range_max_db": 17.2,
+            "click_minus_punch_db": -19.2,
+            "box_minus_click_db": 0.0,
+        },
+        "style_summary": {
+            "dynamic_range_db": 7.4,
+            "stereo_width": 0.42,
+            "crest_factor_db": 11.8,
+        },
+    },
+    "rock": {
+        "label": "Modern Rock",
+        "notes": [
+            "Internet-curated seed built from modern rock reference-track roundups and pro mixer picks.",
+        ],
+        "references": [
+            {
+                "song": "Chaise Longue",
+                "artist": "Wet Leg",
+                "mix_engineer": "Alan Moulder",
+                "source_url": "https://www.izotope.com/en/learn/mixing-reference-tracks.html",
+                "why": "Heavy snare, intimate vocal, and controlled non-hyped top end.",
+            },
+            {
+                "song": "Jumpsuit",
+                "artist": "Twenty One Pilots",
+                "source_url": "https://www.izotope.com/en/learn/pro-reference-tracks.html",
+                "why": "Balanced, dynamic, heavy modern rock with strong drum weight.",
+            },
+            {
+                "song": "Pneuma",
+                "artist": "Tool",
+                "source_url": "https://www.izotope.com/en/learn/12-great-reference-mixes-for-rock",
+                "why": "Long-form loudness build, tight drums, and articulate heavy guitars.",
+            },
+        ],
+        "tilt": {
+            "weight_60_120_vs_plateau_db": 1.1,
+            "sub_35_60_vs_plateau_db": -0.8,
+            "high_4500_12000_vs_plateau_db": -1.5,
+            "plateau_spread_db": 6.0,
+        },
+        "hierarchy": {
+            "lead_over_bgv_rms_db": 4.4,
+            "lead_over_bgv_presence_db": 4.2,
+            "kick_over_bass_55_95_db": 1.1,
+        },
+        "kick": {
+            "click_share_in_master": 0.045,
+            "click_share_in_drums": 0.14,
+            "dynamic_range_max_db": 16.5,
+            "click_minus_punch_db": -17.0,
+            "box_minus_click_db": -1.5,
+        },
+        "style_summary": {
+            "dynamic_range_db": 8.3,
+            "stereo_width": 0.32,
+            "crest_factor_db": 12.0,
+        },
+    },
+}
 
 
 @dataclass
@@ -674,6 +1009,60 @@ def _reference_supports_expander(instrument: str) -> bool:
         "reverb_return",
         "delay_return",
     }
+
+
+def _normalize_genre_token(genre: str | None) -> str:
+    token = str(genre or "").strip().lower()
+    if not token:
+        return ""
+    token = token.replace("&", "and")
+    token = re.sub(r"[^a-z0-9]+", "_", token).strip("_")
+    return GENRE_REFERENCE_ALIASES.get(token, token)
+
+
+def _genre_reference_seed(genre: str | None) -> dict[str, Any]:
+    token = _normalize_genre_token(genre)
+    if not token:
+        return {}
+    seed = GENRE_REFERENCE_STARTS.get(token)
+    if not seed:
+        return {}
+    seeded = copy.deepcopy(seed)
+    seeded["genre"] = token
+    seeded["source_mode"] = "genre_seed_only"
+    return seeded
+
+
+def _merge_balance_targets(seed_targets: dict[str, Any], reference_targets: dict[str, Any]) -> dict[str, Any]:
+    if not seed_targets:
+        merged = copy.deepcopy(reference_targets)
+        if merged and "source_mode" not in merged:
+            merged["source_mode"] = "reference_only"
+        return merged
+    if not reference_targets:
+        return copy.deepcopy(seed_targets)
+
+    merged = copy.deepcopy(seed_targets)
+    for key, value in reference_targets.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key].update(copy.deepcopy(value))
+        else:
+            merged[key] = copy.deepcopy(value)
+    merged["source_mode"] = "genre_seed_plus_reference"
+    return merged
+
+
+def _effective_balance_targets(
+    reference_context: ReferenceMixContext | None,
+    genre: str | None = None,
+) -> dict[str, Any]:
+    seed_targets = _genre_reference_seed(genre)
+    if reference_context is None:
+        return seed_targets
+    reference_targets = _reference_targets_from_context(reference_context)
+    if not reference_targets:
+        return seed_targets
+    return _merge_balance_targets(seed_targets, reference_targets)
 
 
 def _reference_targets_from_context(reference_context: ReferenceMixContext | None) -> dict[str, Any]:
@@ -1181,14 +1570,20 @@ def apply_genre_mix_profile(
     plans: dict[int, ChannelPlan],
     genre: str | None,
 ) -> dict[str, Any]:
-    genre_token = str(genre or "").strip().lower()
+    genre_token = _normalize_genre_token(genre)
     if not genre_token:
         return {"enabled": False, "reason": "no_genre_supplied"}
+    genre_seed = _genre_reference_seed(genre_token)
     if genre_token != "rock":
         return {
             "enabled": False,
             "requested_genre": genre_token,
-            "reason": "unsupported_genre",
+            "reason": "seed_targets_only_genre",
+            "genre_reference_seed": genre_seed,
+            "notes": [
+                "This genre currently uses curated internet-derived balance targets rather than a dedicated static channel-profile pass.",
+                "Stem verification and other target-aware passes still pick up the genre seed as a starting point.",
+            ],
         }
 
     actions: list[dict[str, Any]] = []
@@ -1322,6 +1717,7 @@ def apply_genre_mix_profile(
     return {
         "enabled": bool(actions),
         "genre": genre_token,
+        "genre_reference_seed": genre_seed,
         "notes": [
             "Rock mode tightens lead vocal glue with stronger compression and steadier between-phrase behavior.",
             "Snare layers stay treated as one center snare voice when both top and bottom mics are present.",
@@ -4467,7 +4863,11 @@ def _ltas_tilt_profile(
         mask = (freqs >= band.low_hz) & (freqs < band.high_hz)
         if not np.any(mask):
             continue
-        raw_level_db = 10.0 * np.log10(float(np.sum(avg_power[mask])) + 1e-12)
+        # Use mean power density inside each fractional-octave band instead of
+        # the summed energy. Summation biases wider high-frequency bands upward
+        # and makes the compensated +4.5 dB/oct tilt read brighter than the
+        # actual monitor analyzer view.
+        raw_level_db = 10.0 * np.log10(float(np.mean(avg_power[mask])) + 1e-12)
         compensated_level_db = raw_level_db + compensation_db_per_octave * math.log2(max(band.center_hz, 20.0) / 100.0)
         entry = {
             "center_hz": round(float(band.center_hz), 2),
@@ -4692,8 +5092,13 @@ def _stem_mix_snapshot(
     }
 
 
-def _reference_distance_from_snapshot(snapshot: dict[str, Any], reference_context: ReferenceMixContext | None) -> dict[str, Any]:
-    targets = _reference_targets_from_context(reference_context)
+def _reference_distance_from_snapshot(
+    snapshot: dict[str, Any],
+    reference_context: ReferenceMixContext | None,
+    *,
+    targets_override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    targets = copy.deepcopy(targets_override) if targets_override else _reference_targets_from_context(reference_context)
     if not targets:
         return {"enabled": False}
 
@@ -4920,9 +5325,13 @@ def apply_stem_mix_verification(
     reference_context: ReferenceMixContext | None = None,
 ) -> dict[str, Any]:
     snapshot_before = _stem_mix_snapshot(plans, target_len, sr)
-    reference_distance_before = _reference_distance_from_snapshot(snapshot_before, reference_context)
-    genre_token = str(genre or "").strip().lower()
-    reference_targets = _reference_targets_from_context(reference_context)
+    genre_token = _normalize_genre_token(genre)
+    reference_targets = _effective_balance_targets(reference_context, genre=genre)
+    reference_distance_before = _reference_distance_from_snapshot(
+        snapshot_before,
+        reference_context,
+        targets_override=reference_targets,
+    )
     kick_focus_before = snapshot_before.get("kick_focus") or {}
     kick_entry = next(
         ((channel, plan) for channel, plan in plans.items() if not plan.muted and plan.instrument == "kick"),
@@ -5273,7 +5682,11 @@ def apply_stem_mix_verification(
         }
 
     snapshot_after = _stem_mix_snapshot(plans, target_len, sr)
-    reference_distance_after = _reference_distance_from_snapshot(snapshot_after, reference_context)
+    reference_distance_after = _reference_distance_from_snapshot(
+        snapshot_after,
+        reference_context,
+        targets_override=reference_targets,
+    )
     return {
         "enabled": True,
         "genre": genre_token,
@@ -5412,8 +5825,9 @@ def desired_kick_advantage_from_reference(
     *,
     genre: str | None = None,
 ) -> float:
-    default = 1.8 if str(genre or "").strip().lower() == "rock" else 0.85
-    targets = _reference_targets_from_context(reference_context)
+    genre_token = _normalize_genre_token(genre)
+    default = 1.8 if genre_token == "rock" else 0.85
+    targets = _effective_balance_targets(reference_context, genre=genre)
     hierarchy = targets.get("hierarchy") or {}
     if "kick_over_bass_55_95_db" not in hierarchy:
         return float(default)
@@ -5426,8 +5840,9 @@ def apply_reference_vocal_fx_focus(
     target_len: int,
     sr: int,
     reference_context: ReferenceMixContext | None,
+    genre: str | None = None,
 ) -> dict[str, Any]:
-    targets = _reference_targets_from_context(reference_context)
+    targets = _effective_balance_targets(reference_context, genre=genre)
     if not targets:
         return {"enabled": False, "reason": "no_reference_targets"}
 
@@ -6046,18 +6461,19 @@ def master_process(
     final_limiter: bool = True,
     live_peak_ceiling_db: float = -3.0,
     reference_context: ReferenceMixContext | None = None,
+    allow_reference_mastering: bool = True,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     # Console-like 2-bus cleanup and glue.
-    bus_threshold_db = -11.0
-    bus_ratio = 1.6
-    bus_attack_ms = 25.0
-    bus_release_ms = 250.0
+    bus_threshold_db = -9.5
+    bus_ratio = 1.35
+    bus_attack_ms = 32.0
+    bus_release_ms = 280.0
     reference_tightness = _reference_dynamics_tightness(reference_context)
     if reference_context is not None and reference_tightness > 0.02:
-        bus_threshold_db -= 1.6 * reference_tightness
-        bus_ratio += 0.85 * reference_tightness
-        bus_attack_ms = float(np.clip(bus_attack_ms - reference_tightness * 8.0, 12.0, 25.0))
-        bus_release_ms = float(np.clip(bus_release_ms - reference_tightness * 70.0, 150.0, 250.0))
+        bus_threshold_db -= 0.75 * reference_tightness
+        bus_ratio += 0.35 * reference_tightness
+        bus_attack_ms = float(np.clip(bus_attack_ms - reference_tightness * 5.0, 22.0, 32.0))
+        bus_release_ms = float(np.clip(bus_release_ms - reference_tightness * 55.0, 220.0, 280.0))
     for ch in range(2):
         mix[:, ch] = highpass(mix[:, ch], sr, 28.0)
         mix[:, ch] = compressor(
@@ -6122,7 +6538,7 @@ def master_process(
             "note": "No final limiting or clipping stage; only static master trim is used for live-style headroom.",
         }
 
-    if reference_context is not None:
+    if reference_context is not None and allow_reference_mastering:
         reference_input_mix = np.asarray(mix, dtype=np.float32).copy()
         reference_mastering.update({
             "reference_path": str(reference_context.path),
@@ -6219,6 +6635,14 @@ def master_process(
                     "reason": "reference_mastering_failed",
                     "error": str(exc),
                 })
+    elif reference_context is not None:
+        reference_mastering.update({
+            "enabled": False,
+            "reason": "reference_mastering_disabled_by_flag",
+            "reference_path": str(reference_context.path),
+            "source_type": reference_context.source_type,
+            "reference_sources": [str(path) for path in reference_context.source_paths],
+        })
 
     mix, post_lufs, soft_limiter_used = _conform_master_to_target_lufs(
         mix,
@@ -6236,6 +6660,11 @@ def master_process(
         "bus_compressor": bus_compressor_report,
         "reference_mastering": reference_mastering,
     }
+
+
+def _orchestrator_dry_run_enabled(args: argparse.Namespace) -> bool:
+    """Only enable dry-run when the explicit CLI flag is present."""
+    return bool(getattr(args, "codex_orchestrator_dry_run", False))
 
 
 def main() -> int:
@@ -6266,6 +6695,7 @@ def main() -> int:
     parser.add_argument("--genre", default="", help="Optional genre focus for bounded mix voicing, for example 'rock'")
     parser.add_argument("--reference-dynamics-ride", action="store_true", help="Apply reference-guided stem loudness rides after channel rendering")
     parser.add_argument("--reference-vocal-fx-focus", action="store_true", help="Apply an extra narrow pass that only adjusts lead/BGV/fx space toward the reference")
+    parser.add_argument("--no-reference-mastering", action="store_true", help="Use the reference only for channel/stem decisions and skip stereo reference-mastering on the final mix")
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
@@ -6314,6 +6744,7 @@ def main() -> int:
     ai_config = config.get("ai", {})
     autofoh_config = config.get("autofoh", {})
     reference_context = prepare_reference_mix_context(args.reference)
+    genre_reference_seed = _genre_reference_seed(args.genre)
     use_llm_in_orchestrator = bool(args.codex_orchestrator_allow_llm and args.codex_orchestrator)
     llm = None
     if not args.no_llm and (not args.codex_orchestrator or use_llm_in_orchestrator):
@@ -6362,7 +6793,7 @@ def main() -> int:
         })
         states[ch] = state
     agent.update_channel_states_batch(states)
-    codex_dry_run = bool(args.codex_orchestrator_dry_run or args.codex_orchestrator)
+    codex_dry_run = _orchestrator_dry_run_enabled(args)
 
     orchestration_report = {
         "enabled": bool(args.codex_orchestrator),
@@ -6454,7 +6885,7 @@ def main() -> int:
         reference_context=reference_context,
     )
     reference_vocal_fx_focus = (
-        apply_reference_vocal_fx_focus(plans, target_len, sr, reference_context)
+        apply_reference_vocal_fx_focus(plans, target_len, sr, reference_context, genre=args.genre)
         if args.reference_vocal_fx_focus
         else {"enabled": False, "reason": "disabled_by_flag"}
     )
@@ -6540,20 +6971,24 @@ def main() -> int:
         final_limiter=final_limiter,
         live_peak_ceiling_db=args.live_peak_ceiling_db,
         reference_context=reference_context,
+        allow_reference_mastering=not args.no_reference_mastering,
     )
 
-    tmp_wav = Path(args.output).with_suffix(".wav")
-    sf.write(tmp_wav, mix, sr, subtype="PCM_24")
-
     output = Path(args.output)
-    cmd = [
-        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-i", str(tmp_wav),
-        "-codec:a", "libmp3lame",
-        "-b:a", "320k",
-        str(output),
-    ]
-    subprocess.run(cmd, check=True)
+    if output.suffix.lower() == ".wav":
+        tmp_wav = output
+        sf.write(tmp_wav, mix, sr, subtype="PCM_24")
+    else:
+        tmp_wav = output.with_suffix(".wav")
+        sf.write(tmp_wav, mix, sr, subtype="PCM_24")
+        cmd = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-i", str(tmp_wav),
+            "-codec:a", "libmp3lame",
+            "-b:a", "320k",
+            str(output),
+        ]
+        subprocess.run(cmd, check=True)
 
     meter = pyln.Meter(sr)
     final_lufs = None
@@ -6567,6 +7002,7 @@ def main() -> int:
         "reference": str(reference_context.path) if reference_context is not None else "",
         "reference_sources": [str(path) for path in reference_context.source_paths] if reference_context is not None else [],
         "genre": str(args.genre or ""),
+        "genre_reference_seed": genre_reference_seed,
         "sample_rate": sr,
         "codex_orchestrator": orchestration_report,
         "duration_sec": round(target_len / sr, 3),

@@ -750,6 +750,54 @@ def test_rock_genre_profile_tightens_vocals_and_centers_snare_layers():
     assert plans[3].pan == 0.0
 
 
+def test_genre_reference_seed_normalizes_alias_and_exposes_curated_tracks():
+    mod = load_offline_agent_mix()
+
+    seed = mod._genre_reference_seed("EDM")
+
+    assert seed["genre"] == "electronic"
+    assert seed["source_mode"] == "genre_seed_only"
+    assert len(seed["references"]) >= 2
+    assert any("izotope.com" in item["source_url"] for item in seed["references"])
+    assert seed["hierarchy"]["kick_over_bass_55_95_db"] > 1.0
+
+
+def test_effective_balance_targets_use_genre_seed_without_reference_audio():
+    mod = load_offline_agent_mix()
+
+    targets = mod._effective_balance_targets(None, genre="hip-hop")
+
+    assert targets["source_mode"] == "genre_seed_only"
+    assert targets["hierarchy"]["lead_over_bgv_rms_db"] > 4.0
+    assert targets["style_summary"]["stereo_width"] < 0.4
+
+
+def test_effective_balance_targets_merge_reference_over_genre_seed():
+    mod = load_offline_agent_mix()
+    context = mod.ReferenceMixContext(
+        path=Path("/tmp/ref.wav"),
+        source_type="audio",
+        style_profile=mod.StyleProfile(name="ref"),
+        targets={
+            "hierarchy": {
+                "kick_over_bass_55_95_db": 2.2,
+                "lead_over_bgv_rms_db": 4.9,
+            },
+            "style_summary": {
+                "stereo_width": 0.61,
+            },
+        },
+    )
+
+    targets = mod._effective_balance_targets(context, genre="rock")
+
+    assert targets["source_mode"] == "genre_seed_plus_reference"
+    assert targets["references"]
+    assert targets["hierarchy"]["kick_over_bass_55_95_db"] == 2.2
+    assert targets["style_summary"]["stereo_width"] == 0.61
+    assert targets["kick"]["dynamic_range_max_db"] == mod.GENRE_REFERENCE_STARTS["rock"]["kick"]["dynamic_range_max_db"]
+
+
 def test_cross_adaptive_eq_protects_kick_low_band_and_cuts_bass(monkeypatch):
     mod = load_offline_agent_mix()
     sr = 48_000
