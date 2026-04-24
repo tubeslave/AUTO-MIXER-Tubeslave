@@ -26,7 +26,7 @@ import numpy as np
 import pyloudnorm as pyln
 import soundfile as sf
 import yaml
-from scipy.signal import butter, lfilter
+from scipy.signal import butter, filtfilt, lfilter
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = REPO_ROOT / "backend"
@@ -4258,6 +4258,46 @@ def peaking_eq(x: np.ndarray, sr: int, freq: float, gain_db: float, q: float) ->
     return lfilter(b, aa, x).astype(np.float32)
 
 
+def _zero_phase_filter(x: np.ndarray, sr: int, cutoff: float | tuple[float, float], btype: str) -> np.ndarray:
+    if len(x) == 0:
+        return np.asarray(x, dtype=np.float32)
+    nyquist = sr * 0.5
+    if btype == "lowpass":
+        freq = float(cutoff)
+        if freq <= 0.0 or freq >= nyquist * 0.98:
+            return np.asarray(x, dtype=np.float32)
+        wn = freq / nyquist
+    elif btype == "highpass":
+        freq = float(cutoff)
+        if freq <= 0.0:
+            return np.asarray(x, dtype=np.float32)
+        wn = min(freq / nyquist, 0.98)
+    else:
+        low_hz, high_hz = cutoff
+        low = max(1.0, float(low_hz))
+        high = min(float(high_hz), nyquist * 0.98)
+        if high <= low:
+            return np.zeros_like(x, dtype=np.float32)
+        wn = [low / nyquist, high / nyquist]
+    b, a = butter(2, wn, btype=btype)
+    try:
+        return filtfilt(b, a, x).astype(np.float32)
+    except Exception:
+        return lfilter(b, a, x).astype(np.float32)
+
+
+def _lowpass_zero_phase(x: np.ndarray, sr: int, freq: float) -> np.ndarray:
+    return _zero_phase_filter(x, sr, freq, "lowpass")
+
+
+def _highpass_zero_phase(x: np.ndarray, sr: int, freq: float) -> np.ndarray:
+    return _zero_phase_filter(x, sr, freq, "highpass")
+
+
+def _bandpass_zero_phase(x: np.ndarray, sr: int, low_hz: float, high_hz: float) -> np.ndarray:
+    return _zero_phase_filter(x, sr, (low_hz, high_hz), "bandpass")
+
+
 def compressor(
     x: np.ndarray,
     sr: int,
@@ -6394,6 +6434,283 @@ def apply_offline_fx_plan(
     }
 
 
+def _mid_side_levels(audio: np.ndarray) -> dict[str, float]:
+    if len(audio) == 0:
+        return {"mid_db": -120.0, "side_db": -120.0, "side_minus_mid_db": 0.0, "correlation": 1.0}
+    left = np.asarray(audio[:, 0], dtype=np.float32)
+    right = np.asarray(audio[:, 1], dtype=np.float32)
+    mid = (left + right) * 0.5
+    side = (left - right) * 0.5
+    mid_rms = float(np.sqrt(np.mean(np.square(mid))) + 1e-12)
+    side_rms = float(np.sqrt(np.mean(np.square(side))) + 1e-12)
+    corr = float(np.corrcoef(left, right)[0, 1]) if len(left) > 1 else 1.0
+    return {
+        "mid_db": round(amp_to_db(mid_rms), 2),
+        "side_db": round(amp_to_db(side_rms), 2),
+        "side_minus_mid_db": round(amp_to_db(side_rms / max(mid_rms, 1e-12)), 2),
+        "correlation": round(float(np.clip(corr, -1.0, 1.0)), 4),
+    }
+
+
+def _apply_stereo_width_polish(
+    audio: np.ndarray,
+    sr: int,
+    *,
+    width_gain: float,
+    side_hpf_hz: float = 180.0,
+    side_air_boost_db: float = 0.0,
+) -> np.ndarray:
+    if audio.ndim != 2 or audio.shape[1] != 2 or len(audio) == 0:
+        return np.asarray(audio, dtype=np.float32)
+    left = np.asarray(audio[:, 0], dtype=np.float32)
+    right = np.asarray(audio[:, 1], dtype=np.float32)
+    mid = (left + right) * 0.5
+    side = (left - right) * 0.5
+    side_low = _lowpass_zero_phase(side, sr, side_hpf_hz)
+    side_high = side - side_low
+    polished_side = side_low + side_high * float(max(width_gain, 1.0))
+    if side_air_boost_db > 0.05:
+        polished_side = peaking_eq(polished_side, sr, 9800.0, side_air_boost_db, 0.72)
+    out = np.column_stack((mid + polished_side, mid - polished_side)).astype(np.float32)
+    peak = float(np.max(np.abs(out))) if len(out) else 0.0
+    if peak > 1.0:
+        out = (out / peak).astype(np.float32)
+    return out
+
+
+def _compress_band_component(
+    audio: np.ndarray,
+    sr: int,
+    *,
+    low_hz: float,
+    high_hz: float,
+    ratio: float,
+    attack_ms: float,
+    release_ms: float,
+    threshold_offset_db: float = 0.5,
+) -> np.ndarray:
+    if audio.ndim != 2 or audio.shape[1] != 2 or len(audio) == 0:
+        return np.asarray(audio, dtype=np.float32)
+    out = np.asarray(audio, dtype=np.float32).copy()
+    for ch in range(2):
+        lane = out[:, ch]
+        band = _bandpass_zero_phase(lane, sr, low_hz, high_hz)
+        band_rms = float(np.sqrt(np.mean(np.square(band))) + 1e-12)
+        threshold_db = amp_to_db(band_rms) + threshold_offset_db
+        compressed_band = compressor(
+            band,
+            sr,
+            threshold_db=threshold_db,
+            ratio=ratio,
+            attack_ms=attack_ms,
+            release_ms=release_ms,
+            makeup_db=0.0,
+            auto_makeup=False,
+        )
+        out[:, ch] = (lane - band + compressed_band).astype(np.float32)
+    peak = float(np.max(np.abs(out))) if len(out) else 0.0
+    if peak > 1.0:
+        out = (out / peak).astype(np.float32)
+    return out
+
+
+def apply_large_system_translation_polish(
+    rendered_channels: dict[int, np.ndarray],
+    fx_returns: dict[int, np.ndarray],
+    plans: dict[int, ChannelPlan],
+    sr: int,
+    *,
+    reference_context: ReferenceMixContext | None = None,
+    genre: str | None = None,
+) -> dict[str, Any]:
+    if not rendered_channels:
+        return {"enabled": False, "reason": "no_rendered_channels"}
+
+    targets = _effective_balance_targets(reference_context, genre=genre)
+    style_width = float((targets.get("style_summary") or {}).get("stereo_width", 0.42))
+
+    def _rendered_mix() -> np.ndarray:
+        first = next(iter(rendered_channels.values()))
+        mix = np.zeros_like(first)
+        for audio in rendered_channels.values():
+            mix += audio
+        for audio in fx_returns.values():
+            mix += audio
+        return mix.astype(np.float32)
+
+    mix_before = _rendered_mix()
+    before_width = _mid_side_levels(mix_before)
+    actions: list[dict[str, Any]] = []
+
+    low_end_candidates: list[tuple[float, int, float, float]] = []
+    for channel, audio in rendered_channels.items():
+        plan = plans.get(channel)
+        if plan is None or plan.muted:
+            continue
+        if plan.instrument not in (BASS_INSTRUMENTS | {"playback", "accordion"}):
+            continue
+        dominant_db = _band_rms_db(audio, sr, 55.0, 70.0)
+        punch_db = _band_rms_db(audio, sr, 90.0, 120.0)
+        delta_db = dominant_db - punch_db
+        if dominant_db > -42.0 and delta_db > 2.4:
+            low_end_candidates.append((delta_db, channel, dominant_db, punch_db))
+
+    for delta_db, channel, dominant_db, punch_db in sorted(low_end_candidates, reverse=True)[:3]:
+        plan = plans[channel]
+        before = rendered_channels[channel]
+        ratio = float(np.clip(1.65 + (delta_db - 2.4) * 0.18, 1.65, 2.35))
+        after = _compress_band_component(
+            before,
+            sr,
+            low_hz=55.0,
+            high_hz=70.0,
+            ratio=ratio,
+            attack_ms=42.0,
+            release_ms=240.0,
+            threshold_offset_db=0.45,
+        )
+        if plan.instrument in {"bass", "bass_guitar", "bass_di", "bass_mic", "synth_bass"}:
+            for idx in range(2):
+                after[:, idx] = peaking_eq(after[:, idx], sr, 62.0, -0.6, 0.95)
+        rendered_channels[channel] = after.astype(np.float32)
+        actions.append({
+            "type": "low_end_band_control",
+            "channel": channel,
+            "file": plan.path.name,
+            "instrument": plan.instrument,
+            "band_hz": "55-70",
+            "dominant_before_db": round(dominant_db, 2),
+            "punch_before_db": round(punch_db, 2),
+            "ratio": round(ratio, 2),
+            "reason": "Large-system polish kept the 55-70 Hz dominance under control so the PA does not over-bloom around the main bass resonance.",
+        })
+
+    low_mid_candidates: list[tuple[float, int, float, float]] = []
+    for channel, audio in rendered_channels.items():
+        plan = plans.get(channel)
+        if plan is None or plan.muted:
+            continue
+        if plan.instrument not in (WINDOW_SPACE_COMPETITOR_INSTRUMENTS | {"backing_vocal"}):
+            continue
+        low_mid_db = _band_rms_db(audio, sr, 180.0, 350.0)
+        focus_db = _band_rms_db(audio, sr, 700.0, 1500.0)
+        delta_db = low_mid_db - focus_db
+        if low_mid_db > -40.0 and delta_db > 1.8:
+            low_mid_candidates.append((delta_db, channel, low_mid_db, focus_db))
+
+    for delta_db, channel, low_mid_db, focus_db in sorted(low_mid_candidates, reverse=True)[:4]:
+        plan = plans[channel]
+        cut_db = float(np.clip(0.7 + (delta_db - 1.8) * 0.18, 0.7, 1.55))
+        before = rendered_channels[channel]
+        after = before.copy()
+        for idx in range(2):
+            after[:, idx] = peaking_eq(after[:, idx], sr, 265.0, -cut_db, 1.08)
+        rendered_channels[channel] = after.astype(np.float32)
+        actions.append({
+            "type": "low_mid_cleanup",
+            "channel": channel,
+            "file": plan.path.name,
+            "instrument": plan.instrument,
+            "frequency_hz": 265.0,
+            "gain_db": round(-cut_db, 2),
+            "low_mid_before_db": round(low_mid_db, 2),
+            "focus_before_db": round(focus_db, 2),
+            "reason": "Large-system polish cleaned the 180-350 Hz body build-up so the center translates with less boxiness on PA.",
+        })
+
+    for bus_id, audio in list(fx_returns.items()):
+        low_mid_db = _band_rms_db(audio, sr, 180.0, 350.0)
+        focus_db = _band_rms_db(audio, sr, 2200.0, 5200.0)
+        if low_mid_db > -42.0 and low_mid_db - focus_db > 1.4:
+            after = audio.copy()
+            for idx in range(2):
+                after[:, idx] = peaking_eq(after[:, idx], sr, 280.0, -0.85, 1.0)
+            fx_returns[bus_id] = after.astype(np.float32)
+            actions.append({
+                "type": "fx_low_mid_cleanup",
+                "bus_id": str(bus_id),
+                "frequency_hz": 280.0,
+                "gain_db": -0.85,
+                "reason": "Large-system polish trimmed muddy low-mid from the return so ambience sits around the lead instead of masking the center.",
+            })
+
+    width_target_db = -17.4 if style_width >= 0.46 else -18.2
+    side_shortage_db = max(0.0, width_target_db - float(before_width["side_minus_mid_db"]))
+    if side_shortage_db > 0.8:
+        width_gain = float(np.clip(1.08 + side_shortage_db * 0.05, 1.08, 1.32))
+        side_air_boost_db = float(np.clip(0.25 + side_shortage_db * 0.12, 0.25, 0.95))
+        for channel, audio in list(rendered_channels.items()):
+            plan = plans.get(channel)
+            if plan is None or plan.muted:
+                continue
+            if plan.instrument not in {"playback", "electric_guitar", "accordion"}:
+                continue
+            if abs(float(plan.pan)) < 0.08:
+                continue
+            rendered_channels[channel] = _apply_stereo_width_polish(
+                audio,
+                sr,
+                width_gain=width_gain,
+                side_hpf_hz=185.0,
+                side_air_boost_db=side_air_boost_db * (0.9 if plan.instrument == "accordion" else 1.0),
+            )
+            actions.append({
+                "type": "support_width_expansion",
+                "channel": channel,
+                "file": plan.path.name,
+                "instrument": plan.instrument,
+                "width_gain": round(width_gain, 3),
+                "side_air_boost_db": round(side_air_boost_db, 2),
+                "reason": "Large-system polish widened support layers above the low-mid so the mix opens sideways without loosening the mono low end.",
+            })
+
+        for bus_id, audio in list(fx_returns.items()):
+            fx_returns[bus_id] = _apply_stereo_width_polish(
+                audio,
+                sr,
+                width_gain=min(1.4, width_gain + 0.08),
+                side_hpf_hz=220.0,
+                side_air_boost_db=min(1.1, side_air_boost_db + 0.2),
+            )
+            actions.append({
+                "type": "fx_width_expansion",
+                "bus_id": str(bus_id),
+                "width_gain": round(min(1.4, width_gain + 0.08), 3),
+                "reason": "Large-system polish moved ambience wider than the center image so the vocal can stay stable while the space opens around it.",
+            })
+
+    mix_after = _rendered_mix()
+    return {
+        "enabled": True,
+        "applied": bool(actions),
+        "actions": actions,
+        "before": {
+            "stereo": before_width,
+            "band_rms_db": {
+                "55_70": round(_band_rms_db(mix_before, sr, 55.0, 70.0), 2),
+                "90_120": round(_band_rms_db(mix_before, sr, 90.0, 120.0), 2),
+                "180_350": round(_band_rms_db(mix_before, sr, 180.0, 350.0), 2),
+                "2200_4000": round(_band_rms_db(mix_before, sr, 2200.0, 4000.0), 2),
+                "8000_12000": round(_band_rms_db(mix_before, sr, 8000.0, 12000.0), 2),
+            },
+        },
+        "after": {
+            "stereo": _mid_side_levels(mix_after),
+            "band_rms_db": {
+                "55_70": round(_band_rms_db(mix_after, sr, 55.0, 70.0), 2),
+                "90_120": round(_band_rms_db(mix_after, sr, 90.0, 120.0), 2),
+                "180_350": round(_band_rms_db(mix_after, sr, 180.0, 350.0), 2),
+                "2200_4000": round(_band_rms_db(mix_after, sr, 2200.0, 4000.0), 2),
+                "8000_12000": round(_band_rms_db(mix_after, sr, 8000.0, 12000.0), 2),
+            },
+        },
+        "notes": [
+            "Large-system polish treats the mix like a playback master for PA: control the 55-70 Hz dominance, declutter 180-350 Hz, and create width around the center instead of inside the sub range.",
+            "Any stereo expansion is applied only above the side high-pass so the low end stays mono-stable.",
+        ],
+    }
+
+
 def _soft_limiter(mix: np.ndarray, drive_db: float, ceiling_db: float = -1.0) -> np.ndarray:
     drive = db_to_amp(drive_db)
     ceiling = db_to_amp(ceiling_db)
@@ -6462,6 +6779,7 @@ def master_process(
     live_peak_ceiling_db: float = -3.0,
     reference_context: ReferenceMixContext | None = None,
     allow_reference_mastering: bool = True,
+    ceiling_dbfs: float = -1.0,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     # Console-like 2-bus cleanup and glue.
     bus_threshold_db = -9.5
@@ -6552,7 +6870,7 @@ def master_process(
             ref_sr = int(reference_context.sample_rate)
             if ref_sr != sr:
                 ref_audio = resample_audio(ref_audio, ref_sr, sr)
-            auto_master = AutoMaster(sample_rate=sr, target_lufs=target_lufs, true_peak_limit=-1.0)
+            auto_master = AutoMaster(sample_rate=sr, target_lufs=target_lufs, true_peak_limit=ceiling_dbfs)
             try:
                 mastered = auto_master.master(mix, reference=ref_audio, sample_rate=sr)
                 if isinstance(mastered, MasteringResult):
@@ -6609,7 +6927,7 @@ def master_process(
                         mastered_audio,
                         meter,
                         target_lufs,
-                        ceiling_dbfs=-1.0,
+                        ceiling_dbfs=ceiling_dbfs,
                     )
                     reference_mastering.update({
                         "pre_target_conform_lufs": round(float(reference_post_lufs), 2)
@@ -6622,7 +6940,7 @@ def master_process(
                     return np.asarray(mix, dtype=np.float32), {
                         "final_limiter": True,
                         "soft_limiter": soft_limiter_used,
-                        "ceiling_dbfs": -1.0,
+                        "ceiling_dbfs": round(float(ceiling_dbfs), 2),
                         "pre_master_peak_dbfs": round(peak_db, 2),
                         "pre_master_lufs": round(pre_lufs, 2) if pre_lufs is not None and np.isfinite(pre_lufs) else None,
                         "post_master_lufs": round(post_lufs, 2) if post_lufs is not None and np.isfinite(post_lufs) else None,
@@ -6648,12 +6966,12 @@ def master_process(
         mix,
         meter,
         target_lufs,
-        ceiling_dbfs=-1.0,
+        ceiling_dbfs=ceiling_dbfs,
     )
     return np.asarray(mix, dtype=np.float32), {
         "final_limiter": True,
         "soft_limiter": soft_limiter_used,
-        "ceiling_dbfs": -1.0,
+        "ceiling_dbfs": round(float(ceiling_dbfs), 2),
         "pre_master_peak_dbfs": round(peak_db, 2),
         "pre_master_lufs": round(pre_lufs, 2) if pre_lufs is not None and np.isfinite(pre_lufs) else None,
         "post_master_lufs": round(post_lufs, 2) if post_lufs is not None and np.isfinite(post_lufs) else None,
@@ -6677,7 +6995,9 @@ def main() -> int:
     parser.add_argument("--no-drum-vocal-duck", action="store_true")
     parser.add_argument("--live-peak-ceiling-db", type=float, default=-3.0)
     parser.add_argument("--live-channel-peak-ceiling-db", type=float, default=-3.0)
+    parser.add_argument("--master-ceiling-dbfs", type=float, default=-1.0)
     parser.add_argument("--live-input-fade-ms", type=float, default=25.0)
+    parser.add_argument("--channel-input-fade-ms", type=float, default=4.0)
     parser.add_argument("--tempo-bpm", type=float, default=120.0)
     parser.add_argument("--disable-fx", action="store_true")
     parser.add_argument("--bass-drum-boost-db", type=float, default=0.0)
@@ -6696,6 +7016,7 @@ def main() -> int:
     parser.add_argument("--reference-dynamics-ride", action="store_true", help="Apply reference-guided stem loudness rides after channel rendering")
     parser.add_argument("--reference-vocal-fx-focus", action="store_true", help="Apply an extra narrow pass that only adjusts lead/BGV/fx space toward the reference")
     parser.add_argument("--no-reference-mastering", action="store_true", help="Use the reference only for channel/stem decisions and skip stereo reference-mastering on the final mix")
+    parser.add_argument("--large-system-polish", action="store_true", help="Apply a final translation-oriented pass for PA playback: tame 55-70 Hz, clean 180-350 Hz, and open stereo support layers.")
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
@@ -6724,7 +7045,7 @@ def main() -> int:
             hpf=hpf,
             target_rms_db=target_rms,
             trim_db=trim,
-            input_fade_ms=args.live_input_fade_ms if args.no_final_limiter else 0.0,
+            input_fade_ms=args.live_input_fade_ms if args.no_final_limiter else args.channel_input_fade_ms,
             eq_bands=list(eq),
             comp_threshold_db=threshold,
             comp_ratio=ratio,
@@ -6957,6 +7278,18 @@ def main() -> int:
             reference_context=reference_context,
         )
     )
+    large_system_polish = (
+        apply_large_system_translation_polish(
+            rendered_channels,
+            fx_returns,
+            plans,
+            sr,
+            reference_context=reference_context,
+            genre=args.genre,
+        )
+        if args.large_system_polish
+        else {"enabled": False, "reason": "disabled_by_flag"}
+    )
     mix = np.zeros((target_len, 2), dtype=np.float32)
     for rendered in rendered_channels.values():
         mix += rendered
@@ -6972,6 +7305,7 @@ def main() -> int:
         live_peak_ceiling_db=args.live_peak_ceiling_db,
         reference_context=reference_context,
         allow_reference_mastering=not args.no_reference_mastering,
+        ceiling_dbfs=args.master_ceiling_dbfs,
     )
 
     output = Path(args.output)
@@ -7019,11 +7353,14 @@ def main() -> int:
         "stem_mix_verification": stem_mix_verification,
         "reference_vocal_fx_focus": reference_vocal_fx_focus,
         "reference_dynamics_ride": reference_dynamics_ride,
+        "large_system_polish": large_system_polish,
         "dynamic_vocal_priority": dynamic_vocal_priority,
         "kick_presence_boost": kick_presence_boost,
         "kick_focus_cymbal_cut": cymbal_focus_cleanup,
         "soft_master": args.soft_master,
         "master_target_lufs": round(args.master_target_lufs, 2),
+        "master_ceiling_dbfs": round(args.master_ceiling_dbfs, 2),
+        "channel_input_fade_ms": round(args.channel_input_fade_ms, 2),
         "autofoh_analyzer_pass": autofoh_analyzer_pass,
         "codex_corrections": codex_corrections,
         "codex_bleed_control": codex_bleed_control,
