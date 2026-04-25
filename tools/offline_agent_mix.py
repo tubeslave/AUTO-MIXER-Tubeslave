@@ -18,6 +18,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -61,6 +62,14 @@ from auto_fx import AutoFXPlanner, FXBusDecision, FXPlan  # noqa: E402
 from channel_recognizer import classification_from_legacy_preset  # noqa: E402
 from cross_adaptive_eq import CrossAdaptiveEQ  # noqa: E402
 from ml.style_transfer import InstrumentStyle, StyleProfile, StyleTransfer  # noqa: E402
+from perceptual import PerceptualConfig, PerceptualEvaluator  # noqa: E402
+from source_knowledge import (  # noqa: E402
+    DecisionTrace,
+    FeedbackRecord,
+    RuleMatch,
+    SourceGroundedConfig,
+    SourceKnowledgeLayer,
+)
 
 
 DRUM_INSTRUMENTS = {
@@ -4601,6 +4610,691 @@ def metrics_for(x: np.ndarray, sr: int, instrument: str | None = None) -> dict[s
     }
 
 
+def _repo_resolved_config_path(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    path = Path(text).expanduser()
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    return str(path)
+
+
+def _make_offline_source_knowledge_layer(
+    args: argparse.Namespace,
+    config: dict[str, Any],
+) -> tuple[SourceKnowledgeLayer | None, dict[str, Any]]:
+    """Create the optional source-grounded layer for offline candidate logging."""
+
+    section = dict((config or {}).get("source_knowledge") or {})
+    if getattr(args, "source_knowledge_enable", False):
+        section["enabled"] = True
+    if getattr(args, "source_knowledge_log", ""):
+        section["log_path"] = str(args.source_knowledge_log)
+    section.setdefault("mode", "shadow")
+    if section.get("enabled"):
+        section["queue_maxsize"] = max(1024, int(section.get("queue_maxsize", 256) or 256))
+    for key in ("sources_path", "rules_path", "log_path"):
+        if section.get(key):
+            section[key] = _repo_resolved_config_path(section[key])
+
+    try:
+        layer = SourceKnowledgeLayer(SourceGroundedConfig.from_mapping(section))
+        validation_errors = layer.store.validate()
+        report = {
+            "enabled": bool(layer.enabled),
+            "mode": layer.config.mode,
+            "log_path": str(layer.config.log_path),
+            "sources_path": str(layer.store.sources_path),
+            "rules_path": str(layer.store.rules_path),
+            "validation_errors": validation_errors,
+            "error": "",
+        }
+        if layer.enabled:
+            layer.start()
+        return layer, report
+    except Exception as exc:
+        return None, {
+            "enabled": False,
+            "mode": str(section.get("mode", "shadow")),
+            "log_path": str(section.get("log_path", "")),
+            "validation_errors": [],
+            "error": str(exc),
+        }
+
+
+def _make_offline_perceptual_evaluator(
+    args: argparse.Namespace,
+    config: dict[str, Any],
+) -> tuple[PerceptualEvaluator | None, dict[str, Any]]:
+    """Create the optional offline MERT/perceptual evaluator."""
+
+    section = dict((config or {}).get("perceptual") or {})
+    if getattr(args, "mert_enable", False):
+        section.update({
+            "enabled": True,
+            "mode": "shadow",
+            "backend": "mert",
+            "async_evaluation": False,
+            "log_scores": True,
+            "evaluate_mix_bus": True,
+            "evaluate_channels": False,
+        })
+    if getattr(args, "mert_model_name", ""):
+        section["model_name"] = str(args.mert_model_name)
+    if getattr(args, "mert_local_files_only", False):
+        section["local_files_only"] = True
+    if getattr(args, "perceptual_log", ""):
+        section["log_path"] = str(args.perceptual_log)
+    if getattr(args, "perceptual_window_sec", None) is not None:
+        section["window_seconds"] = float(args.perceptual_window_sec)
+    if section.get("log_path"):
+        section["log_path"] = _repo_resolved_config_path(section["log_path"])
+
+    try:
+        evaluator = PerceptualEvaluator(PerceptualConfig.from_mapping(section))
+        return evaluator, {
+            "enabled": bool(evaluator.enabled),
+            "mode": evaluator.mode,
+            "requested_backend": str(section.get("backend", "lightweight")),
+            "actual_backend": evaluator.backend.name,
+            "model_name": str(section.get("model_name", "")),
+            "sample_rate": int(evaluator.config.sample_rate),
+            "window_seconds": float(evaluator.config.window_seconds),
+            "log_path": str(evaluator.log_path),
+            "error": "",
+        }
+    except Exception as exc:
+        return None, {
+            "enabled": False,
+            "mode": str(section.get("mode", "shadow")),
+            "requested_backend": str(section.get("backend", "lightweight")),
+            "actual_backend": "",
+            "model_name": str(section.get("model_name", "")),
+            "log_path": str(section.get("log_path", "")),
+            "error": str(exc),
+        }
+
+
+def _record_offline_perceptual_mix_bus(
+    evaluator: PerceptualEvaluator | None,
+    *,
+    before_audio: np.ndarray,
+    after_audio: np.ndarray,
+    sr: int,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    if evaluator is None or not evaluator.enabled:
+        return {"enabled": False}
+    try:
+        result = evaluator.record_shadow_decision(
+            before_audio,
+            after_audio,
+            sr,
+            context=context,
+            osc_sent=False,
+        )
+        snapshot = evaluator.evaluate_mix_snapshot(
+            after_audio,
+            stems=None,
+            context={"sample_rate": sr, **context},
+        )
+        payload = {
+            "enabled": True,
+            "backend": evaluator.backend.name,
+            "decision": result.to_dict() if result is not None else None,
+            "snapshot": snapshot,
+            "error": "",
+        }
+        if result is not None:
+            payload.update({
+                "verdict": result.verdict,
+                "delta_score": round(float(result.delta_score), 6),
+                "mse": round(float(result.mse), 6),
+                "cosine_distance": round(float(result.cosine_distance), 6),
+                "confidence": round(float(result.confidence), 6),
+                "reference_used": bool(result.reference_used),
+            })
+        return payload
+    except Exception as exc:
+        return {
+            "enabled": True,
+            "backend": getattr(getattr(evaluator, "backend", None), "name", ""),
+            "decision": None,
+            "snapshot": None,
+            "error": str(exc),
+        }
+
+
+def _source_metrics(audio: np.ndarray, sr: int, instrument: str | None = None) -> dict[str, Any]:
+    mono = mono_sum(np.asarray(audio, dtype=np.float32))
+    raw = metrics_for(mono, sr, instrument=instrument)
+    result: dict[str, Any] = {}
+    for key in (
+        "peak_db",
+        "true_peak_db",
+        "rms_db",
+        "lufs_momentary",
+        "dynamic_range_db",
+        "analysis_active_sec",
+        "analysis_active_ratio",
+    ):
+        if key in raw and isinstance(raw[key], (int, float, np.floating)):
+            result[key] = round(float(raw[key]), 3)
+    band_energy = raw.get("band_energy") or {}
+    result["band_energy"] = {
+        str(key): round(float(value), 3)
+        for key, value in band_energy.items()
+        if isinstance(value, (int, float, np.floating))
+    }
+    return result
+
+
+def _source_metric_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    delta: dict[str, Any] = {}
+    for key in ("peak_db", "true_peak_db", "rms_db", "lufs_momentary", "dynamic_range_db"):
+        if key in before and key in after:
+            delta[key] = round(float(after[key]) - float(before[key]), 3)
+    before_bands = before.get("band_energy") or {}
+    after_bands = after.get("band_energy") or {}
+    band_delta = {
+        key: round(float(after_bands[key]) - float(before_bands[key]), 3)
+        for key in before_bands.keys() & after_bands.keys()
+    }
+    if band_delta:
+        delta["band_energy"] = band_delta
+    return delta
+
+
+def _source_rules_from_matches(
+    matches: list[RuleMatch],
+    selected_limit: int = 3,
+) -> tuple[list[str], list[str], list[str]]:
+    candidate_rule_ids = [match.rule.rule_id for match in matches]
+    selected_rule_ids = candidate_rule_ids[:selected_limit]
+    source_ids = sorted({
+        source_id
+        for match in matches[:selected_limit]
+        for source_id in match.rule.source_ids
+    })
+    return candidate_rule_ids, selected_rule_ids, source_ids
+
+
+def _safe_source_retrieve(
+    layer: SourceKnowledgeLayer | None,
+    query: str,
+    *,
+    domains: list[str],
+    instrument: str,
+    problems: list[str],
+    action_types: list[str],
+    limit: int = 6,
+) -> list[RuleMatch]:
+    if layer is None or not layer.enabled:
+        return []
+    try:
+        matches = layer.retrieve(
+            query,
+            domains=domains,
+            instruments=[instrument],
+            problems=problems,
+            action_types=action_types,
+            limit=limit,
+        )
+        if matches:
+            return matches
+        return layer.retrieve(
+            "bounded logged decisions source rule before after metrics feedback",
+            domains=["automation", "logging"],
+            instruments=["all"],
+            problems=["training_data_gap"],
+            action_types=["decision_trace"],
+            limit=max(1, min(3, limit)),
+        )
+    except Exception:
+        return []
+
+
+def _infer_eq_problem(instrument: str, freq_hz: float, gain_db: float) -> tuple[list[str], str]:
+    freq = float(freq_hz)
+    gain = float(gain_db)
+    if gain < 0.0 and 160.0 <= freq <= 520.0:
+        return ["mud", "low_mid_buildup", "masking"], "low-mid cleanup"
+    if gain < 0.0 and 2400.0 <= freq <= 8500.0:
+        if "vocal" in instrument:
+            return ["harshness", "sharp_vocal", "listener_fatigue"], "vocal harshness control"
+        if "guitar" in instrument:
+            return ["harshness", "sharp_guitar", "listener_fatigue"], "guitar harshness control"
+        return ["harshness", "listener_fatigue"], "harshness control"
+    if gain > 0.0 and freq < 140.0:
+        return ["weak_low_end", "thin_low_end"], "low-end support"
+    if gain > 0.0 and 1800.0 <= freq <= 6500.0:
+        return ["thinness", "translation"], "presence support"
+    return ["masking", "translation"], "tonal correction"
+
+
+def _source_feedback_for_candidate(
+    category: str,
+    action: dict[str, Any],
+    delta: dict[str, Any],
+) -> tuple[str, str]:
+    """Generate a conservative Codex listening proxy for later operator review."""
+
+    if category == "eq":
+        freq = float(action.get("freq_hz", 0.0) or 0.0)
+        gain = float(action.get("gain_db", 0.0) or 0.0)
+        if gain < 0.0 and 160.0 <= freq <= 520.0:
+            return (
+                "codex_predicted_better",
+                "Expected listening result: less low-mid cloud without changing the musical role.",
+            )
+        if gain < 0.0 and 2400.0 <= freq <= 8500.0:
+            return (
+                "codex_predicted_better",
+                "Expected listening result: smoother edge; verify articulation did not fall back.",
+            )
+        if gain > 0.0:
+            return (
+                "codex_watch",
+                "Expected listening result: more definition; watch for added harshness or headroom loss.",
+            )
+    if category == "compressor":
+        dr_delta = float(delta.get("dynamic_range_db", 0.0) or 0.0)
+        if dr_delta < -0.2:
+            return (
+                "codex_predicted_better",
+                "Expected listening result: steadier envelope and denser placement in the mix.",
+            )
+        return (
+            "codex_neutral",
+            "Expected listening result: subtle compression; operator A/B should confirm benefit.",
+        )
+    if category == "pan":
+        pan = float(action.get("pan", 0.0) or 0.0)
+        if abs(pan) < 0.05:
+            return (
+                "codex_neutral",
+                "Expected listening result: center anchor preserved for mono compatibility.",
+            )
+        return (
+            "codex_predicted_better",
+            "Expected listening result: clearer soundfield role with less center masking.",
+        )
+    if category == "fx":
+        return (
+            "codex_watch",
+            "Expected listening result: more depth or width; verify the wet return does not mask the front.",
+        )
+    return (
+        "codex_neutral",
+        "Expected listening result: logged for operator review.",
+    )
+
+
+def _source_candidate_confidence(matches: list[RuleMatch], action: dict[str, Any]) -> float:
+    if not matches:
+        return 0.0
+    rule_conf = max(float(match.rule.confidence) for match in matches[:3])
+    relevance = min(0.18, 0.03 * float(matches[0].relevance_score))
+    magnitude = 0.0
+    if "gain_db" in action:
+        magnitude = min(0.08, abs(float(action.get("gain_db", 0.0))) / 40.0)
+    elif "ratio" in action:
+        magnitude = min(0.08, max(0.0, float(action.get("ratio", 1.0)) - 1.0) / 60.0)
+    elif "pan" in action:
+        magnitude = min(0.08, abs(float(action.get("pan", 0.0))) / 12.0)
+    return round(float(np.clip(rule_conf + relevance + magnitude, 0.0, 0.98)), 3)
+
+
+def _record_source_candidate(
+    layer: SourceKnowledgeLayer | None,
+    *,
+    session_id: str,
+    decision_id: str,
+    channel: str,
+    instrument: str,
+    category: str,
+    problem: str,
+    matches: list[RuleMatch],
+    action: dict[str, Any],
+    before_audio: np.ndarray,
+    after_audio: np.ndarray,
+    sr: int,
+    context: dict[str, Any] | None = None,
+) -> bool:
+    if layer is None or not layer.enabled:
+        return False
+    try:
+        before_metrics = _source_metrics(before_audio, sr, instrument)
+        after_metrics = _source_metrics(after_audio, sr, instrument)
+        delta = _source_metric_delta(before_metrics, after_metrics)
+        candidate_rule_ids, selected_rule_ids, source_ids = _source_rules_from_matches(matches)
+        rating, comment = _source_feedback_for_candidate(category, action, delta)
+        selected_action = dict(action)
+        selected_action.update({
+            "selected_rule_ids": selected_rule_ids,
+            "source_ids": source_ids,
+            "listening_feedback": comment,
+        })
+        trace_context = dict(context or {})
+        trace_context.update({
+            "offline_mix": True,
+            "category": category,
+            "metrics_delta": delta,
+            "listening_feedback": {
+                "listener": "codex",
+                "rating": rating,
+                "comment": comment,
+            },
+        })
+        confidence = _source_candidate_confidence(matches, action)
+        trace = DecisionTrace(
+            session_id=session_id,
+            decision_id=decision_id,
+            channel=channel,
+            instrument=instrument,
+            problem=problem,
+            context=trace_context,
+            candidate_rule_ids=candidate_rule_ids,
+            selected_rule_ids=selected_rule_ids,
+            source_ids=source_ids,
+            candidate_actions=[dict(action)],
+            selected_action=selected_action,
+            before_metrics=before_metrics,
+            after_metrics=after_metrics,
+            outcome=rating,
+            confidence=confidence,
+            osc_sent=False,
+            safety_state={
+                "mode": "shadow",
+                "offline_only": True,
+                "osc_behavior_changed": False,
+            },
+            notes=comment,
+        )
+        layer.record_decision(trace)
+        layer.record_feedback(FeedbackRecord(
+            session_id=session_id,
+            decision_id=decision_id,
+            listener="codex",
+            rating=rating,
+            comment=comment,
+            preferred_action=selected_action,
+            tags=["offline_mix", category, "listening_proxy"],
+        ))
+        return True
+    except Exception:
+        return False
+
+
+def _source_decision_slug(*parts: Any) -> str:
+    text = "_".join(str(part) for part in parts if str(part))
+    return re.sub(r"[^a-zA-Z0-9_.-]+", "_", text).strip("_")[:180] or "candidate"
+
+
+def _fit_audio_to_len(audio: np.ndarray, target_len: int) -> np.ndarray:
+    if len(audio) < target_len:
+        if audio.ndim == 1:
+            return np.pad(audio, (0, target_len - len(audio))).astype(np.float32)
+        return np.pad(audio, ((0, target_len - len(audio)), (0, 0))).astype(np.float32)
+    return audio[:target_len].astype(np.float32, copy=False)
+
+
+def trace_channel_source_candidates(
+    layer: SourceKnowledgeLayer | None,
+    *,
+    session_id: str,
+    channel: int,
+    plan: ChannelPlan,
+    target_len: int,
+    sr: int,
+) -> int:
+    """Replay the offline channel strip only to log source-grounded candidates."""
+
+    if layer is None or not layer.enabled:
+        return 0
+    logged = 0
+    trace_plan = copy.deepcopy(plan)
+    try:
+        audio, file_sr = sf.read(trace_plan.path, dtype="float32", always_2d=False)
+        if int(file_sr) != int(sr):
+            return 0
+    except Exception:
+        return 0
+
+    is_stereo_source = (
+        isinstance(audio, np.ndarray)
+        and audio.ndim == 2
+        and audio.shape[1] == 2
+        and trace_plan.instrument in {"overhead", "playback", "room"}
+    )
+    channel_name = f"{channel}:{trace_plan.path.name}"
+
+    if is_stereo_source:
+        stereo = _fit_audio_to_len(np.asarray(audio, dtype=np.float32), target_len)
+        stereo = np.column_stack([
+            declick_start(stereo[:, 0], sr, trace_plan.input_fade_ms),
+            declick_start(stereo[:, 1], sr, trace_plan.input_fade_ms),
+        ]).astype(np.float32)
+        stereo = (stereo * db_to_amp(trace_plan.trim_db)).astype(np.float32)
+        if trace_plan.phase_invert:
+            stereo = (-stereo).astype(np.float32)
+        if abs(trace_plan.delay_ms) > 1e-4:
+            stereo = np.column_stack([
+                delay_signal(stereo[:, 0], sr, trace_plan.delay_ms),
+                delay_signal(stereo[:, 1], sr, trace_plan.delay_ms),
+            ]).astype(np.float32)
+        for channel_index in range(2):
+            lane = stereo[:, channel_index]
+            lane = highpass(lane, sr, trace_plan.hpf)
+            if trace_plan.lpf > 0.0:
+                lane = lowpass(lane, sr, trace_plan.lpf)
+            stereo[:, channel_index] = lane.astype(np.float32)
+
+        for band_index, (freq, gain, q) in enumerate(trace_plan.eq_bands, start=1):
+            before = stereo.copy()
+            for channel_index in range(2):
+                stereo[:, channel_index] = peaking_eq(
+                    stereo[:, channel_index],
+                    sr,
+                    freq,
+                    gain,
+                    q,
+                )
+            problems, label = _infer_eq_problem(trace_plan.instrument, freq, gain)
+            matches = _safe_source_retrieve(
+                layer,
+                f"{trace_plan.instrument} {label} eq {freq:.0f}Hz {gain:.1f}dB",
+                domains=["eq", "masking", "tone"],
+                instrument=trace_plan.instrument,
+                problems=problems,
+                action_types=["eq_candidate"],
+            )
+            logged += int(_record_source_candidate(
+                layer,
+                session_id=session_id,
+                decision_id=_source_decision_slug(session_id, channel, "eq", band_index),
+                channel=channel_name,
+                instrument=trace_plan.instrument,
+                category="eq",
+                problem=problems[0],
+                matches=matches,
+                action={
+                    "action_type": "eq_candidate",
+                    "band_index": band_index,
+                    "freq_hz": round(float(freq), 3),
+                    "gain_db": round(float(gain), 3),
+                    "q": round(float(q), 3),
+                },
+                before_audio=before,
+                after_audio=stereo,
+                sr=sr,
+                context={"stage": "channel_strip", "source_mode": "stereo_preserved"},
+            ))
+
+        before_comp = stereo.copy()
+        for channel_index in range(2):
+            stereo[:, channel_index] = compressor(
+                stereo[:, channel_index],
+                sr,
+                threshold_db=trace_plan.comp_threshold_db,
+                ratio=trace_plan.comp_ratio,
+                attack_ms=trace_plan.comp_attack_ms,
+                release_ms=trace_plan.comp_release_ms,
+                makeup_db=0.0,
+            )
+        if trace_plan.comp_ratio > 1.01:
+            matches = _safe_source_retrieve(
+                layer,
+                f"{trace_plan.instrument} compression level envelope density",
+                domains=["dynamics", "compression"],
+                instrument=trace_plan.instrument,
+                problems=["unstable_level", "excessive_peaks", "weak_density"],
+                action_types=["compressor_candidate"],
+            )
+            logged += int(_record_source_candidate(
+                layer,
+                session_id=session_id,
+                decision_id=_source_decision_slug(session_id, channel, "comp"),
+                channel=channel_name,
+                instrument=trace_plan.instrument,
+                category="compressor",
+                problem="unstable_level",
+                matches=matches,
+                action={
+                    "action_type": "compressor_candidate",
+                    "threshold_db": round(float(trace_plan.comp_threshold_db), 3),
+                    "ratio": round(float(trace_plan.comp_ratio), 3),
+                    "attack_ms": round(float(trace_plan.comp_attack_ms), 3),
+                    "release_ms": round(float(trace_plan.comp_release_ms), 3),
+                },
+                before_audio=before_comp,
+                after_audio=stereo,
+                sr=sr,
+                context={"stage": "channel_strip", "source_mode": "stereo_preserved"},
+            ))
+        return logged
+
+    mono = _fit_audio_to_len(mono_sum(audio), target_len)
+    mono = declick_start(mono, sr, trace_plan.input_fade_ms)
+    mono = (mono * db_to_amp(trace_plan.trim_db)).astype(np.float32)
+    if trace_plan.phase_invert:
+        mono = (-mono).astype(np.float32)
+    mono = delay_signal(mono, sr, trace_plan.delay_ms)
+    x = highpass(mono, sr, trace_plan.hpf)
+    if trace_plan.lpf > 0.0:
+        x = lowpass(x, sr, trace_plan.lpf)
+    x, _ = apply_event_based_expander(x, sr, trace_plan)
+
+    for band_index, (freq, gain, q) in enumerate(trace_plan.eq_bands, start=1):
+        before = x.copy()
+        x = peaking_eq(x, sr, freq, gain, q)
+        problems, label = _infer_eq_problem(trace_plan.instrument, freq, gain)
+        matches = _safe_source_retrieve(
+            layer,
+            f"{trace_plan.instrument} {label} eq {freq:.0f}Hz {gain:.1f}dB",
+            domains=["eq", "masking", "tone"],
+            instrument=trace_plan.instrument,
+            problems=problems,
+            action_types=["eq_candidate"],
+        )
+        logged += int(_record_source_candidate(
+            layer,
+            session_id=session_id,
+            decision_id=_source_decision_slug(session_id, channel, "eq", band_index),
+            channel=channel_name,
+            instrument=trace_plan.instrument,
+            category="eq",
+            problem=problems[0],
+            matches=matches,
+            action={
+                "action_type": "eq_candidate",
+                "band_index": band_index,
+                "freq_hz": round(float(freq), 3),
+                "gain_db": round(float(gain), 3),
+                "q": round(float(q), 3),
+            },
+            before_audio=before,
+            after_audio=x,
+            sr=sr,
+            context={"stage": "channel_strip", "source_mode": "mono"},
+        ))
+
+    if trace_plan.comp_ratio > 1.01:
+        before_comp = x.copy()
+        after_comp = compressor(
+            x,
+            sr,
+            threshold_db=trace_plan.comp_threshold_db,
+            ratio=trace_plan.comp_ratio,
+            attack_ms=trace_plan.comp_attack_ms,
+            release_ms=trace_plan.comp_release_ms,
+            makeup_db=0.0,
+        )
+        matches = _safe_source_retrieve(
+            layer,
+            f"{trace_plan.instrument} compression level envelope density",
+            domains=["dynamics", "compression"],
+            instrument=trace_plan.instrument,
+            problems=["unstable_level", "excessive_peaks", "weak_density"],
+            action_types=["compressor_candidate"],
+        )
+        logged += int(_record_source_candidate(
+            layer,
+            session_id=session_id,
+            decision_id=_source_decision_slug(session_id, channel, "comp"),
+            channel=channel_name,
+            instrument=trace_plan.instrument,
+            category="compressor",
+            problem="unstable_level",
+            matches=matches,
+            action={
+                "action_type": "compressor_candidate",
+                "threshold_db": round(float(trace_plan.comp_threshold_db), 3),
+                "ratio": round(float(trace_plan.comp_ratio), 3),
+                "attack_ms": round(float(trace_plan.comp_attack_ms), 3),
+                "release_ms": round(float(trace_plan.comp_release_ms), 3),
+            },
+            before_audio=before_comp,
+            after_audio=after_comp,
+            sr=sr,
+            context={"stage": "channel_strip", "source_mode": "mono"},
+        ))
+        x = after_comp
+
+    before_pan = pan_mono(x, 0.0) * db_to_amp(trace_plan.fader_db)
+    after_pan = pan_mono(x, trace_plan.pan) * db_to_amp(trace_plan.fader_db)
+    matches = _safe_source_retrieve(
+        layer,
+        f"{trace_plan.instrument} pan soundfield role center masking",
+        domains=["pan", "soundfield", "balance"],
+        instrument=trace_plan.instrument,
+        problems=["crowded_center", "unclear_roles", "narrow_mix"],
+        action_types=["pan_candidate"],
+    )
+    logged += int(_record_source_candidate(
+        layer,
+        session_id=session_id,
+        decision_id=_source_decision_slug(session_id, channel, "pan"),
+        channel=channel_name,
+        instrument=trace_plan.instrument,
+        category="pan",
+        problem="crowded_center" if abs(trace_plan.pan) >= 0.05 else "unclear_roles",
+        matches=matches,
+        action={
+            "action_type": "pan_candidate",
+            "pan": round(float(trace_plan.pan), 4),
+            "fader_db": round(float(trace_plan.fader_db), 3),
+            "center_anchor": abs(trace_plan.pan) < 0.05,
+        },
+        before_audio=before_pan,
+        after_audio=after_pan,
+        sr=sr,
+        context={"stage": "channel_strip", "source_mode": "mono"},
+    ))
+    return logged
+
+
 def apply_event_based_expander(x: np.ndarray, sr: int, plan: ChannelPlan) -> tuple[np.ndarray, dict[str, Any]]:
     if not plan.expander_enabled or len(x) == 0:
         return x, {"enabled": False}
@@ -7084,6 +7778,8 @@ def apply_offline_fx_plan(
     sr: int,
     tempo_bpm: float = 120.0,
     reference_context: ReferenceMixContext | None = None,
+    source_layer: SourceKnowledgeLayer | None = None,
+    source_session_id: str = "",
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
     """Render shared stereo FX returns from the rule-based FX plan."""
     planner = AutoFXPlanner(tempo_bpm=tempo_bpm, vocal_priority=True)
@@ -7271,6 +7967,91 @@ def apply_offline_fx_plan(
         fx_return = (fx_return * db_to_amp(bus.return_level_db)).astype(np.float32)
         key = f"{bus.bus_id}_{bus.name.lower().replace(' ', '_')}"
         returns[key] = fx_return
+        if source_layer is not None and source_layer.enabled:
+            first_instrument = str(active_sends[0].get("instrument", "all")) if active_sends else "all"
+            fx_domains = [str(bus.fx_type), "depth", "fx"]
+            fx_problems = ["dry_vocal", "no_depth", "muddy_fx", "washed_out_front"]
+            bus_matches = _safe_source_retrieve(
+                source_layer,
+                f"{first_instrument} {bus.fx_type} fx depth filtered return",
+                domains=fx_domains,
+                instrument=first_instrument,
+                problems=fx_problems,
+                action_types=["fx_send_candidate"],
+            )
+            _record_source_candidate(
+                source_layer,
+                session_id=source_session_id or "offline_mix",
+                decision_id=_source_decision_slug(source_session_id, "fx", bus.bus_id, "return"),
+                channel=f"FX:{bus.name}",
+                instrument=first_instrument,
+                category="fx",
+                problem="no_depth",
+                matches=bus_matches,
+                action={
+                    "action_type": "fx_candidate",
+                    "candidate_kind": "return_bus",
+                    "bus_id": int(bus.bus_id),
+                    "name": bus.name,
+                    "fx_type": bus.fx_type,
+                    "return_level_db": round(float(bus.return_level_db), 3),
+                    "hpf_hz": round(float(bus.hpf_hz), 3),
+                    "lpf_hz": round(float(bus.lpf_hz), 3),
+                    "duck_source": bus.duck_source,
+                    "duck_depth_db": round(float(bus.duck_depth_db), 3),
+                    "active_send_count": len(active_sends),
+                    "params": dict(bus.params),
+                },
+                before_audio=bus_input,
+                after_audio=fx_return,
+                sr=sr,
+                context={"stage": "fx_return", "active_sends": active_sends},
+            )
+            for send_item in active_sends:
+                send_channel = int(send_item.get("channel_id", 0) or 0)
+                send_instrument = str(send_item.get("instrument", "all"))
+                if send_channel not in rendered_channels:
+                    continue
+                send_problem = "dry_vocal" if "vocal" in send_instrument else "no_depth"
+                send_matches = _safe_source_retrieve(
+                    source_layer,
+                    f"{send_instrument} {bus.fx_type} send depth filtered return",
+                    domains=fx_domains,
+                    instrument=send_instrument,
+                    problems=[send_problem, "no_depth", "muddy_fx"],
+                    action_types=["fx_send_candidate"],
+                )
+                send_audio = rendered_channels[send_channel] * db_to_amp(float(send_item["send_db"]))
+                _record_source_candidate(
+                    source_layer,
+                    session_id=source_session_id or "offline_mix",
+                    decision_id=_source_decision_slug(
+                        source_session_id,
+                        "fx",
+                        bus.bus_id,
+                        "send",
+                        send_channel,
+                    ),
+                    channel=f"{send_channel}:{send_item.get('file', '')}",
+                    instrument=send_instrument,
+                    category="fx",
+                    problem=send_problem,
+                    matches=send_matches,
+                    action={
+                        "action_type": "fx_send_candidate",
+                        "candidate_kind": "send_to_return",
+                        "bus_id": int(bus.bus_id),
+                        "bus_name": bus.name,
+                        "fx_type": bus.fx_type,
+                        "send_db": round(float(send_item["send_db"]), 3),
+                        "post_fader": bool(send_item.get("post_fader", True)),
+                        "reason": str(send_item.get("reason", "")),
+                    },
+                    before_audio=send_audio,
+                    after_audio=fx_return,
+                    sr=sr,
+                    context={"stage": "fx_send", "bus": bus.__dict__},
+                )
         return_reports.append({
             **bus.__dict__,
             "active_send_count": len(active_sends),
@@ -7875,6 +8656,13 @@ def main() -> int:
     parser.add_argument("--analysis-preview-sec", type=float, default=ANALYZER_RENDER_PREVIEW_SEC, help="Active-window render length used by offline analyzers.")
     parser.add_argument("--no-render-cache", action="store_true", help="Disable the offline channel render cache.")
     parser.add_argument("--render-cache-max-mb", type=float, default=DEFAULT_RENDER_CACHE_MAX_MB, help="Maximum memory used by the offline render cache.")
+    parser.add_argument("--source-knowledge-enable", action="store_true", help="Enable shadow source-grounded logging for offline EQ/comp/pan/FX candidates.")
+    parser.add_argument("--source-knowledge-log", default="", help="Override source-grounded JSONL log path for the offline pass.")
+    parser.add_argument("--mert-enable", action="store_true", help="Enable offline perceptual shadow scoring with the MERT backend.")
+    parser.add_argument("--mert-model-name", default="m-a-p/MERT-v1-95M", help="HuggingFace model name for --mert-enable.")
+    parser.add_argument("--mert-local-files-only", action="store_true", help="Load the MERT model only from the local HuggingFace cache.")
+    parser.add_argument("--perceptual-log", default="", help="Override perceptual/MERT JSONL log path for the offline pass.")
+    parser.add_argument("--perceptual-window-sec", type=float, default=8.0, help="Audio window length used by offline perceptual/MERT scoring.")
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
@@ -7923,6 +8711,16 @@ def main() -> int:
     config = yaml.safe_load((REPO_ROOT / "config" / "automixer.yaml").read_text(encoding="utf-8"))
     ai_config = config.get("ai", {})
     autofoh_config = config.get("autofoh", {})
+    source_layer, source_knowledge_report = _make_offline_source_knowledge_layer(args, config)
+    perceptual_evaluator, perceptual_report = _make_offline_perceptual_evaluator(args, config)
+    source_session_id = _source_decision_slug(
+        "offline_mix",
+        input_dir.name,
+        int(time.time()),
+    )
+    source_knowledge_report["session_id"] = source_session_id
+    source_knowledge_report["channel_candidate_logs_requested"] = 0
+    perceptual_report["session_id"] = source_session_id
     reference_context = prepare_reference_mix_context(args.reference)
     genre_reference_seed = _genre_reference_seed(args.genre)
     render_cache = OfflineRenderCache(
@@ -8119,9 +8917,18 @@ def main() -> int:
 
     rendered_channels: dict[int, np.ndarray] = {}
     channel_reports = []
+    source_candidate_logs = 0
     for ch, plan in plans.items():
         if plan.muted:
             continue
+        source_candidate_logs += trace_channel_source_candidates(
+            source_layer,
+            session_id=source_session_id,
+            channel=ch,
+            plan=plan,
+            target_len=target_len,
+            sr=sr,
+        )
         rendered = render_channel_cached(ch, plan, target_len, sr, render_cache)
         rendered_channels[ch] = rendered
         channel_reports.append({
@@ -8178,6 +8985,8 @@ def main() -> int:
             sr,
             tempo_bpm=args.tempo_bpm,
             reference_context=reference_context,
+            source_layer=source_layer,
+            source_session_id=source_session_id,
         )
     )
     large_system_polish = (
@@ -8197,6 +9006,7 @@ def main() -> int:
         mix += rendered
     for rendered in fx_returns.values():
         mix += rendered
+    perceptual_before_master = mix.copy()
 
     final_limiter = (not args.no_final_limiter) or args.soft_master
     mix, master_report = master_process(
@@ -8232,6 +9042,33 @@ def main() -> int:
         final_lufs = float(meter.integrated_loudness(mix))
     except Exception:
         pass
+    perceptual_mix_bus = _record_offline_perceptual_mix_bus(
+        perceptual_evaluator,
+        before_audio=perceptual_before_master,
+        after_audio=mix,
+        sr=sr,
+        context={
+            "channel": "mix_bus",
+            "instrument": "full_mix",
+            "sample_rate": sr,
+            "session_id": source_session_id,
+            "action": {
+                "action_type": "offline_mert_mix_bus_shadow",
+                "master_target_lufs": round(float(args.master_target_lufs), 3),
+                "master_ceiling_dbfs": round(float(args.master_ceiling_dbfs), 3),
+                "final_limiter": bool(final_limiter),
+                "large_system_polish": bool(args.large_system_polish),
+                "source_knowledge_enabled": bool(source_layer and source_layer.enabled),
+            },
+            "engineering_score": 0.0,
+            "safety_score": 1.0,
+        },
+    )
+    perceptual_report["mix_bus"] = perceptual_mix_bus
+    if source_layer is not None:
+        source_layer.stop()
+        source_knowledge_report["channel_candidate_logs_requested"] = int(source_candidate_logs)
+        source_knowledge_report["logger_stats"] = source_layer.logger.stats.__dict__.copy()
     report = {
         "input_dir": str(input_dir),
         "output": str(output),
@@ -8247,6 +9084,8 @@ def main() -> int:
             "fast_compressor": os.environ.get("AUTO_MIXER_SLOW_COMPRESSOR") != "1",
         },
         "codex_orchestrator": orchestration_report,
+        "source_knowledge": source_knowledge_report,
+        "perceptual": perceptual_report,
         "duration_sec": round(target_len / sr, 3),
         "final_peak_dbfs": round(amp_to_db(float(np.max(np.abs(mix)))), 2),
         "final_lufs": round(final_lufs, 2) if final_lufs is not None and np.isfinite(final_lufs) else None,

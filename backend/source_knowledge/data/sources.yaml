@@ -1,0 +1,182 @@
+sources:
+  - source_id: senior_mixing_secrets
+    title: "Mixing Secrets for the Small Studio"
+    source_type: book
+    authors: ["Mike Senior"]
+    publisher: "Focal Press / Routledge"
+    year: 2026
+    url: "https://www.routledge.com/Mixing-Secrets-for-the-Small-Studio/Senior/p/book/9781032840451"
+    authority_tier: primary_book
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - workflow_domains
+      - citation_metadata
+    notes: "Seeded from publisher description and table of contents; no long excerpts stored."
+  - source_id: izhaki_mixing_audio
+    title: "Mixing Audio: Concepts, Practices, and Tools"
+    source_type: book
+    authors: ["Roey Izhaki"]
+    publisher: "Focal Press / Routledge"
+    year: 2023
+    url: "https://www.routledge.com/Mixing-Audio-Concepts-Practices-and-Tools/Izhaki/p/book/9781032219448"
+    authority_tier: primary_book
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - workflow_domains
+      - citation_metadata
+    notes: "Publisher table of contents covers phase, faders, panning, EQ, dynamics, delays, reverbs, and meters."
+  - source_id: owsinski_handbook
+    title: "The Mixing Engineer's Handbook"
+    source_type: book
+    authors: ["Bobby Owsinski"]
+    publisher: "Mix Books / Bobby Owsinski Media"
+    year: 1999
+    url: "https://www.mixonline.com/recording/mixing-engineers-handbook-364940"
+    authority_tier: primary_book_reviewed
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - workflow_domains
+      - citation_metadata
+    notes: "MixOnline review identifies balance, dynamics, EQ, sound-field placement, effects, and final mix as core topics."
+  - source_id: intelligent_music_production
+    title: "Intelligent Music Production"
+    source_type: book
+    authors: ["Brecht De Man", "Ryan Stables", "Joshua D. Reiss"]
+    publisher: "Focal Press / Routledge"
+    year: 2020
+    url: "https://www.routledge.com/Intelligent-Music-Production-1st-Edition/De-Man-Stables-Reiss/p/book/9781138055186"
+    authority_tier: primary_book_research
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - automation_methodology
+      - citation_metadata
+    notes: "Publisher description covers classification, data collection, perceptual evaluation, and intelligent systems."
+  - source_id: ten_years_automatic_mixing
+    title: "Ten Years of Automatic Mixing"
+    source_type: paper
+    authors: ["Brecht De Man", "Joshua D. Reiss", "Ryan Stables"]
+    publisher: "Workshop on Intelligent Music Production"
+    year: 2017
+    url: "https://www.open-access.bcu.ac.uk/4968/"
+    authority_tier: peer_reviewed_or_workshop
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - citation_metadata
+    notes: "Open-access workshop paper for automatic mixing context."
+  - source_id: yamaha_sound_reinforcement
+    title: "The Sound Reinforcement Handbook"
+    source_type: book
+    authors: ["Gary Davis", "Ralph Jones", "Yamaha International Corporation"]
+    publisher: "Hal Leonard / Yamaha"
+    year: 1989
+    url: "https://catalog.libraries.psu.edu/catalog/17086367"
+    authority_tier: primary_book_live_sound
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - live_sound_safety
+      - citation_metadata
+    notes: "Library catalog lists phase, frequency response, dynamic range, mixers, and signal processing."
+  - source_id: itu_bs1770
+    title: "ITU-R BS.1770"
+    source_type: standard
+    authors: ["International Telecommunication Union"]
+    publisher: "ITU"
+    year: 2025
+    url: "https://www.itu.int/rec/R-REC-BS.1770/en"
+    authority_tier: official_standard
+    status: active
+    allowed_uses:
+      - metering
+      - citation_metadata
+    notes: "Used for loudness and true-peak measurement, not for artistic mix taste."
+  - source_id: ebu_r128
+    title: "EBU R 128"
+    source_type: standard
+    authors: ["European Broadcasting Union"]
+    publisher: "EBU"
+    year: 2023
+    url: "https://tech.ebu.ch/fr/publications/r128"
+    authority_tier: official_standard
+    status: active
+    allowed_uses:
+      - metering
+      - citation_metadata
+    notes: "Used for loudness normalization concepts and true-peak descriptors."
+  - source_id: sound_on_sound_youtube
+    title: "Sound On Sound YouTube Channel"
+    source_type: video_channel
+    authors: ["Sound On Sound"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@soundonsound"
+    authority_tier: vetted_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered as a future source; no seeded rules depend on unreviewed transcripts."
+  - source_id: pensados_place_youtube
+    title: "Pensado's Place YouTube Channel"
+    source_type: video_channel
+    authors: ["Pensado's Place"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@PensadosPlace"
+    authority_tier: vetted_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered as a future source; no seeded rules depend on unreviewed transcripts."
+  - source_id: produce_like_a_pro_youtube
+    title: "Produce Like A Pro YouTube Channel"
+    source_type: video_channel
+    authors: ["Produce Like A Pro"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@Producelikeapro"
+    authority_tier: vetted_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered as a future source; no seeded rules depend on unreviewed transcripts."
+  - source_id: mix_with_the_masters_youtube
+    title: "Mix With The Masters YouTube Channel"
+    source_type: video_channel
+    authors: ["Mix With The Masters"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@MixWithTheMASTERS"
+    authority_tier: vetted_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered as a future source; no seeded rules depend on unreviewed transcripts."
+  - source_id: izotope_youtube
+    title: "iZotope YouTube Channel"
+    source_type: video_channel
+    authors: ["iZotope"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@iZotopeOfficial"
+    authority_tier: manufacturer_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered for future reviewed transcripts and manufacturer guidance."
+  - source_id: fabfilter_youtube
+    title: "FabFilter YouTube Channel"
+    source_type: video_channel
+    authors: ["FabFilter"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@FabFilter"
+    authority_tier: manufacturer_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered for future reviewed transcripts and manufacturer guidance."
