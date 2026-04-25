@@ -39,7 +39,61 @@ def test_event_based_metrics_raise_tom_rms_above_bleed_only_average():
 
     assert tom_metrics["analysis_mode"] == "event_based"
     assert tom_metrics["analysis_active_ratio"] < 0.25
+    assert tom_metrics["analysis_event_to_bleed_db"] > 10.0
+    assert tom_metrics["analysis_bleed_dominant"] is False
     assert tom_metrics["rms_db"] > full_metrics["rms_db"] + 8.0
+
+
+def test_bleed_aware_trim_caps_quiet_overhead_boost():
+    mod = load_offline_agent_mix()
+
+    trim, report = mod.compute_bleed_aware_trim(
+        "overhead",
+        -27.0,
+        {
+            "rms_db": -39.5,
+            "analysis_mode": "windowed_full_track",
+            "analysis_active_ratio": 0.9,
+        },
+    )
+
+    assert trim == 6.0
+    assert report["limited_by_bleed"] is True
+    assert report["max_boost_db"] == 6.0
+
+
+def test_bleed_aware_trim_caps_bleed_dominant_tom_but_allows_clear_hits():
+    mod = load_offline_agent_mix()
+
+    bleed_trim, bleed_report = mod.compute_bleed_aware_trim(
+        "rack_tom",
+        -25.0,
+        {
+            "rms_db": -38.0,
+            "analysis_mode": "event_based",
+            "analysis_active_ratio": 0.62,
+            "analysis_event_to_bleed_db": 3.0,
+            "analysis_bleed_ratio": 0.35,
+            "analysis_bleed_dominant": True,
+        },
+    )
+    clear_trim, clear_report = mod.compute_bleed_aware_trim(
+        "rack_tom",
+        -25.0,
+        {
+            "rms_db": -33.0,
+            "analysis_mode": "event_based",
+            "analysis_active_ratio": 0.04,
+            "analysis_event_to_bleed_db": 18.0,
+            "analysis_bleed_ratio": 0.02,
+            "analysis_bleed_dominant": False,
+        },
+    )
+
+    assert bleed_trim == 6.0
+    assert bleed_report["limited_by_bleed"] is True
+    assert clear_trim == 8.0
+    assert clear_report["limited_by_bleed"] is False
 
 
 def test_event_based_metrics_focus_vocal_phrases_not_between_phrase_bleed():
@@ -540,6 +594,119 @@ def test_compressor_auto_makeup_restores_sustained_signal_rms():
     assert abs(with_makeup_rms_db - input_rms_db) < 0.75
 
 
+def test_fast_compressor_stays_close_to_samplewise_envelope(monkeypatch):
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 1.2
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+    x = (
+        0.58 * np.sin(2.0 * np.pi * 140.0 * t)
+        + 0.18 * np.sin(2.0 * np.pi * 760.0 * t)
+    ).astype(np.float32)
+    burst_start = int(0.55 * sr)
+    burst_len = int(0.03 * sr)
+    x[burst_start:burst_start + burst_len] += 0.7 * np.hanning(burst_len).astype(np.float32)
+
+    monkeypatch.delenv("AUTO_MIXER_SLOW_COMPRESSOR", raising=False)
+    fast = mod.compressor(
+        x,
+        sr,
+        threshold_db=-21.0,
+        ratio=3.6,
+        attack_ms=8.0,
+        release_ms=120.0,
+        auto_makeup=False,
+    )
+    monkeypatch.setenv("AUTO_MIXER_SLOW_COMPRESSOR", "1")
+    slow = mod.compressor(
+        x,
+        sr,
+        threshold_db=-21.0,
+        ratio=3.6,
+        attack_ms=8.0,
+        release_ms=120.0,
+        auto_makeup=False,
+    )
+
+    fast_rms_db = mod.amp_to_db(float(np.sqrt(np.mean(np.square(fast))) + 1e-12))
+    slow_rms_db = mod.amp_to_db(float(np.sqrt(np.mean(np.square(slow))) + 1e-12))
+    assert abs(fast_rms_db - slow_rms_db) < 1.0
+    assert np.max(np.abs(fast)) <= np.max(np.abs(x)) + 1e-5
+
+
+def test_render_cache_reuses_unchanged_channel_signature(monkeypatch):
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    t = np.arange(int(sr * 0.08), dtype=np.float32) / sr
+    mono = (0.25 * np.sin(2.0 * np.pi * 220.0 * t)).astype(np.float32)
+
+    with TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "Tone.wav"
+        sf.write(path, mono, sr, subtype="PCM_24")
+        plan = mod.ChannelPlan(
+            path=path,
+            name="Tone",
+            instrument="lead_vocal",
+            pan=0.0,
+            hpf=90.0,
+            target_rms_db=-20.0,
+            comp_threshold_db=-24.0,
+            comp_ratio=3.0,
+        )
+        cache = mod.OfflineRenderCache(enabled=True, max_bytes=16 * 1024 * 1024)
+        original_render = mod.render_channel
+        calls = {"count": 0}
+
+        def counted_render(*args, **kwargs):
+            calls["count"] += 1
+            return original_render(*args, **kwargs)
+
+        monkeypatch.setattr(mod, "render_channel", counted_render)
+        first = mod.render_channel_cached(1, plan, len(mono), sr, cache)
+        second = mod.render_channel_cached(1, plan, len(mono), sr, cache)
+        plan.fader_db = -1.0
+        third = mod.render_channel_cached(1, plan, len(mono), sr, cache)
+
+        assert calls["count"] == 2
+        assert np.allclose(first, second)
+        assert not np.allclose(second, third)
+        assert cache.summary()["hits"] == 1
+
+
+def test_autofoh_analyzer_respects_round_limit(monkeypatch):
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    plan = mod.ChannelPlan(
+        path=Path("Kick.wav"),
+        name="Kick",
+        instrument="kick",
+        pan=0.0,
+        hpf=40.0,
+        target_rms_db=-18.0,
+    )
+
+    monkeypatch.setattr(
+        mod,
+        "render_channel_preview_cached",
+        lambda *args, **kwargs: np.zeros((1024, 2), dtype=np.float32),
+    )
+
+    def fake_corrections(*args, **kwargs):
+        return {
+            "enabled": True,
+            "measurement_mode": "fake",
+            "detected_problems": [],
+            "applied_actions": [{"sent": True}],
+            "notes": [],
+        }
+
+    monkeypatch.setattr(mod, "apply_autofoh_measurement_corrections", fake_corrections)
+    report = mod.apply_autofoh_analyzer_pass({1: plan}, 1024, sr, max_rounds=2)
+
+    assert report["round_count"] == 2
+    assert report["max_rounds"] == 2
+
+
 def test_render_channel_uses_trim_pre_processing_and_fader_post_pan():
     mod = load_offline_agent_mix()
     sr = 48_000
@@ -915,6 +1082,72 @@ def test_kick_bass_hierarchy_boosts_kick_when_bass_overwhelms():
     assert report["bass_fader_after_db"] < report["bass_fader_before_db"]
     assert report["kick_eq_added"]
     assert report["bass_eq_added"]
+
+
+def test_kick_bass_hierarchy_uses_trim_when_kick_fader_is_at_ceiling():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    duration_sec = 3.0
+    length = int(sr * duration_sec)
+    t = np.arange(length, dtype=np.float32) / sr
+
+    bass = (0.24 * np.sin(2.0 * np.pi * 72.0 * t)).astype(np.float32)
+    kick = np.zeros_like(bass)
+    for start_sec in (0.4, 1.0, 1.6, 2.2):
+        start = int(start_sec * sr)
+        hit_len = int(0.12 * sr)
+        hit_t = np.arange(hit_len, dtype=np.float32) / sr
+        env = np.hanning(hit_len).astype(np.float32)
+        hit = (
+            0.11 * np.sin(2.0 * np.pi * 64.0 * hit_t)
+            + 0.025 * np.sin(2.0 * np.pi * 3200.0 * hit_t)
+        ).astype(np.float32)
+        kick[start:start + hit_len] += hit * env
+
+    with TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        kick_path = tmpdir_path / "KICK.wav"
+        bass_path = tmpdir_path / "Bass.wav"
+        sf.write(kick_path, kick, sr, subtype="PCM_24")
+        sf.write(bass_path, bass, sr, subtype="PCM_24")
+
+        kick_plan = mod.ChannelPlan(
+            path=kick_path,
+            name="KICK",
+            instrument="kick",
+            pan=0.0,
+            hpf=35.0,
+            target_rms_db=-20.0,
+            trim_db=1.0,
+            fader_db=0.0,
+            eq_bands=[],
+            comp_threshold_db=0.0,
+            comp_ratio=1.0,
+            metrics=mod.metrics_for(kick, sr, instrument="kick"),
+            trim_analysis={"max_boost_db": 6.0},
+        )
+        bass_plan = mod.ChannelPlan(
+            path=bass_path,
+            name="Bass",
+            instrument="bass_guitar",
+            pan=0.0,
+            hpf=35.0,
+            target_rms_db=-21.0,
+            fader_db=0.0,
+            eq_bands=[],
+            comp_threshold_db=0.0,
+            comp_ratio=1.0,
+            metrics=mod.metrics_for(bass, sr, instrument="bass_guitar"),
+        )
+
+        report = mod.apply_kick_bass_hierarchy({1: kick_plan, 2: bass_plan}, length, sr, desired_kick_advantage_db=2.5)
+
+    assert report["enabled"] is True
+    assert report["kick_fader_before_db"] == 0.0
+    assert report["kick_fader_after_db"] == 0.0
+    assert report["kick_trim_after_db"] > report["kick_trim_before_db"]
+    assert 0.0 < report["kick_trim_boost_db"] <= 3.2
+    assert report["bass_fader_after_db"] < report["bass_fader_before_db"]
 
 
 def test_stem_mix_verification_checks_slope_and_reseats_kick():
@@ -1336,3 +1569,223 @@ def test_frequency_window_balance_clears_vocal_window_and_keeps_kick_untouched()
     assert plans[2].eq_bands
     assert plans[4].eq_bands
     assert plans[5].eq_bands == kick_eq_before
+
+
+def test_band_power_uses_bounded_analysis_window(monkeypatch):
+    mod = load_offline_agent_mix()
+    sr = 1_000
+    duration_sec = 30.0
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+    audio = (0.1 * np.sin(2.0 * np.pi * 63.0 * t)).astype(np.float32)
+
+    fft_lengths = []
+    original_rfft = mod.np.fft.rfft
+
+    def counting_rfft(samples, *args, **kwargs):
+        fft_lengths.append(len(samples))
+        return original_rfft(samples, *args, **kwargs)
+
+    monkeypatch.setattr(mod.np.fft, "rfft", counting_rfft)
+
+    power = mod._band_power(audio, sr, 55.0, 95.0)
+
+    assert power > 1e-12
+    assert fft_lengths
+    assert max(fft_lengths) <= int(mod.BAND_ANALYSIS_WINDOW_SEC * sr)
+    assert max(fft_lengths) < len(audio)
+
+
+def test_frequency_window_snapshot_never_ffts_entire_long_track(monkeypatch):
+    mod = load_offline_agent_mix()
+    sr = 1_000
+    duration_sec = 30.0
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+    lead = (0.08 * np.sin(2.0 * np.pi * 900.0 * t)).astype(np.float32)
+    guitar = (0.11 * np.sin(2.0 * np.pi * 1100.0 * t)).astype(np.float32)
+
+    rendered = {
+        1: np.column_stack([lead, lead]).astype(np.float32),
+        2: np.column_stack([guitar, guitar]).astype(np.float32),
+    }
+    plans = {
+        1: mod.ChannelPlan(
+            path=Path("Lead.wav"),
+            name="Lead",
+            instrument="lead_vocal",
+            pan=0.0,
+            hpf=90.0,
+            target_rms_db=-20.0,
+        ),
+        2: mod.ChannelPlan(
+            path=Path("Guitar.wav"),
+            name="Guitar",
+            instrument="electric_guitar",
+            pan=-0.35,
+            hpf=90.0,
+            target_rms_db=-22.0,
+        ),
+    }
+
+    fft_lengths = []
+    original_rfft = mod.np.fft.rfft
+
+    def counting_rfft(samples, *args, **kwargs):
+        fft_lengths.append(len(samples))
+        return original_rfft(samples, *args, **kwargs)
+
+    monkeypatch.setattr(mod.np.fft, "rfft", counting_rfft)
+
+    snapshot = mod._frequency_window_snapshot(rendered, plans, sr)
+
+    assert snapshot["windows"]
+    assert fft_lengths
+    assert max(fft_lengths) <= int(mod.BAND_ANALYSIS_WINDOW_SEC * sr)
+    assert max(fft_lengths) < len(lead)
+
+
+def test_frequency_window_balance_uses_preview_renderer_not_full_render(monkeypatch):
+    mod = load_offline_agent_mix()
+    sr = 1_000
+    duration_sec = 2.0
+    t = np.arange(int(sr * duration_sec), dtype=np.float32) / sr
+    lead = (0.06 * np.sin(2.0 * np.pi * 900.0 * t)).astype(np.float32)
+    guitar = (0.09 * np.sin(2.0 * np.pi * 1100.0 * t)).astype(np.float32)
+
+    def fail_full_render(*_args, **_kwargs):
+        raise AssertionError("frequency-window balance should use bounded preview rendering")
+
+    monkeypatch.setattr(mod, "render_channel", fail_full_render)
+
+    with TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        lead_path = tmp / "Lead.wav"
+        guitar_path = tmp / "Guitar.wav"
+        sf.write(lead_path, lead, sr, subtype="PCM_24")
+        sf.write(guitar_path, guitar, sr, subtype="PCM_24")
+        plans = {
+            1: mod.ChannelPlan(
+                path=lead_path,
+                name="Lead",
+                instrument="lead_vocal",
+                pan=0.0,
+                hpf=90.0,
+                target_rms_db=-20.0,
+            ),
+            2: mod.ChannelPlan(
+                path=guitar_path,
+                name="Guitar",
+                instrument="electric_guitar",
+                pan=-0.35,
+                hpf=90.0,
+                target_rms_db=-22.0,
+            ),
+        }
+
+        report = mod.apply_frequency_window_balance(plans, len(lead), sr)
+
+    assert report["enabled"] is True
+    assert report["before"]
+
+
+def _mirror_shape(mod, audio, sr):
+    levels = mod._mirror_eq_band_levels(audio, sr)
+    normalized, _anchor = mod._mirror_eq_normalized_profile(levels)
+    return mod._mirror_eq_shape_metrics(normalized)
+
+
+def test_reference_mirror_master_eq_restores_underfilled_lowmid_without_overmatching():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    t = np.arange(int(sr * 2.0), dtype=np.float32) / sr
+
+    mix_mono = (
+        0.012 * np.sin(2.0 * np.pi * 250.0 * t)
+        + 0.010 * np.sin(2.0 * np.pi * 350.0 * t)
+        + 0.090 * np.sin(2.0 * np.pi * 1000.0 * t)
+        + 0.120 * np.sin(2.0 * np.pi * 2000.0 * t)
+        + 0.110 * np.sin(2.0 * np.pi * 4000.0 * t)
+    ).astype(np.float32)
+    reference_mono = (
+        0.22 * np.sin(2.0 * np.pi * 250.0 * t)
+        + 0.18 * np.sin(2.0 * np.pi * 350.0 * t)
+        + 0.08 * np.sin(2.0 * np.pi * 1000.0 * t)
+        + 0.025 * np.sin(2.0 * np.pi * 3000.0 * t)
+    ).astype(np.float32)
+    mix = np.column_stack([mix_mono, mix_mono]).astype(np.float32)
+    reference = np.column_stack([reference_mono, reference_mono]).astype(np.float32)
+
+    before = _mirror_shape(mod, mix, sr)
+    processed, report = mod.apply_reference_mirror_master_eq(
+        mix,
+        sr,
+        reference,
+        sr,
+        strength=1.0,
+        lowmid_floor_db=7.5,
+        lowmid_ceiling_db=12.0,
+    )
+    after = _mirror_shape(mod, processed, sr)
+
+    assert report["enabled"] is True
+    assert after["lowmid_250_500_minus_presence_2_4k_db"] > before["lowmid_250_500_minus_presence_2_4k_db"] + 0.5
+    assert after["lowmid_250_500_minus_presence_2_4k_db"] < 13.5
+    assert max(item["gain_db"] for item in report["corrections"]) <= 2.2
+
+
+def test_reference_mirror_master_eq_blocks_white_noise_high_boost():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    t = np.arange(int(sr * 2.0), dtype=np.float32) / sr
+
+    mix_mono = (
+        0.025 * np.sin(2.0 * np.pi * 300.0 * t)
+        + 0.065 * np.sin(2.0 * np.pi * 1000.0 * t)
+        + 0.140 * np.sin(2.0 * np.pi * 7000.0 * t)
+    ).astype(np.float32)
+    bright_reference = (
+        0.030 * np.sin(2.0 * np.pi * 300.0 * t)
+        + 0.060 * np.sin(2.0 * np.pi * 1000.0 * t)
+        + 0.220 * np.sin(2.0 * np.pi * 7000.0 * t)
+    ).astype(np.float32)
+    mix = np.column_stack([mix_mono, mix_mono]).astype(np.float32)
+    reference = np.column_stack([bright_reference, bright_reference]).astype(np.float32)
+
+    _processed, report = mod.apply_reference_mirror_master_eq(
+        mix,
+        sr,
+        reference,
+        sr,
+        strength=1.0,
+        white_noise_top_floor_db=-7.0,
+    )
+
+    high_boosts = [
+        item
+        for item in report["corrections"]
+        if item["frequency_hz"] >= 4000.0 and item["gain_db"] > 0.0
+    ]
+    assert high_boosts == []
+
+
+def test_reference_mirror_master_eq_reports_normalized_before_after_profiles():
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    t = np.arange(int(sr * 1.0), dtype=np.float32) / sr
+    mix_mono = (
+        0.030 * np.sin(2.0 * np.pi * 250.0 * t)
+        + 0.080 * np.sin(2.0 * np.pi * 1000.0 * t)
+    ).astype(np.float32)
+    reference_mono = (
+        0.120 * np.sin(2.0 * np.pi * 250.0 * t)
+        + 0.080 * np.sin(2.0 * np.pi * 1000.0 * t)
+    ).astype(np.float32)
+    mix = np.column_stack([mix_mono, mix_mono]).astype(np.float32)
+    reference = np.column_stack([reference_mono, reference_mono]).astype(np.float32)
+
+    _processed, report = mod.apply_reference_mirror_master_eq(mix, sr, reference, sr)
+
+    assert report["mode"] == "bounded_reference_mirror_eq"
+    assert "250" in report["before"]["normalized_db"]
+    assert "250" in report["reference"]["normalized_db"]
+    assert "250" in report["after"]["normalized_db"]
+    assert report["notes"]

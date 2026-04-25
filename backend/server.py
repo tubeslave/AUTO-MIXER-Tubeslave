@@ -3088,6 +3088,8 @@ class AutoMixerServer:
         duration_sec: float = 6.0,
         target_bus: str = "master",
         target_id: int = 1,
+        correction_mode: str = "flat",
+        reference_curve: str = "pink_noise_live_pa",
     ):
         """Capture reference + measurement mic and estimate system transfer function."""
         if not self.mixer_client or not self.mixer_client.is_connected:
@@ -3112,6 +3114,8 @@ class AutoMixerServer:
             target_id = int(target_id)
             duration_sec = float(duration_sec)
             target = self._parse_target_bus(target_bus)
+            correction_mode = (correction_mode or "flat").strip().lower()
+            reference_curve = (reference_curve or "pink_noise_live_pa").strip().lower()
         except (TypeError, ValueError) as exc:
             await self.send_to_client(websocket, {
                 "type": "system_measurement_result",
@@ -3151,6 +3155,8 @@ class AutoMixerServer:
             analysis = self.system_measurement_controller.analyze_reference_measurement(
                 reference_signal,
                 measurement_signal,
+                correction_mode=correction_mode,
+                reference_curve=reference_curve,
             )
 
             await self.broadcast({
@@ -3158,6 +3164,8 @@ class AutoMixerServer:
                 "success": True,
                 "target_bus": target.value,
                 "target_id": target_id,
+                "correction_mode": analysis.get("correction_mode", correction_mode),
+                "reference_curve": analysis.get("reference_curve", reference_curve),
                 "reference_channel": reference_channel,
                 "measurement_channel": measurement_channel,
                 "recommended_target": self.system_measurement_controller.get_recommended_target(),

@@ -72,6 +72,8 @@ backend/.env
 *.temp
 extracted_text.txt
 output.txt
+models/training_datasets/
+artifacts/runs/
 .claude/
 GitHub/
 backend/models/

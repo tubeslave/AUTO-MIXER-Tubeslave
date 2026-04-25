@@ -114,7 +114,7 @@ def build_initial_plans(mixmod, input_dir: Path) -> tuple[list[Path], int, int, 
         if file_sr != sr:
             raise ValueError(f"{path.name}: sample rate mismatch {file_sr} != {sr}")
         metrics = mixmod.metrics_for(mono, sr, instrument=instrument)
-        trim = float(np.clip(target_rms - metrics["rms_db"], -18.0, 12.0))
+        trim, trim_analysis = mixmod.compute_bleed_aware_trim(instrument, target_rms, metrics)
         threshold, ratio, attack, release = comp
         plans[idx] = mixmod.ChannelPlan(
             path=path,
@@ -132,6 +132,7 @@ def build_initial_plans(mixmod, input_dir: Path) -> tuple[list[Path], int, int, 
             phase_invert=phase,
             event_activity=mixmod._event_activity_ranges(mono, sr, instrument) or {},
             metrics=metrics,
+            trim_analysis=trim_analysis,
         )
         del mono
 
@@ -243,6 +244,7 @@ def channel_report_for_plan(plan: Any) -> dict[str, Any]:
         "file": plan.path.name,
         "instrument": plan.instrument,
         "trim_db": round(plan.trim_db, 2),
+        "trim_analysis": plan.trim_analysis,
         "fader_db": round(plan.fader_db, 2),
         "pan": round(plan.pan, 3),
         "hpf": plan.hpf,

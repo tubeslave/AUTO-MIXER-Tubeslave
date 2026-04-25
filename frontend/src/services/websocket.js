@@ -480,7 +480,16 @@ class WebSocketService extends BaseWebSocketTransport {
 
   // ========== System Measurement / Master EQ ==========
 
-  startSystemMeasurement(deviceId, referenceChannel, measurementChannel, durationSec = 6, targetBus = 'master', targetId = 1) {
+  startSystemMeasurement(
+    deviceId,
+    referenceChannel,
+    measurementChannel,
+    durationSec = 6,
+    targetBus = 'master',
+    targetId = 1,
+    correctionMode = 'flat',
+    referenceCurve = 'pink_noise_live_pa'
+  ) {
     this.send({
       type: 'start_system_measurement',
       device_id: deviceId,
@@ -489,6 +498,8 @@ class WebSocketService extends BaseWebSocketTransport {
       duration_sec: durationSec,
       target_bus: targetBus,
       target_id: targetId,
+      correction_mode: correctionMode,
+      reference_curve: referenceCurve,
     });
   }
 

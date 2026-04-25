@@ -1,0 +1,20 @@
+perceptual:
+  enabled: false
+  mode: shadow
+  backend: lightweight
+  model_name: "m-a-p/MERT-v1-95M"
+  sample_rate: 24000
+  window_seconds: 5
+  hop_seconds: 2
+  evaluate_channels: true
+  evaluate_mix_bus: true
+  max_cpu_percent: 25
+  log_scores: true
+  block_osc_when_score_worse: false
+  log_path: logs/perceptual_decisions.jsonl
+  queue_maxsize: 128
+  async_evaluation: true
+  improvement_threshold: 0.03
+  local_files_only: false
+  reference_embedding_cache_size: 8
+  max_candidate_scores: 2

@@ -18,6 +18,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -226,6 +227,15 @@ FREQUENCY_WINDOW_DEFINITIONS: tuple[dict[str, Any], ...] = (
         "q": 1.2,
     },
 )
+
+BAND_ANALYSIS_WINDOW_SEC = 18.0
+FREQUENCY_WINDOW_PREVIEW_SEC = 8.0
+ANALYZER_RENDER_PREVIEW_SEC = 24.0
+DEFAULT_AUTOFOH_ANALYZER_ROUNDS = 1
+DEFAULT_RENDER_CACHE_MAX_MB = 1536.0
+FAST_COMPRESSOR_MIN_SAMPLES = 8192
+FAST_COMPRESSOR_FRAME_MS = 2.0
+MIRROR_EQ_CENTERS_HZ = (63.0, 125.0, 250.0, 350.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0)
 
 GENRE_REFERENCE_ALIASES = {
     "edm": "electronic",
@@ -591,6 +601,7 @@ class ChannelPlan:
     expander_report: dict[str, Any] = field(default_factory=dict)
     event_activity: dict[str, Any] = field(default_factory=dict)
     metrics: dict[str, Any] = field(default_factory=dict)
+    trim_analysis: dict[str, Any] = field(default_factory=dict)
     phase_notes: list[dict[str, Any]] = field(default_factory=list)
     pan_notes: list[dict[str, Any]] = field(default_factory=list)
     cross_adaptive_eq: list[dict[str, Any]] = field(default_factory=list)
@@ -3064,12 +3075,22 @@ def apply_autofoh_analyzer_pass(
     target_len: int,
     sr: int,
     autofoh_config: dict[str, Any] | None = None,
+    *,
+    max_rounds: int = DEFAULT_AUTOFOH_ANALYZER_ROUNDS,
+    render_cache: OfflineRenderCache | None = None,
+    analysis_preview_sec: float = ANALYZER_RENDER_PREVIEW_SEC,
 ) -> dict[str, Any]:
     rounds: list[dict[str, Any]] = []
-    max_rounds = 3
+    max_rounds = max(1, int(max_rounds))
     for round_index in range(1, max_rounds + 1):
         rendered_channels = {
-            channel: render_channel(plan.path, plan, target_len, sr)
+            channel: render_channel_preview_cached(
+                channel,
+                plan,
+                sr,
+                preview_sec=analysis_preview_sec,
+                render_cache=render_cache,
+            )
             for channel, plan in plans.items()
             if not plan.muted
         }
@@ -3106,11 +3127,14 @@ def apply_autofoh_analyzer_pass(
     final_report = dict(rounds[-1])
     final_report["measurement_mode"] = "autofoh_analyzers_iterative"
     final_report["round_count"] = len(rounds)
+    final_report["max_rounds"] = max_rounds
+    final_report["analysis_preview_sec"] = round(float(analysis_preview_sec), 2)
     final_report["rounds"] = rounds
     final_report["detected_problems"] = combined_detected
     final_report["applied_actions"] = combined_actions
     final_report["notes"] = list(final_report.get("notes", [])) + [
-        "Offline analyzer mode runs up to three bounded measurement rounds so small safety-limited actions can converge audibly.",
+        "Offline analyzer mode uses bounded preview renders for fast measurement.",
+        "Increase --autofoh-rounds for a slower deep convergence pass.",
     ]
     return final_report
 
@@ -3830,6 +3854,65 @@ def _event_activity_ranges(x: np.ndarray, sr: int, instrument: str | None) -> di
     }
 
 
+def _ranges_to_mask(length: int, ranges: list[tuple[int, int]]) -> np.ndarray:
+    mask = np.zeros(max(0, int(length)), dtype=bool)
+    for start, end in ranges:
+        mask[max(0, int(start)):min(len(mask), int(end))] = True
+    return mask
+
+
+def _rms_db_for_samples(samples: np.ndarray) -> float | None:
+    if len(samples) == 0:
+        return None
+    rms = float(np.sqrt(np.mean(np.square(samples))) + 1e-12)
+    return amp_to_db(rms)
+
+
+def _activity_bleed_metrics(x: np.ndarray, sr: int, activity: dict[str, Any] | None) -> dict[str, Any]:
+    if not activity or not activity.get("ranges") or len(x) == 0:
+        return {
+            "analysis_event_rms_db": None,
+            "analysis_bleed_rms_db": None,
+            "analysis_event_to_bleed_db": None,
+            "analysis_bleed_ratio": None,
+            "analysis_bleed_dominant": False,
+        }
+
+    mask = _ranges_to_mask(len(x), list(activity.get("ranges") or []))
+    if not np.any(mask):
+        return {
+            "analysis_event_rms_db": None,
+            "analysis_bleed_rms_db": None,
+            "analysis_event_to_bleed_db": None,
+            "analysis_bleed_ratio": None,
+            "analysis_bleed_dominant": False,
+        }
+
+    active = x[mask]
+    inactive = x[~mask]
+    event_rms_db = _rms_db_for_samples(active)
+    bleed_rms_db = _rms_db_for_samples(inactive)
+    if event_rms_db is None or bleed_rms_db is None:
+        event_to_bleed_db = None
+        bleed_ratio = None
+        bleed_dominant = False
+    else:
+        event_to_bleed_db = float(event_rms_db - bleed_rms_db)
+        event_power = db_to_amp(event_rms_db) ** 2
+        bleed_power = db_to_amp(bleed_rms_db) ** 2
+        bleed_ratio = float(bleed_power / max(event_power + bleed_power, 1e-12))
+        active_ratio = float(activity.get("active_samples", 0)) / max(1, len(x))
+        bleed_dominant = bool(event_to_bleed_db < 8.0 or active_ratio > 0.35 or bleed_ratio > 0.2)
+
+    return {
+        "analysis_event_rms_db": round(event_rms_db, 2) if event_rms_db is not None else None,
+        "analysis_bleed_rms_db": round(bleed_rms_db, 2) if bleed_rms_db is not None else None,
+        "analysis_event_to_bleed_db": round(event_to_bleed_db, 2) if event_to_bleed_db is not None else None,
+        "analysis_bleed_ratio": round(bleed_ratio, 4) if bleed_ratio is not None else None,
+        "analysis_bleed_dominant": bleed_dominant,
+    }
+
+
 def _analysis_signal_for_metrics(x: np.ndarray, sr: int, instrument: str | None) -> tuple[np.ndarray, dict[str, Any]]:
     activity = _event_activity_ranges(x, sr, instrument)
     if not activity:
@@ -3839,6 +3922,7 @@ def _analysis_signal_for_metrics(x: np.ndarray, sr: int, instrument: str | None)
             "analysis_active_sec": round(len(block) / sr, 3) if sr else 0.0,
             "analysis_active_ratio": round(len(block) / max(1, len(x)), 4),
             "analysis_threshold_db": None,
+            **_activity_bleed_metrics(x, sr, None),
         }
 
     merged = activity["ranges"]
@@ -3851,6 +3935,7 @@ def _analysis_signal_for_metrics(x: np.ndarray, sr: int, instrument: str | None)
             "analysis_active_sec": round(len(block) / sr, 3) if sr else 0.0,
             "analysis_active_ratio": round(len(block) / max(1, len(x)), 4),
             "analysis_threshold_db": round(threshold_db, 2),
+            **_activity_bleed_metrics(x, sr, activity),
         }
     block = np.concatenate([x[start:end] for start, end in merged], axis=0) if merged else _analysis_block(x, sr)
     if len(block) < max(512, frame // 2):
@@ -3864,6 +3949,68 @@ def _analysis_signal_for_metrics(x: np.ndarray, sr: int, instrument: str | None)
         "analysis_active_sec": round(active_samples / sr, 3) if sr else 0.0,
         "analysis_active_ratio": round(active_samples / max(1, len(x)), 4),
         "analysis_threshold_db": round(threshold_db, 2),
+        **_activity_bleed_metrics(x, sr, activity),
+    }
+
+
+def compute_bleed_aware_trim(
+    instrument: str,
+    target_rms_db: float,
+    metrics: dict[str, Any],
+) -> tuple[float, dict[str, Any]]:
+    """Compute input trim without letting bleed-heavy channels demand unsafe boosts."""
+    raw_trim_db = float(target_rms_db - float(metrics.get("rms_db", -100.0)))
+    max_boost_db = 12.0
+    reasons: list[str] = []
+    mode = str(metrics.get("analysis_mode") or "")
+    active_ratio = float(metrics.get("analysis_active_ratio") or 0.0)
+    event_to_bleed_db = metrics.get("analysis_event_to_bleed_db")
+    bleed_ratio = metrics.get("analysis_bleed_ratio")
+    bleed_dominant = bool(metrics.get("analysis_bleed_dominant"))
+
+    if instrument in {"overhead", "room"}:
+        max_boost_db = 6.0
+        reasons.append("ambient mic: do not convert low-level kit bleed into large input gain")
+    elif instrument in {"rack_tom", "floor_tom"}:
+        if mode != "event_based":
+            max_boost_db = 4.0
+            reasons.append("tom detector did not find reliable primary hits")
+        elif bleed_dominant:
+            max_boost_db = 6.0
+            reasons.append("tom event windows are not sufficiently separated from bleed")
+        else:
+            max_boost_db = 10.0
+            reasons.append("tom primary hits are separated from bleed")
+    elif instrument == "snare":
+        if mode != "event_based" or bleed_dominant:
+            max_boost_db = 7.0
+            reasons.append("snare analysis is bleed-prone, cap corrective trim")
+        else:
+            max_boost_db = 10.0
+            reasons.append("snare primary hits are separated from bleed")
+    elif instrument in {"kick", "hi_hat", "ride", "percussion"}:
+        if mode == "event_based" and not bleed_dominant:
+            max_boost_db = 9.0
+            reasons.append("percussive primary events are separated from bleed")
+        else:
+            max_boost_db = 6.0
+            reasons.append("percussive channel is bleed-prone, cap corrective trim")
+    elif instrument in {"lead_vocal", "backing_vocal"} and bleed_dominant:
+        max_boost_db = 8.0
+        reasons.append("vocal phrase analysis is close to bleed floor")
+
+    trim_db = float(np.clip(raw_trim_db, -18.0, max_boost_db))
+    return trim_db, {
+        "raw_trim_db": round(raw_trim_db, 2),
+        "applied_trim_db": round(trim_db, 2),
+        "max_boost_db": round(max_boost_db, 2),
+        "limited_by_bleed": bool(trim_db < raw_trim_db - 1e-6),
+        "analysis_mode": mode,
+        "active_ratio": round(active_ratio, 4),
+        "event_to_bleed_db": round(float(event_to_bleed_db), 2) if event_to_bleed_db is not None else None,
+        "bleed_ratio": round(float(bleed_ratio), 4) if bleed_ratio is not None else None,
+        "bleed_dominant": bleed_dominant,
+        "reasons": reasons,
     }
 
 
@@ -4004,10 +4151,19 @@ def apply_cross_adaptive_eq(
     plans: dict[int, ChannelPlan],
     target_len: int,
     sr: int,
+    *,
+    render_cache: OfflineRenderCache | None = None,
+    analysis_preview_sec: float = ANALYZER_RENDER_PREVIEW_SEC,
 ) -> dict[str, Any]:
     """Run priority-based CrossAdaptiveEQ and add conservative channel EQ moves."""
     preview = {
-        channel: render_channel(plan.path, plan, target_len, sr)
+        channel: render_channel_preview_cached(
+            channel,
+            plan,
+            sr,
+            preview_sec=analysis_preview_sec,
+            render_cache=render_cache,
+        )
         for channel, plan in plans.items()
         if not plan.muted
     }
@@ -4125,6 +4281,7 @@ def apply_cross_adaptive_eq(
         "raw_adjustments": len(raw_adjustments),
         "applied_adjustments": len(applied),
         "skipped_adjustments": skipped,
+        "analysis_preview_sec": round(float(analysis_preview_sec), 2),
         "channel_priorities": {
             str(channel): priority
             for channel, priority in sorted(channel_priorities.items())
@@ -4258,6 +4415,77 @@ def peaking_eq(x: np.ndarray, sr: int, freq: float, gain_db: float, q: float) ->
     return lfilter(b, aa, x).astype(np.float32)
 
 
+def _smooth_gain_reduction_samplewise(
+    gain_reduction_db: np.ndarray,
+    sr: int,
+    attack_ms: float,
+    release_ms: float,
+) -> np.ndarray:
+    attack = math.exp(-1.0 / max(1.0, attack_ms * 0.001 * sr))
+    release = math.exp(-1.0 / max(1.0, release_ms * 0.001 * sr))
+    smoothed = np.zeros_like(gain_reduction_db, dtype=np.float32)
+    last = 0.0
+    for i, gr in enumerate(gain_reduction_db):
+        coeff = attack if gr > last else release
+        last = coeff * last + (1.0 - coeff) * float(gr)
+        smoothed[i] = last
+    return smoothed
+
+
+def _smooth_gain_reduction_fast(
+    gain_reduction_db: np.ndarray,
+    sr: int,
+    attack_ms: float,
+    release_ms: float,
+    frame_ms: float = FAST_COMPRESSOR_FRAME_MS,
+) -> np.ndarray:
+    """Frame-rate compressor envelope.
+
+    The old path smoothed gain reduction sample-by-sample in Python, which is
+    expensive for 200-second multitracks. This keeps the same attack/release
+    law, but evaluates it at a small control-rate frame and interpolates the
+    gain envelope back to sample rate.
+    """
+
+    total_len = len(gain_reduction_db)
+    if total_len == 0:
+        return np.zeros(0, dtype=np.float32)
+
+    frame = max(16, int(frame_ms * 0.001 * sr))
+    frame = min(frame, total_len)
+    padded_len = int(math.ceil(total_len / frame) * frame)
+    padded = np.pad(
+        np.asarray(gain_reduction_db, dtype=np.float32),
+        (0, padded_len - total_len),
+        mode="edge",
+    )
+    frame_view = padded.reshape(-1, frame)
+    frame_mean = frame_view.mean(axis=1)
+    frame_peak = frame_view.max(axis=1)
+    frame_reduction = (frame_mean + (frame_peak - frame_mean) * 0.35).astype(np.float32)
+
+    attack = math.exp(-frame / max(1.0, attack_ms * 0.001 * sr))
+    release = math.exp(-frame / max(1.0, release_ms * 0.001 * sr))
+    frame_smoothed = np.zeros_like(frame_reduction, dtype=np.float32)
+    last = 0.0
+    for i, gr in enumerate(frame_reduction):
+        coeff = attack if gr > last else release
+        last = coeff * last + (1.0 - coeff) * float(gr)
+        frame_smoothed[i] = last
+
+    sample_points = np.minimum(
+        np.arange(len(frame_smoothed), dtype=np.float32) * frame + frame * 0.5,
+        float(total_len - 1),
+    )
+    points = np.concatenate(([0.0], sample_points, [float(total_len - 1)]))
+    values = np.concatenate(([frame_smoothed[0]], frame_smoothed, [frame_smoothed[-1]]))
+    return np.interp(
+        np.arange(total_len, dtype=np.float32),
+        points,
+        values,
+    ).astype(np.float32)
+
+
 def _zero_phase_filter(x: np.ndarray, sr: int, cutoff: float | tuple[float, float], btype: str) -> np.ndarray:
     if len(x) == 0:
         return np.asarray(x, dtype=np.float32)
@@ -4312,14 +4540,10 @@ def compressor(
     level_db = 20.0 * np.log10(abs_x)
     over = level_db - threshold_db
     gain_reduction_db = np.where(over > 0, over * (1.0 - 1.0 / max(ratio, 1.0)), 0.0)
-    attack = math.exp(-1.0 / max(1.0, attack_ms * 0.001 * sr))
-    release = math.exp(-1.0 / max(1.0, release_ms * 0.001 * sr))
-    smoothed = np.zeros_like(gain_reduction_db, dtype=np.float32)
-    last = 0.0
-    for i, gr in enumerate(gain_reduction_db):
-        coeff = attack if gr > last else release
-        last = coeff * last + (1.0 - coeff) * float(gr)
-        smoothed[i] = last
+    if len(gain_reduction_db) >= FAST_COMPRESSOR_MIN_SAMPLES and os.environ.get("AUTO_MIXER_SLOW_COMPRESSOR") != "1":
+        smoothed = _smooth_gain_reduction_fast(gain_reduction_db, sr, attack_ms, release_ms)
+    else:
+        smoothed = _smooth_gain_reduction_samplewise(gain_reduction_db, sr, attack_ms, release_ms)
     gain = 10.0 ** (-smoothed / 20.0)
     compressed = (x * gain).astype(np.float32)
 
@@ -4504,18 +4728,273 @@ def render_channel(path: Path, plan: ChannelPlan, target_len: int, sr: int) -> n
     return (stereo * db_to_amp(plan.fader_db)).astype(np.float32)
 
 
+def _render_frequency_window_preview(
+    plan: ChannelPlan,
+    sr: int,
+    preview_sec: float = FREQUENCY_WINDOW_PREVIEW_SEC,
+) -> np.ndarray:
+    """Render a bounded channel preview for broad frequency-window decisions."""
+
+    audio, file_sr = sf.read(plan.path, dtype="float32", always_2d=False)
+    if file_sr != sr:
+        raise ValueError(f"{plan.path.name}: expected {sr} Hz, got {file_sr} Hz")
+
+    preview_len = max(1024, int(float(preview_sec) * sr))
+    if (
+        isinstance(audio, np.ndarray)
+        and audio.ndim == 2
+        and audio.shape[1] == 2
+        and plan.instrument in {"overhead", "playback", "room"}
+    ):
+        stereo_source = audio.astype(np.float32, copy=False)
+        mono_reference = mono_sum(stereo_source)
+        start = _active_segment_start(
+            mono_reference,
+            sr,
+            window_sec=float(preview_sec),
+        )
+        stereo = stereo_source[start:start + preview_len]
+        if len(stereo) < preview_len:
+            stereo = np.pad(stereo, ((0, preview_len - len(stereo)), (0, 0)))
+        stereo = np.column_stack([
+            declick_start(stereo[:, 0], sr, plan.input_fade_ms),
+            declick_start(stereo[:, 1], sr, plan.input_fade_ms),
+        ]).astype(np.float32)
+        stereo = (stereo * db_to_amp(plan.trim_db)).astype(np.float32)
+        if plan.phase_invert:
+            stereo = (-stereo).astype(np.float32)
+        if abs(plan.delay_ms) > 1e-4:
+            stereo = np.column_stack([
+                delay_signal(stereo[:, 0], sr, plan.delay_ms),
+                delay_signal(stereo[:, 1], sr, plan.delay_ms),
+            ]).astype(np.float32)
+        for channel_index in range(2):
+            lane = stereo[:, channel_index]
+            lane = highpass(lane, sr, plan.hpf)
+            if plan.lpf > 0.0:
+                lane = lowpass(lane, sr, plan.lpf)
+            for freq, gain, q in plan.eq_bands:
+                lane = peaking_eq(lane, sr, freq, gain, q)
+            lane = compressor(
+                lane,
+                sr,
+                threshold_db=plan.comp_threshold_db,
+                ratio=plan.comp_ratio,
+                attack_ms=plan.comp_attack_ms,
+                release_ms=plan.comp_release_ms,
+                makeup_db=0.0,
+            )
+            stereo[:, channel_index] = lane.astype(np.float32)
+        return (stereo * db_to_amp(plan.fader_db)).astype(np.float32)
+
+    mono = mono_sum(audio)
+    block = _analysis_block(
+        mono,
+        sr,
+        window_sec=float(preview_sec),
+    )
+    if len(block) < preview_len:
+        block = np.pad(block, (0, preview_len - len(block)))
+    else:
+        block = block[:preview_len]
+    x = declick_start(block.astype(np.float32), sr, plan.input_fade_ms)
+    x = x * db_to_amp(plan.trim_db)
+    if plan.phase_invert:
+        x = -x
+    x = delay_signal(x, sr, plan.delay_ms)
+    x = highpass(x, sr, plan.hpf)
+    if plan.lpf > 0.0:
+        x = lowpass(x, sr, plan.lpf)
+    for freq, gain, q in plan.eq_bands:
+        x = peaking_eq(x, sr, freq, gain, q)
+    x = compressor(
+        x,
+        sr,
+        threshold_db=plan.comp_threshold_db,
+        ratio=plan.comp_ratio,
+        attack_ms=plan.comp_attack_ms,
+        release_ms=plan.comp_release_ms,
+        makeup_db=0.0,
+    )
+    stereo = pan_mono(x, plan.pan)
+    return (stereo * db_to_amp(plan.fader_db)).astype(np.float32)
+
+
+def _round_render_value(value: float, digits: int = 4) -> float:
+    return round(float(value), digits)
+
+
+def _event_activity_signature(activity: dict[str, Any]) -> tuple[Any, ...]:
+    ranges = activity.get("ranges") if isinstance(activity, dict) else None
+    if not ranges:
+        return ()
+    return (
+        int(activity.get("frame", 0) or 0),
+        int(activity.get("hop", 0) or 0),
+        _round_render_value(activity.get("threshold_db", 0.0), 3),
+        tuple((int(start), int(end)) for start, end in ranges[:128]),
+        int(activity.get("active_samples", 0) or 0),
+    )
+
+
+def _plan_render_signature(plan: ChannelPlan, sr: int, target_len: int, mode: str) -> tuple[Any, ...]:
+    try:
+        stat = plan.path.stat()
+        file_signature = (
+            str(plan.path.resolve()),
+            int(stat.st_mtime_ns),
+            int(stat.st_size),
+        )
+    except OSError:
+        file_signature = (str(plan.path), 0, 0)
+    return (
+        mode,
+        file_signature,
+        int(sr),
+        int(target_len),
+        plan.instrument,
+        bool(plan.muted),
+        _round_render_value(plan.pan),
+        _round_render_value(plan.hpf),
+        _round_render_value(plan.lpf),
+        _round_render_value(plan.trim_db),
+        _round_render_value(plan.fader_db),
+        bool(plan.phase_invert),
+        _round_render_value(plan.delay_ms),
+        _round_render_value(plan.input_fade_ms),
+        tuple(
+            (
+                _round_render_value(freq, 3),
+                _round_render_value(gain, 4),
+                _round_render_value(q, 4),
+            )
+            for freq, gain, q in plan.eq_bands
+        ),
+        _round_render_value(plan.comp_threshold_db),
+        _round_render_value(plan.comp_ratio),
+        _round_render_value(plan.comp_attack_ms),
+        _round_render_value(plan.comp_release_ms),
+        bool(plan.expander_enabled),
+        _round_render_value(plan.expander_range_db),
+        _round_render_value(plan.expander_open_ms),
+        _round_render_value(plan.expander_close_ms),
+        _round_render_value(plan.expander_hold_ms),
+        _round_render_value(plan.expander_threshold_db or 0.0),
+        _event_activity_signature(plan.event_activity),
+    )
+
+
+class OfflineRenderCache:
+    """Small LRU cache for expensive offline channel renders."""
+
+    def __init__(
+        self,
+        *,
+        enabled: bool = True,
+        max_bytes: int = int(DEFAULT_RENDER_CACHE_MAX_MB * 1024 * 1024),
+    ):
+        self.enabled = bool(enabled)
+        self.max_bytes = max(0, int(max_bytes))
+        self._items: OrderedDict[tuple[Any, ...], np.ndarray] = OrderedDict()
+        self._bytes = 0
+        self.hits = 0
+        self.misses = 0
+        self.evictions = 0
+
+    def get_or_render(self, key: tuple[Any, ...], render_fn) -> np.ndarray:
+        if not self.enabled or self.max_bytes <= 0:
+            self.misses += 1
+            return render_fn()
+        cached = self._items.get(key)
+        if cached is not None:
+            self.hits += 1
+            self._items.move_to_end(key)
+            return cached.copy()
+
+        self.misses += 1
+        rendered = np.asarray(render_fn(), dtype=np.float32)
+        self._store(key, rendered)
+        return rendered.copy()
+
+    def _store(self, key: tuple[Any, ...], value: np.ndarray) -> None:
+        if key in self._items:
+            old = self._items.pop(key)
+            self._bytes -= int(old.nbytes)
+        self._items[key] = value.copy()
+        self._bytes += int(value.nbytes)
+        self._items.move_to_end(key)
+        while self._bytes > self.max_bytes and self._items:
+            _old_key, old_value = self._items.popitem(last=False)
+            self._bytes -= int(old_value.nbytes)
+            self.evictions += 1
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "hits": int(self.hits),
+            "misses": int(self.misses),
+            "evictions": int(self.evictions),
+            "items": int(len(self._items)),
+            "bytes": int(self._bytes),
+            "max_bytes": int(self.max_bytes),
+        }
+
+
+def render_channel_cached(
+    channel: int,
+    plan: ChannelPlan,
+    target_len: int,
+    sr: int,
+    render_cache: OfflineRenderCache | None = None,
+) -> np.ndarray:
+    if render_cache is None:
+        return render_channel(plan.path, plan, target_len, sr)
+    key = ("full", int(channel), _plan_render_signature(plan, sr, target_len, "full"))
+    return render_cache.get_or_render(key, lambda: render_channel(plan.path, plan, target_len, sr))
+
+
+def render_channel_preview_cached(
+    channel: int,
+    plan: ChannelPlan,
+    sr: int,
+    *,
+    preview_sec: float,
+    render_cache: OfflineRenderCache | None = None,
+) -> np.ndarray:
+    target_len = max(1024, int(float(preview_sec) * sr))
+    if render_cache is None:
+        if not plan.path.exists():
+            return render_channel(plan.path, plan, target_len, sr)
+        return _render_frequency_window_preview(plan, sr, preview_sec=preview_sec)
+    key = (
+        "preview",
+        int(channel),
+        _round_render_value(preview_sec, 3),
+        _plan_render_signature(plan, sr, target_len, "preview"),
+    )
+    return render_cache.get_or_render(
+        key,
+        lambda: (
+            render_channel(plan.path, plan, target_len, sr)
+            if not plan.path.exists()
+            else _render_frequency_window_preview(plan, sr, preview_sec=preview_sec)
+        ),
+    )
+
+
 def apply_live_channel_peak_headroom(
     plans: dict[int, ChannelPlan],
     target_len: int,
     sr: int,
     channel_peak_ceiling_db: float = -3.0,
+    render_cache: OfflineRenderCache | None = None,
 ) -> dict[str, Any]:
     """Use static channel fader trims for no-master-limiter live headroom."""
     adjusted = []
     for channel, plan in plans.items():
         if plan.muted:
             continue
-        rendered = render_channel(plan.path, plan, target_len, sr)
+        rendered = render_channel_cached(channel, plan, target_len, sr, render_cache)
         peak_db = amp_to_db(float(np.max(np.abs(rendered))) if len(rendered) else 0.0)
         reduction_db = min(0.0, channel_peak_ceiling_db - peak_db)
         if reduction_db < -0.05:
@@ -4621,7 +5100,7 @@ def apply_kick_presence_boost(plans: dict[int, ChannelPlan], boost_db: float) ->
 
 def _band_rms_db(audio: np.ndarray, sr: int, low_hz: float, high_hz: float) -> float:
     mono = mono_sum(audio)
-    block = _analysis_block(mono, sr)
+    block = _analysis_block(mono, sr, window_sec=BAND_ANALYSIS_WINDOW_SEC)
     if len(block) < 256:
         return -100.0
     windowed = block * np.hanning(len(block))
@@ -4636,9 +5115,10 @@ def _band_rms_db(audio: np.ndarray, sr: int, low_hz: float, high_hz: float) -> f
 
 def _band_power(audio: np.ndarray, sr: int, low_hz: float, high_hz: float) -> float:
     mono = mono_sum(audio)
-    if len(mono) < 256:
+    block = _analysis_block(mono, sr, window_sec=BAND_ANALYSIS_WINDOW_SEC)
+    if len(block) < 256:
         return 1e-12
-    windowed = mono * np.hanning(len(mono))
+    windowed = block * np.hanning(len(block))
     spec = np.abs(np.fft.rfft(windowed)) + 1e-12
     power = np.square(spec)
     freqs = np.fft.rfftfreq(len(windowed), 1.0 / sr)
@@ -4646,6 +5126,268 @@ def _band_power(audio: np.ndarray, sr: int, low_hz: float, high_hz: float) -> fl
     if not np.any(idx):
         return 1e-12
     return float(np.sum(power[idx]) + 1e-12)
+
+
+def _mirror_eq_band_levels(
+    audio: np.ndarray,
+    sr: int,
+    centers_hz: tuple[float, ...] = MIRROR_EQ_CENTERS_HZ,
+    *,
+    window_sec: float = 24.0,
+) -> dict[float, float]:
+    mono = mono_sum(normalize_audio_shape(audio))
+    block = _analysis_block(mono, sr, window_sec=window_sec)
+    if len(block) < 256:
+        return {float(center): -100.0 for center in centers_hz}
+
+    windowed = block.astype(np.float32) * np.hanning(len(block)).astype(np.float32)
+    power = np.square(np.abs(np.fft.rfft(windowed)).astype(np.float64)) + 1e-12
+    freqs = np.fft.rfftfreq(len(windowed), 1.0 / sr)
+
+    levels: dict[float, float] = {}
+    for center in centers_hz:
+        width = math.sqrt(2.0)
+        low_hz = max(20.0, float(center) / width)
+        high_hz = min(sr * 0.49, float(center) * width)
+        mask = (freqs >= low_hz) & (freqs < high_hz)
+        if not np.any(mask):
+            levels[float(center)] = -100.0
+            continue
+        levels[float(center)] = 10.0 * math.log10(float(np.mean(power[mask])) + 1e-12)
+    return levels
+
+
+def _mirror_eq_normalized_profile(levels: dict[float, float]) -> tuple[dict[float, float], float]:
+    anchors = [
+        float(levels[center])
+        for center in (500.0, 1000.0, 2000.0)
+        if center in levels and np.isfinite(levels[center]) and levels[center] > -99.0
+    ]
+    anchor_db = float(np.mean(anchors)) if anchors else 0.0
+    return {float(center): float(value - anchor_db) for center, value in levels.items()}, anchor_db
+
+
+def _mirror_eq_shape_metrics(levels: dict[float, float]) -> dict[str, float]:
+    lowmid = float(np.mean([levels.get(250.0, -100.0), levels.get(350.0, -100.0), levels.get(500.0, -100.0)]))
+    presence = float(np.mean([levels.get(2000.0, -100.0), levels.get(4000.0, -100.0)]))
+    top = float(np.mean([levels.get(4000.0, -100.0), levels.get(8000.0, -100.0)]))
+    return {
+        "lowmid_250_500_minus_presence_2_4k_db": float(lowmid - presence),
+        "top_4_8k_minus_lowmid_250_500_db": float(top - lowmid),
+    }
+
+
+def _mirror_eq_target_bounds(center_hz: float) -> tuple[float, float]:
+    center = float(center_hz)
+    if center <= 80.0:
+        return 10.0, 20.0
+    if center <= 160.0:
+        return 7.0, 14.0
+    if center <= 280.0:
+        return 4.0, 9.5
+    if center <= 420.0:
+        return 3.0, 8.0
+    if center <= 700.0:
+        return 1.0, 6.0
+    if center <= 1500.0:
+        return -2.5, 2.5
+    if center <= 3000.0:
+        return -5.0, 1.0
+    if center <= 6000.0:
+        return -10.0, -2.0
+    return -16.0, -6.5
+
+
+def _mirror_eq_q(center_hz: float) -> float:
+    center = float(center_hz)
+    if center <= 160.0:
+        return 0.85
+    if center <= 500.0:
+        return 0.95
+    if center <= 2000.0:
+        return 1.15
+    return 1.3
+
+
+def apply_reference_mirror_master_eq(
+    mix: np.ndarray,
+    sr: int,
+    reference_audio: np.ndarray,
+    reference_sr: int,
+    *,
+    centers_hz: tuple[float, ...] = MIRROR_EQ_CENTERS_HZ,
+    strength: float = 0.42,
+    lowmid_floor_db: float = 7.5,
+    lowmid_ceiling_db: float = 12.0,
+    white_noise_top_floor_db: float = -7.0,
+    max_boost_db: float = 1.8,
+    max_cut_db: float = 2.4,
+    window_sec: float = 24.0,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Apply conservative reference mirror EQ on the master bus.
+
+    This intentionally does not match the reference literally. It mirrors the
+    smoothed reference/current residual, then clamps the result into a broad
+    mix-safe corridor so dark references do not overfill low-mid and bright
+    references do not push the mix toward a white-noise tilt.
+    """
+
+    if mix.size == 0:
+        return np.asarray(mix, dtype=np.float32), {"enabled": False, "reason": "empty_mix"}
+
+    prepared_reference = normalize_audio_shape(reference_audio)
+    if int(reference_sr) != int(sr):
+        prepared_reference = resample_audio(prepared_reference, int(reference_sr), int(sr))
+
+    before_levels = _mirror_eq_band_levels(mix, sr, centers_hz, window_sec=window_sec)
+    reference_levels = _mirror_eq_band_levels(prepared_reference, sr, centers_hz, window_sec=window_sec)
+    before_norm, before_anchor = _mirror_eq_normalized_profile(before_levels)
+    reference_norm, reference_anchor = _mirror_eq_normalized_profile(reference_levels)
+    before_shape = _mirror_eq_shape_metrics(before_norm)
+
+    lowmid_metric = before_shape["lowmid_250_500_minus_presence_2_4k_db"]
+    top_metric = before_shape["top_4_8k_minus_lowmid_250_500_db"]
+    pending_corrections: list[dict[str, Any]] = []
+
+    for center in centers_hz:
+        center = float(center)
+        current = float(before_norm.get(center, 0.0))
+        reference = float(reference_norm.get(center, current))
+        lower, upper = _mirror_eq_target_bounds(center)
+        mirror_target = current + (reference - current) * float(np.clip(strength, 0.0, 1.0))
+        target = float(np.clip(mirror_target, lower, upper))
+
+        # If the overall low-mid is underfilled, deliberately restore a little
+        # 250-500 Hz even when the reference residual is ambiguous. If it is
+        # already full, do not allow the dark-reference mirror to add more.
+        if 180.0 <= center <= 500.0:
+            if lowmid_metric < lowmid_floor_db:
+                needed = (lowmid_floor_db - lowmid_metric) * 0.45
+                target = max(target, min(upper, current + needed))
+            elif lowmid_metric > lowmid_ceiling_db:
+                target = min(target, max(lower, current - (lowmid_metric - lowmid_ceiling_db) * 0.35))
+
+        # The old pink-noise pass failed here: top end moved above low-mid.
+        # Only permit high boosts when the mix is not already bright by shape.
+        if center >= 4000.0 and top_metric > white_noise_top_floor_db:
+            target = min(target, current)
+
+        raw_gain = target - current
+        band_max_boost = max_boost_db
+        band_max_cut = max_cut_db
+        if center <= 80.0:
+            band_max_boost = 0.5
+        elif 180.0 <= center <= 500.0:
+            band_max_boost = max(max_boost_db, 2.2)
+            band_max_cut = min(max_cut_db, 1.8)
+        elif center >= 4000.0:
+            band_max_boost = min(max_boost_db, 0.9)
+
+        gain_db = float(np.clip(raw_gain, -band_max_cut, band_max_boost))
+        if abs(gain_db) < 0.18:
+            continue
+
+        q = _mirror_eq_q(center)
+        pending_corrections.append({
+            "frequency_hz": round(center, 2),
+            "requested_gain_db": round(gain_db, 2),
+            "q": round(q, 2),
+            "current_normalized_db": round(current, 2),
+            "reference_normalized_db": round(reference, 2),
+            "mirror_target_normalized_db": round(mirror_target, 2),
+            "safe_target_normalized_db": round(target, 2),
+            "bounds_db": [round(lower, 2), round(upper, 2)],
+        })
+
+    def render_scaled(scale: float) -> tuple[np.ndarray, list[dict[str, Any]], dict[float, float], float, dict[str, float]]:
+        rendered = np.asarray(mix, dtype=np.float32).copy()
+        scaled_corrections: list[dict[str, Any]] = []
+        for item in pending_corrections:
+            gain_db = float(item["requested_gain_db"]) * float(scale)
+            if abs(gain_db) < 0.08:
+                continue
+            center = float(item["frequency_hz"])
+            q = float(item["q"])
+            for channel in range(rendered.shape[1] if rendered.ndim == 2 else 1):
+                if rendered.ndim == 1:
+                    rendered = peaking_eq(rendered, sr, center, gain_db, q)
+                    break
+                rendered[:, channel] = peaking_eq(rendered[:, channel], sr, center, gain_db, q)
+            scaled_item = dict(item)
+            scaled_item["gain_db"] = round(gain_db, 2)
+            scaled_item["scale"] = round(float(scale), 3)
+            scaled_corrections.append(scaled_item)
+
+        scaled_levels = _mirror_eq_band_levels(rendered, sr, centers_hz, window_sec=window_sec)
+        scaled_norm, scaled_anchor = _mirror_eq_normalized_profile(scaled_levels)
+        scaled_shape = _mirror_eq_shape_metrics(scaled_norm)
+        return rendered.astype(np.float32), scaled_corrections, scaled_norm, scaled_anchor, scaled_shape
+
+    def scale_score(shape: dict[str, float]) -> float:
+        target_lowmid = 0.5 * (float(lowmid_floor_db) + float(lowmid_ceiling_db))
+        lowmid = float(shape["lowmid_250_500_minus_presence_2_4k_db"])
+        top = float(shape["top_4_8k_minus_lowmid_250_500_db"])
+        score = -abs(lowmid - target_lowmid)
+        score -= max(0.0, lowmid - float(lowmid_ceiling_db) - 0.6) * 3.5
+        score -= max(0.0, float(lowmid_floor_db) - lowmid) * 1.8
+        score -= max(0.0, top - float(white_noise_top_floor_db)) * 3.0
+        return float(score)
+
+    scale_candidates = (1.0, 0.75, 0.55, 0.4, 0.3, 0.22, 0.15)
+    best_render = None
+    for scale in scale_candidates:
+        candidate = render_scaled(scale)
+        candidate_score = scale_score(candidate[4])
+        if best_render is None or candidate_score > best_render[0]:
+            best_render = (candidate_score, scale, *candidate)
+
+    if best_render is None:
+        out = np.asarray(mix, dtype=np.float32).copy()
+        corrections: list[dict[str, Any]] = []
+        after_norm = dict(before_norm)
+        after_anchor = before_anchor
+        after_shape = dict(before_shape)
+        selected_scale = 0.0
+    else:
+        _score, selected_scale, out, corrections, after_norm, after_anchor, after_shape = best_render
+
+    after_levels = _mirror_eq_band_levels(out, sr, centers_hz, window_sec=window_sec)
+    after_norm, after_anchor = _mirror_eq_normalized_profile(after_levels)
+    after_shape = _mirror_eq_shape_metrics(after_norm)
+
+    return out.astype(np.float32), {
+        "enabled": bool(corrections),
+        "mode": "bounded_reference_mirror_eq",
+        "reference_sample_rate": int(reference_sr),
+        "analysis_window_sec": round(float(window_sec), 2),
+        "strength": round(float(strength), 3),
+        "lowmid_floor_db": round(float(lowmid_floor_db), 2),
+        "lowmid_ceiling_db": round(float(lowmid_ceiling_db), 2),
+        "white_noise_top_floor_db": round(float(white_noise_top_floor_db), 2),
+        "max_boost_db": round(float(max_boost_db), 2),
+        "max_cut_db": round(float(max_cut_db), 2),
+        "selected_scale": round(float(selected_scale), 3),
+        "before": {
+            "anchor_db": round(before_anchor, 2),
+            "normalized_db": {str(int(center)): round(value, 2) for center, value in before_norm.items()},
+            **{key: round(value, 2) for key, value in before_shape.items()},
+        },
+        "reference": {
+            "anchor_db": round(reference_anchor, 2),
+            "normalized_db": {str(int(center)): round(value, 2) for center, value in reference_norm.items()},
+        },
+        "after": {
+            "anchor_db": round(after_anchor, 2),
+            "normalized_db": {str(int(center)): round(value, 2) for center, value in after_norm.items()},
+            **{key: round(value, 2) for key, value in after_shape.items()},
+        },
+        "corrections": corrections,
+        "notes": [
+            "Mirror EQ uses normalized smoothed band deltas, not absolute loudness.",
+            "Dark references are clamped so low-mid is restored without copying their whole 180-500 Hz buildup.",
+            "High-frequency boosts are blocked when the mix shape is already too close to a white-noise tilt.",
+        ],
+    }
 
 
 def _sampled_band_dynamic_range_db(
@@ -4701,36 +5443,69 @@ def _frequency_window_snapshot(
     if not rendered_channels:
         return {"windows": [], "by_id": {}}
 
+    spectrum_cache: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+    valid_channels: list[tuple[int, ChannelPlan, np.ndarray]] = []
     family_audio: dict[str, np.ndarray] = {}
     for channel, audio in rendered_channels.items():
         plan = plans.get(channel)
         if plan is None or plan.muted:
             continue
+        valid_channels.append((channel, plan, audio))
         family = _frequency_window_family(plan)
         if family not in family_audio:
             family_audio[family] = np.zeros_like(audio)
         family_audio[family] += audio
+
+    def _cached_band_metrics(audio: np.ndarray, low_hz: float, high_hz: float) -> tuple[float, float]:
+        key = id(audio)
+        cached = spectrum_cache.get(key)
+        if cached is None:
+            mono = mono_sum(audio)
+            block = _analysis_block(mono, sr, window_sec=BAND_ANALYSIS_WINDOW_SEC)
+            if len(block) < 256:
+                cached = (
+                    np.array([], dtype=np.float64),
+                    np.array([], dtype=np.float64),
+                )
+            else:
+                windowed = block * np.hanning(len(block))
+                spec = np.abs(np.fft.rfft(windowed)) + 1e-12
+                cached = (
+                    np.fft.rfftfreq(len(windowed), 1.0 / sr),
+                    np.square(spec),
+                )
+            spectrum_cache[key] = cached
+
+        freqs, power = cached
+        if freqs.size == 0:
+            return 1e-12, -100.0
+        idx = (freqs >= low_hz) & (freqs < high_hz)
+        if not np.any(idx):
+            return 1e-12, -100.0
+        band_power = float(np.sum(power[idx]) + 1e-12)
+        band_rms = float(np.sqrt(np.mean(power[idx])) + 1e-12)
+        return band_power, amp_to_db(band_rms)
 
     windows: list[dict[str, Any]] = []
     by_id: dict[str, dict[str, Any]] = {}
     for config in FREQUENCY_WINDOW_DEFINITIONS:
         low_hz = float(config["low_hz"])
         high_hz = float(config["high_hz"])
-        total_power = sum(_band_power(audio, sr, low_hz, high_hz) for audio in rendered_channels.values())
+        total_power = sum(
+            _cached_band_metrics(audio, low_hz, high_hz)[0]
+            for _channel, _plan, audio in valid_channels
+        )
         total_power = max(total_power, 1e-12)
 
         top_channels = []
-        for channel, audio in rendered_channels.items():
-            plan = plans.get(channel)
-            if plan is None or plan.muted:
-                continue
-            power = _band_power(audio, sr, low_hz, high_hz)
+        for channel, plan, audio in valid_channels:
+            power, band_db = _cached_band_metrics(audio, low_hz, high_hz)
             top_channels.append({
                 "channel": channel,
                 "file": plan.path.name,
                 "instrument": plan.instrument,
                 "family": _frequency_window_family(plan),
-                "band_db": round(_band_rms_db(audio, sr, low_hz, high_hz), 2),
+                "band_db": round(band_db, 2),
                 "share": round(float(power / total_power), 4),
                 "dynamic_range_db": round(_sampled_band_dynamic_range_db(audio, sr, low_hz, high_hz), 2),
             })
@@ -4739,12 +5514,12 @@ def _frequency_window_snapshot(
         family_metrics = []
         family_shares: dict[str, float] = {}
         for family, audio in family_audio.items():
-            power = _band_power(audio, sr, low_hz, high_hz)
+            power, band_db = _cached_band_metrics(audio, low_hz, high_hz)
             share = float(power / total_power)
             family_shares[family] = round(share, 4)
             family_metrics.append({
                 "family": family,
-                "band_db": round(_band_rms_db(audio, sr, low_hz, high_hz), 2),
+                "band_db": round(band_db, 2),
                 "share": round(share, 4),
                 "dynamic_range_db": round(_sampled_band_dynamic_range_db(audio, sr, low_hz, high_hz), 2),
             })
@@ -4955,9 +5730,18 @@ def _stem_mix_snapshot(
     plans: dict[int, ChannelPlan],
     target_len: int,
     sr: int,
+    *,
+    render_cache: OfflineRenderCache | None = None,
+    analysis_preview_sec: float = ANALYZER_RENDER_PREVIEW_SEC,
 ) -> dict[str, Any]:
     rendered_channels = {
-        channel: render_channel(plan.path, plan, target_len, sr)
+        channel: render_channel_preview_cached(
+            channel,
+            plan,
+            sr,
+            preview_sec=analysis_preview_sec,
+            render_cache=render_cache,
+        )
         for channel, plan in plans.items()
         if not plan.muted
     }
@@ -5129,6 +5913,7 @@ def _stem_mix_snapshot(
         "tilt_conformity": tilt_conformity,
         "kick_focus": kick_focus,
         "hierarchy_metrics": hierarchy_metrics,
+        "analysis_preview_sec": round(float(analysis_preview_sec), 2),
     }
 
 
@@ -5207,9 +5992,17 @@ def apply_frequency_window_balance(
     plans: dict[int, ChannelPlan],
     target_len: int,
     sr: int,
+    *,
+    render_cache: OfflineRenderCache | None = None,
 ) -> dict[str, Any]:
     rendered_before = {
-        channel: render_channel(plan.path, plan, target_len, sr)
+        channel: render_channel_preview_cached(
+            channel,
+            plan,
+            sr,
+            preview_sec=FREQUENCY_WINDOW_PREVIEW_SEC,
+            render_cache=render_cache,
+        )
         for channel, plan in plans.items()
         if not plan.muted
     }
@@ -5337,7 +6130,13 @@ def apply_frequency_window_balance(
         }
 
     rendered_after = {
-        channel: render_channel(plan.path, plan, target_len, sr)
+        channel: render_channel_preview_cached(
+            channel,
+            plan,
+            sr,
+            preview_sec=FREQUENCY_WINDOW_PREVIEW_SEC,
+            render_cache=render_cache,
+        )
         for channel, plan in plans.items()
         if not plan.muted
     }
@@ -5363,8 +6162,16 @@ def apply_stem_mix_verification(
     *,
     genre: str | None = None,
     reference_context: ReferenceMixContext | None = None,
+    render_cache: OfflineRenderCache | None = None,
+    analysis_preview_sec: float = ANALYZER_RENDER_PREVIEW_SEC,
 ) -> dict[str, Any]:
-    snapshot_before = _stem_mix_snapshot(plans, target_len, sr)
+    snapshot_before = _stem_mix_snapshot(
+        plans,
+        target_len,
+        sr,
+        render_cache=render_cache,
+        analysis_preview_sec=analysis_preview_sec,
+    )
     genre_token = _normalize_genre_token(genre)
     reference_targets = _effective_balance_targets(reference_context, genre=genre)
     reference_distance_before = _reference_distance_from_snapshot(
@@ -5721,7 +6528,13 @@ def apply_stem_mix_verification(
             "actions": [],
         }
 
-    snapshot_after = _stem_mix_snapshot(plans, target_len, sr)
+    snapshot_after = _stem_mix_snapshot(
+        plans,
+        target_len,
+        sr,
+        render_cache=render_cache,
+        analysis_preview_sec=analysis_preview_sec,
+    )
     reference_distance_after = _reference_distance_from_snapshot(
         snapshot_after,
         reference_context,
@@ -5767,6 +6580,8 @@ def apply_kick_bass_hierarchy(
     sr: int,
     *,
     desired_kick_advantage_db: float = 1.0,
+    render_cache: OfflineRenderCache | None = None,
+    analysis_preview_sec: float = ANALYZER_RENDER_PREVIEW_SEC,
 ) -> dict[str, Any]:
     kick_entry = next(
         ((channel, plan) for channel, plan in plans.items() if not plan.muted and plan.instrument == "kick"),
@@ -5781,8 +6596,20 @@ def apply_kick_bass_hierarchy(
 
     kick_channel, kick_plan = kick_entry
     bass_channel, bass_plan = bass_entry
-    kick_audio = render_channel(kick_plan.path, kick_plan, target_len, sr)
-    bass_audio = render_channel(bass_plan.path, bass_plan, target_len, sr)
+    kick_audio = render_channel_preview_cached(
+        kick_channel,
+        kick_plan,
+        sr,
+        preview_sec=analysis_preview_sec,
+        render_cache=render_cache,
+    )
+    bass_audio = render_channel_preview_cached(
+        bass_channel,
+        bass_plan,
+        sr,
+        preview_sec=analysis_preview_sec,
+        render_cache=render_cache,
+    )
 
     kick_block, kick_meta = _analysis_signal_for_metrics(mono_sum(kick_audio), sr, "kick")
     bass_block, bass_meta = _analysis_signal_for_metrics(mono_sum(bass_audio), sr, "bass_guitar")
@@ -5802,22 +6629,35 @@ def apply_kick_bass_hierarchy(
             "kick_anchor_db": round(kick_anchor_db, 2),
             "bass_anchor_db": round(bass_anchor_db, 2),
             "measured_advantage_db": round(measured_advantage, 2),
-            "desired_kick_advantage_db": round(desired_kick_advantage_db, 2),
-        }
+        "desired_kick_advantage_db": round(desired_kick_advantage_db, 2),
+        "analysis_preview_sec": round(float(analysis_preview_sec), 2),
+    }
 
     kick_fader_before = float(kick_plan.fader_db)
     bass_fader_before = float(bass_plan.fader_db)
+    kick_trim_before = float(kick_plan.trim_db)
     kick_boost_db = float(np.clip(0.8 + shortage_db * 0.45, 0.75, 1.8))
-    bass_cut_db = float(np.clip(0.45 + shortage_db * 0.4, 0.35, 1.4))
+    bass_cut_ceiling_db = 2.8 if shortage_db > 4.0 else 1.4
+    bass_cut_db = float(np.clip(0.45 + shortage_db * 0.4, 0.35, bass_cut_ceiling_db))
     kick_plan.fader_db = float(np.clip(kick_plan.fader_db + kick_boost_db, -30.0, 0.0))
     bass_plan.fader_db = float(np.clip(bass_plan.fader_db - bass_cut_db, -30.0, 0.0))
+    actual_kick_fader_boost_db = float(kick_plan.fader_db - kick_fader_before)
+
+    kick_trim_boost_db = 0.0
+    if actual_kick_fader_boost_db < kick_boost_db - 0.25:
+        trim_ceiling_db = min(6.0, float(kick_plan.trim_analysis.get("max_boost_db", 6.0) or 6.0))
+        available_trim_boost_db = max(0.0, trim_ceiling_db - float(kick_plan.trim_db))
+        requested_trim_boost_db = float(np.clip(0.7 + shortage_db * 0.18, 0.5, 3.2))
+        kick_trim_boost_db = min(available_trim_boost_db, requested_trim_boost_db)
+        if kick_trim_boost_db > 0.05:
+            kick_plan.trim_db = float(np.clip(kick_plan.trim_db + kick_trim_boost_db, -18.0, trim_ceiling_db))
 
     kick_eq_changes: list[tuple[float, float, float]] = []
     bass_eq_changes: list[tuple[float, float, float]] = []
 
     if kick_anchor_db < bass_anchor_db + desired_kick_advantage_db:
-        kick_eq_changes.append((68.0, float(np.clip(0.8 + shortage_db * 0.35, 0.8, 1.6)), 0.95))
-        kick_eq_changes.append((3200.0, 0.6, 1.6))
+        kick_eq_changes.append((68.0, float(np.clip(0.8 + shortage_db * 0.35, 0.8, 2.2)), 0.95))
+        kick_eq_changes.append((3200.0, float(np.clip(0.6 + shortage_db * 0.08, 0.6, 1.3)), 1.6))
     bass_overlap_db = max(bass_anchor_db, bass_low_mid_db)
     if shortage_db > 0.5 or bass_overlap_db > kick_anchor_db - 1.0:
         bass_eq_changes.append((82.0, float(np.clip(-0.7 - shortage_db * 0.2, -1.3, -0.7)), 1.0))
@@ -5840,9 +6680,13 @@ def apply_kick_bass_hierarchy(
         "bass_low_mid_db": round(bass_low_mid_db, 2),
         "measured_advantage_db": round(measured_advantage, 2),
         "desired_kick_advantage_db": round(desired_kick_advantage_db, 2),
+        "analysis_preview_sec": round(float(analysis_preview_sec), 2),
         "shortage_db": round(shortage_db, 2),
         "kick_fader_before_db": round(kick_fader_before, 2),
         "kick_fader_after_db": round(float(kick_plan.fader_db), 2),
+        "kick_trim_before_db": round(kick_trim_before, 2),
+        "kick_trim_after_db": round(float(kick_plan.trim_db), 2),
+        "kick_trim_boost_db": round(float(kick_trim_boost_db), 2),
         "bass_fader_before_db": round(bass_fader_before, 2),
         "bass_fader_after_db": round(float(bass_plan.fader_db), 2),
         "kick_eq_added": [
@@ -5881,6 +6725,9 @@ def apply_reference_vocal_fx_focus(
     sr: int,
     reference_context: ReferenceMixContext | None,
     genre: str | None = None,
+    *,
+    render_cache: OfflineRenderCache | None = None,
+    analysis_preview_sec: float = ANALYZER_RENDER_PREVIEW_SEC,
 ) -> dict[str, Any]:
     targets = _effective_balance_targets(reference_context, genre=genre)
     if not targets:
@@ -5901,8 +6748,14 @@ def apply_reference_vocal_fx_focus(
 
     def _sum_render(entries: list[tuple[int, ChannelPlan]]) -> np.ndarray:
         rendered = [
-            render_channel(plan.path, plan, target_len, sr)
-            for _, plan in entries
+            render_channel_preview_cached(
+                channel,
+                plan,
+                sr,
+                preview_sec=analysis_preview_sec,
+                render_cache=render_cache,
+            )
+            for channel, plan in entries
         ]
         return sum(rendered, np.zeros_like(rendered[0]))
 
@@ -6066,6 +6919,7 @@ def apply_reference_vocal_fx_focus(
         "rounds": rounds,
         "target_lead_over_bgv_rms_db": round(target_gap, 3),
         "target_lead_over_bgv_presence_db": round(target_presence_gap, 3),
+        "analysis_preview_sec": round(float(analysis_preview_sec), 2),
         "before": {
             "lead_over_bgv_rms_db": round(before_metrics["lead_over_bgv_rms_db"], 3),
             "lead_over_bgv_presence_db": round(before_metrics["lead_over_bgv_presence_db"], 3),
@@ -7017,6 +7871,10 @@ def main() -> int:
     parser.add_argument("--reference-vocal-fx-focus", action="store_true", help="Apply an extra narrow pass that only adjusts lead/BGV/fx space toward the reference")
     parser.add_argument("--no-reference-mastering", action="store_true", help="Use the reference only for channel/stem decisions and skip stereo reference-mastering on the final mix")
     parser.add_argument("--large-system-polish", action="store_true", help="Apply a final translation-oriented pass for PA playback: tame 55-70 Hz, clean 180-350 Hz, and open stereo support layers.")
+    parser.add_argument("--autofoh-rounds", type=int, default=DEFAULT_AUTOFOH_ANALYZER_ROUNDS, help="Number of bounded AutoFOH analyzer rounds; use 3 for a slower deep pass.")
+    parser.add_argument("--analysis-preview-sec", type=float, default=ANALYZER_RENDER_PREVIEW_SEC, help="Active-window render length used by offline analyzers.")
+    parser.add_argument("--no-render-cache", action="store_true", help="Disable the offline channel render cache.")
+    parser.add_argument("--render-cache-max-mb", type=float, default=DEFAULT_RENDER_CACHE_MAX_MB, help="Maximum memory used by the offline render cache.")
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
@@ -7035,7 +7893,7 @@ def main() -> int:
         if file_sr != sr:
             raise ValueError(f"{path.name}: sample rate mismatch {file_sr} != {sr}")
         m = metrics_for(mono, sr, instrument=instrument)
-        trim = float(np.clip(target_rms - m["rms_db"], -18.0, 12.0))
+        trim, trim_analysis = compute_bleed_aware_trim(instrument, target_rms, m)
         threshold, ratio, attack, release = comp
         plan = ChannelPlan(
             path=path,
@@ -7054,6 +7912,7 @@ def main() -> int:
             phase_invert=phase,
             event_activity=_event_activity_ranges(mono, sr, instrument) or {},
             metrics=m,
+            trim_analysis=trim_analysis,
         )
         plans[idx] = plan
         del mono
@@ -7066,6 +7925,11 @@ def main() -> int:
     autofoh_config = config.get("autofoh", {})
     reference_context = prepare_reference_mix_context(args.reference)
     genre_reference_seed = _genre_reference_seed(args.genre)
+    render_cache = OfflineRenderCache(
+        enabled=not args.no_render_cache,
+        max_bytes=int(max(0.0, float(args.render_cache_max_mb)) * 1024 * 1024),
+    )
+    analysis_preview_sec = max(1.0, float(args.analysis_preview_sec))
     use_llm_in_orchestrator = bool(args.codex_orchestrator_allow_llm and args.codex_orchestrator)
     llm = None
     if not args.no_llm and (not args.codex_orchestrator or use_llm_in_orchestrator):
@@ -7173,7 +8037,15 @@ def main() -> int:
     autofoh_analyzer_pass = (
         {"enabled": False, "notes": ["AutoFOH analyzer pass explicitly disabled by CLI flag."]}
         if args.no_autofoh_analyzer_pass
-        else apply_autofoh_analyzer_pass(plans, target_len, sr, autofoh_config)
+        else apply_autofoh_analyzer_pass(
+            plans,
+            target_len,
+            sr,
+            autofoh_config,
+            max_rounds=args.autofoh_rounds,
+            render_cache=render_cache,
+            analysis_preview_sec=analysis_preview_sec,
+        )
     )
     bass_drum_push = apply_bass_drum_push(plans, args.bass_drum_boost_db)
     kick_presence_boost = apply_kick_presence_boost(plans, args.kick_presence_boost_db)
@@ -7185,7 +8057,13 @@ def main() -> int:
             "Vocal space must come from priority EQ and measured analyzer corrections.",
         ],
     }
-    cross_adaptive_eq = apply_cross_adaptive_eq(plans, target_len, sr)
+    cross_adaptive_eq = apply_cross_adaptive_eq(
+        plans,
+        target_len,
+        sr,
+        render_cache=render_cache,
+        analysis_preview_sec=analysis_preview_sec,
+    )
     reference_mix_guidance = apply_reference_mix_guidance(plans, sr, reference_context)
     genre_mix_profile = apply_genre_mix_profile(plans, args.genre)
     kick_bass_hierarchy = apply_kick_bass_hierarchy(
@@ -7196,22 +8074,45 @@ def main() -> int:
             reference_context,
             genre=args.genre,
         ),
+        render_cache=render_cache,
+        analysis_preview_sec=analysis_preview_sec,
     )
-    frequency_window_balance = apply_frequency_window_balance(plans, target_len, sr)
+    frequency_window_balance = apply_frequency_window_balance(
+        plans,
+        target_len,
+        sr,
+        render_cache=render_cache,
+    )
     stem_mix_verification = apply_stem_mix_verification(
         plans,
         target_len,
         sr,
         genre=args.genre,
         reference_context=reference_context,
+        render_cache=render_cache,
+        analysis_preview_sec=analysis_preview_sec,
     )
     reference_vocal_fx_focus = (
-        apply_reference_vocal_fx_focus(plans, target_len, sr, reference_context, genre=args.genre)
+        apply_reference_vocal_fx_focus(
+            plans,
+            target_len,
+            sr,
+            reference_context,
+            genre=args.genre,
+            render_cache=render_cache,
+            analysis_preview_sec=analysis_preview_sec,
+        )
         if args.reference_vocal_fx_focus
         else {"enabled": False, "reason": "disabled_by_flag"}
     )
     live_channel_headroom = (
-        apply_live_channel_peak_headroom(plans, target_len, sr, args.live_channel_peak_ceiling_db)
+        apply_live_channel_peak_headroom(
+            plans,
+            target_len,
+            sr,
+            args.live_channel_peak_ceiling_db,
+            render_cache=render_cache,
+        )
         if args.no_final_limiter
         else {"enabled": False}
     )
@@ -7221,13 +8122,14 @@ def main() -> int:
     for ch, plan in plans.items():
         if plan.muted:
             continue
-        rendered = render_channel(plan.path, plan, target_len, sr)
+        rendered = render_channel_cached(ch, plan, target_len, sr, render_cache)
         rendered_channels[ch] = rendered
         channel_reports.append({
             "channel": ch,
             "file": plan.path.name,
             "instrument": plan.instrument,
             "trim_db": round(plan.trim_db, 2),
+            "trim_analysis": plan.trim_analysis,
             "agent_fader_db": round(plan.fader_db, 2),
             "pan": plan.pan,
             "hpf": plan.hpf,
@@ -7338,6 +8240,12 @@ def main() -> int:
         "genre": str(args.genre or ""),
         "genre_reference_seed": genre_reference_seed,
         "sample_rate": sr,
+        "performance": {
+            "autofoh_rounds": max(1, int(args.autofoh_rounds)),
+            "analysis_preview_sec": round(float(analysis_preview_sec), 2),
+            "render_cache": render_cache.summary(),
+            "fast_compressor": os.environ.get("AUTO_MIXER_SLOW_COMPRESSOR") != "1",
+        },
         "codex_orchestrator": orchestration_report,
         "duration_sec": round(target_len / sr, 3),
         "final_peak_dbfs": round(amp_to_db(float(np.max(np.abs(mix)))), 2),

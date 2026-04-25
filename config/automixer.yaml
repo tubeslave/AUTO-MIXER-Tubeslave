@@ -134,6 +134,24 @@ autofoh:
       feedback_notch_max_cut_db: -6.0
       feedback_notch_min_q: 8.0
       feedback_notch_ttl_sec: 120.0
+perceptual:
+  enabled: false
+  mode: shadow
+  backend: lightweight
+  model_name: m-a-p/MERT-v1-95M
+  sample_rate: 24000
+  window_seconds: 5
+  hop_seconds: 2
+  evaluate_channels: true
+  evaluate_mix_bus: true
+  max_cpu_percent: 25
+  log_scores: true
+  block_osc_when_score_worse: false
+  log_path: logs/perceptual_decisions.jsonl
+  queue_maxsize: 128
+  async_evaluation: true
+  improvement_threshold: 0.03
+  local_files_only: false
 logging:
   level: INFO
   json_output: false

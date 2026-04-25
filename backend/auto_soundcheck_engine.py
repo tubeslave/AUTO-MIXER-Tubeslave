@@ -88,6 +88,11 @@ from signal_metrics import (
 )
 from observation_mixer import ObservationMixerClient
 
+try:
+    from perceptual import PerceptualEvaluator
+except Exception:
+    PerceptualEvaluator = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -463,6 +468,7 @@ class AutoSoundcheckEngine:
         autofoh_evaluation = autofoh_config.get("evaluation", {})
         autofoh_logging = autofoh_config.get("logging", {})
         autofoh_soundcheck_profile = autofoh_config.get("soundcheck_profile", {})
+        perceptual_config = self.config_manager.get_section("perceptual")
         self.autofoh_analysis_config = autofoh_config.get("analysis", {})
         detector_config = autofoh_config.get("detectors", {})
         self.monitor_cycle_interval_sec = float(
@@ -530,6 +536,18 @@ class AutoSoundcheckEngine:
         self.autofoh_logger: Optional[AutoFOHStructuredLogger] = None
         self.autofoh_session_report: Optional[AutoFOHSessionReport] = None
         self.autofoh_session_report_summary: str = ""
+        self.perceptual_config = perceptual_config
+        self.perceptual_evaluator: Optional[Any] = None
+        self._perceptual_pending_audio: Dict[int, Dict[str, Any]] = {}
+        if bool(perceptual_config.get("enabled", False)):
+            if PerceptualEvaluator is None:
+                logger.warning("Perceptual evaluator import failed; shadow evaluation disabled")
+            else:
+                try:
+                    self.perceptual_evaluator = PerceptualEvaluator(perceptual_config)
+                except Exception as exc:
+                    logger.warning("Perceptual evaluator initialization failed: %s", exc)
+                    self.perceptual_evaluator = None
         self.loaded_soundcheck_profile: Optional[AutoFOHSoundcheckProfile] = None
         self.discovered_mixer: Optional[DiscoveredMixer] = None
         self.selected_audio_device: Optional[AudioDevice] = None
@@ -611,6 +629,7 @@ class AutoSoundcheckEngine:
             f"observe_only={observe_only}, "
             f"min_class_conf={self.minimum_auto_apply_classification_confidence:.2f}, "
             f"eval_enabled={self.evaluation_policy.enabled}, "
+            f"perceptual_enabled={self._perceptual_shadow_enabled()}, "
             f"log_enabled={self.autofoh_logging_enabled}, "
             f"profile_enabled={self.soundcheck_profile_enabled}"
         )
@@ -818,6 +837,89 @@ class AutoSoundcheckEngine:
         except Exception:
             return default
 
+    def _perceptual_shadow_enabled(self) -> bool:
+        evaluator = getattr(self, "perceptual_evaluator", None)
+        return bool(
+            evaluator is not None
+            and getattr(evaluator, "enabled", False)
+            and str(getattr(evaluator, "mode", "shadow")).lower() == "shadow"
+        )
+
+    def _capture_perceptual_audio(self, channel_id: Optional[int]) -> Optional[np.ndarray]:
+        if (
+            not self._perceptual_shadow_enabled()
+            or channel_id is None
+            or self.audio_capture is None
+            or not bool(self.perceptual_config.get("evaluate_channels", True))
+        ):
+            return None
+        window_seconds = float(self.perceptual_config.get("window_seconds", 5.0))
+        num_samples = max(self.block_size, int(self.sample_rate * max(0.1, window_seconds)))
+        try:
+            samples = self.audio_capture.get_buffer(channel_id, num_samples)
+        except Exception as exc:
+            logger.debug("Perceptual pre/post audio capture failed for ch %s: %s", channel_id, exc)
+            return None
+        samples = np.asarray(samples, dtype=np.float32).reshape(-1)
+        if samples.size == 0:
+            return None
+        return samples.copy()
+
+    def _submit_perceptual_shadow_evaluation(
+        self,
+        pending: PendingActionEvaluation,
+        outcome: Optional[ActionEvaluationOutcome] = None,
+        control_state_applied: Optional[bool] = None,
+    ) -> bool:
+        if not self._perceptual_shadow_enabled():
+            return False
+        pending_audio = self._perceptual_pending_audio.pop(pending.evaluation_id, None)
+        if not pending_audio:
+            return False
+        after_audio = self._capture_perceptual_audio(pending.channel_id)
+        if after_audio is None:
+            return False
+
+        info = self.channels.get(pending.channel_id) if pending.channel_id is not None else None
+        engineering_score = 0.0
+        if outcome is not None:
+            if outcome.improved:
+                engineering_score = 1.0
+            elif outcome.worsened:
+                engineering_score = -1.0
+
+        action_payload = pending.action
+        context = {
+            "timestamp": time.time(),
+            "channel": info.name if info is not None else str(pending.channel_id),
+            "instrument": (
+                info.preset
+                or info.source_role
+                if info is not None
+                else None
+            ),
+            "action": action_payload,
+            "engineering_score": engineering_score,
+            "safety_score": 1.0 if (control_state_applied is not False) else 0.0,
+            "evaluation_id": pending.evaluation_id,
+            "runtime_state": pending.runtime_state.value,
+            "expected_effect": pending.expected_effect,
+            "metadata": pending.metadata,
+        }
+        try:
+            return bool(
+                self.perceptual_evaluator.submit_shadow_evaluation(
+                    pending_audio["before_audio"],
+                    after_audio,
+                    self.sample_rate,
+                    context=context,
+                    osc_sent=bool(pending_audio.get("osc_sent", True)),
+                )
+            )
+        except Exception as exc:
+            logger.warning("Perceptual shadow submit failed: %s", exc)
+            return False
+
     def _phase_target_for_runtime_state(self, runtime_state: Optional[RuntimeState] = None):
         profile = self.loaded_soundcheck_profile
         if profile is None or not getattr(profile, "phase_targets", None):
@@ -1004,6 +1106,7 @@ class AutoSoundcheckEngine:
         return {
             "channel_id": channel_id,
             "pre_features": pre_features,
+            "perceptual_before_audio": self._capture_perceptual_audio(channel_id),
             "rollback_action": rollback_action,
             "evaluation_band_name": evaluation_band,
             "expected_effect": str(
@@ -1019,18 +1122,23 @@ class AutoSoundcheckEngine:
         runtime_state: RuntimeState,
         snapshot: Optional[Dict[str, Any]] = None,
     ):
-        if not self.evaluation_policy.enabled:
+        if not self.evaluation_policy.enabled and not self._perceptual_shadow_enabled():
             return None
         channel_id = getattr(action, "channel_id", None)
         if channel_id is None:
             return None
         snapshot = snapshot or {}
+        evaluation_delay_sec = (
+            float(self.evaluation_policy.evaluation_window_sec)
+            if self.evaluation_policy.enabled
+            else float(self.perceptual_config.get("hop_seconds", 2.0))
+        )
         self._action_evaluation_seq += 1
         pending = PendingActionEvaluation(
             evaluation_id=self._action_evaluation_seq,
             action=action,
             registered_at=time.monotonic(),
-            due_at=time.monotonic() + self.evaluation_policy.evaluation_window_sec,
+            due_at=time.monotonic() + evaluation_delay_sec,
             runtime_state=runtime_state,
             channel_id=channel_id,
             pre_features=snapshot.get("pre_features"),
@@ -1050,6 +1158,12 @@ class AutoSoundcheckEngine:
                 float(action.target_db) - float(previous_target or 0.0),
             )
         self._pending_action_evaluations.append(pending)
+        perceptual_before_audio = snapshot.get("perceptual_before_audio")
+        if self._perceptual_shadow_enabled() and perceptual_before_audio is not None:
+            self._perceptual_pending_audio[pending.evaluation_id] = {
+                "before_audio": perceptual_before_audio,
+                "osc_sent": True,
+            }
         self._log_autofoh_event(
             "action_evaluation_scheduled",
             evaluation_id=pending.evaluation_id,
@@ -1098,7 +1212,7 @@ class AutoSoundcheckEngine:
         return True, {"note": "control-state verification not implemented for action type"}
 
     def _evaluate_pending_actions(self, force: bool = False) -> List[ActionEvaluationOutcome]:
-        if not self.evaluation_policy.enabled or not self._pending_action_evaluations:
+        if not self._pending_action_evaluations:
             return []
 
         now = time.monotonic()
@@ -1113,44 +1227,53 @@ class AutoSoundcheckEngine:
             control_state_applied, control_metrics = self._read_control_state_for_action(
                 pending.action
             )
-            post_features = None
-            if self.evaluation_policy.allow_proxy_audio_evaluation_for_testing:
-                post_features = self._capture_live_analysis_features(
-                    pending.channel_id,
-                    runtime_state=pending.runtime_state,
+
+            outcome = None
+            if self.evaluation_policy.enabled:
+                post_features = None
+                if self.evaluation_policy.allow_proxy_audio_evaluation_for_testing:
+                    post_features = self._capture_live_analysis_features(
+                        pending.channel_id,
+                        runtime_state=pending.runtime_state,
+                    )
+
+                outcome = evaluate_pending_action(
+                    pending,
+                    policy=self.evaluation_policy,
+                    control_state_applied=control_state_applied,
+                    post_features=post_features,
+                )
+                outcome.metrics.update(control_metrics)
+                outcomes.append(outcome)
+
+                self._log_autofoh_event(
+                    "action_evaluation",
+                    evaluation_id=pending.evaluation_id,
+                    channel_id=pending.channel_id,
+                    action=pending.action,
+                    expected_effect=pending.expected_effect,
+                    evaluation_band_name=pending.evaluation_band_name,
+                    measured_effect=outcome.measured_effect,
+                    evaluated=outcome.evaluated,
+                    observable=outcome.observable,
+                    improved=outcome.improved,
+                    worsened=outcome.worsened,
+                    should_rollback=outcome.should_rollback,
+                    control_state_applied=outcome.control_state_applied,
+                    metrics=outcome.metrics,
+                    note=outcome.note,
+                    pre_features=self._feature_snapshot_payload(pending.pre_features),
+                    post_features=self._feature_snapshot_payload(post_features),
+                    metadata=pending.metadata,
                 )
 
-            outcome = evaluate_pending_action(
+            self._submit_perceptual_shadow_evaluation(
                 pending,
-                policy=self.evaluation_policy,
+                outcome=outcome,
                 control_state_applied=control_state_applied,
-                post_features=post_features,
-            )
-            outcome.metrics.update(control_metrics)
-            outcomes.append(outcome)
-
-            self._log_autofoh_event(
-                "action_evaluation",
-                evaluation_id=pending.evaluation_id,
-                channel_id=pending.channel_id,
-                action=pending.action,
-                expected_effect=pending.expected_effect,
-                evaluation_band_name=pending.evaluation_band_name,
-                measured_effect=outcome.measured_effect,
-                evaluated=outcome.evaluated,
-                observable=outcome.observable,
-                improved=outcome.improved,
-                worsened=outcome.worsened,
-                should_rollback=outcome.should_rollback,
-                control_state_applied=outcome.control_state_applied,
-                metrics=outcome.metrics,
-                note=outcome.note,
-                pre_features=self._feature_snapshot_payload(pending.pre_features),
-                post_features=self._feature_snapshot_payload(post_features),
-                metadata=pending.metadata,
             )
 
-            if outcome.should_rollback and outcome.rollback_action is not None:
+            if outcome and outcome.should_rollback and outcome.rollback_action is not None:
                 rollback_decision = self._execute_action(
                     outcome.rollback_action,
                     runtime_state=RuntimeState.ROLLBACK,
@@ -3823,6 +3946,12 @@ class AutoSoundcheckEngine:
             except Exception:
                 pass
 
+        if self.perceptual_evaluator is not None:
+            try:
+                self.perceptual_evaluator.stop()
+            except Exception:
+                pass
+
         if self.mixer_client:
             try:
                 self.mixer_client.disconnect()
@@ -3908,6 +4037,18 @@ class AutoSoundcheckEngine:
             "applied_channel_ids": sorted(self._applied_channels),
             "safety_action_history_size": len(self.safety_controller.history) if self.safety_controller else 0,
             "pending_action_evaluations": len(self._pending_action_evaluations),
+            "perceptual_enabled": self._perceptual_shadow_enabled(),
+            "perceptual_mode": str(self.perceptual_config.get("mode", "shadow")),
+            "perceptual_backend": (
+                getattr(self.perceptual_evaluator.backend, "name", "")
+                if self.perceptual_evaluator is not None
+                else ""
+            ),
+            "perceptual_log_path": (
+                str(getattr(self.perceptual_evaluator, "log_path", ""))
+                if self._perceptual_shadow_enabled()
+                else ""
+            ),
             "autofoh_log_enabled": self.autofoh_logging_enabled,
             "autofoh_log_path": str(self._default_autofoh_log_path()) if self.autofoh_logging_enabled else "",
             "autofoh_report_path": (

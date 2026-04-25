@@ -9,6 +9,16 @@ const TARGET_OPTIONS = [
   { value: 'matrix', label: 'Matrix' },
 ];
 
+const CORRECTION_MODES = [
+  { value: 'flat', label: 'Flat TF' },
+  { value: 'pink_noise_reference', label: 'Pink ref' },
+];
+
+const REFERENCE_CURVES = [
+  { value: 'pink_noise_live_pa', label: 'Live PA' },
+  { value: 'pink_noise_flat', label: 'Flat pink' },
+];
+
 function SystemMeasurementTab({ selectedDevice, availableChannels }) {
   const [running, setRunning] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -19,6 +29,8 @@ function SystemMeasurementTab({ selectedDevice, availableChannels }) {
     durationSec: 6,
     targetBus: 'master',
     targetId: 1,
+    correctionMode: 'flat',
+    referenceCurve: 'pink_noise_live_pa',
   });
 
   useEffect(() => {
@@ -77,6 +89,8 @@ function SystemMeasurementTab({ selectedDevice, availableChannels }) {
       settings.durationSec,
       settings.targetBus,
       settings.targetId,
+      settings.correctionMode,
+      settings.referenceCurve,
     );
   };
 
@@ -167,6 +181,30 @@ function SystemMeasurementTab({ selectedDevice, availableChannels }) {
             />
           </label>
           <label>
+            Mode
+            <select
+              value={settings.correctionMode}
+              onChange={e => setSettings(s => ({ ...s, correctionMode: e.target.value }))}
+              disabled={running}
+            >
+              {CORRECTION_MODES.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Curve
+            <select
+              value={settings.referenceCurve}
+              onChange={e => setSettings(s => ({ ...s, referenceCurve: e.target.value }))}
+              disabled={running || settings.correctionMode !== 'pink_noise_reference'}
+            >
+              {REFERENCE_CURVES.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
             Device channels
             <input type="text" value={availableChannels?.length || 0} disabled />
           </label>
@@ -178,6 +216,7 @@ function SystemMeasurementTab({ selectedDevice, availableChannels }) {
               <div className="summary-chip">Quality: {(Number(result.quality || 0) * 100).toFixed(0)}%</div>
               <div className="summary-chip">Corrections: {result.num_corrections || 0}</div>
               <div className="summary-chip">Target: {result.target_bus || settings.targetBus} {result.target_id || settings.targetId}</div>
+              <div className="summary-chip">Mode: {result.correction_mode || settings.correctionMode}</div>
             </div>
 
             <table className="data-table">

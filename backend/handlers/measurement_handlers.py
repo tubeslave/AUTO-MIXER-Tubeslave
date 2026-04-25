@@ -11,6 +11,8 @@ def register_handlers(server):
             duration_sec=data.get("duration_sec", 6.0),
             target_bus=data.get("target_bus", "master"),
             target_id=data.get("target_id", 1),
+            correction_mode=data.get("correction_mode", "flat"),
+            reference_curve=data.get("reference_curve", "pink_noise_live_pa"),
         )
 
     async def handle_apply_system_measurement(websocket, data):

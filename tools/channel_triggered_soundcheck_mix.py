@@ -165,7 +165,17 @@ def build_initial_plans(mixmod, input_dir: Path) -> tuple[int, int, dict[int, An
         analysis_audio, analysis_meta = _collect_analysis_audio(mixmod, mono, sr, instrument, ranges_report)
         full_track_metrics = mixmod.metrics_for(mono, sr, instrument=instrument)
         analysis_metrics = mixmod.metrics_for(analysis_audio, sr, instrument=instrument)
-        trim = float(np.clip(target_rms - analysis_metrics["rms_db"], -18.0, 12.0))
+        trim_metrics = dict(analysis_metrics)
+        for key in (
+            "analysis_mode",
+            "analysis_active_ratio",
+            "analysis_event_to_bleed_db",
+            "analysis_bleed_ratio",
+            "analysis_bleed_dominant",
+        ):
+            if full_track_metrics.get(key) is not None:
+                trim_metrics[key] = full_track_metrics[key]
+        trim, trim_analysis = mixmod.compute_bleed_aware_trim(instrument, target_rms, trim_metrics)
         metrics = dict(full_track_metrics)
         for key in ("rms_db", "lufs_momentary", "dynamic_range_db", "band_energy", "channel_armed", "needs_attention"):
             metrics[key] = analysis_metrics[key]
@@ -186,6 +196,7 @@ def build_initial_plans(mixmod, input_dir: Path) -> tuple[int, int, dict[int, An
             phase_invert=phase,
             event_activity=mixmod._event_activity_ranges(mono, sr, instrument) or {},
             metrics={**metrics, **analysis_meta},
+            trim_analysis=trim_analysis,
         )
         del mono
 
@@ -590,6 +601,7 @@ def channel_report_for_plan(plan: Any) -> dict[str, Any]:
         "file": plan.path.name,
         "instrument": plan.instrument,
         "trim_db": round(plan.trim_db, 2),
+        "trim_analysis": plan.trim_analysis,
         "fader_db": round(plan.fader_db, 2),
         "pan": round(plan.pan, 3),
         "hpf": plan.hpf,

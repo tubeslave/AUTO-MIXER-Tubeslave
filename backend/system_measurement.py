@@ -161,6 +161,30 @@ class EQCorrection:
         }
 
 
+@dataclass(frozen=True)
+class ReferenceCurve:
+    """Target frequency-response curve for system EQ."""
+    name: str
+    points: Tuple[Tuple[float, float], ...]
+
+    def magnitude_for(self, frequencies: np.ndarray) -> np.ndarray:
+        """Interpolate curve points in log-frequency space."""
+        if len(frequencies) == 0:
+            return np.array([])
+        freqs = np.asarray(frequencies, dtype=np.float64)
+        points = np.asarray(self.points, dtype=np.float64)
+        point_freqs = np.maximum(points[:, 0], 1.0)
+        point_db = points[:, 1]
+        safe_freqs = np.maximum(freqs, 1.0)
+        return np.interp(
+            np.log2(safe_freqs),
+            np.log2(point_freqs),
+            point_db,
+            left=point_db[0],
+            right=point_db[-1],
+        )
+
+
 class SineSweepGenerator:
     """
     Generate exponential sine sweep for system measurement.
@@ -623,8 +647,44 @@ class CorrectionCalculator:
     def __init__(self):
         self.max_cut_db = 10.0
         self.max_boost_db = 6.0
+        self.reference_curve_max_cut_db = 6.0
+        self.reference_curve_max_boost_db = 3.0
+        self.reference_curve_min_coherence = 0.35
         self.q_range = (1.4, 2.0)
         self.target_variance_db = 3.0  # Target ±3dB flatness
+        self.reference_curves: Dict[str, ReferenceCurve] = {
+            "pink_noise_flat": ReferenceCurve(
+                name="pink_noise_flat",
+                points=(
+                    (31.5, 0.0),
+                    (63.0, 0.0),
+                    (125.0, 0.0),
+                    (250.0, 0.0),
+                    (500.0, 0.0),
+                    (1000.0, 0.0),
+                    (2000.0, 0.0),
+                    (4000.0, 0.0),
+                    (8000.0, 0.0),
+                    (16000.0, 0.0),
+                ),
+            ),
+            "pink_noise_live_pa": ReferenceCurve(
+                name="pink_noise_live_pa",
+                points=(
+                    (31.5, -5.0),
+                    (63.0, -2.0),
+                    (125.0, -0.5),
+                    (250.0, 0.0),
+                    (500.0, 0.0),
+                    (1000.0, 0.0),
+                    (2000.0, -0.5),
+                    (4000.0, -1.0),
+                    (8000.0, -2.5),
+                    (12000.0, -4.0),
+                    (16000.0, -6.0),
+                ),
+            ),
+        }
         
         logger.info("CorrectionCalculator initialized")
     
@@ -706,6 +766,94 @@ class CorrectionCalculator:
         
         return corrections
 
+    def get_reference_curve(self, name: str = "pink_noise_live_pa") -> ReferenceCurve:
+        """Return a named reference curve, defaulting to the live-PA pink-noise curve."""
+        normalized = (name or "pink_noise_live_pa").strip().lower()
+        if normalized in {"pink", "pink_noise", "live_pa", "house"}:
+            normalized = "pink_noise_live_pa"
+        if normalized in {"flat", "pink_flat"}:
+            normalized = "pink_noise_flat"
+        if normalized not in self.reference_curves:
+            raise ValueError(f"Unsupported reference curve: {name}")
+        return self.reference_curves[normalized]
+
+    def calculate_reference_curve_corrections(
+        self,
+        measurement: MeasurementResult,
+        curve_name: str = "pink_noise_live_pa",
+    ) -> List[EQCorrection]:
+        """
+        Calculate master EQ corrections toward a pink-noise reference curve.
+
+        This is intentionally band-limited and conservative: it normalizes the
+        measured transfer function around the vocal midrange, ignores low
+        coherence bins, uses fixed master-EQ centers, and avoids large boosts.
+        """
+        smoothed = measurement.magnitude_response.get_smoothed(1.0 / 6.0)
+        if len(smoothed.magnitude_db) == 0:
+            return []
+
+        frequencies = np.asarray(smoothed.frequencies, dtype=np.float64)
+        magnitude_db = np.asarray(smoothed.magnitude_db, dtype=np.float64)
+        coherence_vals = np.asarray(smoothed.coherence, dtype=np.float64)
+        curve = self.get_reference_curve(curve_name)
+        target_db = curve.magnitude_for(frequencies)
+
+        usable = (
+            (frequencies >= 40.0)
+            & (frequencies <= 16000.0)
+            & np.isfinite(magnitude_db)
+            & (coherence_vals >= self.reference_curve_min_coherence)
+        )
+        anchor = usable & (frequencies >= 500.0) & (frequencies <= 2000.0)
+        if not np.any(anchor):
+            anchor = usable
+        if not np.any(anchor):
+            return []
+
+        measured_anchor = float(np.median(magnitude_db[anchor]))
+        target_anchor = float(np.median(target_db[anchor]))
+        normalized_measured = magnitude_db - measured_anchor
+        normalized_target = target_db - target_anchor
+        deviation_db = normalized_measured - normalized_target
+
+        band_centers = [63.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0]
+        corrections: List[EQCorrection] = []
+        for center in band_centers:
+            band_mask = usable & (
+                frequencies >= center / np.sqrt(2.0)
+            ) & (
+                frequencies <= center * np.sqrt(2.0)
+            )
+            if not np.any(band_mask):
+                continue
+
+            band_deviation = float(np.median(deviation_db[band_mask]))
+            desired_gain = -band_deviation
+
+            # Avoid unsafe low-sub/air boosts; those are usually level/noise/room limits.
+            max_boost = self.reference_curve_max_boost_db
+            if center < 80.0 or center > 10000.0:
+                max_boost = 0.0
+            gain_db = float(np.clip(desired_gain, -self.reference_curve_max_cut_db, max_boost))
+            if abs(gain_db) < 0.75:
+                continue
+
+            q = 1.1 if center <= 125.0 else 1.25 if center <= 1000.0 else 1.4
+            corrections.append(EQCorrection(
+                frequency=center,
+                gain_db=gain_db,
+                q=q,
+                type="peak",
+            ))
+
+        logger.info(
+            "Calculated %d reference-curve corrections using %s",
+            len(corrections),
+            curve.name,
+        )
+        return corrections
+
 
 class SystemMeasurementController:
     """
@@ -775,16 +923,33 @@ class SystemMeasurementController:
             'coherence': result.magnitude_response.coherence.tolist(),
         }
 
-    def analyze_reference_measurement(self, reference_signal: np.ndarray, measurement_signal: np.ndarray) -> Dict[str, Any]:
+    def analyze_reference_measurement(
+        self,
+        reference_signal: np.ndarray,
+        measurement_signal: np.ndarray,
+        correction_mode: str = "flat",
+        reference_curve: str = "pink_noise_live_pa",
+    ) -> Dict[str, Any]:
         """Analyze live reference-vs-mic capture and calculate corrective EQ."""
         result = self.measurement.analyze_transfer_function(reference_signal, measurement_signal)
         self.last_result = result
 
-        corrections = self.correction_calculator.calculate_corrections(result)
+        mode = (correction_mode or "flat").strip().lower()
+        if mode in {"pink_noise_reference", "reference_curve", "pink"}:
+            corrections = self.correction_calculator.calculate_reference_curve_corrections(
+                result,
+                curve_name=reference_curve,
+            )
+            mode = "pink_noise_reference"
+        else:
+            corrections = self.correction_calculator.calculate_corrections(result)
+            mode = "flat"
         self.applied_corrections = corrections
 
         return {
             'status': 'complete',
+            'correction_mode': mode,
+            'reference_curve': reference_curve if mode == "pink_noise_reference" else "",
             'quality': result.overall_quality,
             'rt60': result.rt60.to_dict(),
             'num_corrections': len(corrections),
