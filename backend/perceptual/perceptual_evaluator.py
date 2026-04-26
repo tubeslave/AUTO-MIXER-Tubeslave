@@ -42,6 +42,8 @@ class PerceptualConfig:
     improvement_threshold: float = 0.03
     min_confidence_for_verdict: float = 0.2
     local_files_only: bool = False
+    fallback_to_lightweight: bool = True
+    device: str = "auto"
     reference_embedding_cache_size: int = 8
     max_candidate_scores: int = 2
     extra: Dict[str, Any] = field(default_factory=dict)
@@ -69,6 +71,8 @@ class PerceptualConfig:
                 "sample_rate": self.sample_rate,
                 "window_seconds": self.window_seconds,
                 "local_files_only": self.local_files_only,
+                "fallback_to_lightweight": self.fallback_to_lightweight,
+                "device": self.device,
             }
         )
         return payload

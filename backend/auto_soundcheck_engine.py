@@ -62,7 +62,9 @@ from autofoh_safety import (
     ChannelFaderMove,
     ChannelGainMove,
     CompressorAdjust,
+    CompressorMakeupAdjust,
     EmergencyFeedbackNotch,
+    GateAdjust,
     HighPassAdjust,
     PanAdjust,
     SafetyDecision,
@@ -74,7 +76,7 @@ from channel_recognizer import (
     scan_and_recognize, AVAILABLE_PRESETS,
 )
 from config_manager import ConfigManager
-from feedback_detector import FeedbackDetector, FeedbackEvent
+from feedback_detector import FeedbackDetector, FeedbackDetectorConfig, FeedbackEvent
 from mixer_discovery import (
     discover_mixer_auto, discover_mixers, DiscoveredMixer,
 )
@@ -114,7 +116,7 @@ class EngineState(Enum):
 
 @dataclass
 class ChannelSnapshot:
-    """Backup of a channel's settings before reset."""
+    """Snapshot of a channel's settings before automatic correction."""
     channel: int
     fader_db: float = -100.0
     muted: bool = False
@@ -325,6 +327,14 @@ INSTRUMENT_COMPRESSOR: Dict[str, Tuple[float, float, float, float]] = {
     "custom": (-20.0, 2.5, 10.0, 100.0),
 }
 
+# Close mics where a gate/expander is part of hearing the corrected result.
+# Tuple: threshold_db, range_db, attack_ms, hold_ms, release_ms.
+INSTRUMENT_GATE_PRESETS: Dict[str, Tuple[float, float, float, float, float]] = {
+    "kick": (-36.0, 32.0, 1.0, 70.0, 140.0),
+    "snare": (-42.0, 26.0, 1.5, 80.0, 180.0),
+    "tom": (-44.0, 34.0, 2.0, 120.0, 260.0),
+}
+
 # Default pan positions per instrument (-100=L, 0=C, +100=R)
 INSTRUMENT_PAN: Dict[str, float] = {
     "kick": 0.0,
@@ -474,11 +484,81 @@ class AutoSoundcheckEngine:
         self.monitor_cycle_interval_sec = float(
             detector_config.get("monitor_cycle_interval_sec", 1.0)
         )
+        self.feedback_event_min_interval_sec = float(
+            detector_config.get("feedback_event_min_interval_sec", 8.0)
+        )
+        self.feedback_frequency_bucket_hz = float(
+            detector_config.get("feedback_frequency_bucket_hz", 100.0)
+        )
+        self.feedback_channel_min_interval_sec = float(
+            detector_config.get("feedback_channel_min_interval_sec", 8.0)
+        )
+        self.feedback_global_min_interval_sec = float(
+            detector_config.get("feedback_global_min_interval_sec", 0.75)
+        )
+        self.feedback_max_actions_per_channel_per_run = int(
+            detector_config.get("feedback_max_actions_per_channel_per_run", 2)
+        )
+        self.feedback_max_actions_per_run = int(
+            detector_config.get("feedback_max_actions_per_run", 16)
+        )
+        self.feedback_detector_persistence_frames = int(
+            detector_config.get("feedback_persistence_frames", 12)
+        )
+        self.feedback_detector_min_confidence = float(
+            detector_config.get("feedback_min_confidence", 0.75)
+        )
+        self.feedback_detector_peak_height_db = float(
+            detector_config.get("feedback_peak_height_db", -12.0)
+        )
+        self.feedback_detector_peak_prominence_db = float(
+            detector_config.get("feedback_peak_prominence_db", 10.0)
+        )
         self.minimum_auto_apply_classification_confidence = float(
             autofoh_safety.get("minimum_auto_apply_classification_confidence", 0.75)
         )
         self.new_or_unknown_channel_auto_corrections_enabled = bool(
             autofoh_safety.get("new_or_unknown_channel_auto_corrections_enabled", False)
+        )
+        self.preserve_existing_processing = bool(
+            autofoh_safety.get("preserve_existing_processing", True)
+        )
+        self.allow_destructive_reset = bool(
+            autofoh_safety.get("allow_destructive_reset", False)
+        )
+        self.allow_input_trim_boost = bool(
+            autofoh_safety.get("allow_input_trim_boost", False)
+        )
+        self.auto_gate_close_mics = bool(
+            autofoh_safety.get("auto_gate_close_mics", True)
+        )
+        self.auto_fx_sends_enabled = bool(
+            autofoh_safety.get("auto_fx_sends_enabled", False)
+        )
+        self.close_mic_fx_sends_enabled = bool(
+            autofoh_safety.get("close_mic_fx_sends_enabled", False)
+        )
+        self.master_reference_channels = {
+            int(ch) for ch in autofoh_safety.get("master_reference_channels", [])
+            if int(ch) > 0
+        }
+        self.compressor_gr_max_db = float(
+            autofoh_safety.get("compressor_gr_max_db", 8.0)
+        )
+        self.compressor_gr_target_db = float(
+            autofoh_safety.get("compressor_gr_target_db", 4.0)
+        )
+        self.compressor_makeup_compensation_ratio = float(
+            autofoh_safety.get("compressor_makeup_compensation_ratio", 0.7)
+        )
+        self.compressor_makeup_max_step_db = float(
+            autofoh_safety.get("compressor_makeup_max_step_db", 2.0)
+        )
+        self.compressor_makeup_max_db = float(
+            autofoh_safety.get("compressor_makeup_max_db", 9.0)
+        )
+        self.compressor_makeup_true_peak_ceiling_db = float(
+            autofoh_safety.get("compressor_makeup_true_peak_ceiling_db", -3.0)
         )
         self.action_safety_config = AutoFOHSafetyConfig.from_config(
             autofoh_safety.get("action_limits", {})
@@ -532,6 +612,11 @@ class AutoSoundcheckEngine:
         self._observation_mixer_client: Optional[ObservationMixerClient] = None
         self.audio_capture: Optional[AudioCapture] = None
         self.feedback_detector: Optional[FeedbackDetector] = None
+        self._last_feedback_event_at: Dict[Tuple[int, str, int], float] = {}
+        self._last_feedback_channel_action_at: Dict[int, float] = {}
+        self._last_feedback_global_action_at: float = 0.0
+        self._feedback_actions_sent_by_channel: Dict[int, int] = {}
+        self._feedback_actions_sent_total: int = 0
         self.safety_controller: Optional[AutoFOHSafetyController] = None
         self.autofoh_logger: Optional[AutoFOHStructuredLogger] = None
         self.autofoh_session_report: Optional[AutoFOHSessionReport] = None
@@ -628,6 +713,7 @@ class AutoSoundcheckEngine:
             f"channels={self._configured_channel_count()}, sr={sample_rate}, "
             f"observe_only={observe_only}, "
             f"min_class_conf={self.minimum_auto_apply_classification_confidence:.2f}, "
+            f"preserve_existing_processing={self.preserve_existing_processing}, "
             f"eval_enabled={self.evaluation_policy.enabled}, "
             f"perceptual_enabled={self._perceptual_shadow_enabled()}, "
             f"log_enabled={self.autofoh_logging_enabled}, "
@@ -1480,6 +1566,18 @@ class AutoSoundcheckEngine:
         info.classification_match_type = str(result.get("match_type", "unknown"))
         info.recognized = bool(result.get("recognized", False))
         info.auto_corrections_enabled = self._determine_auto_corrections_enabled(info)
+        self._apply_channel_role_overrides(info)
+
+    def _apply_channel_role_overrides(self, info: ChannelInfo):
+        """Apply operator-declared roles that should not be treated as sources."""
+        if info.channel in self.master_reference_channels:
+            info.preset = "playback"
+            info.source_role = "mix_bus_reference"
+            info.stem_roles = ["MASTER"]
+            info.allowed_controls = []
+            info.priority = 0.0
+            info.recognized = True
+            info.auto_corrections_enabled = False
 
     def _control_allowed(self, info: ChannelInfo, control_name: str) -> bool:
         if control_name in {"feedback_notch", "emergency_fader"}:
@@ -1772,11 +1870,70 @@ class AutoSoundcheckEngine:
 
     # ── 3b. Read existing channel settings from mixer ────────────
 
+    @staticmethod
+    def _as_float(value: Any, default: float = 0.0) -> float:
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _as_bool(value: Any, default: bool = False) -> bool:
+        if value is None:
+            return default
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "on", "yes"}
+        return bool(value)
+
+    @staticmethod
+    def _bounded_toward(current: float, target: float, max_delta: float) -> float:
+        delta = target - current
+        delta = max(-max_delta, min(max_delta, delta))
+        return current + delta
+
+    def _snapshot_raw(self, info: ChannelInfo) -> Dict[str, Any]:
+        if info.original_snapshot is None:
+            return {}
+        return dict(info.original_snapshot.raw_settings or {})
+
+    def _snapshot_value(self, info: ChannelInfo, key: str, default: Any = None) -> Any:
+        return self._snapshot_raw(info).get(key, default)
+
+    def _channel_has_existing_processing(self, raw_settings: Dict[str, Any]) -> bool:
+        fader_db = self._as_float(raw_settings.get("fader_db"), -144.0)
+        muted = self._as_bool(raw_settings.get("muted"), False)
+        gain_db = self._as_float(raw_settings.get("gain_db"), 0.0)
+        pan = self._as_float(raw_settings.get("pan"), 0.0)
+        hpf_enabled = self._as_bool(raw_settings.get("hpf_enabled"), False)
+        hpf_freq = self._as_float(raw_settings.get("hpf_freq"), 20.0)
+        compressor_enabled = self._as_bool(raw_settings.get("compressor_enabled"), False)
+        gate_enabled = self._as_bool(raw_settings.get("gate_enabled"), False)
+        polarity_inverted = self._as_bool(raw_settings.get("polarity_inverted"), False)
+        delay_enabled = self._as_bool(raw_settings.get("delay_enabled"), False)
+        delay_ms = self._as_float(raw_settings.get("delay_ms"), 0.0)
+
+        if fader_db > -90.0 or (not muted and fader_db > -50.0):
+            return True
+        if abs(gain_db) > 0.1 or abs(pan) > 0.5:
+            return True
+        if hpf_enabled and hpf_freq > 25.0:
+            return True
+        if gate_enabled or compressor_enabled or polarity_inverted or (delay_enabled and abs(delay_ms) > 0.01):
+            return True
+
+        eq_bands = raw_settings.get("eq_bands") or []
+        for band in eq_bands:
+            if len(band) >= 2 and abs(self._as_float(band[1], 0.0)) > 0.1:
+                return True
+        return False
+
     def _read_channel_state(self):
         """Read current processing settings for all channels.
 
-        Determines which channels already have non-default settings
-        (EQ, HPF, fader, gain) so we can back them up before resetting.
+        Determines which channels already have non-default settings so later
+        actions can be relative corrections instead of destructive preset writes.
         """
         self._set_state(
             EngineState.READING_STATE,
@@ -1796,30 +1953,34 @@ class AutoSoundcheckEngine:
                 logger.debug(f"Ch {ch}: could not read settings: {e}")
                 raw_settings = {}
 
-            fader_db = raw_settings.get("fader_db", -100.0)
-            muted = raw_settings.get("muted", False)
-
-            # Detect if channel has non-default processing
-            has_processing = False
-            if fader_db > -90.0:
-                has_processing = True
-            if not muted and fader_db > -50.0:
-                has_processing = True
+            fader_db = self._as_float(raw_settings.get("fader_db"), -144.0)
+            muted = self._as_bool(raw_settings.get("muted"), False)
+            gain_db = self._as_float(raw_settings.get("gain_db"), 0.0)
+            hpf_freq = self._as_float(raw_settings.get("hpf_freq"), 20.0)
+            hpf_enabled = self._as_bool(raw_settings.get("hpf_enabled"), False)
+            eq_bands = raw_settings.get("eq_bands")
+            has_processing = self._channel_has_existing_processing(raw_settings)
 
             snapshot = ChannelSnapshot(
                 channel=ch,
                 fader_db=fader_db,
                 muted=muted,
+                eq_bands=eq_bands,
+                hpf_freq=hpf_freq,
+                hpf_enabled=hpf_enabled,
+                gain_db=gain_db,
                 had_processing=has_processing,
                 raw_settings=raw_settings,
             )
             info.original_snapshot = snapshot
+            info.fader_db = fader_db
 
             if has_processing:
                 channels_with_processing += 1
                 logger.debug(
                     f"Ch {ch} '{info.name}': existing settings detected "
-                    f"(fader={fader_db:.1f}dB, muted={muted})"
+                    f"(fader={fader_db:.1f}dB, gain={gain_db:.1f}dB, "
+                    f"hpf={hpf_freq:.0f}Hz/{hpf_enabled}, muted={muted})"
                 )
 
         logger.info(
@@ -1830,15 +1991,58 @@ class AutoSoundcheckEngine:
     # ── 3c. Reset channels to neutral before analysis ────────────
 
     def _reset_channels(self):
-        """Reset all channel processing to flat/neutral.
+        """Prepare channels for analysis without erasing operator processing.
 
-        This ensures that the audio we analyze is the raw unprocessed
-        signal from the stage. After analysis, new settings will be
-        applied from scratch.
+        Destructive reset is opt-in only. The live default preserves current
+        EQ, filters, dynamics, delay, polarity, faders, and sends; later stages
+        apply bounded corrections relative to the snapshot read in
+        _read_channel_state().
         """
+        if self.preserve_existing_processing or not self.allow_destructive_reset:
+            self._set_state(
+                EngineState.RESETTING,
+                "Preserving current channel processing before analysis..."
+            )
+
+            preserved_count = 0
+            skipped_count = 0
+            for ch in self._iter_channels():
+                info = self.channels.get(ch)
+                if info is None:
+                    continue
+                if not info.auto_corrections_enabled:
+                    skipped_count += 1
+                    self._log_processing_skip(ch, info, "pre-analysis preserve")
+                    continue
+                preserved_count += 1
+                info.was_reset = False
+
+            if self.soundcheck_profile_capture_multiphase_learning and self.audio_capture is not None:
+                silence_window = max(0.0, self.soundcheck_profile_silence_capture_duration_sec)
+                if silence_window > 0.0:
+                    time.sleep(silence_window)
+                self._capture_learning_phase(
+                    "SILENCE_CAPTURE",
+                    RuntimeState.SILENCE_CAPTURE,
+                    include_inactive=True,
+                    metadata={
+                        "reset_count": 0,
+                        "preserved_count": preserved_count,
+                        "skipped_count": skipped_count,
+                    },
+                    notes="Pre-analysis noise floor capture with existing mixer processing preserved",
+                )
+
+            logger.info(
+                "Pre-analysis preserve complete: %s channels preserved, %s skipped for safety",
+                preserved_count,
+                skipped_count,
+            )
+            return
+
         self._set_state(
             EngineState.RESETTING,
-            "Resetting channel processing to neutral..."
+            "Resetting channel processing to neutral by explicit operator opt-in..."
         )
 
         reset_count = 0
@@ -2743,10 +2947,10 @@ class AutoSoundcheckEngine:
         compressor with makeup → pan → fader → FX sends.
         Then: phase/polarity check across correlated pairs.
 
-        Channels have been reset to neutral before analysis, so all
-        settings are applied from scratch to clean channels.
+        Existing console state is preserved by default. Targets are interpreted
+        as bounded corrections relative to the snapshot captured before analysis.
         """
-        self._set_state(EngineState.APPLYING, "Applying full processing chain...")
+        self._set_state(EngineState.APPLYING, "Applying bounded corrections over current mixer state...")
         phase_guard_context = self._build_phase_target_guard_context(
             runtime_state=self.runtime_state
         )
@@ -2763,10 +2967,10 @@ class AutoSoundcheckEngine:
             preset = info.preset or "custom"
             had_proc = ""
             if info.original_snapshot and info.original_snapshot.had_processing:
-                had_proc = " (previous settings cleared)"
+                had_proc = " (existing settings preserved)"
             logger.info(
                 f"Ch {ch} '{info.name}' (preset={preset}): "
-                f"applying full processing chain{had_proc}..."
+                f"applying bounded correction chain{had_proc}..."
             )
 
             try:
@@ -2785,6 +2989,13 @@ class AutoSoundcheckEngine:
                         preset,
                         phase_guard_context=phase_guard_context,
                     )
+                # 2b. Gate/expander for close drum mics so bleed is not what drives EQ/trim.
+                self._apply_gate(
+                    ch,
+                    info,
+                    preset,
+                    phase_guard_context=phase_guard_context,
+                )
                 # 3. Parametric EQ (4-band)
                 if self._control_allowed(info, "eq"):
                     self._apply_eq(
@@ -2911,21 +3122,38 @@ class AutoSoundcheckEngine:
             elif sub_ratio > 0.5 and centroid < 150:
                 adaptive_freq = max(base_freq * 0.8, 25.0)
 
+        raw_settings = self._snapshot_raw(info)
+        current_hpf_enabled = self._as_bool(raw_settings.get("hpf_enabled"), False)
+        current_hpf_freq = self._as_float(raw_settings.get("hpf_freq"), adaptive_freq)
+        requested_freq = adaptive_freq
+        if self.preserve_existing_processing and current_hpf_enabled:
+            max_hpf_step = max(20.0, current_hpf_freq * 0.25)
+            requested_freq = self._bounded_toward(
+                current_hpf_freq,
+                adaptive_freq,
+                max_hpf_step,
+            )
+
         try:
             if hasattr(self.mixer_client, 'set_hpf'):
                 decision = self._execute_action(
                     HighPassAdjust(
                         channel_id=ch,
-                        freq_hz=adaptive_freq,
+                        freq_hz=requested_freq,
                         enabled=True,
-                        reason=f"HPF preset for {preset}",
+                        reason=f"HPF correction for {preset}",
                     ),
                     phase_guard_context=phase_guard_context,
                 )
-                if decision and decision.sent and abs(adaptive_freq - base_freq) > 5:
-                    logger.info(f"Ch {ch}: HPF={adaptive_freq:.0f}Hz (preset {base_freq:.0f}Hz)")
+                if decision and decision.sent and current_hpf_enabled:
+                    logger.info(
+                        f"Ch {ch}: HPF {current_hpf_freq:.0f}→{requested_freq:.0f}Hz "
+                        f"(analysis target {adaptive_freq:.0f}Hz)"
+                    )
+                elif decision and decision.sent and abs(requested_freq - base_freq) > 5:
+                    logger.info(f"Ch {ch}: HPF={requested_freq:.0f}Hz (preset {base_freq:.0f}Hz)")
                 elif decision and decision.sent:
-                    logger.debug(f"Ch {ch}: HPF={adaptive_freq:.0f}Hz")
+                    logger.debug(f"Ch {ch}: HPF={requested_freq:.0f}Hz")
         except Exception as e:
             logger.warning(f"Ch {ch}: HPF failed: {e}")
 
@@ -3012,17 +3240,40 @@ class AutoSoundcheckEngine:
 
         try:
             sent_any = False
+            raw_settings = self._snapshot_raw(info)
+            existing_eq_on = self._as_bool(raw_settings.get("eq_on"), False)
+            existing_bands = raw_settings.get("eq_bands") or []
+            if not existing_eq_on and hasattr(self.mixer_client, "set_eq_on"):
+                self.mixer_client.set_eq_on(ch, 1)
             for band_idx, (freq, gain, q) in enumerate(adapted_bands, start=1):
                 if band_idx > 4:
                     break
+                target_freq = freq
+                target_q = q
+                if self.preserve_existing_processing and existing_eq_on and len(existing_bands) >= band_idx:
+                    existing_band = existing_bands[band_idx - 1]
+                    if len(existing_band) >= 3:
+                        existing_freq = self._as_float(existing_band[0], freq)
+                        existing_gain = self._as_float(existing_band[1], 0.0)
+                        existing_q = self._as_float(existing_band[2], q)
+                        ratio = max(existing_freq, freq) / max(1.0, min(existing_freq, freq))
+                        if abs(existing_gain) > 0.1 and ratio <= 1.8:
+                            target_freq = existing_freq
+                            target_q = existing_q
+                        elif abs(existing_gain) > 0.1:
+                            logger.info(
+                                f"Ch {ch} '{info.name}': EQ band {band_idx} "
+                                f"retuned from {existing_freq:.0f}Hz to {freq:.0f}Hz "
+                                "because the existing band does not match the requested problem range"
+                            )
                 decision = self._execute_action(
                     ChannelEQMove(
                         channel_id=ch,
                         band=band_idx,
-                        freq_hz=freq,
+                        freq_hz=target_freq,
                         gain_db=gain,
-                        q=q,
-                        reason=f"EQ preset for {preset}",
+                        q=target_q,
+                        reason=f"EQ correction for {preset}",
                     ),
                     phase_guard_context=phase_guard_context,
                 )
@@ -3131,9 +3382,22 @@ class AutoSoundcheckEngine:
             "playback": -10.0, "leadVocal": -3.0, "backVocal": -8.0,
         }
         base_fader = fader_levels.get(preset, -10.0)
+        current_fader = self._as_float(
+            self._snapshot_value(info, "fader_db", None),
+            info.fader_db if info.fader_db > -140 else base_fader,
+        )
+        is_muted = self._as_bool(self._snapshot_value(info, "muted", False), False)
 
-        # Start with base + LUFS gain correction (from _apply_gain_correction)
-        fader_db = base_fader + info.gain_correction_db
+        if self.preserve_existing_processing and (is_muted or current_fader <= -90.0):
+            info.fader_db = current_fader
+            logger.info(
+                f"Ch {ch} '{info.name}': fader correction skipped "
+                f"(current={current_fader:.1f}dB, muted={is_muted})"
+            )
+            return
+
+        # Start with the operator's current fader and apply only a correction.
+        fader_db = current_fader + info.gain_correction_db
 
         # Collect LUFS from all active channels for relative balance
         all_lufs: Dict[int, Tuple[float, str]] = {}
@@ -3173,8 +3437,8 @@ class AutoSoundcheckEngine:
             balance_adj = max(-4.0, min(4.0, -deviation * 0.5 + crest_adj))
             fader_db += balance_adj
 
-        fader_db = max(-30.0, min(0.0, fader_db))
-        previous_fader_db = float(info.fader_db)
+        fader_db = max(-144.0, min(0.0, fader_db))
+        previous_fader_db = current_fader
 
         try:
             decision = self._execute_action(
@@ -3187,15 +3451,15 @@ class AutoSoundcheckEngine:
                 phase_guard_context=phase_guard_context,
             )
             if decision and decision.sent:
-                info.fader_db = fader_db
+                info.fader_db = getattr(decision.action, "target_db", fader_db)
             else:
                 info.fader_db = previous_fader_db
 
-            total_adj = fader_db - base_fader
+            total_adj = fader_db - current_fader
             if decision and decision.sent and abs(total_adj) > 0.5:
                 logger.info(
-                    f"Ch {ch} '{info.name}': fader={fader_db:.1f}dB "
-                    f"(base={base_fader:.1f}, lufs_corr={info.gain_correction_db:+.1f}, "
+                    f"Ch {ch} '{info.name}': fader {current_fader:.1f}→{fader_db:.1f}dB "
+                    f"(preset_ref={base_fader:.1f}, lufs_corr={info.gain_correction_db:+.1f}, "
                     f"lufs={info.lufs:.1f})"
                 )
             elif decision and decision.sent:
@@ -3256,20 +3520,52 @@ class AutoSoundcheckEngine:
         # Absolute gain safety clamp (per .cursorrules: gain ≤ +60 dB)
         SAFE_MAX_GAIN_DB = 12.0
         correction = max(-SAFE_MAX_GAIN_DB, min(SAFE_MAX_GAIN_DB, correction))
+        current_gain = self._as_float(
+            self._snapshot_value(info, "gain_db", None),
+            self._as_float(getattr(info.original_snapshot, "gain_db", 0.0), 0.0)
+            if info.original_snapshot else 0.0,
+        )
+        target_gain = max(-SAFE_MAX_GAIN_DB, min(SAFE_MAX_GAIN_DB, current_gain + correction))
+        effective_correction = target_gain - current_gain
+
+        if abs(effective_correction) < 1.0:
+            return
+        if effective_correction > 0.0 and not self.allow_input_trim_boost:
+            logger.info(
+                f"Ch {ch} '{info.name}': input trim boost skipped "
+                f"({current_gain:+.1f}→{target_gain:+.1f}dB requested; "
+                "live policy avoids reacting to bleed)"
+            )
+            return
+        if (
+            effective_correction > 0.0
+            and info.original_snapshot is not None
+            and (
+                info.original_snapshot.muted
+                or info.original_snapshot.fader_db <= -50.0
+                or info.classification_confidence < self.minimum_auto_apply_classification_confidence
+            )
+        ):
+            logger.info(
+                f"Ch {ch} '{info.name}': input trim boost skipped "
+                "(muted/parked or low-confidence source during line check)"
+            )
+            return
 
         try:
             decision = self._execute_action(
                 ChannelGainMove(
                     channel_id=ch,
-                    target_db=correction,
-                    reason=f"Input gain staging for {preset}",
+                    target_db=target_gain,
+                    reason=f"Input gain correction for {preset}",
                 ),
                 phase_guard_context=phase_guard_context,
             )
             if decision and decision.sent:
                 logger.info(
-                    f"Ch {ch} '{info.name}': input gain {correction:+.1f}dB "
-                    f"(TP={true_peak:.1f}dBTP, RMS={rms:.1f}, "
+                    f"Ch {ch} '{info.name}': input gain {current_gain:+.1f}→{target_gain:+.1f}dB "
+                    f"({effective_correction:+.1f}dB correction; "
+                    f"TP={true_peak:.1f}dBTP, RMS={rms:.1f}, "
                     f"crest={crest:.1f}, target={target_peak:.0f}dB)"
                 )
         except Exception as e:
@@ -3327,6 +3623,27 @@ class AutoSoundcheckEngine:
 
                 # Phase inversion detected
                 if icm.phase_inverted:
+                    raw_b = self._snapshot_raw(info_b) if info_b else {}
+                    current_polarity = self._as_bool(
+                        raw_b.get("polarity_inverted"),
+                        False,
+                    )
+                    if self.preserve_existing_processing and current_polarity:
+                        logger.info(
+                            f"Phase: Ch {ch_b} polarity already inverted; preserving current state"
+                        )
+                        continue
+                    if (
+                        self.preserve_existing_processing
+                        and info_b
+                        and info_b.original_snapshot
+                        and info_b.original_snapshot.had_processing
+                    ):
+                        logger.info(
+                            f"Phase: skipping polarity flip on Ch {ch_b}; "
+                            "existing channel processing is preserved"
+                        )
+                        continue
                     logger.warning(
                         f"Phase: {name_b} is inverted (corr={icm.cross_correlation:.3f}), "
                         f"flipping polarity"
@@ -3337,12 +3654,40 @@ class AutoSoundcheckEngine:
                 # Time alignment
                 elif icm.delay_ms > 0.1 and icm.coherence > 0.3:
                     align_ch = ch_b if icm.delay_samples > 0 else ch_a
+                    align_info = self.channels.get(align_ch)
+                    align_raw = self._snapshot_raw(align_info) if align_info else {}
+                    current_delay_enabled = self._as_bool(
+                        align_raw.get("delay_enabled"),
+                        False,
+                    )
+                    current_delay_ms = self._as_float(
+                        align_raw.get("delay_ms"),
+                        0.0,
+                    )
+                    delay_target_ms = icm.delay_ms
+                    if self.preserve_existing_processing and current_delay_enabled:
+                        delay_target_ms = self._bounded_toward(
+                            current_delay_ms,
+                            icm.delay_ms,
+                            0.25,
+                        )
+                    elif (
+                        self.preserve_existing_processing
+                        and align_info
+                        and align_info.original_snapshot
+                        and align_info.original_snapshot.had_processing
+                    ):
+                        logger.info(
+                            f"Phase: skipping delay write on Ch {align_ch}; "
+                            "existing channel processing is preserved"
+                        )
+                        continue
                     logger.info(
-                        f"Phase: applying {icm.delay_ms:.2f}ms delay "
+                        f"Phase: applying {delay_target_ms:.2f}ms delay "
                         f"to Ch {align_ch} (coherence={icm.coherence:.3f})"
                     )
                     if hasattr(self.mixer_client, 'set_delay'):
-                        self.mixer_client.set_delay(align_ch, icm.delay_ms, enabled=True)
+                        self.mixer_client.set_delay(align_ch, delay_target_ms, enabled=True)
 
             except Exception as e:
                 logger.warning(f"Phase check error for pair ({ch_a}, {ch_b}): {e}")
@@ -3385,6 +3730,13 @@ class AutoSoundcheckEngine:
             return
 
         pan = INSTRUMENT_PAN.get(preset, 0.0)
+        raw_settings = self._snapshot_raw(info)
+        if self.preserve_existing_processing and "pan" in raw_settings:
+            current_pan = self._as_float(raw_settings.get("pan"), 0.0)
+            logger.info(
+                f"Ch {ch} '{info.name}': pan preserved at {current_pan:+.0f}"
+            )
+            return
 
         # Smart panning for stereo pairs and multiple instruments
         preset_channels = [
@@ -3428,7 +3780,269 @@ class AutoSoundcheckEngine:
         except Exception as e:
             logger.warning(f"Ch {ch}: pan set failed: {e}")
 
-    # ── 5g. Compressor ───────────────────────────────────────────
+    # ── 5g. Gate / Expander ──────────────────────────────────────
+
+    def _apply_gate(
+        self,
+        ch: int,
+        info: ChannelInfo,
+        preset: str,
+        *,
+        phase_guard_context: Optional[Dict[str, Any]] = None,
+    ):
+        """Enable a bounded gate on close drum mics before tonal decisions."""
+        if not info.auto_corrections_enabled:
+            return
+        if not self.auto_gate_close_mics:
+            return
+        if preset not in INSTRUMENT_GATE_PRESETS:
+            return
+        if not hasattr(self.mixer_client, "set_gate"):
+            return
+
+        base_threshold, base_range, base_attack, base_hold, base_release = INSTRUMENT_GATE_PRESETS[preset]
+        threshold = base_threshold
+        range_db = base_range
+        attack = base_attack
+        hold = base_hold
+        release = base_release
+
+        m = info.metrics
+        if m and m.level.rms_db > -90 and m.level.true_peak_dbtp > -90:
+            # Keep the threshold below real hits, but above likely bleed.
+            threshold = min(m.level.true_peak_dbtp - 10.0, m.level.rms_db + 6.0)
+            threshold = max(base_threshold - 10.0, min(base_threshold + 8.0, threshold))
+            if m.level.crest_factor_db > 18.0:
+                attack = min(attack, 1.5)
+                hold = max(hold, 90.0)
+
+        raw_settings = self._snapshot_raw(info)
+        if self.preserve_existing_processing and self._as_bool(raw_settings.get("gate_enabled"), False):
+            current_threshold = self._as_float(raw_settings.get("gate_threshold_db"), threshold)
+            current_range = self._as_float(raw_settings.get("gate_range_db"), range_db)
+            threshold = self._bounded_toward(current_threshold, threshold, 4.0)
+            range_db = self._bounded_toward(current_range, range_db, 6.0)
+
+        try:
+            decision = self._execute_action(
+                GateAdjust(
+                    channel_id=ch,
+                    threshold_db=round(threshold, 1),
+                    range_db=round(range_db, 1),
+                    attack_ms=round(attack, 1),
+                    hold_ms=round(hold, 1),
+                    release_ms=round(release, 1),
+                    enabled=True,
+                    reason=f"Gate profile for {preset}",
+                ),
+                phase_guard_context=phase_guard_context,
+            )
+            if decision and decision.sent:
+                logger.info(
+                    f"Ch {ch} '{info.name}': gate on thr={threshold:.0f}dB "
+                    f"range={range_db:.0f}dB atk={attack:.0f}ms hold={hold:.0f}ms rel={release:.0f}ms"
+                )
+        except Exception as e:
+            logger.warning(f"Ch {ch}: gate failed: {e}")
+
+    # ── 5h. Compressor ───────────────────────────────────────────
+
+    @staticmethod
+    def _normalise_gain_reduction_db(value: Any) -> Optional[float]:
+        if value is None:
+            return None
+        try:
+            gr = abs(float(value))
+        except (TypeError, ValueError):
+            return None
+        if not np.isfinite(gr):
+            return None
+        return max(0.0, min(24.0, gr))
+
+    def _compressor_peak_db_for_headroom(self, metrics: Optional[ChannelMetrics]) -> Optional[float]:
+        if metrics is None:
+            return None
+        level = getattr(metrics, "level", None)
+        if level is None:
+            return None
+        for attr in ("true_peak_dbtp", "peak_db"):
+            value = getattr(level, attr, None)
+            try:
+                peak_db = float(value)
+            except (TypeError, ValueError):
+                continue
+            if np.isfinite(peak_db) and peak_db > -90.0:
+                return peak_db
+        return None
+
+    def _estimate_compressor_gr_from_signal(
+        self,
+        raw_settings: Dict[str, Any],
+        metrics: Optional[ChannelMetrics],
+        model: str,
+    ) -> Optional[float]:
+        if metrics is None:
+            return None
+        level = getattr(metrics, "level", None)
+        if level is None:
+            return None
+        peak_db = self._compressor_peak_db_for_headroom(metrics)
+        rms_db = self._as_float(getattr(level, "rms_db", None), -100.0)
+        if peak_db is None or (peak_db < -55.0 and rms_db < -70.0):
+            return None
+
+        model = str(model or "").upper()
+        threshold = self._as_float(raw_settings.get("compressor_threshold_db"), None)
+        ratio = self._as_float(raw_settings.get("compressor_ratio"), 2.0)
+        mix = self._as_float(raw_settings.get("compressor_mix_pct"), 100.0)
+        mix_scale = max(0.0, min(1.0, mix / 100.0))
+        detector = str(raw_settings.get("compressor_detector") or "RMS").upper()
+
+        if model in {"COMP", "STD", "B560", "RED3"} and threshold is not None and ratio > 1.01:
+            detector_level = peak_db if detector == "PEAK" else rms_db
+            over_threshold = detector_level - threshold
+            if over_threshold <= 0.0:
+                return 0.0
+            return max(0.0, over_threshold * (1.0 - (1.0 / ratio)) * mix_scale)
+
+        # BDX160 exposes threshold as a unitless 0.01..5 parameter. Without a
+        # read-only GR meter, use a conservative audition value only when the
+        # signal is clearly active and the control is near maximum sensitivity.
+        if model == "B160" and threshold is not None and threshold <= 0.05 and peak_db > -12.0:
+            return 1.5 * mix_scale
+
+        return None
+
+    def _calculate_compressor_makeup_target(
+        self,
+        *,
+        current_makeup_db: Any,
+        gain_reduction_db: Any,
+        metrics: Optional[ChannelMetrics],
+        assume_target_gr: bool = False,
+    ) -> Tuple[float, Dict[str, Any]]:
+        current_makeup = self._as_float(current_makeup_db, 0.0)
+        current_makeup = max(-6.0, min(12.0, current_makeup))
+
+        measured_gr = self._normalise_gain_reduction_db(gain_reduction_db)
+        gr_for_compensation = measured_gr or 0.0
+        if gr_for_compensation <= 0.25 and assume_target_gr:
+            gr_for_compensation = max(0.0, self.compressor_gr_target_db)
+
+        overcompressed = (
+            measured_gr is not None
+            and measured_gr > self.compressor_gr_max_db
+        )
+        if overcompressed:
+            gr_for_compensation = min(gr_for_compensation, self.compressor_gr_target_db)
+
+        desired_makeup = gr_for_compensation * max(
+            0.0,
+            min(1.0, self.compressor_makeup_compensation_ratio),
+        )
+        desired_makeup = max(0.0, min(self.compressor_makeup_max_db, desired_makeup))
+
+        peak_db = self._compressor_peak_db_for_headroom(metrics)
+        headroom_limited = False
+        if peak_db is not None and desired_makeup > current_makeup:
+            available_headroom = self.compressor_makeup_true_peak_ceiling_db - peak_db
+            if available_headroom <= 0.0:
+                desired_makeup = current_makeup
+                headroom_limited = True
+            else:
+                allowed_makeup = current_makeup + available_headroom
+                if desired_makeup > allowed_makeup:
+                    desired_makeup = allowed_makeup
+                    headroom_limited = True
+
+        # Preserve intentionally hotter makeup unless it exceeds our live cap.
+        if desired_makeup < current_makeup and current_makeup <= self.compressor_makeup_max_db:
+            desired_makeup = current_makeup
+
+        target_makeup = self._bounded_toward(
+            current_makeup,
+            desired_makeup,
+            max(0.1, self.compressor_makeup_max_step_db),
+        )
+        details = {
+            "current_makeup_db": round(current_makeup, 2),
+            "target_makeup_db": round(target_makeup, 2),
+            "desired_makeup_db": round(desired_makeup, 2),
+            "measured_gr_db": None if measured_gr is None else round(measured_gr, 2),
+            "gr_used_for_compensation_db": round(gr_for_compensation, 2),
+            "compensation_ratio": round(self.compressor_makeup_compensation_ratio, 2),
+            "headroom_peak_db": None if peak_db is None else round(peak_db, 2),
+            "true_peak_ceiling_db": round(self.compressor_makeup_true_peak_ceiling_db, 2),
+            "headroom_limited": headroom_limited,
+            "overcompressed": overcompressed,
+            "source_rules": [
+                "compression.reason_only",
+                "compression.makeup_compensates_gain_reduction_safely",
+                "dynamics.preserve_microdynamics_first",
+                "automation.keep_effect_parameters_interpretable",
+            ],
+            "perceptual_shadow_enabled": self._perceptual_shadow_enabled(),
+            "perceptual_backend": (
+                getattr(self.perceptual_evaluator.backend, "name", "")
+                if self.perceptual_evaluator is not None
+                else ""
+            ),
+        }
+        return target_makeup, details
+
+    def _apply_compressor_makeup_adjustment(
+        self,
+        ch: int,
+        info: ChannelInfo,
+        target_makeup_db: float,
+        details: Dict[str, Any],
+        *,
+        phase_guard_context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[SafetyDecision]:
+        current_makeup = float(details.get("current_makeup_db", 0.0))
+        if abs(target_makeup_db - current_makeup) < 0.1:
+            logger.info(
+                f"Ch {ch} '{info.name}': compressor makeup kept at {current_makeup:.1f}dB "
+                f"(GR={details.get('measured_gr_db')}dB, headroom_limited={details.get('headroom_limited')})"
+            )
+            return None
+
+        decision = self._execute_action(
+            CompressorMakeupAdjust(
+                channel_id=ch,
+                makeup_db=round(target_makeup_db, 1),
+                reason=(
+                    "Compensate compressor gain reduction with bounded makeup gain; "
+                    "source_rules=compression.makeup_compensates_gain_reduction_safely,"
+                    "dynamics.preserve_microdynamics_first"
+                ),
+            ),
+            evaluation_context={
+                "expected_effect": "restore level lost to compression without bypassing headroom",
+                **details,
+            },
+            phase_guard_context=phase_guard_context,
+        )
+        if decision and decision.sent:
+            logger.info(
+                f"Ch {ch} '{info.name}': compressor makeup "
+                f"{current_makeup:.1f}→{target_makeup_db:.1f}dB, "
+                f"GR={details.get('measured_gr_db')}dB, "
+                f"rules={','.join(details.get('source_rules', []))}"
+            )
+            self._emit_observation(
+                operation={
+                    "action": "compressor_makeup",
+                    "channel": ch,
+                    "channel_name": info.name,
+                    "message": (
+                        f"Ch {ch} compressor makeup {current_makeup:.1f}→"
+                        f"{target_makeup_db:.1f}dB"
+                    ),
+                    **details,
+                }
+            )
+        return decision
 
     def _apply_compressor(
         self,
@@ -3456,6 +4070,31 @@ class AutoSoundcheckEngine:
         ratio = base_ratio
         attack = base_attack
         release = base_release
+        raw_settings = self._snapshot_raw(info)
+        current_comp_enabled = self._as_bool(
+            raw_settings.get("compressor_enabled"),
+            False,
+        )
+        current_model = str(raw_settings.get("compressor_model") or "").upper()
+        existing_gr = None
+        gr_getter = getattr(self.mixer_client, "get_compressor_gr", None)
+        if gr_getter is not None:
+            try:
+                existing_gr = gr_getter(ch)
+            except Exception:
+                existing_gr = None
+        existing_gr_db = self._normalise_gain_reduction_db(existing_gr)
+        compressor_gr_source = "osc_meter" if existing_gr_db is not None else "unavailable"
+        if existing_gr_db is None:
+            estimated_gr = self._estimate_compressor_gr_from_signal(
+                raw_settings,
+                info.metrics,
+                current_model,
+            )
+            if estimated_gr is not None:
+                existing_gr = estimated_gr
+                existing_gr_db = self._normalise_gain_reduction_db(estimated_gr)
+                compressor_gr_source = "signal_estimate"
 
         m = info.metrics
         if m and m.level.rms_db > -80:
@@ -3507,6 +4146,89 @@ class AutoSoundcheckEngine:
                 f"DR={dynamic_range:.1f}dB atk_measured={measured_attack:.0f}ms "
                 f"trans_density={transient_density:.1f}/s flux={spectral_flux:.3f}"
             )
+        else:
+            crest_factor = 0.0
+            dynamic_range = 0.0
+
+        if not current_comp_enabled and m and crest_factor < 8.0 and dynamic_range < 8.0:
+            logger.info(
+                f"Ch {ch} '{info.name}': compressor skipped; measured dynamics do not justify enabling it"
+            )
+            return
+
+        current_makeup = self._as_float(raw_settings.get("compressor_makeup_db"), 0.0)
+        makeup, makeup_details = self._calculate_compressor_makeup_target(
+            current_makeup_db=current_makeup,
+            gain_reduction_db=existing_gr,
+            metrics=m,
+            assume_target_gr=not current_comp_enabled and m is not None,
+        )
+        makeup_details["compressor_gr_source"] = compressor_gr_source
+
+        if (
+            self.preserve_existing_processing
+            and current_comp_enabled
+            and current_model
+            and current_model not in {"COMP", "STD"}
+        ):
+            if existing_gr_db is not None and existing_gr_db > self.compressor_gr_max_db:
+                current_threshold = self._as_float(
+                    raw_settings.get("compressor_threshold_db"),
+                    threshold,
+                )
+                target_threshold = current_threshold + min(
+                    6.0,
+                    existing_gr_db - self.compressor_gr_target_db,
+                )
+                if hasattr(self.mixer_client, "set_compressor_threshold"):
+                    self.mixer_client.set_compressor_threshold(ch, round(target_threshold, 1))
+                    logger.info(
+                        f"Ch {ch} '{info.name}': {current_model} GR={existing_gr_db:.1f}dB; "
+                        f"raising threshold {current_threshold:.1f}→{target_threshold:.1f}dB"
+                    )
+            else:
+                logger.info(
+                    f"Ch {ch} '{info.name}': preserving {current_model} compressor model; "
+                    "generic compressor timing write skipped"
+                )
+            makeup_decision = self._apply_compressor_makeup_adjustment(
+                ch,
+                info,
+                makeup,
+                makeup_details,
+                phase_guard_context=phase_guard_context,
+            )
+            if makeup_decision and makeup_decision.sent:
+                info.compressor_applied = True
+            return
+
+        if self.preserve_existing_processing and current_comp_enabled:
+            current_threshold = self._as_float(
+                raw_settings.get("compressor_threshold_db"),
+                threshold,
+            )
+            current_ratio = self._as_float(
+                raw_settings.get("compressor_ratio"),
+                ratio,
+            )
+            current_attack = self._as_float(
+                raw_settings.get("compressor_attack_ms"),
+                attack,
+            )
+            current_release = self._as_float(
+                raw_settings.get("compressor_release_ms"),
+                release,
+            )
+            if existing_gr_db is not None and existing_gr_db > self.compressor_gr_max_db:
+                threshold = max(threshold, current_threshold + min(
+                    6.0,
+                    existing_gr_db - self.compressor_gr_target_db,
+                ))
+                ratio = min(ratio, max(1.5, current_ratio - 0.5))
+            threshold = self._bounded_toward(current_threshold, threshold, 3.0)
+            ratio = self._bounded_toward(current_ratio, ratio, 1.0)
+            attack = self._bounded_toward(current_attack, attack, 10.0)
+            release = self._bounded_toward(current_release, release, 75.0)
 
         try:
             decision = self._execute_action(
@@ -3516,10 +4238,20 @@ class AutoSoundcheckEngine:
                     ratio=round(ratio, 1),
                     attack_ms=round(attack, 1),
                     release_ms=round(release, 1),
-                    makeup_db=0.0,
+                    makeup_db=round(makeup, 1),
                     enabled=True,
-                    reason=f"Compressor profile for {preset}",
+                    reason=(
+                        f"Compressor profile for {preset}; makeup compensates gain reduction "
+                        "per source rule compression.makeup_compensates_gain_reduction_safely"
+                    ),
                 ),
+                evaluation_context={
+                    "expected_effect": (
+                        "control dynamics and restore level lost to compression without "
+                        "bypassing headroom"
+                    ),
+                    **makeup_details,
+                },
                 phase_guard_context=phase_guard_context,
             )
             info.compressor_applied = bool(decision and decision.sent)
@@ -3533,12 +4265,31 @@ class AutoSoundcheckEngine:
                 changes.append(f"atk: {base_attack:.0f}→{attack:.0f}")
             if abs(release - base_release) > 10.0:
                 changes.append(f"rel: {base_release:.0f}→{release:.0f}")
+            if abs(makeup - current_makeup) > 0.2:
+                changes.append(f"makeup: {current_makeup:.1f}→{makeup:.1f}")
 
             adapted = f" (adapted: {', '.join(changes)})" if changes else ""
             if decision and decision.sent:
                 logger.info(
                     f"Ch {ch} '{info.name}': compressor thr={threshold:.0f}dB "
-                    f"ratio={ratio:.1f}:1 atk={attack:.0f}ms rel={release:.0f}ms{adapted}"
+                    f"ratio={ratio:.1f}:1 atk={attack:.0f}ms rel={release:.0f}ms "
+                    f"makeup={makeup:.1f}dB GR={makeup_details.get('measured_gr_db')}dB{adapted}"
+                )
+                self._emit_observation(
+                    operation={
+                        "action": "compressor",
+                        "channel": ch,
+                        "channel_name": info.name,
+                        "message": (
+                            f"Ch {ch} compressor: thr {threshold:.1f}dB, "
+                            f"ratio {ratio:.1f}:1, makeup {makeup:.1f}dB"
+                        ),
+                        "threshold_db": round(threshold, 1),
+                        "ratio": round(ratio, 1),
+                        "attack_ms": round(attack, 1),
+                        "release_ms": round(release, 1),
+                        **makeup_details,
+                    }
                 )
         except Exception as e:
             logger.warning(f"Ch {ch}: compressor failed: {e}")
@@ -3564,6 +4315,19 @@ class AutoSoundcheckEngine:
         - dynamics.transient_density — percussive → shorter/less reverb
         """
         if not hasattr(self.mixer_client, 'set_send_level'):
+            return
+        if not self.auto_fx_sends_enabled:
+            logger.info(
+                f"Ch {ch} '{info.name}': automatic FX sends disabled for live safety"
+            )
+            return
+        if info.channel in self.master_reference_channels or "MASTER" in info.stem_roles:
+            logger.info(f"Ch {ch} '{info.name}': FX send skipped for master reference channel")
+            return
+        if preset in {"kick", "snare", "tom"} and not self.close_mic_fx_sends_enabled:
+            logger.info(
+                f"Ch {ch} '{info.name}': close-mic FX send skipped; use operator-approved drum bus/FX routing"
+            )
             return
 
         sends = INSTRUMENT_FX_SENDS.get(preset, [])
@@ -3635,8 +4399,14 @@ class AutoSoundcheckEngine:
     def _monitor_loop(self):
         """Continuous monitoring: feedback detection + cautious mix cleanup."""
         self.feedback_detector = FeedbackDetector(
-            sample_rate=self.sample_rate,
-            fft_size=2048,
+            config=FeedbackDetectorConfig(
+                sample_rate=self.sample_rate,
+                fft_size=2048,
+                persistence_frames=self.feedback_detector_persistence_frames,
+                min_confidence=self.feedback_detector_min_confidence,
+                peak_height_db=self.feedback_detector_peak_height_db,
+                peak_prominence_db=self.feedback_detector_peak_prominence_db,
+            ),
         )
 
         while not self._stop_event.is_set():
@@ -3670,10 +4440,10 @@ class AutoSoundcheckEngine:
             time.sleep(0.1)
 
     def _apply_corrections_single(self, ch: int):
-        """Apply full processing chain for a single newly detected channel.
+        """Apply bounded processing corrections for a newly detected channel.
 
-        Resets the channel, runs a short analysis pass for fresh metrics,
-        then applies the full processing chain.
+        Reads the current channel state first, then runs a short analysis pass
+        and applies corrections relative to the preserved console snapshot.
         """
         info = self.channels.get(ch)
         if info is None or ch in self._applied_channels:
@@ -3683,9 +4453,26 @@ class AutoSoundcheckEngine:
             return
         preset = info.preset or "custom"
         try:
-            self.mixer_client.reset_channel_processing(ch)
-            info.was_reset = True
-            time.sleep(0.3)
+            try:
+                raw_settings = self.mixer_client.get_channel_settings(ch)
+            except Exception as read_exc:
+                logger.debug(f"Ch {ch}: could not read settings before single-channel correction: {read_exc}")
+                raw_settings = {}
+            fader_db = self._as_float(raw_settings.get("fader_db"), info.fader_db)
+            snapshot = ChannelSnapshot(
+                channel=ch,
+                fader_db=fader_db,
+                muted=self._as_bool(raw_settings.get("muted"), False),
+                eq_bands=raw_settings.get("eq_bands"),
+                hpf_freq=self._as_float(raw_settings.get("hpf_freq"), 20.0),
+                hpf_enabled=self._as_bool(raw_settings.get("hpf_enabled"), False),
+                gain_db=self._as_float(raw_settings.get("gain_db"), 0.0),
+                had_processing=self._channel_has_existing_processing(raw_settings),
+                raw_settings=raw_settings,
+            )
+            info.original_snapshot = snapshot
+            info.fader_db = fader_db
+            info.was_reset = False
 
             # Quick analysis pass (1.5s) for fresh metrics
             analyzer = SignalAnalyzer(ch, self.sample_rate, self.block_size)
@@ -3714,6 +4501,12 @@ class AutoSoundcheckEngine:
                     preset,
                     phase_guard_context=phase_guard_context,
                 )
+            self._apply_gate(
+                ch,
+                info,
+                preset,
+                phase_guard_context=phase_guard_context,
+            )
             if self._control_allowed(info, "eq"):
                 self._apply_eq(
                     ch,
@@ -3755,22 +4548,26 @@ class AutoSoundcheckEngine:
 
     def _handle_feedback_event(self, ch: int, event: FeedbackEvent):
         """React to a feedback event by applying notch or reducing fader."""
+        info = self.channels.get(ch)
+        if info is None:
+            return
+        if self._suppress_repeated_feedback_event(ch, event):
+            return
+
         logger.warning(
             f"FEEDBACK Ch {ch}: {event.action} at {event.frequency_hz:.0f}Hz "
             f"({event.magnitude_db:.1f}dB)"
         )
-        info = self.channels.get(ch)
-        if info is None:
-            return
         if event.action == "notch" and hasattr(self.mixer_client, "set_eq_band"):
             if not self._control_allowed(info, "feedback_notch"):
                 self._log_processing_skip(ch, info, "feedback notch")
                 return
             try:
-                self._execute_action(
+                notch_band = self._select_feedback_notch_band(info)
+                decision = self._execute_action(
                     EmergencyFeedbackNotch(
                         channel_id=ch,
-                        band=4,
+                        band=notch_band,
                         freq_hz=event.frequency_hz,
                         q=10.0,
                         gain_db=-6.0,
@@ -3778,6 +4575,8 @@ class AutoSoundcheckEngine:
                     ),
                     runtime_state=RuntimeState.EMERGENCY_FEEDBACK,
                 )
+                if decision and decision.sent:
+                    self._record_feedback_action_sent(ch)
             except Exception:
                 pass
         elif event.action == "fader_reduce":
@@ -3789,7 +4588,7 @@ class AutoSoundcheckEngine:
                 return
             try:
                 current = info.fader_db
-                new_fader = max(-30.0, current - 3.0)
+                new_fader = max(-144.0, current - 3.0)
                 decision = self._execute_action(
                     ChannelFaderMove(
                         channel_id=ch,
@@ -3800,10 +4599,98 @@ class AutoSoundcheckEngine:
                     runtime_state=RuntimeState.EMERGENCY_FEEDBACK,
                 )
                 if decision and decision.sent:
-                    info.fader_db = new_fader
-                    logger.warning(f"FEEDBACK: Ch {ch} fader reduced to {new_fader:.1f}dB")
+                    actual_fader = getattr(decision.action, "target_db", new_fader)
+                    info.fader_db = actual_fader
+                    self._record_feedback_action_sent(ch)
+                    logger.warning(f"FEEDBACK: Ch {ch} fader reduced to {actual_fader:.1f}dB")
             except Exception:
                 pass
+
+    def _suppress_repeated_feedback_event(self, ch: int, event: FeedbackEvent) -> bool:
+        if self._feedback_actions_sent_total >= max(0, self.feedback_max_actions_per_run):
+            logger.info(
+                "Feedback event suppressed: run cap reached (%s actions)",
+                self._feedback_actions_sent_total,
+            )
+            return True
+        channel_count = self._feedback_actions_sent_by_channel.get(int(ch), 0)
+        if channel_count >= max(0, self.feedback_max_actions_per_channel_per_run):
+            logger.info(
+                "Feedback event suppressed: channel %s cap reached (%s actions)",
+                ch,
+                channel_count,
+            )
+            return True
+
+        bucket_hz = max(1.0, self.feedback_frequency_bucket_hz)
+        bucket = int(round(float(event.frequency_hz or 0.0) / bucket_hz))
+        key = (int(ch), str(event.action), bucket)
+        now = time.monotonic()
+        last = self._last_feedback_event_at.get(key)
+        if (
+            last is not None
+            and (now - last) < max(0.0, self.feedback_event_min_interval_sec)
+        ):
+            logger.debug(
+                "Feedback event suppressed by cooldown: ch=%s action=%s freq=%.0fHz",
+                ch,
+                event.action,
+                event.frequency_hz,
+            )
+            return True
+        channel_last = self._last_feedback_channel_action_at.get(int(ch))
+        if (
+            channel_last is not None
+            and (now - channel_last) < max(0.0, self.feedback_channel_min_interval_sec)
+        ):
+            logger.debug(
+                "Feedback event suppressed by channel cooldown: ch=%s action=%s freq=%.0fHz",
+                ch,
+                event.action,
+                event.frequency_hz,
+            )
+            return True
+        if (
+            self._last_feedback_global_action_at > 0.0
+            and (now - self._last_feedback_global_action_at)
+            < max(0.0, self.feedback_global_min_interval_sec)
+        ):
+            logger.debug(
+                "Feedback event suppressed by global cooldown: ch=%s action=%s freq=%.0fHz",
+                ch,
+                event.action,
+                event.frequency_hz,
+            )
+            return True
+        self._last_feedback_event_at[key] = now
+        return False
+
+    def _record_feedback_action_sent(self, ch: int):
+        now = time.monotonic()
+        channel = int(ch)
+        self._last_feedback_channel_action_at[channel] = now
+        self._last_feedback_global_action_at = now
+        self._feedback_actions_sent_by_channel[channel] = (
+            self._feedback_actions_sent_by_channel.get(channel, 0) + 1
+        )
+        self._feedback_actions_sent_total += 1
+
+    def _select_feedback_notch_band(self, info: ChannelInfo) -> int:
+        raw_settings = self._snapshot_raw(info)
+        existing_bands = raw_settings.get("eq_bands") or []
+        if not self.preserve_existing_processing or not existing_bands:
+            return 4
+
+        candidates = []
+        for idx, band in enumerate(existing_bands[:4], start=1):
+            gain = 0.0
+            if len(band) >= 2:
+                gain = self._as_float(band[1], 0.0)
+            candidates.append((abs(gain), idx))
+
+        if not candidates:
+            return 4
+        return min(candidates)[1]
 
     # ── Main run ─────────────────────────────────────────────────
 
@@ -3816,15 +4703,20 @@ class AutoSoundcheckEngine:
         3. Scan audio devices, select best multichannel input
         4. Start audio capture
         5. Read channel names → recognize instruments
-        6. Read existing channel settings (backup)
-        7. Reset all channels to neutral (flat EQ, HPF off)
-        8. Wait for audio signals (now receiving clean/raw audio)
+        6. Read existing channel settings (operator snapshot)
+        7. Preserve current processing unless destructive reset is explicitly enabled
+        8. Wait for audio signals
         9. Analyze signals (LUFS, peak, spectrum)
-        10. Apply new corrections (HPF, EQ, gain, fader)
+        10. Apply bounded corrections relative to the snapshot
         11. Enter monitoring mode (feedback detection, new channels)
         """
         self._stop_event.clear()
         self._phase_learning_snapshots = {}
+        self._last_feedback_event_at = {}
+        self._last_feedback_channel_action_at = {}
+        self._last_feedback_global_action_at = 0.0
+        self._feedback_actions_sent_by_channel = {}
+        self._feedback_actions_sent_total = 0
 
         # Steps 1-2: Discover and connect mixer
         if not self._connect_mixer():
@@ -3845,13 +4737,13 @@ class AutoSoundcheckEngine:
         # Step 6: Read existing settings from mixer
         self._read_channel_state()
 
-        # Step 7: Reset all channels to neutral before analysis
+        # Step 7: Preserve channel processing before analysis, unless explicitly opted into reset
         self._reset_channels()
 
-        # Steps 8-9: Wait for clean audio signals and analyze
+        # Steps 8-9: Wait for audio signals and analyze
         self._wait_and_analyze()
 
-        # Step 10: Apply new corrections from scratch
+        # Step 10: Apply bounded corrections over the preserved console state
         if self.auto_apply:
             self._apply_corrections()
         elif self.soundcheck_profile_capture_multiphase_learning:
@@ -4033,6 +4925,7 @@ class AutoSoundcheckEngine:
             "audio_devices_available": audio_devices_list,
             "total_channels": len(self.channels) if self.channels else self._configured_channel_count(),
             "selected_channels": self._iter_channels(),
+            "master_reference_channels": sorted(self.master_reference_channels),
             "observe_only": self.observe_only,
             "applied_channel_ids": sorted(self._applied_channels),
             "safety_action_history_size": len(self.safety_controller.history) if self.safety_controller else 0,

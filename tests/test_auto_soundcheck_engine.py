@@ -4,17 +4,20 @@ import os
 import sys
 import json
 
+import pytest
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-from auto_soundcheck_engine import AutoSoundcheckEngine, ChannelInfo
+from auto_soundcheck_engine import AutoSoundcheckEngine, ChannelInfo, ChannelSnapshot
 from autofoh_analysis import extract_analysis_features
 from autofoh_detectors import LeadMaskingAnalyzer, aggregate_stem_features
 from autofoh_models import RuntimeState
 from autofoh_profiles import build_phase_learning_snapshot, build_soundcheck_profile
 from autofoh_safety import AutoFOHSafetyController, ChannelEQMove
+from feedback_detector import FeedbackEvent
 from observation_mixer import ObservationMixerClient
+from signal_metrics import ChannelMetrics, LevelMetrics
 
 
 class FakeMixer:
@@ -72,6 +75,19 @@ class ResetTrackingMixer:
         self.reset_calls.append(channel)
 
 
+class GainTrackingMixer:
+    is_connected = True
+    state = {}
+    callbacks = {}
+
+    def __init__(self):
+        self.gain_calls = []
+
+    def set_gain(self, channel, value):
+        self.gain_calls.append((channel, value))
+        return True
+
+
 class DetectorMixer:
     is_connected = True
     state = {}
@@ -83,6 +99,9 @@ class DetectorMixer:
         self.eq_freq = {}
         self.hpf = {}
         self.compressor = {}
+        self.compressor_threshold = {}
+        self.compressor_gr = {}
+        self.gate = {}
         self.send_level = {}
         self.calls = []
 
@@ -101,6 +120,10 @@ class DetectorMixer:
         self.eq_gain[(channel, band)] = gain
         self.eq_freq[(channel, band)] = freq
         self.calls.append(("set_eq_band", channel, band, freq, gain, q))
+        return True
+
+    def set_eq_on(self, channel, on):
+        self.calls.append(("set_eq_on", channel, on))
         return True
 
     def set_hpf(self, channel, freq_hz, enabled=True):
@@ -138,6 +161,27 @@ class DetectorMixer:
                 enabled,
             )
         )
+        return True
+
+    def set_compressor_threshold(self, channel, threshold):
+        self.compressor_threshold[channel] = threshold
+        self.calls.append(("set_compressor_threshold", channel, threshold))
+        return True
+
+    def set_compressor_gain(self, channel, gain):
+        self.calls.append(("set_compressor_gain", channel, gain))
+        return True
+
+    def get_compressor_gr(self, channel):
+        return self.compressor_gr.get(channel)
+
+    def set_gate(self, channel, threshold, range_db, attack, hold, release, ratio=None):
+        self.gate[channel] = (threshold, range_db, attack, hold, release, ratio)
+        self.calls.append(("set_gate", channel, threshold, range_db, attack, hold, release, ratio))
+        return True
+
+    def set_gate_on(self, channel, on):
+        self.calls.append(("set_gate_on", channel, on))
         return True
 
     def set_send_level(self, channel, send_bus, level_db):
@@ -199,7 +243,7 @@ def _build_single_channel_phase_profile(
     )
 
 
-def test_unknown_channels_are_skipped_for_auto_reset_by_default():
+def test_engine_preserves_existing_processing_by_default():
     mixer = ResetTrackingMixer()
     engine = AutoSoundcheckEngine(
         num_channels=2,
@@ -210,9 +254,375 @@ def test_unknown_channels_are_skipped_for_auto_reset_by_default():
     engine._scan_channels()
     engine._reset_channels()
 
+    assert mixer.reset_calls == []
+    assert engine.channels[1].auto_corrections_enabled is False
+    assert engine.channels[2].auto_corrections_enabled is True
+
+
+def test_destructive_reset_requires_explicit_opt_in():
+    mixer = ResetTrackingMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=2,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.preserve_existing_processing = False
+    engine.allow_destructive_reset = True
+
+    engine._scan_channels()
+    engine._reset_channels()
+
     assert mixer.reset_calls == [2]
     assert engine.channels[1].auto_corrections_enabled is False
     assert engine.channels[2].auto_corrections_enabled is True
+
+
+def test_master_reference_channels_are_not_source_corrected():
+    engine = AutoSoundcheckEngine(
+        num_channels=24,
+        auto_discover=False,
+    )
+    engine.master_reference_channels = {23, 24}
+    info = ChannelInfo(channel=23, name="Master Ref")
+
+    engine._apply_classification_to_info(
+        info,
+        {
+            "preset": "playback",
+            "source_role": "playback",
+            "stem_roles": ["PLAYBACK"],
+            "allowed_controls": ["gain", "hpf", "eq", "compressor", "fader"],
+            "confidence": 0.99,
+            "match_type": "test",
+            "recognized": True,
+        },
+    )
+
+    assert info.source_role == "mix_bus_reference"
+    assert info.stem_roles == ["MASTER"]
+    assert info.allowed_controls == []
+    assert info.auto_corrections_enabled is False
+
+
+def test_input_gain_correction_does_not_boost_trim_by_default():
+    mixer = GainTrackingMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    info = ChannelInfo(
+        channel=1,
+        name="Kick",
+        preset="kick",
+        has_signal=True,
+        recognized=True,
+        auto_corrections_enabled=True,
+        peak_db=-16.0,
+        rms_db=-30.0,
+        original_snapshot=ChannelSnapshot(
+            channel=1,
+            gain_db=4.0,
+            raw_settings={"gain_db": 4.0},
+            had_processing=True,
+        ),
+    )
+    engine.channels = {1: info}
+
+    engine._apply_input_gain(1, info, "kick")
+
+    assert mixer.gain_calls == []
+
+
+def test_input_gain_correction_still_reduces_hot_trim():
+    mixer = GainTrackingMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    info = ChannelInfo(
+        channel=1,
+        name="Kick",
+        preset="kick",
+        has_signal=True,
+        recognized=True,
+        auto_corrections_enabled=True,
+        peak_db=-3.0,
+        rms_db=-18.0,
+        original_snapshot=ChannelSnapshot(
+            channel=1,
+            gain_db=8.0,
+            raw_settings={"gain_db": 8.0},
+            had_processing=True,
+        ),
+    )
+    engine.channels = {1: info}
+
+    engine._apply_input_gain(1, info, "kick")
+
+    assert mixer.gain_calls[0][0] == 1
+    assert mixer.gain_calls[0][1] < 8.0
+
+
+def test_eq_correction_enables_eq_and_retunes_mismatched_existing_band():
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    info = ChannelInfo(
+        channel=1,
+        name="Snare",
+        preset="snare",
+        has_signal=True,
+        recognized=True,
+        auto_corrections_enabled=True,
+        allowed_controls=["eq"],
+        original_snapshot=ChannelSnapshot(
+            channel=1,
+            raw_settings={
+                "eq_on": False,
+                "eq_bands": [
+                    (120.0, 1.5, 1.5),
+                    (5359.0, -6.0, 10.0),
+                    (2500.0, 3.0, 2.5),
+                    (5359.0, -6.0, 10.0),
+                ],
+            },
+            had_processing=True,
+        ),
+    )
+    engine.channels = {1: info}
+
+    engine._apply_eq(1, "snare")
+
+    assert ("set_eq_on", 1, 1) in mixer.calls
+    band2_calls = [call for call in mixer.calls if call[0] == "set_eq_band" and call[2] == 2]
+    assert band2_calls
+    assert band2_calls[0][3] == pytest.approx(400.0)
+
+
+def test_gate_is_enabled_for_close_drum_mics():
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    info = ChannelInfo(
+        channel=1,
+        name="Rack Tom",
+        preset="tom",
+        has_signal=True,
+        recognized=True,
+        auto_corrections_enabled=True,
+    )
+    engine.channels = {1: info}
+
+    engine._apply_gate(1, info, "tom")
+
+    assert any(call[0] == "set_gate" for call in mixer.calls)
+    assert ("set_gate_on", 1, 1) in mixer.calls
+
+
+def test_automatic_fx_sends_are_disabled_by_default():
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    info = ChannelInfo(
+        channel=1,
+        name="Lead Vox",
+        preset="leadVocal",
+        has_signal=True,
+        recognized=True,
+        auto_corrections_enabled=True,
+    )
+    engine.channels = {1: info}
+
+    engine._apply_fx_sends(1, info, "leadVocal")
+
+    assert not any(call[0] == "set_send_level" for call in mixer.calls)
+
+
+def test_character_compressor_model_is_preserved_when_gr_is_available():
+    mixer = DetectorMixer()
+    mixer.compressor_gr[1] = 12.0
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    info = ChannelInfo(
+        channel=1,
+        name="Kick",
+        preset="kick",
+        has_signal=True,
+        recognized=True,
+        auto_corrections_enabled=True,
+        original_snapshot=ChannelSnapshot(
+            channel=1,
+            raw_settings={
+                "compressor_enabled": True,
+                "compressor_model": "B160",
+                "compressor_threshold_db": -18.0,
+            },
+            had_processing=True,
+        ),
+    )
+    engine.channels = {1: info}
+
+    engine._apply_compressor(1, info, "kick")
+
+    assert ("set_compressor_threshold", 1, -12.0) in mixer.calls
+    assert ("set_compressor_gain", 1, 2.0) in mixer.calls
+    assert not any(call[0] == "set_compressor" for call in mixer.calls)
+
+
+def test_existing_generic_compressor_makeup_compensates_gain_reduction():
+    mixer = DetectorMixer()
+    mixer.compressor_gr[1] = 6.0
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    info = ChannelInfo(
+        channel=1,
+        name="Vocal",
+        preset="leadVocal",
+        has_signal=True,
+        recognized=True,
+        auto_corrections_enabled=True,
+        original_snapshot=ChannelSnapshot(
+            channel=1,
+            raw_settings={
+                "compressor_enabled": True,
+                "compressor_model": "COMP",
+                "compressor_threshold_db": -22.0,
+                "compressor_ratio": 3.0,
+                "compressor_attack_ms": 8.0,
+                "compressor_release_ms": 120.0,
+                "compressor_makeup_db": 0.0,
+            },
+            had_processing=True,
+        ),
+    )
+    engine.channels = {1: info}
+
+    engine._apply_compressor(1, info, "leadVocal")
+
+    comp_calls = [call for call in mixer.calls if call[0] == "set_compressor"]
+    assert comp_calls
+    assert comp_calls[-1][6] == 2.0
+
+
+def test_b160_missing_gr_meter_gets_conservative_makeup_from_signal_headroom():
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    info = ChannelInfo(
+        channel=1,
+        name="Kick Out",
+        preset="kick",
+        has_signal=True,
+        recognized=True,
+        auto_corrections_enabled=True,
+        metrics=ChannelMetrics(
+            channel=1,
+            level=LevelMetrics(
+                peak_db=-6.0,
+                true_peak_dbtp=-6.0,
+                rms_db=-26.0,
+                crest_factor_db=20.0,
+            ),
+        ),
+        original_snapshot=ChannelSnapshot(
+            channel=1,
+            raw_settings={
+                "compressor_enabled": True,
+                "compressor_model": "B160",
+                "compressor_threshold_db": 0.01,
+                "compressor_mix_pct": 100.0,
+                "compressor_makeup_db": 0.0,
+            },
+            had_processing=True,
+        ),
+    )
+    engine.channels = {1: info}
+
+    engine._apply_compressor(1, info, "kick")
+
+    assert ("set_compressor_gain", 1, 1.0) in mixer.calls
+    assert not any(call[0] == "set_compressor" for call in mixer.calls)
+
+
+def test_feedback_events_are_cooled_down_and_use_least_busy_eq_band():
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.feedback_event_min_interval_sec = 30.0
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="Lead Vox",
+            allowed_controls=["feedback_notch"],
+            original_snapshot=ChannelSnapshot(
+                channel=1,
+                raw_settings={
+                    "eq_on": True,
+                    "eq_bands": [
+                        (120.0, 2.0, 1.0),
+                        (350.0, -1.5, 1.2),
+                        (2500.0, 0.0, 1.5),
+                        (8000.0, 3.0, 1.0),
+                    ],
+                },
+                had_processing=True,
+            ),
+        )
+    }
+    event = FeedbackEvent(
+        channel=1,
+        frequency_hz=3150.0,
+        magnitude_db=-10.0,
+        action="notch",
+        confidence=0.9,
+    )
+
+    engine._handle_feedback_event(1, event)
+    engine._handle_feedback_event(1, event)
+
+    eq_calls = [call for call in mixer.calls if call[0] == "set_eq_band"]
+    assert len(eq_calls) == 1
+    assert eq_calls[0][2] == 3
 
 
 def test_monitor_analysis_routes_lead_masking_action_through_safety_layer():

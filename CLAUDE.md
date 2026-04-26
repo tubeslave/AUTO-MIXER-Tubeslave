@@ -64,6 +64,10 @@ Docs/                    — PDF документация WING, техничес
 - `find_snap_by_name()` — КЭШИРОВАТЬ имена. Загрузка = деструкция mixer state на концерте
 - `ratio_float_to_wing()` — константы WING_RATIO_VALUES/WING_RATIO_STRINGS должны быть на уровне модуля
 - NumPy типы (np.float64) не сериализуются в JSON → `convert_numpy_types()` перед `json.dumps()`
+- Live soundcheck trim — по умолчанию НЕ поднимать input trim по короткому сигналу: bleed может выглядеть как тихий источник. Авто-трим в live режиме только снижает перегруз, boost требует явного opt-in.
+- WING EQ bands — существующая полоса может быть feedback-notch/ручной полосой, а не “band 2 = low-mid”. При EQ-коррекции проверять частотное совпадение или перестраивать полосу, и включать `eq/on`, чтобы оператор слышал результат.
+- Master-reference Dante channels — каналы, заведённые как master/reference feed, не являются обычными source channels и должны исключаться из source gain/EQ/FX correction.
+- Compressor makeup — при сжатии компенсировать потерянный уровень через bounded `dyn/gain`, ориентируясь на GR и true-peak headroom; не использовать makeup как обход headroom, feedback или bleed safety.
 
 ### Архитектурные решения
 - AudioCapture — единый сервис. НЕ создавать PyAudio потоки в отдельных модулях

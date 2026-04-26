@@ -121,6 +121,19 @@ autofoh:
   safety:
     minimum_auto_apply_classification_confidence: 0.75
     new_or_unknown_channel_auto_corrections_enabled: false
+    preserve_existing_processing: true
+    allow_destructive_reset: false
+    allow_input_trim_boost: false
+    auto_gate_close_mics: true
+    auto_fx_sends_enabled: false
+    close_mic_fx_sends_enabled: false
+    master_reference_channels: [23, 24]
+    compressor_gr_max_db: 8.0
+    compressor_gr_target_db: 4.0
+    compressor_makeup_compensation_ratio: 0.7
+    compressor_makeup_max_step_db: 2.0
+    compressor_makeup_max_db: 9.0
+    compressor_makeup_true_peak_ceiling_db: -3.0
     action_limits:
       channel_fader_max_step_db: 1.0
       channel_fader_min_interval_sec: 3.0
@@ -135,9 +148,9 @@ autofoh:
       feedback_notch_min_q: 8.0
       feedback_notch_ttl_sec: 120.0
 perceptual:
-  enabled: false
+  enabled: true
   mode: shadow
-  backend: lightweight
+  backend: mert
   model_name: m-a-p/MERT-v1-95M
   sample_rate: 24000
   window_seconds: 5
@@ -152,6 +165,8 @@ perceptual:
   async_evaluation: true
   improvement_threshold: 0.03
   local_files_only: false
+  fallback_to_lightweight: false
+  device: auto
 source_knowledge:
   enabled: false
   mode: shadow

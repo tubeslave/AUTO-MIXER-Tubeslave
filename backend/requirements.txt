@@ -21,6 +21,9 @@ librosa>=0.10.0
 
 # ML (PyTorch — use CPU build for Apple Silicon)
 torch>=2.0.0
+transformers>=4.40.0
+safetensors>=0.4.3
+nnAudio>=0.3.3
 
 # AI / RAG
 chromadb>=0.4.0

@@ -29,6 +29,7 @@ class FakeWebSocket:
 
 def test_is_connection_closed_error_detects_normal_close():
     assert is_connection_closed_error(FakeClosedError()) is True
+    assert is_connection_closed_error(FakeClosedError("received 1000 (OK); then sent 1000 (OK)", code=1000)) is True
     assert is_connection_closed_error(Exception("going away")) is True
     assert is_connection_closed_error(Exception("boom")) is False
 

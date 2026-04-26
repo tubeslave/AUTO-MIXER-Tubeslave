@@ -1,7 +1,7 @@
 perceptual:
-  enabled: false
+  enabled: true
   mode: shadow
-  backend: lightweight
+  backend: mert
   model_name: "m-a-p/MERT-v1-95M"
   sample_rate: 24000
   window_seconds: 5
@@ -16,5 +16,7 @@ perceptual:
   async_evaluation: true
   improvement_threshold: 0.03
   local_files_only: false
+  fallback_to_lightweight: false
+  device: auto
   reference_embedding_cache_size: 8
   max_candidate_scores: 2

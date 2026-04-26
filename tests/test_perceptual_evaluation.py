@@ -74,6 +74,24 @@ def test_mert_backend_absence_falls_back_to_lightweight():
     assert evaluator.extract_embedding(_sine(), 48000).size > 0
 
 
+def test_mert_backend_strict_mode_raises_when_unavailable():
+    try:
+        PerceptualEvaluator(
+            {
+                "enabled": True,
+                "backend": "mert",
+                "model_name": "missing-local/mert-model",
+                "local_files_only": True,
+                "fallback_to_lightweight": False,
+                "log_scores": False,
+            }
+        )
+    except RuntimeError as exc:
+        assert "fallback_to_lightweight is disabled" in str(exc)
+    else:
+        raise AssertionError("strict MERT config must not silently fall back")
+
+
 def test_reference_embedding_is_cached_for_candidate_scoring():
     evaluator = PerceptualEvaluator(
         {

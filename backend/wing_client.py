@@ -1785,12 +1785,96 @@ class WingClient(MixerClientBase):
         self.set_delay(channel, 0.0, enabled=False)
 
     def get_channel_settings(self, channel: int) -> Dict[str, Any]:
+        query_addresses = [
+            f"/ch/{channel}/fdr",
+            f"/ch/{channel}/mute",
+            f"/ch/{channel}/in/set/trim",
+            f"/ch/{channel}/in/set/inv",
+            f"/ch/{channel}/in/set/dlyon",
+            f"/ch/{channel}/in/set/dly",
+            f"/ch/{channel}/pan",
+            f"/ch/{channel}/flt/lc",
+            f"/ch/{channel}/flt/lcf",
+            f"/ch/{channel}/eq/on",
+            f"/ch/{channel}/dyn/on",
+            f"/ch/{channel}/dyn/mdl",
+            f"/ch/{channel}/dyn/thr",
+            f"/ch/{channel}/dyn/ratio",
+            f"/ch/{channel}/dyn/att",
+            f"/ch/{channel}/dyn/rel",
+            f"/ch/{channel}/dyn/gain",
+            f"/ch/{channel}/dyn/mix",
+            f"/ch/{channel}/dyn/det",
+            f"/ch/{channel}/dyn/gr",
+            f"/ch/{channel}/dyn/$gr",
+            f"/ch/{channel}/gate/on",
+            f"/ch/{channel}/gate/mdl",
+            f"/ch/{channel}/gate/thr",
+            f"/ch/{channel}/gate/range",
+            f"/ch/{channel}/gate/att",
+            f"/ch/{channel}/gate/hld",
+            f"/ch/{channel}/gate/rel",
+            f"/ch/{channel}/gate/acc",
+            f"/ch/{channel}/gate/ratio",
+        ]
+        for band in range(1, 5):
+            query_addresses.extend(
+                [
+                    f"/ch/{channel}/eq/{band}f",
+                    f"/ch/{channel}/eq/{band}g",
+                    f"/ch/{channel}/eq/{band}q",
+                ]
+            )
+
+        for address in query_addresses:
+            self.send(address)
+
+        # Give the receiver thread a short window to populate state from WING replies.
+        time.sleep(0.12)
+
+        eq_bands = []
+        for band in range(1, 5):
+            eq_bands.append(
+                (
+                    self.state.get(f"/ch/{channel}/eq/{band}f"),
+                    self.state.get(f"/ch/{channel}/eq/{band}g"),
+                    self.state.get(f"/ch/{channel}/eq/{band}q"),
+                )
+            )
+
         return {
             "channel": channel,
             "name": self.get_channel_name(channel),
             "fader_db": self.get_fader(channel),
             "muted": self.get_mute(channel),
             "gain_db": self.get_channel_gain(channel) or 0.0,
+            "pan": self.get_channel_pan(channel),
+            "polarity_inverted": self.state.get(f"/ch/{channel}/in/set/inv"),
+            "delay_enabled": self.state.get(f"/ch/{channel}/in/set/dlyon"),
+            "delay_ms": self.state.get(f"/ch/{channel}/in/set/dly"),
+            "hpf_enabled": self.state.get(f"/ch/{channel}/flt/lc"),
+            "hpf_freq": self.state.get(f"/ch/{channel}/flt/lcf"),
+            "eq_on": self.get_eq_on(channel),
+            "eq_bands": eq_bands,
+            "compressor_enabled": self.get_compressor_on(channel),
+            "compressor_model": self.state.get(f"/ch/{channel}/dyn/mdl"),
+            "compressor_threshold_db": self.get_compressor_threshold(channel),
+            "compressor_ratio": self.get_compressor_ratio(channel),
+            "compressor_attack_ms": self.state.get(f"/ch/{channel}/dyn/att"),
+            "compressor_release_ms": self.state.get(f"/ch/{channel}/dyn/rel"),
+            "compressor_makeup_db": self.get_compressor_gain(channel),
+            "compressor_mix_pct": self.state.get(f"/ch/{channel}/dyn/mix"),
+            "compressor_detector": self.state.get(f"/ch/{channel}/dyn/det"),
+            "compressor_gr_db": self.get_compressor_gr(channel),
+            "gate_enabled": self.state.get(f"/ch/{channel}/gate/on"),
+            "gate_model": self.state.get(f"/ch/{channel}/gate/mdl"),
+            "gate_threshold_db": self.state.get(f"/ch/{channel}/gate/thr"),
+            "gate_range_db": self.state.get(f"/ch/{channel}/gate/range"),
+            "gate_attack_ms": self.state.get(f"/ch/{channel}/gate/att"),
+            "gate_hold_ms": self.state.get(f"/ch/{channel}/gate/hld"),
+            "gate_release_ms": self.state.get(f"/ch/{channel}/gate/rel"),
+            "gate_accent": self.state.get(f"/ch/{channel}/gate/acc"),
+            "gate_ratio": self.state.get(f"/ch/{channel}/gate/ratio"),
         }
 
     def recall_scene(self, scene_number: int):

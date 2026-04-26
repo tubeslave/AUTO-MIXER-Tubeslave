@@ -13,10 +13,17 @@ logger = logging.getLogger(__name__)
 def is_connection_closed_error(exc: Exception) -> bool:
     """Return True when the exception looks like a normal closed WS connection."""
     msg = str(exc).lower()
-    if "1001" in msg or "going away" in msg or "connection closed" in msg:
+    if (
+        "1000" in msg
+        or "1001" in msg
+        or "going away" in msg
+        or "connection closed" in msg
+        or "received 1000" in msg
+        or "sent 1000" in msg
+    ):
         return True
     try:
-        return getattr(exc, "code", None) == 1001
+        return getattr(exc, "code", None) in {1000, 1001}
     except Exception:
         return False
 

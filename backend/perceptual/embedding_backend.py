@@ -190,7 +190,7 @@ class MERTEmbeddingBackend(EmbeddingBackend):
             raise RuntimeError("torch/transformers are not available") from exc
 
         self.torch = torch
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = self._resolve_device(torch, device)
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(
             model_name,
             local_files_only=self.local_files_only,
@@ -203,6 +203,19 @@ class MERTEmbeddingBackend(EmbeddingBackend):
         )
         self.model.to(self.device)
         self.model.eval()
+        logger.info("Loaded MERT backend model=%s device=%s", self.model_name, self.device)
+
+    @staticmethod
+    def _resolve_device(torch_module: Any, requested_device: Optional[str]) -> str:
+        device = str(requested_device or "auto").strip().lower()
+        if device and device != "auto":
+            return device
+        if torch_module.cuda.is_available():
+            return "cuda"
+        mps = getattr(getattr(torch_module, "backends", None), "mps", None)
+        if mps is not None and mps.is_available():
+            return "mps"
+        return "cpu"
 
     def extract(
         self,
@@ -247,6 +260,7 @@ def create_embedding_backend(config: Optional[Dict[str, Any]] = None) -> Embeddi
     backend_name = str(config.get("backend", "lightweight")).strip().lower()
     sample_rate = int(config.get("sample_rate", 24000))
     window_seconds = float(config.get("window_seconds", 5.0))
+    fallback_to_lightweight = bool(config.get("fallback_to_lightweight", True))
 
     if backend_name in {"mert", "mert-like", "mert_like"}:
         try:
@@ -258,6 +272,10 @@ def create_embedding_backend(config: Optional[Dict[str, Any]] = None) -> Embeddi
                 local_files_only=bool(config.get("local_files_only", False)),
             )
         except Exception as exc:
+            if not fallback_to_lightweight:
+                raise RuntimeError(
+                    "MERT backend unavailable and fallback_to_lightweight is disabled"
+                ) from exc
             logger.warning(
                 "MERT backend unavailable (%s); falling back to lightweight perceptual backend",
                 exc,

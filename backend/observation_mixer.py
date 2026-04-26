@@ -262,6 +262,33 @@ class ObservationMixerClient:
             updates[f"/ch/{channel}/dyn/on"] = 1 if kwargs["enabled"] else 0
         return self._record("set_compressor", (channel,), kwargs, updates)
 
+    def set_gate_on(self, channel: int, on: int):
+        return self._record("set_gate_on", (channel, on), {}, {f"/ch/{channel}/gate/on": on})
+
+    def set_gate(self, channel: int, **kwargs):
+        updates = {}
+        if "threshold_db" in kwargs:
+            updates[f"/ch/{channel}/gate/thr"] = kwargs["threshold_db"]
+        elif "threshold" in kwargs:
+            updates[f"/ch/{channel}/gate/thr"] = kwargs["threshold"]
+        if "range_db" in kwargs:
+            updates[f"/ch/{channel}/gate/range"] = kwargs["range_db"]
+        if "attack_ms" in kwargs:
+            updates[f"/ch/{channel}/gate/att"] = kwargs["attack_ms"]
+        elif "attack" in kwargs:
+            updates[f"/ch/{channel}/gate/att"] = kwargs["attack"]
+        if "hold_ms" in kwargs:
+            updates[f"/ch/{channel}/gate/hld"] = kwargs["hold_ms"]
+        elif "hold" in kwargs:
+            updates[f"/ch/{channel}/gate/hld"] = kwargs["hold"]
+        if "release_ms" in kwargs:
+            updates[f"/ch/{channel}/gate/rel"] = kwargs["release_ms"]
+        elif "release" in kwargs:
+            updates[f"/ch/{channel}/gate/rel"] = kwargs["release"]
+        if "ratio" in kwargs:
+            updates[f"/ch/{channel}/gate/ratio"] = kwargs["ratio"]
+        return self._record("set_gate", (channel,), kwargs, updates)
+
     def get_compressor_gr(self, channel: int):
         getter = getattr(self._base_client, "get_compressor_gr", None)
         return getter(channel) if getter is not None else None

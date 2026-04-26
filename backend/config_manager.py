@@ -210,6 +210,8 @@ class ConfigManager:
                 'async_evaluation': True,
                 'improvement_threshold': 0.03,
                 'local_files_only': False,
+                'fallback_to_lightweight': True,
+                'device': 'auto',
             },
             'source_knowledge': {
                 'enabled': False,

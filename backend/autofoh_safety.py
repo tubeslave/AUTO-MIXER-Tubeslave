@@ -125,6 +125,39 @@ class CompressorAdjust(TypedCorrectionAction):
 
 
 @dataclass
+class CompressorMakeupAdjust(TypedCorrectionAction):
+    channel_id: int
+    makeup_db: float
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_COMPRESSOR
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.channel_id)
+
+
+@dataclass
+class GateAdjust(TypedCorrectionAction):
+    channel_id: int
+    threshold_db: float
+    range_db: float
+    attack_ms: float
+    hold_ms: float
+    release_ms: float
+    enabled: bool = True
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_COMPRESSOR
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.channel_id)
+
+
+@dataclass
 class PanAdjust(TypedCorrectionAction):
     channel_id: int
     pan: float
@@ -327,7 +360,7 @@ class AutoFOHSafetyController:
             max_step = self.config.lead_fader_max_step_db if action.is_lead else self.config.channel_fader_max_step_db
             desired_delta = action.target_db - current
             bounded_delta = max(-max_step, min(max_step, desired_delta))
-            target = max(-30.0, min(0.0, current + bounded_delta))
+            target = max(-144.0, min(0.0, current + bounded_delta))
             bounded = abs(target - action.target_db) > 1e-6
             return ChannelFaderMove(
                 channel_id=action.channel_id,
@@ -381,6 +414,29 @@ class AutoFOHSafetyController:
             bounded = bounded_action != action
             return bounded_action, bounded
 
+        if isinstance(action, CompressorMakeupAdjust):
+            bounded_action = CompressorMakeupAdjust(
+                channel_id=action.channel_id,
+                makeup_db=max(-6.0, min(12.0, action.makeup_db)),
+                reason=action.reason,
+            )
+            bounded = bounded_action != action
+            return bounded_action, bounded
+
+        if isinstance(action, GateAdjust):
+            bounded_action = GateAdjust(
+                channel_id=action.channel_id,
+                threshold_db=max(-80.0, min(0.0, action.threshold_db)),
+                range_db=max(3.0, min(60.0, action.range_db)),
+                attack_ms=max(0.0, min(120.0, action.attack_ms)),
+                hold_ms=max(0.0, min(200.0, action.hold_ms)),
+                release_ms=max(4.0, min(4000.0, action.release_ms)),
+                enabled=action.enabled,
+                reason=action.reason,
+            )
+            bounded = bounded_action != action
+            return bounded_action, bounded
+
         if isinstance(action, PanAdjust):
             pan = max(self.config.pan_min, min(self.config.pan_max, action.pan))
             bounded = pan != action.pan
@@ -417,7 +473,7 @@ class AutoFOHSafetyController:
             min_interval = self.config.broad_eq_min_interval_sec
         elif isinstance(action, ChannelGainMove):
             min_interval = self.config.gain_min_interval_sec
-        elif isinstance(action, CompressorAdjust):
+        elif isinstance(action, (CompressorAdjust, CompressorMakeupAdjust, GateAdjust)):
             min_interval = self.config.compressor_min_interval_sec
         elif isinstance(action, SendLevelAdjust):
             min_interval = self.config.fx_return_min_interval_sec
@@ -451,6 +507,16 @@ class AutoFOHSafetyController:
                     enabled=a.enabled,
                 ),
             )
+        if isinstance(action, CompressorMakeupAdjust):
+            return self._require_method(
+                "set_compressor_gain",
+                lambda a: self.mixer_client.set_compressor_gain(a.channel_id, a.makeup_db),
+            )
+        if isinstance(action, GateAdjust):
+            return self._require_method(
+                "set_gate",
+                lambda a: self._set_gate(a),
+            )
         if isinstance(action, PanAdjust):
             return self._require_method("set_pan", lambda a: self.mixer_client.set_pan(a.channel_id, a.pan))
         if isinstance(action, SendLevelAdjust):
@@ -458,6 +524,30 @@ class AutoFOHSafetyController:
         if isinstance(action, EmergencyFeedbackNotch):
             return self._require_method("set_eq_band", lambda a: self.mixer_client.set_eq_band(a.channel_id, a.band, a.freq_hz, a.gain_db, a.q))
         return None
+
+    def _set_gate(self, action: GateAdjust):
+        try:
+            result = self.mixer_client.set_gate(
+                action.channel_id,
+                threshold=action.threshold_db,
+                range_db=action.range_db,
+                attack=action.attack_ms,
+                hold=action.hold_ms,
+                release=action.release_ms,
+                ratio="GATE",
+            )
+        except TypeError:
+            result = self.mixer_client.set_gate(
+                action.channel_id,
+                threshold_db=action.threshold_db,
+                enabled=action.enabled,
+            )
+        setter = getattr(self.mixer_client, "set_gate_on", None)
+        if setter is not None:
+            on_result = setter(action.channel_id, 1 if action.enabled else 0)
+            if result is False or on_result is False:
+                return False
+        return result
 
     def _require_method(self, method_name: str, callback):
         if hasattr(self.mixer_client, method_name):
