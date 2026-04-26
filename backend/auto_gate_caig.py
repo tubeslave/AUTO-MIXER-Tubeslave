@@ -66,8 +66,8 @@ class GateSettings:
     """Gate settings for a channel."""
     threshold_db: float = -60.0
     attack_ms: float = 0.5
-    release_ms: float = 80.0
-    hold_ms: float = 10.0
+    release_ms: float = 120.0
+    hold_ms: float = 100.0
     range_db: float = -80.0  # Max attenuation when closed
     hysteresis_db: float = 3.0
     
@@ -75,6 +75,70 @@ class GateSettings:
     adaptive_threshold: bool = True
     noise_floor_db: float = -70.0
     noise_floor_margin_db: float = 6.0
+
+
+DRUM_GATE_INSTRUMENTS = frozenset({
+    "kick", "snare", "tom", "toms", "floor_tom", "rack_tom",
+})
+
+OVERHEAD_GATE_INSTRUMENTS = frozenset({
+    "overhead", "overheads", "room", "hihat", "hi_hat", "ride", "cymbals",
+})
+
+
+def live_gate_settings_for_instrument(
+    instrument: str,
+    target_peak_db: Optional[float] = None,
+    nearest_source_db: Optional[float] = None,
+    noise_floor_db: float = -70.0,
+) -> GateSettings:
+    """
+    Return live-sound gate settings for an instrument.
+
+    Drum thresholds prefer a margin above the nearest bleeding source. Other
+    instruments prefer a threshold below the target peak. If neither is known,
+    use a conservative margin above the tracked noise floor.
+    """
+    normalized = (instrument or "unknown").strip().lower()
+    threshold = noise_floor_db + 6.0
+
+    if normalized in DRUM_GATE_INSTRUMENTS:
+        if nearest_source_db is not None:
+            threshold = float(nearest_source_db) + 6.0
+        elif target_peak_db is not None:
+            threshold = float(target_peak_db) - 6.0
+        return GateSettings(
+            threshold_db=threshold,
+            attack_ms=0.05,
+            hold_ms=180.0,
+            release_ms=180.0,
+            range_db=-80.0,
+            noise_floor_db=noise_floor_db,
+        )
+
+    if normalized in OVERHEAD_GATE_INSTRUMENTS:
+        if target_peak_db is not None:
+            threshold = float(target_peak_db) - 10.0
+        return GateSettings(
+            threshold_db=threshold,
+            attack_ms=0.5,
+            hold_ms=200.0,
+            release_ms=250.0,
+            range_db=-10.0,
+            noise_floor_db=noise_floor_db,
+        )
+
+    if target_peak_db is not None:
+        threshold = float(target_peak_db) - 6.0
+
+    return GateSettings(
+        threshold_db=threshold,
+        attack_ms=0.5,
+        hold_ms=100.0,
+        release_ms=120.0,
+        range_db=-80.0,
+        noise_floor_db=noise_floor_db,
+    )
 
 
 @dataclass
@@ -526,9 +590,13 @@ class AutoGateController:
         channel_id: int,
         instrument: str,
         group: InstrumentGroup,
-        attack_ms: float = 0.5,
-        release_ms: float = 80.0,
-        is_drum: bool = False
+        attack_ms: Optional[float] = None,
+        release_ms: Optional[float] = None,
+        is_drum: bool = False,
+        hold_ms: Optional[float] = None,
+        threshold_db: Optional[float] = None,
+        target_peak_db: Optional[float] = None,
+        nearest_source_db: Optional[float] = None,
     ):
         """Configure a channel."""
         self.instruments[channel_id] = instrument
@@ -539,9 +607,20 @@ class AutoGateController:
             self.drum_rules.register_drum(instrument, channel_id)
         
         # Configure settings
-        settings = GateSettings()
-        settings.attack_ms = attack_ms
-        settings.release_ms = release_ms
+        settings = live_gate_settings_for_instrument(
+            instrument=instrument,
+            target_peak_db=target_peak_db,
+            nearest_source_db=nearest_source_db,
+            noise_floor_db=self.threshold_calculator.noise_floor_db,
+        )
+        if attack_ms is not None:
+            settings.attack_ms = attack_ms
+        if release_ms is not None:
+            settings.release_ms = release_ms
+        if hold_ms is not None:
+            settings.hold_ms = hold_ms
+        if threshold_db is not None:
+            settings.threshold_db = threshold_db
         self.settings[channel_id] = settings
         
         # Configure processor
@@ -585,8 +664,13 @@ class AutoGateController:
             group = self.groups.get(ch, InstrumentGroup.OTHER)
             group_influence = self.group_analyzer.get_group_influence(ch, group)
             
-            threshold = self.threshold_calculator.calculate_threshold(
-                feat, group_influence
+            adaptive_threshold = self.threshold_calculator.calculate_threshold(
+                feat, group_influence, settings.noise_floor_margin_db
+            )
+            threshold = (
+                max(settings.threshold_db, adaptive_threshold)
+                if settings.adaptive_threshold
+                else settings.threshold_db
             )
             
             # Apply drum kit rules

@@ -136,6 +136,163 @@ def test_trace_channel_source_candidates_logs_eq_comp_pan_without_console_calls(
     assert console.calls == []
 
 
+def test_source_rules_mert_only_plan_uses_metrics_and_disables_project_passes(tmp_path):
+    mod = load_offline_agent_mix()
+    layer = enabled_layer(tmp_path)
+    sr = 48000
+    target_len = sr
+    vocal = mod.ChannelPlan(
+        path=tmp_path / "Vocal.wav",
+        name="Vocal",
+        instrument="lead_vocal",
+        pan=0.4,
+        hpf=40.0,
+        target_rms_db=-18.0,
+        trim_db=5.0,
+        fader_db=-6.0,
+        phase_invert=True,
+        eq_bands=[(1000.0, 4.0, 1.0)],
+        comp_threshold_db=-10.0,
+        comp_ratio=1.0,
+        metrics={
+            "rms_db": -26.0,
+            "peak_db": -7.0,
+            "dynamic_range_db": 19.0,
+            "analysis_active_ratio": 0.72,
+            "band_energy": {
+                "sub": -36.0,
+                "bass": -22.0,
+                "low_mid": -14.0,
+                "mid": -20.0,
+                "presence": -28.0,
+            },
+        },
+    )
+    guitar = mod.ChannelPlan(
+        path=tmp_path / "Guitar L.wav",
+        name="Guitar L",
+        instrument="electric_guitar",
+        pan=0.0,
+        hpf=40.0,
+        target_rms_db=-18.0,
+        metrics={
+            "rms_db": -24.0,
+            "peak_db": -8.0,
+            "dynamic_range_db": 16.0,
+            "analysis_active_ratio": 0.9,
+            "band_energy": {
+                "sub": -42.0,
+                "bass": -25.0,
+                "low_mid": -22.0,
+                "mid": -18.0,
+                "presence": -15.0,
+            },
+        },
+    )
+
+    report = mod.apply_source_rules_mert_only_plan(
+        {1: vocal, 2: guitar},
+        sr,
+        target_len,
+        layer,
+        "source-only-test",
+    )
+
+    assert report["enabled"] is True
+    assert report["mode"] == "source_rules_mert_only"
+    assert "mixing_agent_rule_engine" in report["disabled_project_passes"]
+    assert vocal.fader_db == 0.0
+    assert vocal.phase_invert is False
+    assert vocal.expander_enabled is False
+    assert vocal.eq_bands
+    assert vocal.comp_ratio > 1.0
+    assert vocal.trim_analysis["mode"] == "source_rules_mert_only"
+    assert guitar.pan < 0.0
+    assert guitar.eq_bands
+
+
+def test_source_rules_only_fx_plan_is_manual_and_filtered(tmp_path):
+    mod = load_offline_agent_mix()
+    plans = {
+        1: mod.ChannelPlan(
+            path=tmp_path / "Vocal.wav",
+            name="Vocal",
+            instrument="lead_vocal",
+            pan=0.0,
+            hpf=90.0,
+            target_rms_db=-20.0,
+        ),
+        2: mod.ChannelPlan(
+            path=tmp_path / "Back Vox L.wav",
+            name="Back Vox L",
+            instrument="backing_vocal",
+            pan=-0.3,
+            hpf=110.0,
+            target_rms_db=-24.0,
+        ),
+    }
+
+    fx_plan = mod.build_source_rules_only_fx_plan(plans, tempo_bpm=120.0)
+
+    assert "source_rules_mert_only" in fx_plan.notes
+    assert {bus.bus_id for bus in fx_plan.buses} == {13, 14, 15, 16}
+    assert all(bus.hpf_hz >= 180.0 for bus in fx_plan.buses)
+    lead_sends = [send for send in fx_plan.sends if send.channel_id == 1]
+    bgv_sends = [send for send in fx_plan.sends if send.channel_id == 2]
+    assert {send.bus_id for send in lead_sends} == {13, 15}
+    assert {send.bus_id for send in bgv_sends} == {13, 16}
+
+
+def test_layer_group_corrections_balance_snare_bottom_from_summed_group(tmp_path):
+    mod = load_offline_agent_mix()
+    sr = 48000
+    samples = np.arange(sr, dtype=np.float32)
+    hit = (0.18 * np.sin(2 * np.pi * 220 * samples / sr)).astype(np.float32)
+    top_audio = mod.pan_mono(hit, 0.0)
+    bottom_audio = mod.pan_mono(hit * 0.9, 0.0)
+    top_plan = mod.ChannelPlan(
+        path=tmp_path / "SNARE T.wav",
+        name="SNARE T",
+        instrument="snare",
+        pan=0.0,
+        hpf=90.0,
+        target_rms_db=-29.0,
+        metrics={"rms_db": -30.0, "band_energy": {"low_mid": -14.0}},
+    )
+    bottom_plan = mod.ChannelPlan(
+        path=tmp_path / "Snare B.wav",
+        name="Snare B",
+        instrument="snare",
+        pan=0.0,
+        hpf=90.0,
+        target_rms_db=-36.0,
+        metrics={"rms_db": -30.0, "band_energy": {"low_mid": -15.0}},
+    )
+    plans = {1: top_plan, 2: bottom_plan}
+    rendered = {1: top_audio.copy(), 2: bottom_audio.copy()}
+
+    report = mod.apply_layer_group_mix_corrections(
+        rendered,
+        plans,
+        sr,
+        base_target_rms_db=-28.0,
+        band_medians={"low_mid": -20.0, "presence": -22.0},
+        source_layer=None,
+        source_session_id="test-layer-group",
+    )
+
+    assert report["enabled"] is True
+    assert report["groups"][0]["group_id"] == "snare"
+    top_db = mod._audio_rms_db(rendered[1])
+    bottom_db = mod._audio_rms_db(rendered[2])
+    assert abs((top_db - bottom_db) - 10.0) < 0.7
+    assert any(action["type"] == "group_level" for action in report["groups"][0]["actions"])
+    assert top_plan.pan == 0.0
+    assert bottom_plan.pan == 0.0
+    assert top_plan.trim_analysis["layer_group_id"] == "snare"
+    assert bottom_plan.trim_analysis["layer_group_id"] == "snare"
+
+
 def test_apply_offline_fx_plan_logs_fx_candidates(tmp_path):
     mod = load_offline_agent_mix()
     layer = enabled_layer(tmp_path)

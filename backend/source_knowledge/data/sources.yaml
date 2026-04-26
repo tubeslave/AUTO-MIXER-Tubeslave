@@ -180,3 +180,350 @@ sources:
       - future_transcript_ingestion
       - citation_metadata
     notes: "Registered for future reviewed transcripts and manufacturer guidance."
+  - source_id: jaes_hafezi_reiss_masking_eq
+    title: "Autonomous Multitrack Equalization Based on Masking Reduction"
+    source_type: paper
+    authors: ["Sina Hafezi", "Joshua D. Reiss"]
+    publisher: "Journal of the Audio Engineering Society"
+    year: 2015
+    url: "https://doi.org/10.17743/jaes.2015.0021"
+    authority_tier: peer_reviewed_jaes
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - masking_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about targeted multitrack masking reduction and the limits of objective masking measures."
+  - source_id: aes_wichern_masking_loudness_loss
+    title: "Quantitative Analysis of Masking in Multitrack Mixes Using Loudness Loss"
+    source_type: conference_paper
+    authors: ["Gordon Wichern", "Hannah Robertson", "Aaron Wishnick"]
+    publisher: "Audio Engineering Society"
+    year: 2016
+    url: "https://secure.aes.org/forum/pubs/conventions/?elib=18450"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - masking_rules
+      - automation_methodology
+      - citation_metadata
+    notes: "AES abstract emphasizes focusing on problematic masking outliers rather than blindly minimizing all masking."
+  - source_id: aes_tom_reiss_spatial_unmasking
+    title: "An Automatic Mixing System for Multitrack Spatialization for Stereo Based on Unmasking and Best Panning Practices"
+    source_type: conference_paper
+    authors: ["Ajin Tom", "Joshua D. Reiss", "Philippe Depalle"]
+    publisher: "Audio Engineering Society"
+    year: 2019
+    url: "https://secure.aes.org/forum/pubs/conventions/?elib=20311"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - panning_rules
+      - masking_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules connecting stereo placement, masking reduction, and best panning practices."
+  - source_id: aes_wichern_loudness_level_features
+    title: "Comparison of Loudness Features for Automatic Level Adjustment in Mixing"
+    source_type: conference_paper
+    authors: ["Gordon Wichern", "Aaron Wishnick", "Alexey Lukin", "Hannah Robertson"]
+    publisher: "Audio Engineering Society"
+    year: 2015
+    url: "https://secure.aes.org/forum/pubs/conventions/?elib=17928"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - level_rules
+      - metering
+      - citation_metadata
+    notes: "AES abstract compares loudness features for automatic track-level adjustment and instrument-dependent targets."
+  - source_id: arxiv_steinmetz_differentiable_mixing
+    title: "Automatic Multitrack Mixing with a Differentiable Mixing Console of Neural Audio Effects"
+    source_type: paper
+    authors: ["Christian J. Steinmetz", "Jordi Pons", "Santiago Pascual", "Joan Serra"]
+    publisher: "arXiv"
+    year: 2020
+    url: "https://arxiv.org/abs/2010.10291"
+    authority_tier: research_preprint
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - citation_metadata
+    notes: "Used for rules that keep automatic decisions interpretable through human-readable console parameters."
+  - source_id: arxiv_diff_mst
+    title: "Diff-MST: Differentiable Mixing Style Transfer"
+    source_type: paper
+    authors: ["Soumya Sai Vanka", "Christian Steinmetz", "Jean-Baptiste Rolland", "Joshua Reiss", "George Fazekas"]
+    publisher: "arXiv"
+    year: 2024
+    url: "https://arxiv.org/abs/2407.08889"
+    authority_tier: research_preprint
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - style_transfer
+      - citation_metadata
+    notes: "Used for paraphrased guidance that reference/style systems should remain controllable through traditional audio effects."
+  - source_id: sos_mixing_essentials
+    title: "Mixing Essentials"
+    source_type: article
+    authors: ["Paul White"]
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/techniques/mixing-essentials"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Used for dynamics, headroom, level automation, and avoiding excessive EQ/compression."
+  - source_id: sos_depth_mix
+    title: "Creating A Sense Of Depth In Your Mix"
+    source_type: article
+    authors: ["Paul White"]
+    publisher: "Sound On Sound"
+    year: 2009
+    url: "https://www.soundonsound.com/techniques/creating-sense-depth-your-mix"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - citation_metadata
+    notes: "Used for paraphrased rules about depth through level, EQ, reverb, delay, and pre-delay."
+  - source_id: sos_multitracked_drums
+    title: "Mixing Multitracked Drums"
+    source_type: article
+    authors: ["Mike Senior"]
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/techniques/mixing-multitracked-drums"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - drum_dynamics
+      - citation_metadata
+    notes: "Used for paraphrased rules about parallel drum weight and preserving performance dynamics."
+  - source_id: sos_mixing_metal
+    title: "Mixing Metal"
+    source_type: article
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/techniques/mixing-metal"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - drum_dynamics
+      - citation_metadata
+    notes: "Used for paraphrased rules about attack/body shaping with compressor timing on kick, snare, bass, vocals, and guitars."
+  - source_id: pensado_place_into_lair
+    title: "Into The Lair"
+    source_type: video_series
+    authors: ["Dave Pensado", "Herb Trawick"]
+    publisher: "Pensado's Place"
+    url: "https://www.pensadosplace.tv/intothelair/"
+    authority_tier: vetted_engineer_channel
+    status: active
+    allowed_uses:
+      - citation_metadata
+      - future_transcript_ingestion
+    notes: "Official series page identifies Dave Pensado as a top mixing engineer; individual transcript-derived rules still require reviewed transcripts."
+  - source_id: produce_like_a_pro_quick_tricks
+    title: "Quick Mixing Tricks Archive"
+    source_type: article_archive
+    authors: ["Warren Huart"]
+    publisher: "Produce Like A Pro"
+    url: "https://producelikeapro.com/blog/tag/quick-mixing-tricks/"
+    authority_tier: vetted_engineer_channel
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules from Warren Huart/Produce Like A Pro pages on automation, gain staging, kick-bass low end, vocals, and panning."
+  - source_id: aes_kruk_sobecki_phase_alignment
+    title: "Methods of Phase-Aligning Individual Instruments Recorded with Multiple Microphones during Post-Production"
+    source_type: conference_paper
+    authors: ["Bartlomiej Kruk", "Aleksander Sobecki"]
+    publisher: "Audio Engineering Society"
+    year: 2016
+    url: "https://secure.aes.org/forum/pubs/conventions/?elib=18278"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - phase_rules
+      - automation_methodology
+      - citation_metadata
+    notes: "Used for paraphrased rules that treat phase/time alignment as an early multi-mic diagnostic before EQ or compression fixes."
+  - source_id: sos_multimic_time_alignment
+    title: "Making Multi-mic Recordings Work"
+    source_type: article
+    authors: ["Sam Inglis"]
+    publisher: "Sound On Sound"
+    year: 2020
+    url: "https://www.soundonsound.com/techniques/making-multi-mic-recordings-work"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - phase_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about auditioning drum time-alignment by ear, in mono, and in the full mix instead of treating visual alignment as inherently correct."
+  - source_id: sos_mix_rescue_phase_relationships
+    title: "Mix Rescue: Phase Relationships"
+    source_type: article
+    authors: ["Mike Senior"]
+    publisher: "Sound On Sound"
+    year: 2010
+    url: "https://www.soundonsound.com/techniques/mix-rescue-phase-relationships"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - phase_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about polarity/time checks on drum overheads and close mics for punch and mono compatibility."
+  - source_id: sos_reverb_delay
+    title: "Using Reverb & Delay"
+    source_type: article
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/techniques/using-reverb-delay"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - citation_metadata
+    notes: "Used for paraphrased rules about reverb/delay sends, modulation after delay, ducked returns, and automation of FX send levels."
+  - source_id: sos_reverb_like_pro
+    title: "How To Use Reverb Like A Pro: 1"
+    source_type: article
+    authors: ["Mike Senior"]
+    publisher: "Sound On Sound"
+    year: 2008
+    url: "https://www.soundonsound.com/techniques/how-use-reverb-pro-1"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - citation_metadata
+    notes: "Used for paraphrased rules about shared send reverbs, fully wet returns, pre-delay, early reflections, reverb tails, and ignoring preset names in favor of intended space."
+  - source_id: sos_optimise_reverb_treatments
+    title: "How To Optimise Your Reverb Treatments"
+    source_type: article
+    authors: ["Paul White"]
+    publisher: "Sound On Sound"
+    year: 2020
+    url: "https://www.soundonsound.com/techniques/how-optimise-your-reverb-treatments"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about filtering returns, ducked reverb, smooth filtered delays, gated reverb, and modulation placement before or after reverb."
+  - source_id: sos_how_phasers_work
+    title: "How Phasers Work"
+    source_type: article
+    authors: ["Hugh Robjohns"]
+    publisher: "Sound On Sound"
+    year: 2021
+    url: "https://www.soundonsound.com/sound-advice/how-phasers-work"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased modulation rules about phaser and flanger architectures, moving notches, stages, feedback, and audible sweep intensity."
+  - source_id: sos_phasing_vs_flanging
+    title: "Q. What's The Difference Between Phasing And Flanging?"
+    source_type: article
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/sound-advice/q-whats-difference-between-phasing-and-flanging"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules distinguishing flanger delay-based comb filtering from phaser all-pass phase shifting and stereo modulation variants."
+  - source_id: izotope_modulation_effects
+    title: "Understanding Chorus, Flangers, and Phasers in Audio Production"
+    source_type: article
+    authors: ["Nick Messitte"]
+    publisher: "iZotope"
+    year: 2021
+    url: "https://www.izotope.com/en/learn/understanding-chorus-flangers-and-phasers-in-audio-production.html"
+    authority_tier: manufacturer_education
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about chorus, flanger, and phaser use, common delay ranges, feedback, stereo width, and avoiding overdone modulation on lead elements."
+  - source_id: izotope_reverb_predelay
+    title: "Reverb Pre-delay Explained: How To Avoid A Muddy Reverb Sound"
+    source_type: article
+    authors: ["Nick Messitte"]
+    publisher: "iZotope"
+    year: 2023
+    url: "https://www.izotope.com/en/learn/reverb-pre-delay.html"
+    authority_tier: manufacturer_education
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - citation_metadata
+    notes: "Used for paraphrased rules about using pre-delay to preserve source attack, reduce mud, and create role-specific depth for vocals, guitars, and drums."
+  - source_id: fabfilter_reverb_use
+    title: "Reverb - How To Use Reverb?"
+    source_type: article
+    publisher: "FabFilter"
+    url: "https://www.fabfilter.com/learn/reverb/how-to-use-reverb"
+    authority_tier: manufacturer_education
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - citation_metadata
+    notes: "Used for paraphrased rules about adjusting reverb in context, using subtle support levels, choosing delay instead of reverb in busy mixes, and gated/controlled space."
+  - source_id: valhalla_room_early_controls
+    title: "ValhallaRoom: The Early Controls"
+    source_type: white_paper
+    authors: ["Sean Costello"]
+    publisher: "Valhalla DSP"
+    year: 2011
+    url: "https://valhalladsp.com/2011/05/18/valhallaroom-the-early-controls/"
+    authority_tier: manufacturer_whitepaper
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about early reflection crossfeed, echo density, early chorusing rate/depth, and preserving spatial imaging."
+  - source_id: lexicon_480l_manual
+    title: "Lexicon 480L Digital Reverb and Effects Manual"
+    source_type: manual
+    publisher: "Universal Audio / Lexicon"
+    url: "https://help.uaudio.com/hc/en-us/articles/33194625601044-Lexicon-480L-Digital-Reverb-and-Effects-Manual"
+    authority_tier: manufacturer_manual
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about pre-echoes, pre-delay, diffusion, spin/wander modulation, early/late balance, and filtered natural reverb tone."
+  - source_id: eventide_h90_modulation
+    title: "Eventide H90 Documentation - Modulation"
+    source_type: manual
+    publisher: "Eventide"
+    url: "https://cdn.eventideaudio.com/manuals/h90/1.9.4/content/algorithms/modulation.html"
+    authority_tier: manufacturer_manual
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about flanger depth, chorus delay/detune, mono-to-stereo widening, envelope-modulated chorus clarity, and wet-path tone filtering."

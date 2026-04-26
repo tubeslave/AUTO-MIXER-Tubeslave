@@ -39,7 +39,10 @@ logger = logging.getLogger(__name__)
 MAX_PAN_PERCENT = 80.0
 
 # Frequency threshold below which sources are centred [12, 74, 120].
-LOW_FREQ_CENTER_HZ = 250.0
+LOW_FREQ_CENTER_HZ = 200.0
+PAN_TRANSITION_MS = 22.0
+
+LOW_FREQUENCY_BANDS = frozenset({"sub", "bass", "low", "low_bass"})
 
 # Instruments that must always be centred [12].
 CENTER_INSTRUMENTS = frozenset({
@@ -63,6 +66,8 @@ class PanDecision:
     instrument: str
     pan_percent: float  # -100 (hard left) .. +100 (hard right), 0 = center
     reason: str
+    dominant_band: Optional[str] = None
+    transition_ms: float = PAN_TRANSITION_MS
 
 
 class AutoPanner:
@@ -78,10 +83,13 @@ class AutoPanner:
         self,
         max_pan_percent: float = MAX_PAN_PERCENT,
         low_freq_center_hz: float = LOW_FREQ_CENTER_HZ,
+        transition_ms: float = PAN_TRANSITION_MS,
     ):
         self.max_pan = min(abs(max_pan_percent), 100.0)
         self.low_freq_center_hz = low_freq_center_hz
+        self.transition_ms = max(0.0, float(transition_ms))
         self.decisions: Dict[int, PanDecision] = {}
+        self.band_accumulator: Dict[int, Dict[str, int]] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -92,6 +100,7 @@ class AutoPanner:
         channels: List[int],
         instrument_types: Dict[int, str],
         spectral_centroids: Optional[Dict[int, float]] = None,
+        channel_band_energy: Optional[Dict[int, Dict[str, float]]] = None,
     ) -> Dict[int, PanDecision]:
         """
         Calculate panning positions for a list of channels.
@@ -105,6 +114,11 @@ class AutoPanner:
         spectral_centroids : dict, optional
             Mapping channel_id -> spectral centroid in Hz (for frequency-
             based panning decisions).
+        channel_band_energy : dict, optional
+            Mapping channel_id -> band name -> energy dB. When provided,
+            dominant bands are accumulated over calls and same-band sources are
+            distributed symmetrically with lower physical input numbers closer
+            to center.
 
         Returns
         -------
@@ -112,6 +126,7 @@ class AutoPanner:
         """
         if spectral_centroids is None:
             spectral_centroids = {}
+        dominant_bands = self.update_band_accumulator(channel_band_energy or {})
 
         center_ids: List[int] = []
         near_center_ids: List[int] = []
@@ -124,6 +139,10 @@ class AutoPanner:
 
             # Rule 1: Low-frequency sources -> center [12, 74, 120].
             centroid = spectral_centroids.get(ch_id, 0.0)
+            dominant_band = dominant_bands.get(ch_id)
+            if dominant_band in LOW_FREQUENCY_BANDS:
+                center_ids.append(ch_id)
+                continue
             if centroid > 0 and centroid < self.low_freq_center_hz:
                 center_ids.append(ch_id)
                 continue
@@ -154,6 +173,8 @@ class AutoPanner:
                 instrument=instrument_types.get(ch_id, "unknown"),
                 pan_percent=0.0,
                 reason="center (low freq / lead vocal / kick / snare / bass) [IMP 7.2]",
+                dominant_band=dominant_bands.get(ch_id),
+                transition_ms=self.transition_ms,
             )
 
         # 3. Near-center instruments -> slight offset, alternating L/R.
@@ -165,6 +186,8 @@ class AutoPanner:
                 instrument=instrument_types.get(ch_id, "unknown"),
                 pan_percent=round(side * near_center_offset, 1),
                 reason="near-center [IMP 7.2]",
+                dominant_band=dominant_bands.get(ch_id),
+                transition_ms=self.transition_ms,
             )
             side *= -1.0
 
@@ -172,38 +195,39 @@ class AutoPanner:
         #    Higher spectral centroid -> wider panning [12, 49, 120],
         #    but relationship tapers off after low mids [74].
         if pan_ids:
-            # Sort by spectral centroid ascending (low freq closer to center).
-            pan_ids_sorted = sorted(
-                pan_ids,
-                key=lambda cid: spectral_centroids.get(cid, 500.0),
-            )
+            grouped = self._group_pan_candidates(pan_ids, dominant_bands)
+            for band_name, group_ids in grouped.items():
+                if band_name:
+                    group_ids_sorted = sorted(group_ids)
+                else:
+                    group_ids_sorted = sorted(
+                        group_ids,
+                        key=lambda cid: spectral_centroids.get(cid, 500.0),
+                    )
+                positions = self._symmetric_positions(len(group_ids_sorted))
 
-            n = len(pan_ids_sorted)
-            side = 1.0  # alternate L/R for symmetric balance [49]
+                for i, ch_id in enumerate(group_ids_sorted):
+                    centroid = spectral_centroids.get(ch_id, 500.0)
+                    width_factor = self._centroid_to_width(centroid)
+                    pan_amount = positions[i] * max(0.25, width_factor)
+                    pan_amount = round(max(-self.max_pan, min(self.max_pan, pan_amount)), 1)
 
-            for i, ch_id in enumerate(pan_ids_sorted):
-                centroid = spectral_centroids.get(ch_id, 500.0)
+                    if band_name:
+                        reason = (
+                            f"spectral-band pan (band={band_name}, "
+                            f"centroid={centroid:.0f} Hz, input priority) [Perez/Reiss]"
+                        )
+                    else:
+                        reason = f"spectral pan (centroid={centroid:.0f} Hz) [IMP 7.2]"
 
-                # Map centroid to pan width.
-                # Low mids (~250-500 Hz) -> narrow panning.
-                # Mid-high (~2-8 kHz) -> wider panning.
-                # Tapers off: beyond ~4 kHz panning doesn't increase [74].
-                width_factor = self._centroid_to_width(centroid)
-
-                # Combine spectral width with positional spread.
-                # Ensure roughly equal distribution across stereo field [49].
-                positional_spread = (i + 1) / max(n, 1)
-                combined = 0.5 * width_factor + 0.5 * positional_spread
-
-                pan_amount = round(side * combined * self.max_pan, 1)
-
-                decisions[ch_id] = PanDecision(
-                    channel_id=ch_id,
-                    instrument=instrument_types.get(ch_id, "unknown"),
-                    pan_percent=pan_amount,
-                    reason=f"spectral pan (centroid={centroid:.0f} Hz) [IMP 7.2]",
-                )
-                side *= -1.0
+                    decisions[ch_id] = PanDecision(
+                        channel_id=ch_id,
+                        instrument=instrument_types.get(ch_id, "unknown"),
+                        pan_percent=pan_amount,
+                        reason=reason,
+                        dominant_band=dominant_bands.get(ch_id),
+                        transition_ms=self.transition_ms,
+                    )
 
         self.decisions = decisions
         return decisions
@@ -244,6 +268,60 @@ class AutoPanner:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def update_band_accumulator(
+        self,
+        channel_band_energy: Dict[int, Dict[str, float]],
+    ) -> Dict[int, str]:
+        """
+        Accumulate dominant spectral bands per channel.
+
+        Perez/Reiss-style panning uses repeated short-window observations
+        rather than a single instantaneous sample. Callers can feed 100 ms
+        band-energy snapshots; the most frequently dominant band wins.
+        """
+        dominant: Dict[int, str] = {}
+        for ch_id, bands in channel_band_energy.items():
+            finite_bands = {
+                name: float(value)
+                for name, value in bands.items()
+                if value is not None and math.isfinite(float(value))
+            }
+            if not finite_bands:
+                continue
+            current_band = max(finite_bands, key=finite_bands.get)
+            accumulator = self.band_accumulator.setdefault(ch_id, {})
+            accumulator[current_band] = accumulator.get(current_band, 0) + 1
+            dominant[ch_id] = max(accumulator, key=accumulator.get)
+
+        return dominant
+
+    @staticmethod
+    def _group_pan_candidates(
+        pan_ids: List[int],
+        dominant_bands: Dict[int, str],
+    ) -> Dict[Optional[str], List[int]]:
+        grouped: Dict[Optional[str], List[int]] = {}
+        for ch_id in pan_ids:
+            band_name = dominant_bands.get(ch_id)
+            grouped.setdefault(band_name, []).append(ch_id)
+        return grouped
+
+    def _symmetric_positions(self, count: int) -> List[float]:
+        """Return positions ordered so earlier physical inputs are nearer center."""
+        if count <= 0:
+            return []
+        if count == 1:
+            return [0.0]
+
+        pair_count = math.ceil(count / 2)
+        positions: List[float] = []
+        for i in range(count):
+            rank = (i // 2) + 1
+            amount = self.max_pan * rank / pair_count
+            sign = -1.0 if i % 2 == 0 else 1.0
+            positions.append(sign * amount)
+        return positions
 
     @staticmethod
     def _centroid_to_width(centroid_hz: float) -> float:

@@ -136,6 +136,12 @@ class TestMasterFallback:
         result = master._master_fallback(input_audio, ref_audio, 48000)
         assert len(result) == len(input_audio)
 
+    def test_fallback_keeps_full_mix_length_with_short_reference(self, master):
+        input_audio = _make_sine(amplitude=0.3, duration_sec=1.0)
+        ref_audio = _make_sine(amplitude=0.7, freq_hz=880.0, duration_sec=0.25)
+        result = master._master_fallback(input_audio, ref_audio, 48000)
+        assert len(result) == len(input_audio)
+
     def test_fallback_increases_quiet_signal(self, master):
         quiet = _make_sine(amplitude=0.01)
         loud_ref = _make_sine(amplitude=0.8, freq_hz=880.0)
@@ -202,11 +208,11 @@ class TestMasterFallback:
 class TestApplyEQMatch:
 
     def test_eq_match_returns_same_length(self, master):
-        audio = _make_sine(amplitude=0.5).astype(np.float64)
-        ref = _make_sine(amplitude=0.5, freq_hz=880.0).astype(np.float64)
+        audio = _make_sine(amplitude=0.5, duration_sec=1.0).astype(np.float64)
+        ref = _make_sine(amplitude=0.5, freq_hz=880.0, duration_sec=0.25).astype(np.float64)
         result = master._apply_eq_match(audio, ref, 48000)
-        # Result length should be at most the minimum of input lengths
-        assert len(result) <= max(len(audio), len(ref))
+        assert len(result) == len(audio)
+        assert np.all(np.isfinite(result))
 
     def test_eq_match_without_scipy(self, master):
         """Without scipy, _apply_eq_match should return audio unchanged."""

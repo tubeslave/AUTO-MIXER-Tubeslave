@@ -58,7 +58,7 @@ from autofoh_safety import (  # noqa: E402
     ChannelFaderMove,
     TypedCorrectionAction,
 )
-from auto_fx import AutoFXPlanner, FXBusDecision, FXPlan  # noqa: E402
+from auto_fx import AutoFXPlanner, FXBusDecision, FXPlan, FXSendDecision  # noqa: E402
 from channel_recognizer import classification_from_legacy_preset  # noqa: E402
 from cross_adaptive_eq import CrossAdaptiveEQ  # noqa: E402
 from ml.style_transfer import InstrumentStyle, StyleProfile, StyleTransfer  # noqa: E402
@@ -617,6 +617,15 @@ class ChannelPlan:
     autofoh_actions: list[dict[str, Any]] = field(default_factory=list)
     fx_send_db: float | None = None
     fx_bus_send_db: dict[int, float] = field(default_factory=dict)
+
+
+@dataclass
+class LayerGroupPlan:
+    group_id: str
+    instrument: str
+    channels: list[int]
+    roles: dict[int, str]
+    group_kind: str
 
 
 @dataclass
@@ -5027,6 +5036,1167 @@ def _record_source_candidate(
         return False
 
 
+SOURCE_RULES_ONLY_ANCHORS = {
+    "kick",
+    "snare",
+    "bass",
+    "bass_guitar",
+    "bass_di",
+    "bass_mic",
+    "synth_bass",
+    "lead_vocal",
+}
+
+SOURCE_RULES_ONLY_LEVEL_OFFSETS = {
+    "lead_vocal": 1.6,
+    "kick": 0.8,
+    "bass": -0.1,
+    "bass_guitar": -0.2,
+    "bass_di": -0.2,
+    "bass_mic": -0.2,
+    "synth_bass": -0.4,
+    "snare": -1.0,
+    "rack_tom": -4.8,
+    "floor_tom": -4.6,
+    "hi_hat": -8.0,
+    "ride": -8.0,
+    "overhead": -8.4,
+    "room": -9.2,
+    "electric_guitar": -4.1,
+    "lead_guitar": -3.7,
+    "rhythm_guitar": -4.3,
+    "acoustic_guitar": -4.7,
+    "accordion": -5.0,
+    "keys": -5.0,
+    "piano": -5.0,
+    "organ": -5.0,
+    "synth": -5.2,
+    "pad": -6.2,
+    "playback": -5.5,
+    "backing_vocal": -5.2,
+}
+
+SOURCE_RULES_ONLY_HPF = {
+    "kick": 32.0,
+    "bass": 35.0,
+    "bass_guitar": 35.0,
+    "bass_di": 35.0,
+    "bass_mic": 35.0,
+    "synth_bass": 28.0,
+    "snare": 90.0,
+    "rack_tom": 60.0,
+    "floor_tom": 52.0,
+    "hi_hat": 180.0,
+    "ride": 170.0,
+    "overhead": 170.0,
+    "room": 85.0,
+    "lead_vocal": 95.0,
+    "backing_vocal": 110.0,
+    "electric_guitar": 110.0,
+    "lead_guitar": 100.0,
+    "rhythm_guitar": 115.0,
+    "acoustic_guitar": 100.0,
+    "accordion": 125.0,
+    "keys": 85.0,
+    "piano": 80.0,
+    "organ": 70.0,
+    "synth": 55.0,
+    "pad": 90.0,
+    "playback": 35.0,
+}
+
+
+def _source_rule_ids(matches: list[RuleMatch], limit: int = 3) -> list[str]:
+    return [match.rule.rule_id for match in matches[:limit]]
+
+
+def _source_rules_only_retrieve(
+    source_layer: SourceKnowledgeLayer | None,
+    query: str,
+    *,
+    domains: list[str],
+    instrument: str,
+    problems: list[str],
+    action_types: list[str],
+    limit: int = 5,
+) -> list[RuleMatch]:
+    return _safe_source_retrieve(
+        source_layer,
+        query,
+        domains=domains,
+        instrument=instrument,
+        problems=problems,
+        action_types=action_types,
+        limit=limit,
+    )
+
+
+def _source_rules_only_pan(plan: ChannelPlan) -> tuple[float, list[str]]:
+    """Panning policy for the experimental source-rules-only offline render."""
+
+    instrument = str(plan.instrument)
+    name = plan.path.stem.lower()
+    notes: list[str] = []
+    if instrument in SOURCE_RULES_ONLY_ANCHORS:
+        notes.append("anchor_kept_center")
+        return 0.0, notes
+
+    left_hint = bool(re.search(r"(^|[\s_.-])(l|left)([\s_.-]|$)", name))
+    right_hint = bool(re.search(r"(^|[\s_.-])(r|right)([\s_.-]|$)", name))
+    if left_hint and not right_hint:
+        notes.append("filename_left_hint")
+        direction = -1.0
+    elif right_hint and not left_hint:
+        notes.append("filename_right_hint")
+        direction = 1.0
+    else:
+        stable_hash = sum(ord(char) for char in plan.path.stem.lower())
+        direction = -1.0 if stable_hash % 2 else 1.0
+        notes.append("role_based_alternating_support_pan")
+
+    width_by_instrument = {
+        "overhead": 0.78,
+        "room": 0.72,
+        "playback": 0.70,
+        "electric_guitar": 0.62,
+        "lead_guitar": 0.58,
+        "rhythm_guitar": 0.62,
+        "acoustic_guitar": 0.42,
+        "backing_vocal": 0.38,
+        "accordion": 0.34,
+        "keys": 0.40,
+        "piano": 0.34,
+        "organ": 0.34,
+        "synth": 0.44,
+        "pad": 0.58,
+        "hi_hat": 0.28,
+        "ride": 0.28,
+        "rack_tom": 0.22,
+        "floor_tom": 0.28,
+    }
+    pan = float(direction * width_by_instrument.get(instrument, 0.25))
+    return float(np.clip(pan, -0.85, 0.85)), notes
+
+
+def _source_rules_only_band_medians(plans: dict[int, ChannelPlan]) -> dict[str, float]:
+    medians: dict[str, float] = {}
+    for band in ("sub", "bass", "low_mid", "mid", "presence"):
+        values = []
+        for plan in plans.values():
+            band_energy = plan.metrics.get("band_energy") or {}
+            value = band_energy.get(band)
+            if isinstance(value, (int, float, np.floating)) and np.isfinite(float(value)):
+                values.append(float(value))
+        medians[band] = _median_value(values, default=-24.0)
+    return medians
+
+
+def _source_rules_only_eq_bands(
+    plan: ChannelPlan,
+    band_medians: dict[str, float],
+    source_layer: SourceKnowledgeLayer | None,
+) -> tuple[list[tuple[float, float, float]], list[dict[str, Any]]]:
+    instrument = str(plan.instrument)
+    bands = plan.metrics.get("band_energy") or {}
+    decisions: list[dict[str, Any]] = []
+    eq: list[tuple[float, float, float]] = []
+
+    def add_band(
+        freq: float,
+        gain: float,
+        q: float,
+        problem: str,
+        query: str,
+        domains: list[str] | None = None,
+    ) -> None:
+        matches = _source_rules_only_retrieve(
+            source_layer,
+            query,
+            domains=domains or ["eq", "masking", "tone"],
+            instrument=instrument,
+            problems=[problem, "masking", "translation"],
+            action_types=["eq_candidate"],
+            limit=4,
+        )
+        eq.append((float(freq), float(gain), float(q)))
+        decisions.append({
+            "problem": problem,
+            "freq_hz": round(float(freq), 2),
+            "gain_db": round(float(gain), 2),
+            "q": round(float(q), 2),
+            "selected_rule_ids": _source_rule_ids(matches),
+        })
+
+    low_mid = float(bands.get("low_mid", band_medians.get("low_mid", -24.0)))
+    mid = float(bands.get("mid", band_medians.get("mid", -24.0)))
+    presence = float(bands.get("presence", band_medians.get("presence", -30.0)))
+    bass = float(bands.get("bass", band_medians.get("bass", -20.0)))
+    low_mid_excess = low_mid - float(band_medians.get("low_mid", low_mid))
+    presence_excess = presence - float(band_medians.get("presence", presence))
+
+    if low_mid_excess > 1.3:
+        cut_db = -float(np.clip(1.0 + low_mid_excess * 0.34, 1.1, 2.8))
+        center = 320.0
+        if instrument in {"bass", "bass_guitar", "bass_di", "bass_mic"}:
+            center = 210.0
+        elif instrument in {"snare", "rack_tom", "floor_tom"}:
+            center = 360.0
+        elif "guitar" in instrument:
+            center = 280.0
+        add_band(
+            center,
+            cut_db,
+            1.2,
+            "low_mid_buildup",
+            f"{instrument} low mid mud masking measured excess",
+            domains=["eq", "masking"],
+        )
+
+    if presence_excess > 2.2 and instrument in {
+        "lead_vocal",
+        "backing_vocal",
+        "electric_guitar",
+        "lead_guitar",
+        "rhythm_guitar",
+        "accordion",
+        "hi_hat",
+        "ride",
+        "overhead",
+    }:
+        center = 3600.0 if "vocal" in instrument else 4200.0
+        if instrument in {"hi_hat", "ride", "overhead"}:
+            center = 6200.0
+        cut_db = -float(np.clip(0.8 + presence_excess * 0.22, 0.9, 2.2))
+        add_band(
+            center,
+            cut_db,
+            1.5,
+            "harshness",
+            f"{instrument} measured presence harshness targeted cut",
+            domains=["eq", "harshness"],
+        )
+
+    if instrument == "kick":
+        click_shortfall = (bass - presence)
+        if click_shortfall > 15.0:
+            add_band(
+                3600.0,
+                float(np.clip((click_shortfall - 14.0) * 0.16, 0.8, 2.2)),
+                1.25,
+                "weak_attack",
+                "kick weak click attack measured bass dominates presence",
+                domains=["eq", "dynamics", "drums"],
+            )
+        if low_mid > bass - 1.0:
+            add_band(
+                320.0,
+                -1.4,
+                1.25,
+                "boxiness",
+                "kick boxy low mid measured cleanup",
+                domains=["eq", "masking", "drums"],
+            )
+    elif instrument == "snare":
+        if mid - presence > 1.0:
+            add_band(
+                4800.0,
+                1.0,
+                1.15,
+                "weak_attack",
+                "snare attack presence measured support",
+                domains=["eq", "drums"],
+            )
+        if low_mid_excess > 0.8:
+            add_band(
+                520.0,
+                -1.0,
+                1.7,
+                "boxiness",
+                "snare boxy midrange measured cleanup",
+                domains=["eq", "masking", "drums"],
+            )
+    elif instrument == "lead_vocal":
+        if presence_excess < -1.8:
+            add_band(
+                2800.0,
+                1.0,
+                1.0,
+                "vocal_intelligibility",
+                "lead vocal measured presence support",
+                domains=["eq", "vocal", "tone"],
+            )
+        if low_mid_excess > 0.5:
+            add_band(
+                240.0,
+                -1.2,
+                1.2,
+                "low_mid_buildup",
+                "lead vocal low mid cleanup measured proximity",
+                domains=["eq", "masking", "vocal"],
+            )
+
+    return eq[:4], decisions
+
+
+def _source_rules_only_compressor(
+    plan: ChannelPlan,
+    source_layer: SourceKnowledgeLayer | None,
+) -> tuple[tuple[float, float, float, float], dict[str, Any]]:
+    instrument = str(plan.instrument)
+    metrics = plan.metrics or {}
+    rms_db = float(metrics.get("rms_db", -36.0))
+    dynamic_range = float(metrics.get("dynamic_range_db", 0.0))
+    active_ratio = float(metrics.get("analysis_active_ratio", 1.0) or 1.0)
+    matches = _source_rules_only_retrieve(
+        source_layer,
+        f"{instrument} compression envelope dynamics measured {dynamic_range:.1f} dB",
+        domains=["dynamics", "compression"],
+        instrument=instrument,
+        problems=["unstable_level", "excessive_peaks", "weak_attack", "flat_dynamics"],
+        action_types=["compressor_candidate"],
+        limit=5,
+    )
+
+    threshold = 0.0
+    ratio = 1.0
+    attack = 18.0
+    release = 150.0
+    reason = "left_uncompressed_by_metrics"
+    if instrument == "kick" and dynamic_range > 7.5:
+        threshold = float(np.clip(rms_db + 4.0, -28.0, -8.0))
+        ratio = 3.0
+        attack = 24.0
+        release = 95.0
+        reason = "kick_transient_preserving_compression"
+    elif instrument == "snare" and dynamic_range > 8.0:
+        threshold = float(np.clip(rms_db + 3.0, -30.0, -10.0))
+        ratio = 3.3
+        attack = 7.0
+        release = 125.0
+        reason = "snare_body_without_losing_attack"
+    elif instrument in {"rack_tom", "floor_tom"} and dynamic_range > 9.0 and active_ratio > 0.02:
+        threshold = float(np.clip(rms_db + 4.0, -30.0, -9.0))
+        ratio = 2.5
+        attack = 16.0
+        release = 145.0
+        reason = "tom_level_density"
+    elif instrument in {"lead_vocal", "backing_vocal"} and dynamic_range > 8.0:
+        threshold = float(np.clip(rms_db + 2.0, -32.0, -10.0))
+        ratio = 2.7 if instrument == "lead_vocal" else 2.0
+        attack = 9.0
+        release = 135.0
+        reason = "vocal_consistency_from_measured_dynamics"
+    elif instrument in BASS_INSTRUMENTS and dynamic_range > 7.0:
+        threshold = float(np.clip(rms_db + 2.5, -30.0, -10.0))
+        ratio = 3.0
+        attack = 18.0
+        release = 165.0
+        reason = "bass_note_stability"
+    elif "guitar" in instrument and dynamic_range > 12.0:
+        threshold = float(np.clip(rms_db + 4.0, -30.0, -10.0))
+        ratio = 1.7
+        attack = 14.0
+        release = 145.0
+        reason = "support_source_peak_control"
+    elif instrument in {"accordion", "keys", "piano", "organ", "synth", "playback"} and dynamic_range > 13.0:
+        threshold = float(np.clip(rms_db + 4.0, -30.0, -10.0))
+        ratio = 1.6
+        attack = 18.0
+        release = 165.0
+        reason = "support_layer_peak_control"
+
+    return (
+        (threshold, ratio, attack, release),
+        {
+            "reason": reason,
+            "dynamic_range_db": round(dynamic_range, 2),
+            "analysis_active_ratio": round(active_ratio, 4),
+            "selected_rule_ids": _source_rule_ids(matches),
+        },
+    )
+
+
+def apply_source_rules_mert_only_plan(
+    plans: dict[int, ChannelPlan],
+    sr: int,
+    target_len: int,
+    source_layer: SourceKnowledgeLayer | None,
+    source_session_id: str,
+) -> dict[str, Any]:
+    """Build an offline mix plan from metrics, source rules, and MERT shadow only.
+
+    This intentionally bypasses the project's normal rule engine, AutoFOH analyzers,
+    reference voicing, and agent actions. The final limiter/headroom stage remains
+    outside this function as a non-negotiable offline render safety guard.
+    """
+
+    active_rms = [
+        float(plan.metrics.get("rms_db", -60.0))
+        for plan in plans.values()
+        if float(plan.metrics.get("rms_db", -120.0)) > -65.0
+    ]
+    base_target = float(np.clip(_median_value(active_rms, default=-25.0) - 1.0, -29.0, -21.0))
+    band_medians = _source_rules_only_band_medians(plans)
+    level_matches = _source_rules_only_retrieve(
+        source_layer,
+        "automatic balance loudness metrics role priority true peak",
+        domains=["balance", "fader", "metering"],
+        instrument="all",
+        problems=["unstable_starting_point", "unknown_loudness", "unclear_mix"],
+        action_types=["balance_pass"],
+        limit=5,
+    )
+    pan_matches = _source_rules_only_retrieve(
+        source_layer,
+        "panning unmask supports keep anchors center",
+        domains=["pan", "soundfield", "masking"],
+        instrument="all",
+        problems=["crowded_center", "narrow_mix", "masking"],
+        action_types=["pan_candidate"],
+        limit=5,
+    )
+    hpf_matches = _source_rules_only_retrieve(
+        source_layer,
+        "filtered low end cleanup source rule hpf masking mud",
+        domains=["eq", "filter", "masking"],
+        instrument="all",
+        problems=["mud", "masking", "headroom_risk"],
+        action_types=["eq_candidate"],
+        limit=5,
+    )
+
+    channel_reports: list[dict[str, Any]] = []
+    selected_rule_ids: set[str] = set()
+    for match in [*level_matches, *pan_matches, *hpf_matches]:
+        selected_rule_ids.add(match.rule.rule_id)
+
+    for channel, plan in plans.items():
+        instrument = str(plan.instrument)
+        metrics = plan.metrics or {}
+        rms_db = float(metrics.get("rms_db", -60.0))
+        active_ratio = float(metrics.get("analysis_active_ratio", 1.0) or 1.0)
+        is_bleed_like = bool(metrics.get("analysis_bleed_dominant", False)) or (
+            instrument in {"overhead", "room", "hi_hat", "ride"}
+        )
+
+        target = base_target + float(SOURCE_RULES_ONLY_LEVEL_OFFSETS.get(instrument, -4.5))
+        if "snare" in plan.path.stem.lower() and ("bottom" in plan.path.stem.lower() or re.search(r"\bsnare\s*b\b", plan.path.stem.lower())):
+            target -= 7.0
+        max_boost = 8.5
+        if is_bleed_like:
+            max_boost = 3.5
+        elif active_ratio < 0.04 and instrument in {"rack_tom", "floor_tom", "snare"}:
+            max_boost = 5.5
+        trim_raw = target - rms_db
+        trim = float(np.clip(trim_raw, -18.0, max_boost))
+        pan, pan_notes = _source_rules_only_pan(plan)
+        eq_bands, eq_decisions = _source_rules_only_eq_bands(plan, band_medians, source_layer)
+        (threshold, ratio, attack, release), comp_decision = _source_rules_only_compressor(plan, source_layer)
+
+        plan.target_rms_db = float(target)
+        plan.trim_db = trim
+        plan.fader_db = 0.0
+        plan.pan = pan
+        plan.hpf = float(SOURCE_RULES_ONLY_HPF.get(instrument, 80.0))
+        plan.lpf = 0.0
+        plan.eq_bands = eq_bands
+        plan.comp_threshold_db = float(threshold)
+        plan.comp_ratio = float(ratio)
+        plan.comp_attack_ms = float(attack)
+        plan.comp_release_ms = float(release)
+        plan.phase_invert = False
+        plan.delay_ms = 0.0
+        plan.expander_enabled = False
+        plan.expander_range_db = 0.0
+        plan.expander_report = {
+            "enabled": False,
+            "reason": "source_rules_mert_only_disables_project_event_expander",
+        }
+        plan.phase_notes = [{
+            "mode": "source_rules_mert_only",
+            "decision": "no_phase_or_delay_change",
+            "reason": "phase rule is shadow/advisory unless auditioned against full mix",
+        }]
+        plan.pan_notes = [{
+            "mode": "source_rules_mert_only",
+            "pan": round(float(pan), 3),
+            "notes": pan_notes,
+            "selected_rule_ids": _source_rule_ids(pan_matches),
+        }]
+        plan.cross_adaptive_eq = []
+        plan.autofoh_actions = []
+        plan.fx_send_db = None
+        plan.fx_bus_send_db = {}
+        plan.trim_analysis = {
+            "mode": "source_rules_mert_only",
+            "base_target_rms_db": round(base_target, 2),
+            "target_rms_db": round(float(target), 2),
+            "input_rms_db": round(rms_db, 2),
+            "raw_trim_db": round(float(trim_raw), 2),
+            "applied_trim_db": round(float(trim), 2),
+            "max_boost_db": round(float(max_boost), 2),
+            "analysis_active_ratio": round(active_ratio, 4),
+            "bleed_like": bool(is_bleed_like),
+            "selected_rule_ids": _source_rule_ids(level_matches),
+        }
+
+        for item in eq_decisions:
+            selected_rule_ids.update(item.get("selected_rule_ids", []))
+        selected_rule_ids.update(comp_decision.get("selected_rule_ids", []))
+
+        channel_reports.append({
+            "channel": int(channel),
+            "file": plan.path.name,
+            "instrument": instrument,
+            "target_rms_db": round(float(target), 2),
+            "trim_db": round(float(trim), 2),
+            "fader_db": 0.0,
+            "pan": round(float(pan), 3),
+            "hpf_hz": round(float(plan.hpf), 1),
+            "eq": eq_decisions,
+            "compressor": {
+                "threshold_db": round(float(threshold), 2),
+                "ratio": round(float(ratio), 2),
+                "attack_ms": round(float(attack), 2),
+                "release_ms": round(float(release), 2),
+                **comp_decision,
+            },
+            "phase": "shadow_only_no_change",
+        })
+
+    return {
+        "enabled": True,
+        "mode": "source_rules_mert_only",
+        "sample_rate": int(sr),
+        "duration_sec": round(float(target_len) / float(sr), 3) if sr else 0.0,
+        "source_session_id": source_session_id,
+        "base_target_rms_db": round(base_target, 2),
+        "band_medians": {key: round(float(value), 3) for key, value in band_medians.items()},
+        "selected_rule_ids": sorted(selected_rule_ids),
+        "disabled_project_passes": [
+            "mixing_agent_rule_engine",
+            "codex_orchestrator",
+            "drum_phase_alignment",
+            "overhead_anchored_drum_panning",
+            "event_based_dynamics",
+            "autofoh_analyzer_pass",
+            "bass_drum_push",
+            "kick_presence_boost",
+            "cymbal_focus_cleanup",
+            "cross_adaptive_eq",
+            "reference_mix_guidance",
+            "genre_mix_profile",
+            "kick_bass_hierarchy",
+            "frequency_window_balance",
+            "stem_mix_verification",
+            "reference_vocal_fx_focus",
+            "reference_dynamics_ride",
+            "large_system_polish",
+            "master_bus_glue_compressor",
+        ],
+        "safety_kept": [
+            "offline_render_only_no_osc",
+            "channel_faders_not_above_0_db",
+            "final_limiter_and_master_ceiling",
+            "mert_shadow_only_no_command_blocking",
+        ],
+        "channels": channel_reports,
+    }
+
+
+def build_source_rules_only_fx_plan(
+    plans: dict[int, ChannelPlan],
+    tempo_bpm: float = 120.0,
+) -> FXPlan:
+    """Create a source-rules-only FX plan without invoking AutoFXPlanner."""
+
+    quarter_ms = 60000.0 / max(40.0, min(float(tempo_bpm), 240.0))
+    dotted_eighth_ms = quarter_ms * 0.75
+    quarter_delay_ms = quarter_ms
+    buses = [
+        FXBusDecision(
+            bus_id=13,
+            name="Source Plate",
+            fx_type="reverb",
+            fx_slot="aux_13",
+            model="source_rules_filtered_plate",
+            return_level_db=-7.5,
+            params={
+                "decay_s": 1.35,
+                "predelay_ms": 48.0,
+                "density": 0.62,
+                "brightness": 0.42,
+            },
+            hpf_hz=220.0,
+            lpf_hz=7200.0,
+            duck_source="lead_vocal",
+            duck_depth_db=2.0,
+            reason="rules_jsonl filtered shared vocal depth with predelay",
+        ),
+        FXBusDecision(
+            bus_id=14,
+            name="Source Drum Room",
+            fx_type="reverb",
+            fx_slot="aux_14",
+            model="source_rules_short_room",
+            return_level_db=-9.5,
+            params={
+                "decay_s": 0.62,
+                "predelay_ms": 14.0,
+                "density": 0.78,
+                "brightness": 0.36,
+            },
+            hpf_hz=180.0,
+            lpf_hz=5600.0,
+            duck_source=None,
+            duck_depth_db=0.0,
+            reason="rules_jsonl short filtered drum ambience preserving attack",
+        ),
+        FXBusDecision(
+            bus_id=15,
+            name="Source Tempo Delay",
+            fx_type="delay",
+            fx_slot="aux_15",
+            model="source_rules_filtered_tempo_delay",
+            return_level_db=-5.5,
+            params={
+                "left_delay_ms": float(np.clip(dotted_eighth_ms, 120.0, 500.0)),
+                "right_delay_ms": float(np.clip(quarter_delay_ms, 150.0, 500.0)),
+                "feedback": 0.18,
+                "width": 0.72,
+            },
+            hpf_hz=260.0,
+            lpf_hz=5200.0,
+            duck_source="lead_vocal",
+            duck_depth_db=4.0,
+            reason="rules_jsonl filtered ducked delay for depth without reverb wash",
+        ),
+        FXBusDecision(
+            bus_id=16,
+            name="Source Mod Doubler",
+            fx_type="chorus",
+            fx_slot="aux_16",
+            model="source_rules_filtered_chorus_width",
+            return_level_db=-13.0,
+            params={
+                "left_delay_ms": 11.0,
+                "right_delay_ms": 17.0,
+                "depth": 0.13,
+                "rate_hz": 0.45,
+            },
+            hpf_hz=220.0,
+            lpf_hz=8500.0,
+            duck_source=None,
+            duck_depth_db=0.0,
+            reason="rules_jsonl subtle support-source modulation width",
+        ),
+    ]
+    sends: list[FXSendDecision] = []
+    for channel, plan in plans.items():
+        if plan.muted:
+            continue
+        instrument = str(plan.instrument)
+
+        def add(bus_id: int, send_db: float, reason: str) -> None:
+            sends.append(FXSendDecision(
+                channel_id=int(channel),
+                instrument=instrument,
+                bus_id=int(bus_id),
+                send_db=float(send_db),
+                post_fader=True,
+                reason=reason,
+            ))
+
+        if instrument == "lead_vocal":
+            add(13, -18.5, "filtered plate keeps lead present but not dry")
+            add(15, -25.0, "ducked tempo delay adds vocal depth")
+        elif instrument == "backing_vocal":
+            add(13, -16.0, "backing vocals placed deeper than lead")
+            add(16, -24.5, "subtle modulation widens support vocal")
+        elif instrument == "snare":
+            add(14, -18.5, "short room restores snare space without long wash")
+            add(13, -27.0, "small shared plate tail")
+        elif instrument in {"rack_tom", "floor_tom"}:
+            add(14, -20.5, "short room supports tom body")
+        elif instrument in {"overhead", "room", "hi_hat", "ride"}:
+            add(14, -34.0, "minimal room return because source already contains kit ambience")
+        elif "guitar" in instrument:
+            add(13, -25.5, "filtered plate gives guitar depth")
+            add(16, -27.0, "subtle modulation keeps guitar off the center")
+        elif instrument in {"accordion", "keys", "piano", "organ", "synth", "pad"}:
+            add(13, -24.5, "filtered shared space for support instrument")
+            add(15, -30.0, "quiet delay depth for support instrument")
+            add(16, -28.0, "light modulation texture")
+        elif instrument == "playback":
+            add(13, -31.0, "very low shared space on prebuilt layer")
+            add(16, -31.0, "very low support width on prebuilt layer")
+
+    return FXPlan(
+        buses=buses,
+        sends=sends,
+        notes=[
+            "source_rules_mert_only",
+            "Built without AutoFXPlanner; values come from source FX rules and measured role classification.",
+        ],
+    )
+
+
+def _layer_role_from_name(plan: ChannelPlan) -> str:
+    name = plan.path.stem.lower()
+    if "bottom" in name or re.search(r"\bsnare\s*b\b", name) or name.endswith(" b"):
+        return "bottom"
+    if "top" in name or re.search(r"\bsnare\s*t\b", name) or name.endswith(" t"):
+        return "top"
+    if re.search(r"(^|[\s_.-])(l|left)([\s_.-]|$)", name):
+        return "left"
+    if re.search(r"(^|[\s_.-])(r|right)([\s_.-]|$)", name):
+        return "right"
+    if "dt" in name or "double" in name:
+        return "double"
+    return "main"
+
+
+def _layer_group_key(plan: ChannelPlan) -> tuple[str, str, str] | None:
+    instrument = str(plan.instrument)
+    role = _layer_role_from_name(plan)
+    if instrument == "snare":
+        return ("snare", "snare", "top_bottom")
+    if instrument in {"overhead", "room", "playback"} and role in {"left", "right"}:
+        return (f"{instrument}_stereo", instrument, "stereo_pair")
+    if instrument == "backing_vocal" and role in {"left", "right", "double"}:
+        return ("backing_vocal_stack", instrument, "support_stack")
+    if "guitar" in instrument and role in {"left", "right", "double"}:
+        return ("electric_guitar_layers", instrument, "support_stack")
+    return None
+
+
+def build_layer_group_plans(plans: dict[int, ChannelPlan]) -> list[LayerGroupPlan]:
+    groups: dict[str, LayerGroupPlan] = {}
+    for channel, plan in sorted(plans.items()):
+        if plan.muted:
+            continue
+        key = _layer_group_key(plan)
+        if key is None:
+            continue
+        group_id, instrument, group_kind = key
+        group = groups.setdefault(
+            group_id,
+            LayerGroupPlan(
+                group_id=group_id,
+                instrument=instrument,
+                channels=[],
+                roles={},
+                group_kind=group_kind,
+            ),
+        )
+        group.channels.append(int(channel))
+        group.roles[int(channel)] = _layer_role_from_name(plan)
+    return [group for group in groups.values() if len(group.channels) > 1]
+
+
+def _audio_rms_db(audio: np.ndarray) -> float:
+    mono = mono_sum(np.asarray(audio, dtype=np.float32))
+    if len(mono) == 0:
+        return -120.0
+    rms = float(np.sqrt(np.mean(np.square(mono))) + 1e-12)
+    return amp_to_db(rms)
+
+
+def _audio_peak_db(audio: np.ndarray) -> float:
+    arr = np.asarray(audio, dtype=np.float32)
+    if len(arr) == 0:
+        return -120.0
+    return amp_to_db(float(np.max(np.abs(arr))))
+
+
+def _apply_stereo_gain(audio: np.ndarray, gain_db: float) -> np.ndarray:
+    return (np.asarray(audio, dtype=np.float32) * db_to_amp(float(gain_db))).astype(np.float32)
+
+
+def _apply_stereo_peaking_eq(audio: np.ndarray, sr: int, freq: float, gain_db: float, q: float) -> np.ndarray:
+    arr = np.asarray(audio, dtype=np.float32)
+    if arr.ndim == 1:
+        return peaking_eq(arr, sr, freq, gain_db, q)
+    return np.column_stack([
+        peaking_eq(arr[:, channel], sr, freq, gain_db, q)
+        for channel in range(arr.shape[1])
+    ]).astype(np.float32)
+
+
+def _sum_layer_group_audio(
+    rendered_channels: dict[int, np.ndarray],
+    group: LayerGroupPlan,
+) -> np.ndarray:
+    first = rendered_channels[group.channels[0]]
+    return sum((rendered_channels[channel] for channel in group.channels), np.zeros_like(first))
+
+
+def _layer_group_phase_score(audio: np.ndarray, sr: int, instrument: str) -> float:
+    mono = mono_sum(audio)
+    if len(mono) == 0:
+        return -120.0
+    if instrument == "snare":
+        body = _bandpass_zero_phase(mono, sr, 140.0, 520.0)
+        crack = _bandpass_zero_phase(mono, sr, 1800.0, 6500.0)
+        body_db = _audio_rms_db(body)
+        crack_db = _audio_rms_db(crack)
+        peak_db = _audio_peak_db(mono)
+        return float(body_db * 0.68 + crack_db * 0.22 + peak_db * 0.10)
+    if instrument in BASS_INSTRUMENTS or instrument == "kick":
+        low = _bandpass_zero_phase(mono, sr, 45.0, 180.0)
+        return _audio_rms_db(low)
+    return _audio_rms_db(mono)
+
+
+def _apply_layer_render_gain(
+    rendered_channels: dict[int, np.ndarray],
+    plans: dict[int, ChannelPlan],
+    channel: int,
+    gain_db: float,
+    reason: str,
+) -> None:
+    if abs(float(gain_db)) < 1e-4:
+        return
+    rendered_channels[channel] = _apply_stereo_gain(rendered_channels[channel], gain_db)
+    plans[channel].trim_db = float(np.clip(plans[channel].trim_db + float(gain_db), -30.0, 12.0))
+    plans[channel].trim_analysis.setdefault("layer_group_adjustments", []).append({
+        "gain_db": round(float(gain_db), 3),
+        "reason": reason,
+    })
+
+
+def _apply_layer_group_internal_balance(
+    rendered_channels: dict[int, np.ndarray],
+    plans: dict[int, ChannelPlan],
+    group: LayerGroupPlan,
+) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+    levels = {channel: _audio_rms_db(rendered_channels[channel]) for channel in group.channels}
+    if group.group_kind == "top_bottom":
+        top_channels = [ch for ch in group.channels if group.roles.get(ch) == "top"]
+        if not top_channels:
+            top_channels = [
+                ch for ch in group.channels
+                if group.roles.get(ch) not in {"bottom"}
+            ]
+        if not top_channels:
+            return actions
+        top_channel = max(top_channels, key=lambda ch: levels.get(ch, -120.0))
+        top_level = levels.get(top_channel, -120.0)
+        for channel in group.channels:
+            if group.roles.get(channel) != "bottom":
+                continue
+            before = levels.get(channel, -120.0)
+            target = top_level - 10.0
+            gain = float(np.clip(target - before, -12.0, 3.0))
+            _apply_layer_render_gain(
+                rendered_channels,
+                plans,
+                channel,
+                gain,
+                "layer_group_internal_snare_bottom_to_top_minus_10_db",
+            )
+            after = _audio_rms_db(rendered_channels[channel])
+            actions.append({
+                "type": "internal_balance",
+                "channel": int(channel),
+                "file": plans[channel].path.name,
+                "role": "bottom",
+                "reference_channel": int(top_channel),
+                "reference_file": plans[top_channel].path.name,
+                "target_relative_db": -10.0,
+                "before_rms_db": round(before, 2),
+                "after_rms_db": round(after, 2),
+                "gain_db": round(gain, 2),
+            })
+        return actions
+
+    if group.group_kind in {"stereo_pair", "support_stack"}:
+        usable = [
+            levels[channel]
+            for channel in group.channels
+            if np.isfinite(levels.get(channel, -120.0)) and levels[channel] > -90.0
+        ]
+        if len(usable) < 2:
+            return actions
+        target = _median_value(usable, default=usable[0])
+        for channel in group.channels:
+            before = levels[channel]
+            gain = float(np.clip(target - before, -3.0, 3.0))
+            if abs(gain) < 0.25:
+                continue
+            _apply_layer_render_gain(
+                rendered_channels,
+                plans,
+                channel,
+                gain,
+                "layer_group_internal_pair_balance",
+            )
+            actions.append({
+                "type": "internal_balance",
+                "channel": int(channel),
+                "file": plans[channel].path.name,
+                "role": group.roles.get(channel, "layer"),
+                "target_rms_db": round(target, 2),
+                "before_rms_db": round(before, 2),
+                "after_rms_db": round(_audio_rms_db(rendered_channels[channel]), 2),
+                "gain_db": round(gain, 2),
+            })
+    return actions
+
+
+def _apply_layer_group_phase(
+    rendered_channels: dict[int, np.ndarray],
+    plans: dict[int, ChannelPlan],
+    group: LayerGroupPlan,
+    sr: int,
+) -> list[dict[str, Any]]:
+    if group.group_kind != "top_bottom":
+        return []
+    actions: list[dict[str, Any]] = []
+    for channel in group.channels:
+        if group.roles.get(channel) != "bottom":
+            continue
+        before_audio = _sum_layer_group_audio(rendered_channels, group)
+        before_score = _layer_group_phase_score(before_audio, sr, group.instrument)
+        rendered_channels[channel] = (-rendered_channels[channel]).astype(np.float32)
+        flipped_audio = _sum_layer_group_audio(rendered_channels, group)
+        flipped_score = _layer_group_phase_score(flipped_audio, sr, group.instrument)
+        improvement = float(flipped_score - before_score)
+        if improvement >= 0.35:
+            plans[channel].phase_invert = not bool(plans[channel].phase_invert)
+            action = {
+                "type": "phase",
+                "channel": int(channel),
+                "file": plans[channel].path.name,
+                "role": group.roles.get(channel),
+                "decision": "polarity_flipped",
+                "score_before": round(before_score, 3),
+                "score_after": round(flipped_score, 3),
+                "improvement_db": round(improvement, 3),
+            }
+        else:
+            rendered_channels[channel] = (-rendered_channels[channel]).astype(np.float32)
+            action = {
+                "type": "phase",
+                "channel": int(channel),
+                "file": plans[channel].path.name,
+                "role": group.roles.get(channel),
+                "decision": "kept_original_polarity",
+                "score_before": round(before_score, 3),
+                "score_after_if_flipped": round(flipped_score, 3),
+                "improvement_db": round(improvement, 3),
+            }
+        plans[channel].phase_notes.append({
+            "mode": "layer_group_sum",
+            **action,
+        })
+        actions.append(action)
+    return actions
+
+
+def _layer_group_target_rms(base_target_rms_db: float, instrument: str) -> float:
+    return float(base_target_rms_db + SOURCE_RULES_ONLY_LEVEL_OFFSETS.get(instrument, -4.5))
+
+
+def _infer_layer_group_base_target(plans: dict[int, ChannelPlan]) -> float:
+    """Infer a group-level balance base from the current mix plan."""
+
+    candidates: list[float] = []
+    for plan in plans.values():
+        if plan.muted:
+            continue
+        try:
+            target = float(plan.target_rms_db)
+        except (TypeError, ValueError):
+            continue
+        if not np.isfinite(target):
+            continue
+        offset = float(SOURCE_RULES_ONLY_LEVEL_OFFSETS.get(str(plan.instrument), -4.5))
+        candidates.append(target - offset)
+    return float(np.clip(_median_value(candidates, default=-24.5), -29.0, -18.0))
+
+
+def _apply_layer_group_sum_corrections(
+    rendered_channels: dict[int, np.ndarray],
+    plans: dict[int, ChannelPlan],
+    group: LayerGroupPlan,
+    sr: int,
+    base_target_rms_db: float,
+    band_medians: dict[str, float],
+    source_layer: SourceKnowledgeLayer | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+    before_audio = _sum_layer_group_audio(rendered_channels, group)
+    before_metrics = _source_metrics(before_audio, sr, group.instrument)
+    level_matches = _source_rules_only_retrieve(
+        source_layer,
+        f"{group.instrument} layered instrument summed loudness balance",
+        domains=["balance", "fader", "metering"],
+        instrument=group.instrument,
+        problems=["unstable_starting_point", "unknown_loudness", "unclear_mix"],
+        action_types=["balance_pass"],
+        limit=5,
+    )
+    eq_matches = _source_rules_only_retrieve(
+        source_layer,
+        f"{group.instrument} layered sum low mid masking eq",
+        domains=["eq", "masking"],
+        instrument=group.instrument,
+        problems=["low_mid_buildup", "mud", "masking", "boxiness"],
+        action_types=["eq_candidate"],
+        limit=5,
+    )
+    pan_matches = _source_rules_only_retrieve(
+        source_layer,
+        f"{group.instrument} layered sum position pan instrument image",
+        domains=["pan", "soundfield", "masking"],
+        instrument=group.instrument,
+        problems=["crowded_center", "narrow_mix", "unclear_roles"],
+        action_types=["pan_candidate"],
+        limit=5,
+    )
+
+    group_audio = before_audio
+    group_bands = before_metrics.get("band_energy") or {}
+    low_mid = float(group_bands.get("low_mid", band_medians.get("low_mid", -24.0)))
+    low_mid_excess = low_mid - float(band_medians.get("low_mid", low_mid))
+    if low_mid_excess > 1.4:
+        freq = 360.0 if group.instrument == "snare" else 300.0
+        gain = -float(np.clip(0.8 + low_mid_excess * 0.22, 0.9, 2.2))
+        for channel in group.channels:
+            rendered_channels[channel] = _apply_stereo_peaking_eq(rendered_channels[channel], sr, freq, gain, 1.25)
+            plans[channel].eq_bands.append((freq, gain, 1.25))
+        actions.append({
+            "type": "group_eq",
+            "freq_hz": round(freq, 2),
+            "gain_db": round(gain, 2),
+            "q": 1.25,
+            "problem": "summed_low_mid_buildup",
+            "selected_rule_ids": _source_rule_ids(eq_matches),
+        })
+        group_audio = _sum_layer_group_audio(rendered_channels, group)
+
+    level_metrics = _source_metrics(group_audio, sr, group.instrument)
+    target = _layer_group_target_rms(base_target_rms_db, group.instrument)
+    group_rms = float(level_metrics.get("rms_db", _audio_rms_db(group_audio)))
+    max_group_boost = 4.0
+    if group.instrument in {"overhead", "room", "hi_hat", "ride"}:
+        max_group_boost = 1.5
+    elif group.group_kind in {"stereo_pair", "support_stack"}:
+        max_group_boost = 2.5
+    group_gain = float(np.clip(target - group_rms, -8.0, max_group_boost))
+    for channel in group.channels:
+        _apply_layer_render_gain(
+            rendered_channels,
+            plans,
+            channel,
+            group_gain,
+            "layer_group_summed_instrument_level",
+        )
+        plans[channel].trim_analysis.setdefault("layer_group", group.group_id)
+    actions.append({
+        "type": "group_level",
+        "target_rms_db": round(target, 2),
+        "before_group_rms_db": round(group_rms, 2),
+        "gain_db": round(group_gain, 2),
+        "max_boost_db": round(max_group_boost, 2),
+        "selected_rule_ids": _source_rule_ids(level_matches),
+    })
+
+    if group.instrument in SOURCE_RULES_ONLY_ANCHORS:
+        for channel in group.channels:
+            plans[channel].pan = 0.0
+            plans[channel].pan_notes.append({
+                "mode": "layer_group_sum",
+                "group_id": group.group_id,
+                "decision": "group_anchor_centered",
+                "selected_rule_ids": _source_rule_ids(pan_matches),
+            })
+        actions.append({
+            "type": "group_position",
+            "pan": 0.0,
+            "reason": "summed_anchor_instrument_kept_center",
+            "selected_rule_ids": _source_rule_ids(pan_matches),
+        })
+    else:
+        after_position_audio = _sum_layer_group_audio(rendered_channels, group)
+        left_db = _audio_rms_db(after_position_audio[:, 0]) if after_position_audio.ndim == 2 else _audio_rms_db(after_position_audio)
+        right_db = _audio_rms_db(after_position_audio[:, 1]) if after_position_audio.ndim == 2 else left_db
+        actions.append({
+            "type": "group_position",
+            "pan": "internal_layers",
+            "left_rms_db": round(left_db, 2),
+            "right_rms_db": round(right_db, 2),
+            "center_offset_db": round(left_db - right_db, 2),
+            "selected_rule_ids": _source_rule_ids(pan_matches),
+        })
+
+    after_audio = _sum_layer_group_audio(rendered_channels, group)
+    after_metrics = _source_metrics(after_audio, sr, group.instrument)
+    return actions, before_metrics, after_metrics
+
+
+def apply_layer_group_mix_corrections(
+    rendered_channels: dict[int, np.ndarray],
+    plans: dict[int, ChannelPlan],
+    sr: int,
+    *,
+    base_target_rms_db: float,
+    band_medians: dict[str, float] | None = None,
+    source_layer: SourceKnowledgeLayer | None = None,
+    source_session_id: str = "",
+) -> dict[str, Any]:
+    """Treat multi-layer instruments as summed instruments after layer prep."""
+
+    groups = build_layer_group_plans(plans)
+    if not groups:
+        return {"enabled": False, "reason": "no_layer_groups_detected", "groups": []}
+
+    medians = dict(band_medians or _source_rules_only_band_medians(plans))
+    group_reports: list[dict[str, Any]] = []
+    for group in groups:
+        if any(channel not in rendered_channels for channel in group.channels):
+            continue
+        internal_actions = _apply_layer_group_internal_balance(rendered_channels, plans, group)
+        phase_actions = _apply_layer_group_phase(rendered_channels, plans, group, sr)
+        group_actions, before_metrics, after_metrics = _apply_layer_group_sum_corrections(
+            rendered_channels,
+            plans,
+            group,
+            sr,
+            base_target_rms_db,
+            medians,
+            source_layer,
+        )
+        report = {
+            "group_id": group.group_id,
+            "instrument": group.instrument,
+            "group_kind": group.group_kind,
+            "channels": group.channels,
+            "files": [plans[channel].path.name for channel in group.channels],
+            "roles": {str(channel): role for channel, role in group.roles.items()},
+            "before_metrics": before_metrics,
+            "after_metrics": after_metrics,
+            "actions": [*internal_actions, *phase_actions, *group_actions],
+        }
+        for channel in group.channels:
+            plans[channel].trim_analysis.setdefault("layer_group_reported", True)
+            plans[channel].trim_analysis.setdefault("layer_group_id", group.group_id)
+        group_reports.append(report)
+
+    return {
+        "enabled": bool(group_reports),
+        "mode": "post_render_summed_layer_groups",
+        "source_session_id": source_session_id,
+        "groups": group_reports,
+        "notes": [
+            "Layer channels are first prepared individually, then summed and corrected as one instrument.",
+            "Group level and image decisions use the summed layer audio, not isolated layer metrics.",
+        ],
+    }
+
+
 def _source_decision_slug(*parts: Any) -> str:
     text = "_".join(str(part) for part in parts if str(part))
     return re.sub(r"[^a-zA-Z0-9_.-]+", "_", text).strip("_")[:180] or "candidate"
@@ -7780,14 +8950,18 @@ def apply_offline_fx_plan(
     reference_context: ReferenceMixContext | None = None,
     source_layer: SourceKnowledgeLayer | None = None,
     source_session_id: str = "",
+    fx_plan_override: FXPlan | None = None,
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
     """Render shared stereo FX returns from the rule-based FX plan."""
-    planner = AutoFXPlanner(tempo_bpm=tempo_bpm, vocal_priority=True)
-    fx_plan: FXPlan = planner.create_plan({
-        channel: plan.instrument
-        for channel, plan in plans.items()
-        if channel in rendered_channels and not plan.muted
-    })
+    if fx_plan_override is not None:
+        fx_plan = fx_plan_override
+    else:
+        planner = AutoFXPlanner(tempo_bpm=tempo_bpm, vocal_priority=True)
+        fx_plan = planner.create_plan({
+            channel: plan.instrument
+            for channel, plan in plans.items()
+            if channel in rendered_channels and not plan.muted
+        })
     reference_fx_overrides: dict[str, Any] = {
         "enabled": False,
         "bus_adjustments": [],
@@ -8061,6 +9235,7 @@ def apply_offline_fx_plan(
     return returns, {
         "enabled": True,
         "tempo_bpm": tempo_bpm,
+        "plan_override": bool(fx_plan_override is not None),
         "plan": fx_plan.to_dict(),
         "returns": return_reports,
         "sends_by_bus": sends_by_bus,
@@ -8415,6 +9590,7 @@ def master_process(
     reference_context: ReferenceMixContext | None = None,
     allow_reference_mastering: bool = True,
     ceiling_dbfs: float = -1.0,
+    apply_bus_processing: bool = True,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     # Console-like 2-bus cleanup and glue.
     bus_threshold_db = -9.5
@@ -8427,16 +9603,17 @@ def master_process(
         bus_ratio += 0.35 * reference_tightness
         bus_attack_ms = float(np.clip(bus_attack_ms - reference_tightness * 5.0, 22.0, 32.0))
         bus_release_ms = float(np.clip(bus_release_ms - reference_tightness * 55.0, 220.0, 280.0))
-    for ch in range(2):
-        mix[:, ch] = highpass(mix[:, ch], sr, 28.0)
-        mix[:, ch] = compressor(
-            mix[:, ch],
-            sr,
-            threshold_db=bus_threshold_db,
-            ratio=bus_ratio,
-            attack_ms=bus_attack_ms,
-            release_ms=bus_release_ms,
-        )
+    if apply_bus_processing:
+        for ch in range(2):
+            mix[:, ch] = highpass(mix[:, ch], sr, 28.0)
+            mix[:, ch] = compressor(
+                mix[:, ch],
+                sr,
+                threshold_db=bus_threshold_db,
+                ratio=bus_ratio,
+                attack_ms=bus_attack_ms,
+                release_ms=bus_release_ms,
+            )
 
     meter = pyln.Meter(sr)
     peak = float(np.max(np.abs(mix))) if len(mix) else 0.0
@@ -8452,12 +9629,15 @@ def master_process(
         "enabled": False,
     }
     bus_compressor_report = {
+        "enabled": bool(apply_bus_processing),
         "threshold_db": round(float(bus_threshold_db), 2),
         "ratio": round(float(bus_ratio), 2),
         "attack_ms": round(float(bus_attack_ms), 2),
         "release_ms": round(float(bus_release_ms), 2),
         "reference_tightness": round(float(reference_tightness), 3),
     }
+    if not apply_bus_processing:
+        bus_compressor_report["reason"] = "disabled_by_source_rules_mert_only"
 
     if not final_limiter:
         target_gain_db = 0.0
@@ -8663,7 +9843,20 @@ def main() -> int:
     parser.add_argument("--mert-local-files-only", action="store_true", help="Load the MERT model only from the local HuggingFace cache.")
     parser.add_argument("--perceptual-log", default="", help="Override perceptual/MERT JSONL log path for the offline pass.")
     parser.add_argument("--perceptual-window-sec", type=float, default=8.0, help="Audio window length used by offline perceptual/MERT scoring.")
+    parser.add_argument("--source-rules-mert-only", action="store_true", help="Experimental offline render: build DSP only from measured metrics, rules.jsonl, and MERT shadow scoring; skip built-in project mix passes.")
     args = parser.parse_args()
+    if args.source_rules_mert_only:
+        args.source_knowledge_enable = True
+        args.mert_enable = True
+        args.no_autofoh_analyzer_pass = True
+        args.codex_orchestrator = False
+        args.codex_correction_pass = False
+        args.reference_dynamics_ride = False
+        args.reference_vocal_fx_focus = False
+        args.large_system_polish = False
+        args.bass_drum_boost_db = 0.0
+        args.kick_presence_boost_db = 0.0
+        args.kick_focus_cymbal_cut_db = 0.0
 
     input_dir = Path(args.input_dir)
     wavs = sorted(p for p in input_dir.glob("*.wav") if p.is_file())
@@ -8705,9 +9898,6 @@ def main() -> int:
         plans[idx] = plan
         del mono
 
-    phase_report = apply_drum_phase_alignment(plans, sr)
-    drum_pan_rule = apply_overhead_anchored_drum_panning(plans, sr)
-
     config = yaml.safe_load((REPO_ROOT / "config" / "automixer.yaml").read_text(encoding="utf-8"))
     ai_config = config.get("ai", {})
     autofoh_config = config.get("autofoh", {})
@@ -8721,8 +9911,28 @@ def main() -> int:
     source_knowledge_report["session_id"] = source_session_id
     source_knowledge_report["channel_candidate_logs_requested"] = 0
     perceptual_report["session_id"] = source_session_id
-    reference_context = prepare_reference_mix_context(args.reference)
-    genre_reference_seed = _genre_reference_seed(args.genre)
+    if args.source_rules_mert_only:
+        phase_report = {
+            "enabled": False,
+            "reason": "source_rules_mert_only_disables_project_phase_alignment",
+        }
+        drum_pan_rule = {
+            "enabled": False,
+            "reason": "source_rules_mert_only_disables_project_overhead_panning",
+        }
+        source_rules_mert_only_report = apply_source_rules_mert_only_plan(
+            plans,
+            sr,
+            target_len,
+            source_layer,
+            source_session_id,
+        )
+    else:
+        phase_report = apply_drum_phase_alignment(plans, sr)
+        drum_pan_rule = apply_overhead_anchored_drum_panning(plans, sr)
+        source_rules_mert_only_report = {"enabled": False}
+    reference_context = None if args.source_rules_mert_only else prepare_reference_mix_context(args.reference)
+    genre_reference_seed = {} if args.source_rules_mert_only else _genre_reference_seed(args.genre)
     render_cache = OfflineRenderCache(
         enabled=not args.no_render_cache,
         max_bytes=int(max(0.0, float(args.render_cache_max_mb)) * 1024 * 1024),
@@ -8730,7 +9940,7 @@ def main() -> int:
     analysis_preview_sec = max(1.0, float(args.analysis_preview_sec))
     use_llm_in_orchestrator = bool(args.codex_orchestrator_allow_llm and args.codex_orchestrator)
     llm = None
-    if not args.no_llm and (not args.codex_orchestrator or use_llm_in_orchestrator):
+    if (not args.source_rules_mert_only) and not args.no_llm and (not args.codex_orchestrator or use_llm_in_orchestrator):
         llm = LLMClient(
             backend=ai_config.get("llm_backend", "auto"),
             model=ai_config.get("llm_model", "gpt-5.4"),
@@ -8779,13 +9989,23 @@ def main() -> int:
     codex_dry_run = _orchestrator_dry_run_enabled(args)
 
     orchestration_report = {
-        "enabled": bool(args.codex_orchestrator),
+        "enabled": bool(args.codex_orchestrator) and not bool(args.source_rules_mert_only),
         "dry_run": codex_dry_run,
         "llm_enabled": llm is not None,
         "mode": agent.state.mode.value,
         "max_actions_per_cycle": agent._max_actions_per_cycle,
     }
-    if args.codex_orchestrator:
+    if args.source_rules_mert_only:
+        orchestration_report.update({
+            "enabled": False,
+            "mode": "source_rules_mert_only",
+            "proposed_actions": [],
+            "proposed_count": 0,
+            "applied_count": 0,
+            "pending_before_approve": 0,
+            "reason": "project_agent_and_rule_engine_disabled_for_this_render",
+        })
+    elif args.codex_orchestrator:
         try:
             proposed_actions = agent._prepare_actions(agent._decide({"channels": states}))
             orchestration_report.update({
@@ -8831,23 +10051,86 @@ def main() -> int:
             "Use the AutoFOH analyzer pass and measured event-based dynamics instead.",
         ] if args.codex_correction_pass else [],
     }
-    event_based_dynamics = apply_event_based_dynamics(plans)
-    autofoh_analyzer_pass = (
-        {"enabled": False, "notes": ["AutoFOH analyzer pass explicitly disabled by CLI flag."]}
-        if args.no_autofoh_analyzer_pass
-        else apply_autofoh_analyzer_pass(
+    if args.source_rules_mert_only:
+        disabled_reason = "disabled_by_source_rules_mert_only"
+        event_based_dynamics = {"enabled": False, "reason": disabled_reason}
+        autofoh_analyzer_pass = {"enabled": False, "reason": disabled_reason}
+        bass_drum_push = {"enabled": False, "reason": disabled_reason}
+        kick_presence_boost = {"enabled": False, "reason": disabled_reason}
+        cymbal_focus_cleanup = {"enabled": False, "reason": disabled_reason}
+        cross_adaptive_eq = {"enabled": False, "reason": disabled_reason}
+        reference_mix_guidance = {"enabled": False, "reason": disabled_reason}
+        genre_mix_profile = {"enabled": False, "reason": disabled_reason}
+        kick_bass_hierarchy = {"enabled": False, "reason": disabled_reason}
+        frequency_window_balance = {"enabled": False, "reason": disabled_reason}
+        stem_mix_verification = {"enabled": False, "reason": disabled_reason}
+        reference_vocal_fx_focus = {"enabled": False, "reason": disabled_reason}
+    else:
+        event_based_dynamics = apply_event_based_dynamics(plans)
+        autofoh_analyzer_pass = (
+            {"enabled": False, "notes": ["AutoFOH analyzer pass explicitly disabled by CLI flag."]}
+            if args.no_autofoh_analyzer_pass
+            else apply_autofoh_analyzer_pass(
+                plans,
+                target_len,
+                sr,
+                autofoh_config,
+                max_rounds=args.autofoh_rounds,
+                render_cache=render_cache,
+                analysis_preview_sec=analysis_preview_sec,
+            )
+        )
+        bass_drum_push = apply_bass_drum_push(plans, args.bass_drum_boost_db)
+        kick_presence_boost = apply_kick_presence_boost(plans, args.kick_presence_boost_db)
+        cymbal_focus_cleanup = apply_cymbal_cleanup_for_kick_focus(plans, args.kick_focus_cymbal_cut_db)
+        cross_adaptive_eq = apply_cross_adaptive_eq(
             plans,
             target_len,
             sr,
-            autofoh_config,
-            max_rounds=args.autofoh_rounds,
             render_cache=render_cache,
             analysis_preview_sec=analysis_preview_sec,
         )
-    )
-    bass_drum_push = apply_bass_drum_push(plans, args.bass_drum_boost_db)
-    kick_presence_boost = apply_kick_presence_boost(plans, args.kick_presence_boost_db)
-    cymbal_focus_cleanup = apply_cymbal_cleanup_for_kick_focus(plans, args.kick_focus_cymbal_cut_db)
+        reference_mix_guidance = apply_reference_mix_guidance(plans, sr, reference_context)
+        genre_mix_profile = apply_genre_mix_profile(plans, args.genre)
+        kick_bass_hierarchy = apply_kick_bass_hierarchy(
+            plans,
+            target_len,
+            sr,
+            desired_kick_advantage_db=desired_kick_advantage_from_reference(
+                reference_context,
+                genre=args.genre,
+            ),
+            render_cache=render_cache,
+            analysis_preview_sec=analysis_preview_sec,
+        )
+        frequency_window_balance = apply_frequency_window_balance(
+            plans,
+            target_len,
+            sr,
+            render_cache=render_cache,
+        )
+        stem_mix_verification = apply_stem_mix_verification(
+            plans,
+            target_len,
+            sr,
+            genre=args.genre,
+            reference_context=reference_context,
+            render_cache=render_cache,
+            analysis_preview_sec=analysis_preview_sec,
+        )
+        reference_vocal_fx_focus = (
+            apply_reference_vocal_fx_focus(
+                plans,
+                target_len,
+                sr,
+                reference_context,
+                genre=args.genre,
+                render_cache=render_cache,
+                analysis_preview_sec=analysis_preview_sec,
+            )
+            if args.reference_vocal_fx_focus
+            else {"enabled": False, "reason": "disabled_by_flag"}
+        )
     vocal_bed_balance = {
         "enabled": False,
         "notes": [
@@ -8855,54 +10138,6 @@ def main() -> int:
             "Vocal space must come from priority EQ and measured analyzer corrections.",
         ],
     }
-    cross_adaptive_eq = apply_cross_adaptive_eq(
-        plans,
-        target_len,
-        sr,
-        render_cache=render_cache,
-        analysis_preview_sec=analysis_preview_sec,
-    )
-    reference_mix_guidance = apply_reference_mix_guidance(plans, sr, reference_context)
-    genre_mix_profile = apply_genre_mix_profile(plans, args.genre)
-    kick_bass_hierarchy = apply_kick_bass_hierarchy(
-        plans,
-        target_len,
-        sr,
-        desired_kick_advantage_db=desired_kick_advantage_from_reference(
-            reference_context,
-            genre=args.genre,
-        ),
-        render_cache=render_cache,
-        analysis_preview_sec=analysis_preview_sec,
-    )
-    frequency_window_balance = apply_frequency_window_balance(
-        plans,
-        target_len,
-        sr,
-        render_cache=render_cache,
-    )
-    stem_mix_verification = apply_stem_mix_verification(
-        plans,
-        target_len,
-        sr,
-        genre=args.genre,
-        reference_context=reference_context,
-        render_cache=render_cache,
-        analysis_preview_sec=analysis_preview_sec,
-    )
-    reference_vocal_fx_focus = (
-        apply_reference_vocal_fx_focus(
-            plans,
-            target_len,
-            sr,
-            reference_context,
-            genre=args.genre,
-            render_cache=render_cache,
-            analysis_preview_sec=analysis_preview_sec,
-        )
-        if args.reference_vocal_fx_focus
-        else {"enabled": False, "reason": "disabled_by_flag"}
-    )
     live_channel_headroom = (
         apply_live_channel_peak_headroom(
             plans,
@@ -8916,7 +10151,6 @@ def main() -> int:
     )
 
     rendered_channels: dict[int, np.ndarray] = {}
-    channel_reports = []
     source_candidate_logs = 0
     for ch, plan in plans.items():
         if plan.muted:
@@ -8931,6 +10165,33 @@ def main() -> int:
         )
         rendered = render_channel_cached(ch, plan, target_len, sr, render_cache)
         rendered_channels[ch] = rendered
+
+    layer_group_base_target = (
+        float(source_rules_mert_only_report.get("base_target_rms_db", -25.0))
+        if args.source_rules_mert_only
+        else _infer_layer_group_base_target(plans)
+    )
+    layer_group_mix = apply_layer_group_mix_corrections(
+        rendered_channels,
+        plans,
+        sr,
+        base_target_rms_db=layer_group_base_target,
+        band_medians=(
+            source_rules_mert_only_report.get("band_medians") or None
+            if args.source_rules_mert_only
+            else None
+        ),
+        source_layer=source_layer,
+        source_session_id=source_session_id,
+    )
+    layer_group_mix["base_target_rms_db"] = round(float(layer_group_base_target), 3)
+    if args.source_rules_mert_only:
+        source_rules_mert_only_report["layer_group_mix"] = layer_group_mix
+
+    channel_reports = []
+    for ch, plan in plans.items():
+        if plan.muted:
+            continue
         channel_reports.append({
             "channel": ch,
             "file": plan.path.name,
@@ -8972,9 +10233,18 @@ def main() -> int:
         ],
     }
     reference_dynamics_ride = (
-        apply_reference_dynamics_ride(rendered_channels, plans, sr, reference_context)
-        if args.reference_dynamics_ride
-        else {"enabled": False, "reason": "disabled_by_flag"}
+        {"enabled": False, "reason": "disabled_by_source_rules_mert_only"}
+        if args.source_rules_mert_only
+        else (
+            apply_reference_dynamics_ride(rendered_channels, plans, sr, reference_context)
+            if args.reference_dynamics_ride
+            else {"enabled": False, "reason": "disabled_by_flag"}
+        )
+    )
+    source_rules_only_fx_plan = (
+        build_source_rules_only_fx_plan(plans, tempo_bpm=args.tempo_bpm)
+        if args.source_rules_mert_only
+        else None
     )
     fx_returns, fx_report = (
         ({}, {"enabled": False})
@@ -8987,19 +10257,24 @@ def main() -> int:
             reference_context=reference_context,
             source_layer=source_layer,
             source_session_id=source_session_id,
+            fx_plan_override=source_rules_only_fx_plan,
         )
     )
     large_system_polish = (
-        apply_large_system_translation_polish(
-            rendered_channels,
-            fx_returns,
-            plans,
-            sr,
-            reference_context=reference_context,
-            genre=args.genre,
+        {"enabled": False, "reason": "disabled_by_source_rules_mert_only"}
+        if args.source_rules_mert_only
+        else (
+            apply_large_system_translation_polish(
+                rendered_channels,
+                fx_returns,
+                plans,
+                sr,
+                reference_context=reference_context,
+                genre=args.genre,
+            )
+            if args.large_system_polish
+            else {"enabled": False, "reason": "disabled_by_flag"}
         )
-        if args.large_system_polish
-        else {"enabled": False, "reason": "disabled_by_flag"}
     )
     mix = np.zeros((target_len, 2), dtype=np.float32)
     for rendered in rendered_channels.values():
@@ -9018,6 +10293,7 @@ def main() -> int:
         reference_context=reference_context,
         allow_reference_mastering=not args.no_reference_mastering,
         ceiling_dbfs=args.master_ceiling_dbfs,
+        apply_bus_processing=not args.source_rules_mert_only,
     )
 
     output = Path(args.output)
@@ -9059,6 +10335,7 @@ def main() -> int:
                 "final_limiter": bool(final_limiter),
                 "large_system_polish": bool(args.large_system_polish),
                 "source_knowledge_enabled": bool(source_layer and source_layer.enabled),
+                "source_rules_mert_only": bool(args.source_rules_mert_only),
             },
             "engineering_score": 0.0,
             "safety_score": 1.0,
@@ -9084,6 +10361,8 @@ def main() -> int:
             "fast_compressor": os.environ.get("AUTO_MIXER_SLOW_COMPRESSOR") != "1",
         },
         "codex_orchestrator": orchestration_report,
+        "source_rules_mert_only": source_rules_mert_only_report,
+        "layer_group_mix": layer_group_mix,
         "source_knowledge": source_knowledge_report,
         "perceptual": perceptual_report,
         "duration_sec": round(target_len / sr, 3),

@@ -209,38 +209,94 @@ class AutoMaster:
         return self._match_target_loudness(working, self.target_lufs)
 
     def _apply_eq_match(self, audio: np.ndarray, reference: np.ndarray, sample_rate: int) -> np.ndarray:
-        """Very lightweight spectral tilt matching."""
+        """Very lightweight, broad-band spectral tilt matching.
+
+        The fallback is used when a full reference-mastering backend is not
+        available. It must be conservative: keep the caller's full program
+        length, avoid narrow FFT-bin matching, and never turn short reference
+        excerpts into a hard edit of the mix.
+        """
         if not HAS_SCIPY:
             return audio
 
+        original_dtype = np.asarray(audio).dtype
         audio = self._normalize_audio_shape(audio)
         reference = self._normalize_audio_shape(reference)
 
         min_len = min(len(audio), len(reference))
-        if min_len == 0:
+        if min_len == 0 or len(audio) == 0:
             return audio
 
-        audio = audio[:min_len]
-        reference = reference[:min_len]
+        analysis_audio = self._monitor_signal(audio[:min_len]).astype(np.float64, copy=False)
+        analysis_ref = self._monitor_signal(reference[:min_len]).astype(np.float64, copy=False)
+        if not np.any(np.abs(analysis_audio) > 1e-9) or not np.any(np.abs(analysis_ref) > 1e-9):
+            return audio.astype(original_dtype, copy=False)
 
-        ref_monitor = self._monitor_signal(reference)
-        audio_monitor = self._monitor_signal(audio)
-        fft_ref = np.fft.rfft(ref_monitor)
-        fft_audio_monitor = np.fft.rfft(audio_monitor)
-        mag_audio = np.abs(fft_audio_monitor) + 1e-9
-        mag_ref = np.abs(fft_ref) + 1e-9
-        ratio = np.clip(mag_ref / mag_audio, 0.5, 2.0)
+        window = np.hanning(min_len).astype(np.float64)
+        if not np.any(window):
+            window = np.ones(min_len, dtype=np.float64)
+        freqs = np.fft.rfftfreq(min_len, d=1.0 / float(sample_rate))
+        audio_mag = np.abs(np.fft.rfft(analysis_audio * window)) + 1e-10
+        ref_mag = np.abs(np.fft.rfft(analysis_ref * window)) + 1e-10
+
+        nyquist = float(sample_rate) * 0.5
+        bands = [
+            (30.0, 60.0),
+            (60.0, 120.0),
+            (120.0, 250.0),
+            (250.0, 500.0),
+            (500.0, 1000.0),
+            (1000.0, 2000.0),
+            (2000.0, 4000.0),
+            (4000.0, 8000.0),
+            (8000.0, min(12000.0, nyquist * 0.95)),
+            (12000.0, min(18000.0, nyquist * 0.98)),
+        ]
+        centers: list[float] = []
+        gains_db: list[float] = []
+        for low_hz, high_hz in bands:
+            if high_hz <= low_hz or low_hz >= nyquist:
+                continue
+            mask = (freqs >= low_hz) & (freqs < high_hz)
+            if int(np.count_nonzero(mask)) < 2:
+                continue
+            audio_db = 20.0 * np.log10(float(np.sqrt(np.mean(audio_mag[mask] ** 2))) + 1e-10)
+            ref_db = 20.0 * np.log10(float(np.sqrt(np.mean(ref_mag[mask] ** 2))) + 1e-10)
+            gain_db = float(np.clip(ref_db - audio_db, -2.5, 2.5))
+
+            # High-frequency boosts from short previews are a common way to
+            # manufacture hiss. Keep air matching mostly subtractive.
+            if low_hz >= 8000.0:
+                gain_db = min(gain_db, 0.75)
+            elif low_hz >= 4000.0:
+                gain_db = min(gain_db, 1.25)
+
+            centers.append(float(np.sqrt(low_hz * high_hz)))
+            gains_db.append(gain_db)
+
+        if not centers:
+            return audio.astype(original_dtype, copy=False)
+
+        interp_freqs = np.fft.rfftfreq(len(audio), d=1.0 / float(sample_rate))
+        safe_freqs = np.maximum(interp_freqs, 20.0)
+        x = np.log2(np.asarray([20.0, *centers, nyquist], dtype=np.float64))
+        y = np.asarray([0.0, *gains_db, 0.0], dtype=np.float64)
+        curve_db = np.interp(np.log2(safe_freqs), x, y).astype(np.float64)
+        curve_db[interp_freqs < 25.0] = 0.0
+        if nyquist > 16000.0:
+            curve_db[interp_freqs > 16000.0] = np.minimum(curve_db[interp_freqs > 16000.0], 0.0)
+        ratio = (10.0 ** (curve_db / 20.0)).astype(np.float64)
+
+        def match_channel(channel_audio: np.ndarray) -> np.ndarray:
+            spectrum = np.fft.rfft(channel_audio.astype(np.float64, copy=False))
+            matched = np.fft.irfft(spectrum * ratio, n=len(channel_audio))
+            return matched.astype(original_dtype, copy=False)
 
         if audio.ndim == 1:
-            matched = np.fft.irfft(np.fft.rfft(audio) * ratio, n=min_len)
-            return matched.astype(audio.dtype, copy=False)
+            return match_channel(audio)
 
-        matched_channels = []
-        for channel_idx in range(audio.shape[1]):
-            fft_audio = np.fft.rfft(audio[:, channel_idx])
-            matched_channel = np.fft.irfft(fft_audio * ratio, n=min_len)
-            matched_channels.append(matched_channel.astype(audio.dtype, copy=False))
-        return np.column_stack(matched_channels).astype(audio.dtype, copy=False)
+        matched_channels = [match_channel(audio[:, channel_idx]) for channel_idx in range(audio.shape[1])]
+        return np.column_stack(matched_channels).astype(original_dtype, copy=False)
 
     def _write_wav(self, path: str, audio: np.ndarray, sample_rate: int):
         """Write PCM16 WAV when scipy is available."""
