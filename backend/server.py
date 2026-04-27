@@ -5730,8 +5730,10 @@ def _atexit_cleanup():
 if __name__ == "__main__":
     # Register atexit handler
     atexit.register(_atexit_cleanup)
-    
-    server = AutoMixerServer()
+
+    ws_host = os.environ.get("AUTOMIXER_WS_HOST", "0.0.0.0")
+    ws_port = int(os.environ.get("AUTOMIXER_WS_PORT", "8765"))
+    server = AutoMixerServer(ws_host=ws_host, ws_port=ws_port)
     _server_instance = server
     
     try:

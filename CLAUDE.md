@@ -28,7 +28,7 @@ backend/
   feedback_detector.py   — Обнаружение обратной связи, notch EQ, fader fallback
   thread_safety.py       — ThreadSafeMixerState (asyncio.Lock, copy-on-read)
   config_manager.py      — YAML config с hot-reload (watchdog)
-  handlers/              — 14 WebSocket handler-модулей (см. docs/ARCHITECTURE.md)
+  handlers/              — 18 WebSocket handler-модулей (см. docs/ARCHITECTURE.md)
   agents/                — Multi-agent система (coordinator → eq/fader/gain agents)
   ai/                    — LLM orchestrator + ChromaDB/RAG knowledge base
   ml/                    — PyTorch ML модели (classifier, predictor, style transfer)

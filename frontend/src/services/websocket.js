@@ -1,6 +1,13 @@
 import { BaseWebSocketTransport } from './websocketCore.mjs';
 
 class WebSocketService extends BaseWebSocketTransport {
+  setServerUrl(url) {
+    this.setUrl(url);
+  }
+
+  getServerUrl() {
+    return this.getUrl();
+  }
 
   // Wing direct connection
   connectWing(ip, sendPort = 2223, receivePort = 2223) {
@@ -44,6 +51,24 @@ class WebSocketService extends BaseWebSocketTransport {
   disconnectMixer() {
     this.send({
       type: 'disconnect_mixer'
+    });
+  }
+
+  // Scan network for supported mixers (WING + dLive)
+  scanMixers(fullScan = false, subnet = null) {
+    this.send({
+      type: 'scan_mixers',
+      full_scan: fullScan,
+      subnet
+    });
+  }
+
+  autoConnectMixer(preferredType = null, preferredIp = null, fullScan = false) {
+    this.send({
+      type: 'auto_connect',
+      preferred_type: preferredType,
+      preferred_ip: preferredIp,
+      full_scan: fullScan
     });
   }
 
@@ -311,6 +336,35 @@ class WebSocketService extends BaseWebSocketTransport {
     this.send({
       type: 'scan_channel_names',
       channels: channels
+    });
+  }
+
+  scanAudioDevices() {
+    this.send({
+      type: 'scan_audio_devices'
+    });
+  }
+
+  selectAudioDevice(preferredName = null, preferredProtocol = null, minChannels = 2) {
+    this.send({
+      type: 'select_audio_device',
+      preferred_name: preferredName,
+      preferred_protocol: preferredProtocol,
+      min_channels: minChannels
+    });
+  }
+
+  createSnapshot(channels = []) {
+    this.send({
+      type: 'create_snapshot',
+      channels
+    });
+  }
+
+  restoreSnapshot(snapshotPath = null) {
+    this.send({
+      type: 'undo_restore_snapshot',
+      snapshot_path: snapshotPath
     });
   }
 

@@ -11,6 +11,7 @@ import AutoSoundcheckTab from './components/AutoSoundcheckTab';
 import AutoCompressorTab from './components/AutoCompressorTab';
 import SettingsTab from './components/SettingsTab';
 import AIAgentTab from './components/AIAgentTab';
+import IPhoneControlSurface from './components/IPhoneControlSurface';
 
 // Color map for routing roles
 const ROLE_COLORS = {
@@ -27,6 +28,7 @@ const ROLE_COLORS = {
 };
 
 const NAV_ITEMS = [
+  { id: 'remote', icon: '▣', label: 'Remote' },
   { id: 'mixer', icon: '🔌', label: 'Connect' },
   { id: 'gainStaging', icon: '📊', label: 'Gain' },
   { id: 'phaseAlignment', icon: '⟳', label: 'Phase' },
@@ -51,7 +53,10 @@ function App() {
   const [availableChannels, setAvailableChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [connecting, setConnecting] = useState(false);
-  const [activeTab, setActiveTab] = useState('mixer');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 700) return 'remote';
+    return 'mixer';
+  });
   const [globalMode, setGlobalMode] = useState('soundcheck');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [routingScheme, setRoutingScheme] = useState([]);
@@ -172,6 +177,18 @@ function App() {
       if (data.routing_scheme) setRoutingScheme(data.routing_scheme);
     };
 
+    const handleAudioDeviceSelected = (data) => {
+      if (data.device) {
+        const deviceId = data.device.id ?? data.device.index;
+        if (deviceId !== undefined) {
+          setSelectedDevice(deviceId);
+        }
+        setStatusMessage(`Audio: ${data.device.name}`);
+      } else if (data.error) {
+        setStatusMessage(`Audio: ${data.error}`);
+      }
+    };
+
     websocketService.on('connection_status', handleConnectionStatus);
     websocketService.on('audio_devices', handleAudioDevices);
     websocketService.on('bypass_result', handleBypassResult);
@@ -179,6 +196,7 @@ function App() {
     websocketService.on('disconnected', handleDisconnected);
     websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
     websocketService.on('dante_routing', handleDanteRouting);
+    websocketService.on('audio_device_selected', handleAudioDeviceSelected);
 
     websocketService.connect()
       .then(() => {
@@ -201,13 +219,16 @@ function App() {
       websocketService.off('disconnected', handleDisconnected);
       websocketService.off('all_settings_loaded', handleAllSettingsLoaded);
       websocketService.off('dante_routing', handleDanteRouting);
+      websocketService.off('audio_device_selected', handleAudioDeviceSelected);
       websocketService.disconnect();
     };
   }, []);
 
   const handleDeviceChange = (deviceId) => {
     setSelectedDevice(deviceId);
-    const device = audioDevices.find(d => d.id === deviceId);
+    const device = audioDevices.find(d =>
+      String(d.id) === String(deviceId) || String(d.index) === String(deviceId)
+    );
     if (device) {
       setAvailableChannels(device.channels || []);
       setSelectedChannels([]);
@@ -263,7 +284,7 @@ function App() {
   };
 
   return (
-    <div className="App">
+    <div className={`App ${activeTab === 'remote' ? 'remote-mode' : ''}`}>
       {/* Sidebar */}
       <nav className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
@@ -331,6 +352,31 @@ function App() {
 
         {/* Tab Content */}
         <div className="tab-content">
+          {activeTab === 'remote' && (
+            <IPhoneControlSurface
+              serverConnected={serverConnected}
+              mixerConnected={mixerConnected}
+              statusMessage={statusMessage}
+              mixerIp={mixerIp}
+              mixerPort={mixerPort}
+              onMixerIpChange={setMixerIp}
+              onMixerPortChange={setMixerPort}
+              connecting={connecting}
+              onConnect={handleConnect}
+              audioDevices={audioDevices}
+              selectedDevice={selectedDevice}
+              onDeviceChange={handleDeviceChange}
+              availableChannels={availableChannels}
+              selectedChannels={selectedChannels}
+              onChannelToggle={handleChannelToggle}
+              onSelectAllChannels={handleSelectAllChannels}
+              onScanMixer={handleScanMixer}
+              onBypass={handleBypass}
+              globalMode={globalMode}
+              onGlobalModeChange={setGlobalMode}
+            />
+          )}
+
           {activeTab === 'mixer' && (
             <div className="connect-page">
               <div className="connect-card">

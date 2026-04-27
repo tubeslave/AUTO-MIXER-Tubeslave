@@ -1,0 +1,120 @@
+neutral:
+  target_loudness_range_lufs: [-20.0, -14.0]
+  acceptable_dynamic_range_lu: [6.0, 14.0]
+  low_end_expectation: balanced
+  vocal_prominence_db: [1.0, 4.0]
+  stereo_width_expectation: moderate
+  transient_priority: medium
+  reverb_density_expectation: moderate
+  reference_tolerance:
+    spectral_distance: 0.35
+    band_delta_db: 4.0
+    stereo_width_delta: 0.25
+pop:
+  target_loudness_range_lufs: [-16.0, -10.0]
+  acceptable_dynamic_range_lu: [4.0, 10.0]
+  low_end_expectation: controlled_full
+  vocal_prominence_db: [2.0, 5.0]
+  stereo_width_expectation: wide_supports_center_lead
+  transient_priority: medium
+  reverb_density_expectation: polished_medium
+  reference_tolerance:
+    spectral_distance: 0.30
+    band_delta_db: 3.5
+    stereo_width_delta: 0.22
+hip-hop:
+  target_loudness_range_lufs: [-15.0, -9.0]
+  acceptable_dynamic_range_lu: [3.0, 9.0]
+  low_end_expectation: strong_sub_and_kick_bass_separation
+  vocal_prominence_db: [2.0, 5.5]
+  stereo_width_expectation: centered_low_end_wide_supports
+  transient_priority: high
+  reverb_density_expectation: low_to_medium
+  reference_tolerance:
+    spectral_distance: 0.32
+    band_delta_db: 4.0
+    stereo_width_delta: 0.22
+rock:
+  target_loudness_range_lufs: [-16.0, -10.0]
+  acceptable_dynamic_range_lu: [5.0, 12.0]
+  low_end_expectation: punchy_kick_bass_guitar_balance
+  vocal_prominence_db: [1.5, 4.0]
+  stereo_width_expectation: guitars_support_center
+  transient_priority: high
+  reverb_density_expectation: low_to_medium
+  reference_tolerance:
+    spectral_distance: 0.34
+    band_delta_db: 4.0
+    stereo_width_delta: 0.25
+edm:
+  target_loudness_range_lufs: [-12.0, -7.0]
+  acceptable_dynamic_range_lu: [2.5, 8.0]
+  low_end_expectation: strong_mono_sub
+  vocal_prominence_db: [1.0, 4.0]
+  stereo_width_expectation: wide_above_low_end
+  transient_priority: high
+  reverb_density_expectation: tempo_synced
+  reference_tolerance:
+    spectral_distance: 0.30
+    band_delta_db: 3.5
+    stereo_width_delta: 0.20
+acoustic:
+  target_loudness_range_lufs: [-22.0, -15.0]
+  acceptable_dynamic_range_lu: [8.0, 18.0]
+  low_end_expectation: natural_controlled
+  vocal_prominence_db: [2.0, 5.0]
+  stereo_width_expectation: natural
+  transient_priority: medium
+  reverb_density_expectation: natural_room
+  reference_tolerance:
+    spectral_distance: 0.38
+    band_delta_db: 4.5
+    stereo_width_delta: 0.28
+jazz:
+  target_loudness_range_lufs: [-23.0, -16.0]
+  acceptable_dynamic_range_lu: [9.0, 20.0]
+  low_end_expectation: natural_dynamic
+  vocal_prominence_db: [1.0, 4.0]
+  stereo_width_expectation: ensemble_depth
+  transient_priority: natural
+  reverb_density_expectation: room_or_hall
+  reference_tolerance:
+    spectral_distance: 0.40
+    band_delta_db: 5.0
+    stereo_width_delta: 0.30
+cinematic:
+  target_loudness_range_lufs: [-27.0, -18.0]
+  acceptable_dynamic_range_lu: [10.0, 24.0]
+  low_end_expectation: extended_but_headroom_safe
+  vocal_prominence_db: [0.0, 4.0]
+  stereo_width_expectation: immersive_but_mono_safe
+  transient_priority: context_dependent
+  reverb_density_expectation: large_depth
+  reference_tolerance:
+    spectral_distance: 0.45
+    band_delta_db: 5.5
+    stereo_width_delta: 0.35
+podcast:
+  target_loudness_range_lufs: [-19.0, -14.0]
+  acceptable_dynamic_range_lu: [3.0, 8.0]
+  low_end_expectation: speech_clean_no_rumble
+  vocal_prominence_db: [4.0, 8.0]
+  stereo_width_expectation: narrow_center
+  transient_priority: low
+  reverb_density_expectation: dry
+  reference_tolerance:
+    spectral_distance: 0.35
+    band_delta_db: 4.0
+    stereo_width_delta: 0.15
+broadcast:
+  target_loudness_range_lufs: [-24.0, -18.0]
+  acceptable_dynamic_range_lu: [4.0, 12.0]
+  low_end_expectation: translation_safe
+  vocal_prominence_db: [3.0, 7.0]
+  stereo_width_expectation: mono_compatible
+  transient_priority: medium
+  reverb_density_expectation: controlled
+  reference_tolerance:
+    spectral_distance: 0.35
+    band_delta_db: 4.0
+    stereo_width_delta: 0.18

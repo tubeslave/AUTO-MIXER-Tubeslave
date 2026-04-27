@@ -18,7 +18,7 @@
     │          │          │          │
 ┌───▼───┐ ┌───▼───┐ ┌───▼────┐ ┌───▼──────────────┐
 │Handlers│ │Agents │ │   AI   │ │    ML Pipeline   │
-│ (14)   │ │       │ │        │ │                  │
+│ (18)   │ │       │ │        │ │                  │
 └───┬────┘ └───┬───┘ └───┬────┘ └───┬──────────────┘
     │          │          │          │
 ┌───▼──────────▼──────────▼──────────▼────────────────────────┐
@@ -47,6 +47,7 @@
 
 | Handler | Файл | Ответственность |
 |---------|------|-----------------|
+| Agent | `agent_handlers.py` | AI mixing agent, pending actions, approval queue |
 | Audio | `audio_handlers.py` | Аудио устройства, capture, уровни |
 | Automation | `automation_handlers.py` | Управление модулями автоматизации |
 | Channel Scan | `channel_scan_handlers.py` | Сканирование каналов, распознавание |
@@ -54,12 +55,15 @@
 | Connection | `connection_handlers.py` | Подключение к пульту |
 | EQ | `eq_handlers.py` | Auto-EQ, cross-adaptive EQ |
 | Fader | `fader_handlers.py` | Auto-fader, LUFS-based |
+| FX | `fx_handlers.py` | FX slots, inserts, send/return state |
 | Gain Staging | `gain_staging_handlers.py` | LUFS gain staging |
+| Measurement | `measurement_handlers.py` | System/master measurement and correction |
 | Mixer | `mixer_handlers.py` | Общие операции с пультом |
 | Phase | `phase_handlers.py` | GCC-PHAT фазовое выравнивание |
 | Routing | `routing_handlers.py` | Dante/аналоговый маршрутизация |
 | Snapshot | `snapshot_handlers.py` | Загрузка/сохранение снапшотов |
 | Soundcheck | `soundcheck_handlers.py` | Автоматический саундчек |
+| Training | `training_handlers.py` | Online/offline training service controls |
 | Voice | `voice_handlers.py` | Голосовое управление |
 
 ### 3. Agent System (`backend/agents/`)
@@ -121,10 +125,10 @@ PyTorch модели для intelligent mixing:
 - Fallback: снижение фейдера если notch недостаточен
 - Абсолютный приоритет над другими агентами
 
-#### ConfigManager (`config_manager.py`)
-- YAML-based конфигурация (`config/automixer.yaml`)
-- Hot-reload через watchdog (FileSystemEventHandler)
-- Валидация схемы при загрузке
+#### Runtime Config
+- `server.py` загружает `config/default_config.json` и накладывает runtime-секции из `config/automixer.yaml`
+- `config_manager.py` отвечает за YAML config/hot-reload для сервисов, которым нужен watchdog
+- Пользовательские UI-настройки сохраняются отдельно в `config/user_config.json` и не являются каноническим default config
 
 ### 7. Mixer Clients
 

@@ -2,6 +2,24 @@
 
 Приложение для автоматического микширования с использованием микшерного пульта **Behringer Wing Rack** (fw 3.0.5) через протокол OSC.
 
+## Mix Agent Offline / Backend Facade
+
+Для исследовательско-инженерного offline сведения и безопасной интеграции с
+реальным пультом добавлен пакет `mix_agent/`.
+
+```bash
+python -m mix_agent analyze --stems ./stems --mix ./mix.wav --reference ./ref.wav --genre pop --out ./report.md
+python -m mix_agent suggest --stems ./stems --genre rock --out ./suggestions.json
+python -m mix_agent apply --stems ./stems --suggestions ./suggestions.json --out ./renders/conservative_mix.wav
+```
+
+Фасад не заменяет микс-инженера и не считает одну метрику признаком качества.
+Он строит dashboard из независимых оценок, объясняет каждую рекомендацию,
+пишет Markdown/JSON отчёты и применяет offline только малые обратимые операции.
+Для live/backend работы рекомендации переводятся в AutoFOH typed actions через
+`MixAgentBackendBridge` и могут быть отправлены на пульт только через
+`AutoFOHSafetyController`.
+
 ## Структура проекта
 
 ```

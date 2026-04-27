@@ -1,17 +1,71 @@
+const DEFAULT_WS_PORT = 8765;
+const WS_URL_STORAGE_KEY = 'automixer_ws_url';
+
+function safeLocalStorage() {
+  try {
+    return globalThis.localStorage || null;
+  } catch {
+    return null;
+  }
+}
+
+export function inferWebSocketUrl() {
+  const storage = safeLocalStorage();
+  const saved = storage?.getItem(WS_URL_STORAGE_KEY);
+  if (saved) return saved;
+
+  const location = globalThis.location;
+  if (location?.protocol?.startsWith('http') && location.hostname) {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${location.hostname}:${DEFAULT_WS_PORT}`;
+  }
+
+  return `ws://localhost:${DEFAULT_WS_PORT}`;
+}
+
+function normalizeWebSocketUrl(url) {
+  const trimmed = String(url || '').trim();
+  if (!trimmed) return inferWebSocketUrl();
+  if (trimmed.startsWith('ws://') || trimmed.startsWith('wss://')) return trimmed;
+  if (trimmed.startsWith('http://')) return trimmed.replace(/^http:\/\//, 'ws://');
+  if (trimmed.startsWith('https://')) return trimmed.replace(/^https:\/\//, 'wss://');
+  return `ws://${trimmed}`;
+}
+
 export class BaseWebSocketTransport {
   constructor({
-    url = 'ws://localhost:8765',
+    url = inferWebSocketUrl(),
     reconnectInterval = 3000,
     WebSocketImpl = globalThis.WebSocket
   } = {}) {
     this.ws = null;
-    this.url = url;
+    this.url = normalizeWebSocketUrl(url);
     this.listeners = new Map();
     this.reconnectInterval = reconnectInterval;
     this.reconnectTimer = null;
     this.connectPromise = null;
     this.shouldReconnect = true;
     this.WebSocketImpl = WebSocketImpl;
+  }
+
+  getUrl() {
+    return this.url;
+  }
+
+  setUrl(url, { persist = true, reconnect = true } = {}) {
+    const nextUrl = normalizeWebSocketUrl(url);
+    if (nextUrl === this.url) return;
+
+    this.url = nextUrl;
+    if (persist) {
+      safeLocalStorage()?.setItem(WS_URL_STORAGE_KEY, nextUrl);
+    }
+
+    if (reconnect) {
+      this.disconnect();
+      this.shouldReconnect = true;
+      this.connect().catch(err => console.error('Reconnect failed:', err));
+    }
   }
 
   connect() {

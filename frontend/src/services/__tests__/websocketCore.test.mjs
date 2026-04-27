@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BaseWebSocketTransport } from '../websocketCore.mjs';
+import { BaseWebSocketTransport, inferWebSocketUrl } from '../websocketCore.mjs';
 
 class FakeWebSocket {
   static CONNECTING = 0;
@@ -56,6 +56,8 @@ function createTransport(overrides = {}) {
 
 test.beforeEach(() => {
   FakeWebSocket.instances = [];
+  delete globalThis.location;
+  delete globalThis.localStorage;
 });
 
 test('reuses the same pending connect promise and resolves on open', async () => {
@@ -121,4 +123,27 @@ test('send() serializes messages when socket is open', async () => {
   transport.send({ type: 'ping', id: 7 });
 
   assert.deepEqual(socket.sentMessages, ['{"type":"ping","id":7}']);
+});
+
+test('infers websocket host from browser page host', () => {
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: { protocol: 'http:', hostname: '192.168.1.20' }
+  });
+
+  assert.equal(inferWebSocketUrl(), 'ws://192.168.1.20:8765');
+});
+
+test('setUrl normalizes and persists manual websocket host', () => {
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: key => store.get(key) || null,
+    setItem: (key, value) => store.set(key, value)
+  };
+
+  const transport = createTransport({ url: 'ws://localhost:8765' });
+  transport.setUrl('192.168.1.30:8765', { reconnect: false });
+
+  assert.equal(transport.getUrl(), 'ws://192.168.1.30:8765');
+  assert.equal(store.get('automixer_ws_url'), 'ws://192.168.1.30:8765');
 });

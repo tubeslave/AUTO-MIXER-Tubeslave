@@ -1,5 +1,10 @@
 # Deep Code Review: AUTO-MIXER-Tubeslave
 
+> Historical snapshot from 2026-03-15. This file is retained as an old review
+> artifact, not as current project truth. Use `CLAUDE.md`, `Docs/ARCHITECTURE.md`,
+> `Docs/CONVENTIONS.md`, `Docs/TOOLS.md`, current tests, and git history for the
+> live architecture and safety rules.
+
 **Дата:** 2026-03-15
 **Проект:** AUTO-MIXER-Tubeslave (Python backend + React frontend, Behringer Wing Rack, OSC)
 **Общий объём:** ~24 600 строк Python, 29 .py файлов + 2 конфиг-файла
