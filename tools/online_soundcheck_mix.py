@@ -28,6 +28,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = REPO_ROOT / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
+from output_paths import ai_logs_path, ai_mixing_path, ensure_ai_output_dirs, ensure_parent_dir  # noqa: E402
+
 
 def load_offline_mix_module():
     spec = importlib.util.spec_from_file_location(
@@ -259,6 +261,7 @@ def channel_report_for_plan(plan: Any) -> dict[str, Any]:
 
 
 def export_mp3(output_path: Path, audio: np.ndarray, sr: int):
+    output_path = ensure_parent_dir(output_path)
     tmp_wav = output_path.with_suffix(".wav")
     sf.write(tmp_wav, audio, sr, subtype="PCM_24")
     cmd = [
@@ -278,13 +281,14 @@ def export_mp3(output_path: Path, audio: np.ndarray, sr: int):
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-dir", default=str(Path.home() / "Desktop" / "MIX"))
-    parser.add_argument("--output", default=str(Path.home() / "Desktop" / "AUTO_MIX_AGENT_online_soundcheck.mp3"))
-    parser.add_argument("--report", default=str(Path.home() / "Desktop" / "AUTO_MIX_AGENT_online_soundcheck_report.json"))
+    parser.add_argument("--output", default=str(ai_mixing_path("AUTO_MIX_AGENT_online_soundcheck.mp3")))
+    parser.add_argument("--report", default=str(ai_logs_path("AUTO_MIX_AGENT_online_soundcheck_report.json")))
     parser.add_argument("--tempo-bpm", type=float, default=120.0)
     parser.add_argument("--use-llm", action="store_true")
     parser.add_argument("--no-codex-correction-pass", action="store_true")
     parser.add_argument("--no-final-limiter", action="store_true")
     args = parser.parse_args()
+    audio_dir, logs_dir = ensure_ai_output_dirs()
 
     mixmod = load_offline_mix_module()
     input_dir = Path(args.input_dir)
@@ -395,7 +399,7 @@ def main() -> int:
         live_peak_ceiling_db=-3.0,
     )
 
-    output = Path(args.output)
+    output = ensure_parent_dir(args.output)
     export_mp3(output, online_mix, sr)
 
     meter = pyln.Meter(sr)
@@ -408,6 +412,11 @@ def main() -> int:
     report = {
         "input_dir": str(input_dir),
         "output": str(output),
+        "artifact_policy": {
+            "audio_dir": str(audio_dir),
+            "logs_dir": str(logs_dir),
+            "report": str(ensure_parent_dir(args.report)),
+        },
         "sample_rate": sr,
         "duration_sec": round(duration_sec, 3),
         "online_soundcheck": {
@@ -437,7 +446,7 @@ def main() -> int:
         "stage_reports": stage_reports,
         "final_channels": [channel_report_for_plan(plan) for _, plan in sorted(adaptive_cleanup_plans.items())],
     }
-    Path(args.report).write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    ensure_parent_dir(args.report).write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(report, indent=2, ensure_ascii=False))
     return 0
 

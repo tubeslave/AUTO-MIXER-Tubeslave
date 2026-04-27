@@ -409,14 +409,14 @@ class AutoMixerServer:
                 yml = yaml.safe_load(f)
             if not isinstance(yml, dict):
                 return config
-            for key in ("ai", "agent", "audio", "mixer", "websocket", "safety", "training"):
+            for key in ("ai", "agent", "audio", "mixer", "websocket", "safety", "training", "muq_eval"):
                 if key not in yml or not isinstance(yml[key], dict):
                     continue
                 if key not in config or not isinstance(config[key], dict):
                     config[key] = {}
                 config[key].update(yml[key])
             logger.info(
-                "Merged settings from %s (ai/agent/audio/mixer/websocket/safety/training)",
+                "Merged settings from %s (ai/agent/audio/mixer/websocket/safety/training/muq_eval)",
                 yaml_path,
             )
         except Exception as e:

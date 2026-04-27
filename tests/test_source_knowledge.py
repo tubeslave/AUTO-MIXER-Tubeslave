@@ -7,6 +7,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 from config_manager import ConfigManager
+from output_paths import ai_logs_path
 from source_knowledge import (
     DecisionTrace,
     FeedbackRecord,
@@ -114,7 +115,7 @@ def test_config_defaults_keep_source_knowledge_disabled():
     source_config = SourceGroundedConfig.from_mapping(config.get("source_knowledge"))
 
     assert source_config.enabled is False
-    assert source_config.log_path == "logs/source_grounded_decisions.jsonl"
+    assert source_config.log_path == str(ai_logs_path("source_grounded_decisions.jsonl"))
     assert source_config.allow_unsourced_rules is False
 
 

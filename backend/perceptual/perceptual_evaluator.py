@@ -14,6 +14,11 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
+try:
+    from output_paths import ai_logs_path
+except ImportError:  # pragma: no cover - package import fallback
+    from backend.output_paths import ai_logs_path
+
 from .embedding_backend import create_embedding_backend
 from .metrics import cosine_distance, embedding_mse, fad_like_distance
 from .reference_store import ReferenceStore
@@ -36,7 +41,7 @@ class PerceptualConfig:
     max_cpu_percent: float = 25.0
     log_scores: bool = True
     block_osc_when_score_worse: bool = False
-    log_path: str = "logs/perceptual_decisions.jsonl"
+    log_path: str = str(ai_logs_path("perceptual_decisions.jsonl"))
     queue_maxsize: int = 128
     async_evaluation: bool = True
     improvement_threshold: float = 0.03
@@ -131,7 +136,7 @@ class PerceptualEvaluator:
         self.config = config if isinstance(config, PerceptualConfig) else PerceptualConfig.from_mapping(config)
         self.backend = create_embedding_backend(self.config.backend_config())
         self.reference_store = ReferenceStore(self.config.extra.get("reference_store_path"))
-        self.log_path = Path(self.config.log_path)
+        self.log_path = Path(self.config.log_path).expanduser()
         self._queue: queue.Queue = queue.Queue(maxsize=max(1, int(self.config.queue_maxsize)))
         self._stop_event = threading.Event()
         self._worker_thread: Optional[threading.Thread] = None

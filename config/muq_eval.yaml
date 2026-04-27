@@ -8,8 +8,8 @@ rollback_on_quality_drop: true
 fallback_enabled: true
 log_scores: true
 shadow_mode: true
-log_path: logs/muq_eval_decisions.jsonl
-training_log_path: logs/muq_eval_rewards.jsonl
+log_path: ~/Desktop/Ai LOGS/muq_eval_decisions.jsonl
+training_log_path: ~/Desktop/Ai LOGS/muq_eval_rewards.jsonl
 model_repo_id: zhudi2825/MuQ-Eval-A1
 local_files_only: true
 max_gain_change_db_per_step: 1.0

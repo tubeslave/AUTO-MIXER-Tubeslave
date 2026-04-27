@@ -22,6 +22,7 @@ import json
 import math
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,13 @@ import numpy as np
 import pyloudnorm as pyln
 import soundfile as sf
 from scipy.signal import butter, lfilter
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+BACKEND_DIR = REPO_ROOT / "backend"
+sys.path.insert(0, str(BACKEND_DIR))
+
+from output_paths import ai_logs_dir, ai_logs_path, ai_mixing_dir, ai_mixing_path, ensure_ai_output_dirs, ensure_parent_dir  # noqa: E402
 
 
 ANALYSIS_WINDOW_SEC = 18.0
@@ -733,6 +741,9 @@ def export_mp3(wav_path: Path, mp3_path: Path):
 
 def run_chat_only_mix(input_dir: Path, output_path: Path, report_path: Path):
     channels, sr, target_len = load_channels(input_dir)
+    ensure_ai_output_dirs()
+    output_path = ensure_parent_dir(output_path)
+    report_path = ensure_parent_dir(report_path)
 
     rough_mix = render_mix(channels, target_len)
     analysis_start = analysis_window_start(np.mean(rough_mix, axis=1), sr)
@@ -741,6 +752,11 @@ def run_chat_only_mix(input_dir: Path, output_path: Path, report_path: Path):
     report: dict[str, Any] = {
         "source_chat_url": "https://chatgpt.com/share/69e7cc2e-2a50-832a-88f6-bf6c2164e7cb",
         "mode": "chat_only_shared_logic",
+        "artifact_policy": {
+            "audio_dir": str(ai_mixing_dir()),
+            "logs_dir": str(ai_logs_dir()),
+            "report": str(report_path),
+        },
         "analysis_window_sec": ANALYSIS_WINDOW_SEC,
         "analysis_window_start_sec": round(analysis_start / sr, 2),
         "analysis_window_end_sec": round(analysis_end / sr, 2),
@@ -828,9 +844,10 @@ def run_chat_only_mix(input_dir: Path, output_path: Path, report_path: Path):
 def main():
     parser = argparse.ArgumentParser(description="Mix multitrack using only the shared chat balancing logic")
     parser.add_argument("--input-dir", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--output", type=Path, default=ai_mixing_path("CHAT_ONLY_SHARED_MIX.mp3"))
+    parser.add_argument("--report", type=Path, default=ai_logs_path("CHAT_ONLY_SHARED_MIX_report.json"))
     args = parser.parse_args()
+    ensure_ai_output_dirs()
     run_chat_only_mix(args.input_dir, args.output, args.report)
 
 

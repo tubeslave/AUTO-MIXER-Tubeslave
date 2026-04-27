@@ -8,6 +8,8 @@ the actual console write must still go through the existing safety controller.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, is_dataclass
+import importlib
+import importlib.util
 import json
 import logging
 import math
@@ -18,6 +20,11 @@ import time
 from typing import Any, Dict, Optional
 
 import numpy as np
+
+try:
+    from output_paths import ai_logs_path
+except ImportError:  # pragma: no cover - package import fallback
+    from backend.output_paths import ai_logs_path
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +77,8 @@ class MuQEvalConfig:
     fallback_enabled: bool = True
     log_scores: bool = True
     shadow_mode: bool = True
-    log_path: str = "logs/muq_eval_decisions.jsonl"
-    training_log_path: str = "logs/muq_eval_rewards.jsonl"
+    log_path: str = str(ai_logs_path("muq_eval_decisions.jsonl"))
+    training_log_path: str = str(ai_logs_path("muq_eval_rewards.jsonl"))
     model_repo_id: str = "zhudi2825/MuQ-Eval-A1"
     local_files_only: bool = True
     muq_eval_root: str = ""
@@ -388,9 +395,9 @@ class MuQEvalService:
         if not self.config.log_scores:
             return
         record = decision.to_dict()
-        self._write_jsonl(Path(self.config.log_path), record)
+        self._write_jsonl(Path(self.config.log_path).expanduser(), record)
         self._write_jsonl(
-            Path(self.config.training_log_path),
+            Path(self.config.training_log_path).expanduser(),
             {
                 "timestamp": record["timestamp"],
                 "session_id": record["session_id"],
@@ -416,7 +423,10 @@ class MuQEvalService:
         try:
             import torch
             from omegaconf import OmegaConf
-            from src.model import MusicQualityModel
+            if root and (root_path / "src" / "model.py").exists():
+                MusicQualityModel = self._import_muq_eval_model(root_path)
+            else:
+                from src.model import MusicQualityModel
         except Exception as exc:
             self._model_status = "unavailable"
             self._model_error = str(exc)
@@ -429,7 +439,7 @@ class MuQEvalService:
                 raise RuntimeError("checkpoint files are not available locally")
             self._torch = torch
             self._device = self._resolve_device(torch)
-            model_config = OmegaConf.load(str(config_path))
+            model_config = self._load_model_config(OmegaConf, config_path)
             model = MusicQualityModel(model_config)
             state = torch.load(str(model_path), map_location=self._device)
             if isinstance(state, dict) and "state_dict" in state:
@@ -445,6 +455,59 @@ class MuQEvalService:
             self._model_status = "unavailable"
             self._model_error = str(exc)
             logger.info("MuQ-Eval checkpoint unavailable: %s", exc)
+
+    @staticmethod
+    def _import_muq_eval_model(root_path: Path) -> Any:
+        """Import MuQ-Eval's `src.model` under an alias to avoid app `src` clashes."""
+
+        package_name = "_muq_eval_external_src"
+        if package_name not in sys.modules:
+            init_path = root_path / "src" / "__init__.py"
+            spec = importlib.util.spec_from_file_location(
+                package_name,
+                init_path,
+                submodule_search_locations=[str(root_path / "src")],
+            )
+            if spec is None or spec.loader is None:
+                raise ImportError(f"Cannot load MuQ-Eval package from {root_path}")
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[package_name] = module
+            spec.loader.exec_module(module)
+        model_module = importlib.import_module(f"{package_name}.model")
+        return model_module.MusicQualityModel
+
+    def _load_model_config(self, omegaconf: Any, config_path: Path) -> Any:
+        """Load MuQ-Eval config, resolving the HF `defaults: base` shorthand locally."""
+
+        cfg = omegaconf.load(str(config_path))
+        defaults = cfg.get("defaults") if hasattr(cfg, "get") else None
+        wants_base = False
+        if defaults is not None:
+            try:
+                defaults_iter = list(defaults)
+            except TypeError:
+                defaults_iter = []
+            wants_base = any(
+                item == "base"
+                or (isinstance(item, dict) and "base" in item.values())
+                for item in defaults_iter
+            )
+        if not wants_base:
+            return cfg
+
+        root = self.config.muq_eval_root or os.environ.get("MUQ_EVAL_ROOT", "")
+        candidates = []
+        if root:
+            candidates.append(Path(root).expanduser().resolve() / "configs" / "base.yaml")
+        candidates.append(config_path.parent / "base.yaml")
+        for base_path in candidates:
+            if base_path.exists():
+                base_cfg = omegaconf.load(str(base_path))
+                cfg_without_defaults = omegaconf.create(
+                    {key: value for key, value in cfg.items() if key != "defaults"}
+                )
+                return omegaconf.merge(base_cfg, cfg_without_defaults)
+        return cfg
 
     def _resolve_checkpoint_paths(self) -> tuple[Optional[Path], Optional[Path]]:
         config_path = Path(self.config.checkpoint_config_path).expanduser() if self.config.checkpoint_config_path else None

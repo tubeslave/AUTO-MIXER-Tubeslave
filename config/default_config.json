@@ -276,6 +276,26 @@
       }
     }
   },
+  "muq_eval": {
+    "enabled": true,
+    "device": "auto",
+    "window_sec": 10,
+    "hop_sec": 5,
+    "sample_rate": 24000,
+    "min_improvement_threshold": 0.03,
+    "rollback_on_quality_drop": true,
+    "fallback_enabled": true,
+    "log_scores": true,
+    "shadow_mode": true,
+    "log_path": "~/Desktop/Ai LOGS/muq_eval_decisions.jsonl",
+    "training_log_path": "~/Desktop/Ai LOGS/muq_eval_rewards.jsonl",
+    "model_repo_id": "zhudi2825/MuQ-Eval-A1",
+    "local_files_only": true,
+    "max_gain_change_db_per_step": 1.0,
+    "max_eq_gain_change_db_per_step": 1.0,
+    "max_compressor_threshold_change_db_per_step": 2.0,
+    "min_seconds_between_quality_decisions": 5.0
+  },
   "safety": {
     "max_fader": 10,
     "max_gain": 18,

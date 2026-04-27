@@ -11,7 +11,7 @@ perceptual:
   max_cpu_percent: 25
   log_scores: true
   block_osc_when_score_worse: false
-  log_path: logs/perceptual_decisions.jsonl
+  log_path: ~/Desktop/Ai LOGS/perceptual_decisions.jsonl
   queue_maxsize: 128
   async_evaluation: true
   improvement_threshold: 0.03

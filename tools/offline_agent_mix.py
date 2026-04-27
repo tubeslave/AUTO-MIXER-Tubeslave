@@ -62,6 +62,7 @@ from auto_fx import AutoFXPlanner, FXBusDecision, FXPlan, FXSendDecision  # noqa
 from channel_recognizer import classification_from_legacy_preset  # noqa: E402
 from cross_adaptive_eq import CrossAdaptiveEQ  # noqa: E402
 from ml.style_transfer import InstrumentStyle, StyleProfile, StyleTransfer  # noqa: E402
+from output_paths import ai_logs_path, ai_mixing_path, ensure_ai_output_dirs, ensure_parent_dir  # noqa: E402
 from perceptual import PerceptualConfig, PerceptualEvaluator  # noqa: E402
 from source_knowledge import (  # noqa: E402
     DecisionTrace,
@@ -9803,8 +9804,8 @@ def _orchestrator_dry_run_enabled(args: argparse.Namespace) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-dir", default=str(Path.home() / "Desktop" / "MIX"))
-    parser.add_argument("--output", default=str(Path.home() / "Desktop" / "AUTO_MIX_AGENT.mp3"))
-    parser.add_argument("--report", default=str(Path.home() / "Desktop" / "AUTO_MIX_AGENT_report.json"))
+    parser.add_argument("--output", default=str(ai_mixing_path("AUTO_MIX_AGENT.mp3")))
+    parser.add_argument("--report", default=str(ai_logs_path("AUTO_MIX_AGENT_report.json")))
     parser.add_argument("--no-llm", action="store_true")
     parser.add_argument("--no-final-limiter", action="store_true")
     parser.add_argument("--no-drum-vocal-duck", action="store_true")
@@ -9837,14 +9838,17 @@ def main() -> int:
     parser.add_argument("--no-render-cache", action="store_true", help="Disable the offline channel render cache.")
     parser.add_argument("--render-cache-max-mb", type=float, default=DEFAULT_RENDER_CACHE_MAX_MB, help="Maximum memory used by the offline render cache.")
     parser.add_argument("--source-knowledge-enable", action="store_true", help="Enable shadow source-grounded logging for offline EQ/comp/pan/FX candidates.")
-    parser.add_argument("--source-knowledge-log", default="", help="Override source-grounded JSONL log path for the offline pass.")
+    parser.add_argument("--source-knowledge-log", default=str(ai_logs_path("source_grounded_decisions.jsonl")), help="Override source-grounded JSONL log path for the offline pass.")
     parser.add_argument("--mert-enable", action="store_true", help="Enable offline perceptual shadow scoring with the MERT backend.")
     parser.add_argument("--mert-model-name", default="m-a-p/MERT-v1-95M", help="HuggingFace model name for --mert-enable.")
     parser.add_argument("--mert-local-files-only", action="store_true", help="Load the MERT model only from the local HuggingFace cache.")
-    parser.add_argument("--perceptual-log", default="", help="Override perceptual/MERT JSONL log path for the offline pass.")
+    parser.add_argument("--perceptual-log", default=str(ai_logs_path("perceptual_decisions.jsonl")), help="Override perceptual/MERT JSONL log path for the offline pass.")
     parser.add_argument("--perceptual-window-sec", type=float, default=8.0, help="Audio window length used by offline perceptual/MERT scoring.")
     parser.add_argument("--source-rules-mert-only", action="store_true", help="Experimental offline render: build DSP only from measured metrics, rules.jsonl, and MERT shadow scoring; skip built-in project mix passes.")
     args = parser.parse_args()
+    audio_dir, logs_dir = ensure_ai_output_dirs()
+    args.output = str(Path(args.output).expanduser())
+    args.report = str(Path(args.report).expanduser())
     if args.source_rules_mert_only:
         args.source_knowledge_enable = True
         args.mert_enable = True
@@ -10296,7 +10300,7 @@ def main() -> int:
         apply_bus_processing=not args.source_rules_mert_only,
     )
 
-    output = Path(args.output)
+    output = ensure_parent_dir(args.output)
     if output.suffix.lower() == ".wav":
         tmp_wav = output
         sf.write(tmp_wav, mix, sr, subtype="PCM_24")
@@ -10346,9 +10350,15 @@ def main() -> int:
         source_layer.stop()
         source_knowledge_report["channel_candidate_logs_requested"] = int(source_candidate_logs)
         source_knowledge_report["logger_stats"] = source_layer.logger.stats.__dict__.copy()
+    report_path = ensure_parent_dir(args.report)
     report = {
         "input_dir": str(input_dir),
         "output": str(output),
+        "artifact_policy": {
+            "audio_dir": str(audio_dir),
+            "logs_dir": str(logs_dir),
+            "report": str(report_path),
+        },
         "reference": str(reference_context.path) if reference_context is not None else "",
         "reference_sources": [str(path) for path in reference_context.source_paths] if reference_context is not None else [],
         "genre": str(args.genre or ""),
@@ -10401,7 +10411,7 @@ def main() -> int:
         "virtual_console_calls": console.calls,
         "channels": channel_reports,
     }
-    Path(args.report).write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(report, indent=2, ensure_ascii=False))
     return 0
 

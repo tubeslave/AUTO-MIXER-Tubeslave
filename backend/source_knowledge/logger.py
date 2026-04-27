@@ -60,7 +60,7 @@ class SourceDecisionLogger:
     stats: SourceLoggerStats = field(default_factory=SourceLoggerStats)
 
     def __post_init__(self) -> None:
-        self.path = Path(self.path)
+        self.path = Path(self.path).expanduser()
         self._queue: queue.Queue = queue.Queue(maxsize=max(1, int(self.queue_maxsize)))
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None

@@ -197,19 +197,38 @@ perceptual:
   max_cpu_percent: 25
   log_scores: true
   block_osc_when_score_worse: false
-  log_path: logs/perceptual_decisions.jsonl
+  log_path: ~/Desktop/Ai LOGS/perceptual_decisions.jsonl
   queue_maxsize: 128
   async_evaluation: true
   improvement_threshold: 0.03
   local_files_only: false
   fallback_to_lightweight: false
   device: auto
+muq_eval:
+  enabled: true
+  device: auto
+  window_sec: 10
+  hop_sec: 5
+  sample_rate: 24000
+  min_improvement_threshold: 0.03
+  rollback_on_quality_drop: true
+  fallback_enabled: true
+  log_scores: true
+  shadow_mode: true
+  log_path: ~/Desktop/Ai LOGS/muq_eval_decisions.jsonl
+  training_log_path: ~/Desktop/Ai LOGS/muq_eval_rewards.jsonl
+  model_repo_id: zhudi2825/MuQ-Eval-A1
+  local_files_only: true
+  max_gain_change_db_per_step: 1.0
+  max_eq_gain_change_db_per_step: 1.0
+  max_compressor_threshold_change_db_per_step: 2.0
+  min_seconds_between_quality_decisions: 5.0
 source_knowledge:
   enabled: false
   mode: shadow
   sources_path: backend/source_knowledge/data/sources.yaml
   rules_path: backend/source_knowledge/data/rules.jsonl
-  log_path: logs/source_grounded_decisions.jsonl
+  log_path: ~/Desktop/Ai LOGS/source_grounded_decisions.jsonl
   queue_maxsize: 256
   min_rule_confidence: 0.55
   allow_unsourced_rules: false

@@ -145,6 +145,123 @@ autofoh:
 
 Это позволяет быстро увидеть, сколько коррекций было отправлено, сколько заблокировано, и сколько действий система не применила из-за `phase_target_guard`, не открывая JSON report вручную.
 
+### MuQ-Eval quality layer
+
+В проект добавлен опциональный слой оценки качества итогового master mix на базе
+[MuQ-Eval](https://github.com/dgtql/MuQ-Eval). Он оценивает 5-10 секунд master-reference
+аудио и пишет reward/feedback для агента, но сам не управляет пультом и не отправляет OSC.
+Все реальные команды по-прежнему проходят через `AutoFOHSafetyController` и mixer clients.
+
+Конфиг: `config/muq_eval.yaml`.
+
+```yaml
+enabled: true
+device: auto
+window_sec: 10
+hop_sec: 5
+sample_rate: 24000
+min_improvement_threshold: 0.03
+rollback_on_quality_drop: true
+fallback_enabled: true
+log_scores: true
+shadow_mode: true
+```
+
+По умолчанию `shadow_mode: true`: слой только оценивает уже предложенные/примененные решения
+и пишет JSONL, не блокируя live OSC. Если перевести `shadow_mode` в `false`, агрессивные
+коррекции требуют уверенного A/B результата; без candidate/dry-run audio они будут отклонены
+как небезопасные.
+
+MuQ-Eval зависимости не обязательны. Для полноценной модели установите/склонируйте MuQ-Eval
+и его зависимости, затем укажите путь:
+
+```bash
+git clone https://github.com/dgtql/MuQ-Eval external/MuQ-Eval
+export MUQ_EVAL_ROOT="$PWD/external/MuQ-Eval"
+pip install torch omegaconf huggingface_hub
+```
+
+Сервис пытается найти checkpoint `zhudi2825/MuQ-Eval-A1` локально. Если MuQ-Eval или checkpoint
+недоступны, программа не падает: включается fallback-оценка по clipping, low-end, harshness
+2-5 kHz, spectral balance, crest factor и RMS/LUFS sanity.
+
+Offline-артефакты сведения теперь разделены по папкам на рабочем столе:
+
+- аудио-рендеры WAV/MP3: `~/Desktop/Ai MIXING/`
+- отчёты, JSONL decision/reward logs и графики: `~/Desktop/Ai LOGS/`
+
+Логи:
+
+- `~/Desktop/Ai LOGS/muq_eval_decisions.jsonl` — evaluation cycle: action, scores before/after, delta,
+  accepted/rejected, reason, OSC commands if accepted.
+- `~/Desktop/Ai LOGS/muq_eval_rewards.jsonl` — training reward rows:
+  `reward = delta_quality_score - safety_penalty - excessive_change_penalty`.
+
+Пример строки:
+
+```json
+{"timestamp":123.0,"session_id":"song-1","current_scene":"verse","proposed_action":{"action_type":"ChannelEQMove","delta_db":0.2},"score_before":{"quality_score":0.0,"model_status":"unavailable"},"score_after":{"quality_score":0.56,"model_status":"unavailable"},"delta":0.56,"accepted":true,"rejection_reason":"","osc_commands":[{"address":"/ch/2/eq/1g","value":-1.0}],"reward":0.56}
+```
+
+MuQ-Eval не является единственным критерием: он добавляет perceptual reward к существующим
+правилам баланса, фазировки, headroom, feedback safety и знаниям по инструментам.
+
+### MuQ-Eval Director Offline Test
+
+`MUQ_EVAL_DIRECTOR_OFFLINE_TEST` — экспериментальный offline-only режим, где MuQ-Eval
+становится главным decision/reward engine для сведения мультитрека. Он не подключается к
+пульту, не создает mixer client и жестко запрещает `send_osc: true`.
+
+Конфиг: `config/muq_director_test.yaml`. Все изменения применяются только к offline-render
+копиям: WAV-кандидаты и `best_mix.wav` пишутся в `~/Desktop/Ai MIXING/muq_director/<session_id>/`,
+а `report.json`, `steps.jsonl`, best-state JSON и графики — в `~/Desktop/Ai LOGS/muq_director/<session_id>/`.
+
+Запуск:
+
+```bash
+PYTHONPATH=backend python -m src.experiments.muq_eval_director \
+  --input "/path/to/multitrack_dir" \
+  --config config/muq_director_test.yaml \
+  --mode muq_safe
+```
+
+Dry-run без рендера и MuQ-оценки:
+
+```bash
+PYTHONPATH=backend python -m src.experiments.muq_eval_director \
+  --input "/path/to/multitrack_dir" \
+  --config config/muq_director_test.yaml \
+  --mode muq_safe \
+  --dry-run
+```
+
+Режимы:
+
+- `pure_muq` — выбор только по среднему MuQ quality score.
+- `muq_safe` — `0.70 * MuQ + 0.10 * loudness + 0.10 * peak headroom + 0.05 * phase/mono + 0.05 * anti-overprocessing`.
+- `muq_genre` — `muq_safe` плюс небольшой жанровый prior.
+- `muq_vs_existing_agent` — тот же safety score, но report пытается сравнить director result с обычным automixer render, если путь задан в config.
+
+Артефакты:
+
+- `report.json` — итоговый score, action sequence, stopping reason, warnings, финальные LUFS/peak/phase.
+- `steps.jsonl` — каждый A/B candidate: action, before/after параметры, MuQ before/after, delta, safety score, accepted/rejected.
+- `best_mix.wav` — лучший найденный offline-render.
+- `candidate_renders/` — WAV-кандидаты, если `save_every_candidate: true`.
+- `best_states/` — JSON-снимки лучших beam states.
+- `score_curve.png`, `action_timeline.png`, `channel_change_summary.png`, если доступен `matplotlib`.
+
+Пример строки `steps.jsonl`:
+
+```json
+{"step":1,"parent_state_id":"state_0000","candidate_id":"step_001_state_0001","action":{"action_type":"gain","channel_id":2,"instrument":"lead_vocal","parameters":{"delta_db":1.0}},"muq_score_before":0.51,"muq_score_after":0.54,"delta_muq":0.03,"loudness_after":-14.0,"peak_after":-3.0,"phase_score":0.96,"final_score":0.61,"accepted":true,"rejection_reason":"","render_path":"~/Desktop/Ai MIXING/muq_director/test_001/candidate_renders/step_001_state_0001.wav","audio_window_scores":[0.53,0.55]}
+```
+
+Почему нельзя включать в live: director делает много candidate renders, может быть медленным,
+исследует рискованные гипотезы и использует MuQ как основной оптимизатор. Это полезно для
+оценки способности метрики вести процесс сведения, но недостаточно надежно для FOH без
+человека и existing safety pipeline.
+
 ### Автообучение агентов через интернет
 
 Включается через секцию `training` в `config/automixer.yaml` (по умолчанию выключено).

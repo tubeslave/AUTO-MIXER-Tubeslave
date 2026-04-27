@@ -27,3 +27,6 @@
 - The writing agent and reviewing agent should use different worktrees.
 - Durable lessons should be generic enough to survive beyond a single task.
 - Routing and channel-name writes on a live WING require an explicit expected patch/name map; audit/readback can be automatic, but patch writes should stay disabled by default.
+- MuQ-A1 offline rock passes should A/B `large_system_polish` and extra drum-focus boosts instead of treating them as defaults; on SONG REPA, MuQ preferred the full agent/source-knowledge/AutoFOH/phase stack with `large_system_polish` disabled.
+- MuQ-A1 FX-led rock passes should treat `0.9` whole-mix score as an aspirational, not fixed, gate unless calibrated against references; on SONG REPA the provided commercial reference scored `0.7959`, while subtle reference-guided FX plus section-selective modulation reached `0.7725` without clipping.
+- Operator accepted the `MIX_AYAIC_FX_SOFTPRINT_FINAL` direction for Desktop/MIX: use AYAIC Mix Monolith-inspired level-plane/relative balance, shared filtered FX returns, real MuQ-A1 audit, and light mix-print mastering. Avoid MuQ score chasing through segment EQ, clipping, heavy limiting, or aggressive compression when this direction is requested.

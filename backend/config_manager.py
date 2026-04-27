@@ -7,6 +7,11 @@ import copy
 from typing import Any, Dict, List, Optional, Callable
 from dataclasses import dataclass, field
 
+try:
+    from output_paths import ai_logs_path
+except ImportError:  # pragma: no cover - package import fallback
+    from backend.output_paths import ai_logs_path
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -221,7 +226,7 @@ class ConfigManager:
                 'max_cpu_percent': 25,
                 'log_scores': True,
                 'block_osc_when_score_worse': False,
-                'log_path': 'logs/perceptual_decisions.jsonl',
+                'log_path': str(ai_logs_path('perceptual_decisions.jsonl')),
                 'queue_maxsize': 128,
                 'async_evaluation': True,
                 'improvement_threshold': 0.03,
@@ -240,8 +245,8 @@ class ConfigManager:
                 'fallback_enabled': True,
                 'log_scores': True,
                 'shadow_mode': True,
-                'log_path': 'logs/muq_eval_decisions.jsonl',
-                'training_log_path': 'logs/muq_eval_rewards.jsonl',
+                'log_path': str(ai_logs_path('muq_eval_decisions.jsonl')),
+                'training_log_path': str(ai_logs_path('muq_eval_rewards.jsonl')),
                 'model_repo_id': 'zhudi2825/MuQ-Eval-A1',
                 'local_files_only': True,
                 'min_seconds_between_quality_decisions': 5.0,
@@ -254,7 +259,7 @@ class ConfigManager:
                 'mode': 'shadow',
                 'sources_path': 'backend/source_knowledge/data/sources.yaml',
                 'rules_path': 'backend/source_knowledge/data/rules.jsonl',
-                'log_path': 'logs/source_grounded_decisions.jsonl',
+                'log_path': str(ai_logs_path('source_grounded_decisions.jsonl')),
                 'queue_maxsize': 256,
                 'min_rule_confidence': 0.55,
                 'allow_unsourced_rules': False,

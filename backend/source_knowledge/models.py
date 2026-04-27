@@ -6,6 +6,11 @@ from dataclasses import dataclass, field
 import time
 from typing import Any, Dict, List, Optional
 
+try:
+    from output_paths import ai_logs_path
+except ImportError:  # pragma: no cover - package import fallback
+    from backend.output_paths import ai_logs_path
+
 
 @dataclass
 class SourceGroundedConfig:
@@ -15,7 +20,7 @@ class SourceGroundedConfig:
     mode: str = "shadow"
     sources_path: str = ""
     rules_path: str = ""
-    log_path: str = "logs/source_grounded_decisions.jsonl"
+    log_path: str = str(ai_logs_path("source_grounded_decisions.jsonl"))
     queue_maxsize: int = 256
     min_rule_confidence: float = 0.55
     allow_unsourced_rules: bool = False
