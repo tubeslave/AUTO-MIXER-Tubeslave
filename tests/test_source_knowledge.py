@@ -109,6 +109,55 @@ def test_modulation_and_spatial_fx_rules_are_retrievable():
     assert modulation_matches[0].rule.rule_id == "fx.modulation_support_width_texture"
 
 
+def test_expanded_mixing_canon_rules_are_retrievable():
+    store = SourceKnowledgeStore({"source_knowledge": {"min_rule_confidence": 0.0}})
+
+    for source_id in [
+        "moylan_crafting_mix",
+        "katz_mastering_audio",
+        "moffat_sandler_approaches_imp",
+        "itu_bs1534_mushra",
+        "toole_sound_reproduction",
+        "sos_mix_rescue_series",
+    ]:
+        assert store.get_source(source_id) is not None
+
+    master_rule = store.get_rule("mastering.transparent_headroom_over_loudness")
+    metric_rule = store.get_rule("automation.human_metric_hybrid_decisions")
+    style_rule = store.get_rule("professional_principles_no_style_imitation")
+
+    assert master_rule is not None
+    assert "katz_mastering_audio" in master_rule.source_ids
+    assert metric_rule is not None
+    assert metric_rule.mode == "shadow"
+    assert "itu_bs1534_mushra" in metric_rule.source_ids
+    assert style_rule is not None
+    assert style_rule.bounds["no_named_style_clone"] is True
+
+    balance_matches = store.search_rules(
+        "level planes role anchors support balance",
+        domains=["balance"],
+        instruments=["lead_vocal"],
+        problems=["unclear_roles"],
+        action_types=["balance_pass"],
+        limit=4,
+    )
+    balance_rule_ids = {match.rule.rule_id for match in balance_matches}
+
+    assert "balance.level_planes_role_context" in balance_rule_ids
+    assert "arrangement.mix_moves_should_respect_source_role" in {
+        match.rule.rule_id
+        for match in store.search_rules(
+            "anchor support texture arrangement role before processing",
+            domains=["arrangement"],
+            instruments=["guitar"],
+            problems=["unclear_roles"],
+            action_types=["role_assignment"],
+            limit=4,
+        )
+    }
+
+
 def test_config_defaults_keep_source_knowledge_disabled():
     config = ConfigManager()
 
