@@ -17,7 +17,7 @@ from autofoh_profiles import build_phase_learning_snapshot, build_soundcheck_pro
 from autofoh_safety import AutoFOHSafetyController, ChannelEQMove
 from feedback_detector import FeedbackEvent
 from observation_mixer import ObservationMixerClient
-from signal_metrics import ChannelMetrics, LevelMetrics
+from signal_metrics import ChannelMetrics, InterChannelMetrics, LevelMetrics
 
 
 class FakeMixer:
@@ -95,6 +95,10 @@ class DetectorMixer:
 
     def __init__(self):
         self.fader = {1: -6.0, 2: -8.0}
+        self.main_fader = {1: -2.0}
+        self.delay = {}
+        self.polarity = {}
+        self.bus_fader = {}
         self.eq_gain = {}
         self.eq_freq = {}
         self.hpf = {}
@@ -103,6 +107,22 @@ class DetectorMixer:
         self.compressor_gr = {}
         self.gate = {}
         self.send_level = {}
+        self.bus_settings = {
+            5: {
+                "bus": 5,
+                "name": "VOC BUS",
+                "fader_db": -4.0,
+                "muted": False,
+                "eq_bands": [],
+                "compressor_enabled": True,
+                "dca_assignments": [6],
+                "tags": "#D6",
+            }
+        }
+        self.dca_settings = {
+            2: {"dca": 2, "name": "Lead DCA", "fader_db": -3.0, "muted": False},
+            6: {"dca": 6, "name": "Vocal DCA", "fader_db": -2.0, "muted": False},
+        }
         self.calls = []
 
     def get_fader(self, channel):
@@ -121,6 +141,75 @@ class DetectorMixer:
         self.eq_freq[(channel, band)] = freq
         self.calls.append(("set_eq_band", channel, band, freq, gain, q))
         return True
+
+    def get_main_fader(self, main=1):
+        return self.main_fader.get(main, 0.0)
+
+    def set_main_fader(self, main, value_db):
+        self.main_fader[main] = value_db
+        self.calls.append(("set_main_fader", main, value_db))
+        return True
+
+    def get_delay(self, channel):
+        return self.delay.get(channel, 0.0)
+
+    def set_delay(self, channel, delay_ms, enabled=True):
+        self.delay[channel] = delay_ms
+        self.calls.append(("set_delay", channel, delay_ms, enabled))
+        return True
+
+    def get_polarity(self, channel):
+        return self.polarity.get(channel, False)
+
+    def set_polarity(self, channel, inverted):
+        self.polarity[channel] = inverted
+        self.calls.append(("set_polarity", channel, inverted))
+        return True
+
+    def get_bus_fader(self, bus):
+        if bus in self.bus_fader:
+            return self.bus_fader[bus]
+        return self.bus_settings.get(bus, {}).get("fader_db", -100.0)
+
+    def set_bus_fader(self, bus, value_db):
+        self.bus_fader[bus] = value_db
+        self.calls.append(("set_bus_fader", bus, value_db))
+        return True
+
+    def get_channel_settings(self, channel):
+        return {
+            "channel": channel,
+            "name": f"Ch {channel}",
+            "fader_db": self.fader.get(channel, -10.0),
+            "muted": False,
+            "gain_db": 0.0,
+            "hpf_freq": 20.0,
+            "hpf_enabled": False,
+            "eq_on": True,
+            "eq_bands": [
+                (90.0, self.eq_gain.get((channel, 1), 0.0), 1.0),
+                (320.0, self.eq_gain.get((channel, 2), 0.0), 1.0),
+                (2500.0, self.eq_gain.get((channel, 3), 0.0), 1.0),
+                (7600.0, self.eq_gain.get((channel, 4), 0.0), 1.0),
+            ],
+            "input_routing": {
+                "main_group": "MOD",
+                "main_channel": channel,
+                "alt_group": None,
+                "alt_channel": None,
+            },
+            "main_send": {"on": 1, "level_db": 0.0, "pre": 0},
+            "active_bus_sends": [],
+            "dca_assignments": [],
+        }
+
+    def get_bus_settings(self, bus):
+        self.calls.append(("get_bus_settings", bus))
+        return dict(self.bus_settings.get(bus, {"bus": bus, "fader_db": -100.0, "muted": False}))
+
+    def get_dca_settings(self, dca):
+        self.calls.append(("get_dca_settings", dca))
+        return dict(self.dca_settings.get(dca, {"dca": dca, "fader_db": -100.0, "muted": False}))
 
     def set_eq_on(self, channel, on):
         self.calls.append(("set_eq_on", channel, on))
@@ -302,6 +391,241 @@ def test_master_reference_channels_are_not_source_corrected():
     assert info.stem_roles == ["MASTER"]
     assert info.allowed_controls == []
     assert info.auto_corrections_enabled is False
+
+
+def test_channel_state_read_captures_group_bus_and_dca_routes():
+    mixer = DetectorMixer()
+    base_get_channel_settings = mixer.get_channel_settings
+
+    def routed_channel_settings(channel):
+        settings = base_get_channel_settings(channel)
+        settings["active_bus_sends"] = [
+            {
+                "bus": 5,
+                "on": 1,
+                "level_db": -12.0,
+                "mode": "POST",
+                "active": True,
+            }
+        ]
+        settings["dca_assignments"] = [2]
+        settings["tags"] = "#D2"
+        return settings
+
+    mixer.get_channel_settings = routed_channel_settings
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="Lead Vox",
+            preset="leadVocal",
+            auto_corrections_enabled=True,
+        )
+    }
+
+    engine._read_channel_state()
+    status = engine.get_status()
+
+    assert engine.channel_group_routes[1] == {"bus_ids": [5], "dca_ids": [2]}
+    assert engine.bus_snapshots[5].name == "VOC BUS"
+    assert engine.bus_snapshots[5].source_channels == [1]
+    assert engine.dca_snapshots[2].source_channels == [1]
+    assert engine.dca_snapshots[6].source_buses == [5]
+    assert status["channels"][1]["active_bus_sends"] == [5]
+    assert status["group_buses"][5]["dca_assignments"] == [6]
+    assert status["dca_groups"][6]["source_buses"] == [5]
+
+
+def test_group_bus_correction_skips_monitor_buses():
+    mixer = DetectorMixer()
+    mixer.bus_settings[12] = {
+        "bus": 12,
+        "name": "VOC GROUP",
+        "fader_db": 2.0,
+        "muted": False,
+        "dca_assignments": [],
+    }
+    mixer.bus_settings[13] = {
+        "bus": 13,
+        "name": "DIMA MON",
+        "fader_db": 2.0,
+        "muted": False,
+        "dca_assignments": [],
+    }
+    base_get_channel_settings = mixer.get_channel_settings
+
+    def routed_channel_settings(channel):
+        settings = base_get_channel_settings(channel)
+        settings["active_bus_sends"] = [
+            {"bus": 12, "on": 1, "level_db": -6.0, "active": True},
+            {"bus": 13, "on": 1, "level_db": -6.0, "active": True},
+        ]
+        return settings
+
+    mixer.get_channel_settings = routed_channel_settings
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    engine.monitor_bus_ids = {13, 14, 15, 16}
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="Lead Vox",
+            preset="leadVocal",
+            has_signal=True,
+            auto_corrections_enabled=True,
+            lufs=-18.0,
+        )
+    }
+
+    engine._read_channel_state()
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    engine._apply_group_bus_corrections()
+
+    assert ("set_bus_fader", 12, 0.0) in mixer.calls
+    assert not any(call[:2] == ("set_bus_fader", 13) for call in mixer.calls)
+
+
+def test_drum_phase_delay_corrects_processed_channels_through_safety(monkeypatch):
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=2,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    engine.audio_capture = DetectorAudioCapture(
+        {
+            1: np.ones(48000, dtype=np.float32) * 0.1,
+            2: np.ones(48000, dtype=np.float32) * 0.1,
+        }
+    )
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="KICK IN",
+            preset="kick",
+            has_signal=True,
+            original_snapshot=ChannelSnapshot(
+                channel=1,
+                had_processing=True,
+                raw_settings={"delay_enabled": 0, "delay_ms": 0.0},
+            ),
+        ),
+        2: ChannelInfo(
+            channel=2,
+            name="KICK OUT",
+            preset="kick",
+            has_signal=True,
+            original_snapshot=ChannelSnapshot(
+                channel=2,
+                had_processing=True,
+                raw_settings={"delay_enabled": 0, "delay_ms": 0.0},
+            ),
+        ),
+    }
+
+    monkeypatch.setattr(
+        "auto_soundcheck_engine.compare_channels",
+        lambda *_args, **_kwargs: InterChannelMetrics(
+            channel_a=1,
+            channel_b=2,
+            cross_correlation=0.8,
+            delay_samples=24,
+            delay_ms=0.5,
+            coherence=0.9,
+            spectral_similarity=0.9,
+            phase_inverted=False,
+        ),
+    )
+
+    engine._detect_and_fix_phase()
+
+    assert ("set_delay", 2, 0.25, True) in mixer.calls
+
+
+def test_phase_pairing_does_not_align_unrelated_lead_vocals():
+    engine = AutoSoundcheckEngine(
+        num_channels=2,
+        auto_discover=False,
+    )
+    engine.channels = {
+        1: ChannelInfo(channel=1, name="KATYA", preset="leadVocal", has_signal=True),
+        2: ChannelInfo(channel=2, name="SERGEY", preset="leadVocal", has_signal=True),
+    }
+
+    assert engine._find_correlated_pairs() == []
+
+
+def test_live_shared_mix_uses_master_reference_without_source_correcting_it():
+    def sine(freq_hz, amplitude):
+        t = np.arange(48000, dtype=np.float32) / 48000.0
+        return amplitude * np.sin(2.0 * np.pi * freq_hz * t)
+
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=24,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    engine.master_reference_channels = {23, 24}
+    engine.shared_chat_mix_config.analysis_window_sec = 1.0
+    engine.audio_capture = DetectorAudioCapture(
+        {
+            1: sine(1000.0, 0.2),
+            23: sine(1000.0, 0.9),
+            24: sine(1000.0, 0.9),
+        }
+    )
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="Lead Vox",
+            preset="leadVocal",
+            source_role="lead_vocal",
+            stem_roles=["LEAD"],
+            allowed_controls=[],
+            has_signal=True,
+            recognized=True,
+            auto_corrections_enabled=False,
+            fader_db=-6.0,
+        ),
+        23: ChannelInfo(
+            channel=23,
+            name="Master L",
+            source_role="mix_bus_reference",
+            stem_roles=["MASTER"],
+            has_signal=True,
+            recognized=True,
+            auto_corrections_enabled=False,
+        ),
+        24: ChannelInfo(
+            channel=24,
+            name="Master R",
+            source_role="mix_bus_reference",
+            stem_roles=["MASTER"],
+            has_signal=True,
+            recognized=True,
+            auto_corrections_enabled=False,
+        ),
+    }
+
+    decisions = engine._apply_live_shared_mix_pass()
+
+    assert any(decision.sent for decision in decisions)
+    assert ("set_main_fader", 1, -3.0) in mixer.calls
+    assert not any(call[0] == "set_eq_band" and call[1] in {23, 24} for call in mixer.calls)
 
 
 def test_input_gain_correction_does_not_boost_trim_by_default():
@@ -1066,6 +1390,82 @@ def test_phase_target_guard_blocks_detector_eq_when_stem_is_below_learned_baseli
 
     assert decisions == []
     assert mixer.calls == []
+
+
+def test_phase_target_guard_allows_mirror_eq_inside_green_corridor():
+    def sine(freq_hz, amplitude):
+        t = np.arange(12000, dtype=np.float32) / 48000.0
+        return amplitude * np.sin(2.0 * np.pi * freq_hz * t)
+
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SNAPSHOT_LOCK
+    engine.audio_capture = DetectorAudioCapture({1: sine(2800.0, 0.4)})
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="Gtr 1",
+            source_role="guitar",
+            stem_roles=["GUITARS", "MUSIC"],
+            allowed_controls=["eq", "fader"],
+            has_signal=True,
+            recognized=True,
+            auto_corrections_enabled=True,
+            fader_db=-8.0,
+            priority=0.6,
+        ),
+    }
+    features = {1: extract_analysis_features(sine(2800.0, 0.4))}
+    stems = aggregate_stem_features(features, {1: ["GUITARS", "MUSIC"]})
+    profile = build_soundcheck_profile(
+        channel_features=features,
+        channel_metadata={
+            1: {
+                "name": "Gtr 1",
+                "source_role": "guitar",
+                "stem_roles": ["GUITARS", "MUSIC"],
+                "allowed_controls": ["eq", "fader"],
+                "priority": 0.6,
+            },
+        },
+        stem_features=stems,
+        stem_contributions={},
+        phase_snapshots={
+            "SNAPSHOT_LOCK": build_phase_learning_snapshot(
+                phase_name="SNAPSHOT_LOCK",
+                runtime_state="SNAPSHOT_LOCK",
+                channel_features=features,
+                stem_features=stems,
+            ),
+        },
+    )
+    engine.loaded_soundcheck_profile = profile
+    engine.soundcheck_profile_use_loaded_target_corridor = True
+    engine.soundcheck_profile_use_phase_target_action_guards = True
+
+    decision = engine._execute_action(
+        ChannelEQMove(
+            channel_id=1,
+            band=3,
+            freq_hz=3000.0,
+            gain_db=-1.0,
+            q=4.0,
+            reason="Mirror EQ cut masker: cross-adaptive overlap at 3000Hz",
+        ),
+        runtime_state=RuntimeState.SNAPSHOT_LOCK,
+        phase_guard_context=engine._build_phase_target_guard_context(
+            runtime_state=RuntimeState.SNAPSHOT_LOCK
+        ),
+    )
+
+    assert decision is not None
+    assert decision.sent
+    assert mixer.calls[-1][0] == "set_eq_band"
 
 
 def test_phase_target_guard_blocks_initial_fader_move_without_mutating_channel_state():

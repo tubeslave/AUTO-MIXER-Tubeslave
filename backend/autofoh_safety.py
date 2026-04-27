@@ -21,6 +21,7 @@ from autofoh_runtime import (
     ACTION_FAMILY_GAIN,
     ACTION_FAMILY_HPF,
     ACTION_FAMILY_PAN,
+    ACTION_FAMILY_PHASE,
     ACTION_FAMILY_TONAL_EQ,
     RuntimeStatePolicy,
 )
@@ -74,6 +75,79 @@ class ChannelFaderMove(TypedCorrectionAction):
 
 
 @dataclass
+class BusFaderMove(TypedCorrectionAction):
+    bus_id: int
+    target_db: float
+    delta_db: float = 0.0
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_FADER
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.bus_id)
+
+
+@dataclass
+class DCAFaderMove(TypedCorrectionAction):
+    dca_id: int
+    target_db: float
+    delta_db: float = 0.0
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_FADER
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.dca_id)
+
+
+@dataclass
+class MasterFaderMove(TypedCorrectionAction):
+    main_id: int
+    target_db: float
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_EMERGENCY_FADER
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.main_id)
+
+
+@dataclass
+class PolarityAdjust(TypedCorrectionAction):
+    channel_id: int
+    inverted: bool
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_PHASE
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.channel_id)
+
+
+@dataclass
+class DelayAdjust(TypedCorrectionAction):
+    channel_id: int
+    delay_ms: float
+    enabled: bool = True
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_PHASE
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.channel_id)
+
+
+@dataclass
 class ChannelEQMove(TypedCorrectionAction):
     channel_id: int
     band: int
@@ -88,6 +162,23 @@ class ChannelEQMove(TypedCorrectionAction):
     @property
     def target_key(self) -> Tuple[Any, ...]:
         return (self.action_type, self.channel_id, self.band)
+
+
+@dataclass
+class BusEQMove(TypedCorrectionAction):
+    bus_id: int
+    band: int
+    freq_hz: float
+    gain_db: float
+    q: float
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_TONAL_EQ
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.bus_id, self.band)
 
 
 @dataclass
@@ -125,6 +216,25 @@ class CompressorAdjust(TypedCorrectionAction):
 
 
 @dataclass
+class BusCompressorAdjust(TypedCorrectionAction):
+    bus_id: int
+    threshold_db: float
+    ratio: float
+    attack_ms: float
+    release_ms: float
+    makeup_db: float = 0.0
+    enabled: bool = True
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_COMPRESSOR
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.bus_id)
+
+
+@dataclass
 class CompressorMakeupAdjust(TypedCorrectionAction):
     channel_id: int
     makeup_db: float
@@ -136,6 +246,20 @@ class CompressorMakeupAdjust(TypedCorrectionAction):
     @property
     def target_key(self) -> Tuple[Any, ...]:
         return (self.action_type, self.channel_id)
+
+
+@dataclass
+class BusCompressorMakeupAdjust(TypedCorrectionAction):
+    bus_id: int
+    makeup_db: float
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_COMPRESSOR
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.bus_id)
 
 
 @dataclass
@@ -234,6 +358,10 @@ class SafetyDecision:
 class AutoFOHSafetyConfig:
     channel_fader_max_step_db: float = 1.0
     channel_fader_min_interval_sec: float = 3.0
+    bus_fader_max_step_db: float = 1.0
+    bus_fader_min_interval_sec: float = 3.0
+    dca_fader_max_step_db: float = 1.0
+    dca_fader_min_interval_sec: float = 3.0
     lead_fader_max_step_db: float = 0.5
     lead_fader_min_interval_sec: float = 2.0
     gain_max_abs_db: float = 12.0
@@ -247,6 +375,12 @@ class AutoFOHSafetyConfig:
     fx_send_min_db: float = -40.0
     fx_send_max_db: float = -5.0
     fx_return_min_interval_sec: float = 3.0
+    master_fader_max_cut_db: float = 1.0
+    master_fader_min_interval_sec: float = 1.0
+    delay_max_step_ms: float = 0.25
+    delay_max_ms: float = 10.0
+    delay_min_interval_sec: float = 3.0
+    polarity_min_interval_sec: float = 3.0
     pan_min: float = -100.0
     pan_max: float = 100.0
     feedback_notch_max_cut_db: float = -6.0
@@ -259,6 +393,10 @@ class AutoFOHSafetyConfig:
         return cls(
             channel_fader_max_step_db=float(config.get("channel_fader_max_step_db", 1.0)),
             channel_fader_min_interval_sec=float(config.get("channel_fader_min_interval_sec", 3.0)),
+            bus_fader_max_step_db=float(config.get("bus_fader_max_step_db", 1.0)),
+            bus_fader_min_interval_sec=float(config.get("bus_fader_min_interval_sec", 3.0)),
+            dca_fader_max_step_db=float(config.get("dca_fader_max_step_db", 1.0)),
+            dca_fader_min_interval_sec=float(config.get("dca_fader_min_interval_sec", 3.0)),
             lead_fader_max_step_db=float(config.get("lead_fader_max_step_db", 0.5)),
             lead_fader_min_interval_sec=float(config.get("lead_fader_min_interval_sec", 2.0)),
             gain_max_abs_db=float(config.get("gain_max_abs_db", 12.0)),
@@ -272,6 +410,12 @@ class AutoFOHSafetyConfig:
             fx_send_min_db=float(config.get("fx_send_min_db", -40.0)),
             fx_send_max_db=float(config.get("fx_send_max_db", -5.0)),
             fx_return_min_interval_sec=float(config.get("fx_return_min_interval_sec", 3.0)),
+            master_fader_max_cut_db=float(config.get("master_fader_max_cut_db", 1.0)),
+            master_fader_min_interval_sec=float(config.get("master_fader_min_interval_sec", 1.0)),
+            delay_max_step_ms=float(config.get("delay_max_step_ms", 0.25)),
+            delay_max_ms=float(config.get("delay_max_ms", 10.0)),
+            delay_min_interval_sec=float(config.get("delay_min_interval_sec", 3.0)),
+            polarity_min_interval_sec=float(config.get("polarity_min_interval_sec", 3.0)),
             pan_min=float(config.get("pan_min", -100.0)),
             pan_max=float(config.get("pan_max", 100.0)),
             feedback_notch_max_cut_db=float(config.get("feedback_notch_max_cut_db", -6.0)),
@@ -293,7 +437,7 @@ class AutoFOHSafetyController:
         self.runtime_policy = runtime_policy or RuntimeStatePolicy()
         self.time_provider = time_provider or time.monotonic
         self._last_sent_at: Dict[Tuple[Any, ...], float] = {}
-        self._eq_baselines: Dict[Tuple[int, int], float] = {}
+        self._eq_baselines: Dict[Tuple[Any, ...], float] = {}
         self.history: List[SafetyDecision] = []
 
     def execute(
@@ -370,6 +514,80 @@ class AutoFOHSafetyController:
                 reason=action.reason,
             ), bounded
 
+        if isinstance(action, BusFaderMove):
+            current = self._safe_get(lambda: self.mixer_client.get_bus_fader(action.bus_id), default=-144.0)
+            desired_delta = action.target_db - current
+            bounded_delta = max(
+                -self.config.bus_fader_max_step_db,
+                min(self.config.bus_fader_max_step_db, desired_delta),
+            )
+            target = max(-144.0, min(0.0, current + bounded_delta))
+            bounded = abs(target - action.target_db) > 1e-6
+            return BusFaderMove(
+                bus_id=action.bus_id,
+                target_db=target,
+                delta_db=target - current,
+                reason=action.reason,
+            ), bounded
+
+        if isinstance(action, DCAFaderMove):
+            current = self._safe_get(lambda: self.mixer_client.get_dca_fader(action.dca_id), default=-144.0)
+            desired_delta = action.target_db - current
+            bounded_delta = max(
+                -self.config.dca_fader_max_step_db,
+                min(self.config.dca_fader_max_step_db, desired_delta),
+            )
+            target = max(-144.0, min(0.0, current + bounded_delta))
+            bounded = abs(target - action.target_db) > 1e-6
+            return DCAFaderMove(
+                dca_id=action.dca_id,
+                target_db=target,
+                delta_db=target - current,
+                reason=action.reason,
+            ), bounded
+
+        if isinstance(action, MasterFaderMove):
+            current = self._safe_get(
+                lambda: self.mixer_client.get_main_fader(action.main_id),
+                default=0.0,
+            )
+            target = min(float(action.target_db), float(current), 0.0)
+            target = max(float(current) - self.config.master_fader_max_cut_db, target)
+            target = max(-144.0, min(0.0, target))
+            bounded = abs(target - action.target_db) > 1e-6
+            return MasterFaderMove(
+                main_id=action.main_id,
+                target_db=target,
+                reason=action.reason,
+            ), bounded
+
+        if isinstance(action, PolarityAdjust):
+            return PolarityAdjust(
+                channel_id=action.channel_id,
+                inverted=bool(action.inverted),
+                reason=action.reason,
+            ), False
+
+        if isinstance(action, DelayAdjust):
+            current = self._safe_get(
+                lambda: self.mixer_client.get_delay(action.channel_id),
+                default=0.0,
+            )
+            desired_delta = float(action.delay_ms) - float(current or 0.0)
+            bounded_delta = max(
+                -self.config.delay_max_step_ms,
+                min(self.config.delay_max_step_ms, desired_delta),
+            )
+            target = float(current or 0.0) + bounded_delta
+            target = max(0.0, min(self.config.delay_max_ms, target))
+            bounded = abs(target - float(action.delay_ms)) > 1e-6
+            return DelayAdjust(
+                channel_id=action.channel_id,
+                delay_ms=target,
+                enabled=bool(action.enabled),
+                reason=action.reason,
+            ), bounded
+
         if isinstance(action, ChannelEQMove):
             key = (action.channel_id, action.band)
             current_gain = self._safe_get(
@@ -388,6 +606,31 @@ class AutoFOHSafetyController:
             bounded = abs(target_gain - action.gain_db) > 1e-6
             return ChannelEQMove(
                 channel_id=action.channel_id,
+                band=action.band,
+                freq_hz=max(20.0, min(20000.0, action.freq_hz)),
+                gain_db=target_gain,
+                q=max(0.44, min(12.0, action.q)),
+                reason=action.reason,
+            ), bounded
+
+        if isinstance(action, BusEQMove):
+            key = ("bus", action.bus_id, action.band)
+            current_gain = self._safe_get(
+                lambda: self.mixer_client.get_bus_eq_band_gain(action.bus_id, action.band),
+                default=0.0,
+            )
+            baseline = self._eq_baselines.setdefault(key, float(current_gain or 0.0))
+            desired_step = action.gain_db - float(current_gain or 0.0)
+            bounded_step = max(-self.config.broad_eq_max_step_db, min(self.config.broad_eq_max_step_db, desired_step))
+            target_gain = float(current_gain or 0.0) + bounded_step
+            target_gain = max(
+                baseline - self.config.broad_eq_max_total_db_from_snapshot,
+                min(baseline + self.config.broad_eq_max_total_db_from_snapshot, target_gain),
+            )
+            target_gain = max(-15.0, min(15.0, target_gain))
+            bounded = abs(target_gain - action.gain_db) > 1e-6
+            return BusEQMove(
+                bus_id=action.bus_id,
                 band=action.band,
                 freq_hz=max(20.0, min(20000.0, action.freq_hz)),
                 gain_db=target_gain,
@@ -414,9 +657,32 @@ class AutoFOHSafetyController:
             bounded = bounded_action != action
             return bounded_action, bounded
 
+        if isinstance(action, BusCompressorAdjust):
+            bounded_action = BusCompressorAdjust(
+                bus_id=action.bus_id,
+                threshold_db=max(-50.0, min(-5.0, action.threshold_db)),
+                ratio=max(1.0, min(20.0, action.ratio)),
+                attack_ms=max(1.0, min(120.0, action.attack_ms)),
+                release_ms=max(30.0, min(600.0, action.release_ms)),
+                makeup_db=max(-6.0, min(12.0, action.makeup_db)),
+                enabled=action.enabled,
+                reason=action.reason,
+            )
+            bounded = bounded_action != action
+            return bounded_action, bounded
+
         if isinstance(action, CompressorMakeupAdjust):
             bounded_action = CompressorMakeupAdjust(
                 channel_id=action.channel_id,
+                makeup_db=max(-6.0, min(12.0, action.makeup_db)),
+                reason=action.reason,
+            )
+            bounded = bounded_action != action
+            return bounded_action, bounded
+
+        if isinstance(action, BusCompressorMakeupAdjust):
+            bounded_action = BusCompressorMakeupAdjust(
+                bus_id=action.bus_id,
                 makeup_db=max(-6.0, min(12.0, action.makeup_db)),
                 reason=action.reason,
             )
@@ -469,11 +735,21 @@ class AutoFOHSafetyController:
         min_interval = 0.0
         if isinstance(action, ChannelFaderMove):
             min_interval = self.config.lead_fader_min_interval_sec if action.is_lead else self.config.channel_fader_min_interval_sec
-        elif isinstance(action, ChannelEQMove):
+        elif isinstance(action, BusFaderMove):
+            min_interval = self.config.bus_fader_min_interval_sec
+        elif isinstance(action, DCAFaderMove):
+            min_interval = self.config.dca_fader_min_interval_sec
+        elif isinstance(action, MasterFaderMove):
+            min_interval = self.config.master_fader_min_interval_sec
+        elif isinstance(action, DelayAdjust):
+            min_interval = self.config.delay_min_interval_sec
+        elif isinstance(action, PolarityAdjust):
+            min_interval = self.config.polarity_min_interval_sec
+        elif isinstance(action, (ChannelEQMove, BusEQMove)):
             min_interval = self.config.broad_eq_min_interval_sec
         elif isinstance(action, ChannelGainMove):
             min_interval = self.config.gain_min_interval_sec
-        elif isinstance(action, (CompressorAdjust, CompressorMakeupAdjust, GateAdjust)):
+        elif isinstance(action, (CompressorAdjust, CompressorMakeupAdjust, BusCompressorAdjust, BusCompressorMakeupAdjust, GateAdjust)):
             min_interval = self.config.compressor_min_interval_sec
         elif isinstance(action, SendLevelAdjust):
             min_interval = self.config.fx_return_min_interval_sec
@@ -490,8 +766,20 @@ class AutoFOHSafetyController:
             return self._require_method("set_gain", lambda a: self.mixer_client.set_gain(a.channel_id, a.target_db))
         if isinstance(action, ChannelFaderMove):
             return self._require_method("set_fader", lambda a: self.mixer_client.set_fader(a.channel_id, a.target_db))
+        if isinstance(action, BusFaderMove):
+            return self._require_method("set_bus_fader", lambda a: self.mixer_client.set_bus_fader(a.bus_id, a.target_db))
+        if isinstance(action, DCAFaderMove):
+            return self._require_method("set_dca_fader", lambda a: self.mixer_client.set_dca_fader(a.dca_id, a.target_db))
+        if isinstance(action, MasterFaderMove):
+            return self._require_method("set_main_fader", lambda a: self.mixer_client.set_main_fader(a.main_id, a.target_db))
+        if isinstance(action, PolarityAdjust):
+            return self._require_method("set_polarity", lambda a: self.mixer_client.set_polarity(a.channel_id, a.inverted))
+        if isinstance(action, DelayAdjust):
+            return self._require_method("set_delay", lambda a: self.mixer_client.set_delay(a.channel_id, a.delay_ms, enabled=a.enabled))
         if isinstance(action, ChannelEQMove):
             return self._require_method("set_eq_band", lambda a: self.mixer_client.set_eq_band(a.channel_id, a.band, a.freq_hz, a.gain_db, a.q))
+        if isinstance(action, BusEQMove):
+            return self._require_method("set_bus_eq_band", lambda a: self.mixer_client.set_bus_eq_band(a.bus_id, a.band, a.freq_hz, a.gain_db, a.q))
         if isinstance(action, HighPassAdjust):
             return self._require_method("set_hpf", lambda a: self.mixer_client.set_hpf(a.channel_id, a.freq_hz, enabled=a.enabled))
         if isinstance(action, CompressorAdjust):
@@ -507,10 +795,28 @@ class AutoFOHSafetyController:
                     enabled=a.enabled,
                 ),
             )
+        if isinstance(action, BusCompressorAdjust):
+            return self._require_method(
+                "set_bus_compressor",
+                lambda a: self.mixer_client.set_bus_compressor(
+                    a.bus_id,
+                    threshold_db=a.threshold_db,
+                    ratio=a.ratio,
+                    attack_ms=a.attack_ms,
+                    release_ms=a.release_ms,
+                    makeup_db=a.makeup_db,
+                    enabled=a.enabled,
+                ),
+            )
         if isinstance(action, CompressorMakeupAdjust):
             return self._require_method(
                 "set_compressor_gain",
                 lambda a: self.mixer_client.set_compressor_gain(a.channel_id, a.makeup_db),
+            )
+        if isinstance(action, BusCompressorMakeupAdjust):
+            return self._require_method(
+                "set_bus_compressor_gain",
+                lambda a: self.mixer_client.set_bus_compressor_gain(a.bus_id, a.makeup_db),
             )
         if isinstance(action, GateAdjust):
             return self._require_method(

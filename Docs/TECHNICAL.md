@@ -73,7 +73,7 @@ Backend ↔ Wing (OSC):
 /ch/01/eq/1/f <float>             # EQ band 1 частота
 /ch/01/eq/1/g <float>             # EQ band 1 gain
 /ch/01/eq/1/q <float>             # EQ band 1 Q-фактор
-/ch/01/dyn/thr <float>            # Компрессор threshold
+/ch/01/dyn/thr26 <float>          # Компрессор threshold
 ```
 
 ### Frontend (React)
@@ -140,7 +140,7 @@ Backend ↔ Wing (OSC):
 #### Динамика (Компрессор)
 - `/ch/X/dyn/on` - Включение (0/1)
 - `/ch/X/dyn/mdl` - Модель: COMP, EXP, B160, B560, D241, ECL33, 9000C, SBUS, RED3, 76LA, LA, F670, BLISS, NSTR, WAVE, RIDE, 2250, L100, CMB
-- `/ch/X/dyn/thr` - Threshold (-60 до 0 dB)
+- `/ch/X/dyn/thr26` - Threshold (-60 до 0 dB)
 - `/ch/X/dyn/ratio` - Ratio: 1.1, 1.2, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 8.0, 10, 20, 50, 100
 - `/ch/X/dyn/knee` - Knee (0-5)
 - `/ch/X/dyn/att` - Attack (0-120 ms)

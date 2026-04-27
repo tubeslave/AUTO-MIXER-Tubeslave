@@ -19,9 +19,11 @@
 - `server.py` is a coordinator; keep logic in dedicated handlers or modules.
 - `AudioCapture` is the shared audio service; do not duplicate capture pipelines casually.
 - Repeated DSP or protocol rules belong in `CLAUDE.md` or `Docs/CONVENTIONS.md`, not only in task-specific notes.
+- Live WING shared-mix analysis lives in `backend/live_shared_mix.py`; keep it as a pure planner and send actions through `AutoFOHSafetyController`.
 
 ## Council Lessons
 
 - Separate planning, implementation, and review into different phases.
 - The writing agent and reviewing agent should use different worktrees.
 - Durable lessons should be generic enough to survive beyond a single task.
+- Routing and channel-name writes on a live WING require an explicit expected patch/name map; audit/readback can be automatic, but patch writes should stay disabled by default.

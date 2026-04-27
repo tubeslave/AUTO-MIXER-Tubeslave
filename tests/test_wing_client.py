@@ -188,6 +188,108 @@ class TestStateManagement:
             assert client.state["/ch/1/$name"] == "Vocals"
 
 
+class TestRoutingState:
+    """Tests for WING channel/BUS/DCA routing snapshots."""
+
+    def test_dca_tags_are_parsed_from_wing_tags(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+
+            assert WingClient._parse_dca_assignments("#D3 vocal #D12") == [3, 12]
+            assert WingClient._parse_dca_assignments(["#D1", "band", "#D16"]) == [1, 16]
+
+    def test_get_channel_settings_reads_bus_sends_and_dca_assignments(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            sent = []
+            client.send = lambda address, *values: sent.append(address) or True
+            client.state.update({
+                "/ch/7/$name": "Lead Vox",
+                "/ch/7/fdr": -6.0,
+                "/ch/7/mute": 0,
+                "/ch/7/tags": "#D2 #VOCAL",
+                "/ch/7/send/5/on": 1,
+                "/ch/7/send/5/lvl": -12.0,
+                "/ch/7/send/5/mode": "POST",
+                "/ch/7/send/8/on": 0,
+                "/ch/7/send/8/lvl": -10.0,
+            })
+
+            with patch("wing_client.time.sleep", lambda _seconds: None):
+                settings = client.get_channel_settings(7)
+
+            assert "/ch/7/tags" in sent
+            assert "/ch/7/send/5/lvl" in sent
+            assert settings["dca_assignments"] == [2]
+            assert settings["active_bus_sends"] == [
+                {
+                    "bus": 5,
+                    "on": 1,
+                    "level_db": -12.0,
+                    "pre_on": None,
+                    "mode": "POST",
+                    "plink": None,
+                    "pan": None,
+                    "active": True,
+                }
+            ]
+
+    def test_get_bus_and_dca_settings_read_processing_state(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            sent = []
+            client.send = lambda address, *values: sent.append(address) or True
+            client.state.update({
+                "/bus/4/$name": "VOC BUS",
+                "/bus/4/fdr": -4.0,
+                "/bus/4/mute": 0,
+                "/bus/4/eq/on": 1,
+                "/bus/4/dyn/on": 1,
+                "/bus/4/dyn/thr37": -18.0,
+                "/bus/4/tags": "#D6",
+                "/dca/6/name": "Vocals",
+                "/dca/6/fdr": -2.0,
+                "/dca/6/mute": 0,
+            })
+
+            with patch("wing_client.time.sleep", lambda _seconds: None):
+                bus_settings = client.get_bus_settings(4)
+                dca_settings = client.get_dca_settings(6)
+
+            assert "/bus/4/dyn/thr37" in sent
+            assert "/dca/6/fdr" in sent
+            assert bus_settings["name"] == "VOC BUS"
+            assert bus_settings["compressor_enabled"] == 1
+            assert bus_settings["dca_assignments"] == [6]
+            assert dca_settings["name"] == "Vocals"
+            assert dca_settings["fader_db"] == -2.0
+
+
 class TestConnectionLifecycle:
     """Tests for connect/disconnect logic."""
 
@@ -296,7 +398,7 @@ class TestAutoSoundcheckBridge:
                 )
 
             assert client.state["/ch/1/dyn/on"] == 1
-            assert client.state["/ch/1/dyn/thr"] == -18.0
+            assert client.state["/ch/1/dyn/thr26"] == -18.0
             assert client.state["/ch/1/dyn/ratio"] == "4.0"
             assert client.state["/ch/1/dyn/att"] == 12.0
             assert client.state["/ch/1/dyn/rel"] == 120.0

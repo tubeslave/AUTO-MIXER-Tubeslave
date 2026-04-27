@@ -51,7 +51,16 @@ safety:
   max_notch_depth_db: -12.0
 autofoh:
   classifier:
-    name_overrides: []
+    name_overrides:
+    - pattern: ^katya$
+      source_role: lead_vocal
+      confidence: 0.96
+    - pattern: ^sergey$
+      source_role: lead_vocal
+      confidence: 0.96
+    - pattern: ^slava$
+      source_role: lead_vocal
+      confidence: 0.96
     role_overrides:
       lead_vocal:
         priority: 1.0
@@ -127,6 +136,9 @@ autofoh:
     auto_gate_close_mics: true
     auto_fx_sends_enabled: false
     close_mic_fx_sends_enabled: false
+    monitor_bus_ids: [13, 14, 15, 16]
+    effect_bus_ids: [9, 10]
+    group_bus_correction_enabled: true
     master_reference_channels: [23, 24]
     compressor_gr_max_db: 8.0
     compressor_gr_target_db: 4.0
@@ -137,6 +149,10 @@ autofoh:
     action_limits:
       channel_fader_max_step_db: 1.0
       channel_fader_min_interval_sec: 3.0
+      bus_fader_max_step_db: 1.0
+      bus_fader_min_interval_sec: 3.0
+      dca_fader_max_step_db: 1.0
+      dca_fader_min_interval_sec: 3.0
       lead_fader_max_step_db: 0.5
       lead_fader_min_interval_sec: 2.0
       gain_max_abs_db: 12.0
@@ -147,6 +163,27 @@ autofoh:
       feedback_notch_max_cut_db: -6.0
       feedback_notch_min_q: 8.0
       feedback_notch_ttl_sec: 120.0
+      master_fader_max_cut_db: 1.0
+      master_fader_min_interval_sec: 1.0
+      delay_max_step_ms: 0.25
+      delay_max_ms: 10.0
+      delay_min_interval_sec: 3.0
+      polarity_min_interval_sec: 3.0
+  shared_chat_mix:
+    enabled: true
+    analysis_window_sec: 8.0
+    max_actions_per_pass: 8
+    master_peak_ceiling_db: -3.0
+    master_max_cut_db: 1.0
+    correct_master_output: true
+    mirror_eq_enabled: true
+    mirror_eq_max_actions_per_pass: 6
+    mirror_eq_overlap_tolerance_db: 6.0
+    mirror_eq_relative_floor_db: 24.0
+    mirror_eq_max_cut_db: -3.0
+    mirror_eq_max_boost_db: 1.5
+    apply_routing_fixes: false
+    rename_generic_channels: false
 perceptual:
   enabled: true
   mode: shadow

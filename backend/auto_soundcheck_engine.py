@@ -58,17 +58,31 @@ from autofoh_profiles import (
 from autofoh_safety import (
     AutoFOHSafetyConfig,
     AutoFOHSafetyController,
+    BusCompressorAdjust,
+    BusCompressorMakeupAdjust,
+    BusEQMove,
+    BusFaderMove,
     ChannelEQMove,
     ChannelFaderMove,
     ChannelGainMove,
     CompressorAdjust,
     CompressorMakeupAdjust,
+    DCAFaderMove,
+    DelayAdjust,
     EmergencyFeedbackNotch,
     GateAdjust,
     HighPassAdjust,
+    MasterFaderMove,
     PanAdjust,
+    PolarityAdjust,
     SafetyDecision,
     SendLevelAdjust,
+)
+from live_shared_mix import (
+    LiveSharedMixChannel,
+    LiveSharedMixConfig,
+    build_live_shared_mix_plan,
+    normalize_live_role,
 )
 from channel_recognizer import (
     classification_from_legacy_preset,
@@ -94,6 +108,11 @@ try:
     from perceptual import PerceptualEvaluator
 except Exception:
     PerceptualEvaluator = None
+
+try:
+    from evaluation import MuQEvalService
+except Exception:
+    MuQEvalService = None
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +144,32 @@ class ChannelSnapshot:
     hpf_enabled: bool = False
     gain_db: float = 0.0
     had_processing: bool = False
+    raw_settings: Optional[Dict] = None
+
+
+@dataclass
+class BusSnapshot:
+    """Snapshot of a bus that receives corrected channels."""
+    bus: int
+    name: str = ""
+    fader_db: float = -100.0
+    muted: bool = False
+    eq_bands: Optional[List[Tuple[float, float, float]]] = None
+    compressor_enabled: bool = False
+    dca_assignments: List[int] = field(default_factory=list)
+    source_channels: List[int] = field(default_factory=list)
+    raw_settings: Optional[Dict] = None
+
+
+@dataclass
+class DCASnapshot:
+    """Snapshot of a DCA controlling corrected channels or their buses."""
+    dca: int
+    name: str = ""
+    fader_db: float = -100.0
+    muted: bool = False
+    source_channels: List[int] = field(default_factory=list)
+    source_buses: List[int] = field(default_factory=list)
     raw_settings: Optional[Dict] = None
 
 
@@ -478,7 +523,11 @@ class AutoSoundcheckEngine:
         autofoh_evaluation = autofoh_config.get("evaluation", {})
         autofoh_logging = autofoh_config.get("logging", {})
         autofoh_soundcheck_profile = autofoh_config.get("soundcheck_profile", {})
+        self.shared_chat_mix_config = LiveSharedMixConfig.from_mapping(
+            autofoh_config.get("shared_chat_mix", {})
+        )
         perceptual_config = self.config_manager.get_section("perceptual")
+        muq_eval_config = self._load_muq_eval_config()
         self.autofoh_analysis_config = autofoh_config.get("analysis", {})
         detector_config = autofoh_config.get("detectors", {})
         self.monitor_cycle_interval_sec = float(
@@ -537,6 +586,17 @@ class AutoSoundcheckEngine:
         )
         self.close_mic_fx_sends_enabled = bool(
             autofoh_safety.get("close_mic_fx_sends_enabled", False)
+        )
+        self.monitor_bus_ids = {
+            int(bus) for bus in autofoh_safety.get("monitor_bus_ids", [13, 14, 15, 16])
+            if int(bus) > 0
+        }
+        self.effect_bus_ids = {
+            int(bus) for bus in autofoh_safety.get("effect_bus_ids", [9, 10])
+            if int(bus) > 0
+        }
+        self.group_bus_correction_enabled = bool(
+            autofoh_safety.get("group_bus_correction_enabled", True)
         )
         self.master_reference_channels = {
             int(ch) for ch in autofoh_safety.get("master_reference_channels", [])
@@ -624,6 +684,10 @@ class AutoSoundcheckEngine:
         self.perceptual_config = perceptual_config
         self.perceptual_evaluator: Optional[Any] = None
         self._perceptual_pending_audio: Dict[int, Dict[str, Any]] = {}
+        self.muq_eval_config = muq_eval_config
+        self.muq_eval_service: Optional[Any] = None
+        self._muq_pending_audio: Dict[int, Dict[str, Any]] = {}
+        self.muq_eval_session_id = f"autofoh_{int(time.time())}"
         if bool(perceptual_config.get("enabled", False)):
             if PerceptualEvaluator is None:
                 logger.warning("Perceptual evaluator import failed; shadow evaluation disabled")
@@ -633,6 +697,15 @@ class AutoSoundcheckEngine:
                 except Exception as exc:
                     logger.warning("Perceptual evaluator initialization failed: %s", exc)
                     self.perceptual_evaluator = None
+        if bool(muq_eval_config.get("enabled", False)):
+            if MuQEvalService is None:
+                logger.warning("MuQ-Eval service import failed; quality reward disabled")
+            else:
+                try:
+                    self.muq_eval_service = MuQEvalService(muq_eval_config)
+                except Exception as exc:
+                    logger.warning("MuQ-Eval service initialization failed: %s", exc)
+                    self.muq_eval_service = None
         self.loaded_soundcheck_profile: Optional[AutoFOHSoundcheckProfile] = None
         self.discovered_mixer: Optional[DiscoveredMixer] = None
         self.selected_audio_device: Optional[AudioDevice] = None
@@ -641,6 +714,9 @@ class AutoSoundcheckEngine:
         self.state = EngineState.IDLE
         self.runtime_state = RuntimeState.IDLE
         self.channels: Dict[int, ChannelInfo] = {}
+        self.bus_snapshots: Dict[int, BusSnapshot] = {}
+        self.dca_snapshots: Dict[int, DCASnapshot] = {}
+        self.channel_group_routes: Dict[int, Dict[str, List[int]]] = {}
         self._stop_event = threading.Event()
         self._engine_thread: Optional[threading.Thread] = None
         self._monitor_thread: Optional[threading.Thread] = None
@@ -716,6 +792,8 @@ class AutoSoundcheckEngine:
             f"preserve_existing_processing={self.preserve_existing_processing}, "
             f"eval_enabled={self.evaluation_policy.enabled}, "
             f"perceptual_enabled={self._perceptual_shadow_enabled()}, "
+            f"muq_eval_enabled={self._muq_eval_enabled()}, "
+            f"shared_chat_mix={self.shared_chat_mix_config.enabled}, "
             f"log_enabled={self.autofoh_logging_enabled}, "
             f"profile_enabled={self.soundcheck_profile_enabled}"
         )
@@ -923,6 +1001,27 @@ class AutoSoundcheckEngine:
         except Exception:
             return default
 
+    def _load_muq_eval_config(self) -> Dict[str, Any]:
+        """Load MuQ-Eval config from ConfigManager and optional config/muq_eval.yaml."""
+
+        config = dict(self.config_manager.get_section("muq_eval") or {})
+        config_path = Path(__file__).resolve().parents[1] / "config" / "muq_eval.yaml"
+        if not config_path.exists():
+            return config
+        try:
+            import yaml
+
+            with config_path.open(encoding="utf-8") as handle:
+                payload = yaml.safe_load(handle) or {}
+        except Exception as exc:
+            logger.warning("MuQ-Eval config load skipped: %s", exc)
+            return config
+        if isinstance(payload, dict) and isinstance(payload.get("muq_eval"), dict):
+            payload = payload["muq_eval"]
+        if isinstance(payload, dict):
+            config.update(payload)
+        return config
+
     def _perceptual_shadow_enabled(self) -> bool:
         evaluator = getattr(self, "perceptual_evaluator", None)
         return bool(
@@ -930,6 +1029,127 @@ class AutoSoundcheckEngine:
             and getattr(evaluator, "enabled", False)
             and str(getattr(evaluator, "mode", "shadow")).lower() == "shadow"
         )
+
+    def _muq_eval_enabled(self) -> bool:
+        service = getattr(self, "muq_eval_service", None)
+        return bool(service is not None and getattr(service, "enabled", False))
+
+    def _muq_shadow_mode(self) -> bool:
+        service = getattr(self, "muq_eval_service", None)
+        if service is None:
+            return True
+        return bool(getattr(getattr(service, "config", None), "shadow_mode", True))
+
+    def _capture_muq_master_audio(self) -> Optional[np.ndarray]:
+        if not self._muq_eval_enabled():
+            return None
+        window_sec = float(self.muq_eval_config.get("window_sec", 10.0))
+        return self._capture_master_reference_audio(window_sec=window_sec)
+
+    def _muq_action_context(self, action, snapshot: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        payload = {"action_type": getattr(action, "action_type", action.__class__.__name__)}
+        if hasattr(action, "__dict__"):
+            payload.update(action.__dict__)
+        if snapshot:
+            previous_state = (
+                snapshot.get("metadata", {})
+                .get("previous_state", {})
+            )
+            if previous_state:
+                payload["previous_state"] = dict(previous_state)
+        return payload
+
+    def _is_muq_aggressive_action(self, action) -> bool:
+        return isinstance(
+            action,
+            (
+                ChannelGainMove,
+                ChannelFaderMove,
+                BusFaderMove,
+                DCAFaderMove,
+                MasterFaderMove,
+                ChannelEQMove,
+                BusEQMove,
+                CompressorAdjust,
+                CompressorMakeupAdjust,
+                BusCompressorAdjust,
+                BusCompressorMakeupAdjust,
+            ),
+        )
+
+    def _preflight_muq_quality_gate(
+        self,
+        action,
+        snapshot: Dict[str, Any],
+        runtime_state: RuntimeState,
+    ):
+        """Optionally block aggressive writes when MuQ-Eval is in non-shadow mode."""
+
+        if (
+            not self._muq_eval_enabled()
+            or self._muq_shadow_mode()
+            or not self._is_muq_aggressive_action(action)
+        ):
+            return None
+        before_audio = snapshot.get("muq_before_audio")
+        try:
+            return self.muq_eval_service.validate_correction(
+                before_audio=before_audio,
+                sample_rate=self.sample_rate,
+                proposed_action=self._muq_action_context(action, snapshot),
+                after_audio=None,
+                session_id=self.muq_eval_session_id,
+                current_scene=runtime_state.value,
+                osc_commands=[],
+                safety_penalty=0.0,
+            )
+        except Exception as exc:
+            logger.warning("MuQ-Eval preflight failed; blocking aggressive action: %s", exc)
+            return None
+
+    def _submit_muq_quality_validation(
+        self,
+        pending: PendingActionEvaluation,
+        decision: Optional[SafetyDecision] = None,
+        control_state_applied: Optional[bool] = None,
+    ) -> Optional[Any]:
+        if not self._muq_eval_enabled():
+            return None
+        pending_audio = self._muq_pending_audio.pop(pending.evaluation_id, None)
+        if not pending_audio:
+            return None
+        after_audio = self._capture_muq_master_audio()
+        safety_penalty = 0.0
+        if decision is not None:
+            if not decision.sent:
+                safety_penalty = 0.5
+            elif decision.bounded:
+                safety_penalty = 0.05
+        if control_state_applied is False:
+            safety_penalty = max(safety_penalty, 0.25)
+        try:
+            muq_decision = self.muq_eval_service.validate_correction(
+                before_audio=pending_audio.get("before_audio"),
+                sample_rate=self.sample_rate,
+                proposed_action=pending_audio.get("action") or self._muq_action_context(pending.action),
+                after_audio=after_audio,
+                session_id=self.muq_eval_session_id,
+                current_scene=pending.runtime_state.value,
+                osc_commands=pending_audio.get("osc_commands") or [],
+                safety_penalty=safety_penalty,
+            )
+        except Exception as exc:
+            logger.warning("MuQ-Eval validation failed: %s", exc)
+            return None
+        self._log_autofoh_event(
+            "muq_quality_decision",
+            evaluation_id=pending.evaluation_id,
+            channel_id=pending.channel_id,
+            action=pending.action,
+            quality_decision=muq_decision.to_dict(),
+            reward=muq_decision.reward,
+        )
+        return muq_decision
 
     def _capture_perceptual_audio(self, channel_id: Optional[int]) -> Optional[np.ndarray]:
         if (
@@ -1143,6 +1363,18 @@ class AutoSoundcheckEngine:
         if isinstance(action, ChannelFaderMove):
             direction = "raise" if action.delta_db >= 0.0 else "lower"
             return f"{direction} channel level without exceeding safe bounds"
+        if isinstance(action, BusEQMove):
+            return f"Move bus {action.bus_id} {band_name or 'target'} spectral balance safely"
+        if isinstance(action, BusFaderMove):
+            direction = "raise" if action.delta_db >= 0.0 else "lower"
+            return f"{direction} bus {action.bus_id} level within safe bounds"
+        if isinstance(action, DCAFaderMove):
+            direction = "raise" if action.delta_db >= 0.0 else "lower"
+            return f"{direction} DCA {action.dca_id} level within safe bounds"
+        if isinstance(action, DelayAdjust):
+            return f"align channel {action.channel_id} timing without resetting existing input delay"
+        if isinstance(action, PolarityAdjust):
+            return f"set channel {action.channel_id} polarity from measured phase correlation"
         return action.reason
 
     def _capture_action_snapshot(
@@ -1177,6 +1409,16 @@ class AutoSoundcheckEngine:
                     action.freq_hz,
                 )
                 previous_state["q"] = action.q
+            elif isinstance(action, DelayAdjust):
+                previous_state["delay_ms"] = self._safe_call(
+                    lambda: self.mixer_client.get_delay(channel_id),
+                    None,
+                )
+            elif isinstance(action, PolarityAdjust):
+                previous_state["inverted"] = self._safe_call(
+                    lambda: self.mixer_client.get_polarity(channel_id),
+                    None,
+                )
 
         evaluation_band = str(
             evaluation_context.get("band_name") or infer_evaluation_band(action) or ""
@@ -1193,6 +1435,9 @@ class AutoSoundcheckEngine:
             "channel_id": channel_id,
             "pre_features": pre_features,
             "perceptual_before_audio": self._capture_perceptual_audio(channel_id),
+            "muq_before_audio": self._capture_muq_master_audio()
+            if self._is_muq_aggressive_action(action)
+            else None,
             "rollback_action": rollback_action,
             "evaluation_band_name": evaluation_band,
             "expected_effect": str(
@@ -1208,10 +1453,14 @@ class AutoSoundcheckEngine:
         runtime_state: RuntimeState,
         snapshot: Optional[Dict[str, Any]] = None,
     ):
-        if not self.evaluation_policy.enabled and not self._perceptual_shadow_enabled():
+        if (
+            not self.evaluation_policy.enabled
+            and not self._perceptual_shadow_enabled()
+            and not self._muq_eval_enabled()
+        ):
             return None
         channel_id = getattr(action, "channel_id", None)
-        if channel_id is None:
+        if channel_id is None and not self._muq_eval_enabled():
             return None
         snapshot = snapshot or {}
         evaluation_delay_sec = (
@@ -1249,6 +1498,13 @@ class AutoSoundcheckEngine:
             self._perceptual_pending_audio[pending.evaluation_id] = {
                 "before_audio": perceptual_before_audio,
                 "osc_sent": True,
+            }
+        muq_before_audio = snapshot.get("muq_before_audio")
+        if self._muq_eval_enabled() and muq_before_audio is not None:
+            self._muq_pending_audio[pending.evaluation_id] = {
+                "before_audio": muq_before_audio,
+                "action": self._muq_action_context(action, snapshot),
+                "osc_commands": [],
             }
         self._log_autofoh_event(
             "action_evaluation_scheduled",
@@ -1293,6 +1549,48 @@ class AutoSoundcheckEngine:
                 {
                     "current_value_db": float(current_value),
                     "target_value_db": float(action.gain_db),
+                },
+            )
+        if isinstance(action, MasterFaderMove):
+            current_value = self._safe_call(
+                lambda: self.mixer_client.get_main_fader(action.main_id),
+                None,
+            )
+            if current_value is None:
+                return False, {"note": "main fader state unavailable"}
+            return (
+                abs(float(current_value) - float(action.target_db)) <= 0.25,
+                {
+                    "current_value_db": float(current_value),
+                    "target_value_db": float(action.target_db),
+                },
+            )
+        if isinstance(action, DelayAdjust):
+            current_value = self._safe_call(
+                lambda: self.mixer_client.get_delay(action.channel_id),
+                None,
+            )
+            if current_value is None:
+                return False, {"note": "delay state unavailable"}
+            return (
+                abs(float(current_value) - float(action.delay_ms)) <= 0.05,
+                {
+                    "current_value_ms": float(current_value),
+                    "target_value_ms": float(action.delay_ms),
+                },
+            )
+        if isinstance(action, PolarityAdjust):
+            current_value = self._safe_call(
+                lambda: self.mixer_client.get_polarity(action.channel_id),
+                None,
+            )
+            if current_value is None:
+                return False, {"note": "polarity state unavailable"}
+            return (
+                bool(current_value) == bool(action.inverted),
+                {
+                    "current_inverted": bool(current_value),
+                    "target_inverted": bool(action.inverted),
                 },
             )
         return True, {"note": "control-state verification not implemented for action type"}
@@ -1358,8 +1656,21 @@ class AutoSoundcheckEngine:
                 outcome=outcome,
                 control_state_applied=control_state_applied,
             )
+            muq_decision = self._submit_muq_quality_validation(
+                pending,
+                decision=None,
+                control_state_applied=control_state_applied,
+            )
 
-            if outcome and outcome.should_rollback and outcome.rollback_action is not None:
+            muq_requests_rollback = bool(
+                muq_decision is not None
+                and getattr(muq_decision, "should_block_osc", False)
+                and getattr(muq_decision, "rejection_reason", "") == "quality_drop"
+            )
+            if (
+                (outcome and outcome.should_rollback)
+                or muq_requests_rollback
+            ) and outcome and outcome.rollback_action is not None:
                 rollback_decision = self._execute_action(
                     outcome.rollback_action,
                     runtime_state=RuntimeState.ROLLBACK,
@@ -1523,6 +1834,37 @@ class AutoSoundcheckEngine:
             evaluation_context,
             effective_state,
         )
+        muq_gate = self._preflight_muq_quality_gate(action, snapshot, effective_state)
+        if muq_gate is not None and getattr(muq_gate, "should_block_osc", False):
+            decision = SafetyDecision(
+                action=action,
+                runtime_state=effective_state,
+                allowed=False,
+                sent=False,
+                message=f"MuQ-Eval quality gate rejected: {muq_gate.rejection_reason}",
+                payload={"muq_eval": muq_gate.to_dict()},
+            )
+            self._log_autofoh_event(
+                "action_decision",
+                channel_id=getattr(action, "channel_id", None),
+                requested_action=action,
+                applied_action=action,
+                requested_runtime_state=effective_state.value,
+                sent=False,
+                allowed=False,
+                supported=True,
+                bounded=False,
+                rate_limited=False,
+                message=decision.message,
+                expected_effect=snapshot.get("expected_effect"),
+                evaluation_band_name=snapshot.get("evaluation_band_name"),
+                pre_features=self._feature_snapshot_payload(snapshot.get("pre_features")),
+                metadata={
+                    **dict(snapshot.get("metadata", {})),
+                    "muq_quality_decision": muq_gate.to_dict(),
+                },
+            )
+            return decision
         decision = self.safety_controller.execute(action, effective_state)
         self._log_autofoh_event(
             "action_decision",
@@ -1542,8 +1884,94 @@ class AutoSoundcheckEngine:
             metadata=snapshot.get("metadata", {}),
         )
         if decision.sent and register_evaluation:
-            self._register_pending_action_evaluation(decision.action, effective_state, snapshot)
+            pending = self._register_pending_action_evaluation(
+                decision.action,
+                effective_state,
+                snapshot,
+            )
+            if pending is not None and pending.evaluation_id in self._muq_pending_audio:
+                self._muq_pending_audio[pending.evaluation_id]["osc_commands"] = [
+                    dict(decision.payload)
+                ] if decision.payload else []
         return decision
+
+    def apply_bus_fader_target(self, bus_id: int, target_db: float, reason: str = "bus level correction"):
+        """Apply a bounded bus fader correction through the safety layer."""
+        return self._execute_action(
+            BusFaderMove(bus_id=bus_id, target_db=target_db, reason=reason),
+            register_evaluation=False,
+        )
+
+    def apply_dca_fader_target(self, dca_id: int, target_db: float, reason: str = "DCA level correction"):
+        """Apply a bounded DCA fader correction through the safety layer."""
+        return self._execute_action(
+            DCAFaderMove(dca_id=dca_id, target_db=target_db, reason=reason),
+            register_evaluation=False,
+        )
+
+    def apply_bus_eq(
+        self,
+        bus_id: int,
+        band: int,
+        freq_hz: float,
+        gain_db: float,
+        q: float,
+        reason: str = "bus EQ correction",
+    ):
+        """Apply a bounded bus EQ correction through the safety layer."""
+        return self._execute_action(
+            BusEQMove(
+                bus_id=bus_id,
+                band=band,
+                freq_hz=freq_hz,
+                gain_db=gain_db,
+                q=q,
+                reason=reason,
+            ),
+            register_evaluation=False,
+        )
+
+    def apply_bus_compressor(
+        self,
+        bus_id: int,
+        threshold_db: float,
+        ratio: float,
+        attack_ms: float,
+        release_ms: float,
+        makeup_db: float = 0.0,
+        enabled: bool = True,
+        reason: str = "bus compressor correction",
+    ):
+        """Apply a bounded bus compressor correction through the safety layer."""
+        return self._execute_action(
+            BusCompressorAdjust(
+                bus_id=bus_id,
+                threshold_db=threshold_db,
+                ratio=ratio,
+                attack_ms=attack_ms,
+                release_ms=release_ms,
+                makeup_db=makeup_db,
+                enabled=enabled,
+                reason=reason,
+            ),
+            register_evaluation=False,
+        )
+
+    def apply_bus_compressor_makeup(
+        self,
+        bus_id: int,
+        makeup_db: float,
+        reason: str = "bus compressor makeup correction",
+    ):
+        """Apply bounded bus compressor make-up through the safety layer."""
+        return self._execute_action(
+            BusCompressorMakeupAdjust(
+                bus_id=bus_id,
+                makeup_db=makeup_db,
+                reason=reason,
+            ),
+            register_evaluation=False,
+        )
 
     def _determine_auto_corrections_enabled(self, info: ChannelInfo) -> bool:
         if not info.allowed_controls:
@@ -1929,6 +2357,164 @@ class AutoSoundcheckEngine:
                 return True
         return False
 
+    def _extract_bus_ids_from_channel_settings(self, raw_settings: Dict[str, Any]) -> List[int]:
+        bus_ids = []
+        sends = raw_settings.get("active_bus_sends")
+        if not sends:
+            sends = [
+                send for send in raw_settings.get("sends", [])
+                if self._as_bool(send.get("active"), False)
+            ]
+        for send in sends or []:
+            try:
+                bus_id = int(send.get("bus"))
+            except (TypeError, ValueError):
+                continue
+            if 1 <= bus_id <= 16 and bus_id not in bus_ids:
+                bus_ids.append(bus_id)
+        return bus_ids
+
+    def _parse_dca_tags(self, tags: Any) -> List[int]:
+        dca_ids = set()
+
+        def visit(item: Any):
+            if item is None:
+                return
+            if isinstance(item, (list, tuple, set)):
+                for nested in item:
+                    visit(nested)
+                return
+            for token in str(item).replace(",", " ").replace(";", " ").split():
+                token = token.strip().upper()
+                if not token.startswith("#D"):
+                    continue
+                suffix = token[2:]
+                if suffix.isdigit():
+                    dca = int(suffix)
+                    if 1 <= dca <= 16:
+                        dca_ids.add(dca)
+
+        visit(tags)
+        return sorted(dca_ids)
+
+    def _extract_dca_ids_from_settings(self, raw_settings: Dict[str, Any]) -> List[int]:
+        dca_ids = []
+        for item in raw_settings.get("dca_assignments") or []:
+            try:
+                dca = int(item)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= dca <= 16 and dca not in dca_ids:
+                dca_ids.append(dca)
+        for dca in self._parse_dca_tags(raw_settings.get("tags")):
+            if dca not in dca_ids:
+                dca_ids.append(dca)
+        return sorted(dca_ids)
+
+    def _is_monitor_bus(self, bus_id: int) -> bool:
+        return int(bus_id) in self.monitor_bus_ids
+
+    def _is_effect_bus(self, bus_id: int, bus_name: str = "") -> bool:
+        name = str(bus_name or "").lower()
+        return int(bus_id) in self.effect_bus_ids or "delay" in name or "reverb" in name
+
+    def _read_group_state_for_channels(self, channels: Optional[List[int]] = None):
+        """Read BUS/DCA state connected to the channels under correction."""
+        if self.mixer_client is None:
+            return
+
+        selected = channels if channels is not None else self._iter_channels()
+        bus_sources: Dict[int, List[int]] = {}
+        dca_source_channels: Dict[int, List[int]] = {}
+
+        for ch in selected:
+            info = self.channels.get(ch)
+            if info is None or info.original_snapshot is None:
+                continue
+            raw_settings = dict(info.original_snapshot.raw_settings or {})
+            bus_ids = self._extract_bus_ids_from_channel_settings(raw_settings)
+            dca_ids = self._extract_dca_ids_from_settings(raw_settings)
+            self.channel_group_routes[ch] = {
+                "bus_ids": bus_ids,
+                "dca_ids": dca_ids,
+            }
+            for bus_id in bus_ids:
+                bus_sources.setdefault(bus_id, [])
+                if ch not in bus_sources[bus_id]:
+                    bus_sources[bus_id].append(ch)
+            for dca_id in dca_ids:
+                dca_source_channels.setdefault(dca_id, [])
+                if ch not in dca_source_channels[dca_id]:
+                    dca_source_channels[dca_id].append(ch)
+
+        if channels is None:
+            self.bus_snapshots = {}
+            self.dca_snapshots = {}
+
+        dca_source_buses: Dict[int, List[int]] = {}
+        bus_reader = getattr(self.mixer_client, "get_bus_settings", None)
+        for bus_id, source_channels in sorted(bus_sources.items()):
+            try:
+                raw_bus = bus_reader(bus_id) if callable(bus_reader) else {}
+            except Exception as exc:
+                logger.debug(f"Bus {bus_id}: could not read settings: {exc}")
+                raw_bus = {}
+            bus_dcas = self._extract_dca_ids_from_settings(raw_bus)
+            for dca_id in bus_dcas:
+                dca_source_buses.setdefault(dca_id, [])
+                if bus_id not in dca_source_buses[dca_id]:
+                    dca_source_buses[dca_id].append(bus_id)
+            existing_bus = self.bus_snapshots.get(bus_id)
+            merged_source_channels = sorted(
+                set(source_channels)
+                | set(existing_bus.source_channels if existing_bus is not None else [])
+            )
+            self.bus_snapshots[bus_id] = BusSnapshot(
+                bus=bus_id,
+                name=str(raw_bus.get("name") or ""),
+                fader_db=self._as_float(raw_bus.get("fader_db"), -100.0),
+                muted=self._as_bool(raw_bus.get("muted"), False),
+                eq_bands=raw_bus.get("eq_bands"),
+                compressor_enabled=self._as_bool(raw_bus.get("compressor_enabled"), False),
+                dca_assignments=bus_dcas,
+                source_channels=merged_source_channels,
+                raw_settings=raw_bus,
+            )
+
+        dca_ids = set(dca_source_channels.keys()) | set(dca_source_buses.keys())
+        dca_reader = getattr(self.mixer_client, "get_dca_settings", None)
+        for dca_id in sorted(dca_ids):
+            try:
+                raw_dca = dca_reader(dca_id) if callable(dca_reader) else {}
+            except Exception as exc:
+                logger.debug(f"DCA {dca_id}: could not read settings: {exc}")
+                raw_dca = {}
+            existing_dca = self.dca_snapshots.get(dca_id)
+            merged_source_channels = sorted(
+                set(dca_source_channels.get(dca_id, []))
+                | set(existing_dca.source_channels if existing_dca is not None else [])
+            )
+            merged_source_buses = sorted(
+                set(dca_source_buses.get(dca_id, []))
+                | set(existing_dca.source_buses if existing_dca is not None else [])
+            )
+            self.dca_snapshots[dca_id] = DCASnapshot(
+                dca=dca_id,
+                name=str(raw_dca.get("name") or ""),
+                fader_db=self._as_float(raw_dca.get("fader_db"), -100.0),
+                muted=self._as_bool(raw_dca.get("muted"), False),
+                source_channels=merged_source_channels,
+                source_buses=merged_source_buses,
+                raw_settings=raw_dca,
+            )
+
+        if bus_sources or dca_ids:
+            logger.info(
+                "Group state read: %s bus(es), %s DCA group(s) connected to corrected channels",
+                len(bus_sources),
+                len(dca_ids),
+            )
+
     def _read_channel_state(self):
         """Read current processing settings for all channels.
 
@@ -1987,6 +2573,7 @@ class AutoSoundcheckEngine:
             f"Channel state read: {channels_with_processing}/{len(self.channels)} "
             f"channels have existing settings"
         )
+        self._read_group_state_for_channels()
 
     # ── 3c. Reset channels to neutral before analysis ────────────
 
@@ -2398,6 +2985,392 @@ class AutoSoundcheckEngine:
             runtime_state=runtime_state or self.runtime_state,
         )
 
+    def _read_live_settings_for_channel(
+        self,
+        ch: int,
+        info: ChannelInfo,
+    ) -> Dict[str, Any]:
+        """Read the current console state before a shared live-mix decision."""
+        raw_settings = self._snapshot_raw(info)
+        if self.mixer_client is None or not hasattr(self.mixer_client, "get_channel_settings"):
+            return raw_settings
+        try:
+            current_settings = self.mixer_client.get_channel_settings(ch) or {}
+        except Exception as exc:
+            logger.debug("Ch %s: live shared-mix state read failed: %s", ch, exc)
+            return raw_settings
+
+        merged = dict(raw_settings)
+        merged.update(current_settings)
+        info.fader_db = self._as_float(merged.get("fader_db"), info.fader_db)
+        return merged
+
+    def _current_eq_gain_map_from_settings(self, raw_settings: Dict[str, Any]) -> Dict[int, float]:
+        gains: Dict[int, float] = {}
+        for idx, band in enumerate((raw_settings.get("eq_bands") or [])[:4], start=1):
+            if isinstance(band, (list, tuple)) and len(band) >= 2:
+                gains[idx] = self._as_float(band[1], 0.0)
+        return gains
+
+    def _build_live_shared_mix_channels(self) -> List[LiveSharedMixChannel]:
+        if self.audio_capture is None:
+            return []
+
+        window_samples = max(
+            self.block_size,
+            int(max(1.0, self.shared_chat_mix_config.analysis_window_sec) * self.sample_rate),
+        )
+        channels: List[LiveSharedMixChannel] = []
+        for ch in self._iter_channels():
+            info = self.channels.get(ch)
+            if info is None or not info.has_signal:
+                continue
+            if ch in self.master_reference_channels or "MASTER" in info.stem_roles:
+                continue
+
+            raw_settings = self._read_live_settings_for_channel(ch, info)
+            try:
+                audio = np.asarray(
+                    self.audio_capture.get_buffer(ch, window_samples),
+                    dtype=np.float32,
+                ).reshape(-1)
+            except Exception as exc:
+                logger.debug("Ch %s: live shared-mix audio capture failed: %s", ch, exc)
+                continue
+            if audio.size < max(1024, self.block_size // 2):
+                continue
+
+            role = normalize_live_role(
+                preset=info.preset or "",
+                source_role=info.source_role or "",
+                name=info.name or "",
+            )
+            stems = tuple(stem for stem in info.stem_roles if stem and stem != "MASTER")
+            if not stems:
+                stems = (role.upper(),) if role != "unknown" else ("UNKNOWN",)
+
+            channels.append(
+                LiveSharedMixChannel(
+                    channel_id=ch,
+                    name=info.name or f"Ch {ch}",
+                    role=role,
+                    stems=stems,
+                    priority=float(info.priority),
+                    audio=audio.copy(),
+                    sample_rate=self.sample_rate,
+                    fader_db=self._as_float(raw_settings.get("fader_db"), info.fader_db),
+                    muted=self._as_bool(raw_settings.get("muted"), False),
+                    auto_corrections_enabled=bool(info.auto_corrections_enabled),
+                    raw_settings=raw_settings,
+                    current_eq_gain=self._current_eq_gain_map_from_settings(raw_settings),
+                    current_hpf_hz=self._as_float(raw_settings.get("hpf_freq"), 20.0),
+                    hpf_enabled=self._as_bool(raw_settings.get("hpf_enabled"), False),
+                )
+            )
+        return channels
+
+    def _capture_master_reference_audio(self, window_sec: Optional[float] = None) -> Optional[np.ndarray]:
+        if self.audio_capture is None or not self.master_reference_channels:
+            return None
+
+        analysis_window_sec = (
+            self.shared_chat_mix_config.analysis_window_sec
+            if window_sec is None
+            else float(window_sec)
+        )
+        window_samples = max(
+            self.block_size,
+            int(max(1.0, analysis_window_sec) * self.sample_rate),
+        )
+        buffers: List[np.ndarray] = []
+        for ch in sorted(self.master_reference_channels)[:2]:
+            if ch > self.num_channels:
+                continue
+            try:
+                samples = np.asarray(
+                    self.audio_capture.get_buffer(ch, window_samples),
+                    dtype=np.float32,
+                ).reshape(-1)
+            except Exception as exc:
+                logger.debug("Master reference Ch %s capture failed: %s", ch, exc)
+                continue
+            if samples.size >= max(1024, self.block_size // 2):
+                buffers.append(samples.copy())
+
+        if not buffers:
+            return None
+        min_len = min(buffer.size for buffer in buffers)
+        if min_len <= 0:
+            return None
+        aligned = [buffer[-min_len:] for buffer in buffers]
+        if len(aligned) == 1:
+            return aligned[0]
+        return np.column_stack(aligned[:2]).astype(np.float32)
+
+    def _read_main_fader_for_live_mix(self) -> Optional[float]:
+        if self.mixer_client is None or not hasattr(self.mixer_client, "get_main_fader"):
+            return None
+        try:
+            value = self.mixer_client.get_main_fader(1)
+        except Exception as exc:
+            logger.debug("Main 1 fader readback failed before shared mix: %s", exc)
+            return None
+        if value is None:
+            return None
+        return self._as_float(value, 0.0)
+
+    def _apply_live_shared_mix_pass(
+        self,
+        *,
+        phase_guard_context: Optional[Dict[str, Any]] = None,
+    ) -> List[SafetyDecision]:
+        if not self.shared_chat_mix_config.enabled:
+            return []
+        if self.audio_capture is None or self.safety_controller is None:
+            return []
+
+        channels = self._build_live_shared_mix_channels()
+        if not channels:
+            self._log_autofoh_event(
+                "live_shared_chat_mix_plan",
+                enabled=True,
+                reason="no_eligible_source_channels",
+            )
+            return []
+
+        master_audio = self._capture_master_reference_audio()
+        main_fader = self._read_main_fader_for_live_mix()
+        plan = build_live_shared_mix_plan(
+            channels,
+            self.sample_rate,
+            config=self.shared_chat_mix_config,
+            master_audio=master_audio,
+            master_current_fader_db=main_fader,
+        )
+        self._log_autofoh_event(
+            "live_shared_chat_mix_plan",
+            report=plan.report,
+        )
+        self._emit_observation(
+            message=(
+                "[AUTOFOH] Live shared-mix analysis: "
+                f"{plan.report.get('actions_planned', 0)} action(s), "
+                f"master={plan.report.get('master', {}).get('action', 'n/a')}"
+            ),
+            summary={
+                "live_shared_chat_mix": plan.report,
+            },
+        )
+
+        decisions: List[SafetyDecision] = []
+        for action in plan.actions:
+            action_channel_id = getattr(action, "channel_id", None)
+            target_info = self.channels.get(action_channel_id) if action_channel_id is not None else None
+            control_name = self._typed_action_control_name(action)
+            if (
+                control_name is not None
+                and target_info is not None
+                and not self._control_allowed(target_info, control_name)
+            ):
+                self._log_processing_skip(
+                    action_channel_id,
+                    target_info,
+                    "live shared-mix correction",
+                )
+                continue
+
+            requested_action = action
+            decision = self._execute_action(
+                action,
+                evaluation_context={
+                    "problem_type": "live_shared_chat_mix",
+                    "expected_effect": getattr(action, "reason", ""),
+                    "source_rules": list(plan.report.get("rules", [])),
+                    "analysis_before": (
+                        plan.report.get("analysis_before", {})
+                        .get("band_deviation_db", {})
+                    ),
+                    "planned_action_types": list(plan.report.get("planned_action_types", [])),
+                },
+                phase_guard_context=phase_guard_context,
+            )
+            if decision is None:
+                continue
+            decisions.append(decision)
+            logger.info(
+                "Live shared-mix decision: %s ch=%s sent=%s allowed=%s rate_limited=%s msg=%s reason=%s",
+                decision.action.action_type,
+                getattr(decision.action, "channel_id", getattr(decision.action, "main_id", None)),
+                decision.sent,
+                decision.allowed,
+                decision.rate_limited,
+                decision.message,
+                getattr(requested_action, "reason", ""),
+            )
+            if decision.sent and isinstance(decision.action, ChannelFaderMove):
+                info = self.channels.get(decision.action.channel_id)
+                if info is not None:
+                    info.fader_db = decision.action.target_db
+
+        sent_count = sum(1 for decision in decisions if decision.sent)
+        decision_payload = [
+            {
+                "action_type": decision.action.action_type,
+                "channel": getattr(decision.action, "channel_id", None),
+                "main": getattr(decision.action, "main_id", None),
+                "band": getattr(decision.action, "band", None),
+                "freq_hz": round(float(getattr(decision.action, "freq_hz", 0.0)), 1)
+                if hasattr(decision.action, "freq_hz")
+                else None,
+                "gain_db": round(float(getattr(decision.action, "gain_db", 0.0)), 2)
+                if hasattr(decision.action, "gain_db")
+                else None,
+                "sent": bool(decision.sent),
+                "allowed": bool(decision.allowed),
+                "bounded": bool(decision.bounded),
+                "rate_limited": bool(decision.rate_limited),
+                "message": decision.message,
+                "reason": getattr(decision.action, "reason", ""),
+            }
+            for decision in decisions
+        ]
+        self._emit_observation(
+            message=(
+                "[AUTOFOH] Live shared-mix applied: "
+                f"{sent_count}/{len(plan.actions)} action(s) sent"
+            ),
+            summary={
+                "live_shared_chat_mix_applied": {
+                    "planned": len(plan.actions),
+                    "sent": sent_count,
+                    "decisions": decision_payload,
+                }
+            },
+        )
+        logger.info(
+            "Live shared-mix pass complete: planned=%s sent=%s",
+            len(plan.actions),
+            sent_count,
+        )
+        return decisions
+
+    def _apply_group_bus_corrections(
+        self,
+        *,
+        phase_guard_context: Optional[Dict[str, Any]] = None,
+    ) -> List[SafetyDecision]:
+        """Apply bounded level corrections to routed group buses, excluding monitors."""
+        if not self.group_bus_correction_enabled:
+            return []
+        if self.safety_controller is None or self.mixer_client is None:
+            return []
+
+        self._read_group_state_for_channels()
+        decisions: List[SafetyDecision] = []
+        skipped_monitor = []
+        planned = []
+
+        for bus_id, snapshot in sorted(self.bus_snapshots.items()):
+            if self._is_monitor_bus(bus_id):
+                skipped_monitor.append(bus_id)
+                continue
+            if snapshot.muted:
+                continue
+
+            source_infos = [
+                self.channels[ch]
+                for ch in snapshot.source_channels
+                if ch in self.channels
+                and self.channels[ch].has_signal
+                and self.channels[ch].auto_corrections_enabled
+            ]
+            if not source_infos:
+                continue
+
+            current_fader = self._safe_call(
+                lambda bus=bus_id: self.mixer_client.get_bus_fader(bus),
+                snapshot.fader_db,
+            )
+            current_fader = self._as_float(current_fader, snapshot.fader_db)
+            target_fader = current_fader
+            reasons = []
+
+            if current_fader > 0.0:
+                target_fader = 0.0
+                reasons.append("bus fader above 0dB ceiling")
+
+            hot_peaks = [
+                (info.metrics.level.true_peak_dbtp if info.metrics else info.peak_db)
+                for info in source_infos
+                if (info.metrics and info.metrics.level.true_peak_dbtp > -90.0) or info.peak_db > -90.0
+            ]
+            if hot_peaks and max(hot_peaks) > -4.0:
+                target_fader = min(target_fader, current_fader - 0.5)
+                reasons.append("routed source true peak close to headroom ceiling")
+
+            loud_deviations = []
+            for info in source_infos:
+                measured_lufs = info.lufs
+                if info.metrics and info.metrics.level.lufs_integrated > -90.0:
+                    measured_lufs = info.metrics.level.lufs_integrated
+                target_lufs = INSTRUMENT_TARGET_LUFS.get(info.preset or "custom", -23.0)
+                if measured_lufs > -90.0:
+                    loud_deviations.append(measured_lufs - target_lufs)
+            if loud_deviations and float(np.mean(loud_deviations)) > 2.5:
+                target_fader = min(target_fader, current_fader - 0.5)
+                reasons.append("routed source group is above learned balance target")
+
+            if target_fader >= current_fader - 0.25:
+                continue
+
+            target_fader = max(-144.0, min(0.0, target_fader))
+            decision = self._execute_action(
+                BusFaderMove(
+                    bus_id=bus_id,
+                    target_db=round(target_fader, 2),
+                    reason=(
+                        f"Group BUS correction for {snapshot.name or bus_id}: "
+                        + "; ".join(reasons)
+                    ),
+                ),
+                register_evaluation=False,
+                evaluation_context={
+                    "problem_type": "group_bus_balance",
+                    "expected_effect": "Reduce routed bus level while preserving monitor buses",
+                    "source_channels": list(snapshot.source_channels),
+                    "monitor_bus_ids": sorted(self.monitor_bus_ids),
+                },
+                phase_guard_context=phase_guard_context,
+            )
+            if decision is not None:
+                decisions.append(decision)
+                planned.append(
+                    {
+                        "bus": bus_id,
+                        "name": snapshot.name,
+                        "current_fader_db": round(float(current_fader), 2),
+                        "requested_target_db": round(float(target_fader), 2),
+                        "sent": bool(decision.sent),
+                        "message": decision.message,
+                    }
+                )
+                if decision.sent and isinstance(decision.action, BusFaderMove):
+                    snapshot.fader_db = decision.action.target_db
+
+        if skipped_monitor or planned:
+            self._emit_observation(
+                message=(
+                    "[AUTOFOH] Group bus correction: "
+                    f"{len(planned)} action(s), monitor buses skipped={skipped_monitor}"
+                ),
+                summary={
+                    "group_bus_corrections": planned,
+                    "monitor_bus_ids": sorted(self.monitor_bus_ids),
+                    "skipped_monitor_buses": skipped_monitor,
+                },
+            )
+        return decisions
+
     def _capture_learning_phase(
         self,
         phase_name: str,
@@ -2471,8 +3444,22 @@ class AutoSoundcheckEngine:
 
     @staticmethod
     def _typed_action_control_name(action) -> Optional[str]:
+        if isinstance(action, ChannelGainMove):
+            return "gain"
         if isinstance(action, ChannelEQMove):
             return "eq"
+        if isinstance(action, HighPassAdjust):
+            return "hpf"
+        if isinstance(action, CompressorAdjust):
+            return "compressor"
+        if isinstance(action, CompressorMakeupAdjust):
+            return "compressor"
+        if isinstance(action, GateAdjust):
+            return "compressor"
+        if isinstance(action, PanAdjust):
+            return "pan"
+        if isinstance(action, SendLevelAdjust):
+            return "fx_send"
         if isinstance(action, ChannelFaderMove):
             return "fader"
         return None
@@ -2585,6 +3572,7 @@ class AutoSoundcheckEngine:
             return True, "", metadata
 
         if isinstance(action, ChannelEQMove):
+            is_mirror_eq = str(getattr(action, "reason", "")).startswith("Mirror EQ")
             band_name = infer_evaluation_band(action)
             if band_name:
                 current_band_level = float(
@@ -2607,7 +3595,11 @@ class AutoSoundcheckEngine:
                     }
                 )
                 green_delta_db = float(phase_target.target_corridor.green_delta_db)
-                if action.gain_db < 0.0 and band_error_db <= green_delta_db:
+                if is_mirror_eq:
+                    metadata["green_corridor_decision"] = (
+                        "allow_mirror_eq_source_separation"
+                    )
+                elif action.gain_db < 0.0 and band_error_db <= green_delta_db:
                     return (
                         False,
                         "phase target guard blocked EQ cut inside learned green corridor",
@@ -3061,7 +4053,13 @@ class AutoSoundcheckEngine:
             except Exception as e:
                 logger.error(f"Ch {ch}: error applying corrections: {e}")
 
-        # 9. Phase / polarity check across correlated channel pairs
+        # 9. Full-band shared-chat mix pass over the current live console state.
+        self._apply_live_shared_mix_pass(phase_guard_context=phase_guard_context)
+
+        # 10. Group bus balance/headroom pass; BUS 13-16 monitor buses are excluded by policy.
+        self._apply_group_bus_corrections(phase_guard_context=phase_guard_context)
+
+        # 11. Phase / polarity check across correlated channel pairs
         self._detect_and_fix_phase()
         snapshot_profile = self._build_soundcheck_profile_from_live_buffers()
         if snapshot_profile is not None:
@@ -3633,26 +4631,29 @@ class AutoSoundcheckEngine:
                             f"Phase: Ch {ch_b} polarity already inverted; preserving current state"
                         )
                         continue
-                    if (
-                        self.preserve_existing_processing
-                        and info_b
-                        and info_b.original_snapshot
-                        and info_b.original_snapshot.had_processing
-                    ):
-                        logger.info(
-                            f"Phase: skipping polarity flip on Ch {ch_b}; "
-                            "existing channel processing is preserved"
-                        )
-                        continue
                     logger.warning(
                         f"Phase: {name_b} is inverted (corr={icm.cross_correlation:.3f}), "
-                        f"flipping polarity"
+                        f"correcting polarity through safety layer"
                     )
-                    if hasattr(self.mixer_client, 'set_polarity'):
-                        self.mixer_client.set_polarity(ch_b, True)
+                    self._execute_action(
+                        PolarityAdjust(
+                            channel_id=ch_b,
+                            inverted=True,
+                            reason=(
+                                f"Phase polarity correction for {pair_type}: "
+                                f"corr={icm.cross_correlation:.3f}"
+                            ),
+                        ),
+                        evaluation_context={
+                            "problem_type": "drum_phase_alignment",
+                            "expected_effect": "Improve correlated drum polarity without resetting processing",
+                            "pair": [ch_a, ch_b],
+                            "pair_type": pair_type,
+                        },
+                    )
 
                 # Time alignment
-                elif icm.delay_ms > 0.1 and icm.coherence > 0.3:
+                elif abs(icm.delay_ms) > 0.1 and icm.coherence > 0.3:
                     align_ch = ch_b if icm.delay_samples > 0 else ch_a
                     align_info = self.channels.get(align_ch)
                     align_raw = self._snapshot_raw(align_info) if align_info else {}
@@ -3664,30 +4665,32 @@ class AutoSoundcheckEngine:
                         align_raw.get("delay_ms"),
                         0.0,
                     )
-                    delay_target_ms = icm.delay_ms
-                    if self.preserve_existing_processing and current_delay_enabled:
-                        delay_target_ms = self._bounded_toward(
-                            current_delay_ms,
-                            icm.delay_ms,
-                            0.25,
-                        )
-                    elif (
-                        self.preserve_existing_processing
-                        and align_info
-                        and align_info.original_snapshot
-                        and align_info.original_snapshot.had_processing
-                    ):
-                        logger.info(
-                            f"Phase: skipping delay write on Ch {align_ch}; "
-                            "existing channel processing is preserved"
-                        )
-                        continue
+                    measured_delay_ms = abs(float(icm.delay_ms))
+                    delay_target_ms = current_delay_ms + measured_delay_ms
                     logger.info(
-                        f"Phase: applying {delay_target_ms:.2f}ms delay "
-                        f"to Ch {align_ch} (coherence={icm.coherence:.3f})"
+                        f"Phase: correcting Ch {align_ch} delay "
+                        f"{current_delay_ms:.2f}→{delay_target_ms:.2f}ms "
+                        f"(measured={measured_delay_ms:.2f}ms, "
+                        f"enabled={current_delay_enabled}, coherence={icm.coherence:.3f})"
                     )
-                    if hasattr(self.mixer_client, 'set_delay'):
-                        self.mixer_client.set_delay(align_ch, delay_target_ms, enabled=True)
+                    self._execute_action(
+                        DelayAdjust(
+                            channel_id=align_ch,
+                            delay_ms=delay_target_ms,
+                            enabled=True,
+                            reason=(
+                                f"Drum phase delay alignment for {pair_type}: "
+                                f"{measured_delay_ms:.2f}ms residual"
+                            ),
+                        ),
+                        evaluation_context={
+                            "problem_type": "drum_phase_alignment",
+                            "expected_effect": "Reduce correlated drum timing offset without clearing existing delay",
+                            "pair": [ch_a, ch_b],
+                            "pair_type": pair_type,
+                            "measured_delay_ms": measured_delay_ms,
+                        },
+                    )
 
             except Exception as e:
                 logger.warning(f"Phase check error for pair ({ch_a}, {ch_b}): {e}")
@@ -3695,18 +4698,37 @@ class AutoSoundcheckEngine:
     def _find_correlated_pairs(self) -> List[Tuple[int, int, str]]:
         """Find channel pairs that should be phase-correlated.
 
-        Looks for adjacent channels with the same preset type
-        (e.g. two 'overheads', two 'synth', etc.).
+        Uses source-aware drum rules from the offline mixing workflow:
+        kick/snare/overhead/room mics are aligned within their own source
+        family, while different toms are not treated as one correlated source.
         """
         pairs = []
         preset_channels: Dict[str, List[int]] = {}
 
         for ch, info in self.channels.items():
-            if info.has_signal and info.preset:
+            if (
+                info.has_signal
+                and info.preset
+                and ch not in self.master_reference_channels
+            ):
                 preset_channels.setdefault(info.preset, []).append(ch)
 
+        drum_pair_presets = {"kick", "snare", "overheads", "room"}
+        for preset in drum_pair_presets:
+            channels = sorted(preset_channels.get(preset, []))
+            if len(channels) < 2:
+                continue
+            reference = channels[0]
+            for other in channels[1:]:
+                pairs.append((reference, other, preset))
+
+        phase_pair_presets = set(STEREO_PAIR_PRESETS)
         for preset, channels in preset_channels.items():
             if len(channels) < 2:
+                continue
+            if preset in drum_pair_presets or preset == "tom":
+                continue
+            if preset not in phase_pair_presets:
                 continue
             channels.sort()
             # Pair adjacent channels
@@ -4316,6 +5338,12 @@ class AutoSoundcheckEngine:
         """
         if not hasattr(self.mixer_client, 'set_send_level'):
             return
+        if preset in {"kick", "snare", "tom"} and not self.close_mic_fx_sends_enabled:
+            self._trim_unapproved_close_mic_fx_sends(
+                ch,
+                info,
+                phase_guard_context=phase_guard_context,
+            )
         if not self.auto_fx_sends_enabled:
             logger.info(
                 f"Ch {ch} '{info.name}': automatic FX sends disabled for live safety"
@@ -4393,6 +5421,51 @@ class AutoSoundcheckEngine:
         if sent_buses:
             bus_desc = ", ".join(f"bus{b}={l:.0f}dB" for b, l in sent_buses)
             logger.info(f"Ch {ch} '{info.name}': FX sends: {bus_desc}")
+
+    def _trim_unapproved_close_mic_fx_sends(
+        self,
+        ch: int,
+        info: ChannelInfo,
+        *,
+        phase_guard_context: Optional[Dict[str, Any]] = None,
+    ) -> List[SafetyDecision]:
+        """Pull close drum mics out of non-monitor spatial FX sends."""
+        raw_settings = self._snapshot_raw(info)
+        active_sends = raw_settings.get("active_bus_sends") or []
+        if not active_sends:
+            return []
+
+        decisions: List[SafetyDecision] = []
+        for send in active_sends:
+            try:
+                bus_id = int(send.get("bus"))
+            except (TypeError, ValueError):
+                continue
+            if self._is_monitor_bus(bus_id):
+                continue
+            bus_name = self.bus_snapshots.get(bus_id).name if bus_id in self.bus_snapshots else ""
+            if not self._is_effect_bus(bus_id, bus_name):
+                continue
+            level_db = self._as_float(send.get("level_db"), -40.0)
+            if level_db <= -39.5:
+                continue
+            decision = self._execute_action(
+                SendLevelAdjust(
+                    channel_id=ch,
+                    send_bus=bus_id,
+                    level_db=-40.0,
+                    reason="Close drum mic routed to non-monitor spatial FX bus; trim send safely",
+                ),
+                evaluation_context={
+                    "problem_type": "routing_cleanup",
+                    "expected_effect": "Remove close-mic drum bleed from delay/reverb send without touching monitor buses",
+                    "send_bus": bus_id,
+                },
+                phase_guard_context=phase_guard_context,
+            )
+            if decision is not None:
+                decisions.append(decision)
+        return decisions
 
     # ── 6. Continuous monitoring ─────────────────────────────────
 
@@ -4473,6 +5546,7 @@ class AutoSoundcheckEngine:
             info.original_snapshot = snapshot
             info.fader_db = fader_db
             info.was_reset = False
+            self._read_group_state_for_channels([ch])
 
             # Quick analysis pass (1.5s) for fresh metrics
             analyzer = SignalAnalyzer(ch, self.sample_rate, self.block_size)
@@ -4542,6 +5616,7 @@ class AutoSoundcheckEngine:
                     preset,
                     phase_guard_context=phase_guard_context,
                 )
+            self._apply_group_bus_corrections(phase_guard_context=phase_guard_context)
             self._applied_channels.add(ch)
         except Exception as e:
             logger.error(f"Ch {ch}: single-channel correction error: {e}")
@@ -4861,6 +5936,7 @@ class AutoSoundcheckEngine:
         """Get engine status."""
         channels_info = {}
         for ch, info in self.channels.items():
+            group_route = self.channel_group_routes.get(ch, {})
             channels_info[ch] = {
                 "name": info.name,
                 "preset": info.preset,
@@ -4878,6 +5954,8 @@ class AutoSoundcheckEngine:
                 "gain_correction_db": round(info.gain_correction_db, 1),
                 "eq_applied": info.eq_applied,
                 "fader_db": round(info.fader_db, 1),
+                "active_bus_sends": list(group_route.get("bus_ids", [])),
+                "dca_assignments": list(group_route.get("dca_ids", [])),
             }
 
         discovery_info = None
@@ -4926,6 +6004,27 @@ class AutoSoundcheckEngine:
             "total_channels": len(self.channels) if self.channels else self._configured_channel_count(),
             "selected_channels": self._iter_channels(),
             "master_reference_channels": sorted(self.master_reference_channels),
+            "group_buses": {
+                bus_id: {
+                    "name": snapshot.name,
+                    "fader_db": round(snapshot.fader_db, 1),
+                    "muted": snapshot.muted,
+                    "compressor_enabled": snapshot.compressor_enabled,
+                    "dca_assignments": list(snapshot.dca_assignments),
+                    "source_channels": list(snapshot.source_channels),
+                }
+                for bus_id, snapshot in sorted(self.bus_snapshots.items())
+            },
+            "dca_groups": {
+                dca_id: {
+                    "name": snapshot.name,
+                    "fader_db": round(snapshot.fader_db, 1),
+                    "muted": snapshot.muted,
+                    "source_channels": list(snapshot.source_channels),
+                    "source_buses": list(snapshot.source_buses),
+                }
+                for dca_id, snapshot in sorted(self.dca_snapshots.items())
+            },
             "observe_only": self.observe_only,
             "applied_channel_ids": sorted(self._applied_channels),
             "safety_action_history_size": len(self.safety_controller.history) if self.safety_controller else 0,
@@ -4942,6 +6041,15 @@ class AutoSoundcheckEngine:
                 if self._perceptual_shadow_enabled()
                 else ""
             ),
+            "muq_eval_enabled": self._muq_eval_enabled(),
+            "muq_eval_shadow_mode": self._muq_shadow_mode(),
+            "muq_eval_model_status": (
+                getattr(self.muq_eval_service, "model_status", "")
+                if self.muq_eval_service is not None
+                else ""
+            ),
+            "muq_eval_log_path": str(self.muq_eval_config.get("log_path", "")),
+            "shared_chat_mix_enabled": self.shared_chat_mix_config.enabled,
             "autofoh_log_enabled": self.autofoh_logging_enabled,
             "autofoh_log_path": str(self._default_autofoh_log_path()) if self.autofoh_logging_enabled else "",
             "autofoh_report_path": (
