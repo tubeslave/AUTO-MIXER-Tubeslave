@@ -1,0 +1,71 @@
+profile: "dlive"
+parameters:
+  fader:
+    data_path: "ch.{channel_index}.mix.lvl"
+    format: "plain"
+    value_type: "float"
+  mute:
+    data_path: "ch.{channel_index}.mix.mute"
+    format: "plain"
+    value_type: "bool"
+  pan:
+    data_path: "ch.{channel_index}.mix.pan"
+    format: "plain"
+    value_type: "float"
+  bus.fader:
+    needs_discovery: true
+    data_path: ""
+  dca.fader:
+    needs_discovery: true
+    data_path: ""
+  main.fader:
+    needs_discovery: true
+    data_path: ""
+  gain:
+    needs_discovery: true
+    data_path: ""
+  hpf.enabled:
+    needs_discovery: true
+    data_path: ""
+  hpf.frequency:
+    needs_discovery: true
+    data_path: ""
+  peq.band{band}.enabled:
+    needs_discovery: true
+    data_path: ""
+  peq.band{band}.frequency:
+    needs_discovery: true
+    data_path: ""
+  peq.band{band}.gain:
+    needs_discovery: true
+    data_path: ""
+  peq.band{band}.q:
+    needs_discovery: true
+    data_path: ""
+  peq.band{band}.type:
+    needs_discovery: true
+    data_path: ""
+  send.aux{send_index}.level:
+    needs_discovery: true
+    data_path: ""
+  send.fx{send_index}.level:
+    needs_discovery: true
+    data_path: ""
+  compressor.threshold:
+    needs_discovery: true
+    data_path: ""
+  compressor.ratio:
+    needs_discovery: true
+    data_path: ""
+  compressor.makeup_gain:
+    needs_discovery: true
+    data_path: ""
+  gate.threshold:
+    needs_discovery: true
+    data_path: ""
+  channel.name:
+    needs_discovery: true
+    data_path: ""
+  channel.color:
+    needs_discovery: true
+    data_path: ""

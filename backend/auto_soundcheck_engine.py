@@ -114,6 +114,14 @@ try:
 except Exception:
     MuQEvalService = None
 
+try:
+    from integrations.mixing_station import MixingStationAdapter, MixingStationConfig
+    from integrations.mixing_station.bridge import corrections_from_safety_decision
+except Exception:
+    MixingStationAdapter = None
+    MixingStationConfig = None
+    corrections_from_safety_decision = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -681,6 +689,7 @@ class AutoSoundcheckEngine:
         self.autofoh_logger: Optional[AutoFOHStructuredLogger] = None
         self.autofoh_session_report: Optional[AutoFOHSessionReport] = None
         self.autofoh_session_report_summary: str = ""
+        self.mixing_station_adapter: Optional[Any] = None
         self.perceptual_config = perceptual_config
         self.perceptual_evaluator: Optional[Any] = None
         self._perceptual_pending_audio: Dict[int, Dict[str, Any]] = {}
@@ -781,6 +790,7 @@ class AutoSoundcheckEngine:
             if low_end_config.get("enabled", True)
             else None
         )
+        self._init_mixing_station_adapter()
 
         mode = "auto-discover" if auto_discover and not mixer_ip else "manual"
         target = f"{mixer_type or '?'}@{mixer_ip or 'auto'}:{mixer_port or 'auto'}"
@@ -795,8 +805,35 @@ class AutoSoundcheckEngine:
             f"muq_eval_enabled={self._muq_eval_enabled()}, "
             f"shared_chat_mix={self.shared_chat_mix_config.enabled}, "
             f"log_enabled={self.autofoh_logging_enabled}, "
+            f"mixing_station_enabled={self.mixing_station_adapter is not None}, "
             f"profile_enabled={self.soundcheck_profile_enabled}"
         )
+
+    def _init_mixing_station_adapter(self) -> None:
+        """Initialize optional Mixing Station visualization backend."""
+        if MixingStationAdapter is None or MixingStationConfig is None:
+            return
+
+        config_path = Path(__file__).resolve().parents[1] / "config" / "mixing_station.yaml"
+        try:
+            config = MixingStationConfig.from_file(config_path)
+            if not config.enabled:
+                return
+            adapter = MixingStationAdapter(config)
+            adapter.connect()
+            self.mixing_station_adapter = adapter
+            logger.info(
+                "Mixing Station adapter enabled: profile=%s mode=%s transport=%s dry_run=%s",
+                config.console_profile,
+                config.mode,
+                config.transport,
+                config.dry_run,
+            )
+            if config.discover_paths_on_startup:
+                out = f"logs/mixing_station_discovered_paths_{config.console_profile}.json"
+                adapter.discover_available_paths(out=out)
+        except Exception as exc:
+            logger.warning("Mixing Station adapter initialization failed: %s", exc)
 
     def _configured_channel_count(self) -> int:
         if self.selected_channels:
@@ -1828,6 +1865,14 @@ class AutoSoundcheckEngine:
                         pre_features=self._feature_snapshot_payload(pre_features),
                         metadata=guard_metadata,
                     )
+                    self._mirror_mixing_station_decision(
+                        decision,
+                        snapshot={
+                            "expected_effect": expected_effect,
+                            "evaluation_band_name": evaluation_band_name,
+                            "metadata": guard_metadata,
+                        },
+                    )
                     return decision
         snapshot = self._capture_action_snapshot(
             action,
@@ -1864,6 +1909,7 @@ class AutoSoundcheckEngine:
                     "muq_quality_decision": muq_gate.to_dict(),
                 },
             )
+            self._mirror_mixing_station_decision(decision, snapshot=snapshot)
             return decision
         decision = self.safety_controller.execute(action, effective_state)
         self._log_autofoh_event(
@@ -1883,6 +1929,7 @@ class AutoSoundcheckEngine:
             pre_features=self._feature_snapshot_payload(snapshot.get("pre_features")),
             metadata=snapshot.get("metadata", {}),
         )
+        self._mirror_mixing_station_decision(decision, snapshot=snapshot)
         if decision.sent and register_evaluation:
             pending = self._register_pending_action_evaluation(
                 decision.action,
@@ -1894,6 +1941,47 @@ class AutoSoundcheckEngine:
                     dict(decision.payload)
                 ] if decision.payload else []
         return decision
+
+    def _mirror_mixing_station_decision(
+        self,
+        decision: SafetyDecision,
+        *,
+        snapshot: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Mirror a safety-layer decision into Mixing Station visualization logs/API."""
+        if self.mixing_station_adapter is None or corrections_from_safety_decision is None:
+            return
+        try:
+            channel_names = {
+                int(ch): info.name
+                for ch, info in self.channels.items()
+                if getattr(info, "name", "")
+            }
+            source_metrics: Dict[str, Any] = {}
+            if snapshot:
+                for key in ("expected_effect", "evaluation_band_name"):
+                    if snapshot.get(key) is not None:
+                        source_metrics[key] = snapshot.get(key)
+                metadata = snapshot.get("metadata") or {}
+                if isinstance(metadata, dict):
+                    source_metrics["metadata"] = {
+                        str(k): v
+                        for k, v in metadata.items()
+                        if isinstance(v, (str, int, float, bool)) or v is None
+                    }
+            config = self.mixing_station_adapter.config
+            corrections = corrections_from_safety_decision(
+                decision,
+                console_profile=config.console_profile,
+                mode=config.mode,
+                channel_names=channel_names,
+                source_metrics=source_metrics,
+                dry_run=config.dry_run,
+            )
+            if corrections:
+                self.mixing_station_adapter.send_batch(corrections)
+        except Exception as exc:
+            logger.warning("Mixing Station mirror failed: %s", exc)
 
     def apply_bus_fader_target(self, bus_id: int, target_db: float, reason: str = "bus level correction"):
         """Apply a bounded bus fader correction through the safety layer."""
