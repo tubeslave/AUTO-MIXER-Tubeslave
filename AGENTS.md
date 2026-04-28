@@ -14,6 +14,9 @@ Shared operating agreement for Codex.app, Codex CLI, Kimi CLI, and human contrib
 - Never touch secrets, `.env`, tokens, or API keys.
 - Never raise faders above `0 dBFS` without an explicit operator request.
 - Preserve true-peak headroom and feedback safety checks before increasing gain.
+- Use Ayaic Mix Monolith level planes for gain staging and balance in offline
+  mixes, soundchecks, and live mode, measuring both individual sources and the
+  summed stems/groups they form. Safety limits still win over target loudness.
 - Prefer the smallest safe diff.
 - Do not add production dependencies without a written reason in the proposal or ADR.
 - In planning and review phases, do not edit production code.

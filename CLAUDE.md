@@ -68,6 +68,17 @@ Docs/                    — PDF документация WING, техничес
 - WING EQ bands — существующая полоса может быть feedback-notch/ручной полосой, а не “band 2 = low-mid”. При EQ-коррекции проверять частотное совпадение или перестраивать полосу, и включать `eq/on`, чтобы оператор слышал результат.
 - Master-reference Dante channels — каналы, заведённые как master/reference feed, не являются обычными source channels и должны исключаться из source gain/EQ/FX correction.
 - Compressor makeup — при сжатии компенсировать потерянный уровень через bounded `dyn/gain`, ориентируясь на GR и true-peak headroom; не использовать makeup как обход headroom, feedback или bleed safety.
+- Ayaic gain staging/balance — при offline сведении, саундчеках и live-режимах
+  использовать Ayaic Mix Monolith уровни как дефолтные плоскости для отдельных
+  источников и для стемов/групп одновременно. Не балансировать только
+  изолированные дорожки: сначала выровнять слои внутри инструмента/стема,
+  затем проверить сумму шины. Базовые ориентиры: lead/main element `-22 LUFS`,
+  strong sources и subgroup buses вроде Drums/Bass/Guitars/BG Vocals `-25 LUFS`,
+  tucked backing vocals `-27 LUFS`, keys/synth/ambient support `-30 LUFS`, FX
+  returns/deep effects `-35 LUFS`; doubles/layers держать примерно на 3 LU ниже
+  целевой плоскости группы. В live это только цель для bounded fader/bus moves:
+  true-peak/headroom/feedback safety и запрет fader > 0 dBFS важнее попадания в
+  Ayaic-уровень.
 
 ### Архитектурные решения
 - AudioCapture — единый сервис. НЕ создавать PyAudio потоки в отдельных модулях
@@ -82,6 +93,8 @@ Docs/                    — PDF документация WING, техничес
 - EQ biquads: по Audio EQ Cookbook (Robert Bristow-Johnson)
 - Компрессия ratio: `1 + (max_ratio - 1) * factor` — НЕ инвертировать
 - Gate: объявленный hysteresis ОБЯЗАН применяться в GateProcessor
+- Gain staging/balance: Ayaic Mix Monolith planes применяются к channels и
+  stem/group buses; bus sum проверяется после channel trims.
 
 ## Тестирование
 
