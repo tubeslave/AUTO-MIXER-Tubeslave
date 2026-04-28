@@ -15,6 +15,7 @@ class CorrectionDecisionEngine:
         self.config = dict(config or {})
         self.weights = configured_weights(self.config)
         self.min_score_improvement = float((self.config.get("safety", {}) or {}).get("min_score_improvement", 0.03))
+        self.proxy_weight_multiplier = float(self.config.get("proxy_weight_multiplier", self.config.get("critic_proxy_weight_multiplier", 0.25)))
 
     def choose_best(
         self,
@@ -31,7 +32,11 @@ class CorrectionDecisionEngine:
         for candidate in candidates:
             combined_scores = dict(critic_scores.get(candidate.candidate_id, {}))
             combined_scores["safety"] = safety_scores.get(candidate.candidate_id, {})
-            aggregate = aggregate_scores(combined_scores, self.weights)
+            aggregate = aggregate_scores(
+                combined_scores,
+                self.weights,
+                proxy_weight_multiplier=self.proxy_weight_multiplier,
+            )
             if not safety_scores.get(candidate.candidate_id, {}).get("passed", False) and not candidate.is_no_change:
                 aggregate["final_score"] -= 1.0
             breakdown[candidate.candidate_id] = aggregate

@@ -117,6 +117,7 @@ class OfflineCorrectionRunner:
             {
                 **(self.config.get("virtual_mixer", {}) or {}),
                 "safety": self.config.get("safety", {}),
+                "ayaic_balance": self.config.get("ayaic_balance", {}),
             },
         )
         render_results = renderer.render_candidates(renderable)
@@ -219,6 +220,7 @@ class OfflineCorrectionRunner:
         vm_config = {
             **(self.config.get("virtual_mixer", {}) or {}),
             "safety": self.config.get("safety", {}),
+            "ayaic_balance": self.config.get("ayaic_balance", {}),
         }
         preferred = str(vm_config.get("preferred", "pymixconsole"))
         if preferred == "pymixconsole":

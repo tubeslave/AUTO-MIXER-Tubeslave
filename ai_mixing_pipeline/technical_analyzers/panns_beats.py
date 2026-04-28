@@ -63,12 +63,54 @@ class IdentityBleedCritic(AudioCritic):
             warnings=["PANNs/BEATs unavailable; using filename and signal-statistics fallback."],
             explanation="Identity fallback checks filename role, activity, noise floor, and silence risk.",
             model_available=False,
+            score_source="proxy",
             metadata={
                 "inferred_role": inferred,
                 "expected_role": expected_role,
                 "metrics": metrics,
             },
         )
+
+    def compare(
+        self,
+        before_path: str,
+        after_path: str,
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        before = self.analyze(before_path, context=context)
+        after = self.analyze(after_path, context=context)
+        warnings = list(before.get("warnings", [])) + list(after.get("warnings", []))
+        if not bool(before.get("model_available")) or not bool(after.get("model_available")):
+            warnings.append(
+                "PANNs/BEATs real model unavailable; identity/bleed comparison is neutral and not penalized."
+            )
+            return standard_critic_result(
+                critic_name=self.name,
+                role=self.role,
+                scores={
+                    "overall": 0.0,
+                    "identity_confidence": 0.0,
+                    "activity_score": 0.0,
+                    "noise_score": 0.0,
+                    "bleed_score": 0.0,
+                    "channel_silence_risk": 0.0,
+                },
+                delta={
+                    "overall": 0.0,
+                    "identity_confidence": 0.0,
+                    "activity_score": 0.0,
+                    "noise_score": 0.0,
+                    "bleed_score": 0.0,
+                    "channel_silence_risk": 0.0,
+                },
+                confidence=0.0,
+                warnings=warnings,
+                explanation="Neutral fallback: no real identity/bleed model was available for before/after scoring.",
+                model_available=False,
+                score_source="unavailable",
+                metadata={"before": before.get("metadata", {}), "after": after.get("metadata", {})},
+            )
+        return super().compare(before_path, after_path, context=context)
 
     @staticmethod
     def _infer_role(name: str) -> str:

@@ -24,6 +24,7 @@ def test_fallback_virtual_mixer_renders_gain_and_prevents_clipping(tmp_path):
     _write_sine(multitrack / "vocal.wav", amp=0.9)
     mixer = FallbackVirtualMixer({"sample_rate": 48000, "prevent_clipping": True, "safety": {"max_true_peak_dbfs": -1.0}})
     mixer.load_project(multitrack)
+    assert mixer.state.channels["vocal"].gain_db < 0.0
 
     no_change = mixer.render(CandidateActionSet("no_change", [NoChangeAction()]), tmp_path / "no_change.wav")
     louder = mixer.render(CandidateActionSet("vocal_up", [GainAction("vocal", 1.0)]), tmp_path / "vocal_up.wav")

@@ -18,6 +18,8 @@ that pass the Safety Governor.
 - pymixconsole: preferred headless console backend. It is installed from the
   upstream GitHub repository and used for gain, pan, EQ, and compression when
   available; the adapter falls back automatically if it cannot be imported.
+  Default pymixconsole delay/reverb busses are disabled in offline correction
+  unless FX sends are modeled explicitly.
 - fallback_virtual_mixer: dependency-light WAV/FLAC/AIFF loader and summing
   mixer. It supports gain, pan, EQ, compression, gate/expander, master trim,
   and clipping prevention. FX sends remain logged as unsupported in fallback.
@@ -25,6 +27,10 @@ that pass the Safety Governor.
   installed manually.
 - CriticBridge: calls MuQ-Eval, Audiobox, MERT, CLAP, Essentia, PANNs/BEATs or
   their existing fallbacks.
+- Score Normalizer: separates real model scores from proxy/fallback scores.
+  Real critics use the configured weight, proxy scores are down-weighted by
+  `proxy_weight_multiplier`, and unavailable critics are excluded from the
+  normalized weights.
 - Safety Governor: final protection layer. It can reject the best-scoring
   candidate for clipping, headroom, phase, excessive gain/EQ/compression, vocal
   clarity drop, or bleed risk.
@@ -83,7 +89,10 @@ offline_test_output/<run_id>/
 - `summary_report.md`: dependencies, virtual mixer, optimizer, candidate counts,
   critic scores, selected candidate, and safety explanation.
 - `decision_log.jsonl`: one auditable row per candidate.
-- `critic_scores.csv`: compact critic breakdown.
+- `critic_scores.csv`: compact critic breakdown with `score_source` and
+  `proxy_score`.
+- `model_usage_report.json`: real models used, fallback/proxy scores used,
+  unavailable critics, selected effective weights, and confidence level.
 - `candidate_manifest.json`: render metadata from the sandbox renderer.
 - `accepted_actions.json` and `rejected_actions.json`: final action audit.
 

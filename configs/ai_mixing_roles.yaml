@@ -7,6 +7,7 @@ critics:
     sample_rate: 24000
     max_window_seconds: 10
     model_repo_id: "zhudi2825/MuQ-Eval-A1"
+    muq_eval_root: "external/MuQ-Eval"
     local_files_only: true
 
   audiobox_aesthetics:

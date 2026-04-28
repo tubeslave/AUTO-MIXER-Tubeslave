@@ -38,8 +38,12 @@ class DecisionActionPlanner:
             )
         ]
         vocal_channels = self._roles(channels, "vocal")
+        lead_vocal_channels = [cid for cid in vocal_channels if "back" not in cid.lower()]
+        backing_vocal_channels = [cid for cid in vocal_channels if "back" in cid.lower()]
         bass_channels = self._roles(channels, "bass")
         kick_channels = self._roles(channels, "kick")
+        guitar_channels = self._roles(channels, "guitar")
+        keys_channels = [cid for cid, role in channels.items() if role in {"keys", "piano", "synth"}]
         drum_channels = [cid for cid, role in channels.items() if role in {"kick", "snare", "drums"}]
 
         if vocal_channels:
@@ -87,6 +91,25 @@ class DecisionActionPlanner:
                         *[GainAction(cid, 0.5) for cid in kick_channels],
                     ],
                     description="Micro bass/kick balance candidate.",
+                    source="manual_rule",
+                    safety_limits_snapshot=self._limits(),
+                )
+            )
+
+        balance_actions = [
+            *[GainAction(cid, 0.8) for cid in lead_vocal_channels],
+            *[GainAction(cid, -0.8) for cid in backing_vocal_channels],
+            *[GainAction(cid, 0.4) for cid in kick_channels],
+            *[GainAction(cid, -0.3) for cid in bass_channels],
+            *[GainAction(cid, -0.5) for cid in guitar_channels],
+            *[GainAction(cid, -0.6) for cid in keys_channels if "playback" in cid.lower()],
+        ]
+        if balance_actions:
+            candidates.append(
+                CandidateActionSet(
+                    candidate_id="candidate_009_gain_balance_polish",
+                    actions=balance_actions,
+                    description="Role-aware gain balance candidate around the static rough mix.",
                     source="manual_rule",
                     safety_limits_snapshot=self._limits(),
                 )

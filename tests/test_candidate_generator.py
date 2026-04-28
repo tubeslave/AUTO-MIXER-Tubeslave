@@ -20,3 +20,4 @@ def test_candidate_generator_creates_basic_candidates_and_no_change():
     assert "candidate_001_vocal_up_0_5db" in ids
     assert "candidate_003_low_mid_cleanup" in ids
     assert "candidate_005_bass_kick_balance" in ids
+    assert "candidate_009_gain_balance_polish" in ids

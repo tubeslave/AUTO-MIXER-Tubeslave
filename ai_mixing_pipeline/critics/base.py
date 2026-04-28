@@ -15,10 +15,13 @@ def standard_critic_result(
     warnings: list[str] | None = None,
     explanation: str = "",
     model_available: bool = False,
+    score_source: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return the standard critic payload shape."""
 
+    if score_source is None:
+        score_source = "real_model" if model_available else ("proxy" if scores or delta else "unavailable")
     return {
         "critic_name": critic_name,
         "role": role,
@@ -28,6 +31,8 @@ def standard_critic_result(
         "warnings": list(warnings or []),
         "explanation": explanation,
         "model_available": bool(model_available),
+        "score_source": str(score_source),
+        "proxy_score": bool(score_source not in {"real_model", "unavailable"}),
         "metadata": metadata or {},
     }
 
@@ -81,6 +86,7 @@ class AudioCritic:
             warnings=warnings,
             explanation=f"Compared {self.name} before/after scores.",
             model_available=model_available,
+            score_source="real_model" if model_available else "proxy",
             metadata={
                 "before": before.get("scores", {}),
                 "after": after.get("scores", {}),
@@ -99,4 +105,5 @@ class AudioCritic:
             warnings=[reason],
             explanation=f"{self.name} is unavailable; pipeline continued.",
             model_available=False,
+            score_source="unavailable",
         )

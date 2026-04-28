@@ -70,3 +70,15 @@ def test_decision_layer_safety_rejects_clipped_render(tmp_path):
 
     assert result["passed"] is False
     assert any("true_peak" in reason or "clipping" in reason for reason in result["reasons"])
+
+
+def test_decision_layer_safety_scores_margin_for_safe_render(tmp_path):
+    wav = tmp_path / "near_limit.wav"
+    _write(wav, amp=0.75)
+    governor = DecisionSafetyGovernor({"safety": {"forbid_clipping": True, "max_true_peak_dbfs": -1.0, "min_headroom_db": 1.0}})
+
+    result = governor.check_render(CandidateActionSet("near_limit"), wav)
+
+    assert result["passed"] is True
+    assert 0.0 < result["safety_score"] < 1.0
+    assert result["penalties"]

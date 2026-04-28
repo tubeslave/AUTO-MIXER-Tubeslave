@@ -6,9 +6,10 @@ from pathlib import Path
 from typing import Any
 import json
 
-from ai_mixing_pipeline.audio_utils import loudness_match_to, read_audio, safe_slug, write_audio
+from ai_mixing_pipeline.audio_utils import loudness_match_to, measure_audio, read_audio, safe_slug, write_audio
 
 from .action_schema import CandidateActionSet, ensure_no_change_candidate
+from .ayaic_balance import apply_output_finish
 from .virtual_mixer_base import VirtualMixer
 
 
@@ -26,6 +27,7 @@ class DecisionSandboxRenderer:
     def render_candidate(self, candidate: CandidateActionSet) -> dict[str, Any]:
         filename = f"{safe_slug(candidate.candidate_id)}.wav"
         result = self.virtual_mixer.render(candidate, self.renders_dir / filename)
+        self._apply_ayaic_output_finish(result)
         result["candidate"] = candidate.to_dict()
         self.manifest.append(result)
         return result
@@ -53,6 +55,7 @@ class DecisionSandboxRenderer:
             write_audio(result["path"], matched, sample_rate)
             result["loudness_matched"] = target_lufs is not None
             result["loudness_match_gain_db"] = output_gain
+            result["metrics"] = measure_audio(matched, sample_rate)
 
     def save_render_manifest(self, results: dict[str, dict[str, Any]] | None = None) -> Path:
         target = self.output_dir / "reports" / "candidate_manifest.json"
@@ -60,3 +63,15 @@ class DecisionSandboxRenderer:
         payload = list((results or {}).values()) if results is not None else self.manifest
         target.write_text(json.dumps(payload, indent=2, ensure_ascii=True, default=str), encoding="utf-8")
         return target
+
+    def _apply_ayaic_output_finish(self, result: dict[str, Any]) -> None:
+        ayaic_config = dict(self.config.get("ayaic_balance", {}) or {})
+        output_config = dict(ayaic_config.get("output", {}) or {})
+        if not bool(ayaic_config.get("enabled", False)) or not bool(output_config.get("enabled", False)):
+            return
+        audio, sample_rate = read_audio(result["path"])
+        finished, report = apply_output_finish(audio, sample_rate, ayaic_config)
+        write_audio(result["path"], finished, sample_rate)
+        result["metrics"] = measure_audio(finished, sample_rate)
+        result["ayaic_output_finish"] = report
+        result.setdefault("audit", []).append({"action": report, "status": "applied_ayaic_output_finish"})

@@ -1,4 +1,5 @@
 mode: offline_test
+proxy_weight_multiplier: 0.25
 
 optimizer:
   primary: nevergrad
@@ -11,9 +12,42 @@ virtual_mixer:
   preferred: pymixconsole
   fallback: fallback_virtual_mixer
   sample_rate: 48000
+  num_busses: 0
   loudness_match: true
   target_lufs: -18.0
   prevent_clipping: true
+
+ayaic_balance:
+  enabled: true
+  input:
+    base_lufs: -24.0
+    max_boost_db: 4.0
+    min_gain_db: -24.0
+    per_channel_peak_ceiling_dbfs: -6.0
+    offsets_db:
+      kick: 3.0
+      snare: 1.5
+      bass: 3.0
+      vocal: 6.0
+      backing_vocal: 0.0
+      guitars: -2.0
+      keys: -4.0
+      drums: -3.0
+      unknown: -6.0
+  output:
+    enabled: true
+    high_pass_hz: 30.0
+    mirror_eq_enabled: true
+    max_mirror_eq_cut_db: 1.5
+    low_mid_margin_db: 1.5
+    presence_margin_db: 3.0
+    glue_compressor_enabled: true
+    compressor_threshold_db: -18.0
+    compressor_ratio: 1.35
+    compressor_attack_ms: 25.0
+    compressor_release_ms: 180.0
+    compressor_makeup_db: 0.4
+    peak_ceiling_dbfs: -1.0
 
 action_space:
   gain:
@@ -56,6 +90,10 @@ critics:
     enabled: true
     weight: 0.30
     local_files_only: true
+    sample_rate: 24000
+    max_window_seconds: 10
+    model_repo_id: "zhudi2825/MuQ-Eval-A1"
+    muq_eval_root: "external/MuQ-Eval"
 
   audiobox:
     enabled: true

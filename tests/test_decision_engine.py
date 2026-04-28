@@ -108,3 +108,35 @@ def test_correction_decision_engine_keeps_no_change_for_small_improvement():
 
     assert decision["selected_candidate_id"] == "candidate_000_no_change"
     assert decision["decision"] == "no_change"
+
+
+def test_correction_decision_engine_downweights_proxy_scores():
+    candidates = [
+        CandidateActionSet("candidate_000_no_change", [NoChangeAction()]),
+        CandidateActionSet("candidate_001_proxy_up", [GainAction("vocal", 0.5)]),
+    ]
+    critics = {
+        "candidate_000_no_change": {
+            "muq_eval": {"delta": {"overall": 0.0}, "confidence": 0.25, "score_source": "proxy", "model_available": False}
+        },
+        "candidate_001_proxy_up": {
+            "muq_eval": {"delta": {"overall": 0.2}, "confidence": 0.25, "score_source": "proxy", "model_available": False}
+        },
+    }
+    safety = {
+        "candidate_000_no_change": {"passed": True, "safety_score": 1.0},
+        "candidate_001_proxy_up": {"passed": True, "safety_score": 1.0},
+    }
+
+    decision = CorrectionDecisionEngine(
+        {
+            "critics": {"muq_eval": {"enabled": True, "weight": 0.30}},
+            "safety": {"min_score_improvement": 0.01},
+            "proxy_weight_multiplier": 0.25,
+        }
+    ).choose_best("run", candidates, critics, safety)
+
+    breakdown = decision["critic_breakdown"]["candidate_001_proxy_up"]
+    assert breakdown["weight_sources"]["muq_eval"] == "proxy"
+    assert breakdown["effective_weights"]["muq_eval"] == 0.075
+    assert breakdown["normalized_weights"]["muq_eval"] < 0.30 / (0.30 + 0.05)

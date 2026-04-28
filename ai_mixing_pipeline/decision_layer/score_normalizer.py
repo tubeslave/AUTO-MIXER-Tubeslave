@@ -71,9 +71,29 @@ def extract_signal(critic_name: str, result: dict[str, Any]) -> float | None:
     return None
 
 
-def aggregate_scores(scores: dict[str, dict[str, Any]], weights: dict[str, float]) -> dict[str, Any]:
+def _score_source(result: dict[str, Any]) -> str:
+    source = str(result.get("score_source", "") or "").strip().lower()
+    if source:
+        return source
+    if result.get("model_available") is True:
+        return "real_model"
+    if result.get("scores") or result.get("delta"):
+        return "proxy"
+    return "unavailable"
+
+
+def aggregate_scores(
+    scores: dict[str, dict[str, Any]],
+    weights: dict[str, float],
+    *,
+    proxy_weight_multiplier: float = 0.25,
+) -> dict[str, Any]:
     available: dict[str, float] = {}
     values: dict[str, float] = {}
+    weight_sources: dict[str, str] = {}
+    proxy_weights: dict[str, float] = {}
+    excluded: dict[str, str] = {}
+    proxy_weight_multiplier = max(0.0, min(1.0, float(proxy_weight_multiplier)))
     for name, weight in weights.items():
         if name == "safety":
             safety = scores.get("safety", {})
@@ -81,18 +101,42 @@ def aggregate_scores(scores: dict[str, dict[str, Any]], weights: dict[str, float
             if isinstance(value, (int, float)):
                 available[name] = weight
                 values[name] = normalize_score(name, value)
+                weight_sources[name] = "safety"
             continue
-        value = extract_signal(name, scores.get(name, {}))
+        result = scores.get(name, {})
+        source = _score_source(result)
+        if source == "unavailable":
+            excluded[name] = "unavailable"
+            continue
+        value = extract_signal(name, result)
         if value is not None:
-            available[name] = weight
+            effective_weight = weight if source == "real_model" else weight * proxy_weight_multiplier
+            if effective_weight <= 0.0:
+                excluded[name] = f"{source}_weight_zero"
+                continue
+            available[name] = effective_weight
             values[name] = value
+            weight_sources[name] = source
+            if source != "real_model":
+                proxy_weights[name] = effective_weight
     total = sum(available.values())
     if total <= 0.0:
-        return {"final_score": 0.0, "normalized_weights": {}, "values": values}
+        return {
+            "final_score": 0.0,
+            "normalized_weights": {},
+            "values": values,
+            "weight_sources": weight_sources,
+            "proxy_weights": proxy_weights,
+            "excluded_weights": excluded,
+        }
     normalized = {name: weight / total for name, weight in available.items()}
     final_score = sum(values[name] * normalized[name] for name in normalized)
     return {
         "final_score": float(final_score),
         "normalized_weights": normalized,
+        "effective_weights": available,
+        "weight_sources": weight_sources,
+        "proxy_weights": proxy_weights,
+        "excluded_weights": excluded,
         "values": values,
     }

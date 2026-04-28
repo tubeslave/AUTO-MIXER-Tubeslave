@@ -29,6 +29,7 @@ class PyMixConsoleAdapter(VirtualMixer):
         self.config = dict(config or {})
         self.warnings: list[str] = []
         self.block_size = int(self.config.get("block_size", 512) or 512)
+        self.num_busses = int(self.config.get("num_busses", 0) or 0)
         self._fallback = FallbackVirtualMixer(self.config)
         try:
             import pymixconsole  # type: ignore
@@ -78,17 +79,31 @@ class PyMixConsoleAdapter(VirtualMixer):
         assert self._pymixconsole is not None
         channel_ids = list(self._fallback._audio.keys())
         length = max(len(audio) for audio in self._fallback._audio.values())
+        channel_index = {channel_id: index for index, channel_id in enumerate(channel_ids)}
         console = self._pymixconsole.Console(
             block_size=self.block_size,
             sample_rate=self._fallback.sample_rate,
             num_channels=len(channel_ids),
+            num_busses=self.num_busses,
         )
+        self._mute_default_fx_sends(console)
+        for channel_id, index in channel_index.items():
+            channel_state = self._fallback.state.channels[channel_id]
+            state_gain = float(channel_state.gain_db)
+            post_gain = self._get_processor(console.channels[index].post_processors, "post-gain")
+            self._set_parameter(post_gain, "gain", state_gain)
+            try:
+                panner = self._get_processor(console.channels[index].post_processors, "panner")
+                pan = max(-1.0, min(1.0, float(channel_state.pan)))
+                self._set_parameter(panner, "pan", (pan + 1.0) / 2.0)
+            except Exception as exc:
+                self.warnings.append(f"pymixconsole panner unavailable for {channel_id}; default pan not applied: {exc}")
         warnings = list(self.warnings)
         action_audit: list[dict[str, Any]] = []
         master_gain_db = 0.0
         master_actions: list[Any] = []
         action_by_channel: dict[str, list[Any]] = {}
-        channel_index = {channel_id: index for index, channel_id in enumerate(channel_ids)}
+        pre_console_actions: dict[str, list[Any]] = {}
 
         for action in actions.actions:
             channel_id = getattr(action, "channel_id", "mix")
@@ -105,6 +120,10 @@ class PyMixConsoleAdapter(VirtualMixer):
             if channel_id not in channel_index:
                 warnings.append(f"{channel_id} not found by pymixconsole adapter; action skipped.")
                 action_audit.append({"action": action.to_dict(), "status": "skipped_missing_channel"})
+                continue
+            if action.action_type == "gate_expander":
+                pre_console_actions.setdefault(channel_id, []).append(action)
+                action_audit.append({"action": action.to_dict(), "status": "applied_pre_pymixconsole"})
                 continue
             action_by_channel.setdefault(channel_id, []).append(action)
 
@@ -124,7 +143,10 @@ class PyMixConsoleAdapter(VirtualMixer):
 
         input_matrix = np.zeros((length, len(channel_ids)), dtype=np.float32)
         for index, channel_id in enumerate(channel_ids):
-            input_matrix[:, index] = to_mono(match_length(self._fallback._audio[channel_id], length))
+            channel_audio = match_length(self._fallback._audio[channel_id], length)
+            for action in pre_console_actions.get(channel_id, []):
+                channel_audio = self._fallback._apply_gate_expander_action(channel_audio, action)
+            input_matrix[:, index] = to_mono(channel_audio)
 
         padded_length = int(np.ceil(length / float(self.block_size)) * self.block_size)
         if padded_length > length:
@@ -190,6 +212,14 @@ class PyMixConsoleAdapter(VirtualMixer):
         if action.action_type == "gate_expander":
             return "skipped_unsupported", "gate_expander unsupported by pymixconsole adapter; use fallback mixer for gate DSP."
         return "skipped_unsupported", f"{action.action_type} unsupported by pymixconsole adapter; logged but skipped."
+
+    @staticmethod
+    def _mute_default_fx_sends(console: Any) -> None:
+        """Keep pymixconsole's default delay/reverb busses silent unless explicitly modeled."""
+
+        for bus in getattr(console, "busses", []):
+            for _, parameter in bus.parameters:
+                parameter.value = -120.0
 
     def _apply_master_action(self, console: Any, action: Any) -> tuple[str, str | None]:
         if action.action_type == "eq":

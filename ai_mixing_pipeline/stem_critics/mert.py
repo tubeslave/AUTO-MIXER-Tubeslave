@@ -46,6 +46,15 @@ class MERTStemCritic(AudioCritic):
         if not bool(self.config.get("enabled", True)):
             return self.unavailable_result("MERT critic disabled in config.")
         context = dict(context or {})
+        result, _ = self._analyze_with_embedding(audio_path, context)
+        return result
+
+    def _analyze_with_embedding(
+        self,
+        audio_path: str,
+        context: dict[str, Any] | None = None,
+    ) -> tuple[dict[str, Any], np.ndarray]:
+        context = dict(context or {})
         audio, sample_rate = read_audio(audio_path)
         metrics = measure_audio(audio, sample_rate)
         quality = signal_quality_score(metrics)
@@ -76,7 +85,7 @@ class MERTStemCritic(AudioCritic):
             np.save(output / f"{Path(audio_path).stem}.mert_embedding.npy", embedding)
 
         norm = float(np.linalg.norm(embedding)) if embedding.size else 0.0
-        return standard_critic_result(
+        result = standard_critic_result(
             critic_name=self.name,
             role=self.role,
             scores={
@@ -93,12 +102,16 @@ class MERTStemCritic(AudioCritic):
             warnings=warnings,
             explanation="MERT adapter stores/compares embeddings; custom trained heads are placeholders.",
             model_available=model_available,
+            score_source="real_model" if model_available else "proxy",
             metadata={
                 "backend": backend_name,
                 "embedding_size": int(embedding.size),
+                "embedding_norm": norm,
+                "embedding_is_zero": bool(norm <= 1e-9),
                 "metrics": metrics,
             },
         )
+        return result, embedding
 
     def compare(
         self,
@@ -107,14 +120,31 @@ class MERTStemCritic(AudioCritic):
         context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         context = dict(context or {})
-        before = self.analyze(before_path, context=context)
-        after = self.analyze(after_path, context=context)
+        before, before_embedding = self._analyze_with_embedding(before_path, context=context)
+        after, after_embedding = self._analyze_with_embedding(after_path, context=context)
         delta = {}
         for key, value in after.get("scores", {}).items():
             if isinstance(value, (int, float)) and key in before.get("scores", {}):
                 delta[key] = float(value) - float(before["scores"][key])
+        cosine_similarity, cosine_distance = self._embedding_cosine(before_embedding, after_embedding)
+        delta["embedding_cosine_similarity"] = cosine_similarity
+        delta["embedding_cosine_distance"] = cosine_distance
+        delta["embedding_change_magnitude"] = cosine_distance
         delta.setdefault("overall", delta.get("stem_embedding_quality", 0.0))
         warnings = list(before.get("warnings", [])) + list(after.get("warnings", []))
+        numeric_deltas = [
+            abs(float(value))
+            for key, value in delta.items()
+            if key not in {"embedding_cosine_similarity"} and isinstance(value, (int, float))
+        ]
+        if numeric_deltas and max(numeric_deltas) <= 1e-8:
+            warnings.append(
+                "MERT compare produced neutral deltas; no trained stem head converted embedding movement into an improvement score."
+            )
+        elif abs(float(delta.get("overall", 0.0))) <= 1e-8 and cosine_distance > 1e-6:
+            warnings.append(
+                "MERT embeddings changed but overall delta is neutral because no trained improvement head is available."
+            )
         return standard_critic_result(
             critic_name=self.name,
             role=self.role,
@@ -124,8 +154,35 @@ class MERTStemCritic(AudioCritic):
             warnings=warnings,
             explanation="Compared MERT/custom-head proxy scores before and after.",
             model_available=bool(before.get("model_available")) and bool(after.get("model_available")),
-            metadata={"before": before.get("metadata", {}), "after": after.get("metadata", {})},
+            score_source="real_model" if bool(before.get("model_available")) and bool(after.get("model_available")) else "proxy",
+            metadata={
+                "before": before.get("metadata", {}),
+                "after": after.get("metadata", {}),
+                "embedding_similarity": {
+                    "cosine_similarity": cosine_similarity,
+                    "cosine_distance": cosine_distance,
+                    "before_norm": float(np.linalg.norm(before_embedding)) if before_embedding.size else 0.0,
+                    "after_norm": float(np.linalg.norm(after_embedding)) if after_embedding.size else 0.0,
+                },
+            },
         )
+
+    @staticmethod
+    def _embedding_cosine(before: np.ndarray, after: np.ndarray) -> tuple[float, float]:
+        before = np.asarray(before, dtype=np.float32).reshape(-1)
+        after = np.asarray(after, dtype=np.float32).reshape(-1)
+        if before.size != after.size:
+            size = min(before.size, after.size)
+            before = before[:size]
+            after = after[:size]
+        if before.size == 0 or after.size == 0:
+            return 0.0, 1.0
+        denom = float(np.linalg.norm(before) * np.linalg.norm(after))
+        if denom <= 1e-12:
+            return 0.0, 1.0
+        similarity = float(np.dot(before, after) / denom)
+        similarity = max(-1.0, min(1.0, similarity))
+        return similarity, float(1.0 - similarity)
 
     @staticmethod
     def _vocal_clarity_proxy(metrics: dict[str, Any]) -> float:

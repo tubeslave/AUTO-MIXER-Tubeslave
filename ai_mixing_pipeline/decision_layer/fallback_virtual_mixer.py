@@ -19,6 +19,7 @@ from ai_mixing_pipeline.audio_utils import (
 )
 
 from .action_schema import CandidateActionSet
+from .ayaic_balance import compute_input_gain_db
 from .mixer_state import ChannelState, MixerState, role_from_channel_map
 from .virtual_mixer_base import VirtualMixer
 
@@ -43,18 +44,35 @@ class FallbackVirtualMixer(VirtualMixer):
             raise ValueError(f"No supported audio files found in {root}")
         self._audio.clear()
         self.state.channels.clear()
+        balance_reports: list[dict[str, Any]] = []
+        ayaic_config = dict(self.config.get("ayaic_balance", {}) or {})
         for path in files:
             audio, sample_rate = read_audio(path, target_sample_rate=self.sample_rate)
             self.sample_rate = sample_rate
             channel_id = path.stem
             self._audio[channel_id] = audio
+            role = role_from_channel_map(path, channel_map)
+            if bool(ayaic_config.get("enabled", True)):
+                gain_db, balance_report = compute_input_gain_db(channel_id, role, audio, ayaic_config)
+            else:
+                gain_db = self._default_gain_db(path.stem, role)
+                balance_report = {
+                    "method": "static_role_default",
+                    "channel": channel_id,
+                    "role": role,
+                    "applied_gain_db": gain_db,
+                }
+            balance_reports.append(balance_report)
             self.state.channels[channel_id] = ChannelState(
                 channel_id=channel_id,
                 path=str(path),
-                role=role_from_channel_map(path, channel_map),
+                role=role,
+                gain_db=gain_db,
                 pan=self._default_pan(path.stem),
             )
         self.state.sample_rate = self.sample_rate
+        self.state.metadata["initial_gain_balance"] = "ayaic_level_plane_input" if bool(ayaic_config.get("enabled", True)) else "role_based_static_rough_mix"
+        self.state.metadata["initial_gain_balance_report"] = balance_reports
         return self.export_state()
 
     def render(self, actions: CandidateActionSet, output_path: str | Path) -> dict[str, Any]:
@@ -251,3 +269,31 @@ class FallbackVirtualMixer(VirtualMixer):
         if label.endswith(" r") or " right" in label:
             return 0.65
         return 0.0
+
+    @staticmethod
+    def _default_gain_db(name: str, role: str) -> float:
+        label = name.lower().replace("_", " ").replace("-", " ")
+        role = role.lower()
+        if "back vox" in label or "backing" in label:
+            return -11.0
+        if "playback" in label:
+            return -13.0
+        if "oh " in label or "overhead" in label:
+            return -12.0
+        if "tom" in label:
+            return -11.0
+        if "kick" in role:
+            return -7.0
+        if "snare" in role:
+            return -9.0
+        if "bass" in role:
+            return -7.5
+        if "vocal" in role:
+            return -5.0
+        if "guitar" in role:
+            return -11.0
+        if role in {"keys", "piano", "synth"}:
+            return -12.0
+        if "drum" in role:
+            return -11.0
+        return -14.0
