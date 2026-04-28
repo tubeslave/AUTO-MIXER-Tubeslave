@@ -1,0 +1,90 @@
+mode: offline_test
+
+optimizer:
+  primary: nevergrad
+  fallback: manual_candidates
+  max_candidates: 20
+  random_seed: 42
+  budget: 20
+
+virtual_mixer:
+  preferred: pymixconsole
+  fallback: fallback_virtual_mixer
+  sample_rate: 48000
+  loudness_match: true
+  target_lufs: -18.0
+  prevent_clipping: true
+
+action_space:
+  gain:
+    enabled: true
+    max_abs_db: 1.0
+
+  eq:
+    enabled: true
+    max_abs_db: 1.5
+    low_mid_freq_hz: 250
+    harshness_freq_hz: 3500
+
+  compressor:
+    enabled: true
+    conservative_only: true
+
+  pan:
+    enabled: true
+    max_abs_pan_change: 0.15
+
+  fx:
+    enabled: true
+    max_send_change_db: 1.0
+
+safety:
+  max_gain_change_db_per_step: 1.0
+  max_eq_change_db_per_step: 1.5
+  max_master_gain_boost_db: 0.5
+  min_score_improvement: 0.03
+  max_true_peak_dbfs: -1.0
+  min_headroom_db: 1.0
+  forbid_clipping: true
+  forbid_phase_collapse: true
+  forbid_excessive_compression: true
+  forbid_vocal_clarity_drop: true
+  forbid_bleed_boost: true
+
+critics:
+  muq_eval:
+    enabled: true
+    weight: 0.30
+    local_files_only: true
+
+  audiobox:
+    enabled: true
+    weight: 0.20
+
+  stem_critics:
+    enabled: true
+    weight: 0.15
+    fallback_to_lightweight: true
+
+  clap:
+    enabled: true
+    weight: 0.10
+
+  essentia:
+    enabled: true
+    weight: 0.10
+
+  identity_bleed:
+    enabled: true
+    weight: 0.10
+
+  safety:
+    enabled: true
+    weight: 0.05
+
+outputs:
+  save_all_renders: true
+  save_best_mix: true
+  save_decision_log: true
+  save_reports: true
+  save_mixer_states: true

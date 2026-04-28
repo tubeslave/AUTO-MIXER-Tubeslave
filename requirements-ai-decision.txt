@@ -1,0 +1,15 @@
+# Optional dependencies for the offline AI decision/correction layer.
+# The core pipeline continues through fallback adapters when these are absent.
+nevergrad
+optuna
+numpy
+scipy
+soundfile
+pyloudnorm
+pandas
+pyyaml
+pymixconsole @ git+https://github.com/csteinmetz1/pymixconsole
+
+# Optional experimental trainable DSP. Install manually if it conflicts with
+# the project environment.
+# dasp-pytorch

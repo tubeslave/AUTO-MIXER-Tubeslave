@@ -1,0 +1,79 @@
+critics:
+  muq_eval:
+    enabled: true
+    role: "chief_music_critic"
+    weight: 0.30
+    device_preference: ["mps", "cuda", "cpu"]
+    sample_rate: 24000
+    max_window_seconds: 10
+    model_repo_id: "zhudi2825/MuQ-Eval-A1"
+    local_files_only: true
+
+  audiobox_aesthetics:
+    enabled: true
+    role: "secondary_quality_critic"
+    weight: 0.20
+
+  mert:
+    enabled: true
+    role: "stem_embedding_critic"
+    weight: 0.15
+    backend: "mert"
+    model_name: "m-a-p/MERT-v1-95M"
+    sample_rate: 24000
+    max_window_seconds: 5
+    local_files_only: true
+    fallback_to_lightweight: true
+
+  clap:
+    enabled: true
+    role: "semantic_audio_text_critic"
+    weight: 0.10
+    prompts:
+      - "clean lead vocal"
+      - "balanced live rock mix"
+      - "punchy kick drum"
+      - "defined bass guitar"
+      - "muddy low mids"
+      - "harsh guitar"
+      - "overcompressed mix"
+      - "clear live vocal"
+      - "wide clean mix"
+
+  essentia:
+    enabled: true
+    role: "technical_music_analyzer"
+    weight: 0.10
+
+  panns_or_beats:
+    enabled: true
+    role: "channel_identity_and_bleed_detector"
+    weight: 0.10
+
+  demucs_or_openunmix:
+    enabled: true
+    role: "offline_source_separator"
+    realtime_allowed: false
+
+safety:
+  weight: 0.05
+  max_gain_change_db_per_step: 1.0
+  max_eq_change_db_per_step: 1.5
+  min_score_improvement: 0.03
+  max_true_peak_dbfs: -1.0
+  min_headroom_db: 1.0
+  forbid_vocal_clarity_drop: true
+  forbid_phase_collapse: true
+  forbid_clipping: true
+  forbid_excessive_compression: true
+
+offline_test:
+  input_dir: "offline_test_input"
+  output_dir: "offline_test_output"
+  sample_rate: 48000
+  create_no_change_candidate: true
+  loudness_match_candidates: true
+  safe_render_peak_margin_db: 0.6
+  safe_render_peak_ceiling_dbfs: null
+  save_all_renders: true
+  save_reports: true
