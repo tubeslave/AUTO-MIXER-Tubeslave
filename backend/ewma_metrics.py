@@ -238,8 +238,8 @@ DEFAULT_STEM_ALIASES: Dict[str, Tuple[str, ...]] = {
     "drums": ("drum", "kick", "snare", "tom", "cymbal", "overhead", "room"),
     "bass": ("bass", "sub"),
     "guitars": ("guitar", "gtr"),
-    "keys": ("keys", "keyboard", "piano", "synth", "organ"),
-    "fx": ("fx", "effect", "reverb", "delay", "return"),
+    "keys": ("keys", "keyboard", "piano", "synth", "organ", "accordion"),
+    "fx": ("fx", "effect", "reverb", "delay", "return", "playback", "tracks", "music"),
     "bus": ("bus", "master", "main", "mix"),
 }
 

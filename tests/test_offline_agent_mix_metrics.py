@@ -19,6 +19,150 @@ def load_offline_agent_mix():
     return module
 
 
+class _FakeMuQScore:
+    def __init__(self, score: float, window_sec: float):
+        self.quality_score = score
+        self.confidence = 1.0
+        self.model_status = "fake"
+        self.musical_impression = "fake"
+        self.audio_window_sec = window_sec
+
+
+class _FakeMuQStemService:
+    def __init__(self, mod):
+        real_service = mod.MuQEvalService(
+            {
+                "enabled": False,
+                "window_sec": 1.0,
+                "hop_sec": 1.0,
+                "stem_drift": {
+                    "enabled": True,
+                    "freeze_normal_seconds": 0.1,
+                    "default": {
+                        "tau": 0.001,
+                        "warn_T": 0.02,
+                        "crit_T": 0.04,
+                        "debounce_warn": 0.1,
+                        "debounce_crit": 0.1,
+                    },
+                    "groups": {
+                        "bass": {
+                            "tau": 0.001,
+                            "warn_T": 0.02,
+                            "crit_T": 0.04,
+                            "debounce_warn": 0.1,
+                            "debounce_crit": 0.1,
+                        },
+                        "bus": {
+                            "tau": 0.001,
+                            "warn_T": 0.02,
+                            "crit_T": 0.04,
+                            "debounce_warn": 0.1,
+                            "debounce_crit": 0.1,
+                        },
+                    },
+                },
+            }
+        )
+        self.config = SimpleNamespace(window_sec=1.0, hop_sec=1.0)
+        self.model_status = "fake"
+        self.stem_drift_monitor = real_service.stem_drift_monitor
+
+    def evaluate(self, audio, sr, *, timestamp=None):
+        rms = float(np.sqrt(np.mean(np.square(np.asarray(audio, dtype=np.float32)))))
+        score = 0.90 if rms > 0.05 else 0.72
+        return _FakeMuQScore(score, len(audio) / float(sr))
+
+    def update_stem_score_batch(self, *args, **kwargs):
+        return self.stem_drift_monitor.update_batch(*args, **kwargs)
+
+
+def test_offline_muq_stem_drift_is_disabled_without_service(tmp_path):
+    mod = load_offline_agent_mix()
+
+    report = mod._record_offline_muq_stem_drift(
+        None,
+        {},
+        {},
+        {},
+        np.zeros((32, 2), dtype=np.float32),
+        48_000,
+        target_len=32,
+        report_seed={"enabled": False, "reason": "disabled_by_config"},
+        log_path=tmp_path / "muq.jsonl",
+    )
+
+    assert report["enabled"] is False
+    assert report["reason"] == "disabled_by_config"
+    assert not (tmp_path / "muq.jsonl").exists()
+
+
+def test_offline_muq_stem_drift_records_windowed_crit_and_osc_payload(tmp_path):
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    first = np.full((sr, 2), 0.25, dtype=np.float32)
+    second = np.full((sr, 2), 0.01, dtype=np.float32)
+    rendered = np.vstack([first, second])
+    plan = mod.ChannelPlan(
+        path=Path("Bass.wav"),
+        name="Bass",
+        instrument="bass_guitar",
+        pan=0.0,
+        hpf=35.0,
+        target_rms_db=-21.0,
+        metrics={"peak_db": -12.0, "rms_db": -20.0},
+    )
+    service = _FakeMuQStemService(mod)
+
+    report = mod._record_offline_muq_stem_drift(
+        service,
+        {1: rendered},
+        {},
+        {1: plan},
+        rendered.copy(),
+        sr,
+        target_len=len(rendered),
+        report_seed={"enabled": True, "osc_endpoint": "/autofoh/muq_drift"},
+        log_path=tmp_path / "muq.jsonl",
+    )
+
+    assert report["enabled"] is True
+    assert report["windows"] == 2
+    assert report["final_states"]["bass"] == "CRIT"
+    assert report["frozen_stems"]["bass"]["frozen"] is True
+    assert any(item["endpoint"] == "/autofoh/muq_drift/bass" for item in report["osc_payloads"])
+    assert (tmp_path / "muq.jsonl").exists()
+
+
+def test_offline_muq_stem_audio_merges_fx_channels_and_returns():
+    mod = load_offline_agent_mix()
+    service = _FakeMuQStemService(mod)
+    sr = 48_000
+    rendered = np.full((sr, 2), 0.05, dtype=np.float32)
+    plan = mod.ChannelPlan(
+        path=Path("Playback L.wav"),
+        name="Playback L",
+        instrument="playback",
+        pan=-0.78,
+        hpf=30.0,
+        target_rms_db=-23.0,
+        metrics={"peak_db": -12.0, "rms_db": -20.0},
+    )
+
+    stems, params = mod._build_muq_stem_audio(
+        service,
+        {1: rendered},
+        {"plate": rendered * 0.25},
+        {1: plan},
+        rendered.copy(),
+        len(rendered),
+    )
+
+    assert "fx" in stems
+    assert params["fx"]["channels"][0]["name"] == "Playback L"
+    assert params["fx"]["returns"] == ["plate"]
+
+
 def test_event_based_metrics_raise_tom_rms_above_bleed_only_average():
     mod = load_offline_agent_mix()
     sr = 48_000
