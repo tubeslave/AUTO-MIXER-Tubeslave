@@ -1,0 +1,15 @@
+experiments:
+  - name: baseline_small
+    command:
+      - python
+      - scripts/train.py
+      - --epochs
+      - "3"
+  - name: baseline_longer
+    command:
+      - python
+      - scripts/train.py
+      - --epochs
+      - "5"
+selection_metric: loss
+selection_mode: min

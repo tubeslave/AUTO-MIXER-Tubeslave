@@ -251,7 +251,7 @@ controller.set_profile(preset['name'])
 /ch/{01-32}/eq/1/g      # Gain полосы 1
 /ch/{01-32}/eq/1/f      # Частота полосы 1
 /ch/{01-32}/eq/1/q      # Q полосы 1
-/ch/{01-32}/dyn/thr     # Compressor threshold
+/ch/{01-32}/dyn/thr26   # Compressor threshold
 /ch/{01-32}/mix/fader   # Fader level
 /xremote                 # Подписка на обновления
 ```

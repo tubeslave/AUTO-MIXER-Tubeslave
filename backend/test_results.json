@@ -1,11 +1,11 @@
 {
-  "timestamp": "2026-03-14T18:14:22.275973",
+  "timestamp": "2026-04-13T13:41:01.895714",
   "summary": {
     "total": 66,
     "passed": 64,
-    "failed": 0,
-    "warnings": 2,
-    "success_rate": "100%"
+    "failed": 1,
+    "warnings": 1,
+    "success_rate": "98%"
   },
   "results": [
     {
@@ -284,9 +284,9 @@
       "detail": ""
     },
     {
-      "name": "Wing: find_snap_by_name не найден",
-      "status": "⚠️  WARN",
-      "detail": ""
+      "name": "Wing: find_snap_by_name без GO (C-04 fix)",
+      "status": "❌ FAIL",
+      "detail": "Чтение имён снапшотов без загрузки (read-only query)"
     },
     {
       "name": "Wing: OSC порт 2223 (стандарт Wing)",

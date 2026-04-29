@@ -170,13 +170,30 @@ The standard vocal processing chain order for live sound:
 1. Gate: Threshold -28 dB, attack 0.5 ms, hold 120 ms, release 60 ms, range -40 dB
 2. EQ: HPF 60-80 Hz, boost fundamental (100-200 Hz, +2 dB), cut mud (400 Hz, -3 dB), boost attack (3-5 kHz, +2 dB)
 3. Compressor: 3:1, 15 ms attack, 80 ms release
-4. Pan: Rack toms left-center, floor tom right-center (audience perspective)
+4. Pan: Do not use a fixed rack/floor template until the overhead image is set.
+   Place tom close mics where they are heard in the panned overhead pair.
 
 ### Overheads
 1. No gate (ambient mics)
 2. EQ: HPF 150 Hz (remove low bleed), gentle cut 400 Hz (-2 dB), boost 10 kHz (+2 dB)
 3. Light compression: 2:1, 20 ms attack, 150 ms release
-4. Pan: Hard left and right (L=-0.8, R=+0.8) or spaced
+4. Pan: Set the overhead pair before other drum pan moves. Spread Overhead L/R
+   as wide as possible while keeping kick and snare leakage centered in the
+   stereo output. If kick/snare lean to one side, narrow or offset the pair
+   rather than forcing toms to a static template.
+
+### Overhead-Anchored Drum Panning
+
+1. First pan Overhead L and Overhead R. The acceptance test is that kick drum
+   and snare drum inside the overheads stay as close to center as possible.
+2. Keep kick and snare close mics centered after the overhead pair is set.
+3. Then pan rack tom, floor tom, hi-hat, ride, and other drum spot mics to the
+   same positions where those elements are heard in the panned overhead image.
+4. If the overhead image conflicts with a static audience-perspective template,
+   trust the overhead image. The close mics should reinforce the stereo picture,
+   not create a second drum kit.
+5. When confident measurement is unavailable, make the smallest pan move and
+   flag the decision for human review.
 
 ## Bass Guitar Techniques
 
@@ -236,6 +253,45 @@ most consistent stereo image for large venues:
 - **Quarter Note**: BPM-synced. 120 BPM = 500 ms. 2-3 repeats, -10 dB feedback.
 - **Dotted Eighth**: BPM-synced. 120 BPM = 375 ms. Popular for guitar leads and U2-style.
 - **Stereo Ping-Pong**: Different L/R times for width. Useful on keys and guitar solos.
+
+### Live FX Architecture
+
+Use shared stereo FX returns instead of insert reverbs on individual channels.
+Default live setup:
+
+1. FX1 / Bus 13: Vocal Plate. Decay 1.3-1.8 s, predelay 35-55 ms,
+   HPF 200-250 Hz, LPF 7-9 kHz. Duck the return from lead vocal activity
+   by 1-3 dB so words remain forward. Default return level: -4 dB.
+2. FX2 / Bus 14: Drum Room or Drum Plate. Decay 0.5-0.9 s, predelay 0-15 ms,
+   HPF 160-220 Hz, LPF 4.5-6 kHz. Feed snare and toms; send overheads only
+   very lightly because they already carry room sound. Default return level:
+   -4 dB for an audible but still short live drum space.
+3. FX3 / Bus 15: Tempo Delay. Dotted eighth on one side and quarter note on
+   the other side is the default vocal delay. HPF 250 Hz, LPF 4-6 kHz. Duck
+   3-6 dB from lead vocal so repeats live in phrase gaps. Default return
+   level: -0.5 dB because send levels and ducking keep it behind the dry vocal.
+4. FX4 / Bus 16: Mod Doubler / Chorus. Use subtly on backing vocals, clean
+   guitar, accordion, or keys. Do not use by default on lead vocal, kick, bass,
+   or drums.
+
+All FX sends should normally be post-fader so agent balance moves preserve the
+wet/dry ratio. FX returns must be checked in mono. If an effect reduces vocal
+intelligibility, lower the send or duck the return before changing the dry lead
+vocal balance.
+
+### FX Send Starting Points
+
+| Source         | Vocal Plate | Drum Room | Tempo Delay | Mod Doubler |
+|----------------|-------------|-----------|-------------|-------------|
+| Lead Vocal     | -18 dB      | ---       | -24 dB      | ---         |
+| Backing Vocals | -15 dB      | ---       | ---         | -23 dB      |
+| Snare          | ---         | -17 dB    | ---         | ---         |
+| Toms           | ---         | -19 dB    | ---         | ---         |
+| Overheads      | ---         | -30 dB    | ---         | ---         |
+| Electric Guitar| -25 dB      | ---       | ---         | -26 dB      |
+| Accordion/Keys | -23 dB      | ---       | -29 dB      | optional    |
+| Playback       | -30 dB      | ---       | ---         | ---         |
+| Kick/Bass      | ---         | ---       | ---         | ---         |
 
 ## Live Mixing Best Practices
 

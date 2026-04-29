@@ -1,0 +1,37 @@
+{
+  "id": "Config Test_1776413658",
+  "config": {
+    "name": "Config Test",
+    "venue": "",
+    "genre": "pop_rock",
+    "num_channels": 40,
+    "sample_rate": 48000,
+    "target_lufs": -18.0,
+    "safety_limits": {
+      "max_fader_db": 10.0,
+      "max_gain_change_db": 6.0,
+      "max_eq_cut_db": 15.0,
+      "max_eq_boost_db": 12.0
+    },
+    "automation_enabled": {
+      "gain_staging": true,
+      "auto_eq": false,
+      "auto_fader": false,
+      "auto_compressor": false,
+      "phase_alignment": false,
+      "feedback_detection": true
+    },
+    "custom_params": {}
+  },
+  "created_at": 1776413658.6246982,
+  "updated_at": 1776413658.6246989,
+  "active": true,
+  "events": [
+    {
+      "type": "created",
+      "data": {},
+      "timestamp": 1776413658.6246982
+    }
+  ],
+  "metadata": {}
+}

@@ -136,6 +136,12 @@ class TestMasterFallback:
         result = master._master_fallback(input_audio, ref_audio, 48000)
         assert len(result) == len(input_audio)
 
+    def test_fallback_keeps_full_mix_length_with_short_reference(self, master):
+        input_audio = _make_sine(amplitude=0.3, duration_sec=1.0)
+        ref_audio = _make_sine(amplitude=0.7, freq_hz=880.0, duration_sec=0.25)
+        result = master._master_fallback(input_audio, ref_audio, 48000)
+        assert len(result) == len(input_audio)
+
     def test_fallback_increases_quiet_signal(self, master):
         quiet = _make_sine(amplitude=0.01)
         loud_ref = _make_sine(amplitude=0.8, freq_hz=880.0)
@@ -165,6 +171,35 @@ class TestMasterFallback:
         peak_limit = 10.0 ** (master.true_peak_limit / 20.0)
         assert np.max(np.abs(result)) <= peak_limit + 0.01
 
+    def test_fallback_restores_level_after_eq_match_attenuation(self, master, monkeypatch):
+        """A heavy EQ-match attenuation should still be followed by loudness recovery."""
+        input_audio = _make_sine(amplitude=0.3)
+        ref_audio = _make_sine(amplitude=0.8, freq_hz=880.0)
+
+        monkeypatch.setattr(
+            master,
+            "_apply_eq_match",
+            lambda audio, reference, sample_rate: (audio * 0.03).astype(np.float32),
+        )
+
+        result = master._master_fallback(input_audio, ref_audio, 48000)
+
+        attenuated = (input_audio * 0.03).astype(np.float32)
+        assert AutoMaster._estimate_lufs(result) > AutoMaster._estimate_lufs(attenuated) + 8.0
+
+    def test_fallback_uses_master_target_lufs_instead_of_reference_loudness(self):
+        master = AutoMaster(target_lufs=-18.0, true_peak_limit=-1.0, sample_rate=48000)
+        input_audio = _make_sine(amplitude=0.08)
+        ref_audio = _make_sine(amplitude=0.95, freq_hz=880.0)
+
+        result = master._master_fallback(input_audio, ref_audio, 48000)
+
+        result_lufs = AutoMaster._estimate_lufs(result)
+        reference_lufs = AutoMaster._estimate_lufs(ref_audio)
+
+        assert abs(result_lufs - master.target_lufs) < 3.0
+        assert abs(result_lufs - master.target_lufs) < abs(result_lufs - reference_lufs)
+
 
 # ---------------------------------------------------------------------------
 # _apply_eq_match tests
@@ -173,11 +208,11 @@ class TestMasterFallback:
 class TestApplyEQMatch:
 
     def test_eq_match_returns_same_length(self, master):
-        audio = _make_sine(amplitude=0.5).astype(np.float64)
-        ref = _make_sine(amplitude=0.5, freq_hz=880.0).astype(np.float64)
+        audio = _make_sine(amplitude=0.5, duration_sec=1.0).astype(np.float64)
+        ref = _make_sine(amplitude=0.5, freq_hz=880.0, duration_sec=0.25).astype(np.float64)
         result = master._apply_eq_match(audio, ref, 48000)
-        # Result length should be at most the minimum of input lengths
-        assert len(result) <= max(len(audio), len(ref))
+        assert len(result) == len(audio)
+        assert np.all(np.isfinite(result))
 
     def test_eq_match_without_scipy(self, master):
         """Without scipy, _apply_eq_match should return audio unchanged."""
@@ -207,6 +242,38 @@ class TestMasterPipeline:
         ref_audio = _make_sine(amplitude=0.7, freq_hz=880.0, duration_sec=1.0)
         result = master.master(input_audio, ref_audio, 48000)
         assert isinstance(result, np.ndarray)
+
+    def test_master_reference_prefers_matchering_branch_when_available(self, master, monkeypatch):
+        input_audio = _make_sine(amplitude=0.2)
+        ref_audio = _make_sine(amplitude=0.6, freq_hz=660.0)
+        expected = np.full_like(input_audio, 0.123, dtype=np.float32)
+
+        monkeypatch.setattr(master, "_matchering_available", True)
+
+        def fake_master_with_reference(audio, reference):
+            return type("Result", (), {
+                "audio": expected,
+                "success": True,
+            })()
+
+        monkeypatch.setattr(master, "_master_with_reference", fake_master_with_reference)
+        monkeypatch.setattr(master, "_master_fallback", lambda *args, **kwargs: np.zeros_like(input_audio))
+
+        result = master.master(input_audio, ref_audio, 48000)
+
+        assert isinstance(result, np.ndarray)
+        np.testing.assert_allclose(result, expected)
+
+    def test_master_reference_fallback_handles_stereo_mix(self, master):
+        mono = _make_sine(amplitude=0.3)
+        input_audio = np.column_stack([mono, mono * 0.8]).astype(np.float32)
+        ref_audio = np.column_stack([mono * 0.4, mono * 0.2]).astype(np.float32)
+
+        result = master.master(input_audio, ref_audio, 48000)
+
+        assert isinstance(result, np.ndarray)
+        assert result.shape == input_audio.shape
+        assert result.dtype == np.float32
 
 
 # ---------------------------------------------------------------------------

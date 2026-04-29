@@ -1,124 +1,12 @@
-class WebSocketService {
-  constructor() {
-    this.ws = null;
-    this.url = 'ws://localhost:8765';
-    this.listeners = new Map();
-    this.reconnectInterval = 3000;
-    this.reconnectTimer = null;
+import { BaseWebSocketTransport } from './websocketCore.mjs';
+
+class WebSocketService extends BaseWebSocketTransport {
+  setServerUrl(url) {
+    this.setUrl(url);
   }
 
-  connect() {
-    return new Promise((resolve, reject) => {
-      try {
-        this.ws = new WebSocket(this.url);
-
-        this.ws.onopen = () => {
-          console.log('WebSocket connected');
-          if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-          }
-          resolve();
-        };
-
-        this.ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-console.log('WebSocket message received:', data.type, data);
-this.notifyListeners(data.type, data);
-          } catch (error) {
-console.error('Error parsing message:', error);
-          }
-        };
-
-        this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          reject(error);
-        };
-
-        this.ws.onclose = () => {
-          console.log('WebSocket disconnected');
-          this.notifyListeners('disconnected', {});
-          this.scheduleReconnect();
-        };
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  scheduleReconnect() {
-    if (!this.reconnectTimer) {
-      this.reconnectTimer = setTimeout(() => {
-        console.log('Attempting to reconnect...');
-        this.connect().catch(err => console.error('Reconnect failed:', err));
-      }, this.reconnectInterval);
-    }
-  }
-
-  disconnect() {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-  }
-
-  send(message) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('Sending WebSocket message:', message);
-      try {
-        const jsonMessage = JSON.stringify(message);
-        console.log('Sending JSON string:', jsonMessage);
-this.ws.send(jsonMessage);
-} catch (error) {
-console.error('Error sending WebSocket message:', error);
-      }
-    } else {
-      const state = this.ws ? this.ws.readyState : 'null';
-console.error('WebSocket is not connected. ReadyState:', state);
-      console.error('WebSocket object:', this.ws);
-      console.error('Message that failed to send:', message);
-      if (state === 0) {
-        console.warn('WebSocket is still connecting...');
-      } else if (state === 2 || state === 3) {
-        console.warn('WebSocket is closed. Attempting to reconnect...');
-        this.connect().catch(err => console.error('Reconnect failed:', err));
-      }
-    }
-  }
-
-  on(eventType, callback) {
-    if (!this.listeners.has(eventType)) {
-      this.listeners.set(eventType, []);
-    }
-    this.listeners.get(eventType).push(callback);
-  }
-
-  off(eventType, callback) {
-    if (this.listeners.has(eventType)) {
-      const callbacks = this.listeners.get(eventType);
-      const index = callbacks.indexOf(callback);
-      if (index > -1) {
-        callbacks.splice(index, 1);
-      }
-    }
-  }
-
-  notifyListeners(eventType, data) {
-if (this.listeners.has(eventType)) {
-      this.listeners.get(eventType).forEach(callback => {
-        try {
-callback(data);
-        } catch (error) {
-console.error(`Error in listener for ${eventType}:`, error);
-        }
-      });
-    } else {
-}
+  getServerUrl() {
+    return this.getUrl();
   }
 
   // Wing direct connection
@@ -163,6 +51,24 @@ console.error(`Error in listener for ${eventType}:`, error);
   disconnectMixer() {
     this.send({
       type: 'disconnect_mixer'
+    });
+  }
+
+  // Scan network for supported mixers (WING + dLive)
+  scanMixers(fullScan = false, subnet = null) {
+    this.send({
+      type: 'scan_mixers',
+      full_scan: fullScan,
+      subnet
+    });
+  }
+
+  autoConnectMixer(preferredType = null, preferredIp = null, fullScan = false) {
+    this.send({
+      type: 'auto_connect',
+      preferred_type: preferredType,
+      preferred_ip: preferredIp,
+      full_scan: fullScan
     });
   }
 
@@ -308,6 +214,82 @@ console.error(`Error in listener for ${eventType}:`, error);
     });
   }
 
+  // AI Mixing Agent commands
+  startAgent(mode = 'auto', channels = [], useLlm = true, allowAutoApply = true, forceAutoApply = false) {
+    this.send({
+      type: 'start_agent',
+      mode,
+      channels,
+      use_llm: useLlm,
+      allow_auto_apply: allowAutoApply,
+      force_auto_apply: forceAutoApply
+    });
+  }
+
+  stopAgent() {
+    this.send({ type: 'stop_agent' });
+  }
+
+  emergencyStopAgent() {
+    this.send({ type: 'emergency_stop_agent' });
+  }
+
+  getAgentStatus() {
+    this.send({ type: 'get_agent_status' });
+  }
+
+  setAgentMode(mode = 'auto', channels = [], useLlm = true, allowAutoApply = true, start = false, forceAutoApply = false) {
+    this.send({
+      type: 'set_agent_mode',
+      mode,
+      channels,
+      use_llm: useLlm,
+      allow_auto_apply: allowAutoApply,
+      start,
+      force_auto_apply: forceAutoApply
+    });
+  }
+
+  updateAgentState(channels = [], forceAutoApply = false) {
+    this.send({
+      type: 'update_agent_state',
+      channels,
+      force_auto_apply: forceAutoApply
+    });
+  }
+
+  getPendingActions() {
+    this.send({ type: 'get_pending_actions' });
+  }
+
+  approveAction(index) {
+    this.send({ type: 'approve_action', index });
+  }
+
+  approveAllActions() {
+    this.send({ type: 'approve_all_actions' });
+  }
+
+  dismissAction(index) {
+    this.send({ type: 'dismiss_action', index });
+  }
+
+  dismissAllActions() {
+    this.send({ type: 'dismiss_all_actions' });
+  }
+
+  getActionHistory(limit = 50) {
+    this.send({ type: 'get_action_history', limit });
+  }
+
+  getAudioCaptureStatus() {
+    this.send({ type: 'get_audio_capture_status' });
+  }
+
+  getChannelMeters() {
+    this.send({ type: 'get_channel_meters' });
+  }
+
   // Real-time Peak Correction commands (only remaining gain staging functionality)
 
   startRealtimeCorrection(deviceId = null, channels = [], channelSettings = {}, channelMapping = {}, options = {}) {
@@ -354,6 +336,35 @@ console.error(`Error in listener for ${eventType}:`, error);
     this.send({
       type: 'scan_channel_names',
       channels: channels
+    });
+  }
+
+  scanAudioDevices() {
+    this.send({
+      type: 'scan_audio_devices'
+    });
+  }
+
+  selectAudioDevice(preferredName = null, preferredProtocol = null, minChannels = 2) {
+    this.send({
+      type: 'select_audio_device',
+      preferred_name: preferredName,
+      preferred_protocol: preferredProtocol,
+      min_channels: minChannels
+    });
+  }
+
+  createSnapshot(channels = []) {
+    this.send({
+      type: 'create_snapshot',
+      channels
+    });
+  }
+
+  restoreSnapshot(snapshotPath = null) {
+    this.send({
+      type: 'undo_restore_snapshot',
+      snapshot_path: snapshotPath
     });
   }
 
@@ -521,6 +532,53 @@ console.error(`Error in listener for ${eventType}:`, error);
     });
   }
 
+  // ========== System Measurement / Master EQ ==========
+
+  startSystemMeasurement(
+    deviceId,
+    referenceChannel,
+    measurementChannel,
+    durationSec = 6,
+    targetBus = 'master',
+    targetId = 1,
+    correctionMode = 'flat',
+    referenceCurve = 'pink_noise_live_pa'
+  ) {
+    this.send({
+      type: 'start_system_measurement',
+      device_id: deviceId,
+      reference_channel: referenceChannel,
+      measurement_channel: measurementChannel,
+      duration_sec: durationSec,
+      target_bus: targetBus,
+      target_id: targetId,
+      correction_mode: correctionMode,
+      reference_curve: referenceCurve,
+    });
+  }
+
+  applySystemMeasurement(targetBus = 'master', targetId = 1) {
+    this.send({
+      type: 'apply_system_measurement',
+      target_bus: targetBus,
+      target_id: targetId,
+    });
+  }
+
+  resetSystemMeasurement(targetBus = 'master', targetId = 1) {
+    this.send({
+      type: 'reset_system_measurement',
+      target_bus: targetBus,
+      target_id: targetId,
+    });
+  }
+
+  getSystemMeasurementStatus() {
+    this.send({
+      type: 'get_system_measurement_status',
+    });
+  }
+
   // ========== Auto Fader Commands ==========
 
   // Start Real-Time Fader mode
@@ -639,15 +697,16 @@ console.error(`Error in listener for ${eventType}:`, error);
 
   // ========== Auto Soundcheck Commands ==========
 
-  startAutoSoundcheck(deviceId, channels, channelSettings, channelMapping, timings) {
-    console.log('startAutoSoundcheck called with:', { deviceId, channels, timings });
+  startAutoSoundcheck(deviceId, channels, channelSettings, channelMapping, timings, observeOnly = false) {
+    console.log('startAutoSoundcheck called with:', { deviceId, channels, timings, observeOnly });
     this.send({
       type: 'start_auto_soundcheck',
       device_id: deviceId,
       channels: channels,
       channel_settings: channelSettings,
       channel_mapping: channelMapping,
-      timings: timings
+      timings: timings,
+      observe_only: observeOnly
     });
   }
 
@@ -715,120 +774,8 @@ console.error(`Error in listener for ${eventType}:`, error);
     });
   }
 
-  // ========== Auto Panner ==========
-  startAutoPanner(deviceId, channels, instrumentTypes, spectralCentroids, genre = 'rock') {
-    this.send({
-      type: 'start_auto_panner',
-      device_id: deviceId,
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids,
-      genre: genre
-    });
-  }
-  stopAutoPanner() {
-    this.send({ type: 'stop_auto_panner' });
-  }
-  getAutoPannerStatus() {
-    this.send({ type: 'get_auto_panner_status' });
-  }
-  calculateAutoPanning(channels, instrumentTypes, spectralCentroids) {
-    this.send({
-      type: 'calculate_auto_panning',
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids
-    });
-  }
-  applyAutoPanning() {
-    this.send({ type: 'apply_auto_panning' });
-  }
-
-  // ========== Auto Reverb ==========
-  startAutoReverb(deviceId, channels, instrumentTypes, spectralCentroids, spectralFluxes) {
-    this.send({
-      type: 'start_auto_reverb',
-      device_id: deviceId,
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids,
-      spectral_fluxes: spectralFluxes
-    });
-  }
-  stopAutoReverb() {
-    this.send({ type: 'stop_auto_reverb' });
-  }
-  getAutoReverbStatus() {
-    this.send({ type: 'get_auto_reverb_status' });
-  }
-  calculateAutoReverb(channels, instrumentTypes, spectralCentroids, spectralFluxes) {
-    this.send({
-      type: 'calculate_auto_reverb',
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids,
-      spectral_fluxes: spectralFluxes
-    });
-  }
-  applyAutoReverb() {
-    this.send({ type: 'apply_auto_reverb' });
-  }
-
-  // ========== Auto Gate ==========
-  startAutoGate(deviceId, channels, channelConfigs, settings) {
-    this.send({
-      type: 'start_auto_gate',
-      device_id: deviceId,
-      channels: channels,
-      channel_configs: channelConfigs,
-      settings: settings
-    });
-  }
-  stopAutoGate() {
-    this.send({ type: 'stop_auto_gate' });
-  }
-  getAutoGateStatus() {
-    this.send({ type: 'get_auto_gate_status' });
-  }
-  configureGateChannel(channelId, config) {
-    this.send({
-      type: 'configure_gate_channel',
-      channel_id: channelId,
-      config: config
-    });
-  }
-
-  // ========== Auto Effects ==========
-  startAutoEffects(deviceId, channels, settings) {
-    this.send({
-      type: 'start_auto_effects',
-      device_id: deviceId,
-      channels: channels,
-      settings: settings
-    });
-  }
-  stopAutoEffects() {
-    this.send({ type: 'stop_auto_effects' });
-  }
-  getAutoEffectsStatus() {
-    this.send({ type: 'get_auto_effects_status' });
-  }
-
-  // ========== Cross-Adaptive EQ ==========
-  startCrossAdaptiveEQ(deviceId, channels, settings) {
-    this.send({
-      type: 'start_cross_adaptive_eq',
-      device_id: deviceId,
-      channels: channels,
-      settings: settings
-    });
-  }
-  stopCrossAdaptiveEQ() {
-    this.send({ type: 'stop_cross_adaptive_eq' });
-  }
-  getCrossAdaptiveEQStatus() {
-    this.send({ type: 'get_cross_adaptive_eq_status' });
-  }
 }
 
-export default new WebSocketService();
+const websocketService = new WebSocketService();
+
+export default websocketService;

@@ -1,81 +1,351 @@
-# AUTO-MIXER-Tubeslave Configuration
-# Target setup: Allen & Heath dLive + Waves SoundGrid on macOS (M3 Max)
-
 mixer:
-  type: "dlive"
-  ip: "192.168.3.70"
-  port: 51328
-  protocol: "midi_tcp"
+  type: wing
+  ip: 192.168.1.102
+  port: 2223
+  send_port: 2222
+  receive_port: 2223
+  protocol: osc
   tls: false
   midi_base_channel: 0
   keepalive_interval: 5.0
   command_rate_limit: 10.0
   connection_timeout: 10.0
-
 audio:
   sample_rate: 48000
   block_size: 1024
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
   channels: 64
-  source: "soundgrid"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
-  device_name: ""
-=======
-  channels: 48
-  source: "soundgrid"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
-  device_name: "soundgrid"  # pattern to match (e.g. "Waves SoundGrid", "soundgrid")
->>>>>>> Incoming (Background Agent changes)
-=======
-  channels: 48
-  source: "soundgrid"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
-  device_name: "soundgrid"  # pattern to match (e.g. "Waves SoundGrid", "soundgrid")
->>>>>>> Incoming (Background Agent changes)
+  source: sounddevice
+  device_name: ''
   buffer_seconds: 5.0
-
 websocket:
-  host: "0.0.0.0"
+  host: 0.0.0.0
   port: 8765
   max_clients: 10
-
 agent:
   enabled: true
-  mode: "auto"  # auto = apply without confirmation; suggest, manual
+  mode: auto
   cycle_interval: 0.5
   confidence_threshold: 0.6
   max_actions_per_cycle: 5
-
 ai:
-  llm_backend: "ollama"  # ollama, perplexity
-  llm_model: "llama3"
-  ollama_url: "http://localhost:11434"
-  perplexity_api_key: ""
-  knowledge_dir: ""
-
+  llm_backend: auto
+  llm_model: gpt-5.4
+  kimi_cli_path: ''
+  kimi_work_dir: ''
+  kimi_timeout_sec: 120
+  model_fallbacks:
+  - openai:gpt-5.4
+  - kimi_cli:default
+  - openai:gpt-4o-mini
+  openai_api_key: ''
+  openai_url: https://api.openai.com/v1/responses
+  openai_reasoning_effort: low
+  ollama_url: http://localhost:11434
+  perplexity_api_key: ''
+  knowledge_dir: ''
 safety:
   feedback_detection: true
   max_gain_db: 12.0
   true_peak_limit: -1.0
   max_notch_filters: 8
   max_notch_depth_db: -12.0
-
+autofoh:
+  classifier:
+    name_overrides:
+    - pattern: ^katya$
+      source_role: lead_vocal
+      confidence: 0.96
+    - pattern: ^sergey$
+      source_role: lead_vocal
+      confidence: 0.96
+    - pattern: ^slava$
+      source_role: lead_vocal
+      confidence: 0.96
+    role_overrides:
+      lead_vocal:
+        priority: 1.0
+      unknown:
+        allowed_controls:
+        - feedback_notch
+        - emergency_fader
+  analysis:
+    fft_size: 4096
+    octave_fraction: 3
+    slope_compensation_db_per_octave: 4.5
+  detectors:
+    monitor_cycle_interval_sec: 1.0
+    lead_masking:
+      enabled: true
+      masking_threshold_db: 3.0
+      persistence_cycles: 3
+      min_culprit_contribution: 0.35
+      lead_boost_db: 0.5
+    mud_excess:
+      enabled: true
+      threshold_db: 2.5
+      persistence_cycles: 3
+      hysteresis_db: 0.75
+    harshness_excess:
+      enabled: true
+      threshold_db: 2.5
+      persistence_cycles: 3
+      hysteresis_db: 0.75
+    sibilance_excess:
+      enabled: true
+      threshold_db: 2.5
+      persistence_cycles: 3
+      hysteresis_db: 0.75
+    low_end:
+      enabled: true
+      sub_threshold_db: 4.0
+      bass_threshold_db: 3.0
+      body_threshold_db: 2.5
+      persistence_cycles: 3
+      hysteresis_db: 0.75
+      min_culprit_contribution: 0.35
+  evaluation:
+    enabled: true
+    evaluation_window_sec: 2.0
+    allow_proxy_audio_evaluation_for_testing: false
+    allow_proxy_audio_rollback_for_testing: false
+    min_band_improvement_db: 0.25
+    min_rms_response_db: 0.1
+    worsening_tolerance_db: 0.5
+  logging:
+    enabled: false
+    path: ''
+    queue_maxsize: 1024
+    write_session_report_on_stop: true
+    report_path: ''
+  soundcheck_profile:
+    enabled: true
+    auto_save_after_analysis: true
+    auto_load_on_start: true
+    capture_multiphase_learning: true
+    silence_capture_duration_sec: 0.75
+    path: ''
+    use_loaded_target_corridor: true
+    use_phase_target_action_guards: true
+    replace_live_target_with_learned_corridor: true
+  safety:
+    minimum_auto_apply_classification_confidence: 0.75
+    new_or_unknown_channel_auto_corrections_enabled: false
+    preserve_existing_processing: true
+    allow_destructive_reset: false
+    allow_input_trim_boost: false
+    auto_gate_close_mics: true
+    auto_fx_sends_enabled: false
+    close_mic_fx_sends_enabled: false
+    monitor_bus_ids: [13, 14, 15, 16]
+    effect_bus_ids: [9, 10]
+    group_bus_correction_enabled: true
+    master_reference_channels: [23, 24]
+    compressor_gr_max_db: 8.0
+    compressor_gr_target_db: 4.0
+    compressor_makeup_compensation_ratio: 0.7
+    compressor_makeup_max_step_db: 2.0
+    compressor_makeup_max_db: 9.0
+    compressor_makeup_true_peak_ceiling_db: -3.0
+    action_limits:
+      channel_fader_max_step_db: 1.0
+      channel_fader_min_interval_sec: 3.0
+      bus_fader_max_step_db: 1.0
+      bus_fader_min_interval_sec: 3.0
+      dca_fader_max_step_db: 1.0
+      dca_fader_min_interval_sec: 3.0
+      lead_fader_max_step_db: 0.5
+      lead_fader_min_interval_sec: 2.0
+      gain_max_abs_db: 12.0
+      gain_min_interval_sec: 3.0
+      broad_eq_max_step_db: 1.0
+      broad_eq_max_total_db_from_snapshot: 3.0
+      broad_eq_min_interval_sec: 5.0
+      feedback_notch_max_cut_db: -6.0
+      feedback_notch_min_q: 8.0
+      feedback_notch_ttl_sec: 120.0
+      master_fader_max_cut_db: 1.0
+      master_fader_min_interval_sec: 1.0
+      delay_max_step_ms: 0.25
+      delay_max_ms: 10.0
+      delay_min_interval_sec: 3.0
+      polarity_min_interval_sec: 3.0
+  shared_chat_mix:
+    enabled: true
+    analysis_window_sec: 8.0
+    max_actions_per_pass: 8
+    master_peak_ceiling_db: -3.0
+    master_max_cut_db: 1.0
+    correct_master_output: true
+    mirror_eq_enabled: true
+    mirror_eq_max_actions_per_pass: 6
+    mirror_eq_overlap_tolerance_db: 6.0
+    mirror_eq_relative_floor_db: 24.0
+    mirror_eq_max_cut_db: -3.0
+    mirror_eq_max_boost_db: 1.5
+    apply_routing_fixes: false
+    rename_generic_channels: false
+perceptual:
+  enabled: true
+  mode: shadow
+  backend: mert
+  model_name: m-a-p/MERT-v1-95M
+  sample_rate: 24000
+  window_seconds: 5
+  hop_seconds: 2
+  evaluate_channels: true
+  evaluate_mix_bus: true
+  max_cpu_percent: 25
+  log_scores: true
+  block_osc_when_score_worse: false
+  log_path: ~/Desktop/Ai LOGS/perceptual_decisions.jsonl
+  queue_maxsize: 128
+  async_evaluation: true
+  improvement_threshold: 0.03
+  local_files_only: false
+  fallback_to_lightweight: false
+  device: auto
+muq_eval:
+  enabled: true
+  device: auto
+  window_sec: 10
+  hop_sec: 5
+  sample_rate: 24000
+  min_improvement_threshold: 0.03
+  rollback_on_quality_drop: true
+  fallback_enabled: true
+  log_scores: true
+  shadow_mode: true
+  log_path: ~/Desktop/Ai LOGS/muq_eval_decisions.jsonl
+  training_log_path: ~/Desktop/Ai LOGS/muq_eval_rewards.jsonl
+  model_repo_id: zhudi2825/MuQ-Eval-A1
+  local_files_only: true
+  max_gain_change_db_per_step: 1.0
+  max_eq_gain_change_db_per_step: 1.0
+  max_compressor_threshold_change_db_per_step: 2.0
+  min_seconds_between_quality_decisions: 5.0
+source_knowledge:
+  enabled: false
+  mode: shadow
+  sources_path: backend/source_knowledge/data/sources.yaml
+  rules_path: backend/source_knowledge/data/rules.jsonl
+  log_path: ~/Desktop/Ai LOGS/source_grounded_decisions.jsonl
+  queue_maxsize: 256
+  min_rule_confidence: 0.55
+  allow_unsourced_rules: false
+  log_retrievals: true
+  log_feedback: true
+  default_limit: 8
 logging:
-  level: "INFO"
+  level: INFO
   json_output: false
-  log_file: ""
-
+  log_file: ''
 metrics:
   enabled: false
   prometheus_port: 9090
-
 session:
   auto_save: true
   save_interval: 300
-  session_dir: "sessions"
-
-# Auto Soundcheck Engine settings
+  session_dir: sessions
 soundcheck:
   auto_apply: true
   signal_threshold_db: -50.0
   analysis_seconds: 3.0
   analysis_timeout_seconds: 30.0
   gain_correction_max_db: 12.0
+training:
+  enabled: false
+  safe_autostart: false
+  interval_minutes: 360
+  manifest_url: ''
+  request_timeout_sec: 30
+  max_retries: 2
+  max_dataset_bytes: 21474836480
+  study:
+    enabled: false
+    max_resources_per_run: 0
+    max_resources_per_type: 0
+    max_resource_bytes: 0
+    timeout_sec: 30
+    max_retries: 1
+    output_dir: backend/ai/knowledge
+    source_types:
+    - books
+    - articles
+    - videos
+    allowed_domains:
+    - arxiv.org
+    - openlibrary.org
+    - archive.org
+    - wikipedia.org
+    - ieee.org
+    - acm.org
+    - mdpi.com
+    - nature.com
+    queries:
+      books:
+      - audio engineering handbook
+      - mixing and mastering reference
+      articles:
+      - audio mixing study
+      - digital signal processing music
+      videos:
+      - audio mixing tutorial
+    resource_urls: []
+    feeds: []
+  cleanup_downloads: true
+  discovery:
+    enabled: true
+    max_candidates_per_target: 3
+    hf_search_limit: 8
+    candidate_urls: []
+    queries:
+      channel_classifier:
+      - audio instrument classification dataset jsonl
+      - music spectral features instrument
+      - audio events melspectrogram classification
+      gain_pan_predictor:
+      - multichannel audio gains pans dataset npz
+      - music mix parameters gain pan npz
+      - source separation gain pan metadata
+      mix_console:
+      - multitrack music stems dataset
+      - audio multitrack reference mix dataset
+      - music source separation multitracks
+  artifacts_dir: models
+  dataset_dir: models/training_datasets
+  state_file: models/training_state.json
+  targets:
+    channel_classifier:
+      enabled: false
+      output_path: models/channel_classifier.pt
+      n_epochs: 20
+      batch_size: 32
+      lr: 0.001
+      n_samples_per_class: 100
+      n_mels: 64
+      n_frames: 64
+      n_channels: 8
+      device: cpu
+      train_without_dataset: false
+    gain_pan_predictor:
+      enabled: false
+      output_path: models/gain_pan_predictor.pt
+      n_epochs: 30
+      batch_size: 16
+      lr: 0.001
+      n_channels: 8
+      n_samples: 500
+      n_audio_len: 8192
+      device: cpu
+      train_without_dataset: false
+    mix_console:
+      enabled: false
+      output_path: models/mix_console.pt
+      n_epochs: 30
+      lr: 0.01
+      n_channels: 8
+      audio_len: 16384
+      n_samples: 200
+      sample_rate: 48000
+      device: cpu
+      train_without_dataset: false

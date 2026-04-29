@@ -17,6 +17,7 @@ from auto_gate_caig import (
     GateSettings,
     FeatureExtractor,
     AdaptiveThreshold,
+    live_gate_settings_for_instrument,
 )
 
 
@@ -43,10 +44,30 @@ class TestGateThreshold:
         gs = GateSettings()
         assert gs.threshold_db == -60.0
         assert gs.attack_ms == 0.5
-        assert gs.release_ms == 80.0
-        assert gs.hold_ms == 10.0
+        assert gs.release_ms == 120.0
+        assert gs.hold_ms == 100.0
         assert gs.range_db == -80.0
         assert gs.hysteresis_db == 3.0
+
+    def test_live_gate_settings_for_drums(self):
+        """Drum presets should preserve transients and avoid chatter."""
+        gs = live_gate_settings_for_instrument(
+            "snare",
+            nearest_source_db=-42.0,
+            noise_floor_db=-70.0,
+        )
+        assert 0.01 <= gs.attack_ms <= 0.1
+        assert 100.0 <= gs.hold_ms <= 300.0
+        assert 100.0 <= gs.release_ms <= 300.0
+        assert gs.threshold_db == -36.0
+
+    def test_live_gate_settings_for_sustained_sources(self):
+        """Non-drum presets should sit below the target peak."""
+        gs = live_gate_settings_for_instrument("vocal", target_peak_db=-18.0)
+        assert 0.1 <= gs.attack_ms <= 1.0
+        assert 50.0 <= gs.hold_ms <= 200.0
+        assert 50.0 <= gs.release_ms <= 200.0
+        assert gs.threshold_db == -24.0
 
     def test_gate_state_enum(self):
         """GateState enum should have the expected members."""

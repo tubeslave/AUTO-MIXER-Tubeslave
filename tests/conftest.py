@@ -8,6 +8,30 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 
+@pytest.fixture(autouse=True)
+def isolate_automixer_env():
+    """Keep AUTOMIXER_* overrides from leaking between tests."""
+    keys = [
+        'AUTOMIXER_MIXER_IP',
+        'AUTOMIXER_MIXER_PORT',
+        'AUTOMIXER_WS_PORT',
+        'AUTOMIXER_MODEL_FALLBACKS',
+    ]
+    original = {key: os.environ.get(key) for key in keys}
+
+    for key in keys:
+        os.environ.pop(key, None)
+
+    try:
+        yield
+    finally:
+        for key, value in original.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
 @pytest.fixture
 def sample_rate():
     return 48000

@@ -2,18 +2,63 @@
 Training script for the differentiable mixing console.
 Uses multi-resolution STFT loss to optimize mix parameters against reference mixes.
 """
+import json
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import logging
 import os
-from typing import Optional, List
+from typing import List, Optional, Tuple
 
 from .differentiable_console import DifferentiableMixingConsole
 from .losses import MultiResolutionSTFTLoss, LoudnessLoss, MixConsistencyLoss
 
 logger = logging.getLogger(__name__)
+
+
+def _load_dataset_from_file(path: str, n_channels: int) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    path = os.path.abspath(path)
+    _, ext = os.path.splitext(path.lower())
+    if ext == ".npz":
+        with np.load(path, allow_pickle=True) as raw:
+            if "multitracks" not in raw.files:
+                raise ValueError("NPZ must include 'multitracks'")
+            if "references" not in raw.files:
+                raise ValueError("NPZ must include 'references'")
+            multitracks = raw["multitracks"].tolist()
+            references = raw["references"].tolist()
+    elif ext == ".jsonl":
+        multitracks = []
+        references = []
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                row = json.loads(line)
+                multitracks.append(row.get("multitracks") or row.get("channels"))
+                references.append(row.get("references") or row.get("reference"))
+    else:
+        raise ValueError(f"Unsupported dataset format: {ext}")
+
+    if len(multitracks) != len(references):
+        raise ValueError("multitracks/references length mismatch")
+    if not multitracks:
+        raise ValueError(f"External dataset is empty: {path}")
+
+    parsed_multitracks: List[np.ndarray] = []
+    parsed_references: List[np.ndarray] = []
+    for tracks, ref in zip(multitracks, references):
+        tracks_np = np.asarray(tracks, dtype=np.float32)
+        if tracks_np.ndim != 2:
+            tracks_np = np.asarray(tracks_np).reshape(1, -1)
+        if tracks_np.shape[0] < n_channels:
+            pad = np.zeros((n_channels - tracks_np.shape[0], tracks_np.shape[1]), dtype=np.float32)
+            tracks_np = np.vstack([tracks_np, pad])
+        tracks_np = tracks_np[:n_channels]
+        ref_np = np.asarray(ref, dtype=np.float32).reshape(-1).astype(np.float32)
+        parsed_multitracks.append(tracks_np)
+        parsed_references.append(ref_np)
+
+    return parsed_multitracks, parsed_references
 
 
 def generate_synthetic_multitracks(n_samples: int, n_channels: int,
@@ -78,6 +123,7 @@ def train_mix_console(
     audio_len: int = 16384,
     n_samples: int = 200,
     sample_rate: int = 48000,
+    dataset_path: Optional[str] = None,
     device: Optional[str] = None,
 ):
     """Train the differentiable mixing console parameters against reference mixes."""
@@ -86,11 +132,15 @@ def train_mix_console(
     device = torch.device(device)
     logger.info(f"Training differentiable mixing console on {device}")
 
-    # Generate training data
-    logger.info("Generating synthetic multitrack data...")
-    multitracks, references = generate_synthetic_multitracks(
-        n_samples, n_channels, audio_len, sample_rate,
-    )
+    if dataset_path:
+        logger.info("Loading external multitracks from %s", dataset_path)
+        multitracks, references = _load_dataset_from_file(dataset_path, n_channels)
+        n_samples = len(multitracks)
+    else:
+        logger.info("Generating synthetic multitrack data...")
+        multitracks, references = generate_synthetic_multitracks(
+            n_samples, n_channels, audio_len, sample_rate,
+        )
 
     # Split into train/val
     split = int(0.8 * n_samples)

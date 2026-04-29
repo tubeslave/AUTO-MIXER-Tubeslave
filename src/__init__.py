@@ -1,0 +1,1 @@
+"""Standalone agent template package."""

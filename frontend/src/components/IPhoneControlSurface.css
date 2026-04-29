@@ -1,0 +1,492 @@
+.iphone-remote-shell {
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100vh;
+  background: #0e1012;
+  color: #eef3f5;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  overflow-x: hidden;
+}
+
+.iphone-remote-top {
+  padding: 16px 16px 12px;
+  background: #101316;
+  border-bottom: 1px solid #242b32;
+  flex-shrink: 0;
+}
+
+.iphone-title-row,
+.iphone-card-head,
+.iphone-section-title,
+.iphone-correction,
+.iphone-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.iphone-title-row > div:first-child,
+.iphone-card-head > span,
+.iphone-section-title > span,
+.iphone-correction > div {
+  min-width: 0;
+}
+
+.iphone-title-row h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.iphone-title-row p {
+  margin: 3px 0 0;
+  color: #93a0a8;
+  font-size: 12px;
+}
+
+.iphone-status {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid #2d353d;
+  border-radius: 8px;
+  background: #151a1f;
+  color: #b9c4ca;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.iphone-status span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff615a;
+}
+
+.iphone-status.ok span {
+  background: #55c77a;
+  box-shadow: 0 0 10px rgba(85, 199, 122, 0.35);
+}
+
+.iphone-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 4px;
+  border: 1px solid #2d353d;
+  border-radius: 8px;
+  background: #0d1012;
+}
+
+.iphone-mode-switch button,
+.iphone-bottom-nav button,
+.iphone-command-pad button,
+.iphone-inline-actions button,
+.iphone-section-title button,
+.iphone-field-row button {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #93a0a8;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.iphone-mode-switch button {
+  min-height: 40px;
+  font-size: 13px;
+}
+
+.iphone-mode-switch button.active {
+  background: #e0ad4d;
+  color: #111418;
+}
+
+.iphone-banner {
+  margin: 12px 16px 0;
+  padding: 11px 12px;
+  border: 1px solid #74531e;
+  border-radius: 8px;
+  background: #251d11;
+  color: #f4cf82;
+  font-weight: 760;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.iphone-remote-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 142px;
+}
+
+.iphone-card,
+.iphone-section,
+.iphone-setup {
+  margin-bottom: 12px;
+}
+
+.iphone-card {
+  padding: 12px;
+  border: 1px solid #242b32;
+  border-radius: 8px;
+  background: #151a1f;
+}
+
+.iphone-card.compact {
+  padding-bottom: 10px;
+}
+
+.iphone-card-head {
+  color: #93a0a8;
+  font-size: 12px;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+.iphone-card-head strong {
+  color: #eef3f5;
+  text-transform: none;
+}
+
+.iphone-health-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.iphone-health-grid div {
+  min-width: 0;
+  min-height: 58px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 9px;
+  border: 1px solid #242b32;
+  border-radius: 8px;
+  background: #101418;
+}
+
+.iphone-health-grid b {
+  color: #41c7d6;
+  font-size: 20px;
+}
+
+.iphone-health-grid small {
+  color: #93a0a8;
+  font-size: 11px;
+}
+
+.iphone-section-title {
+  margin: 0 0 8px;
+  color: #93a0a8;
+  text-transform: uppercase;
+  font-weight: 850;
+  font-size: 12px;
+}
+
+.iphone-section-title strong {
+  color: #c6d0d5;
+}
+
+.iphone-section-title button {
+  min-height: 30px;
+  padding: 0 10px;
+  border-color: #2d353d;
+  background: #151a1f;
+  color: #eef3f5;
+}
+
+.iphone-channel-list,
+.iphone-correction-list,
+.iphone-setup {
+  display: grid;
+  gap: 8px;
+}
+
+.iphone-channel {
+  width: 100%;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 94px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #2d353d;
+  border-radius: 8px;
+  background: #151a1f;
+  color: #eef3f5;
+  text-align: left;
+}
+
+.iphone-channel.selected {
+  border-color: #3f6268;
+  background: #132024;
+}
+
+.iphone-channel strong,
+.iphone-correction b {
+  display: block;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iphone-channel small,
+.iphone-correction small {
+  display: block;
+  margin-top: 4px;
+  color: #93a0a8;
+  font-size: 12px;
+}
+
+.iphone-meter-stack {
+  display: grid;
+  gap: 7px;
+}
+
+.iphone-meter {
+  height: 8px;
+  border-radius: 999px;
+  border: 1px solid #242b32;
+  background: #0d1012;
+  overflow: hidden;
+}
+
+.iphone-meter b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #55c77a, #e0ad4d);
+}
+
+.iphone-meter-stack em {
+  color: #93a0a8;
+  font-size: 11px;
+  font-style: normal;
+  text-align: right;
+}
+
+.iphone-correction {
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid #242b32;
+  border-radius: 8px;
+  background: #151a1f;
+}
+
+.iphone-correction strong {
+  color: #41c7d6;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.iphone-correction.muted strong {
+  color: #55c77a;
+}
+
+.iphone-inline-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.iphone-inline-actions button,
+.iphone-field-row button {
+  min-height: 42px;
+  border-color: #2d353d;
+  background: #101418;
+  color: #eef3f5;
+  font-size: 13px;
+}
+
+.iphone-inline-actions button.warn {
+  border-color: #74531e;
+  background: #302514;
+  color: #f4cf82;
+}
+
+.iphone-empty,
+.iphone-note,
+.iphone-history {
+  padding: 12px;
+  border: 1px solid #242b32;
+  border-radius: 8px;
+  background: #151a1f;
+  color: #93a0a8;
+  font-size: 13px;
+}
+
+.iphone-history {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.iphone-setup {
+  padding-bottom: 8px;
+}
+
+.iphone-field {
+  display: grid;
+  gap: 6px;
+}
+
+.iphone-field.two {
+  grid-template-columns: 1fr 116px;
+  gap: 8px;
+}
+
+.iphone-field label,
+.iphone-checkbox {
+  color: #93a0a8;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.iphone-field input,
+.iphone-field select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid #2d353d;
+  border-radius: 8px;
+  background: #101418;
+  color: #eef3f5;
+  font: inherit;
+  font-size: 14px;
+}
+
+.iphone-field-row {
+  align-items: stretch;
+}
+
+.iphone-field-row input {
+  min-width: 0;
+}
+
+.iphone-field-row button {
+  min-width: 58px;
+}
+
+.iphone-checkbox {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  border: 1px solid #2d353d;
+  border-radius: 8px;
+  background: #151a1f;
+}
+
+.iphone-checkbox input {
+  accent-color: #41c7d6;
+}
+
+.iphone-command-pad {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 57px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #101316;
+  border-top: 1px solid #242b32;
+  z-index: 10;
+}
+
+.iphone-command-pad button {
+  min-width: 0;
+  min-height: 46px;
+  color: #eef3f5;
+  font-size: 13px;
+}
+
+.iphone-command-pad .apply {
+  border-color: #2c6947;
+  background: #163026;
+  color: #aef2c4;
+}
+
+.iphone-command-pad .rollback {
+  border-color: #74531e;
+  background: #302514;
+  color: #f4cf82;
+}
+
+.iphone-command-pad .bypass,
+.iphone-command-pad .stop {
+  border-color: #813b37;
+  background: #341716;
+  color: #ffb0ab;
+}
+
+.iphone-command-pad .stop {
+  border-color: #aa3f39;
+  background: #4a1716;
+  color: #ffe0dd;
+}
+
+.iphone-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  min-height: 58px;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  background: #101316;
+  border-top: 1px solid #242b32;
+  z-index: 11;
+}
+
+.iphone-bottom-nav button {
+  min-width: 0;
+  color: #93a0a8;
+  font-size: 11px;
+}
+
+.iphone-bottom-nav button.active {
+  border-color: #3f6268;
+  background: #132024;
+  color: #41c7d6;
+}
+
+@media (min-width: 720px) {
+  .iphone-remote-shell {
+    max-width: 430px;
+    min-height: 860px;
+    margin: 24px auto;
+    border: 1px solid #2d353d;
+    border-radius: 26px;
+    overflow: hidden;
+    box-shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+  }
+
+  .iphone-command-pad,
+  .iphone-bottom-nav {
+    position: sticky;
+  }
+
+  .iphone-command-pad {
+    bottom: 58px;
+  }
+
+  .iphone-bottom-nav {
+    bottom: 0;
+  }
+}

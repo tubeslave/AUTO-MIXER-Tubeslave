@@ -5,7 +5,8 @@ Uses ChromaDB for vector similarity search, falls back to keyword matching.
 import os
 import logging
 import hashlib
-from typing import Dict, List, Optional, Tuple
+import re
+from typing import Dict, Iterable, List, Optional, Tuple
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -24,12 +25,27 @@ class KnowledgeEntry:
 class KnowledgeBase:
     """Knowledge base with vector search and fallback keyword matching."""
 
-    def __init__(self, knowledge_dir: Optional[str] = None, use_vector_db: bool = True):
+    AGENT_RUNTIME_CATEGORIES = frozenset({
+        "agent_auto_apply_protocol",
+        "instrument_profiles",
+        "live_sound_checklist",
+        "mixing_rules",
+        "troubleshooting",
+        "wing_osc_reference",
+    })
+
+    def __init__(
+        self,
+        knowledge_dir: Optional[str] = None,
+        use_vector_db: bool = True,
+        allowed_categories: Optional[Iterable[str]] = None,
+    ):
         self.knowledge_dir = knowledge_dir or os.path.join(os.path.dirname(__file__), 'knowledge')
         self.entries: List[KnowledgeEntry] = []
         self._collection = None
         self._chroma_client = None
         self._use_vector_db = use_vector_db
+        self.allowed_categories = set(allowed_categories) if allowed_categories is not None else None
 
         if use_vector_db:
             try:
@@ -63,7 +79,22 @@ class KnowledgeBase:
                 with open(filepath, 'r', encoding='utf-8') as f:
                     content = f.read()
                 category = filename.replace('.md', '')
-                sections = self._split_sections(content, category)
+                source_type = None
+                first_line_match = re.match(
+                    r"^<!--\s*source_type\s*:\s*([^\s-]+)\s*-->",
+                    content.strip().splitlines()[0] if content.strip() else "",
+                )
+                if first_line_match:
+                    source_type = first_line_match.group(1).strip()
+                    category = f"study_{source_type}"
+                if self.allowed_categories is not None and category not in self.allowed_categories:
+                    continue
+                sections = self._split_sections(
+                    content,
+                    category,
+                    filename=filename,
+                    source_type=source_type or "internal",
+                )
                 for section in sections:
                     self.add_entry(section)
             except Exception as e:
@@ -71,7 +102,20 @@ class KnowledgeBase:
 
         logger.info(f"Loaded {len(self.entries)} knowledge entries from {self.knowledge_dir}")
 
-    def _split_sections(self, content: str, category: str) -> List[KnowledgeEntry]:
+    def refresh(self) -> None:
+        """Reload knowledge files from disk."""
+        self.entries = []
+        if self._use_vector_db and self._collection is not None:
+            pass
+        self._load_knowledge_files()
+
+    def _split_sections(
+        self,
+        content: str,
+        category: str,
+        filename: str,
+        source_type: str,
+    ) -> List[KnowledgeEntry]:
         """Split markdown into sections at ## headings."""
         sections = []
         current_title = category
@@ -87,7 +131,12 @@ class KnowledgeBase:
                             id=f"{category}_{entry_id}",
                             content=text,
                             category=category,
-                            metadata={'title': current_title, 'source': category}
+                            metadata={
+                                'title': current_title,
+                                'source': category,
+                                'filename': filename,
+                                'source_type': source_type,
+                            }
                         ))
                 current_title = line[3:].strip()
                 current_content = [line]
@@ -102,7 +151,12 @@ class KnowledgeBase:
                     id=f"{category}_{entry_id}",
                     content=text,
                     category=category,
-                    metadata={'title': current_title, 'source': category}
+                    metadata={
+                        'title': current_title,
+                        'source': category,
+                        'filename': filename,
+                        'source_type': source_type,
+                    }
                 ))
 
         return sections
@@ -120,16 +174,27 @@ class KnowledgeBase:
             except Exception as e:
                 logger.debug(f"Vector DB add error: {e}")
 
-    def search(self, query: str, n_results: int = 5, category: Optional[str] = None) -> List[KnowledgeEntry]:
+    def search(
+        self,
+        query: str,
+        n_results: int = 5,
+        category: Optional[str | Iterable[str]] = None,
+    ) -> List[KnowledgeEntry]:
         """Search knowledge base. Returns entries sorted by relevance."""
+        categories = self._normalize_category_filter(category)
         if self._use_vector_db and self._collection is not None:
-            return self._vector_search(query, n_results, category)
-        return self._keyword_search(query, n_results, category)
+            return self._vector_search(query, n_results, categories)
+        return self._keyword_search(query, n_results, categories)
 
-    def _vector_search(self, query: str, n_results: int, category: Optional[str]) -> List[KnowledgeEntry]:
+    def _vector_search(self, query: str, n_results: int, categories: Optional[set[str]]) -> List[KnowledgeEntry]:
         """Search using ChromaDB vector similarity."""
         try:
-            where_filter = {"source": category} if category else None
+            where_filter = None
+            if categories:
+                if len(categories) == 1:
+                    where_filter = {"source": next(iter(categories))}
+                else:
+                    where_filter = {"source": {"$in": sorted(categories)}}
             results = self._collection.query(
                 query_texts=[query],
                 n_results=min(n_results, max(1, len(self.entries))),
@@ -149,16 +214,16 @@ class KnowledgeBase:
             return matched
         except Exception as e:
             logger.warning(f"Vector search error: {e}, falling back to keyword")
-            return self._keyword_search(query, n_results, category)
+            return self._keyword_search(query, n_results, categories)
 
-    def _keyword_search(self, query: str, n_results: int, category: Optional[str]) -> List[KnowledgeEntry]:
+    def _keyword_search(self, query: str, n_results: int, categories: Optional[set[str]]) -> List[KnowledgeEntry]:
         """Fallback keyword-based search with TF scoring."""
         query_lower = query.lower()
         query_words = set(query_lower.split())
         scored: List[Tuple[float, KnowledgeEntry]] = []
 
         for entry in self.entries:
-            if category and entry.category != category:
+            if categories and entry.category not in categories:
                 continue
             content_lower = entry.content.lower()
             score = 0.0
@@ -189,6 +254,14 @@ class KnowledgeBase:
 
         scored.sort(key=lambda x: x[0], reverse=True)
         return [entry for _, entry in scored[:n_results]]
+
+    @staticmethod
+    def _normalize_category_filter(category: Optional[str | Iterable[str]]) -> Optional[set[str]]:
+        if category is None:
+            return None
+        if isinstance(category, str):
+            return {category}
+        return {value for value in category if value}
 
     def get_by_category(self, category: str) -> List[KnowledgeEntry]:
         """Get all entries in a category."""

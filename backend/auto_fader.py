@@ -22,6 +22,7 @@ import numpy as np
 import threading
 import logging
 import time
+import re
 from typing import Dict, List, Callable, Optional, Any, Tuple
 from collections import deque
 from scipy import signal
@@ -68,6 +69,125 @@ class GenreProfile(Enum):
     ACOUSTIC = "acoustic"
     CLASSICAL = "classical"
 
+
+LEVEL_PLANE_DEFAULT_BASE_LUFS = -24.0
+
+LEVEL_PLANE_ALIASES = {
+    'leadvocal': 'lead_vocal',
+    'lead_vocal': 'lead_vocal',
+    'vocal': 'lead_vocal',
+    'voice': 'lead_vocal',
+    'backvocal': 'backing_vocal',
+    'back_vocal': 'backing_vocal',
+    'backing_vocal': 'backing_vocal',
+    'bgv': 'backing_vocal',
+    'electricguitar': 'guitar',
+    'electric_guitar': 'guitar',
+    'acousticguitar': 'acoustic_guitar',
+    'acoustic_guitar': 'acoustic_guitar',
+    'tom': 'toms',
+    'overhead': 'overheads',
+}
+
+DEFAULT_LEVEL_PLANE_OFFSETS_DB = {
+    # Front plane
+    'lead_vocal': 2.0,
+    'drums': 2.0,
+    'toms': 2.0,
+    'synth': 1.0,
+
+    # Main body
+    'kick': -1.0,
+    'snare': -1.0,
+    'bass': -1.0,
+    'guitar': -1.0,
+    'acoustic_guitar': -1.0,
+    'piano': -1.0,
+    'playback': -1.0,
+    'accordion': -1.0,
+    'strings': -1.0,
+    'brass': -1.0,
+    'sax': -1.0,
+    'woodwinds': -1.0,
+    'backing_vocal': -1.0,
+
+    # Back plane / texture
+    'keys': -2.0,
+    'pads': -2.0,
+    'fx': -2.0,
+    'percussion': -2.0,
+    'hihat': -11.0,
+    'ride': -11.0,
+    'cymbals': -11.0,
+    'overheads': -11.0,
+    'room': -16.0,
+}
+
+LEVEL_PLANE_GROUPS = {
+    'lead_vocal': 'vocals',
+    'backing_vocal': 'vocals',
+    'kick': 'low_end',
+    'bass': 'low_end',
+    'snare': 'drums',
+    'drums': 'drums',
+    'toms': 'drums',
+    'percussion': 'drums',
+    'hihat': 'cymbals',
+    'ride': 'cymbals',
+    'cymbals': 'cymbals',
+    'overheads': 'cymbals',
+    'room': 'ambience',
+    'guitar': 'harmonic',
+    'acoustic_guitar': 'harmonic',
+    'keys': 'harmonic',
+    'piano': 'harmonic',
+    'synth': 'harmonic',
+    'pads': 'harmonic',
+    'playback': 'harmonic',
+    'accordion': 'harmonic',
+    'strings': 'harmonic',
+    'brass': 'harmonic',
+    'sax': 'harmonic',
+    'woodwinds': 'harmonic',
+    'fx': 'fx',
+}
+
+DEFAULT_LEVEL_PLANE_GROUP_OFFSETS_DB = {
+    'vocals': 1.5,
+    'drums': 1.0,
+    'low_end': 0.0,
+    'harmonic': -1.5,
+    'cymbals': -9.0,
+    'ambience': -14.0,
+    'fx': -4.0,
+}
+
+
+def normalize_level_plane_instrument(instrument_type: Optional[str]) -> str:
+    """Normalize project instrument labels to stable level-plane keys."""
+    if not instrument_type:
+        return 'custom'
+    key = str(instrument_type).strip()
+    if not key:
+        return 'custom'
+    key = re.sub(r'(?<!^)(?=[A-Z])', '_', key)
+    key = re.sub(r'[\s\-]+', '_', key).lower()
+    key = re.sub(r'_+', '_', key).strip('_')
+    compact = key.replace('_', '')
+    return LEVEL_PLANE_ALIASES.get(key, LEVEL_PLANE_ALIASES.get(compact, key))
+
+
+def combine_lufs(lufs_values: List[float]) -> float:
+    """Energy-sum LUFS values for a virtual bus/group estimate."""
+    finite_values = [float(v) for v in lufs_values if np.isfinite(v)]
+    if not finite_values:
+        return -70.0
+    energy = sum(10 ** (value / 10.0) for value in finite_values)
+    if energy <= 0.0:
+        return -70.0
+    return float(10.0 * np.log10(energy))
+
+
 @dataclass
 class BalanceProfile:
     """
@@ -87,6 +207,15 @@ class BalanceProfile:
     
     # Абсолютные целевые уровни LUFS для каждого инструмента
     instrument_target_lufs: Dict[str, float] = field(default_factory=dict)
+
+    # Mix Monolith-inspired level-plane: base plane + per-instrument depth offsets.
+    level_plane_base_lufs: float = LEVEL_PLANE_DEFAULT_BASE_LUFS
+    level_plane_offsets_db: Dict[str, float] = field(
+        default_factory=lambda: dict(DEFAULT_LEVEL_PLANE_OFFSETS_DB)
+    )
+    level_plane_group_offsets_db: Dict[str, float] = field(
+        default_factory=lambda: dict(DEFAULT_LEVEL_PLANE_GROUP_OFFSETS_DB)
+    )
     
     # Параметры AGC
     attack_ms: float = 100.0
@@ -860,6 +989,14 @@ class AutoFaderController:
         self.min_adjustment_db = auto_fader_config.get('min_adjustment_db', -12.0)  # Only for Auto Balance
         self.ratio = auto_fader_config.get('ratio', 2.0)  # Only for Auto Balance
         self.hold_ms = auto_fader_config.get('hold_ms', 800.0)  # Only for Auto Balance
+        self.allow_fader_above_unity = bool(auto_fader_config.get('allow_fader_above_unity', False))
+        configured_fader_ceiling = float(auto_fader_config.get('fader_ceiling_db', 0.0))
+        self.fader_ceiling_db = (
+            configured_fader_ceiling
+            if self.allow_fader_above_unity
+            else min(configured_fader_ceiling, 0.0)
+        )
+        self.fader_floor_db = min(float(auto_fader_config.get('fader_floor_db', -60.0)), self.fader_ceiling_db)
         
         # Профиль баланса
         profile_name = auto_fader_config.get('profile', 'custom')
@@ -867,6 +1004,22 @@ class AutoFaderController:
             self.profile = BalanceProfile.get_preset(GenreProfile(profile_name))
         except:
             self.profile = BalanceProfile.get_preset(GenreProfile.CUSTOM)
+
+        # Mix Monolith-inspired Auto Balance plane:
+        # tracks learn their pre-fader LUFS, then move to a configurable depth plane.
+        self.level_plane_balance_enabled = bool(auto_fader_config.get('level_plane_balance_enabled', True))
+        self.level_plane_base_lufs = float(
+            auto_fader_config.get('level_plane_base_lufs', self.profile.level_plane_base_lufs)
+        )
+        self.level_plane_offsets_db = self._build_level_plane_offsets(
+            auto_fader_config.get('level_plane_offsets_db', {})
+        )
+        self.level_plane_two_pass_enabled = bool(auto_fader_config.get('level_plane_two_pass_enabled', True))
+        self.level_plane_group_offsets_db = self._build_level_plane_group_offsets(
+            auto_fader_config.get('level_plane_group_offsets_db', {})
+        )
+        self.level_plane_group_trim_limit_db = max(0.0, float(auto_fader_config.get('level_plane_group_trim_limit_db', 3.0)))
+        self.level_plane_max_boost_db = max(0.0, float(auto_fader_config.get('level_plane_max_boost_db', 4.0)))
         
         # Режим работы
         self.mode = BalanceMode.REALTIME
@@ -895,7 +1048,6 @@ class AutoFaderController:
         self.realtime_enabled = False
         self.auto_balance_collecting = False
         self.auto_balance_duration = 15.0  # секунд
-        self.bleed_threshold = -50.0  # порог блидинга в LUFS
         self.auto_balance_start_time = 0.0
         self._stop_event = threading.Event()
         # Freeze / manual override
@@ -920,7 +1072,7 @@ class AutoFaderController:
         
         logger.info(f"AutoFaderController initialized: fader_range={self.fader_range_db} dB, "
                    f"avg_window={self.avg_window_sec}s, sensitivity={self.sensitivity}, "
-                   f"profile={self.profile.name}")
+                   f"profile={self.profile.name}, fader_ceiling={self.fader_ceiling_db:+.1f} dB")
     
     def set_automation_frozen(self, frozen: bool):
         """Freeze or unfreeze all automation (no fader commands when frozen)."""
@@ -941,6 +1093,95 @@ class AutoFaderController:
             "frozen_channels": frozen_channels,
             "freeze_cooldown_seconds": self.freeze_cooldown_seconds,
         }
+
+    def _build_level_plane_offsets(self, overrides: Optional[Dict[str, float]] = None) -> Dict[str, float]:
+        offsets = dict(self.profile.level_plane_offsets_db)
+        for instrument, value in (overrides or {}).items():
+            offsets[normalize_level_plane_instrument(instrument)] = float(value)
+        return offsets
+
+    def _build_level_plane_group_offsets(self, overrides: Optional[Dict[str, float]] = None) -> Dict[str, float]:
+        offsets = dict(self.profile.level_plane_group_offsets_db)
+        for group, value in (overrides or {}).items():
+            offsets[str(group).strip().lower()] = float(value)
+        return offsets
+
+    def _resolve_level_plane_target_lufs(self, instrument_type: str) -> Tuple[float, Dict[str, Any]]:
+        instrument_key = normalize_level_plane_instrument(instrument_type)
+        legacy_target = self.profile.instrument_target_lufs.get(
+            instrument_type,
+            self.profile.instrument_target_lufs.get(instrument_key, self.target_lufs)
+        )
+
+        if not self.level_plane_balance_enabled:
+            return float(legacy_target), {
+                'method': 'profile_target',
+                'instrument_key': instrument_key,
+                'level_plane_offset_db': None,
+                'level_plane_group': LEVEL_PLANE_GROUPS.get(instrument_key, 'custom'),
+            }
+
+        if instrument_key not in self.level_plane_offsets_db:
+            return float(legacy_target), {
+                'method': 'profile_target_fallback',
+                'instrument_key': instrument_key,
+                'level_plane_offset_db': None,
+                'level_plane_group': LEVEL_PLANE_GROUPS.get(instrument_key, 'custom'),
+            }
+
+        offset_db = float(self.level_plane_offsets_db[instrument_key])
+        return self.level_plane_base_lufs + offset_db, {
+            'method': 'level_plane',
+            'instrument_key': instrument_key,
+            'level_plane_offset_db': offset_db,
+            'level_plane_group': LEVEL_PLANE_GROUPS.get(instrument_key, 'custom'),
+        }
+
+    def _apply_level_plane_group_pass(self, active_channels: Dict[int, Dict[str, Any]]):
+        if (
+            not self.level_plane_balance_enabled
+            or not self.level_plane_two_pass_enabled
+            or self.auto_balance_pass < 2
+        ):
+            return
+
+        grouped_channels: Dict[str, List[Dict[str, Any]]] = {}
+        for ch_data in active_channels.values():
+            group = ch_data.get('level_plane_group') or 'custom'
+            grouped_channels.setdefault(group, []).append(ch_data)
+
+        for group, channels in grouped_channels.items():
+            if group not in self.level_plane_group_offsets_db or len(channels) < 2:
+                continue
+
+            predicted_group_lufs = combine_lufs([
+                ch['pre_fader'] + ch['ideal_fader']
+                for ch in channels
+            ])
+            target_group_lufs = self.level_plane_base_lufs + float(self.level_plane_group_offsets_db[group])
+            trim_db = float(np.clip(
+                target_group_lufs - predicted_group_lufs,
+                -self.level_plane_group_trim_limit_db,
+                self.level_plane_group_trim_limit_db
+            ))
+
+            if abs(trim_db) < 0.05:
+                continue
+
+            for ch_data in channels:
+                ch_data['ideal_fader'] += trim_db
+                ch_data['level_plane_group_trim_db'] = trim_db
+                ch_data['level_plane_group_target_lufs'] = target_group_lufs
+                ch_data['level_plane_group_lufs'] = predicted_group_lufs
+
+            logger.info(
+                "Level-plane group pass: group=%s channels=%d group=%.1f LUFS target=%.1f LUFS trim=%+.1f dB",
+                group,
+                len(channels),
+                predicted_group_lufs,
+                target_group_lufs,
+                trim_db,
+            )
     
     def start(self,
               device_id: int,
@@ -1679,15 +1920,16 @@ class AutoFaderController:
         1. Измеряем Integrated LUFS каждого канала (с гейтингом по ITU-R BS.1770-4)
         2. Читаем текущие позиции фейдеров из микшера
         3. Вычисляем pre-fader уровень: pre_fader = measured - current_fader
-        4. Вычисляем идеальный фейдер: ideal = target_LUFS - pre_fader
-        5. Если какой-то фейдер выходит за пределы [-60, +10], сдвигаем ВСЕ 
+        4. Вычисляем идеальный фейдер: ideal = level_plane_target_LUFS - pre_fader
+        5. На 2+ проходе подравниваем виртуальные группы как bus groups
+        6. Если какой-то фейдер выходит за безопасный диапазон, сдвигаем ВСЕ
            фейдеры пропорционально, сохраняя относительный баланс
-        6. Коррекция = ideal_fader - current_fader
+        7. Коррекция = ideal_fader - current_fader
         """
         logger.info(f"Computing auto balance (pass {self.auto_balance_pass})...")
         
-        FADER_MAX = 10.0   # dB — максимум фейдера микшера
-        FADER_MIN = -60.0   # dB — минимум фейдера микшера
+        FADER_MAX = float(self.fader_ceiling_db)  # dB — live-safe ceiling defaults to unity
+        FADER_MIN = min(float(self.fader_floor_db), FADER_MAX)
         
         # === Шаг 1: Получаем Integrated LUFS для каждого канала ===
         channel_integrated = {}
@@ -1749,12 +1991,9 @@ class AutoFaderController:
             
             integrated = channel_integrated.get(audio_ch, -70.0)
             
-            # Получаем прямой target LUFS из профиля инструмента
-            # Все расчеты основаны на integrated LUFS
-            target_lufs = self.profile.instrument_target_lufs.get(
-                state.instrument_type, 
-                self.target_lufs  # fallback на базовый target если инструмент не найден
-            )
+            # Target LUFS через Mix Monolith-inspired level-plane:
+            # базовая плоскость + depth offset инструмента; fallback на профиль.
+            target_lufs, level_plane_info = self._resolve_level_plane_target_lufs(state.instrument_type)
             
             # Читаем текущий фейдер из микшера
             current_fader = 0.0
@@ -1774,7 +2013,11 @@ class AutoFaderController:
                     'correction': 0.0,
                     'integrated_lufs': float(integrated),
                     'target_lufs': float(target_lufs),
-                    'locked': False
+                    'locked': False,
+                    'balance_method': level_plane_info.get('method'),
+                    'instrument_key': level_plane_info.get('instrument_key'),
+                    'level_plane_offset_db': level_plane_info.get('level_plane_offset_db'),
+                    'level_plane_group': level_plane_info.get('level_plane_group')
                 }
                 logger.info(f"Channel {audio_ch} ({state.instrument_type}): "
                            f"INACTIVE (pre-fader={pre_fader:.1f} LUFS <= threshold {bleed_thresh} LUFS, fader={current_fader:.1f})")
@@ -1822,7 +2065,12 @@ class AutoFaderController:
                 'ideal_fader': ideal_fader,
                 'state': state,
                 'bleed_ratio': float(bleed_info.bleed_ratio) if bleed_applied and bleed_info else 0.0,
-                'bleed_source': int(bleed_info.bleed_source_channel) if bleed_applied and bleed_info and bleed_info.bleed_source_channel is not None else None
+                'bleed_source': int(bleed_info.bleed_source_channel) if bleed_applied and bleed_info and bleed_info.bleed_source_channel is not None else None,
+                'balance_method': level_plane_info.get('method'),
+                'instrument_key': level_plane_info.get('instrument_key'),
+                'level_plane_offset_db': level_plane_info.get('level_plane_offset_db'),
+                'level_plane_group': level_plane_info.get('level_plane_group'),
+                'level_plane_group_trim_db': 0.0
             }
             
             log_pre = f"compensated={pre_fader_for_balance:.1f}" if bleed_applied else f"pre-fader={pre_fader:.1f}"
@@ -1831,10 +2079,13 @@ class AutoFaderController:
                        f"{log_pre}, target={target_lufs:.1f}, "
                        f"ideal_fader={ideal_fader:+.1f} dB")
         
-        # === Шаг 4: Сдвигаем фейдеры чтобы поместиться в диапазон ===
+        # === Шаг 4: Второй проход по виртуальным группам (как bus groups) ===
+        self._apply_level_plane_group_pass(active_channels)
+
+        # === Шаг 5: Сдвигаем фейдеры чтобы поместиться в диапазон ===
         # Используем 90-й перцентиль ideal_fader для вычисления shift,
         # чтобы единичные аутлайеры (очень тихие каналы) не утягивали весь микс вниз.
-        # Аутлайеры просто клипуются на +10 dB.
+        # Аутлайеры просто клипуются на безопасный ceiling.
         if active_channels:
             ideal_faders_sorted = sorted(ch['ideal_fader'] for ch in active_channels.values())
             n = len(ideal_faders_sorted)
@@ -1865,6 +2116,12 @@ class AutoFaderController:
                 new_fader = ch_data['ideal_fader'] - shift
                 new_fader = float(np.clip(new_fader, FADER_MIN, FADER_MAX))
                 correction = new_fader - ch_data['current_fader']
+
+                if correction > self.level_plane_max_boost_db:
+                    correction = self.level_plane_max_boost_db
+                    new_fader = ch_data['current_fader'] + correction
+                    new_fader = float(np.clip(new_fader, FADER_MIN, FADER_MAX))
+                    correction = new_fader - ch_data['current_fader']
                 
                 # Округляем до 0.1 dB
                 correction = round(correction * 10) / 10.0
@@ -1875,7 +2132,14 @@ class AutoFaderController:
                     'target_lufs': float(ch_data['target_lufs']),
                     'locked': False,
                     'bleed_ratio': float(ch_data.get('bleed_ratio', 0)),
-                    'bleed_source': ch_data.get('bleed_source')
+                    'bleed_source': ch_data.get('bleed_source'),
+                    'balance_method': ch_data.get('balance_method'),
+                    'instrument_key': ch_data.get('instrument_key'),
+                    'level_plane_offset_db': ch_data.get('level_plane_offset_db'),
+                    'level_plane_group': ch_data.get('level_plane_group'),
+                    'level_plane_group_trim_db': float(ch_data.get('level_plane_group_trim_db', 0.0)),
+                    'level_plane_group_target_lufs': ch_data.get('level_plane_group_target_lufs'),
+                    'level_plane_group_lufs': ch_data.get('level_plane_group_lufs')
                 }
                 
                 logger.info(f"Channel {audio_ch} ({state.instrument_type}): "
@@ -1894,11 +2158,17 @@ class AutoFaderController:
                     'target_lufs': float(v['target_lufs']),
                     'locked': bool(v['locked']),
                     'bleed_ratio': float(v.get('bleed_ratio', 0)),
-                    'bleed_source': v.get('bleed_source')
+                    'bleed_source': v.get('bleed_source'),
+                    'balance_method': v.get('balance_method'),
+                    'instrument_key': v.get('instrument_key'),
+                    'level_plane_offset_db': v.get('level_plane_offset_db'),
+                    'level_plane_group': v.get('level_plane_group'),
+                    'level_plane_group_trim_db': float(v.get('level_plane_group_trim_db', 0.0))
                 }
             self.on_status_update({
                 'type': 'auto_balance_ready',
                 'mode': 'static',
+                'balance_method': 'level_plane' if self.level_plane_balance_enabled else 'profile_target',
                 'collecting': False,
                 'pass_number': self.auto_balance_pass,
                 'result': result_dict
@@ -1958,7 +2228,7 @@ class AutoFaderController:
                             logger.warning(f"Channel {state.mixer_channel}: Fader read as {current_db_value:.1f} dB (invalid), using default 0 dB")
                 
                 new_db = current_db + correction
-                new_db = float(np.clip(new_db, -60.0, 10.0))
+                new_db = float(np.clip(new_db, self.fader_floor_db, self.fader_ceiling_db))
                 
                 # Округляем до 0.05 dB
                 new_db = round(new_db * 20) / 20.0
@@ -2075,7 +2345,12 @@ class AutoFaderController:
                     'correction': float(v.get('correction', 0)),
                     'integrated_lufs': float(v.get('integrated_lufs', -70)),
                     'target_lufs': float(v.get('target_lufs', -18)),
-                    'locked': bool(v.get('locked', False))
+                    'locked': bool(v.get('locked', False)),
+                    'balance_method': v.get('balance_method'),
+                    'instrument_key': v.get('instrument_key'),
+                    'level_plane_offset_db': v.get('level_plane_offset_db'),
+                    'level_plane_group': v.get('level_plane_group'),
+                    'level_plane_group_trim_db': float(v.get('level_plane_group_trim_db', 0.0))
                 } for k, v in self.auto_balance_result.items()
             } if self.auto_balance_result else {}
         }
@@ -2196,6 +2471,36 @@ class AutoFaderController:
             self.ratio = ratio
         if hold_ms is not None:
             self.hold_ms = hold_ms
+
+        if 'allow_fader_above_unity' in kwargs:
+            self.allow_fader_above_unity = bool(kwargs['allow_fader_above_unity'])
+            if not self.allow_fader_above_unity:
+                self.fader_ceiling_db = min(self.fader_ceiling_db, 0.0)
+                self.fader_floor_db = min(self.fader_floor_db, self.fader_ceiling_db)
+        if 'fader_ceiling_db' in kwargs:
+            configured_fader_ceiling = float(kwargs['fader_ceiling_db'])
+            self.fader_ceiling_db = (
+                configured_fader_ceiling
+                if self.allow_fader_above_unity
+                else min(configured_fader_ceiling, 0.0)
+            )
+            self.fader_floor_db = min(self.fader_floor_db, self.fader_ceiling_db)
+        if 'fader_floor_db' in kwargs:
+            self.fader_floor_db = min(float(kwargs['fader_floor_db']), self.fader_ceiling_db)
+        if 'level_plane_balance_enabled' in kwargs:
+            self.level_plane_balance_enabled = bool(kwargs['level_plane_balance_enabled'])
+        if 'level_plane_base_lufs' in kwargs:
+            self.level_plane_base_lufs = float(kwargs['level_plane_base_lufs'])
+        if 'level_plane_offsets_db' in kwargs and isinstance(kwargs['level_plane_offsets_db'], dict):
+            self.level_plane_offsets_db = self._build_level_plane_offsets(kwargs['level_plane_offsets_db'])
+        if 'level_plane_two_pass_enabled' in kwargs:
+            self.level_plane_two_pass_enabled = bool(kwargs['level_plane_two_pass_enabled'])
+        if 'level_plane_group_offsets_db' in kwargs and isinstance(kwargs['level_plane_group_offsets_db'], dict):
+            self.level_plane_group_offsets_db = self._build_level_plane_group_offsets(kwargs['level_plane_group_offsets_db'])
+        if 'level_plane_group_trim_limit_db' in kwargs:
+            self.level_plane_group_trim_limit_db = max(0.0, float(kwargs['level_plane_group_trim_limit_db']))
+        if 'level_plane_max_boost_db' in kwargs:
+            self.level_plane_max_boost_db = max(0.0, float(kwargs['level_plane_max_boost_db']))
         
         # Обновляем envelopes
         for envelope in self.envelopes.values():
@@ -2222,7 +2527,12 @@ class AutoFaderController:
                         'target_lufs': float(v.get('target_lufs', -18)),
                         'locked': bool(v.get('locked', False)),
                         'bleed_ratio': float(v.get('bleed_ratio', 0)),
-                        'bleed_source': v.get('bleed_source')
+                        'bleed_source': v.get('bleed_source'),
+                        'balance_method': v.get('balance_method'),
+                        'instrument_key': v.get('instrument_key'),
+                        'level_plane_offset_db': v.get('level_plane_offset_db'),
+                        'level_plane_group': v.get('level_plane_group'),
+                        'level_plane_group_trim_db': float(v.get('level_plane_group_trim_db', 0.0))
                     }
                 else:
                     auto_balance_result[int(k)] = {
@@ -2240,6 +2550,10 @@ class AutoFaderController:
             'profile': str(self.profile.name),
             'target_lufs': float(self.target_lufs),
             'ratio': float(self.ratio),
+            'fader_ceiling_db': float(self.fader_ceiling_db),
+            'level_plane_balance_enabled': bool(self.level_plane_balance_enabled),
+            'level_plane_base_lufs': float(self.level_plane_base_lufs),
+            'level_plane_two_pass_enabled': bool(self.level_plane_two_pass_enabled),
             'channels_count': int(len(self.channels)),
             'auto_balance_result': auto_balance_result,
             'auto_balance_pass': int(self.auto_balance_pass)

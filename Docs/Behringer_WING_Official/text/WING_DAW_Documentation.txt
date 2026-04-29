@@ -1,0 +1,313 @@
+WING DAW-CONTROL
+
+
+
+
+V 1.0
+2       WING DAW-CONTROL
+
+
+Table of Contents
+DAW-Setup. ..................................................................... 3
+    Settings WING. ............................................................................. 3
+    Settings DAW................................................................................ 3
+      CUBASE/NUENDO. ................................................................... 4
+      ABLETON LIVE............................................................................ 5
+      LOGIC............................................................................................ 5
+      STUDIO ONE............................................................................... 6
+      REAPER. ........................................................................................ 7
+      PRO TOOLS. ................................................................................ 8
+Custom Control Section. ................................................ 9
+    Overview........................................................................................ 9
+    Assign Function to CC-Section............................................... 9
+    Store Preset . ............................................................................... 10
+    Share Preset. ............................................................................... 10
+MCU – Implementation. ............................................... 11
+    Layer Buttons.............................................................................. 11
+    Upper CC-Section...................................................................... 11
+HUI- Implementation. .................................................. 12
+    Layer Buttons.............................................................................. 12
+    Upper CC-Section...................................................................... 12
+3      WING DAW-CONTROL
+
+
+DAW-Setup
+The WING console uses the commonly used Mackie MCU- and Mackie HUI-Protocol. These protocols are supported over a wide range of DAWs which allows for instant
+support. Nevertheless, the implementation is dependent on a predefined transmission protocol and the scope of possibilities is limited.
+For DAW remote control there are settings to be made on both, the hardware and software side.
+
+Settings WING
+To enter the DAW-Setup navigate to SETUP  DAW. The left side of the screen provides access to all DAW-Settings on the console. To configure which surface
+components will be used for DAW-Control the remote setup provides different modes.
+
+
+
+
+    DAW ENABLE                         If set to ON - activates DAW function and enables DAW button on the surface.
+    CONNECTION                         Switch between DIN and USB Connection (USB required for multiple devices)
+    EMULATION                          Decide which protocol to use - Mackie HUI or Mackie MCU
+                                       If set to ON – include Upper Custom Control Section for DAW Control.
+    USE UPPER CC FOR DAW
+                                       (otherwise the Upper CC-Section will offer controls detached from the DAW mode)
+    CONFIGURATION                      Dropdown to select which Parts of the surface should be used for DAW-Control
+    PRESET                             Dropdown to load DAW specific preset for lower portion of the Custom Control Section
+
+Once set up, activate DAW-Control with the DAW-Button in the lower portion of the custom section. According to the remote settings this will change the CC- and the
+Fader-Section to DAW-Mode.
+
+Settings DAW
+WING can be connected to the DAW either using standard DIN- or USB-Connection. The USB-Connection is providing 4 Midi-Connections at a time. To use the entire
+surface for DAW control please use the USB connection. When connecting to the computer, WING emulates four virtual hardware devices. These emulations correspond
+to the Midi-Ports as follows:
+Port: MIDI DAW 1 (macOS: WING 1) – Master unit (Mackie MCU/HUI)
+Port: MIDI DAW 2 (macOS: WING 2) – Extender 1 (MCU/HUI-Extender)
+Port: MIDI DAW 3 (macOS: WING 3) – Extender 2 (MCU/HUI-Extender)
+Port: MIDI Control (macOS: WING 4) – General Midi-Connection
+To ensure the correct channel order, please ensure correct setup on DAW-Side. Depending on the DAW, the arrangement of the controllers can be made from top to
+bottom, left to right or vice versa. See setup for some DAWs below.
+4      WING DAW-CONTROL
+
+
+CUBASE/NUENDO
+*Music Tribe recommends Mackie MCU for the use with Cubase/Nuendo
+1. Navigate to Studio  Studio Setup
+2. Select the Folder Remote Devices and add device (+)
+3. Select Mackie Control from the dropdown
+4. If you want to use the complete surface set up 3 devices in total
+
+
+
+
+IMPORTANT: Cubase lists the devices from top to bottom and from right to left. Having this in mind the port assignment needs to be:
+    Mackie Control 1: WING Port 3 (In/Out)
+    Mackie Control 2: WING Port 2 (In/Out)
+    Mackie Control 3: WING Port 1 (In/Out)
+5. To prevent interference with other MIDI messages deselect the ‘ALL MIDI’ checkbox for WING PORT 1-3 under MIDI Port Setup
+5     WING DAW-CONTROL
+
+
+ABLETON LIVE
+*Music Tribe recommends Mackie MCU for the use with Ableton Live
+1. Navigate to Preferences  Link Midi
+2. Select Mackie Control for the first device from the dropdown
+3. Assign WING (Port 1) as Input and Output
+4. If you want to use the whole surface, please select Mackie ControlXT for second and third device from the dropdown
+5. Assign WING (Port 2) & WING (Port3) as Input and Output
+6. For bidirectional Midi-Transmission switch Track and Remote for the respective Inputs and Outputs to ON
+
+
+
+
+LOGIC
+*Music Tribe recommends Mackie MCU for the use with Logic
+1. Navigate to Preferences  Control Surfaces  Setup…
+2. Go to New  Install…
+3. Select Mackie Designs I MCU Pro I Logic Control from the List
+4. Create one device and assign WING Port 1 as Input- and Output-Port
+5. Select Mackie Designs I Mackie Control Extender Pro I Logic Control from the List
+6. Create two devices and assign WING Port 2 & 3 as Input- and Output-Port
+7. Order devices as shown in screenshot below
+6     WING DAW-CONTROL
+
+
+STUDIO ONE
+*Music Tribe recommends Mackie MCU for the use with Studio One
+1. Navigate to Options  External Device
+2. Select Add… | Mackie | Control from the list
+3. Choose WING MIDI DAW 1 under Receive From and Send To
+4. Select Add… | Mackie | Control Extender from the list
+5. Create two devices and choose WING MIDI DAW 2 & 3 under Receive From and Send To
+6. Select Placement… and drag the devices to Group 1 as shown below
+7     WING DAW-CONTROL
+
+
+REAPER
+*Music Tribe recommends Mackie MCU for the use with Reaper
+1. Navigate to Options  Preferences  Control/OSC/web
+2. Select Add | Mackie Control Universal
+3. Choose WING MIDI DAW 1 under MIDI Input and MIDI Output
+4. Select Add | Mackie Control Extender
+5. Choose WING MIDI DAW 2 under MIDI Input and MIDI Output, set Surface offset (tracks) to 8.
+6. Select Add | Mackie Control Extender
+7. Choose WING MIDI DAW 3 under MIDI Input and MIDI Output, set Surface offset (tracks) to 16.
+
+
+
+
+8. Navigate to Options  Preference  Audio/MIDI Devices
+9. Make sure that MIDI inputs and outputs WING MIDI DAW 1 .. 3 are disabled
+8      WING DAW-CONTROL
+
+
+PRO TOOLS
+*To use DAW-Control with Pro Tools please use Mackie HUI
+1. Navigate to Setup  Peripherals
+
+
+
+
+2. Select the MIDI Controllers tab
+3. Select HUI in #1 and assign WING (port 1) as Recieve From and Send To, set #Ch’s to 8
+4. If you want to use the whole surface, please setup #2 and #3 for second and third device
+5. Assign WING (Port 2) & WING (Port3) as Receive From and Send To, set #Ch’s to 8
+9        WING DAW-CONTROL
+
+
+Custom Control Section
+The SETUP  DAW page provides an additional switch to include the upper part of the Custom Control Section. Since the usage of the upper CC-Section is Protocol-
+Specific (MCU/HUI) further explanation can be found in the respective Chapters.
+
+Overview
+Use the DAW-Button to activate DAW-Control. Depending on the DAW the jog wheel and arrow keys can be used for navigation and zoom functionality.
+When in DAW-Mode, the buttons labeled “2-TRACK TRANP”, “MULTI TRANSP”, “MUTE GROUPS” and “SHOW CONTROL” correspond to four dedicated DAW CC-Layers.
+All DAW layers can be freely assigned with functions, however we recommend using one of the presets for a quick start.
+
+                 Layer-Button for
+                 CC-Layers in DAW-Mode
+
+    Open screen to assign functionality
+    to the CC-Layers in DAW-Mode
+
+
+
+
+                          Activate DAW-
+
+
+
+
+ Timeline Navigation / Zoom ≈ Original
+
+
+
+
+Assign Function to CC-Section
+Assigning functionality to one of the four DAW layers works in the same way as for the general Custom Control Section. This means you can assign any command and
+adopt the displayed name to your needs.
+Use the VIEW-Button of the lower portion to enter the CC configuration screen. Select DAW BUTTONS or DAW V-POTS in the functions list and add MCU-Commands to
+any control you like. Depending on the respective DAW function, please use the Edit-Name button to adjust the label in the display.
+
+
+    IMPORTANT:
+    The listed MCU Commands are the standard assignment of the original Mackie MCU Hardware unit. The name of the MCU command and the function in the
+    respective DAW do not necessarily match. To create your own presets for different DAWs, we recommend to lookup the function for different MCU commands in
+    the DAW you are using. For a quick start, please have a look at the translation table in the appendix. This document compares MCU commands to their function in
+    different DAWs.
+    *This list was NOT created in cooperation with the respective DAW manufacturers
+    (no warranty for correctness or completeness)
+
+
+Beside casual surface buttons of the original hardware it is also possible to assign buttons to the CC-Section that are originally tied to a channel. Those functions are
+indicated with square bracket. To activate the function the CC-Button and a button in the channel need to be pressed at the same time.
+
+     Name                                     Type                      Protocol                     Function
+     Fadertouch [MUTE]                        LATCH                     MCU + HUI                    1.Activate CC
+                                                                                                     2.Press MUTE of channel to activate fader touch (X32 like)
+     V-POT CTRL [SEL/SOLO]                    LATCH                     MCU + HUI                    1.Activate CC
+                                                                                                     2.Hold SELECT and use jog wheel to turn virtual encoder
+     V-POT CTRL [SEL/SOLO]                    LATCH                     MCU + HUI                    1.Activate CC
+                                                                                                     2.Press SOLO to push virtual encoder
+     RECRDY CTRL [SEL]                        PUSH                      MCU + HUI                    Press SELECT while holding CC to activate RECORD in channel
+     AUTO [SEL]                               PUSH                      HUI (only)                   Press SELECT while holding CC to press AUTO* in channel
+     V-SEL [SEL]                              PUSH                      HUI (only)                   Press SELECT while holding CC to press V-SEL* in channel
+     INS [SEL]                                PUSH                      HUI (only)                   Press SELECT while holding CC to press INS* in channel
+
+* Button of original Mackie HUI hardware
+In addition to explicit DAW-Functions, console functions can be stored in the DAW-Layers as well. Depending on the selected protocol functions are greyed out on the
+assign page and hidden on the CC LCDs.
+10     WING DAW-CONTROL
+
+
+Store Preset
+As soon as the surface is adapted to ones needs, a preset can be stored. The DAW layers are part of the CC Section and can be saved within a snapshot providing a
+corresponding recall scope. To do so navigate to the Library and store a Snapshot. To limit the snapshot to the parameters of the CC Section, select CUSTOM in the recall
+scope only.
+
+
+
+
+Share Preset
+The presets provided on the Setup Page are intended to be a starting point for different DAWs. We really want to improve these and would like to encourage all
+customers to exchange ideas and presets in our community.
+Please visit: musictribe.com
+11      WING DAW-CONTROL
+
+
+MCU – Implementation
+The MCU implementation offers support for up to 24 faders and is different from other protocols in terms of additional functions that can be accessed via the layer
+buttons and the upper part of the CC section.
+
+Layer Buttons
+The former layer buttons are assigned to virtual buttons of the original Mackie MCU-Hardware:
+
+     LEFT                                                   MID                                                              RIGHT
+     VIEW                            ≈ NAME/VALUE*          VIEW                            ≈ NAME/VALUE*                    VIEW                            ≈ NAME/VALUE*
+     CH1-12                          ≈ TRACK*               SOF FLIP                        ≈ FLIP*                          MAIN/MATRIX                     ≈ TRACK*
+     CH13-24                         ≈ PAN*                 DCA                             ≈ PAN*                           DCA                             ≈ PAN*
+     CH25-40                         ≈ SEND*                MAIN/MATRIX                     ≈ SEND*                          CH1-40                          ≈ SEND*
+     AUX/FX                          ≈ EQ*                  AUX/FX                          ≈ EQ*                            AUX/FX                          ≈ EQ*
+     BUS/MASTER                      ≈ PLUGIN*              BUS/MASTER                      ≈ PLUGIN *                       BUS/MASTER                      ≈ PLUGIN *
+     USER1/USER2                                            USER1/USER2                                                      USER1/USER2
+     [navigate faders in banks of 8]                        [navigate faders in banks of 8]                                  [navigate faders in banks of 8]
+     <4 / 4>                                                <4 / 4>                                                          <4 / 4>
+     [navigate faders by single channel]                    [navigate faders by single channel]                              [navigate faders by single channel]
+
+
+* Button of original Mackie MCU Hardware
+
+Upper CC-Section
+When using the MCU-Protocol, there are two modes for the upper portion of the CC-Section.
+If the USER-Layers is selected in the lower portion it is completely customizable. If one of the DAW-Layers is selected the assignment is preconfigured with Push-
+Encoder functions in blocks of 4:
+
+
+                                                                                                  The display is showing the information of
+                                                                                                  the corresponding 4 Channels
+
+
+                                                                                                  The encoder is used in conjunction with the
+ This section is representing 4 channels of the                                                   button underneath as the Push-Encoder of
+ virtual hardware controller. There are two                                                       the original hardware.
+ ways to navigate channels:                                                                       Upper-Button = Push-Function
+ 1. SELECT a channel and the section jumps to
+ the corresponding 4CH-Goup                                                                       The Lower-Buttons act as the Record-
+ 2. Navigate through channels in clocks of 4                                                      Button of the corresponding channel
+ using the UP- and DOWN-Button
+12      WING DAW-CONTROL
+
+
+HUI- Implementation
+The HUI implementation offers support for up to 24 faders and is different from other protocols in terms of additional functions that can be accessed via the layer
+buttons and the upper part of the CC section.
+
+Layer Buttons
+The former layer buttons are assigned to virtual buttons of the original Mackie HUI-Hardware:
+
+     LEFT                                                      MID                                                    RIGHT
+     VIEW                            ≈ PAN*                    VIEW                            ≈ PAN*                 VIEW                            ≈ PAN*
+     CH1-12                          ≈ SEND A*                 SOF FLIP                        ≈ SEND A*              MAIN/MATRIX                     ≈ SEND A*
+     CH13-24                         ≈ SEND B*                 DCA                             ≈ SEND B*              DCA                             ≈ SEND B*
+     CH25-40                         ≈ SEND C*                 MAIN/MATRIX                     ≈ SEND C*              CH1-40                          ≈ SEND C*
+     AUX/FX                          ≈ SEND D*                 AUX/FX                          ≈ SEND D*              AUX/FX                          ≈ SEND D*
+     BUS/MASTER                      ≈ SEND E*                 BUS/MASTER                      ≈ SEND E*              BUS/MASTER                      ≈ SEND E*
+     USER1/USER2                                               USER1/USER2                                            USER1/USER2
+     [navigate faders in banks of 8]                           [navigate faders in banks of 8]                        [navigate faders in banks of 8]
+     <4 / 4>                                                   <4 / 4>                                                <4 / 4>
+     [navigate faders by single channel]                       [navigate faders by single channel]                    [navigate faders by single channel]
+
+
+* ≈ Button of original Mackie HUI Hardware
+
+Upper CC-Section
+In addition to the preassigned Push-Encoder function (see MCU) for the upper section. Mackie HUI has an additional encoder section that can be activated by pressing
+the VIEW-Button of the upper part while using one of the DAW-Layers.
+
+
+
+
+Encoder + Button [1-4]                            Button [5]
+
+
+                                                                                                           Hold + Jogwheel = Encoder [5]
+We Hear You
+

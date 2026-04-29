@@ -11,6 +11,7 @@ Orchestrates the complete auto fader system:
 
 import logging
 import asyncio
+import math
 import os
 import time
 from typing import Dict, Optional, Callable, Any
@@ -36,6 +37,7 @@ from .core.integrated_lufs import RollingIntegratedLufs
 from .balance.static_balancer import StaticBalancer
 from .balance.dynamic_mixer import DynamicMixer
 from .balance.fuzzy_controller import FuzzyFaderController
+from .balance.dugan_automixer import DuganAutomixer, DuganAutomixSettings
 from .balance.pid_controller import GainSharingController
 from .balance.hierarchical_mixer import HierarchicalMixer
 from .profiles.genre_profiles import GenreProfile, GenreType, GENRE_PROFILES
@@ -97,6 +99,17 @@ class AutoFaderControllerV2:
         self.lufs_window_sec = float(auto_fader_cfg.get("lufs_window_sec", 3.0))
         self.integrated_lufs = RollingIntegratedLufs(window_seconds=self.lufs_window_sec)
         self.latest_integrated_levels: Dict[int, float] = {}
+        self.allow_fader_above_unity = bool(auto_fader_cfg.get("allow_fader_above_unity", False))
+        configured_fader_ceiling = float(auto_fader_cfg.get("fader_ceiling_db", 0.0))
+        self.fader_ceiling_db = (
+            configured_fader_ceiling
+            if self.allow_fader_above_unity
+            else min(configured_fader_ceiling, 0.0)
+        )
+        self.fader_floor_db = min(
+            float(auto_fader_cfg.get("fader_floor_db", -60.0)),
+            self.fader_ceiling_db,
+        )
         self.channel_priorities: Dict[int, int] = {
             int(ch): int(priority) for ch, priority in auto_fader_cfg.get("channel_priorities", {}).items()
         }
@@ -145,10 +158,48 @@ class AutoFaderControllerV2:
             dead_zone=gain_dead_zone,
             gate_threshold=gain_gate_threshold,
         )
+
+        dugan_cfg = auto_fader_cfg.get("dugan", {})
+        self.dugan_automixer = DuganAutomixer(
+            DuganAutomixSettings(
+                active_threshold_db=float(
+                    dugan_cfg.get("active_threshold_db", gain_gate_threshold)
+                ),
+                auto_mix_depth_db=float(dugan_cfg.get("auto_mix_depth_db", 24.0)),
+                max_full_gain_mics=dugan_cfg.get("max_full_gain_mics"),
+                last_hold_enabled=bool(dugan_cfg.get("last_hold_enabled", True)),
+                smoothing_alpha=float(dugan_cfg.get("smoothing_alpha", 1.0)),
+            )
+        )
+        self.dugan_excluded_instruments = {
+            str(inst).strip().lower()
+            for inst in dugan_cfg.get(
+                "excluded_instruments",
+                [
+                    "kick",
+                    "snare",
+                    "tom",
+                    "toms",
+                    "floor_tom",
+                    "rack_tom",
+                    "overhead",
+                    "overheads",
+                    "room",
+                    "hihat",
+                    "hi_hat",
+                    "ride",
+                    "cymbals",
+                    "percussion",
+                    "bass",
+                    "playback",
+                ],
+            )
+        }
+        self.latest_dugan_targets: Dict[int, float] = {}
         self.controller_type = controller_type
-        if self.controller_mode not in {"mvp", "dynamic", "pid", "gain_sharing"}:
+        if self.controller_mode not in {"mvp", "dynamic", "pid", "gain_sharing", "dugan"}:
             self.controller_mode = controller_type
-        if self.controller_mode not in {"mvp", "dynamic", "pid", "gain_sharing"}:
+        if self.controller_mode not in {"mvp", "dynamic", "pid", "gain_sharing", "dugan"}:
             self.controller_mode = "dynamic"
 
         # Keep legacy alias to avoid touching other paths.
@@ -311,9 +362,68 @@ class AutoFaderControllerV2:
             targets[ch] = base_target - (deviation_from_avg * 0.3)
         return targets
 
+    def _calculate_dugan_adjustments(self, current_levels: Dict[int, float]) -> Dict[int, float]:
+        """
+        Convert Dugan target attenuation into relative fader adjustments.
+
+        Dugan outputs are absolute attenuation values relative to the captured
+        baseline fader. AutoFader V2 sends relative fader moves, so this method
+        maps each target to a desired fader position and returns the delta from
+        the current mixer state.
+        """
+        eligible_levels = {
+            ch_id: level
+            for ch_id, level in current_levels.items()
+            if self._is_dugan_eligible_channel(ch_id)
+        }
+        dugan_targets = self.dugan_automixer.calculate_target_gains(eligible_levels)
+        self.latest_dugan_targets = dugan_targets
+
+        adjustments: Dict[int, float] = {}
+        for ch_id, target_gain_db in dugan_targets.items():
+            if not math.isfinite(float(target_gain_db)):
+                continue
+
+            baseline_db = self._initial_fader_positions.get(ch_id, self.fader_ceiling_db)
+            baseline_db = min(float(baseline_db), self.fader_ceiling_db)
+            if not self.allow_fader_above_unity:
+                baseline_db = min(baseline_db, 0.0)
+            baseline_db = max(self.fader_floor_db, baseline_db)
+
+            desired_db = baseline_db + float(target_gain_db)
+            desired_db = max(self.fader_floor_db, min(self.fader_ceiling_db, desired_db))
+
+            current_db = None
+            if self.mixer_client:
+                current_db = self.mixer_client.get_channel_fader(ch_id)
+            if current_db is None:
+                current_db = baseline_db
+
+            adjustments[ch_id] = desired_db - float(current_db)
+
+        return adjustments
+
+    def _is_dugan_eligible_channel(self, channel_id: int) -> bool:
+        """Return whether Dugan/NOM attenuation should control this channel."""
+        instrument = self.instrument_types.get(channel_id, "unknown")
+        return str(instrument).strip().lower() not in self.dugan_excluded_instruments
+
     def _has_stereo_metrics(self, metric: ChannelMetrics) -> bool:
         """True when metrics contain left/right data required for correlation."""
         return hasattr(metric, "left_rms") and hasattr(metric, "right_rms")
+
+    @staticmethod
+    def _metric_band_energy(metric: ChannelMetrics) -> Dict[str, float]:
+        """Extract C++ band-energy fields into the panner/EQ dict shape."""
+        return {
+            "sub": float(metric.band_energy_sub),
+            "bass": float(metric.band_energy_bass),
+            "low_mid": float(metric.band_energy_low_mid),
+            "mid": float(metric.band_energy_mid),
+            "high_mid": float(metric.band_energy_high_mid),
+            "high": float(metric.band_energy_high),
+            "air": float(metric.band_energy_air),
+        }
 
     def _apply_adaptive_noise_gate(self, channel_id: int, metric: ChannelMetrics, now_ts: float) -> None:
         """Open/close gate based on sustained inactivity."""
@@ -718,19 +828,27 @@ class AutoFaderControllerV2:
         self.integrated_lufs.reset()
         self.latest_integrated_levels.clear()
         self.gain_sharing_controller.reset_all()
+        self.dugan_automixer.reset_all()
+        self.latest_dugan_targets.clear()
         self._inactive_since.clear()
         self._gate_closed_channels.clear()
 
         # Apply intelligent panning (IMP 7.2) once at start if enabled.
         if self.auto_panner_enabled and not self._panner_applied:
             try:
+                metrics = self.cpp_bridge.get_all_metrics()
                 centroids = {
                     ch: m.spectral_centroid
-                    for ch, m in self.cpp_bridge.get_all_metrics().items()
+                    for ch, m in metrics.items()
+                    if ch in self.selected_channels
+                }
+                band_energy = {
+                    ch: self._metric_band_energy(m)
+                    for ch, m in metrics.items()
                     if ch in self.selected_channels
                 }
                 pan_decisions = self.auto_panner.calculate_panning(
-                    self.selected_channels, self.instrument_types, centroids,
+                    self.selected_channels, self.instrument_types, centroids, band_energy,
                 )
                 applied = self.auto_panner.apply_to_mixer(self.mixer_client, pan_decisions)
                 self._panner_applied = True
@@ -1024,7 +1142,7 @@ class AutoFaderControllerV2:
         except: pass
         # #endregion
         
-        # Analyze metrics and collect band energy for spectral masking
+        # Analyze metrics and collect band energy for panning/masking/EQ
         channel_band_energy = {}
         for ch_id, metrics in all_metrics.items():
             if ch_id not in self.selected_channels:
@@ -1034,8 +1152,8 @@ class AutoFaderControllerV2:
             features = self.acoustic_analyzer.analyze(metrics)
             self.latest_features[ch_id] = features
             
-            # Collect band energy for spectral masking
-            if self.spectral_masking_enabled and features.band_energy:
+            # Collect band energy for panning/masking/EQ
+            if features.band_energy:
                 channel_band_energy[ch_id] = features.band_energy
         
         # Calculate adjustments - only for selected channels
@@ -1267,7 +1385,14 @@ class AutoFaderControllerV2:
                         logger.info(f"Channel {ch}: manual override detected (fader {current_fader:.1f} vs sent {last_sent:.1f}), freeze {self.freeze_cooldown_seconds}s")
         
         # Calculate adjustments using selected controller
-        if self.controller_mode in {'pid', 'mvp', 'gain_sharing'}:
+        if self.controller_mode == 'dugan':
+            adjustments = self._calculate_dugan_adjustments(current_levels)
+            logger.info(
+                "DUGAN automix controller: NOM=%s, calculated %d adjustments",
+                self.dugan_automixer.last_nom,
+                len(adjustments),
+            )
+        elif self.controller_mode in {'pid', 'mvp', 'gain_sharing'}:
             # Cross-adaptive targets for gain sharing.
             if self.cross_adaptive_enabled:
                 target_levels = self._calculate_cross_adaptive_targets(current_levels)
@@ -1527,6 +1652,7 @@ class AutoFaderControllerV2:
             "bleed_protection_enabled": self.bleed_protection_enabled,
             "controller_mode": self.controller_mode,
             "hierarchical_mix_enabled": self.hierarchical_mixer.enabled,
+            "dugan": self.dugan_automixer.get_state() if self.controller_mode == "dugan" else None,
         })
     
     def _on_metrics_update_auto_balance(self, all_metrics: Dict[int, ChannelMetrics]):
@@ -1584,12 +1710,12 @@ class AutoFaderControllerV2:
             
             # PROTECTION: Limit maximum fader position based on adjustment direction
             # If we're boosting a lot, the channel is probably weak - don't go to maximum
-            MAX_FADER_FOR_WEAK_SIGNAL = 6.0  # dB - maximum fader for weak signals
+            MAX_FADER_FOR_WEAK_SIGNAL = min(6.0, self.fader_ceiling_db)
             if adjustment_db > 1.5 and new_db > MAX_FADER_FOR_WEAK_SIGNAL:
                 new_db = MAX_FADER_FOR_WEAK_SIGNAL
                 logger.debug(f"Channel {channel_id}: Limiting fader to {MAX_FADER_FOR_WEAK_SIGNAL} dB (weak signal protection)")
             
-            new_db = max(-144.0, min(10.0, new_db))  # Wing fader range: -144..10 dB
+            new_db = max(self.fader_floor_db, min(self.fader_ceiling_db, new_db))
             
             # #region agent log
             try:
@@ -1648,4 +1774,5 @@ class AutoFaderControllerV2:
             "bleed_info": self.latest_bleed_info,
             "hierarchical_mix_enabled": self.hierarchical_mixer.enabled,
             "adaptive_noise_gate_enabled": self.adaptive_noise_gate_enabled,
+            "dugan": self.dugan_automixer.get_state(),
         }

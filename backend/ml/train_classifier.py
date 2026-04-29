@@ -1,19 +1,99 @@
+"""Training script for the channel classifier.
+
+Generates synthetic training data by default and trains the CNN model.
+Supports loading external datasets from JSONL/NPZ when `dataset_path` is
+provided.
 """
-Training script for the channel classifier.
-Generates synthetic training data and trains the CNN model.
-"""
+import json
+import logging
+import os
+from typing import Dict, List, Optional, Sequence
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-import numpy as np
-import logging
-import os
-from typing import Optional
 
 from .channel_classifier import ChannelClassifierNet, INSTRUMENT_CLASSES, NUM_CLASSES
 
 logger = logging.getLogger(__name__)
+
+
+def _label_to_index(label: str) -> int:
+    if label in INSTRUMENT_CLASSES:
+        return INSTRUMENT_CLASSES.index(label)
+    return INSTRUMENT_CLASSES.index("unknown")
+
+
+def _to_numpy_array(payload: Sequence, *, expected_mels: int, expected_frames: int) -> np.ndarray:
+    arr = np.asarray(payload, dtype=np.float32)
+    if arr.ndim != 2:
+        arr = np.asarray(arr).reshape(1, -1)
+    if arr.shape != (expected_mels, expected_frames):
+        if arr.size < expected_mels * expected_frames:
+            padded = np.zeros((expected_mels * expected_frames,), dtype=np.float32)
+            padded[:arr.size] = arr.ravel()[: expected_mels * expected_frames]
+            arr = padded.reshape(expected_mels, expected_frames)
+        else:
+            arr = arr.reshape(expected_mels, expected_frames)
+    return arr
+
+
+def _load_dataset_from_file(path: str, *, n_mels: int, n_frames: int) -> List[tuple]:
+    path = os.path.abspath(path)
+    _, ext = os.path.splitext(path.lower())
+    features: List[np.ndarray] = []
+    labels: List[int] = []
+
+    if ext == ".npz":
+        with np.load(path, allow_pickle=True) as raw:
+            data = raw["data"] if "data" in raw.files else None
+            feat = raw["features"] if "features" in raw.files else None
+            lab = raw["labels"] if "labels" in raw.files else None
+            if data is None and feat is None:
+                raise ValueError("NPZ must include 'data' or 'features'")
+            if lab is None:
+                raise ValueError("NPZ must include 'labels'")
+            sample_data = data if data is not None else feat
+            sample_labels = lab
+    elif ext == ".jsonl":
+        sample_data = []
+        sample_labels = []
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                row = json.loads(line)
+                sample_data.append(row.get("spectrogram") or row.get("features"))
+                sample_labels.append(row.get("label", "unknown"))
+    else:
+        raise ValueError(f"Unsupported dataset format: {ext}")
+
+    if isinstance(sample_data, np.ndarray):
+        sample_data = sample_data.tolist()
+    if isinstance(sample_labels, np.ndarray):
+        sample_labels = sample_labels.tolist()
+    if len(sample_data) != len(sample_labels):
+        raise ValueError("Dataset payloads and labels have different lengths")
+
+    for idx, row in enumerate(sample_data):
+        arr = _to_numpy_array(row, expected_mels=n_mels, expected_frames=n_frames)
+        if len(sample_labels) <= idx:
+            label_value = "unknown"
+        else:
+            label_value = sample_labels[idx]
+        if isinstance(label_value, str):
+            class_idx = _label_to_index(label_value)
+        else:
+            class_idx = int(label_value)
+            if class_idx < 0 or class_idx >= NUM_CLASSES:
+                class_idx = NUM_CLASSES - 1
+        features.append(arr)
+        labels.append(class_idx)
+
+    if not features:
+        raise ValueError(f"External dataset is empty: {path}")
+
+    return [(feature, label) for feature, label in zip(features, labels)]
 
 
 class SyntheticInstrumentDataset(Dataset):
@@ -79,12 +159,29 @@ class SyntheticInstrumentDataset(Dataset):
         return torch.from_numpy(self.data[idx]).unsqueeze(0), self.labels[idx]
 
 
+class ExternalInstrumentDataset(Dataset):
+    """Dataset loaded from external internet or local files."""
+
+    def __init__(self, records: List[tuple]):
+        self.records = records
+
+    def __len__(self):
+        return len(self.records)
+
+    def __getitem__(self, idx):
+        spec, label = self.records[idx]
+        return torch.from_numpy(spec).unsqueeze(0), label
+
+
 def train_classifier(
     output_path: str = 'models/channel_classifier.pt',
     n_epochs: int = 20,
     batch_size: int = 32,
     lr: float = 1e-3,
     n_samples_per_class: int = 100,
+    n_mels: int = 64,
+    n_frames: int = 64,
+    dataset_path: Optional[str] = None,
     device: Optional[str] = None,
 ):
     """Train the channel classifier model."""
@@ -92,9 +189,19 @@ def train_classifier(
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
     logger.info(f"Training on {device}")
-    dataset = SyntheticInstrumentDataset(
-        n_samples_per_class=n_samples_per_class,
-    )
+
+    if dataset_path:
+        logger.info("Loading external dataset from %s", dataset_path)
+        records = _load_dataset_from_file(
+            dataset_path, n_mels=n_mels, n_frames=n_frames,
+        )
+        dataset = ExternalInstrumentDataset(records)
+    else:
+        dataset = SyntheticInstrumentDataset(
+            n_samples_per_class=n_samples_per_class,
+            n_mels=n_mels,
+            n_frames=n_frames,
+        )
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_set, val_set = torch.utils.data.random_split(

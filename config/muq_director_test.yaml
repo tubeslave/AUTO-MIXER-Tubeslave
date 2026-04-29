@@ -1,0 +1,30 @@
+enabled: true
+offline_only: true
+send_osc: false
+shadow_mode: false
+window_sec: 10
+hop_sec: 5
+max_steps: 80
+candidates_per_step: 12
+beam_width: 3
+min_delta_accept: 0.005
+stop_if_no_improvement_steps: 8
+rollback_on_drop: true
+save_every_candidate: true
+save_best_mix_each_step: true
+target_lufs: -14.0
+true_peak_ceiling_dbfs: -1.0
+max_gain_change_db: 1.0
+max_eq_gain_change_db: 1.5
+max_pan_change: 0.08
+max_compressor_threshold_change_db: 1.5
+max_ratio_change: 0.4
+allow_master_limiter: true
+allow_aggressive_mode: true
+log_jsonl: true
+mode: muq_safe
+sample_rate: 48000
+require_available_muq: true
+max_eval_windows: 4
+output_root: ~/Desktop/Ai LOGS/muq_director
+audio_output_root: ~/Desktop/Ai MIXING/muq_director

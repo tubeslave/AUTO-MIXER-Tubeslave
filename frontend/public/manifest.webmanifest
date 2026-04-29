@@ -1,0 +1,16 @@
+{
+  "name": "AUTO MIXER Tubeslave Remote",
+  "short_name": "AUTO MIXER",
+  "description": "Touch remote control for AUTO-MIXER Tubeslave",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e1012",
+  "theme_color": "#0e1012",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

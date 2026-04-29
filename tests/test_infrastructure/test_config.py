@@ -110,3 +110,27 @@ class TestConfigManager:
                 os.environ.pop('AUTOMIXER_MIXER_IP', None)
             else:
                 os.environ['AUTOMIXER_MIXER_IP'] = original
+
+    def test_model_fallbacks_env_override(self, monkeypatch):
+        """AUTOMIXER_MODEL_FALLBACKS pins the active LLM fallback chain."""
+        monkeypatch.setenv(
+            'AUTOMIXER_MODEL_FALLBACKS',
+            'ollama:kimi-k2.5:cloud, ollama:qwen3:0.6b',
+        )
+
+        cm = ConfigManager()
+
+        assert cm.get('ai.model_fallbacks') == [
+            'ollama:kimi-k2.5:cloud',
+            'ollama:qwen3:0.6b',
+        ]
+
+    def test_default_model_fallbacks_include_kimi_secondary(self):
+        """Default config wires Kimi as the second backend in the LLM chain."""
+        cm = ConfigManager()
+
+        assert cm.get('ai.model_fallbacks')[:3] == [
+            'openai:gpt-5.4',
+            'kimi_cli:default',
+            'openai:gpt-4o-mini',
+        ]

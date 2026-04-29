@@ -1,0 +1,33 @@
+technical:
+  master_true_peak_warning_dbtp: -1.0
+  mix_headroom_warning_db: 3.0
+  channel_peak_hot_dbfs: -3.0
+  clip_sample_threshold: 0.999
+  dc_offset_warning: 0.01
+  click_pop_zscore: 10.0
+tonal:
+  mud_ratio_warning: 0.22
+  boominess_ratio_warning: 0.28
+  harshness_ratio_warning: 0.18
+  brightness_ratio_warning: 0.34
+  air_low_warning: 0.015
+masking:
+  spectral_overlap_warning: 0.82
+  vocal_to_accompaniment_min_db: 1.0
+  vocal_to_accompaniment_max_db: 6.0
+dynamics:
+  crest_factor_low_warning_db: 6.0
+  lra_low_warning_lu: 3.0
+  lra_high_warning_lu: 18.0
+stereo:
+  correlation_low_warning: 0.10
+  mono_loss_warning_db: 2.0
+  low_frequency_width_warning: 0.25
+translation:
+  small_speaker_midrange_min_ratio: 0.25
+actions:
+  conservative_gain_step_db: 1.0
+  conservative_eq_cut_db: -1.5
+  conservative_eq_boost_db: 0.75
+  max_auto_gain_boost_db: 0.0
+  max_safe_fader_db: 0.0

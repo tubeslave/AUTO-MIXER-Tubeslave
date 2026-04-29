@@ -140,7 +140,7 @@ WING_OSC_ADDRESSES = {
             "mdl": "/ch/{ch}/dyn/mdl",  # Compressor model
             "mix": "/ch/{ch}/dyn/mix",  # Mix (%) 0..100
             "gain": "/ch/{ch}/dyn/gain",  # Gain (dB) -6..12
-            "thr": "/ch/{ch}/dyn/thr",  # Threshold (dB) -60..0
+            "thr": "/ch/{ch}/dyn/thr26",  # Threshold (dB) -60..0
             "ratio": "/ch/{ch}/dyn/ratio",  # Ratio: 1.1, 1.2, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 8.0, 10, 20, 50, 100
             "knee": "/ch/{ch}/dyn/knee",  # Knee 0..5
             "det": "/ch/{ch}/dyn/det",  # Detect: PEAK, RMS

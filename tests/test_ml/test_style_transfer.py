@@ -123,6 +123,15 @@ class TestExtractStyle:
         # A 0.5-amplitude sine at 48 kHz should have LUFS somewhere between -30 and 0
         assert -50 < profile.loudness_lufs < 0
 
+    def test_extract_style_infers_relative_instrument_settings(self, stereo_mix, style_transfer):
+        profile = style_transfer.extract_style(stereo_mix, sr=48000, name="ref")
+        assert profile.instrument_settings_mode == "relative"
+        assert "vocals" in profile.per_instrument_settings
+        assert "kick" in profile.per_instrument_settings
+        assert "bass" in profile.per_instrument_settings
+        assert profile.per_instrument_settings["vocals"].bus_send_level > -24.0
+        assert abs(profile.per_instrument_settings["kick"].pan) <= 1e-6
+
 
 # ---------------------------------------------------------------------------
 # Style application
@@ -168,6 +177,38 @@ class TestApplyStyle:
         result = style_transfer.apply_style(profile, channel_audios, channel_types, sr=48000)
         fader = result["bass"]["fader_db"]
         assert -96.0 <= fader <= 10.0
+
+    def test_apply_style_blends_relative_instrument_settings(self, mono_signal, style_transfer):
+        profile = StyleProfile(
+            name="relative",
+            spectral_balance={b: -10.0 for b in SPECTRAL_BANDS},
+            dynamic_range=11.0,
+            loudness_lufs=-15.0,
+            instrument_settings_mode="relative",
+        )
+        profile.per_instrument_settings["electric_guitar"] = InstrumentStyle(
+            instrument_type="electric_guitar",
+            gain_db=1.2,
+            eq_high_mid_db=1.5,
+            compression_ratio=3.0,
+            compression_threshold_db=-24.0,
+            gate_threshold_db=-48.0,
+            pan=0.55,
+            bus_send_level=-14.0,
+        )
+        result = style_transfer.apply_style(
+            profile,
+            {"gtr": mono_signal},
+            {"gtr": "electric_guitar"},
+            sr=48000,
+            blend_instrument_settings=True,
+        )
+        params = result["gtr"]
+        assert params["fader_db"] > -96.0
+        assert params["pan"] == pytest.approx(0.55, abs=0.01)
+        assert params["gate_threshold"] == pytest.approx(-48.0, abs=0.1)
+        assert params["bus_send"]["1"] == pytest.approx(-14.0, abs=0.1)
+        assert any(abs(band["gain_db"]) > 0.5 for band in params["eq_bands"])
 
 
 # ---------------------------------------------------------------------------

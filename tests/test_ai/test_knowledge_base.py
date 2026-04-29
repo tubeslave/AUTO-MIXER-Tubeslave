@@ -106,6 +106,58 @@ class TestKnowledgeBase:
         results = kb.search("compression vocals", n_results=5, category="mixing_rule")
         assert all(r.category == "mixing_rule" for r in results)
 
+    def test_keyword_search_accepts_multiple_categories(self):
+        """Keyword search can restrict results to more than one allowed category."""
+        kb = KnowledgeBase(knowledge_dir="/nonexistent", use_vector_db=False)
+        kb.add_entry(KnowledgeEntry(
+            id="r1",
+            content="Use compression on vocals",
+            category="mixing_rules",
+            metadata={"title": "Compression", "source": "mixing_rules"},
+        ))
+        kb.add_entry(KnowledgeEntry(
+            id="c1",
+            content="Sound check vocals with compression",
+            category="live_sound_checklist",
+            metadata={"title": "Checklist", "source": "live_sound_checklist"},
+        ))
+        kb.add_entry(KnowledgeEntry(
+            id="s1",
+            content="A random study note about compression",
+            category="study_videos",
+            metadata={"title": "Video", "source": "study_videos"},
+        ))
+
+        results = kb.search(
+            "compression vocals",
+            n_results=5,
+            category=("mixing_rules", "live_sound_checklist"),
+        )
+
+        assert {entry.id for entry in results} == {"r1", "c1"}
+
+    def test_allowed_categories_filter_loaded_runtime_knowledge(self):
+        """allowed_categories prevents runtime KB instances from loading noisy study files."""
+        tmpdir = tempfile.mkdtemp()
+        try:
+            with open(os.path.join(tmpdir, "mixing_rules.md"), "w", encoding="utf-8") as f:
+                f.write("# Rules\n\n## Vocals\nKeep vocals clear.\n")
+            with open(os.path.join(tmpdir, "study_book.md"), "w", encoding="utf-8") as f:
+                f.write("<!-- source_type: books -->\n# Book\n\n## Notes\nIrrelevant metadata.\n")
+            with open(os.path.join(tmpdir, "study_video.md"), "w", encoding="utf-8") as f:
+                f.write("<!-- source_type: videos -->\n# Video\n\n## Notes\nIrrelevant metadata.\n")
+
+            kb = KnowledgeBase(
+                knowledge_dir=tmpdir,
+                use_vector_db=False,
+                allowed_categories=KnowledgeBase.AGENT_RUNTIME_CATEGORIES,
+            )
+
+            assert kb.entry_count() >= 1
+            assert set(kb.get_categories()) == {"mixing_rules"}
+        finally:
+            shutil.rmtree(tmpdir)
+
     def test_get_entry_returns_none_for_missing_id(self):
         """get_entry returns None when entry ID does not exist."""
         kb = KnowledgeBase(knowledge_dir="/nonexistent", use_vector_db=False)

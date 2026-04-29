@@ -1,20 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import websocketService from './services/websocket';
 import VoiceControlTab from './components/VoiceControlTab';
 import GainStagingTab from './components/GainStagingTab';
 import AutoEQTab from './components/AutoEQTab';
 import PhaseAlignmentTab from './components/PhaseAlignmentTab';
+import SystemMeasurementTab from './components/SystemMeasurementTab';
 import AutoFaderTab from './components/AutoFaderTab';
 import AutoSoundcheckTab from './components/AutoSoundcheckTab';
 import AutoCompressorTab from './components/AutoCompressorTab';
-import AutoEffectsTab from './components/AutoEffectsTab';
-import AutoPannerTab from './components/AutoPannerTab';
-import AutoGateTab from './components/AutoGateTab';
-import AutoReverbTab from './components/AutoReverbTab';
-import CrossAdaptiveEQTab from './components/CrossAdaptiveEQTab';
-import SystemMeasurementTab from './components/SystemMeasurementTab';
 import SettingsTab from './components/SettingsTab';
+import AIAgentTab from './components/AIAgentTab';
+import IPhoneControlSurface from './components/IPhoneControlSurface';
 
 // Color map for routing roles
 const ROLE_COLORS = {
@@ -31,19 +28,16 @@ const ROLE_COLORS = {
 };
 
 const NAV_ITEMS = [
+  { id: 'remote', icon: '▣', label: 'Remote' },
   { id: 'mixer', icon: '🔌', label: 'Connect' },
   { id: 'gainStaging', icon: '📊', label: 'Gain' },
   { id: 'phaseAlignment', icon: '⟳', label: 'Phase' },
+  { id: 'systemMeasurement', icon: '📐', label: 'Master' },
   { id: 'autoEQ', icon: '〰', label: 'EQ' },
   { id: 'autoCompressor', icon: '⬇', label: 'Comp' },
-  { id: 'autoGate', icon: '🚪', label: 'Gate' },
   { id: 'autoFader', icon: '🎚', label: 'Fader' },
-  { id: 'autoPanner', icon: '🎧', label: 'Pan' },
-  { id: 'autoReverb', icon: '🌊', label: 'Reverb' },
-  { id: 'autoEffects', icon: '✨', label: 'FX' },
-  { id: 'crossAdaptiveEQ', icon: '🔀', label: 'X-EQ' },
   { id: 'autoSoundcheck', icon: '🎯', label: 'Soundcheck' },
-  { id: 'systemMeasurement', icon: '📐', label: 'Measure' },
+  { id: 'aiAgent', icon: 'AI', label: 'Agent' },
   { id: 'voice', icon: '🎙', label: 'Voice' },
   { id: 'settings', icon: '⚙', label: 'Settings' },
 ];
@@ -59,18 +53,26 @@ function App() {
   const [availableChannels, setAvailableChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [connecting, setConnecting] = useState(false);
-  const [activeTab, setActiveTab] = useState('mixer');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 700) return 'remote';
+    return 'mixer';
+  });
   const [globalMode, setGlobalMode] = useState('soundcheck');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [routingScheme, setRoutingScheme] = useState([]);
   const [routingChannelCount, setRoutingChannelCount] = useState(64);
+  const mixerIpRef = useRef(mixerIp);
 
   useEffect(() => {
-    websocketService.on('connection_status', (data) => {
+    mixerIpRef.current = mixerIp;
+  }, [mixerIp]);
+
+  useEffect(() => {
+    const handleConnectionStatus = (data) => {
       setConnecting(false);
       setMixerConnected(data.connected);
       if (data.connected) {
-        setStatusMessage(`Wing: ${mixerIp}`);
+        setStatusMessage(`${data.mode || 'wing'}: ${data.ip || data.host || mixerIpRef.current}`);
       } else {
         if (data.error) {
           setStatusMessage(`Ошибка: ${data.error}`);
@@ -78,9 +80,9 @@ function App() {
           setStatusMessage('Отключен');
         }
       }
-    });
+    };
 
-    websocketService.on('audio_devices', (data) => {
+    const handleAudioDevices = (data) => {
       setAudioDevices(data.devices || []);
       if (data.devices && data.devices.length > 0) {
         const danteDevice = data.devices.find(device =>
@@ -90,15 +92,15 @@ function App() {
         setSelectedDevice(deviceToSelect.id);
         setAvailableChannels(deviceToSelect.channels || []);
       }
-    });
+    };
 
-    websocketService.on('bypass_result', (data) => {
+    const handleBypassResult = (data) => {
       if (data.error) {
         setStatusMessage(`Bypass: ${data.error}`);
       } else if (data.success) {
         setStatusMessage(`Bypass OK: ${data.success_count}/40`);
       }
-    });
+    };
 
     const isDefaultChannelName = (name) => {
       if (!name || !name.trim()) return true;
@@ -113,7 +115,7 @@ function App() {
       return defaultPatterns.some(pattern => pattern.test(trimmedName));
     };
 
-    websocketService.on('mixer_channel_names', (data) => {
+    const handleMixerChannelNames = (data) => {
       if (data.error) {
         setStatusMessage(`Scan: ${data.error}`);
         return;
@@ -155,26 +157,46 @@ function App() {
           return updatedChannels;
         });
       }
-    });
+    };
 
-    websocketService.on('disconnected', () => {
+    const handleDisconnected = () => {
       setServerConnected(false);
       setMixerConnected(false);
-      setStatusMessage('Переподключение...');
-    });
+      setStatusMessage('Соединение потеряно, переподключение...');
+    };
 
     const handleAllSettingsLoaded = (data) => {
       if (data.settings && data.settings.mixer) {
         const m = data.settings.mixer;
-        if (m.mixerIp) setMixerIp(m.mixerIp);
-        if (m.mixerPort) setMixerPort(m.mixerPort);
+        if (m.mixerIp || m.ip) setMixerIp(m.mixerIp || m.ip);
+        if (m.mixerPort || m.port) setMixerPort(m.mixerPort || m.port);
       }
     };
-    websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
 
-    websocketService.on('dante_routing', (data) => {
+    const handleDanteRouting = (data) => {
       if (data.routing_scheme) setRoutingScheme(data.routing_scheme);
-    });
+    };
+
+    const handleAudioDeviceSelected = (data) => {
+      if (data.device) {
+        const deviceId = data.device.id ?? data.device.index;
+        if (deviceId !== undefined) {
+          setSelectedDevice(deviceId);
+        }
+        setStatusMessage(`Audio: ${data.device.name}`);
+      } else if (data.error) {
+        setStatusMessage(`Audio: ${data.error}`);
+      }
+    };
+
+    websocketService.on('connection_status', handleConnectionStatus);
+    websocketService.on('audio_devices', handleAudioDevices);
+    websocketService.on('bypass_result', handleBypassResult);
+    websocketService.on('mixer_channel_names', handleMixerChannelNames);
+    websocketService.on('disconnected', handleDisconnected);
+    websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
+    websocketService.on('dante_routing', handleDanteRouting);
+    websocketService.on('audio_device_selected', handleAudioDeviceSelected);
 
     websocketService.connect()
       .then(() => {
@@ -190,20 +212,23 @@ function App() {
       });
 
     return () => {
-      websocketService.off('connection_status', () => {});
-      websocketService.off('audio_devices', () => {});
-      websocketService.off('bypass_result', () => {});
-      websocketService.off('mixer_channel_names', () => {});
-      websocketService.off('disconnected', () => {});
+      websocketService.off('connection_status', handleConnectionStatus);
+      websocketService.off('audio_devices', handleAudioDevices);
+      websocketService.off('bypass_result', handleBypassResult);
+      websocketService.off('mixer_channel_names', handleMixerChannelNames);
+      websocketService.off('disconnected', handleDisconnected);
       websocketService.off('all_settings_loaded', handleAllSettingsLoaded);
-      websocketService.off('dante_routing', () => {});
+      websocketService.off('dante_routing', handleDanteRouting);
+      websocketService.off('audio_device_selected', handleAudioDeviceSelected);
       websocketService.disconnect();
     };
   }, []);
 
   const handleDeviceChange = (deviceId) => {
     setSelectedDevice(deviceId);
-    const device = audioDevices.find(d => d.id === deviceId);
+    const device = audioDevices.find(d =>
+      String(d.id) === String(deviceId) || String(d.index) === String(deviceId)
+    );
     if (device) {
       setAvailableChannels(device.channels || []);
       setSelectedChannels([]);
@@ -259,7 +284,7 @@ function App() {
   };
 
   return (
-    <div className="App">
+    <div className={`App ${activeTab === 'remote' ? 'remote-mode' : ''}`}>
       {/* Sidebar */}
       <nav className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
@@ -327,12 +352,37 @@ function App() {
 
         {/* Tab Content */}
         <div className="tab-content">
+          {activeTab === 'remote' && (
+            <IPhoneControlSurface
+              serverConnected={serverConnected}
+              mixerConnected={mixerConnected}
+              statusMessage={statusMessage}
+              mixerIp={mixerIp}
+              mixerPort={mixerPort}
+              onMixerIpChange={setMixerIp}
+              onMixerPortChange={setMixerPort}
+              connecting={connecting}
+              onConnect={handleConnect}
+              audioDevices={audioDevices}
+              selectedDevice={selectedDevice}
+              onDeviceChange={handleDeviceChange}
+              availableChannels={availableChannels}
+              selectedChannels={selectedChannels}
+              onChannelToggle={handleChannelToggle}
+              onSelectAllChannels={handleSelectAllChannels}
+              onScanMixer={handleScanMixer}
+              onBypass={handleBypass}
+              globalMode={globalMode}
+              onGlobalModeChange={setGlobalMode}
+            />
+          )}
+
           {activeTab === 'mixer' && (
             <div className="connect-page">
               <div className="connect-card">
                 <div className="connect-row">
                   <div className="field">
-                    <label>Wing IP</label>
+                    <label>Wing Rack IP</label>
                     <input
                       type="text"
                       value={mixerIp}
@@ -462,18 +512,12 @@ function App() {
 
           {activeTab === 'gainStaging' && <GainStagingTab {...sharedProps} />}
           {activeTab === 'phaseAlignment' && <PhaseAlignmentTab {...sharedProps} />}
+          {activeTab === 'systemMeasurement' && <SystemMeasurementTab {...sharedProps} />}
           {activeTab === 'autoEQ' && <AutoEQTab {...sharedProps} />}
           {activeTab === 'autoFader' && <AutoFaderTab {...sharedProps} />}
           {activeTab === 'autoSoundcheck' && <AutoSoundcheckTab {...sharedProps} />}
+          {activeTab === 'aiAgent' && <AIAgentTab {...sharedProps} />}
           {activeTab === 'autoCompressor' && <AutoCompressorTab {...sharedProps} />}
-          {activeTab === 'autoEffects' && <AutoEffectsTab {...sharedProps} />}
-          {activeTab === 'autoPanner' && <AutoPannerTab {...sharedProps} />}
-          {activeTab === 'autoGate' && <AutoGateTab {...sharedProps} />}
-          {activeTab === 'autoReverb' && <AutoReverbTab {...sharedProps} />}
-          {activeTab === 'crossAdaptiveEQ' && <CrossAdaptiveEQTab {...sharedProps} />}
-          {activeTab === 'systemMeasurement' && (
-            <SystemMeasurementTab selectedDevice={selectedDevice} mixerClient={null} globalMode={globalMode} />
-          )}
           {activeTab === 'voice' && <VoiceControlTab globalMode={globalMode} />}
           {activeTab === 'settings' && (
             <SettingsTab
