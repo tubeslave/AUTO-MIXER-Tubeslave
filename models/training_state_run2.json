@@ -1,0 +1,110 @@
+{
+  "version": "1.1",
+  "run_count": 1,
+  "last_run": {
+    "run_id": "4826b4e771ea",
+    "reason": "manual",
+    "started": "2026-04-16T21:56:53.299451+00:00",
+    "safe_autostart": true,
+    "dry_run": true,
+    "limits": {
+      "max_dataset_bytes": 1048576,
+      "max_candidates_per_target": 2,
+      "hf_search_limit": 3
+    },
+    "dry_run_completed": true,
+    "completed": "2026-04-16T21:56:55.282167+00:00",
+    "results": {
+      "channel_classifier": {
+        "skipped": true,
+        "status": "dry_run",
+        "reason": "safe_autostart_first_run",
+        "selection": {
+          "status": "dry_run_selected",
+          "manifest_id": null,
+          "candidate_urls": [
+            "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+          ],
+          "checked": [
+            {
+              "url": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt",
+              "within_limit": true
+            }
+          ],
+          "selected": {
+            "mode": "candidate_url",
+            "url": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+          },
+          "reason": "safe_autostart_dry_run",
+          "max_dataset_bytes": 1048576
+        }
+      },
+      "gain_pan_predictor": {
+        "skipped": true,
+        "status": "dry_run",
+        "reason": "safe_autostart_first_run",
+        "selection": {
+          "status": "dry_run_selected",
+          "manifest_id": null,
+          "candidate_urls": [
+            "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+          ],
+          "checked": [
+            {
+              "url": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt",
+              "within_limit": true
+            }
+          ],
+          "selected": {
+            "mode": "candidate_url",
+            "url": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+          },
+          "reason": "safe_autostart_dry_run",
+          "max_dataset_bytes": 1048576
+        }
+      },
+      "mix_console": {
+        "skipped": true,
+        "status": "dry_run",
+        "reason": "safe_autostart_first_run",
+        "selection": {
+          "status": "dry_run_selected",
+          "manifest_id": null,
+          "candidate_urls": [
+            "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+          ],
+          "checked": [
+            {
+              "url": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt",
+              "within_limit": true
+            }
+          ],
+          "selected": {
+            "mode": "candidate_url",
+            "url": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+          },
+          "reason": "safe_autostart_dry_run",
+          "max_dataset_bytes": 1048576
+        }
+      }
+    },
+    "all_ok": true
+  },
+  "safe_autostart_done": true,
+  "last_success": null,
+  "last_error": "safe_autostart_dry_run",
+  "targets": {
+    "channel_classifier": {
+      "last_status": "dry_run",
+      "dataset_id": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+    },
+    "gain_pan_predictor": {
+      "last_status": "dry_run",
+      "dataset_id": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+    },
+    "mix_console": {
+      "last_status": "dry_run",
+      "dataset_id": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+    }
+  }
+}

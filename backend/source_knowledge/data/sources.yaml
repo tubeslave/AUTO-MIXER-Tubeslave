@@ -1,0 +1,1021 @@
+sources:
+  - source_id: senior_mixing_secrets
+    title: "Mixing Secrets for the Small Studio"
+    source_type: book
+    authors: ["Mike Senior"]
+    publisher: "Focal Press / Routledge"
+    year: 2026
+    url: "https://www.routledge.com/Mixing-Secrets-for-the-Small-Studio/Senior/p/book/9781032840451"
+    authority_tier: primary_book
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - workflow_domains
+      - citation_metadata
+    notes: "Seeded from publisher description and table of contents; no long excerpts stored."
+  - source_id: izhaki_mixing_audio
+    title: "Mixing Audio: Concepts, Practices, and Tools"
+    source_type: book
+    authors: ["Roey Izhaki"]
+    publisher: "Focal Press / Routledge"
+    year: 2023
+    url: "https://www.routledge.com/Mixing-Audio-Concepts-Practices-and-Tools/Izhaki/p/book/9781032219448"
+    authority_tier: primary_book
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - workflow_domains
+      - citation_metadata
+    notes: "Publisher table of contents covers phase, faders, panning, EQ, dynamics, delays, reverbs, and meters."
+  - source_id: owsinski_handbook
+    title: "The Mixing Engineer's Handbook"
+    source_type: book
+    authors: ["Bobby Owsinski"]
+    publisher: "Mix Books / Bobby Owsinski Media"
+    year: 1999
+    url: "https://www.mixonline.com/recording/mixing-engineers-handbook-364940"
+    authority_tier: primary_book_reviewed
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - workflow_domains
+      - citation_metadata
+    notes: "MixOnline review identifies balance, dynamics, EQ, sound-field placement, effects, and final mix as core topics."
+  - source_id: intelligent_music_production
+    title: "Intelligent Music Production"
+    source_type: book
+    authors: ["Brecht De Man", "Ryan Stables", "Joshua D. Reiss"]
+    publisher: "Focal Press / Routledge"
+    year: 2020
+    url: "https://www.routledge.com/Intelligent-Music-Production-1st-Edition/De-Man-Stables-Reiss/p/book/9781138055186"
+    authority_tier: primary_book_research
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - automation_methodology
+      - citation_metadata
+    notes: "Publisher description covers classification, data collection, perceptual evaluation, and intelligent systems."
+  - source_id: ten_years_automatic_mixing
+    title: "Ten Years of Automatic Mixing"
+    source_type: paper
+    authors: ["Brecht De Man", "Joshua D. Reiss", "Ryan Stables"]
+    publisher: "Workshop on Intelligent Music Production"
+    year: 2017
+    url: "https://www.open-access.bcu.ac.uk/4968/"
+    authority_tier: peer_reviewed_or_workshop
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - citation_metadata
+    notes: "Open-access workshop paper for automatic mixing context."
+  - source_id: yamaha_sound_reinforcement
+    title: "The Sound Reinforcement Handbook"
+    source_type: book
+    authors: ["Gary Davis", "Ralph Jones", "Yamaha International Corporation"]
+    publisher: "Hal Leonard / Yamaha"
+    year: 1989
+    url: "https://catalog.libraries.psu.edu/catalog/17086367"
+    authority_tier: primary_book_live_sound
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - live_sound_safety
+      - citation_metadata
+    notes: "Library catalog lists phase, frequency response, dynamic range, mixers, and signal processing."
+  - source_id: itu_bs1770
+    title: "ITU-R BS.1770"
+    source_type: standard
+    authors: ["International Telecommunication Union"]
+    publisher: "ITU"
+    year: 2025
+    url: "https://www.itu.int/rec/R-REC-BS.1770/en"
+    authority_tier: official_standard
+    status: active
+    allowed_uses:
+      - metering
+      - citation_metadata
+    notes: "Used for loudness and true-peak measurement, not for artistic mix taste."
+  - source_id: ebu_r128
+    title: "EBU R 128"
+    source_type: standard
+    authors: ["European Broadcasting Union"]
+    publisher: "EBU"
+    year: 2023
+    url: "https://tech.ebu.ch/fr/publications/r128"
+    authority_tier: official_standard
+    status: active
+    allowed_uses:
+      - metering
+      - citation_metadata
+    notes: "Used for loudness normalization concepts and true-peak descriptors."
+  - source_id: sound_on_sound_youtube
+    title: "Sound On Sound YouTube Channel"
+    source_type: video_channel
+    authors: ["Sound On Sound"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@soundonsound"
+    authority_tier: vetted_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered as a future source; no seeded rules depend on unreviewed transcripts."
+  - source_id: pensados_place_youtube
+    title: "Pensado's Place YouTube Channel"
+    source_type: video_channel
+    authors: ["Pensado's Place"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@PensadosPlace"
+    authority_tier: vetted_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered as a future source; no seeded rules depend on unreviewed transcripts."
+  - source_id: produce_like_a_pro_youtube
+    title: "Produce Like A Pro YouTube Channel"
+    source_type: video_channel
+    authors: ["Produce Like A Pro"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@Producelikeapro"
+    authority_tier: vetted_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered as a future source; no seeded rules depend on unreviewed transcripts."
+  - source_id: mix_with_the_masters_youtube
+    title: "Mix With The Masters YouTube Channel"
+    source_type: video_channel
+    authors: ["Mix With The Masters"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@MixWithTheMASTERS"
+    authority_tier: vetted_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered as a future source; no seeded rules depend on unreviewed transcripts."
+  - source_id: izotope_youtube
+    title: "iZotope YouTube Channel"
+    source_type: video_channel
+    authors: ["iZotope"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@iZotopeOfficial"
+    authority_tier: manufacturer_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered for future reviewed transcripts and manufacturer guidance."
+  - source_id: fabfilter_youtube
+    title: "FabFilter YouTube Channel"
+    source_type: video_channel
+    authors: ["FabFilter"]
+    publisher: "YouTube"
+    url: "https://www.youtube.com/@FabFilter"
+    authority_tier: manufacturer_channel_pending_transcripts
+    status: candidate
+    allowed_uses:
+      - future_transcript_ingestion
+      - citation_metadata
+    notes: "Registered for future reviewed transcripts and manufacturer guidance."
+  - source_id: jaes_hafezi_reiss_masking_eq
+    title: "Autonomous Multitrack Equalization Based on Masking Reduction"
+    source_type: paper
+    authors: ["Sina Hafezi", "Joshua D. Reiss"]
+    publisher: "Journal of the Audio Engineering Society"
+    year: 2015
+    url: "https://doi.org/10.17743/jaes.2015.0021"
+    authority_tier: peer_reviewed_jaes
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - masking_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about targeted multitrack masking reduction and the limits of objective masking measures."
+  - source_id: aes_wichern_masking_loudness_loss
+    title: "Quantitative Analysis of Masking in Multitrack Mixes Using Loudness Loss"
+    source_type: conference_paper
+    authors: ["Gordon Wichern", "Hannah Robertson", "Aaron Wishnick"]
+    publisher: "Audio Engineering Society"
+    year: 2016
+    url: "https://secure.aes.org/forum/pubs/conventions/?elib=18450"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - masking_rules
+      - automation_methodology
+      - citation_metadata
+    notes: "AES abstract emphasizes focusing on problematic masking outliers rather than blindly minimizing all masking."
+  - source_id: aes_tom_reiss_spatial_unmasking
+    title: "An Automatic Mixing System for Multitrack Spatialization for Stereo Based on Unmasking and Best Panning Practices"
+    source_type: conference_paper
+    authors: ["Ajin Tom", "Joshua D. Reiss", "Philippe Depalle"]
+    publisher: "Audio Engineering Society"
+    year: 2019
+    url: "https://secure.aes.org/forum/pubs/conventions/?elib=20311"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - panning_rules
+      - masking_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules connecting stereo placement, masking reduction, and best panning practices."
+  - source_id: aes_wichern_loudness_level_features
+    title: "Comparison of Loudness Features for Automatic Level Adjustment in Mixing"
+    source_type: conference_paper
+    authors: ["Gordon Wichern", "Aaron Wishnick", "Alexey Lukin", "Hannah Robertson"]
+    publisher: "Audio Engineering Society"
+    year: 2015
+    url: "https://secure.aes.org/forum/pubs/conventions/?elib=17928"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - level_rules
+      - metering
+      - citation_metadata
+    notes: "AES abstract compares loudness features for automatic track-level adjustment and instrument-dependent targets."
+  - source_id: arxiv_steinmetz_differentiable_mixing
+    title: "Automatic Multitrack Mixing with a Differentiable Mixing Console of Neural Audio Effects"
+    source_type: paper
+    authors: ["Christian J. Steinmetz", "Jordi Pons", "Santiago Pascual", "Joan Serra"]
+    publisher: "arXiv"
+    year: 2020
+    url: "https://arxiv.org/abs/2010.10291"
+    authority_tier: research_preprint
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - citation_metadata
+    notes: "Used for rules that keep automatic decisions interpretable through human-readable console parameters."
+  - source_id: arxiv_diff_mst
+    title: "Diff-MST: Differentiable Mixing Style Transfer"
+    source_type: paper
+    authors: ["Soumya Sai Vanka", "Christian Steinmetz", "Jean-Baptiste Rolland", "Joshua Reiss", "George Fazekas"]
+    publisher: "arXiv"
+    year: 2024
+    url: "https://arxiv.org/abs/2407.08889"
+    authority_tier: research_preprint
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - style_transfer
+      - citation_metadata
+    notes: "Used for paraphrased guidance that reference/style systems should remain controllable through traditional audio effects."
+  - source_id: sos_mixing_essentials
+    title: "Mixing Essentials"
+    source_type: article
+    authors: ["Paul White"]
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/techniques/mixing-essentials"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Used for dynamics, headroom, level automation, and avoiding excessive EQ/compression."
+  - source_id: sos_depth_mix
+    title: "Creating A Sense Of Depth In Your Mix"
+    source_type: article
+    authors: ["Paul White"]
+    publisher: "Sound On Sound"
+    year: 2009
+    url: "https://www.soundonsound.com/techniques/creating-sense-depth-your-mix"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - citation_metadata
+    notes: "Used for paraphrased rules about depth through level, EQ, reverb, delay, and pre-delay."
+  - source_id: sos_multitracked_drums
+    title: "Mixing Multitracked Drums"
+    source_type: article
+    authors: ["Mike Senior"]
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/techniques/mixing-multitracked-drums"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - drum_dynamics
+      - citation_metadata
+    notes: "Used for paraphrased rules about parallel drum weight and preserving performance dynamics."
+  - source_id: sos_mixing_metal
+    title: "Mixing Metal"
+    source_type: article
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/techniques/mixing-metal"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - drum_dynamics
+      - citation_metadata
+    notes: "Used for paraphrased rules about attack/body shaping with compressor timing on kick, snare, bass, vocals, and guitars."
+  - source_id: pensado_place_into_lair
+    title: "Into The Lair"
+    source_type: video_series
+    authors: ["Dave Pensado", "Herb Trawick"]
+    publisher: "Pensado's Place"
+    url: "https://www.pensadosplace.tv/intothelair/"
+    authority_tier: vetted_engineer_channel
+    status: active
+    allowed_uses:
+      - citation_metadata
+      - future_transcript_ingestion
+    notes: "Official series page identifies Dave Pensado as a top mixing engineer; individual transcript-derived rules still require reviewed transcripts."
+  - source_id: produce_like_a_pro_quick_tricks
+    title: "Quick Mixing Tricks Archive"
+    source_type: article_archive
+    authors: ["Warren Huart"]
+    publisher: "Produce Like A Pro"
+    url: "https://producelikeapro.com/blog/tag/quick-mixing-tricks/"
+    authority_tier: vetted_engineer_channel
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules from Warren Huart/Produce Like A Pro pages on automation, gain staging, kick-bass low end, vocals, and panning."
+  - source_id: aes_kruk_sobecki_phase_alignment
+    title: "Methods of Phase-Aligning Individual Instruments Recorded with Multiple Microphones during Post-Production"
+    source_type: conference_paper
+    authors: ["Bartlomiej Kruk", "Aleksander Sobecki"]
+    publisher: "Audio Engineering Society"
+    year: 2016
+    url: "https://secure.aes.org/forum/pubs/conventions/?elib=18278"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - phase_rules
+      - automation_methodology
+      - citation_metadata
+    notes: "Used for paraphrased rules that treat phase/time alignment as an early multi-mic diagnostic before EQ or compression fixes."
+  - source_id: sos_multimic_time_alignment
+    title: "Making Multi-mic Recordings Work"
+    source_type: article
+    authors: ["Sam Inglis"]
+    publisher: "Sound On Sound"
+    year: 2020
+    url: "https://www.soundonsound.com/techniques/making-multi-mic-recordings-work"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - phase_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about auditioning drum time-alignment by ear, in mono, and in the full mix instead of treating visual alignment as inherently correct."
+  - source_id: sos_mix_rescue_phase_relationships
+    title: "Mix Rescue: Phase Relationships"
+    source_type: article
+    authors: ["Mike Senior"]
+    publisher: "Sound On Sound"
+    year: 2010
+    url: "https://www.soundonsound.com/techniques/mix-rescue-phase-relationships"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - phase_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about polarity/time checks on drum overheads and close mics for punch and mono compatibility."
+  - source_id: sos_reverb_delay
+    title: "Using Reverb & Delay"
+    source_type: article
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/techniques/using-reverb-delay"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - citation_metadata
+    notes: "Used for paraphrased rules about reverb/delay sends, modulation after delay, ducked returns, and automation of FX send levels."
+  - source_id: sos_reverb_like_pro
+    title: "How To Use Reverb Like A Pro: 1"
+    source_type: article
+    authors: ["Mike Senior"]
+    publisher: "Sound On Sound"
+    year: 2008
+    url: "https://www.soundonsound.com/techniques/how-use-reverb-pro-1"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - citation_metadata
+    notes: "Used for paraphrased rules about shared send reverbs, fully wet returns, pre-delay, early reflections, reverb tails, and ignoring preset names in favor of intended space."
+  - source_id: sos_optimise_reverb_treatments
+    title: "How To Optimise Your Reverb Treatments"
+    source_type: article
+    authors: ["Paul White"]
+    publisher: "Sound On Sound"
+    year: 2020
+    url: "https://www.soundonsound.com/techniques/how-optimise-your-reverb-treatments"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about filtering returns, ducked reverb, smooth filtered delays, gated reverb, and modulation placement before or after reverb."
+  - source_id: sos_how_phasers_work
+    title: "How Phasers Work"
+    source_type: article
+    authors: ["Hugh Robjohns"]
+    publisher: "Sound On Sound"
+    year: 2021
+    url: "https://www.soundonsound.com/sound-advice/how-phasers-work"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased modulation rules about phaser and flanger architectures, moving notches, stages, feedback, and audible sweep intensity."
+  - source_id: sos_phasing_vs_flanging
+    title: "Q. What's The Difference Between Phasing And Flanging?"
+    source_type: article
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/sound-advice/q-whats-difference-between-phasing-and-flanging"
+    authority_tier: professional_article
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules distinguishing flanger delay-based comb filtering from phaser all-pass phase shifting and stereo modulation variants."
+  - source_id: izotope_modulation_effects
+    title: "Understanding Chorus, Flangers, and Phasers in Audio Production"
+    source_type: article
+    authors: ["Nick Messitte"]
+    publisher: "iZotope"
+    year: 2021
+    url: "https://www.izotope.com/en/learn/understanding-chorus-flangers-and-phasers-in-audio-production.html"
+    authority_tier: manufacturer_education
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about chorus, flanger, and phaser use, common delay ranges, feedback, stereo width, and avoiding overdone modulation on lead elements."
+  - source_id: izotope_reverb_predelay
+    title: "Reverb Pre-delay Explained: How To Avoid A Muddy Reverb Sound"
+    source_type: article
+    authors: ["Nick Messitte"]
+    publisher: "iZotope"
+    year: 2023
+    url: "https://www.izotope.com/en/learn/reverb-pre-delay.html"
+    authority_tier: manufacturer_education
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - citation_metadata
+    notes: "Used for paraphrased rules about using pre-delay to preserve source attack, reduce mud, and create role-specific depth for vocals, guitars, and drums."
+  - source_id: fabfilter_reverb_use
+    title: "Reverb - How To Use Reverb?"
+    source_type: article
+    publisher: "FabFilter"
+    url: "https://www.fabfilter.com/learn/reverb/how-to-use-reverb"
+    authority_tier: manufacturer_education
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - citation_metadata
+    notes: "Used for paraphrased rules about adjusting reverb in context, using subtle support levels, choosing delay instead of reverb in busy mixes, and gated/controlled space."
+  - source_id: valhalla_room_early_controls
+    title: "ValhallaRoom: The Early Controls"
+    source_type: white_paper
+    authors: ["Sean Costello"]
+    publisher: "Valhalla DSP"
+    year: 2011
+    url: "https://valhalladsp.com/2011/05/18/valhallaroom-the-early-controls/"
+    authority_tier: manufacturer_whitepaper
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about early reflection crossfeed, echo density, early chorusing rate/depth, and preserving spatial imaging."
+  - source_id: lexicon_480l_manual
+    title: "Lexicon 480L Digital Reverb and Effects Manual"
+    source_type: manual
+    publisher: "Universal Audio / Lexicon"
+    url: "https://help.uaudio.com/hc/en-us/articles/33194625601044-Lexicon-480L-Digital-Reverb-and-Effects-Manual"
+    authority_tier: manufacturer_manual
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about pre-echoes, pre-delay, diffusion, spin/wander modulation, early/late balance, and filtered natural reverb tone."
+  - source_id: eventide_h90_modulation
+    title: "Eventide H90 Documentation - Modulation"
+    source_type: manual
+    publisher: "Eventide"
+    url: "https://cdn.eventideaudio.com/manuals/h90/1.9.4/content/algorithms/modulation.html"
+    authority_tier: manufacturer_manual
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - modulation_rules
+      - citation_metadata
+    notes: "Used for paraphrased rules about flanger depth, chorus delay/detune, mono-to-stereo widening, envelope-modulated chorus clarity, and wet-path tone filtering."
+  - source_id: moylan_crafting_mix
+    title: "Understanding and Crafting the Mix"
+    source_type: book
+    authors: ["William Moylan"]
+    publisher: "Focal Press / Routledge"
+    year: 2020
+    url: "https://www.routledge.com/Understanding-and-Crafting-the-Mix-The-Art-of-Recording/Moylan/p/book/9781138056657"
+    authority_tier: primary_book
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - workflow_domains
+      - citation_metadata
+    notes: "Registered for paraphrased rules about musical balance, sound stage, timbre, dynamics, and evaluating the mix as an artistic whole."
+  - source_id: gibson_art_of_mixing
+    title: "The Art of Mixing"
+    source_type: book
+    authors: ["David Gibson"]
+    publisher: "Hal Leonard / ArtistPro"
+    year: 2005
+    url: "https://www.halleonard.com/product/331519/the-art-of-mixing"
+    authority_tier: primary_book
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - workflow_domains
+      - citation_metadata
+    notes: "Registered for paraphrased rules about front-back depth, left-right placement, height/frequency perception, and visualizing mix relationships."
+  - source_id: katz_mastering_audio
+    title: "Mastering Audio: The Art and the Science"
+    source_type: book
+    authors: ["Bob Katz"]
+    publisher: "Focal Press / Routledge"
+    year: 2014
+    url: "https://www.routledge.com/Mastering-Audio-The-art-and-the-science/Katz/p/book/9780240818962"
+    authority_tier: primary_book
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - mastering_safety
+      - citation_metadata
+    notes: "Registered for paraphrased rules about transparent mastering, monitoring, dynamics, loudness, and preserving musical intent."
+  - source_id: stavrou_mixing_with_your_mind
+    title: "Mixing with Your Mind"
+    source_type: book
+    authors: ["Michael Paul Stavrou"]
+    publisher: "Flux Research"
+    year: 2003
+    url: "https://www.mixingwithyourmind.com/"
+    authority_tier: primary_book
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - workflow_domains
+      - citation_metadata
+    notes: "Registered for paraphrased rules about listening-first decisions, non-formulaic workflows, and intent-based use of tools."
+  - source_id: massey_behind_the_glass
+    title: "Behind the Glass"
+    source_type: book
+    authors: ["Howard Massey"]
+    publisher: "Backbeat Books"
+    year: 2000
+    url: "https://www.halleonard.com/product/331184/behind-the-glass"
+    authority_tier: professional_interviews
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Registered for general engineering principles from interviews; do not imitate any named engineer's proprietary style."
+  - source_id: pensado_papers
+    title: "The Pensado Papers"
+    source_type: book
+    authors: ["Dave Pensado", "Herb Trawick"]
+    publisher: "Hal Leonard"
+    year: 2015
+    url: "https://www.halleonard.com/product/141072/the-pensado-papers"
+    authority_tier: professional_book
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Registered for general mix workflow and decision-framing principles; no trademark-style imitation."
+  - source_id: huber_modern_recording
+    title: "Modern Recording Techniques"
+    source_type: book
+    authors: ["David Miles Huber", "Robert E. Runstein"]
+    publisher: "Focal Press / Routledge"
+    year: 2024
+    url: "https://www.routledge.com/Modern-Recording-Techniques/Huber-Runstein/p/book/9781032275192"
+    authority_tier: primary_book
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - recording_engineering
+      - citation_metadata
+    notes: "Registered for paraphrased rules about capture, signal flow, gain staging, monitoring, phase, and production context."
+  - source_id: rumsey_sound_recording
+    title: "Sound and Recording"
+    source_type: book
+    authors: ["Francis Rumsey", "Tim McCormick"]
+    publisher: "Focal Press / Routledge"
+    year: 2021
+    url: "https://www.routledge.com/Sound-and-Recording-Applications-and-Theory/Rumsey-McCormick/p/book/9780367553029"
+    authority_tier: primary_book
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - recording_engineering
+      - citation_metadata
+    notes: "Registered for paraphrased rules about audio fundamentals, stereo, monitoring, and technical limits of recording/mixing systems."
+  - source_id: toole_sound_reproduction
+    title: "Sound Reproduction: The Acoustics and Psychoacoustics of Loudspeakers and Rooms"
+    source_type: book
+    authors: ["Floyd E. Toole"]
+    publisher: "Focal Press / Routledge"
+    year: 2017
+    url: "https://www.routledge.com/Sound-Reproduction-The-Acoustics-and-Psychoacoustics-of-Loudspeakers-and-Rooms/Toole/p/book/9781138921368"
+    authority_tier: primary_book_research
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - monitoring_translation
+      - citation_metadata
+    notes: "Registered for paraphrased rules about loudspeaker/room translation and avoiding mix decisions based on a single untrusted playback condition."
+  - source_id: moffat_sandler_approaches_imp
+    title: "Approaches in Intelligent Music Production"
+    source_type: paper
+    authors: ["David Moffat", "Mark B. Sandler"]
+    publisher: "arXiv / C4DM"
+    year: 2019
+    url: "https://arxiv.org/abs/1907.07892"
+    authority_tier: research_preprint
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - citation_metadata
+    notes: "Registered for paraphrased rules about intelligent production system design, human-in-the-loop use, and limits of fully automatic decisions."
+  - source_id: reiss_intelligent_systems_multichannel
+    title: "Intelligent systems for mixing multichannel audio"
+    source_type: paper
+    authors: ["Joshua D. Reiss"]
+    publisher: "Digital Signal Processing"
+    year: 2011
+    url: "https://doi.org/10.1016/j.dsp.2011.06.006"
+    authority_tier: peer_reviewed_journal
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - citation_metadata
+    notes: "Registered for paraphrased rules about automatic mixing as bounded decision support rather than opaque control."
+  - source_id: perez_reiss_live_fader_control
+    title: "Automatic gain and fader control for live mixing"
+    source_type: paper
+    authors: ["Enrique Perez Gonzalez", "Joshua D. Reiss"]
+    publisher: "Audio Engineering Society"
+    year: 2010
+    url: "https://www.eecs.qmul.ac.uk/~josh/documents/2010/Perez_GonzalezReiss2010-AGainControl.pdf"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - live_sound_safety
+      - citation_metadata
+    notes: "Registered for paraphrased rules about live fader/gain control, active-signal assumptions, and bounded live automation."
+  - source_id: de_man_reiss_knowledge_engineered_mixing
+    title: "A knowledge-engineered autonomous mixing system"
+    source_type: paper
+    authors: ["Brecht De Man", "Joshua D. Reiss"]
+    publisher: "Audio Engineering Society"
+    year: 2013
+    url: "https://www.eecs.qmul.ac.uk/~josh/documents/2013/DeManReiss2013-KnowledgeEngineeredAutonomousMixingSystem.pdf"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - automation_methodology
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Registered for paraphrased rules that connect expert knowledge, feature extraction, and conventional mix controls."
+  - source_id: mansbridge_pan_positioning
+    title: "An autonomous system for multitrack stereo pan positioning"
+    source_type: paper
+    authors: ["Stuart Mansbridge", "Stephen Finn", "Joshua D. Reiss"]
+    publisher: "Audio Engineering Society"
+    year: 2012
+    url: "https://www.eecs.qmul.ac.uk/~josh/documents/2012/MansbridgeFinnReiss2012-PanPositioning.pdf"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - panning_rules
+      - automation_methodology
+      - citation_metadata
+    notes: "Registered for paraphrased rules about stereo placement, source priority, and automatic panning constraints."
+  - source_id: safe_semantic_audio_features
+    title: "SAFE: A System for the Extraction and Retrieval of Semantic Audio Descriptors"
+    source_type: paper
+    authors: ["Ryan Stables", "Sean Enderby", "Brecht De Man", "Gyorgy Fazekas", "Joshua D. Reiss"]
+    publisher: "Audio Engineering Society"
+    year: 2014
+    url: "https://www.semanticaudio.co.uk/"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - semantic_audio_features
+      - automation_methodology
+      - citation_metadata
+    notes: "Registered for paraphrased rules about semantic descriptors as retrieval/decision context, not as direct mixer commands."
+  - source_id: wilmering_history_audio_effects
+    title: "A History of Audio Effects"
+    source_type: paper
+    authors: ["Thomas Wilmering", "David Moffat", "Antonio Milo", "Mark B. Sandler"]
+    publisher: "Applied Sciences"
+    year: 2020
+    url: "https://doi.org/10.3390/app10030791"
+    authority_tier: peer_reviewed_journal
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - fx_depth
+      - modulation_rules
+      - citation_metadata
+    notes: "Registered for paraphrased rules that effects are intentional tone, space, and time tools rather than preset names to copy."
+  - source_id: medleydb_dataset
+    title: "MedleyDB: A Multitrack Dataset for Annotation-Intensive MIR Research"
+    source_type: dataset_paper
+    authors: ["Rachel M. Bittner", "Justin Salamon", "Mike Tierney", "Matthias Mauch", "Chris Cannam", "Juan P. Bello"]
+    publisher: "International Society for Music Information Retrieval"
+    year: 2014
+    url: "https://medleydb.weebly.com/"
+    authority_tier: research_dataset
+    status: active
+    allowed_uses:
+      - dataset_context
+      - evaluation_methodology
+      - citation_metadata
+    notes: "Registered for dataset-aware training/evaluation rules; do not use reference or filename leakage as a mix decision source."
+  - source_id: musdb18_dataset
+    title: "MUSDB18"
+    source_type: dataset
+    authors: ["Zafar Rafii", "Antoine Liutkus", "Fabian-Robert Stoter", "Dimitrios Mimilakis", "Rachel Bittner"]
+    publisher: "SiSEC / SIGSEP"
+    year: 2017
+    url: "https://sigsep.github.io/datasets/musdb.html"
+    authority_tier: research_dataset
+    status: active
+    allowed_uses:
+      - dataset_context
+      - evaluation_methodology
+      - citation_metadata
+    notes: "Registered for dataset-aware separation/evaluation rules; stems and references are not a license to leak final mix answers into offline tests."
+  - source_id: itu_bs1534_mushra
+    title: "ITU-R BS.1534: MUSHRA"
+    source_type: standard
+    authors: ["International Telecommunication Union"]
+    publisher: "ITU"
+    url: "https://www.itu.int/rec/R-REC-BS.1534/en"
+    authority_tier: official_standard
+    status: active
+    allowed_uses:
+      - evaluation_methodology
+      - citation_metadata
+    notes: "Registered for subjective listening-test discipline and for calibrating objective metrics against human ratings."
+  - source_id: itu_bs1116
+    title: "ITU-R BS.1116"
+    source_type: standard
+    authors: ["International Telecommunication Union"]
+    publisher: "ITU"
+    url: "https://www.itu.int/rec/R-REC-BS.1116/en"
+    authority_tier: official_standard
+    status: active
+    allowed_uses:
+      - evaluation_methodology
+      - citation_metadata
+    notes: "Registered for critical listening assessment of small impairments; use as methodology, not an automatic mix target."
+  - source_id: itu_bs1387_peaq
+    title: "ITU-R BS.1387: PEAQ"
+    source_type: standard
+    authors: ["International Telecommunication Union"]
+    publisher: "ITU"
+    url: "https://www.itu.int/rec/R-REC-BS.1387/en"
+    authority_tier: official_standard
+    status: active
+    allowed_uses:
+      - objective_quality_metrics
+      - citation_metadata
+    notes: "Registered for objective audio quality context and the limits of model-based perceptual prediction."
+  - source_id: thiede_peaq
+    title: "PEAQ - The ITU Standard for Objective Measurement of Perceived Audio Quality"
+    source_type: paper
+    authors: ["Thilo Thiede", "William C. Treurniet", "Roland Bitto", "Christian Schmidmer", "Thomas Sporer", "John G. Beerends", "Catherine Colomes", "Michael Keyhl", "Gert Stoll", "Khaled Brandenburg", "Bernhard Feiten"]
+    publisher: "Journal of the Audio Engineering Society"
+    year: 2000
+    url: "https://www.aes.org/e-lib/browse.cfm?elib=12078"
+    authority_tier: peer_reviewed_jaes
+    status: active
+    allowed_uses:
+      - objective_quality_metrics
+      - citation_metadata
+    notes: "Registered for paraphrased rules about objective quality models needing domain calibration and subjective validation."
+  - source_id: hines_visqol_audio
+    title: "ViSQOLAudio: An Objective Audio Quality Metric for Low Bitrate Codecs"
+    source_type: paper
+    authors: ["Andrew Hines", "Jan Skoglund", "Anil Kokaram", "Naomi Harte"]
+    publisher: "Journal of the Acoustical Society of America / Google Research"
+    year: 2015
+    url: "https://github.com/google/visqol"
+    authority_tier: peer_reviewed_or_reference_implementation
+    status: active
+    allowed_uses:
+      - objective_quality_metrics
+      - citation_metadata
+    notes: "Registered for paraphrased rules about domain-specific objective quality metrics and the need to compare with listening tests."
+  - source_id: peeters_timbre_toolbox
+    title: "The Timbre Toolbox"
+    source_type: paper
+    authors: ["Geoffroy Peeters", "Bruno L. Giordano", "Patrick Susini", "Nicolas Misdariis", "Stephen McAdams"]
+    publisher: "Journal of the Acoustical Society of America"
+    year: 2011
+    url: "https://doi.org/10.1121/1.3642604"
+    authority_tier: peer_reviewed_journal
+    status: active
+    allowed_uses:
+      - semantic_audio_features
+      - objective_quality_metrics
+      - citation_metadata
+    notes: "Registered for feature vocabulary around timbre, brightness, roughness, attack, and spectral descriptors."
+  - source_id: mcfee_librosa
+    title: "librosa: Audio and Music Signal Analysis in Python"
+    source_type: paper
+    authors: ["Brian McFee", "Colin Raffel", "Dawen Liang", "Daniel P. W. Ellis", "Matt McVicar", "Eric Battenberg", "Oriol Nieto"]
+    publisher: "SciPy"
+    year: 2015
+    url: "https://doi.org/10.25080/Majora-7b98e3ed-003"
+    authority_tier: software_paper
+    status: active
+    allowed_uses:
+      - feature_extraction
+      - citation_metadata
+    notes: "Registered for feature extraction/tooling provenance; extracted features must remain advisory and logged."
+  - source_id: vincent_bss_eval
+    title: "Performance measurement in blind audio source separation"
+    source_type: paper
+    authors: ["Emmanuel Vincent", "Remi Gribonval", "Cedric Fevotte"]
+    publisher: "IEEE Transactions on Audio, Speech, and Language Processing"
+    year: 2006
+    url: "https://doi.org/10.1109/TSA.2005.858005"
+    authority_tier: peer_reviewed_journal
+    status: active
+    allowed_uses:
+      - evaluation_methodology
+      - citation_metadata
+    notes: "Registered for separation metric context and for avoiding overinterpretation of stem/isolation scores as mix quality."
+  - source_id: le_roux_sdr_half_baked
+    title: "SDR - Half-baked or Well Done?"
+    source_type: paper
+    authors: ["Jonathan Le Roux", "Scott Wisdom", "Hakan Erdogan", "John R. Hershey"]
+    publisher: "IEEE ICASSP"
+    year: 2019
+    url: "https://arxiv.org/abs/1811.02508"
+    authority_tier: peer_reviewed_conference
+    status: active
+    allowed_uses:
+      - evaluation_methodology
+      - citation_metadata
+    notes: "Registered for metric-critical rules: optimize perceptual mix quality, not a single brittle metric."
+  - source_id: deruty_tardieu_dynamic_processing
+    title: "About Dynamic Processing in Mainstream Music"
+    source_type: paper
+    authors: ["Emmanuel Deruty", "Damien Tardieu"]
+    publisher: "Journal of the Audio Engineering Society"
+    year: 2014
+    url: "https://www.aes.org/e-lib/browse.cfm?elib=17261"
+    authority_tier: peer_reviewed_jaes
+    status: active
+    allowed_uses:
+      - mastering_safety
+      - dynamics_rules
+      - citation_metadata
+    notes: "Registered for paraphrased rules about dynamic processing trends and avoiding the assumption that louder/denser is always better."
+  - source_id: vickers_loudness_war
+    title: "The Loudness War"
+    source_type: paper
+    authors: ["Earl Vickers"]
+    publisher: "Audio Engineering Society"
+    year: 2010
+    url: "https://www.aes.org/e-lib/browse.cfm?elib=15476"
+    authority_tier: aes_convention
+    status: active
+    allowed_uses:
+      - mastering_safety
+      - citation_metadata
+    notes: "Registered for paraphrased rules that loudness maximization can harm quality and should not override dynamics and headroom."
+  - source_id: pulkki_vbap
+    title: "Virtual Sound Source Positioning Using Vector Base Amplitude Panning"
+    source_type: paper
+    authors: ["Ville Pulkki"]
+    publisher: "Journal of the Audio Engineering Society"
+    year: 1997
+    url: "https://www.aes.org/e-lib/browse.cfm?elib=7853"
+    authority_tier: peer_reviewed_jaes
+    status: active
+    allowed_uses:
+      - panning_rules
+      - spatial_audio
+      - citation_metadata
+    notes: "Registered for spatial placement principles and amplitude-panning context; live stereo decisions still require mono and PA translation checks."
+  - source_id: moore_psychology_hearing
+    title: "An Introduction to the Psychology of Hearing"
+    source_type: book
+    authors: ["Brian C. J. Moore"]
+    publisher: "Brill"
+    year: 2012
+    url: "https://brill.com/display/title/24296"
+    authority_tier: primary_book_research
+    status: active
+    allowed_uses:
+      - psychoacoustics
+      - citation_metadata
+    notes: "Registered for paraphrased rules around loudness, masking, temporal resolution, and perception limits."
+  - source_id: zwicker_fastl_psychoacoustics
+    title: "Psychoacoustics: Facts and Models"
+    source_type: book
+    authors: ["Eberhard Zwicker", "Hugo Fastl"]
+    publisher: "Springer"
+    year: 2007
+    url: "https://link.springer.com/book/10.1007/978-3-540-68888-4"
+    authority_tier: primary_book_research
+    status: active
+    allowed_uses:
+      - psychoacoustics
+      - objective_quality_metrics
+      - citation_metadata
+    notes: "Registered for paraphrased rules about masking, loudness, roughness, sharpness, and perceptual model limits."
+  - source_id: sos_mix_rescue_series
+    title: "Sound On Sound - Mix Rescue"
+    source_type: article_series
+    authors: ["Sound On Sound"]
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/series/mix-rescue"
+    authority_tier: professional_article_series
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Registered as a professional corpus for practical troubleshooting principles; individual rules should reference reviewed articles when possible."
+  - source_id: sos_secrets_mix_engineers
+    title: "Sound On Sound - Secrets of the Mix Engineers"
+    source_type: article_series
+    authors: ["Sound On Sound"]
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/series/secrets-mix-engineers"
+    authority_tier: professional_article_series
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Registered for general professional-practice patterns without imitating named engineers."
+  - source_id: sos_inside_track
+    title: "Sound On Sound - Inside Track"
+    source_type: article_series
+    authors: ["Sound On Sound"]
+    publisher: "Sound On Sound"
+    url: "https://www.soundonsound.com/series/inside-track"
+    authority_tier: professional_article_series
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Registered for production-case-study patterns; do not use as a stylistic cloning source."
+  - source_id: tape_op_interviews
+    title: "Tape Op Interviews"
+    source_type: interview_archive
+    authors: ["Tape Op"]
+    publisher: "Tape Op"
+    url: "https://tapeop.com/interviews/"
+    authority_tier: professional_interview_archive
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Registered for general engineering workflow principles and human decision patterns, not exact artist/engineer imitation."
+  - source_id: mix_with_the_masters_platform
+    title: "Mix With The Masters"
+    source_type: education_platform
+    authors: ["Mix With The Masters"]
+    publisher: "Mix With The Masters"
+    url: "https://mixwiththemasters.com/"
+    authority_tier: professional_education_platform
+    status: active
+    allowed_uses:
+      - citation_metadata
+      - future_transcript_ingestion
+    notes: "Registered for future reviewed lessons and general principles; no proprietary seminar details or style imitation stored."

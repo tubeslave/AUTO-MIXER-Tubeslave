@@ -28,7 +28,7 @@ backend/
   feedback_detector.py   — Обнаружение обратной связи, notch EQ, fader fallback
   thread_safety.py       — ThreadSafeMixerState (asyncio.Lock, copy-on-read)
   config_manager.py      — YAML config с hot-reload (watchdog)
-  handlers/              — 14 WebSocket handler-модулей (см. docs/ARCHITECTURE.md)
+  handlers/              — 18 WebSocket handler-модулей (см. docs/ARCHITECTURE.md)
   agents/                — Multi-agent система (coordinator → eq/fader/gain agents)
   ai/                    — LLM orchestrator + ChromaDB/RAG knowledge base
   ml/                    — PyTorch ML модели (classifier, predictor, style transfer)
@@ -64,6 +64,21 @@ Docs/                    — PDF документация WING, техничес
 - `find_snap_by_name()` — КЭШИРОВАТЬ имена. Загрузка = деструкция mixer state на концерте
 - `ratio_float_to_wing()` — константы WING_RATIO_VALUES/WING_RATIO_STRINGS должны быть на уровне модуля
 - NumPy типы (np.float64) не сериализуются в JSON → `convert_numpy_types()` перед `json.dumps()`
+- Live soundcheck trim — по умолчанию НЕ поднимать input trim по короткому сигналу: bleed может выглядеть как тихий источник. Авто-трим в live режиме только снижает перегруз, boost требует явного opt-in.
+- WING EQ bands — существующая полоса может быть feedback-notch/ручной полосой, а не “band 2 = low-mid”. При EQ-коррекции проверять частотное совпадение или перестраивать полосу, и включать `eq/on`, чтобы оператор слышал результат.
+- Master-reference Dante channels — каналы, заведённые как master/reference feed, не являются обычными source channels и должны исключаться из source gain/EQ/FX correction.
+- Compressor makeup — при сжатии компенсировать потерянный уровень через bounded `dyn/gain`, ориентируясь на GR и true-peak headroom; не использовать makeup как обход headroom, feedback или bleed safety.
+- Ayaic gain staging/balance — при offline сведении, саундчеках и live-режимах
+  использовать Ayaic Mix Monolith уровни как дефолтные плоскости для отдельных
+  источников и для стемов/групп одновременно. Не балансировать только
+  изолированные дорожки: сначала выровнять слои внутри инструмента/стема,
+  затем проверить сумму шины. Базовые ориентиры: lead/main element `-22 LUFS`,
+  strong sources и subgroup buses вроде Drums/Bass/Guitars/BG Vocals `-25 LUFS`,
+  tucked backing vocals `-27 LUFS`, keys/synth/ambient support `-30 LUFS`, FX
+  returns/deep effects `-35 LUFS`; doubles/layers держать примерно на 3 LU ниже
+  целевой плоскости группы. В live это только цель для bounded fader/bus moves:
+  true-peak/headroom/feedback safety и запрет fader > 0 dBFS важнее попадания в
+  Ayaic-уровень.
 
 ### Архитектурные решения
 - AudioCapture — единый сервис. НЕ создавать PyAudio потоки в отдельных модулях
@@ -78,6 +93,8 @@ Docs/                    — PDF документация WING, техничес
 - EQ biquads: по Audio EQ Cookbook (Robert Bristow-Johnson)
 - Компрессия ratio: `1 + (max_ratio - 1) * factor` — НЕ инвертировать
 - Gate: объявленный hysteresis ОБЯЗАН применяться в GateProcessor
+- Gain staging/balance: Ayaic Mix Monolith planes применяются к channels и
+  stem/group buses; bus sum проверяется после channel trims.
 
 ## Тестирование
 

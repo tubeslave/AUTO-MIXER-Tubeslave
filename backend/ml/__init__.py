@@ -15,5 +15,6 @@ try:
     from .differentiable_console import DifferentiableMixingConsole
     from .channel_classifier import ChannelClassifier, ChannelClassifierNet, INSTRUMENT_CLASSES
     from .gain_pan_predictor import GainPanPredictor, GainPanPredictorNet
+    from .agent_training_service import AgentTrainingService
 except ImportError:
     pass

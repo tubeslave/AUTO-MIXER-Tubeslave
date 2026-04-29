@@ -7,6 +7,11 @@ import copy
 from typing import Any, Dict, List, Optional, Callable
 from dataclasses import dataclass, field
 
+try:
+    from output_paths import ai_logs_path
+except ImportError:  # pragma: no cover - package import fallback
+    from backend.output_paths import ai_logs_path
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -42,6 +47,8 @@ class ConfigManager:
                 'type': 'wing',
                 'ip': '192.168.1.1',
                 'port': 2222,
+                'send_port': 2222,
+                'receive_port': 2223,
                 'protocol': 'osc',
                 'tls': False,
                 'midi_base_channel': 0,
@@ -73,9 +80,20 @@ class ConfigManager:
                 'max_actions_per_cycle': 5,
             },
             'ai': {
-                'llm_backend': 'ollama',
-                'llm_model': 'llama3',
+                'llm_backend': 'auto',
+                'llm_model': 'gpt-5.4',
                 'ollama_url': 'http://localhost:11434',
+                'openai_api_key': '',
+                'openai_url': 'https://api.openai.com/v1/responses',
+                'openai_reasoning_effort': 'low',
+                'kimi_cli_path': '',
+                'kimi_work_dir': '',
+                'kimi_timeout_sec': 120,
+                'model_fallbacks': [
+                    'openai:gpt-5.4',
+                    'kimi_cli:default',
+                    'openai:gpt-4o-mini',
+                ],
                 'perplexity_api_key': '',
                 'knowledge_dir': '',
             },
@@ -85,6 +103,169 @@ class ConfigManager:
                 'true_peak_limit': -1.0,
                 'max_notch_filters': 8,
                 'max_notch_depth_db': -12.0,
+            },
+            'autofoh': {
+                'classifier': {
+                    'name_overrides': [],
+                    'role_overrides': {},
+                },
+                'analysis': {
+                    'fft_size': 4096,
+                    'octave_fraction': 3,
+                    'slope_compensation_db_per_octave': 4.5,
+                },
+                'detectors': {
+                    'monitor_cycle_interval_sec': 1.0,
+                    'lead_masking': {
+                        'enabled': True,
+                        'masking_threshold_db': 3.0,
+                        'persistence_cycles': 3,
+                        'min_culprit_contribution': 0.35,
+                        'lead_boost_db': 0.5,
+                    },
+                    'mud_excess': {
+                        'enabled': True,
+                        'threshold_db': 2.5,
+                        'persistence_cycles': 3,
+                        'hysteresis_db': 0.75,
+                    },
+                    'harshness_excess': {
+                        'enabled': True,
+                        'threshold_db': 2.5,
+                        'persistence_cycles': 3,
+                        'hysteresis_db': 0.75,
+                    },
+                    'sibilance_excess': {
+                        'enabled': True,
+                        'threshold_db': 2.5,
+                        'persistence_cycles': 3,
+                        'hysteresis_db': 0.75,
+                    },
+                    'low_end': {
+                        'enabled': True,
+                        'sub_threshold_db': 4.0,
+                        'bass_threshold_db': 3.0,
+                        'body_threshold_db': 2.5,
+                        'persistence_cycles': 3,
+                        'hysteresis_db': 0.75,
+                        'min_culprit_contribution': 0.35,
+                    },
+                },
+                'evaluation': {
+                    'enabled': True,
+                    'evaluation_window_sec': 2.0,
+                    'allow_proxy_audio_evaluation_for_testing': False,
+                    'allow_proxy_audio_rollback_for_testing': False,
+                    'min_band_improvement_db': 0.25,
+                    'min_rms_response_db': 0.1,
+                    'worsening_tolerance_db': 0.5,
+                },
+                'logging': {
+                    'enabled': False,
+                    'path': '',
+                    'queue_maxsize': 1024,
+                    'write_session_report_on_stop': True,
+                    'report_path': '',
+                },
+                'soundcheck_profile': {
+                    'enabled': True,
+                    'auto_save_after_analysis': True,
+                    'auto_load_on_start': True,
+                    'capture_multiphase_learning': True,
+                    'silence_capture_duration_sec': 0.75,
+                    'path': '',
+                    'use_loaded_target_corridor': True,
+                    'use_phase_target_action_guards': True,
+                    'replace_live_target_with_learned_corridor': True,
+                },
+                'safety': {
+                    'minimum_auto_apply_classification_confidence': 0.75,
+                    'new_or_unknown_channel_auto_corrections_enabled': False,
+                    'action_limits': {
+                        'channel_fader_max_step_db': 1.0,
+                        'channel_fader_min_interval_sec': 3.0,
+                        'bus_fader_max_step_db': 1.0,
+                        'bus_fader_min_interval_sec': 3.0,
+                        'dca_fader_max_step_db': 1.0,
+                        'dca_fader_min_interval_sec': 3.0,
+                        'lead_fader_max_step_db': 0.5,
+                        'lead_fader_min_interval_sec': 2.0,
+                        'gain_max_abs_db': 12.0,
+                        'gain_min_interval_sec': 3.0,
+                        'broad_eq_max_step_db': 1.0,
+                        'broad_eq_max_total_db_from_snapshot': 3.0,
+                        'broad_eq_min_interval_sec': 5.0,
+                        'feedback_notch_max_cut_db': -6.0,
+                        'feedback_notch_min_q': 8.0,
+                        'feedback_notch_ttl_sec': 120.0,
+                        'master_fader_max_cut_db': 1.0,
+                        'master_fader_min_interval_sec': 1.0,
+                    },
+                },
+                'shared_chat_mix': {
+                    'enabled': True,
+                    'analysis_window_sec': 8.0,
+                    'max_actions_per_pass': 8,
+                    'master_peak_ceiling_db': -3.0,
+                    'master_max_cut_db': 1.0,
+                    'correct_master_output': True,
+                    'apply_routing_fixes': False,
+                    'rename_generic_channels': False,
+                },
+            },
+            'perceptual': {
+                'enabled': False,
+                'mode': 'shadow',
+                'backend': 'lightweight',
+                'model_name': 'm-a-p/MERT-v1-95M',
+                'sample_rate': 24000,
+                'window_seconds': 5,
+                'hop_seconds': 2,
+                'evaluate_channels': True,
+                'evaluate_mix_bus': True,
+                'max_cpu_percent': 25,
+                'log_scores': True,
+                'block_osc_when_score_worse': False,
+                'log_path': str(ai_logs_path('perceptual_decisions.jsonl')),
+                'queue_maxsize': 128,
+                'async_evaluation': True,
+                'improvement_threshold': 0.03,
+                'local_files_only': False,
+                'fallback_to_lightweight': True,
+                'device': 'auto',
+            },
+            'muq_eval': {
+                'enabled': True,
+                'device': 'auto',
+                'window_sec': 10,
+                'hop_sec': 5,
+                'sample_rate': 24000,
+                'min_improvement_threshold': 0.03,
+                'rollback_on_quality_drop': True,
+                'fallback_enabled': True,
+                'log_scores': True,
+                'shadow_mode': True,
+                'log_path': str(ai_logs_path('muq_eval_decisions.jsonl')),
+                'training_log_path': str(ai_logs_path('muq_eval_rewards.jsonl')),
+                'model_repo_id': 'zhudi2825/MuQ-Eval-A1',
+                'local_files_only': True,
+                'min_seconds_between_quality_decisions': 5.0,
+                'max_gain_change_db_per_step': 1.0,
+                'max_eq_gain_change_db_per_step': 1.0,
+                'max_compressor_threshold_change_db_per_step': 2.0,
+            },
+            'source_knowledge': {
+                'enabled': False,
+                'mode': 'shadow',
+                'sources_path': 'backend/source_knowledge/data/sources.yaml',
+                'rules_path': 'backend/source_knowledge/data/rules.jsonl',
+                'log_path': str(ai_logs_path('source_grounded_decisions.jsonl')),
+                'queue_maxsize': 256,
+                'min_rule_confidence': 0.55,
+                'allow_unsourced_rules': False,
+                'log_retrievals': True,
+                'log_feedback': True,
+                'default_limit': 8,
             },
             'logging': {
                 'level': 'INFO',
@@ -133,6 +314,12 @@ class ConfigManager:
             'AUTOMIXER_LOG_LEVEL': ('logging', 'level'),
             'AUTOMIXER_AGENT_MODE': ('agent', 'mode'),
             'AUTOMIXER_LLM_BACKEND': ('ai', 'llm_backend'),
+            'AUTOMIXER_LLM_MODEL': ('ai', 'llm_model'),
+            'OPENAI_API_KEY': ('ai', 'openai_api_key'),
+            'AUTOMIXER_OPENAI_API_KEY': ('ai', 'openai_api_key'),
+            'KIMI_CLI_PATH': ('ai', 'kimi_cli_path'),
+            'AUTOMIXER_KIMI_CLI': ('ai', 'kimi_cli_path'),
+            'AUTOMIXER_KIMI_WORK_DIR': ('ai', 'kimi_work_dir'),
             'AUTOMIXER_PERPLEXITY_KEY': ('ai', 'perplexity_api_key'),
             'AUTOMIXER_SAMPLE_RATE': ('audio', 'sample_rate', int),
         }
@@ -146,6 +333,14 @@ class ConfigManager:
                     self._config[section][key] = converter(val)
                 except (ValueError, KeyError):
                     pass
+
+        fallbacks = os.environ.get('AUTOMIXER_MODEL_FALLBACKS')
+        if fallbacks is not None:
+            self._config['ai']['model_fallbacks'] = [
+                item.strip()
+                for item in fallbacks.split(',')
+                if item.strip()
+            ]
 
     def get(self, path: str, default: Any = None) -> Any:
         """Get config value by dot-separated path (e.g., 'mixer.ip')."""

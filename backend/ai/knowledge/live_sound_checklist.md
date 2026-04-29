@@ -105,9 +105,10 @@ element is heard in context.
 1. Kick drum alone — set level, basic EQ, gate, compression
 2. Snare alone — set level, basic EQ, gate, compression, check phase with kick
 3. Kick + Snare together — verify balance and low-end interaction
-4. Add hi-hat — set level, HPF, basic EQ
-5. Add toms — set levels, gates, basic EQ
-6. Add overheads — set level, HPF, blend with close mics. Check phase.
+4. Add overheads — set level, HPF, blend with close mics. Check phase.
+5. Pan Overhead L/R first so kick and snare leakage remains centered.
+6. Add toms, hi-hat, ride, and other drum spot mics. Pan each one where it is
+   heard in the already-panned overhead image.
 7. Full kit — refine balance, verify in main PA
 
 ### Phase 2: Bass

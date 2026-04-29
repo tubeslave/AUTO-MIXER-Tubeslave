@@ -124,53 +124,13 @@ class DifferentiableMixingConsole(nn.Module):
             x = channels[i]
             if x.dim() == 1:
                 x = x.unsqueeze(0)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
             stacked.append(x)
         batch = torch.cat(stacked, dim=0)  # (n_channels, samples)
         batch = self.eq(batch)
         batch = self.compressor(batch)
         batch = self.gain(batch)
-        processed = [batch[i:i + 1] for i in range(batch.shape[0])]
+        processed = [batch[i : i + 1] for i in range(batch.shape[0])]
         mix = batch.sum(dim=0, keepdim=True)
-=======
-=======
->>>>>>> Incoming (Background Agent changes)
-            # Process through per-channel slice of EQ, compressor, gain
-            n_fft = x.shape[-1]
-            X = torch.fft.rfft(x)
-            freqs = torch.linspace(
-                0, self.eq.sample_rate / 2, X.shape[-1], device=x.device
-            )
-            for band in range(self.eq.n_bands):
-                fc = torch.clamp(self.eq.freq[i, band], 20, self.eq.sample_rate / 2 - 1)
-                g = self.eq.gain_db[i, band]
-                q = torch.clamp(self.eq.q[i, band], 0.1, 10.0)
-                magnitude = 10 ** (g / 20.0)
-                bw = fc / q
-                response = 1.0 + (magnitude - 1.0) / (
-                    1.0 + ((freqs - fc) / (bw / 2 + 1e-8)) ** 2
-                )
-                X = X * response
-            x = torch.fft.irfft(X, n=n_fft)
-
-            # Per-channel compressor
-            eps = 1e-8
-            x_db = 20 * torch.log10(torch.abs(x) + eps)
-            threshold = self.compressor.threshold_db[i]
-            ratio = torch.clamp(self.compressor.ratio[i], 1.0, 20.0)
-            over = F.relu(x_db - threshold)
-            gain_reduction_db = over * (1 - 1 / ratio)
-            gain_linear = 10 ** (-gain_reduction_db / 20.0)
-            x = x * gain_linear
-
-            # Per-channel gain
-            gain_lin = 10 ** (self.gain.gain_db[i] / 20.0)
-            x = x * gain_lin
-
-            processed.append(x)
-        mix = sum(processed)
->>>>>>> Incoming (Background Agent changes)
         return mix, processed
 
     def get_parameters_dict(self):

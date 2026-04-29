@@ -1,0 +1,45 @@
+{
+  "name": "telegram",
+  "version": "0.1.0",
+  "description": "Send Telegram bot messages and inspect recent chat updates from Codex.",
+  "author": {
+    "name": "[TODO: Author or Team Name]",
+    "email": "[TODO: author@example.com]",
+    "url": "[TODO: https://github.com/author]"
+  },
+  "homepage": "https://core.telegram.org/bots/api",
+  "repository": "[TODO: https://github.com/author/plugin]",
+  "license": "[TODO: MIT]",
+  "keywords": [
+    "telegram",
+    "bot",
+    "notifications",
+    "messaging"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "apps": "./.app.json",
+  "interface": {
+    "displayName": "Telegram",
+    "shortDescription": "Send bot alerts and inspect chat updates",
+    "longDescription": "Use Telegram Bot API helpers to send messages, confirm chat IDs, and wire simple Telegram notifications into local Codex workflows.",
+    "developerName": "[TODO: Author or Team Name]",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://core.telegram.org/bots/api",
+    "privacyPolicyURL": "[TODO: Add privacy policy URL]",
+    "termsOfServiceURL": "https://telegram.org/tos",
+    "defaultPrompt": [
+      "Send a Telegram test message to my default chat",
+      "Show recent bot updates so I can find the chat ID",
+      "Draft a short alert and send it via Telegram"
+    ],
+    "brandColor": "#229ED9",
+    "composerIcon": "./assets/telegram-icon.svg",
+    "logo": "./assets/telegram-logo.svg",
+    "screenshots": []
+  }
+}

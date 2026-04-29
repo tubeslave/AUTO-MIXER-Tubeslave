@@ -2,6 +2,7 @@
 Training script for the gain/pan predictor.
 Generates synthetic multitrack training data.
 """
+import json
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,12 +10,90 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import logging
 import os
-from typing import Optional
+from typing import List, Optional, Sequence, Tuple
 
 from .gain_pan_predictor import GainPanPredictorNet
 from .losses import MultiResolutionSTFTLoss
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_list_shape(values: Sequence, *, target_channels: int) -> np.ndarray:
+    array = np.asarray(values, dtype=np.float32)
+    if array.ndim == 1 and array.size == target_channels:
+        return array.astype(np.float32)
+
+    if array.ndim > 1:
+        flattened = array.reshape(-1)
+        if flattened.size < target_channels:
+            padded = np.zeros((target_channels,), dtype=np.float32)
+            padded[: flattened.size] = flattened[:target_channels]
+            return padded
+        return flattened[:target_channels]
+
+    padded = np.zeros((target_channels,), dtype=np.float32)
+    if array.size:
+        padded[:1] = float(array.reshape(-1)[0])
+    return padded
+
+
+def _load_dataset_from_file(path: str, *, n_channels: int) -> List[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    path = os.path.abspath(path)
+    _, ext = os.path.splitext(path.lower())
+    samples: List[Tuple[np.ndarray, np.ndarray, np.ndarray]] = []
+
+    if ext == ".npz":
+        with np.load(path, allow_pickle=True) as raw:
+            channel_data = raw["channel_audios"] if "channel_audios" in raw.files else raw["channels"] if "channels" in raw.files else None
+            if channel_data is None:
+                raise ValueError("NPZ must include 'channel_audios' or 'channels'")
+            if "gains" not in raw.files:
+                raise ValueError("NPZ must include 'gains'")
+            if "pans" not in raw.files:
+                raise ValueError("NPZ must include 'pans'")
+            gains = raw["gains"]
+            pans = raw["pans"]
+    elif ext == ".jsonl":
+        channel_data = []
+        gains = []
+        pans = []
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                row = json.loads(line)
+                channel_data.append(row.get("channels") or row.get("channel_audios"))
+                gains.append(row.get("gains"))
+                pans.append(row.get("pans"))
+    else:
+        raise ValueError(f"Unsupported dataset format: {ext}")
+
+    if isinstance(channel_data, np.ndarray):
+        channel_data = channel_data.tolist()
+    if isinstance(gains, np.ndarray):
+        gains = gains.tolist()
+    if isinstance(pans, np.ndarray):
+        pans = pans.tolist()
+    if len(channel_data) != len(gains) or len(channel_data) != len(pans):
+        raise ValueError("channel/gain/pan datasets have different lengths")
+
+    for channels, gain_values, pan_values in zip(channel_data, gains, pans):
+        channel_matrix = np.asarray(channels, dtype=np.float32)
+        if channel_matrix.ndim == 1:
+            channel_matrix = channel_matrix.reshape(1, -1)
+        if channel_matrix.ndim != 2:
+            raise ValueError("Each sample must contain a 2D (channels, audio_len) array")
+        if channel_matrix.shape[0] < n_channels:
+            pad = np.zeros((n_channels - channel_matrix.shape[0], channel_matrix.shape[1]), dtype=np.float32)
+            channel_matrix = np.vstack([channel_matrix, pad])
+        channel_matrix = channel_matrix[:n_channels]
+
+        target_gains = _normalize_list_shape(gain_values, target_channels=n_channels)
+        target_pans = _normalize_list_shape(pan_values, target_channels=n_channels)
+        samples.append((channel_matrix.astype(np.float32), target_gains, target_pans))
+
+    if not samples:
+        raise ValueError(f"External dataset is empty: {path}")
+
+    return samples
 
 
 class SyntheticMixDataset(Dataset):
@@ -52,6 +131,22 @@ class SyntheticMixDataset(Dataset):
                 torch.from_numpy(self.target_pans[idx]))
 
 
+class ExternalMixDataset(Dataset):
+    """Dataset loaded from external data file."""
+
+    def __init__(self, samples: List[Tuple[np.ndarray, np.ndarray, np.ndarray]]):
+        self.samples = samples
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        channels, gains, pans = self.samples[idx]
+        return (torch.from_numpy(channels),
+                torch.from_numpy(gains),
+                torch.from_numpy(pans))
+
+
 def train_gain_predictor(
     output_path: str = 'models/gain_pan_predictor.pt',
     n_epochs: int = 30,
@@ -59,6 +154,7 @@ def train_gain_predictor(
     lr: float = 1e-3,
     n_channels: int = 8,
     n_samples: int = 500,
+    dataset_path: Optional[str] = None,
     device: Optional[str] = None,
 ):
     """Train the gain/pan predictor."""
@@ -66,7 +162,12 @@ def train_gain_predictor(
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
     logger.info(f"Training gain/pan predictor on {device}")
-    dataset = SyntheticMixDataset(n_samples=n_samples, n_channels=n_channels)
+    if dataset_path:
+        logger.info("Loading external dataset from %s", dataset_path)
+        samples = _load_dataset_from_file(dataset_path, n_channels=n_channels)
+        dataset = ExternalMixDataset(samples)
+    else:
+        dataset = SyntheticMixDataset(n_samples=n_samples, n_channels=n_channels)
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_set, val_set = torch.utils.data.random_split(

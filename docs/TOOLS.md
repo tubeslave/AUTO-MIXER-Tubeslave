@@ -37,7 +37,7 @@ Channels (1-40):
   /ch/{N}/gate/on       int [0,1]          Gate on/off
   /ch/{N}/gate/thr      float              Gate threshold
   /ch/{N}/dyn/on        int [0,1]          Compressor on/off
-  /ch/{N}/dyn/thr       float              Compressor threshold
+  /ch/{N}/dyn/thr26     float              Compressor threshold
   /ch/{N}/dyn/ratio     int                Ratio (index в WING_RATIO_VALUES)
   /ch/{N}/dyn/attack    float              Attack time
   /ch/{N}/dyn/release   float              Release time

@@ -41,6 +41,66 @@ class AudioDeviceType(Enum):
     DEFAULT = "default"
 
 
+@dataclass
+class TestGeneratorConfig:
+    """Compatibility config for simple offline test generators."""
+    __test__ = False
+    generator_type: str = "silence"
+    amplitude: float = 0.5
+    frequency: float = 1000.0
+
+
+class RingBuffer:
+    """Simple mono ring buffer kept for test/integration compatibility."""
+
+    def __init__(self, max_duration_sec: float, sample_rate: int = 48000):
+        self.sample_rate = sample_rate
+        self.capacity = max(1, int(max_duration_sec * sample_rate))
+        self._buffer = np.zeros(self.capacity, dtype=np.float32)
+        self._write_pos = 0
+        self._size = 0
+
+    def write(self, samples: np.ndarray):
+        samples = np.asarray(samples, dtype=np.float32).flatten()
+        if len(samples) >= self.capacity:
+            self._buffer[:] = samples[-self.capacity:]
+            self._write_pos = 0
+            self._size = self.capacity
+            return
+
+        end = self._write_pos + len(samples)
+        if end <= self.capacity:
+            self._buffer[self._write_pos:end] = samples
+        else:
+            first = self.capacity - self._write_pos
+            self._buffer[self._write_pos:] = samples[:first]
+            self._buffer[:len(samples) - first] = samples[first:]
+        self._write_pos = end % self.capacity
+        self._size = min(self.capacity, self._size + len(samples))
+
+    def read(self, num_samples: int) -> np.ndarray:
+        if num_samples <= 0:
+            return np.array([], dtype=np.float32)
+
+        num_samples = min(num_samples, self.capacity)
+        available = min(self._size, num_samples)
+        result = np.zeros(num_samples, dtype=np.float32)
+        if available == 0:
+            return result
+
+        start = (self._write_pos - available) % self.capacity
+        if start < self._write_pos:
+            data = self._buffer[start:self._write_pos]
+        else:
+            data = np.concatenate((self._buffer[start:], self._buffer[:self._write_pos]))
+        result[-available:] = data[-available:]
+        return result
+
+    @property
+    def available_samples(self) -> int:
+        return self._size
+
+
 # ── Device discovery helpers ──────────────────────────────────
 
 SOUNDGRID_PATTERNS = ("waves", "soundgrid", "sg ")
@@ -174,7 +234,14 @@ class AudioCapture:
         block_size: int = 1024,
         source_type: AudioSourceType = AudioSourceType.SILENCE,
         device_name: Optional[str] = None,
+        channels: Optional[int] = None,
+        buffer_duration: Optional[float] = None,
     ):
+        if channels is not None:
+            num_channels = channels
+        if buffer_duration is not None:
+            buffer_seconds = buffer_duration
+
         self.num_channels = num_channels
         self.sample_rate = sample_rate
         self.buffer_seconds = buffer_seconds
@@ -193,6 +260,7 @@ class AudioCapture:
         }
 
         self._subscribers: Dict[str, Callable] = {}
+        self._global_subscribers: List[Callable] = []
         self._running = False
         self._capture_thread: Optional[threading.Thread] = None
         self._stream = None
@@ -322,14 +390,29 @@ class AudioCapture:
         """Notify all subscribers of new data."""
         with self._lock:
             subs = list(self._subscribers.values())
+            global_subs = list(self._global_subscribers)
         for cb in subs:
             try:
                 cb()
             except Exception as e:
                 logger.debug(f"Subscriber callback error: {e}")
+        if global_subs:
+            for ch, buf in self._buffers.items():
+                data = buf.read(self.block_size)
+                for cb in global_subs:
+                    try:
+                        cb(ch, data)
+                    except Exception as e:
+                        logger.debug(f"Global subscriber callback error: {e}")
 
-    def get_buffer(self, channel: int, num_samples: int = 0) -> np.ndarray:
+    def get_buffer(self, channel: Optional[int] = None, num_samples: int = 0, channel_id: Optional[int] = None) -> np.ndarray:
         """Get audio samples from a channel's ring buffer."""
+        if channel is None:
+            channel = channel_id
+        if channel is None:
+            channel = 1
+        if channel == 0:
+            channel = 1
         buf = self._buffers.get(channel)
         if buf is None:
             return np.array([], dtype=np.float32)
@@ -390,3 +473,33 @@ class AudioCapture:
             "buffer_seconds": self.buffer_seconds,
             "subscribers": len(self._subscribers),
         }
+
+    def subscribe_all(self, callback: Callable):
+        """Compatibility helper for consumers that expect per-channel callbacks."""
+        with self._lock:
+            self._global_subscribers.append(callback)
+
+    def unsubscribe_all(self, callback: Callable):
+        """Remove a global callback if present."""
+        with self._lock:
+            self._global_subscribers = [cb for cb in self._global_subscribers if cb != callback]
+
+    @staticmethod
+    def _voss_mccartney(num_samples: int, num_rows: int = 16) -> np.ndarray:
+        """Generate pink-ish noise using the Voss-McCartney method."""
+        if num_samples <= 0:
+            return np.array([], dtype=np.float32)
+
+        rows = np.random.randn(num_rows, num_samples).astype(np.float32)
+        output = np.zeros(num_samples, dtype=np.float32)
+        running = np.zeros(num_rows, dtype=np.float32)
+
+        for i in range(num_samples):
+            changed_bits = (~i) & (i + 1)
+            for row in range(num_rows):
+                if changed_bits & (1 << row):
+                    running[row] = rows[row, i]
+            output[i] = running.sum()
+
+        peak = np.max(np.abs(output)) + 1e-10
+        return (output / peak).astype(np.float32)

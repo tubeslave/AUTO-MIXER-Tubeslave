@@ -1,0 +1,1420 @@
+Quick Start Guide
+
+
+
+
+AoIP-WSG
+AoIP Network Module with WAVES SoundGrid Technology
+and 64x64 Channels of Audio I/O
+
+
+
+
+V 0.0
+2       AoIP-WSG                                                                                                                                                                                                                                                                                                                                          Quick Start Guide               3
+
+(EN) Safety Instruction                                        6. Utilice solo accesorios especificados por el fabricante.                                    7. Utilisez uniquement                                       7. Verwenden Sie nur           9. Não coloque perto de fontes de chama nua,                       si affidi in tutto o in parte a qualsiasi descrizione,
+                                                                                               7. Use solo carros,                                           des chariots, des supports,                                   spezifizierte Wagen,           como velas acesas.                                                 fotografia o dichiarazione contenuta qui. Specifiche
+1. Please read and follow all instructions.
+                                                                                               soportes, trípodes,                                           des trépieds, des supports                                    Ständer, Stative,              10. Intervalo de temperatura de operação de 5° a 45°C              tecniche, aspetti e altre informazioni sono soggette
+2. Keep the apparatus away from water, except for                                                                                                            ou des tables spécifiés.                                      Halterungen oder Tische.                                                                          a modifiche senza preavviso. Tutti i marchi sono di
+                                                                                               soportes o mesas                                                                                                                                           (41° a 113° F).
+outdoor products.                                                                                                                                            Faites attention pour éviter                                  Achten Sie darauf, beim
+                                                                                               especificados. Tenga                                                                                                                                                                                                          proprietà dei rispettivi titolari. Midas, Klark Teknik,
+3. Clean only with a dry cloth.                                                                precaución para evitar el                                     le renversement lors du                                       Bewegen der Wagen-                                                                                Lab Gruppen, Lake, Tannoy, Turbosound, TC Electronic,
+4. Do not block any ventilation openings. Install in                                           vuelco al mover la                                            déplacement de la                                             Geräte-Kombination ein                                                                            TC Helicon, Behringer, Bugera, Aston Microphones e
+accordance with the manufacturer’s instructions.                                               combinación carro/                                            combinaison chariot/                                          Umkippen zu vermeiden.         LEGAL RENUNCIANTE                                                  Coolaudio sono marchi o marchi registrati di Music Tribe
+                                                                                               aparato.                                                      appareil.                      8. Vermeiden Sie die Installation in beengten Räumen                                                                             Global Brands Ltd. © Music Tribe Global Brands Ltd.
+5. Do not install near any heat sources such as radiators,                                                                                                                                                                                                O Music Tribe não se responsabiliza por perda
+heat registers, stoves or other apparatus (including           8. Evite la instalación en espacios confinados                8. Évitez l'installation dans des espaces confinés comme       wie Bücherregalen.                                                                                                               2024 Tutti i diritti riservati.
+                                                                                                                             les bibliothèques.                                                                                                           alguma que possa ser sofrida por qualquer pessoa
+amplifiers) that produce heat.                                 como estanterías.                                                                                                            9. Nicht in der Nähe von offenen Flammenquellen
+                                                                                                                                                                                                                                                          que dependa, seja de maneira completa ou parcial,
+6. Use only attachments/accessories specified by               9. No colocar cerca de fuentes de llama desnuda,              9. Ne pas placer près de sources de flamme nue,                platzieren, wie brennende Kerzen.
+                                                                                                                                                                                                                                                          de qualquer descrição, fotografia, ou declaração                   GARANZIA LIMITATA
+the manufacturer.                                              como velas encendidas.                                        telles que des bougies allumées.                               10. Betriebstemperaturbereich von 5° bis 45°C                 aqui contidas. Dados técnicos, aparências e outras
+                                 7. Use only specified         10. Rango de temperatura de funcionamiento de                 10. Plage de température de fonctionnement de                  (41° bis 113°F).                                              informações estão sujeitas a modificações sem aviso                Per i termini e le condizioni di garanzia applicabili e le
+                                 carts, stands, tripods,       5° a 45°C (41° a 113° F).                                     5° à 45°C (41° à 113°F)                                                                                                      prévio. Todas as marcas são propriedade de seus                    informazioni aggiuntive relative alla garanzia limitata
+                                 brackets, or tables. Use                                                                                                                                                                                                 respectivos donos. Midas, Klark Teknik, Lab Gruppen,               di Music Tribe, consultare online i dettagli completi su
+                                                                                                                                                                                            HAFTUNGSAUSSCHLUSS                                                                                                               community.musictribe.com/support.
+                                 caution to prevent tip-over                                                                                                                                                                                              Lake, Tannoy, Turbosound, TC Electronic, TC Helicon,
+                                 when moving the cart/         NEGACIÓN LEGAL                                                                                                               Music Tribe übernimmt keine Haftung für Verluste,             Behringer, Bugera, Aston Microphones e Coolaudio
+                                 apparatus combination.                                                                      DÉNI LÉGAL
+                                                               Music Tribe no admite ningún tipo de responsabilidad                                                                         die Personen entstanden sind, die sich ganz oder              são marcas ou marcas registradas do Music Tribe
+                                                               por cualquier daño o pérdida que pudiera sufrir               Music Tribe ne peut être tenu pour responsable pour            teilweise auf hier enthaltene Beschreibungen,                 Global Brands Ltd. © Music Tribe Global Brands Ltd.
+                                                                                                                             toute perte pouvant être subie par toute personne              Fotos oder Aussagen verlassen haben. Technische Daten,        2024 Todos direitos reservados.                                    (NL) Belangrijke
+8. Avoid installing in confined spaces like bookcases.         cualquier persona por confiar total o parcialmente en la
+                                                                                                                             se fiant en partie ou en totalité à toute description,         Erscheinungsbild und andere Informationen können                                                                                 veiligheidsvoorschriften
+9. Do not place near naked flame sources, such as              descripciones, fotografías o afirmaciones contenidas en
+                                                               este documento. Las especificaciones técnicas, imágenes       photographie ou affirmation contenue dans ce                   ohne vorherige Ankündigung geändert werden. Alle                                                                                 1. Lees alsjeblieft alle instructies en volg deze op.
+lighted candles.                                                                                                                                                                                                                                          GARANTIA LIMITADA
+                                                               y otras informaciones contenidas en este documento            document. Les caractéristiques, l’apparence et d’autres        Warenzeichen sind Eigentum der jeweiligen Inhaber.                                                                               2. Houd het apparaat uit de buurt van water, behalve
+10. Operating temperature range 5° to 45°C                                                                                   informations peuvent faire l’objet de modifications            Midas, Klark Teknik, Lab Gruppen, Lake, Tannoy,                                                                                  voor producten die bedoeld zijn voor buitengebruik.
+                                                               están sujetas a modificaciones sin previo aviso. Todas las                                                                                                                                 Para obter os termos de garantia aplicáveis e condições e
+(41° to 113°F).                                                                                                              sans notification. Toutes les marques appartiennent            Turbosound, TC Electronic, TC Helicon, Behringer, Bugera,
+                                                               marcas comerciales que aparecen aquí son propiedad                                                                                                                                         informações adicionais a respeito da garantia limitada do          3. Reinig alleen met een droge doek.
+                                                               de sus respectivos dueños. Midas, Klark Teknik,               à leurs propriétaires respectifs. Midas, Klark Teknik,         Aston Microphones und Coolaudio sind Warenzeichen             Music Tribe, favor verificar detalhes na íntegra através do
+                                                                                                                             Lab Gruppen, Lake, Tannoy, Turbosound, TC Electronic,          oder eingetragene Warenzeichen der Music Tribe Global                                                                            4. Blokker geen ventilatieopeningen. Installeer volgens
+                                                               Lab Gruppen, Lake, Tannoy, Turbosound, TC Electronic,                                                                                                                                      website community.musictribe.com/support.                          de instructies van de fabrikant.
+                                                               TC Helicon, Behringer, Bugera, Aston Microphones y            TC Helicon, Behringer, Bugera, Aston Microphones et            Brands Ltd. © Music Tribe Global Brands Ltd. 2024 Alle
+LEGAL DISCLAIMER                                                                                                                                                                                                                                                                                                             5. Installeer niet in de buurt van warmtebronnen
+                                                               Coolaudio son marcas comerciales o marcas registradas         Coolaudio sont des marques ou marques déposées de              Rechte vorbehalten.
+Music Tribe accepts no liability for any loss which may                                                                      Music Tribe Global Brands Ltd. © Music Tribe Global                                                                                                                                             zoals radiatoren, warmte registers, fornuizen of andere
+                                                               de Music Tribe Global Brands Ltd. © Music Tribe Global
+be suffered by any person who relies either wholly or in                                                                     Brands Ltd. 2024 Tous droits réservés.                                                                                                                                                          apparaten (inclusief versterkers) die warmte produceren.
+                                                               Brands Ltd. 2024 Reservados todos los derechos.
+part upon any description, photograph, or statement                                                                                                                                         BESCHRÄNKTE GARANTIE                                          (IT) Istruzioni di sicurezza importanti                            6. Gebruik alleen accessoires die door de fabrikant
+contained herein. Technical specifications, appearances                                                                                                                                     Die geltenden Garantiebedingungen und zusätzliche             1. Per favore, leggere e seguire tutte le istruzioni.              zijn gespecificeerd.
+and other information are subject to change without            GARANTÍA LIMITADA                                             GARANTIE LIMITÉE                                                                                                                                                                                                                  7. Gebruik alleen
+                                                                                                                                                                                            Informationen bezüglich der von Music Tribe gewährten         2. Mantenere l'apparecchio lontano dall'acqua, tranne
+notice. All trademarks are the property of their                                                                             Pour connaître les termes et conditions de                     beschränkten Garantie finden Sie online unter                 per i prodotti destinati all'uso all'aperto.                                                         gespecificeerde karren,
+                                                               Si quiere conocer los detalles y condiciones aplicables
+respective owners. Midas, Klark Teknik, Lab Gruppen,                                                                         garantie applicables, ainsi que les informations               community.musictribe.com/support.                                                                                                                                  standaards, statieven,
+                                                               de la garantía así como información adicional sobre                                                                                                                                        3. Pulire solo con un panno asciutto.
+Lake, Tannoy, Turbosound, TC Electronic, TC Helicon,                                                                         supplémentaires et détaillées sur la Garantie                                                                                                                                                                                     beugels of tafels. Wees
+                                                               la Garantía limitada de Music Tribe, consulte online                                                                                                                                       4. Non ostruire alcuna apertura di ventilazione. Installare
+Behringer, Bugera, Aston Microphones and Coolaudio                                                                           Limitée de Music Tribe, consultez le site Internet                                                                                                                                                                                voorzichtig om kantelen te
+                                                               toda la información en la web community.musictribe.                                                                                                                                        in conformità alle istruzioni del produttore.
+are trademarks or registered trademarks of Music                                                                             community.musictribe.com/support.                                                                                                                                                                                                 voorkomen bij het
+                                                               com/support.
+Tribe Global Brands Ltd. © Music Tribe Global Brands                                                                                                                                        (PT) Instruções de Seguranç                                   5. Non installare vicino a fonti di calore come                                                      verplaatsen van de kar/
+Ltd. 2024 All rights reserved.                                                                                                                                                              Importantes                                                   termosifoni, bocchette di calore, fornelli o altri apparecchi                                        apparaatcombinatie.
+                                                                                                                                                                                                                                                          (compresi gli amplificatori) che producono calore.                 8. Vermijd installatie in afgesloten ruimtes
+                                                                                                                                                                                            1. Por favor, leia e siga todas as instruções.
+                                                                                                                                                                                                                                                          6. Utilizzare solo accessori specificati dal produttore.           zoals boekenkasten.
+LIMITED WARRANTY                                               (FR) Consignes de sécurité                                    (DE) Wichtige Sicherheitshinweise                              2. Mantenha o aparelho longe da água, exceto para
+                                                                                                                                                                                            produtos destinados ao uso externo.                                                              7. Usare solo carrelli,         9. Plaats niet in de buurt van naakte vlambronnen,
+For the applicable warranty terms and conditions               1. Veuillez lire et suivre toutes les instructions.           1. Bitte lesen Sie alle Anweisungen sorgfältig durch und                                                                                                       supporti, treppiedi, staffe      zoals brandende kaarsen.
+and additional information regarding Music Tribe’s                                                                           befolgen Sie diese.                                            3. Limpe apenas com um pano seco.
+                                                               2. Gardez l'appareil éloigné de l'eau, sauf pour les                                                                                                                                                                         o tavoli specificati. Prestare   10. Bedrijfstemperatuurbereik
+Limited Warranty, please see complete details online at        produits destinés à une utilisation en extérieur.             2. Halten Sie das Gerät von Wasser fern, außer für             4. Não bloqueie nenhuma abertura de ventilação. Instale                                         attenzione per evitare il        van 5° tot 45°C (41° tot 113°F).
+community.musictribe.com/support.                                                                                            Produkte, die für den Außeneinsatz vorgesehen sind.            de acordo com as instruções do fabricante.                                                      ribaltamento durante lo
+                                                               3. Nettoyez uniquement avec un chiffon sec.
+                                                                                                                             3. Reinigen Sie es nur mit einem trockenen Tuch.               5. Não instale próximo a fontes de calor, como                                                  spostamento della
+                                                               4. Ne bloquez aucune ouverture de ventilation. Installez                                                                     radiadores, grelhas de calor, fogões ou outros aparelhos                                        combinazione carrello/
+                                                               conformément aux instructions du fabricant.                   4. Blockieren Sie keine Belüftungsöffnungen. Installieren                                                                                                      apparecchio.
+                                                                                                                                                                                            (incluindo amplificadores) que gerem calor.                                                                                      WETTELIJKE ONTKENNING
+                                                               5. N'installez pas près de sources de chaleur telles          Sie gemäß den Anweisungen des Herstellers.
+(ES) Instrucción de seguridad                                                                                                                                                               6. Use apenas acessórios especificados pelo fabricante.       8. Evitare l'installazione in spazi confinati come librerie.
+                                                               que radiateurs, grilles de chaleur, cuisinières ou autres     5. Installieren Sie nicht in der Nähe von Wärmequellen                                                                                                                                          Music Tribe aanvaardt geen aansprakelijkheid voor enig
+1. Por favor, lea y siga todas las instrucciones.                                                                                                                                                                            7. Use apenas carrinhos,     9. Non posizionare vicino a fonti di fiamma nude,                  verlies dat kan worden geleden door een persoon die
+                                                               appareils (y compris les amplificateurs) qui produisent de    wie Heizkörpern, Heizregistern, Öfen oder anderen
+2. Mantenga el aparato alejado del agua, excepto para          la chaleur.                                                   Geräten (einschließlich Verstärkern), die Wärme erzeugen.                                       suportes, tripés, suportes   come candele accese.                                               geheel of gedeeltelijk vertrouwt op enige beschrijving,
+productos destinados al uso en exteriores.                                                                                                                                                                                   ou mesas especificados.      10. Intervallo di temperatura di funzionamento da                  foto of verklaring hierin. Technische specificaties,
+                                                               6. Utilisez uniquement les accessoires spécifiés par          6. Verwenden Sie nur Zubehörteile, die vom Hersteller
+3. Limpie solo con un paño seco.                                                                                                                                                                                             Tenha cuidado para evitar    5° a 45°C (41° a 113°F).                                           verschijningen en andere informatie kunnen zonder
+                                                               le fabricant.                                                 angegeben sind.
+                                                                                                                                                                                                                             tombamentos ao mover a                                                                          voorafgaande kennisgeving worden gewijzigd. Alle
+4. No bloquee ninguna abertura de ventilación. Instale                                                                                                                                                                       combinação carrinho/
+de acuerdo con las instrucciones del fabricante.                                                                                                                                                                                                                                                                             handelsmerken zijn eigendom van hun respectievelijke
+                                                                                                                                                                                                                             aparelho.                    DISCLAIMER LEGALE                                                  eigenaren. Midas, Klark Teknik, Lab Gruppen, Lake,
+5. No instale cerca de fuentes de calor como radiadores,
+                                                                                                                                                                                            8. Evite instalar em espaços confinados, como estantes.                                                                          Tannoy, Turbosound, TC Electronic, TC Helicon,
+registros de calor, estufas u otros aparatos (incluyendo                                                                                                                                                                                                  Music Tribe non si assume alcuna responsabilità per
+                                                                                                                                                                                                                                                                                                                             Behringer, Bugera, Aston Microphones en Coolaudio
+amplificadores) que generen calor.                                                                                                                                                                                                                        eventuali danni che possono essere subiti da chiunque
+4       AoIP-WSG                                                                                                                                                                                                                         Quick Start Guide   5
+
+zijn handelsmerken of gedeponeerde handelsmerken                   (PL) Ważne informacje o                                        (JP) 安全指示                                       (CN) 安全须知
+van Music Tribe Global Brands Ltd. © Music Tribe Global            bezpieczeństwie
+                                                                                                                                  1. すべての指示を読んで、従ってくだ                             1. 请阅读, 保存, 遵守所有的说明, 注意所
+Brands Ltd. 2024 Alle rechten voorbehouden.                        1. Proszę przeczytać i ścisłe przestrzegać                     さい。                                             有的警示。
+                                                                   wszystkich instrukcji.                                         2. 屋外の製品を除き、機器を水から遠ざ                            2. 请勿在靠近水的地方使用本产品。
+BEPERKTE GARANTIE                                                  2. Trzymaj urządzenie z dala od wody, z wyjątkiem              けてください。
+                                                                                                                                                                                  3. 请用干布清洁本产品。
+                                                                   produktów przeznaczonych do użytku na zewnątrz.                3. 乾いた布でのみ清掃してください。
+Voor de toepasselijke garantievoorwaarden en                                                                                                                                      4. 请只使用厂家指定的附属设备和配件。
+                                                                   3. Czyść tylko suchą szmatką.                                  4. 通気口を塞がないでください。
+aanvullende informatie met betrekking tot de beperkte                                                                                                                             不要堵塞任何通风口。按照制造商的说明
+garantie van Music Tribe, zie de volledige details online          4. Nie blokuj żadnych otworów wentylacyjnych.                  メーカーの指示に従ってインストールして                             进行安装。
+op community.musictribe.com/support.                               Instaluj zgodnie z instrukcjami producenta.                    ください。
+                                                                                                                                                                                                             5. 请只使用厂家指
+                                                                   5. Nie instaluj w pobliżu źródeł ciepła, takich jak            5. 暖房器、ヒートレジスター、ストーブな                                                      定的或随货销售的
+                                                                   grzejniki, rejestratory ciepła, kuchenki lub inne urządzenia   どの発熱機器（アンプを含む）の近くには                                                        手推车, 架子, 三角
+                                                                   (w tym wzmacniacze), które generują ciepło.                    取り付けないでください。                                                               架, 支架和桌子等。
+(SE) Viktiga säkerhetsanvisningar                                  6. Używaj tylko akcesoriów określonych                         6. メーカーが指定したアタッチメント/                                                       若使用手推车来搬
+1. Vänligen läs och följ alla instruktioner noggrant.              przez producenta.                                              アクセサリーのみ使用してください。                                                          运设备, 请注意安
+                                                                                                     7. Używaj tylko                         7. 指定されたカー                                                      全放置设备, 以避
+2. Håll apparaten borta från vatten, förutom
+                                                                                                     określonych wózków,                     ト、スタンド、三                                                        免手推车和设备倾
+för utomhusprodukter.
+                                                                                                     stojaków, statywów,                     脚、ブラケット、ま                            倒而受伤。
+3. Rengör endast med en torr trasa.
+                                                                                                     uchwytów lub stołów.                    たはテーブルのみ                             6. 请勿安装在密闭空间, 如书柜或类似
+4. Blockera inte några ventilationsöppningar.                                                        Uważaj, aby zapobiec                    使用してください。                            装置。
+Installera enligt tillverkarens anvisningar.                                                         przewróceniu się wózka/                 カート/機器の組み                            7. 请勿将本产品安装在热源附近, 如暖气
+5. Installera inte nära några värmekällor som element,                                               aparatu podczas                         合わせを移動する                             片, 炉子或其它产生热量的设备 (包括功放
+värmeregistrar, spisar eller andra apparater (inklusive                                              przemieszczania.                        際には、転倒を防ぐ                            器)。 产品上不要放置裸露的火焰源, 如点
+förstärkare) som genererar värme.                                  8. Unikaj instalacji w ciasnych miejscach, takich jak          よう注意してください。                                     燃的蜡烛。
+6. Använd endast tillbehör som anges av tillverkaren.              regały na książki.                                             8. 書棚などの密閉された空間には設置し                            8. 如果液体流入或异物落入设备内,
+                                  7. Använd endast                 9. Nie umieszczaj w pobliżu źródeł otwartego ognia,            ないでください。                                        设备遭雨淋或受潮, 设备不 能正常运作或
+                                  specificerade vagnar, ställ,     takich jak zapalone świeczki.                                  9. 裸火のような火の元の近くに置かない                            被摔坏等, 设备受损需进行维修时, 所有维
+                                  stativ, fästen eller bord. Var   10. Zakres temperatury pracy od 5° do 45°C                     でください。                                          修均须由 合格的维修人员进行维修。
+                                  försiktig för att undvika att    (41° do 113°F).                                                10. 動作温度範囲は摂氏 5 度から 45
+                                  vagnen/                                                                                         度 (華氏 41 度から 113 度) です。
+                                  apparatkombinationen                                                                                                                            法律声明
+                                  tippar när den flyttas.                                                                                                                         对于任何因在此说明书提到的全部或部份
+                                  8. Undvik installation i         ZASTRZEŻENIA PRAWNE                                            法的放棄                                            描述、 图片或声明而造成的损失, Music Tribe
+trånga utrymmen som bokhyllor.                                                                                                                                                    不负任何责任。 技术参数和外观若有更改,
+                                                                   Music Tribe nie ponosi odpowiedzialności za                    ここに含まれる記述、写真、意見の全                               恕不另行通知。 所有的商标均为其各自所
+9. Placera inte nära öppen låga, såsom tända ljus.                 jakiekolwiek straty, które mogą ponieść osoby, które           体または一部に依拠して、いかなる人が                              有者的财产。 Midas, Klark Teknik, Lab Gruppen,
+10. Driftstemperaturområde 5° till 45°C (41° till 113°F).          polegają w całości lub w części na jakimkolwiek opisie,        損害を生じさせた場合にも、Music Tribe                        Lake, Tannoy, Turbosound, TC Electronic, TC Helicon,
+                                                                   fotografii lub oświadczeniu zawartym w niniejszym              は一切の賠償責任を負いません。技術                               Behringer, Bugera, Aston Microphones 和 Coolaudio
+                                                                   dokumencie. Specyfikacje techniczne, wygląd i inne             仕様、外観およびその他の情報は予告                               是 Music Tribe Global Brands Ltd. 公司的商标
+FRISKRIVNINGSKLAUSUL                                               informacje mogą ulec zmianie bez powiadomienia.                なく変更になる場合があります。商標                               或注册商标。 © Music Tribe Global Brands Ltd.
+Music Tribe tar inget ansvar för någon förlust som kan             Wszystkie znaki towarowe są własnością ich                     はすべて、それぞれの所有者に帰属し                               2024 版权所有。
+drabbas av någon person som helt eller delvis förlitar             odpowiednich właścicieli. Midas, Klark Teknik,                 ます。Midas、Klark Teknik、Lab Gruppen、
+sig på någon beskrivning, fotografi eller uttalande som            Lab Gruppen, Lake, Tannoy, Turbosound, TC Electronic,          Lake、Tannoy、Turbosound、TC Electronic、
+finns här. Tekniska specifikationer, utseenden och annan           TC Helicon, Behringer, Bugera, Aston Microphones i             TC Helicon、Behringer、Bugera、Aston Microphones   保修条款
+information kan ändras utan föregående meddelande.                 Coolaudio są znakami towarowymi lub zastrzeżonymi              および Coolaudio は Music Tribe Global Brands
+                                                                                                                                                                                  有关音乐集团保修的适用条款及其它相关
+Alla varumärken tillhör respektive ägare. Midas,                   znakami towarowymi firmy Music Tribe Global Brands             Ltd. の商標または登録商標です。© Music
+                                                                                                                                                                                  信息, 请登陆 community.musictribe.com/support
+Klark Teknik, Lab Gruppen, Lake, Tannoy, Turbosound,               Ltd. © Music Tribe Global Brands Ltd. 2024 Wszystkie           Tribe Global Brands Ltd. 2024 無断転用禁止。
+                                                                                                                                                                                  网站查看完整的详细信息。
+TC Electronic, TC Helicon, Behringer, Bugera, Aston                prawa zastrzeżone.
+Microphones och Coolaudio är varumärken eller
+                                                                                                                                  限定保証
+registrerade varumärken som tillhör Music Tribe Global
+                                                                   OGRANICZONA GWARANCJA
+Brands Ltd. © Music Tribe Global Brands Ltd. 2024 Alla                                                                            適用される保証条件と Music Tribe の限定
+Rättigheter reserverade.                                           Aby zapoznać się z obowiązującymi warunkami                    保証に関する概要については、オンライ
+                                                                   gwarancji i dodatkowymi informacjami dotyczącymi               ン上 community.musictribe.com/support にて詳
+                                                                   ograniczonej gwarancji Music Tribe, zapoznaj się ze            細をご確認ください。
+BEGRÄNSAD GARANTI                                                  wszystkimi szczegółami w trybie online pod adresem
+För tillämpliga garantivillkor och ytterligare information         community.musictribe.com/support.
+om Music Tribes begränsade garanti, se fullständig
+information online på community.musictribe.
+com/support.
+6       AoIP-WSG                                                                                                                                                                                                                                                                                                   Quick Start Guide          7
+
+
+AoIP-WSG Getting started
+1. Introduction                                                                                                                                                          Multiple connections
+The WING SoundGrid module transmits up to 64 input and 64 output channels at 44.1 kHz or 48 kHz and 24 bits over either of the Ethernet ports on the rear panel in       Multiple SoundGrid-compatible devices like Waves servers and interfaces can be added by configuring a “star” network in which all devices are interconnected by a
+the CONTROL/AUDIO NETWORK section. Interconnected devices are also synchronized over the Ethernet connection.                                                            1 Gigabit Ethernet switch (Fig. 2). Please refer to Waves’ documentation for a list of compatible switches.
+                                                                                                                                                                                                                                                                                                                       Host computer
+2. Installation
+Waves plug-ins can be used on the WING by installing a SoundGrid module inside the console. Note that the installation procedure must only be performed by certified     WING console
+service centers. Check behringer.com for your closest service provider.
+To activate the module, hold down UTILITY while turning on the console. The CONSOLE OPTIONS dialog will open automatically. Enter “MOD-WSG” and click on APPLY.
+After the internal module has been installed, the two Ethernet ports on the rear panel act as a dual-redundant connection. Each port transmits 64 input and
+64 output channels.
+
+                CONTROL/AUDIO NETWORK
+
+
+
+                                                                                                                                                                                                                                                                                               Waves I/O device or DSP server
+                                                                                                                                                                                                                                                                                                                 I/O
+
+
+
+
+                                                                                                                                                                                                                                                                    1Gbit ethernet switch
+3. Network Setup
+                                                                                                                                                                         Fig. 2: WING console, host computer and additional I/O device forming a “star” network
+Single connection
+Different network setups are possible, depending on the user’s needs. The simplest setup can be seen below in Fig. 1, consisting of WING console connected directly to   4. Direct routing of Sources to SoundGrid
+a computer with an Ethernet cable.
+                                                                                                                                                                         After connecting the devices in one of the configurations described above, the WING console and all other devices in the network are shown in the SETUP tab in the
+                                                                                                                                                                         SoundGrid software.
+
+WING console
+
+
+
+                                                                                                                                             Host computer
+
+
+
+
+Fig. 1: Direct connection between WING and host computer
+
+In this setup, the Waves SoundGrid software must allow the Digital Signal Processing (DSP) to be carried out by the host computer without the need for a Waves DSP
+server. Please refer to the documentation provided by Waves to compare SoundGrid software specifications.
+
+
+
+
+                                                                                                                                                                         Fig. 3: SuperRack SoundGrid SETUP tab
+8       AoIP-WSG                                                                                                                                                                                                                                                                                                         Quick Start Guide        9
+
+
+AoIP-WSG Getting started
+The source and output groups “WSG” in the ROUTING screen of the WING console allow any source to be assigned to any of the 64 channels sent from the console, as            Finally, choose the corresponding channel from the SOURCE GROUP WSG and assign it as source for the desired channel on the WING console.
+well as assign any of the 64 return channels to any channel on the WING. In the image below, local inputs 1 to 8 have been assigned to WSG outputs 1 to 8. Thus, the
+signal from the preamps 1 to 8 are sent to the SoundGrid network before channel processing.
+
+
+
+
+                                                                                                                                                                            Fig. 6: Assigning SOURCE GROUP WSG to a channel
+
+Fig. 4: WSG source and output groups
+                                                                                                                                                                            5. Inserting SoundGrid as EXTERNAL FX
+To send a WING channel to the SoundGrid network after some or all the channel strip processing has been applied, a USER SIGNAL can be created on the ROUTING
+screen. The USER SIGNAL can be taken at the TAP point or POST fader. The signal can contain both left and right channels (L+R) or just one of them (L or R). Please refer   Waves plug-ins can be assigned to an insert point on any channel of the WING using the EXTERNAL effects unit within WING. When loaded on single channels,
+to the WING console Quick Start Guide for more information on creating a USER SIGNAL.                                                                                       SoundGrid software processes the signal of that single channel. Alternatively, multiple channels can be sent to a single plug-in instance when the effect is loaded
+                                                                                                                                                                            through an insert point on a bus.
+In the SoundGrid software, the 64 channels coming from the console are routed to “racks” where the desired plug-ins are loaded. The output of each rack is then
+routed to one of the 64 channels sent back to the console.                                                                                                                  In the example below, the EXTERNAL EFFECT has been loaded on Slot 1 of the 16 WING effect slots and then loaded on Insert Point 1 of Bus 1.
+
+
+
+
+Fig. 5: Rack routing SuperRack SoundGrid
+
+
+
+
+                                                                                                                                                                            Fig. 7: External loaded as insert point on a bus
+10      AoIP-WSG                                                                                                                                                                                                                                                                                                Quick Start Guide        11
+
+
+AoIP-WSG Getting started                                                                                                                                             AoIP-WSG Puesta en marcha
+On the ROUTING screen, the SOURCE GROUP FX SENDS contains send channels for all 16 slots of the FX rack. EXTERNAL EFFECT is selected for Slot 1, FX SEND 1L and 1R
+must be sent through the desired channels to the SoundGrid software. In this example, FX SEND 1L and 1R are being sent via channels 9 and 10.
+                                                                                                                                                                     1. Introducción
+                                                                                                                                                                     El módulo WING SoundGrid transmite hasta 64 canales de entrada y 64 canales de salida a 44.1 kHz o 48 kHz y 24 bits a través de cualquiera de los puertos Ethernet en
+                                                                                                                                                                     el panel trasero en la sección CONTROL/AUDIO NETWORK. Los dispositivos interconectados también se sincronizan a través de la conexión Ethernet.
+
+                                                                                                                                                                     2. Instalación
+                                                                                                                                                                     Los complementos de Waves se pueden usar en el WING instalando un módulo SoundGrid dentro de la consola. Tenga en cuenta que el procedimiento de instalación
+                                                                                                                                                                     solo debe ser realizado por centros de servicio certificados. Consulte behringer.com para encontrar el proveedor de servicios más cercano.
+                                                                                                                                                                     Para activar el módulo, mantenga pulsada la tecla UTILITY mientras enciende la consola. Se abrirá automáticamente el cuadro de diálogo CONSOLE OPTIONS.
+                                                                                                                                                                     Introduzca «MOD-WSG» y presione APPLY.
+                                                                                                                                                                     Después de instalar el módulo interno, los dos puertos Ethernet en el panel trasero actúan como una conexión redundante doble. Cada puerto transmite 64 canales de
+                                                                                                                                                                     entrada y 64 canales de salida.
+
+                                                                                                                                                                                      CONTROL/AUDIO NETWORK
+
+
+
+
+                                                                                                                                                                     3. Configuración de la red
+Fig. 8: FX SENDS
+                                                                                                                                                                     Conexión única
+Channels 9 and 10 are routed through the SoundGrid software to the desired rack, where plug-ins are added. SoundGrid rack’s output is sent back to the console
+through any available channel. In this example, the rack’s output is sent back through channels 9 and 10, which are then selected as the EXTERNAL EFFECT RETURN      Dependiendo de las necesidades del usuario, son posibles diferentes configuraciones de red. La configuración más simple se puede ver a continuación en la Fig. 1,
+signal (see Fig. 7).                                                                                                                                                 que consiste en una consola WING conectada directamente a una computadora con un cable Ethernet.
+
+
+
+                                                                                                                                                                     WING console
+
+
+
+                                                                                                                                                                                                                                                                                                                  Host computer
+
+
+
+
+                                                                                                                                                                     Fig. 1: Conexión directa entre WING y la computadora anfitriona
+
+                                                                                                                                                                     En esta configuración, el software Waves SoundGrid debe permitir que el procesamiento de señales digitales (DSP) sea realizado por la computadora anfitriona sin
+                                                                                                                                                                     necesidad de un servidor DSP de Waves. Consulte la documentación proporcionada por Waves para comparar las especificaciones del software SoundGrid.
+12      AoIP-WSG                                                                                                                                                                                                                                                                                                      Quick Start Guide        13
+
+
+AoIP-WSG Puesta en marcha
+Conexiones múltiples                                                                                                                                                     Los grupos de fuente y salida “WSG” en la pantalla ROUTING de la consola WING permiten asignar cualquier fuente a cualquiera de los 64 canales enviados desde la
+                                                                                                                                                                         consola, así como asignar cualquiera de los 64 canales de retorno a cualquier canal en el WING. En la imagen de abajo, las entradas locales 1 a 8 se han asignado a las
+Se pueden agregar múltiples dispositivos compatibles con SoundGrid, como servidores e interfaces de Waves, configurando una red “estrella” en la que                     salidas WSG 1 a 8. Así, la señal de los preamplificadores 1 a 8 se envía a la red SoundGrid antes del procesamiento del canal.
+todos los dispositivos están interconectados por un interruptor Ethernet de 1 Gigabit (Fig. 2). Consulte la documentación de Waves para obtener una lista de
+interruptores compatibles.
+                                                                                                                                                     Host computer
+
+
+WING console
+
+
+
+
+                                                                                                                                  Waves I/O device or DSP server
+                                                                                                                                               I/O
+
+
+
+
+                                                                                                          1Gbit ethernet switch
+
+Fig. 2: Consola WING, computadora anfitriona y dispositivo de E/S adicional formando una red “estrella”
+                                                                                                                                                                         Fig. 4: Grupos de fuente y salida WSG
+
+4. Enrutamiento directo de fuentes a SoundGrid                                                                                                                           Para enviar un canal WING a la red SoundGrid después de que se haya aplicado algo o todo el procesamiento de la tira de canal, se puede crear una USER SIGNAL en la
+                                                                                                                                                                         pantalla ROUTING. La USER SIGNAL se puede tomar en el punto TAP o POST fader. La señal puede contener ambos canales izquierdo y derecho (L+R) o solo uno de ellos
+Después de conectar los dispositivos en una de las configuraciones descritas anteriormente, la consola WING y todos los demás dispositivos en la red se muestran en la
+                                                                                                                                                                         (L o R). Consulte la Guía de inicio rápido de la consola WING para obtener más información sobre cómo crear una USER SIGNAL.
+pestaña SETUP en el software SoundGrid.
+                                                                                                                                                                         En el software SoundGrid, los 64 canales que vienen de la consola se enrutan a “racks” donde se cargan los complementos deseados. La salida de cada rack se enruta
+                                                                                                                                                                         luego a uno de los 64 canales que se envían de vuelta a la consola.
+
+
+
+
+                                                                                                                                                                         Fig. 5: Enrutamiento de rack SuperRack SoundGrid
+
+
+
+
+Fig. 3: Pestaña SETUP de SuperRack SoundGrid
+14      AoIP-WSG                                                                                                                                                                                                                                                                                                   Quick Start Guide         15
+
+
+AoIP-WSG Puesta en marcha
+Finalmente, elija el canal correspondiente del SOURCE GROUP WSG y asígnelo como fuente para el canal deseado en la consola WING.                                   En la pantalla ROUTING, el SOURCE GROUP FX SENDS contiene canales de envío para todas las 16 ranuras del rack FX. EXTERNAL EFFECT se selecciona para la
+                                                                                                                                                                   Ranura 1, FX SEND 1L y 1R deben enviarse a través de los canales deseados al software SoundGrid. En este ejemplo, FX SEND 1L y 1R se están enviando a través de
+                                                                                                                                                                   los canales 9 y 10.
+
+
+
+
+Fig. 6: Asignación de SOURCE GROUP WSG a un canal
+
+
+5. Insertando SoundGrid como EXTERNAL FX                                                                                                                           Fig. 8: FX SENDS
+
+                                                                                                                                                                   Los canales 9 y 10 se enrutan a través del software SoundGrid al rack deseado, donde se agregan los complementos. La salida del rack de SoundGrid se envía de vuelta
+Los complementos de Waves se pueden asignar a un punto de inserción en cualquier canal del WING utilizando la unidad de efectos EXTERNAL dentro de WING.
+                                                                                                                                                                   a la consola a través de cualquier canal disponible. En este ejemplo, la salida del rack se envía de vuelta a través de los canales 9 y 10, que luego se seleccionan como la
+Cuando se cargan en canales individuales, el software SoundGrid procesa la señal de ese canal individual. Alternativamente, se pueden enviar múltiples canales a
+                                                                                                                                                                   señal de retorno EXTERNAL EFFECT (ver Fig. 7).
+una sola instancia de complemento cuando el efecto se carga a través de un punto de inserción en un bus.
+En el ejemplo de abajo, el EXTERNAL EFFECT se ha cargado en la Ranura 1 de las 16 ranuras de efectos de WING y luego se ha cargado en el Punto de
+inserción 1 del Bus 1.
+
+
+
+
+Fig. 7: External cargado como punto de inserción en un bus
+16      AoIP-WSG                                                                                                                                                                                                                                                                                                        Quick Start Guide           17
+
+
+AoIP-WSG Mise en oeuvre
+1. Introduction                                                                                                                                                           Connexions multiples
+Le module WING SoundGrid transmet jusqu’à 64 canaux d’entrée et 64 canaux de sortie à 44,1 kHz ou 48 kHz et 24 bits via l’un ou l’autre des ports Ethernet sur le         Plusieurs appareils compatibles SoundGrid comme les serveurs Waves et les interfaces peuvent être ajoutés en configurant un réseau “étoile” dans lequel
+panneau arrière dans la section CONTROL/AUDIO NETWORK. Les appareils interconnectés sont également synchronisés via la connexion Ethernet.                                tous les appareils sont interconnectés par un commutateur Ethernet 1 Gigabit (Fig. 2). Veuillez vous référer à la documentation de Waves pour une liste de
+                                                                                                                                                                          commutateurs compatibles.
+2. Installation                                                                                                                                                                                                                                                                                                             Host computer
+Les plug-ins Waves peuvent être utilisés sur le WING en installant un module SoundGrid à l’intérieur de la console. Notez que la procédure d’installation ne doit être
+effectuée que par des centres de service certifiés. Vérifiez behringer.com pour votre fournisseur de service le plus proche.                                              WING console
+Pour activer le module, maintenez la touche UTILITY enfoncée tout en allumant la console. La boîte de dialogue CONSOLE OPTIONS s’ouvrira automatiquement. Entrez
+“MOD-WSG” et cliquez sur APPLY.
+Une fois le module interne installé, les deux ports Ethernet sur le panneau arrière agissent comme une connexion redondante double. Chaque port transmet 64 canaux
+d’entrée et 64 canaux de sortie.
+
+                 CONTROL/AUDIO NETWORK
+
+
+
+                                                                                                                                                                                                                                                                                                       Waves I/O device or DSP server
+                                                                                                                                                                                                                                                                                                                      I/O
+
+
+
+
+                                                                                                                                                                                                                                                                               1Gbit ethernet switch
+3. Configuration du réseau
+                                                                                                                                                                          Fig. 2 : Console WING, ordinateur hôte et appareil d’E/S supplémentaire formant un réseau “étoile”
+Connexion unique
+Différentes configurations de réseau sont possibles, en fonction des besoins de l’utilisateur. La configuration la plus simple peut être vue ci-dessous dans la Fig. 1,   4. Routage direct des sources vers SoundGrid
+composée d’une console WING connectée directement à un ordinateur avec un câble Ethernet.
+                                                                                                                                                                          Après avoir connecté les appareils dans l’une des configurations décrites ci-dessus, la console WING et tous les autres appareils du réseau sont affichés dans l’onglet
+                                                                                                                                                                          SETUP du logiciel SoundGrid.
+
+WING console
+
+
+
+                                                                                                                                                   Host computer
+
+
+
+
+Fig. 1 : Connexion directe entre WING et l’ordinateur hôte
+
+Dans cette configuration, le logiciel Waves SoundGrid doit permettre au traitement du signal numérique (DSP) d’être effectué par l’ordinateur hôte sans avoir besoin
+d’un serveur DSP Waves. Veuillez vous référer à la documentation fournie par Waves pour comparer les spécifications du logiciel SoundGrid.
+
+
+
+
+                                                                                                                                                                          Fig. 3 : Onglet SETUP de SuperRack SoundGrid
+18      AoIP-WSG                                                                                                                                                                                                                                                                                                            Quick Start Guide       19
+
+
+AoIP-WSG Mise en oeuvre
+Les groupes de sources et de sorties “WSG” dans l’écran ROUTING de la console WING permettent à n’importe quelle source d’être assignée à l’un des 64 canaux                  Enfin, choisissez le canal correspondant du SOURCE GROUP WSG et assignez-le comme source pour le canal souhaité sur la console WING.
+envoyés depuis la console, ainsi qu’à assigner l’un des 64 canaux de retour à n’importe quel canal sur le WING. Dans l’image ci-dessous, les entrées locales 1 à 8 ont été
+assignées aux sorties WSG 1 à 8. Ainsi, le signal des préamplificateurs 1 à 8 est envoyé au réseau SoundGrid avant le traitement du canal.
+
+
+
+
+                                                                                                                                                                              Fig. 6 : Assignation du SOURCE GROUP WSG à un canal
+
+Fig. 4 : Groupes de sources et de sorties WSG
+                                                                                                                                                                              5. Insertion de SoundGrid en tant qu’EXTERNAL FX
+Pour envoyer un canal WING au réseau SoundGrid après qu’un certain ou tout le traitement de la bande de canaux a été appliqué, un USER SIGNAL peut être créé sur
+l’écran ROUTING. Le USER SIGNAL peut être pris au point TAP ou POST fader. Le signal peut contenir à la fois les canaux gauche et droit (L+R) ou juste l’un d’eux (L ou R).   Les plug-ins Waves peuvent être assignés à un point d’insertion sur n’importe quel canal du WING en utilisant l’unité d’effets EXTERNAL au sein du WING. Lorsqu’ils
+Veuillez vous référer au Quick Start Guide de la console WING pour plus d’informations sur la création d’un USER SIGNAL.                                                      sont chargés sur des canaux uniques, le logiciel SoundGrid traite le signal de ce canal unique. Alternativement, plusieurs canaux peuvent être envoyés à une seule
+                                                                                                                                                                              instance de plug-in lorsque l’effet est chargé via un point d’insertion sur un bus.
+Dans le logiciel SoundGrid, les 64 canaux provenant de la console sont acheminés vers des “racks” où les plug-ins souhaités sont chargés. La sortie de chaque rack est
+ensuite acheminée vers l’un des 64 canaux renvoyés à la console.                                                                                                              Dans l’exemple ci-dessous, l’EXTERNAL EFFECT a été chargé sur le Slot 1 des 16 slots d’effet WING puis chargé sur le Point d’Insertion 1 du Bus 1.
+
+
+
+
+Fig. 5 : Routage du rack SuperRack SoundGrid
+
+
+
+
+                                                                                                                                                                              Fig. 7 : External chargé comme point d’insertion sur un bus
+20       AoIP-WSG                                                                                                                                                                                                                                                                                                Quick Start Guide       21
+
+
+AoIP-WSG Mise en oeuvre                                                                                                                                                  AoIP-WSG Erste Schritte
+Sur l’écran ROUTING, le SOURCE GROUP FX SENDS contient des canaux d’envoi pour tous les 16 slots du rack FX. EXTERNAL EFFECT est sélectionné pour le Slot 1,
+FX SEND 1L et 1R doivent être envoyés via les canaux souhaités vers le logiciel SoundGrid. Dans cet exemple, FX SEND 1L et 1R sont envoyés via les canaux 9 et 10.
+                                                                                                                                                                         1. Einführung
+                                                                                                                                                                         Das WING SoundGrid-Modul überträgt bis zu 64 Eingangs- und 64 Ausgangskanäle mit 44,1 kHz oder 48 kHz und 24 Bit über einen der Ethernet-Anschlüsse auf der
+                                                                                                                                                                         Rückseite im CONTROL/AUDIO NETWORK-Bereich. Vernetzte Geräte werden auch über die Ethernet-Verbindung synchronisiert.
+
+                                                                                                                                                                         2. Installation
+                                                                                                                                                                         Waves-Plugins können auf dem WING verwendet werden, indem ein SoundGrid-Modul in die Konsole eingebaut wird. Beachten Sie, dass das Installationsverfahren
+                                                                                                                                                                         nur von zertifizierten Servicezentren durchgeführt werden darf. Überprüfen Sie behringer.com auf Ihren nächstgelegenen Serviceanbieter.
+                                                                                                                                                                         Um das Modul zu aktivieren, halten Sie UTILITY gedrückt, während Sie die Konsole einschalten. Der Dialog CONSOLE OPTIONS wird automatisch geöffnet. Geben Sie
+                                                                                                                                                                         „MOD-WSG“ ein und klicken Sie auf APPLY.
+                                                                                                                                                                         Nachdem das interne Modul installiert wurde, fungieren die beiden Ethernet-Anschlüsse auf der Rückseite als doppelt redundante Verbindung. Jeder Anschluss
+                                                                                                                                                                         überträgt 64 Eingangs- und 64 Ausgangskanäle.
+
+                                                                                                                                                                                        CONTROL/AUDIO NETWORK
+
+
+
+
+                                                                                                                                                                         3. Netzwerkeinrichtung
+Fig. 8 : FX SENDS
+                                                                                                                                                                         Einzelverbindung
+Les canaux 9 et 10 sont acheminés via le logiciel SoundGrid vers le rack souhaité, où les plug-ins sont ajoutés. La sortie du rack SoundGrid est renvoyée à la console
+via n’importe quel canal disponible. Dans cet exemple, la sortie du rack est renvoyée via les canaux 9 et 10, qui sont ensuite sélectionnés comme signal de retour       Je nach Bedarf des Benutzers sind verschiedene Netzwerkeinstellungen möglich. Die einfachste Einrichtung ist unten in Abb. 1 zu sehen, bestehend aus einer
+EXTERNAL EFFECT (voir Fig. 7).                                                                                                                                           WING-Konsole, die direkt mit einem Computer über ein Ethernet-Kabel verbunden ist.
+
+
+
+                                                                                                                                                                         WING console
+
+
+
+                                                                                                                                                                                                                                                                                                                    Host computer
+
+
+
+
+                                                                                                                                                                         Abb. 1: Direkte Verbindung zwischen WING und Host-Computer
+
+                                                                                                                                                                         In dieser Einrichtung muss die Waves SoundGrid-Software die digitale Signalverarbeitung (DSP) durch den Host-Computer ermöglichen, ohne dass ein Waves
+                                                                                                                                                                         DSP-Server benötigt wird. Bitte beziehen Sie sich auf die von Waves bereitgestellte Dokumentation, um die SoundGrid-Software-Spezifikationen zu vergleichen.
+22      AoIP-WSG                                                                                                                                                                                                                                                                                           Quick Start Guide       23
+
+
+AoIP-WSG Erste Schritte
+Mehrere Verbindungen                                                                                                                                             Die Quell- und Ausgangsgruppen “WSG” im ROUTING-Bildschirm der WING-Konsole ermöglichen es, jede Quelle einem der 64 vom Pult gesendeten Kanäle
+                                                                                                                                                                 zuzuweisen, sowie einen der 64 Rückkanäle einem beliebigen Kanal auf dem WING zuzuweisen. Im Bild unten wurden die lokalen Eingänge 1 bis 8 den
+Mehrere SoundGrid-kompatible Geräte wie Waves-Server und Schnittstellen können hinzugefügt werden, indem ein “Stern”-Netzwerk konfiguriert wird, in dem alle     WSG-Ausgängen 1 bis 8 zugewiesen. Somit wird das Signal von den Vorverstärkern 1 bis 8 vor der Kanalverarbeitung an das SoundGrid-Netzwerk gesendet.
+Geräte durch einen 1 Gigabit Ethernet-Switch verbunden sind (Abb. 2). Bitte beziehen Sie sich auf die Waves-Dokumentation für eine Liste kompatibler Switches.
+                                                                                                                                        Host computer
+
+
+WING console
+
+
+
+
+                                                                                                                     Waves I/O device or DSP server
+                                                                                                                                  I/O
+
+
+
+
+                                                                                             1Gbit ethernet switch
+
+Abb. 2: WING-Konsole, Host-Computer und zusätzliches I/O-Gerät bilden ein “Stern”-Netzwerk
+
+
+4. Direkte Weiterleitung von Quellen an SoundGrid                                                                                                                Abb. 4: WSG-Quell- und Ausgangsgruppen
+
+                                                                                                                                                                 Um einen WING-Kanal an das SoundGrid-Netzwerk zu senden, nachdem ein Teil oder die gesamte Kanalstreifenverarbeitung angewendet wurde, kann ein USER
+Nachdem die Geräte in einer der oben beschriebenen Konfigurationen verbunden wurden, werden die WING-Konsole und alle anderen Geräte im Netzwerk im
+                                                                                                                                                                 SIGNAL auf dem ROUTING-Bildschirm erstellt werden. Das USER SIGNAL kann am TAP-Punkt oder POST-Fader genommen werden. Das Signal kann sowohl linke und
+SETUP-Tab in der SoundGrid-Software angezeigt.
+                                                                                                                                                                 rechte Kanäle (L+R) als auch nur einen von ihnen (L oder R) enthalten. Bitte beziehen Sie sich auf das WING-Konsole Quick Start Guide für weitere Informationen zur
+                                                                                                                                                                 Erstellung eines USER SIGNAL.
+                                                                                                                                                                 In der SoundGrid-Software werden die 64 Kanäle, die von der Konsole kommen, zu “Racks” geroutet, in denen die gewünschten Plugins geladen werden. Der Ausgang
+                                                                                                                                                                 jedes Racks wird dann zu einem der 64 Kanäle geroutet, die zurück an die Konsole gesendet werden.
+
+
+
+
+                                                                                                                                                                 Abb. 5: Rack-Routing SuperRack SoundGrid
+
+
+
+
+Abb. 3: SuperRack SoundGrid SETUP-Tab
+24      AoIP-WSG                                                                                                                                                                                                                                                                                       Quick Start Guide         25
+
+
+AoIP-WSG Erste Schritte
+Wählen Sie schließlich den entsprechenden Kanal aus der SOURCE GROUP WSG und weisen Sie ihn als Quelle für den gewünschten Kanal auf der WING-Konsole zu.         Auf dem ROUTING-Bildschirm enthält die SOURCE GROUP FX SENDS Sendekanäle für alle 16 Slots des FX-Racks. Für Slot 1 ist EXTERNAL EFFECT ausgewählt,
+                                                                                                                                                                  FX SEND 1L und 1R müssen über die gewünschten Kanäle an die SoundGrid-Software gesendet werden. In diesem Beispiel werden FX SEND 1L und 1R über Kanäle 9
+                                                                                                                                                                  und 10 gesendet.
+
+
+
+
+Abb. 6: Zuweisung der SOURCE GROUP WSG zu einem Kanal
+
+
+5. Einfügen von SoundGrid als EXTERNAL FX                                                                                                                         Abb. 8: FX SENDS
+
+                                                                                                                                                                  Kanäle 9 und 10 werden durch die SoundGrid-Software zum gewünschten Rack geroutet, wo Plugins hinzugefügt werden. Der Ausgang des SoundGrid-Racks wird
+Waves-Plugins können einem Insert-Punkt auf einem beliebigen Kanal des WING zugewiesen werden, indem die EXTERNAL-Effekteinheit innerhalb von WING
+                                                                                                                                                                  über einen verfügbaren Kanal zurück an die Konsole gesendet. In diesem Beispiel wird der Ausgang des Racks über Kanäle 9 und 10 zurückgesendet, die dann als
+verwendet wird. Wenn sie auf einzelnen Kanälen geladen werden, verarbeitet die SoundGrid-Software das Signal dieses einzelnen Kanals. Alternativ können mehrere
+                                                                                                                                                                  EXTERNAL EFFECT RETURN-Signal ausgewählt werden (siehe Abb. 7).
+Kanäle an eine einzelne Plugin-Instanz gesendet werden, wenn der Effekt über einen Insert-Punkt auf einem Bus geladen wird.
+Im folgenden Beispiel wurde der EXTERNAL EFFECT auf Slot 1 der 16 WING-Effektslots geladen und dann auf Insert Point 1 von Bus 1 geladen.
+
+
+
+
+Abb. 7: External als Insert-Punkt auf einem Bus geladen
+26      AoIP-WSG                                                                                                                                                                                                                                                                                                 Quick Start Guide   27
+
+
+AoIP-WSG Primeiros Passos
+1. Introdução                                                                                                                                                         Conexões múltiplas
+O módulo WING SoundGrid transmite até 64 canais de entrada e 64 canais de saída a 44,1 kHz ou 48 kHz e 24 bits através de qualquer uma das portas Ethernet no         Vários dispositivos compatíveis com SoundGrid, como servidores Waves e interfaces, podem ser adicionados configurando uma rede “estrela” na qual todos os
+painel traseiro na seção CONTROL/AUDIO NETWORK. Os dispositivos interconectados também são sincronizados através da conexão Ethernet.                                 dispositivos estão interconectados por um switch Ethernet de 1 Gigabit (Fig. 2). Consulte a documentação da Waves para uma lista de switches compatíveis.
+                                                                                                                                                                                                                                                                                                                    Host computer
+2. Instalação
+Os plug-ins Waves podem ser usados no WING instalando um módulo SoundGrid dentro do console. Note que o procedimento de instalação deve ser realizado apenas          WING console
+por centros de serviço certificados. Verifique behringer.com para o seu provedor de serviço mais próximo.
+Para ativar o módulo, mantenha pressionada a tecla UTILITY enquanto liga o console. A caixa de diálogo CONSOLE OPTIONS será aberta automaticamente. Digite
+“MOD-WSG” e clique em APPLY.
+Depois que o módulo interno foi instalado, as duas portas Ethernet no painel traseiro atuam como uma conexão redundante dupla. Cada porta transmite 64 canais de
+entrada e 64 canais de saída.
+
+                CONTROL/AUDIO NETWORK
+
+
+                                                                                                                                                                                                                                                                                                 Waves I/O device or DSP server
+                                                                                                                                                                                                                                                                                                              I/O
+
+
+
+
+                                                                                                                                                                                                                                                                         1Gbit ethernet switch
+
+3. Configuração de Rede                                                                                                                                               Fig. 2: Console WING, computador host e dispositivo de E/S adicional formando uma rede “estrela”
+
+Conexão única
+                                                                                                                                                                      4. Roteamento direto de Fontes para SoundGrid
+Diferentes configurações de rede são possíveis, dependendo das necessidades do usuário. A configuração mais simples pode ser vista abaixo na Fig. 1, consistindo em
+um console WING conectado diretamente a um computador com um cabo Ethernet.                                                                                           Após conectar os dispositivos em uma das configurações descritas acima, o console WING e todos os outros dispositivos na rede são mostrados na guia SETUP no
+                                                                                                                                                                      software SoundGrid.
+
+
+WING console
+
+
+
+                                                                                                                                            Host computer
+
+
+
+
+Fig. 1: Conexão direta entre WING e computador host
+
+Nesta configuração, o software Waves SoundGrid deve permitir que o Processamento de Sinal Digital (DSP) seja realizado pelo computador host sem a necessidade de
+um servidor DSP Waves. Consulte a documentação fornecida pela Waves para comparar as especificações do software SoundGrid.
+
+
+
+                                                                                                                                                                      Fig. 3: Guia SETUP do SuperRack SoundGrid
+28      AoIP-WSG                                                                                                                                                                                                                                                                                                   Quick Start Guide   29
+
+
+AoIP-WSG Primeiros Passos
+Os grupos de fonte e saída “WSG” na tela ROUTING do console WING permitem que qualquer fonte seja atribuída a qualquer um dos 64 canais enviados do console, bem      Finalmente, escolha o canal correspondente do SOURCE GROUP WSG e atribua-o como fonte para o canal desejado no console WING.
+como atribuir qualquer um dos 64 canais de retorno a qualquer canal no WING. Na imagem abaixo, as entradas locais de 1 a 8 foram atribuídas às saídas WSG de 1 a 8.
+Assim, o sinal dos pré-amplificadores de 1 a 8 é enviado para a rede SoundGrid antes do processamento do canal.
+
+
+
+
+                                                                                                                                                                      Fig. 6: Atribuindo SOURCE GROUP WSG a um canal
+
+Fig. 4: Grupos de fonte e saída WSG
+                                                                                                                                                                      5. Inserindo SoundGrid como EXTERNAL FX
+Para enviar um canal WING para a rede SoundGrid após a aplicação de alguns ou todos os processamentos do canal, um USER SIGNAL pode ser criado na tela ROUTING.
+O USER SIGNAL pode ser obtido no ponto TAP ou POST fader. O sinal pode conter ambos os canais esquerdo e direito (L+R) ou apenas um deles (L ou R). Consulte o Guia   Os plug-ins Waves podem ser atribuídos a um ponto de inserção em qualquer canal do WING usando a unidade de efeitos EXTERNAL dentro do WING. Quando
+de Início Rápido do console WING para obter mais informações sobre a criação de um USER SIGNAL.                                                                       carregado em canais únicos, o software SoundGrid processa o sinal desse único canal. Alternativamente, vários canais podem ser enviados para uma única instância de
+                                                                                                                                                                      plug-in quando o efeito é carregado através de um ponto de inserção em um ônibus.
+No software SoundGrid, os 64 canais provenientes do console são roteados para “racks” onde os plug-ins desejados são carregados. A saída de cada rack é então
+roteada para um dos 64 canais enviados de volta ao console.                                                                                                           No exemplo abaixo, o EXTERNAL EFFECT foi carregado no Slot 1 dos 16 slots de efeito do WING e depois carregado no Insert Point 1 of Bus 1.
+
+
+
+
+Fig. 5: Roteamento de rack SuperRack SoundGrid
+
+
+
+
+                                                                                                                                                                      Fig. 7: External carregado como ponto de inserção em um ônibus
+30       AoIP-WSG                                                                                                                                                                                                                                                                                                       Quick Start Guide         31
+
+
+AoIP-WSG Primeiros Passos                                                                                                                                               AoIP-WSG Iniziare
+Na tela ROUTING, o SOURCE GROUP FX SENDS contém canais de envio para todos os 16 slots do rack FX. EXTERNAL EFFECT é selecionado para Slot 1, FX SEND 1L e 1R
+devem ser enviados através dos canais desejados para o software SoundGrid. Neste exemplo, FX SEND 1L e 1R estão sendo enviados através dos canais 9 e 10.
+                                                                                                                                                                        1. Introduzione
+                                                                                                                                                                        Il modulo WING SoundGrid trasmette fino a 64 canali di ingresso e 64 canali di uscita a 44,1 kHz o 48 kHz e 24 bit su una delle porte Ethernet sul pannello posteriore
+                                                                                                                                                                        nella sezione CONTROL/AUDIO NETWORK. I dispositivi interconnessi vengono anche sincronizzati tramite la connessione Ethernet.
+
+                                                                                                                                                                        2. Installazione
+                                                                                                                                                                        I plug-in Waves possono essere utilizzati sul WING installando un modulo SoundGrid all’interno della console. Si noti che la procedura di installazione deve essere
+                                                                                                                                                                        eseguita solo da centri di assistenza certificati. Controlla behringer.com per il tuo fornitore di servizi più vicino.
+                                                                                                                                                                        Per attivare il modulo, tenere premuto UTILITY mentre si accende la console. Si aprirà automaticamente la finestra di dialogo CONSOLE OPTIONS. Immettere
+                                                                                                                                                                        “MOD-WSG” e fare clic su APPLY.
+                                                                                                                                                                        Dopo che il modulo interno è stato installato, le due porte Ethernet sul pannello posteriore agiscono come una connessione ridondante doppia. Ogni porta trasmette
+                                                                                                                                                                        64 canali di ingresso e 64 canali di uscita.
+
+                                                                                                                                                                                         CONTROL/AUDIO NETWORK
+
+
+
+
+                                                                                                                                                                        3. Configurazione della rete
+Fig. 8: FX SENDS
+                                                                                                                                                                        Connessione singola
+Os canais 9 e 10 são roteados através do software SoundGrid para o rack desejado, onde os plug-ins são adicionados. A saída do rack SoundGrid é enviada de volta ao
+console através de qualquer canal disponível. Neste exemplo, a saída do rack é enviada de volta através dos canais 9 e 10, que são então selecionados como o sinal de   Sono possibili diverse configurazioni di rete, a seconda delle esigenze dell’utente. La configurazione più semplice può essere vista di seguito in Fig. 1, costituita da una
+retorno EXTERNAL EFFECT (veja Fig. 7).                                                                                                                                  console WING collegata direttamente a un computer con un cavo Ethernet.
+
+
+
+                                                                                                                                                                        WING console
+
+
+
+                                                                                                                                                                                                                                                                                                                           Host computer
+
+
+
+
+                                                                                                                                                                        Fig. 1: Connessione diretta tra WING e computer host
+
+                                                                                                                                                                        In questa configurazione, il software Waves SoundGrid deve consentire l’elaborazione del segnale digitale (DSP) da parte del computer host senza la necessità di un
+                                                                                                                                                                        server DSP Waves. Si prega di fare riferimento alla documentazione fornita da Waves per confrontare le specifiche del software SoundGrid.
+32      AoIP-WSG                                                                                                                                                                                                                                                                                                             Quick Start Guide          33
+
+
+AoIP-WSG Iniziare
+Connessioni multiple                                                                                                                                                          I gruppi di sorgenti e di uscita “WSG” nello schermo ROUTING della console WING permettono di assegnare qualsiasi sorgente a uno dei 64 canali inviati dalla console,
+                                                                                                                                                                              così come di assegnare uno dei 64 canali di ritorno a qualsiasi canale sul WING. Nell’immagine sottostante, gli ingressi locali da 1 a 8 sono stati assegnati alle uscite
+È possibile aggiungere più dispositivi compatibili con SoundGrid come server e interfacce Waves configurando una rete “a stella” in cui tutti i dispositivi sono              WSG da 1 a 8. Così, il segnale dai preamplificatori da 1 a 8 viene inviato alla rete SoundGrid prima dell’elaborazione del canale.
+interconnessi da uno switch Ethernet da 1 Gigabit (Fig. 2). Si prega di fare riferimento alla documentazione di Waves per un elenco di switch compatibili.
+                                                                                                                                                    Host computer
+
+
+WING console
+
+
+
+
+                                                                                                                           Waves I/O device or DSP server
+                                                                                                                                              I/O
+
+
+
+
+                                                                                                   1Gbit ethernet switch
+
+Fig. 2: Console WING, computer host e dispositivo I/O aggiuntivo che formano una rete “a stella”
+
+
+4. Instradamento diretto delle sorgenti a SoundGrid                                                                                                                           Fig. 4: Gruppi di sorgenti e di uscita WSG
+
+                                                                                                                                                                              Per inviare un canale WING alla rete SoundGrid dopo che è stata applicata una parte o tutta l’elaborazione della striscia di canale, si può creare un USER SIGNAL nello
+Dopo aver collegato i dispositivi in una delle configurazioni descritte sopra, la console WING e tutti gli altri dispositivi nella rete vengono mostrati nella scheda SETUP
+                                                                                                                                                                              schermo ROUTING. Il USER SIGNAL può essere preso al punto TAP o POST fader. Il segnale può contenere sia i canali sinistro e destro (L+R) che solo uno di essi (L o R).
+nel software SoundGrid.
+                                                                                                                                                                              Si prega di fare riferimento alla Guida Rapida alla console WING per ulteriori informazioni sulla creazione di un USER SIGNAL.
+                                                                                                                                                                              Nel software SoundGrid, i 64 canali provenienti dalla console vengono instradati a “rack” dove vengono caricati i plug-in desiderati. L’uscita di ogni rack viene poi
+                                                                                                                                                                              instradata a uno dei 64 canali inviati di nuovo alla console.
+
+
+
+
+                                                                                                                                                                              Fig. 5: Instradamento del rack SuperRack SoundGrid
+
+
+
+
+Fig. 3: Scheda SETUP di SuperRack SoundGrid
+34      AoIP-WSG                                                                                                                                                                                                                                                                                                          Quick Start Guide        35
+
+
+AoIP-WSG Iniziare
+Infine, scegli il canale corrispondente dal SOURCE GROUP WSG e assegnalo come sorgente per il canale desiderato sulla console WING.                                       Nella schermata ROUTING, il SOURCE GROUP FX SENDS contiene i canali di invio per tutti i 16 slot del rack FX. EXTERNAL EFFECT è selezionato per lo Slot 1, FX SEND 1L e
+                                                                                                                                                                          1R devono essere inviati attraverso i canali desiderati al software SoundGrid. In questo esempio, FX SEND 1L e 1R vengono inviati tramite i canali 9 e 10.
+
+
+
+
+Fig. 6: Assegnazione del SOURCE GROUP WSG a un canale
+                                                                                                                                                                          Fig. 8: FX SENDS
+
+5. Inserimento di SoundGrid come EXTERNAL FX                                                                                                                              I canali 9 e 10 vengono instradati attraverso il software SoundGrid al rack desiderato, dove vengono aggiunti i plug-in. L’uscita del rack SoundGrid viene inviata
+                                                                                                                                                                          di nuovo alla console attraverso qualsiasi canale disponibile. In questo esempio, l’uscita del rack viene inviata di nuovo attraverso i canali 9 e 10, che vengono poi
+I plug-in Waves possono essere assegnati a un punto di inserimento su qualsiasi canale del WING utilizzando l’unità di effetti EXTERNAL all’interno del WING. Quando
+                                                                                                                                                                          selezionati come segnale di ritorno dell’EXTERNAL EFFECT (vedi Fig. 7).
+caricato su singoli canali, il software SoundGrid elabora il segnale di quel singolo canale. In alternativa, più canali possono essere inviati a una singola istanza di
+plug-in quando l’effetto viene caricato attraverso un punto di inserimento su un bus.
+Nell’esempio sottostante, l’EXTERNAL EFFECT è stato caricato nello Slot 1 dei 16 slot per effetti del WING e poi caricato sul Punto di Inserimento 1 del Bus 1.
+
+
+
+
+Fig. 7: External caricato come punto di inserimento su un bus
+36      AoIP-WSG                                                                                                                                                                                                                                                                                        Quick Start Guide          37
+
+
+AoIP-WSG Aan de slag
+1. Introductie                                                                                                                                                      Meerdere verbindingen
+Het WING SoundGrid-module verzendt tot 64 invoer- en 64 uitvoerkanalen met 44,1 kHz of 48 kHz en 24 bits via een van de Ethernet-poorten op het achterpaneel in     Er kunnen meerdere SoundGrid-compatibele apparaten zoals Waves-servers en interfaces worden toegevoegd door een “ster” -netwerk te configureren waarin alle
+de CONTROL/AUDIO NETWORK-sectie. Onderling verbonden apparaten worden ook gesynchroniseerd via de Ethernet-verbinding.                                              apparaten onderling verbonden zijn door een 1 Gigabit Ethernet-switch (Fig. 2). Raadpleeg de documentatie van Waves voor een lijst met compatibele switches.
+                                                                                                                                                                                                                                                                                                            Host computer
+2. Installatie
+Waves plug-ins kunnen op de WING worden gebruikt door een SoundGrid-module in de console te installeren. Let op: de installatieprocedure mag alleen worden          WING console
+uitgevoerd door gecertificeerde servicecentra. Controleer behringer.com voor uw dichtstbijzijnde serviceprovider.
+Om de module te activeren, houd je de UTILITY-toets ingedrukt terwijl je de console inschakelt. Het CONSOLE OPTIONS-venster wordt automatisch geopend. Voer
+"MOD-WSG" in en klik op APPLY.¹
+Nadat de interne module is geïnstalleerd, fungeren de twee Ethernet-poorten op het achterpaneel als een dubbel redundante verbinding. Elke poort verzendt
+64 invoer- en 64 uitvoerkanalen.
+
+                CONTROL/AUDIO NETWORK
+
+
+                                                                                                                                                                                                                                                                                     Waves I/O device or DSP server
+                                                                                                                                                                                                                                                                                                      I/O
+
+
+
+
+                                                                                                                                                                                                                                                           1Gbit ethernet switch
+
+3. Netwerkinstelling                                                                                                                                                Fig. 2: WING-console, hostcomputer en extra I/O-apparaat vormen een “ster” -netwerk
+
+Enkele verbinding
+                                                                                                                                                                    4. Directe routering van bronnen naar SoundGrid
+Afhankelijk van de behoeften van de gebruiker zijn verschillende netwerkinstellingen mogelijk. De eenvoudigste opstelling is te zien in Fig. 1, bestaande uit een
+WING-console die rechtstreeks op een computer is aangesloten met een Ethernet-kabel.                                                                                Nadat de apparaten in een van de bovenstaande configuraties zijn verbonden, worden de WING-console en alle andere apparaten in het netwerk weergegeven op het
+                                                                                                                                                                    SETUP-tabblad in de SoundGrid-software.
+
+
+WING console
+
+
+
+                                                                                                                                              Host computer
+
+
+
+
+Fig. 1: Directe verbinding tussen WING en hostcomputer
+
+In deze opstelling moet de Waves SoundGrid-software toestaan dat de Digital Signal Processing (DSP) wordt uitgevoerd door de hostcomputer zonder de noodzaak
+van een Waves DSP-server. Raadpleeg de documentatie die door Waves wordt verstrekt om de specificaties van de SoundGrid-software te vergelijken.
+
+
+
+                                                                                                                                                                    Fig. 3: SuperRack SoundGrid SETUP-tabblad
+38      AoIP-WSG                                                                                                                                                                                                                                                                                          Quick Start Guide        39
+
+
+AoIP-WSG Aan de slag
+De bron- en uitvoergroepen “WSG” op het ROUTING-scherm van de WING-console stellen elke bron in staat om te worden toegewezen aan een van de 64 kanalen           Kies ten slotte het overeenkomstige kanaal uit de SOURCE GROUP WSG en wijs het toe als bron voor het gewenste kanaal op de WING-console.
+die vanaf de console worden verzonden, evenals om een van de 64 retourkanalen toe te wijzen aan elk kanaal op de WING. In de afbeelding hieronder zijn lokale
+ingangen 1 tot 8 toegewezen aan WSG-uitgangen 1 tot 8. Zo worden de signalen van de voorversterkers 1 tot 8 naar het SoundGrid-netwerk gestuurd voordat de
+kanaalverwerking plaatsvindt.
+
+
+
+
+                                                                                                                                                                  Fig. 6: SOURCE GROUP WSG toewijzen aan een kanaal
+
+
+
+Fig. 4: WSG-bron- en uitvoergroepen
+                                                                                                                                                                  5. Invoegen van SoundGrid als EXTERNAL FX
+Om een WING-kanaal naar het SoundGrid-netwerk te sturen nadat een deel of alle kanaalstripverwerking is toegepast, kan een USER SIGNAL worden gemaakt op het      Waves plug-ins kunnen worden toegewezen aan een invoegpunt op elk kanaal van de WING met behulp van de EXTERNAL effectseenheid binnen WING. Wanneer
+ROUTING-scherm. Het USER SIGNAL kan worden genomen op het TAP-punt of POST-fader. Het signaal kan zowel de linker- als rechterkanalen (L+R) bevatten of slechts   ze op afzonderlijke kanalen worden geladen, verwerkt de SoundGrid-software het signaal van dat enkele kanaal. Als alternatief kunnen meerdere kanalen naar een
+een van beide (L of R). Raadpleeg de WING-console Quick Start Guide voor meer informatie over het maken van een USER SIGNAL.                                      enkele plug-in-instantie worden gestuurd wanneer het effect wordt geladen via een invoegpunt op een bus.
+
+In de SoundGrid-software worden de 64 kanalen die van de console komen, gerouteerd naar “racks” waar de gewenste plug-ins worden geladen. De uitvoer van elk      In het onderstaande voorbeeld is de EXTERNAL EFFECT geladen op Slot 1 van de 16 WING-effectslots en vervolgens geladen op Insert Point 1 van Bus 1.
+rack wordt vervolgens gerouteerd naar een van de 64 kanalen die terug naar de console worden gestuurd.
+
+
+
+
+Fig. 5: Rack-routing SuperRack SoundGrid
+
+
+
+
+                                                                                                                                                                  Fig. 7: External geladen als invoegpunt op een bus
+40      AoIP-WSG                                                                                                                                                                                                                                                                                           Quick Start Guide       41
+
+
+AoIP-WSG Aan de slag                                                                                                                                               AoIP-WSG Komma igång
+Op het ROUTING-scherm bevat de SOURCE GROUP FX SENDS verzendkanalen voor alle 16 slots van het FX-rek. EXTERNAL EFFECT is geselecteerd voor Slot 1, FX SEND 1L
+en 1R moeten via de gewenste kanalen naar de SoundGrid-software worden gestuurd. In dit voorbeeld worden FX SEND 1L en 1R via kanalen 9 en 10 verzonden.
+                                                                                                                                                                   1. Introduktion
+                                                                                                                                                                   WING SoundGrid-modulen överför upp till 64 inmatnings- och 64 utmatningskanaler vid 44,1 kHz eller 48 kHz och 24 bitar över någon av Ethernet-portarna på
+                                                                                                                                                                   bakpanelen i CONTROL/AUDIO NETWORK-sektionen. Sammanlänkade enheter synkroniseras också över Ethernet-anslutningen.
+
+                                                                                                                                                                   2. Installation
+                                                                                                                                                                   Waves plug-ins kan användas på WING genom att installera en SoundGrid-modul inuti konsolen. Observera att installationsproceduren endast får utföras av
+                                                                                                                                                                   certifierade servicecenter. Kontrollera behringer.com för din närmaste serviceleverantör.
+                                                                                                                                                                   För att aktivera modulen, håll ned UTILITY medan du slår på konsolen. Dialogrutan CONSOLE OPTIONS öppnas automatiskt. Ange ”MOD-WSG” och klicka på APPLY.
+                                                                                                                                                                   Efter att den interna modulen har installerats fungerar de två Ethernet-portarna på bakpanelen som en dubbelredundant anslutning. Varje port överför
+                                                                                                                                                                   64 inmatnings- och 64 utmatningskanaler.
+
+                                                                                                                                                                                    CONTROL/AUDIO NETWORK
+
+
+
+
+                                                                                                                                                                   3. Nätverksinställning
+Fig. 8: FX SENDS                                                                                                                                                   Enkel anslutning
+Kanalen 9 en 10 worden via de SoundGrid-software gerouteerd naar het gewenste rek, waar plug-ins worden toegevoegd. De uitvoer van het SoundGrid-rek wordt         Olika nätverksinställningar är möjliga, beroende på användarens behov. Den enklaste inställningen kan ses nedan i Fig. 1, bestående av WING-konsolen ansluten
+teruggestuurd naar de console via elk beschikbaar kanaal. In dit voorbeeld wordt de uitvoer van het rek teruggestuurd via kanalen 9 en 10, die vervolgens worden   direkt till en dator med en Ethernet-kabel.
+geselecteerd als het EXTERNAL EFFECT RETURN-signaal (zie Fig. 7).
+
+
+                                                                                                                                                                   WING console
+
+
+
+                                                                                                                                                                                                                                                                                                             Host computer
+
+
+
+
+                                                                                                                                                                   Fig. 1: Direkt anslutning mellan WING och värd-dator
+
+                                                                                                                                                                   I denna inställning måste Waves SoundGrid-programvaran tillåta att Digital Signal Processing (DSP) utförs av värd-datorn utan behov av en Waves DSP-server.
+                                                                                                                                                                   Vänligen hänvisa till dokumentationen som tillhandahålls av Waves för att jämföra SoundGrid-programvaruspecifikationer.
+42      AoIP-WSG                                                                                                                                                                                                                                                                                            Quick Start Guide       43
+
+
+AoIP-WSG Komma igång
+Flera anslutningar                                                                                                                                                 Käll- och utgruppsgrupperna “WSG” på ROUTING-skärmen på WING-konsolen tillåter att någon källa kan tilldelas någon av de 64 kanalerna som skickas från konsolen,
+                                                                                                                                                                   samt tilldela någon av de 64 returkanalerna till någon kanal på WING. I bilden nedan har lokala ingångar 1 till 8 tilldelats WSG-utgångar 1 till 8. Således skickas
+Flera SoundGrid-kompatibla enheter som Waves-servrar och gränssnitt kan läggas till genom att konfigurera ett “stjärn”-nätverk där alla enheter är sammanlänkade   signalen från förstärkarna 1 till 8 till SoundGrid-nätverket före kanalbearbetning.
+av en 1 Gigabit Ethernet-switch (Fig. 2). Vänligen hänvisa till Waves dokumentation för en lista över kompatibla switchar.
+                                                                                                                                              Host computer
+
+
+WING console
+
+
+
+
+                                                                                                                      Waves I/O device or DSP server
+                                                                                                                                        I/O
+
+
+
+
+                                                                                           1Gbit ethernet switch
+
+Fig. 2: WING-konsol, värd-dator och ytterligare I/O-enhet bildar ett “stjärn”-nätverk
+
+
+4. Direkt routing av källor till SoundGrid                                                                                                                         Fig. 4: WSG käll- och utgruppsgrupper
+
+                                                                                                                                                                   För att skicka en WING-kanal till SoundGrid-nätverket efter att någon eller all kanalstripbearbetning har tillämpats, kan en USER SIGNAL skapas på ROUTING-skärmen.
+Efter att ha anslutit enheterna i någon av konfigurationerna som beskrivs ovan, visas WING-konsolen och alla andra enheter i nätverket i SETUP-fliken
+                                                                                                                                                                   USER SIGNAL kan tas vid TAP-punkten eller POST-fader. Signalen kan innehålla både vänster och höger kanaler (L+R) eller bara en av dem (L eller R). Vänligen hänvisa
+i SoundGrid-programvaran.
+                                                                                                                                                                   till WING-konsolens Quick Start Guide för mer information om att skapa en USER SIGNAL.
+                                                                                                                                                                   I SoundGrid-programvaran dirigeras de 64 kanalerna som kommer från konsolen till “rack” där de önskade plug-ins laddas. Utgången från varje rack dirigeras sedan
+                                                                                                                                                                   till en av de 64 kanalerna som skickas tillbaka till konsolen.
+
+
+
+
+                                                                                                                                                                   Fig. 5: Rack routing SuperRack SoundGrid
+
+
+
+
+Fig. 3: SuperRack SoundGrid SETUP-flik
+44      AoIP-WSG                                                                                                                                                                                                                                                                                                  Quick Start Guide          45
+
+
+AoIP-WSG Komma igång
+Slutligen, välj den motsvarande kanalen från SOURCE GROUP WSG och tilldela den som källa för den önskade kanalen på WING-konsolen.                                     På ROUTING-skärmen innehåller SOURCE GROUP FX SENDS sändkanaler för alla 16 platser i FX-racken. EXTERNAL EFFECT är vald för Slot 1, FX SEND 1L och 1R måste
+                                                                                                                                                                       skickas genom de önskade kanalerna till SoundGrid-programvaran. I det här exemplet skickas FX SEND 1L och 1R via kanalerna 9 och 10.
+
+
+
+
+Fig. 6: Tilldelning av SOURCE GROUP WSG till en kanal
+                                                                                                                                                                       Fig. 8: FX SENDS
+
+5. Infoga SoundGrid som EXTERNAL FX                                                                                                                                    Kanalerna 9 och 10 dirigeras genom SoundGrid-programvaran till det önskade racket, där plug-ins läggs till. SoundGrid-rackets utgång skickas tillbaka till konsolen
+                                                                                                                                                                       genom vilken tillgänglig kanal som helst. I detta exempel skickas racket utgång tillbaka genom kanalerna 9 och 10, som sedan väljs som EXTERNAL EFFECT
+Waves plug-ins kan tilldelas en infogingspunkt på någon kanal av WING med hjälp av EXTERNAL effektenheten inom WING. När den laddas på enskilda kanaler
+                                                                                                                                                                       RETURN-signal (se Fig. 7).
+bearbetar SoundGrid-programvaran signalen från den enskilda kanalen. Alternativt kan flera kanaler skickas till en enda plug-in-instans när effekten laddas genom en
+infogingspunkt på en buss.
+I exemplet nedan har EXTERNAL EFFECT laddats på Slot 1 av de 16 WING-effektplatserna och sedan laddats på Insert Point 1 av Bus 1.
+
+
+
+
+Fig. 7: External laddad som infogingspunkt på en buss
+46      AoIP-WSG                                                                                                                                                                                                                                                                                              Quick Start Guide   47
+
+
+AoIP-WSG Pierwsze kroki
+1. Wprowadzenie                                                                                                                                                     Wielokrotne połączenia
+
+                                                                                                                                                                    Do konfiguracji można dodać wiele urządzeń kompatybilnych z SoundGrid, takich jak serwery Waves i interfejsy, konfigurując sieć “gwiazda”, w której
+Moduł WING SoundGrid przesyła do 64 kanałów wejściowych i 64 kanałów wyjściowych o częstotliwości 44,1 kHz lub 48 kHz i 24 bitach przez dowolne z portów            wszystkie urządzenia są ze sobą połączone przez przełącznik Ethernet 1 Gigabit (Fig. 2). Proszę zapoznać się z dokumentacją Waves, aby uzyskać listę
+Ethernet na tylnym panelu w sekcji CONTROL/AUDIO NETWORK. Urządzenia połączone są również zsynchronizowane przez połączenie Ethernet.                               kompatybilnych przełączników.
+
+2. Instalacja                                                                                                                                                                                                                                                                                                    Host computer
+
+Wtyczki Waves mogą być używane na WING poprzez zainstalowanie modułu SoundGrid wewnątrz konsoli. Zauważ, że procedura instalacji musi być wykonana tylko
+                                                                                                                                                                    WING console
+przez certyfikowane centra serwisowe. Sprawdź behringer.com, aby znaleźć najbliższego dostawcę usług.
+Aby aktywować moduł, przytrzymaj UTILITY podczas włączania konsoli. Okno dialogowe CONSOLE OPTIONS otworzy się automatycznie. Wprowadź „MOD-WSG” i
+kliknij APPLY.
+Po zainstalowaniu wewnętrznego modułu, dwa porty Ethernet na tylnym panelu działają jako podwójne połączenie redundantne. Każdy port przesyła 64 kanały
+wejściowe i 64 kanały wyjściowe.
+
+                CONTROL/AUDIO NETWORK
+
+
+                                                                                                                                                                                                                                                                                         Waves I/O device or DSP server
+                                                                                                                                                                                                                                                                                                           I/O
+
+
+
+
+                                                                                                                                                                                                                                                               1Gbit ethernet switch
+3. Konfiguracja sieci                                                                                                                                               Fig. 2: Konsola WING, komputer hosta i dodatkowe urządzenie I/O tworzące sieć “gwiazda”
+Pojedyncze połączenie
+Możliwe są różne konfiguracje sieci, w zależności od potrzeb użytkownika. Najprostsza konfiguracja jest pokazana poniżej na Fig. 1, składająca się z konsoli WING   4. Bezpośrednie routowanie źródeł do SoundGrid
+bezpośrednio podłączonej do komputera za pomocą kabla Ethernet.                                                                                                     Po podłączeniu urządzeń w jednej z opisanych powyżej konfiguracji, konsola WING i wszystkie inne urządzenia w sieci są pokazane w zakładce SETUP w
+                                                                                                                                                                    oprogramowaniu SoundGrid.
+
+
+WING console
+
+
+
+                                                                                                                                              Host computer
+
+
+
+
+ig. 1: Bezpośrednie połączenie między WING a komputerem hosta
+
+W tej konfiguracji, oprogramowanie Waves SoundGrid musi pozwolić na przeprowadzenie cyfrowego przetwarzania sygnału (DSP) przez komputer hosta bez potrzeby
+serwera DSP Waves. Proszę zapoznać się z dokumentacją dostarczoną przez Waves, aby porównać specyfikacje oprogramowania SoundGrid.
+
+
+
+                                                                                                                                                                    Fig. 3: Zakładka SETUP w SuperRack SoundGrid
+48      AoIP-WSG                                                                                                                                                                                                                                                                                          Quick Start Guide     49
+
+
+AoIP-WSG Pierwsze kroki
+Grupy źródłowe i wyjściowe “WSG” na ekranie ROUTING konsoli WING pozwalają przypisać dowolne źródło do dowolnego z 64 kanałów wysyłanych z konsoli, a               Na koniec wybierz odpowiedni kanał z SOURCE GROUP WSG i przypisz go jako źródło dla żądanego kanału na konsoli WING.
+także przypisać dowolny z 64 kanałów powrotnych do dowolnego kanału na WING. Na poniższym obrazie, lokalne wejścia od 1 do 8 zostały przypisane do wyjść
+WSG od 1 do 8. W ten sposób sygnał z przedwzmacniaczy od 1 do 8 jest wysyłany do sieci SoundGrid przed przetwarzaniem kanału.
+
+
+
+
+                                                                                                                                                                    Fig. 6: Przypisywanie SOURCE GROUP WSG do kanału
+
+Fig. 4: Grupy źródłowe i wyjściowe WSG
+                                                                                                                                                                    5. Wstawianie SoundGrid jako EXTERNAL FX
+Aby wysłać kanał WING do sieci SoundGrid po zastosowaniu niektórych lub wszystkich procesów paska kanału, można utworzyć USER SIGNAL na ekranie ROUTING.
+USER SIGNAL można pobrać w punkcie TAP lub POST fader. Sygnał może zawierać oba kanały lewe i prawe (L+R) lub tylko jeden z nich (L lub R). Proszę zapoznać się z   Wtyczki Waves mogą być przypisane do punktu wstawienia na dowolnym kanale WING za pomocą jednostki efektów EXTERNAL w WING. Gdy są ładowane na
+przewodnikiem Quick Start Guide dla konsoli WING, aby uzyskać więcej informacji na temat tworzenia USER SIGNAL.                                                     pojedynczych kanałach, oprogramowanie SoundGrid przetwarza sygnał tego pojedynczego kanału. Alternatywnie, do jednej instancji wtyczki można wysłać wiele
+                                                                                                                                                                    kanałów, gdy efekt jest ładowany przez punkt wstawienia na magistrali.
+W oprogramowaniu SoundGrid, 64 kanały pochodzące z konsoli są kierowane do “racków”, gdzie są ładowane żądane wtyczki. Wyjście z każdego racka jest następnie
+kierowane do jednego z 64 kanałów wysyłanych z powrotem do konsoli.                                                                                                 W poniższym przykładzie, EXTERNAL EFFECT został załadowany na Slot 1 z 16 slotów efektów WING, a następnie załadowany na Insert Point 1 of Bus 1.
+
+
+
+
+Fig. 5: Routing racka SuperRack SoundGrid
+
+
+
+
+                                                                                                                                                                    Fig. 7: External załadowany jako punkt wstawienia na magistrali
+50      AoIP-WSG                                                                                                                                                                                                                             Quick Start Guide   51
+
+
+AoIP-WSG Pierwsze kroki                                                                                                                                          AoIP-WSG はじめに
+Na ekranie ROUTING, SOURCE GROUP FX SENDS zawiera kanały wysyłające dla wszystkich 16 slotów racka FX. Dla Slot 1 wybrano EXTERNAL EFFECT, FX SEND 1L i 1R
+muszą być wysłane przez żądane kanały do oprogramowania SoundGrid. W tym przykładzie, FX SEND 1L i 1R są wysyłane przez kanały 9 i 10.
+                                                                                                                                                                 1. はじめに
+                                                                                                                                                                 WING SoundGrid モジュールは、CONTROL/AUDIO NETWORK セクションの背面パネルのいずれかの Ethernet ポートを介して 44.1 kHz または
+                                                                                                                                                                 48 kHz、24 ビットで最大 64 の入力チャンネルと 64 の出力チャンネルを送信します。接続されたデバイスも Ethernet 接続を介して同期されます。
+
+                                                                                                                                                                 2. インストール
+                                                                                                                                                                 Waves プラグインは、コンソール内部に SoundGrid モジュールをインストールすることで WING で使用できます。インストール手順は認定サ
+                                                                                                                                                                 ービスセンターでのみ実行できることに注意してください。最寄りのサービスプロバイダーについては behringer.com をご覧ください。
+                                                                                                                                                                 モジュールをアクティブにするには、UTILITYを押しながらコンソールの電源を入れます。CONSOLE OPTIONSダイアログが自動的に開きま
+                                                                                                                                                                 す。MOD-WSG」と入力し、
+                                                                                                                                                                               「適用」をクリックします。
+                                                                                                                                                                 内部モジュールがインストールされると、背面パネルの 2 つの Ethernet ポートはデュアル冗長接続として機能します。各ポートは 64 の入
+                                                                                                                                                                 力チャンネルと 64 の出力チャンネルを送信します。
+
+                                                                                                                                                                          CONTROL/AUDIO NETWORK
+
+
+
+
+                                                                                                                                                                 3. ネットワーク設定
+Fig. 8: FX SENDS                                                                                                                                                 単一接続
+
+Kanały 9 i 10 są kierowane przez oprogramowanie SoundGrid do żądanego racka, gdzie są dodawane wtyczki. Wyjście racka SoundGrid jest wysyłane z powrotem         ユーザーのニーズに応じて、さまざまなネットワーク設定が可能です。最もシンプルな設定は、Fig. 1 に示すように、WING コンソールが
+                                                                                                                                                                 Ethernet ケーブルで直接コンピュータに接続されているものです。
+do konsoli przez dowolny dostępny kanał. W tym przykładzie, wyjście racka jest wysyłane z powrotem przez kanały 9 i 10, które są następnie wybrane jako sygnał
+EXTERNAL EFFECT RETURN (patrz Fig. 7).
+
+                                                                                                                                                                 WING console
+
+
+
+                                                                                                                                                                                                                                               Host computer
+
+
+
+
+                                                                                                                                                                 Fig. 1: WING とホストコンピュータとの直接接続
+                                                                                                                                                                 この設定では、Waves SoundGrid ソフトウェアは、Waves DSP サーバーが必要ない場合でも、ホストコンピュータでデジタル信号処理 (DSP)
+                                                                                                                                                                 を行うように設定する必要があります。SoundGrid ソフトウェアの仕様を比較するために、Waves が提供するドキュメンテーションを参照
+                                                                                                                                                                 してください。
+52     AoIP-WSG                                                                                                                                                                          Quick Start Guide   53
+
+
+AoIP-WSG はじめに
+複数接続                                                                                                             WING コンソールの ROUTING 画面の「 WSG 」ソースと出力グループでは、任意のソースをコンソールから送信される 64 チャンネルのいずれ
+                                                                                                                 かに割り当てることができます。また、64 のリターンチャンネルのいずれかを WING の任意のチャンネルに割り当てることもできます。
+Waves サーバーやインターフェースなどの複数の SoundGrid 互換デバイスは、すべてのデバイスが 1 ギガビット Ethernet スイッチによって相                                 以下の画像では、ローカル入力 1 から 8 が WSG 出力 1 から 8 に割り当てられています。したがって、プリアンプ 1 から 8 の信号は、チャン
+互接続される「スター」ネットワークを設定することで追加できます (Fig. 2)。互換性のあるスイッチのリストについては、Waves のドキュ
+                                                                                                                 ネル処理の前に SoundGrid ネットワークに送信されます。
+メンテーションを参照してください。
+                                                                                                 Host computer
+
+
+WING console
+
+
+
+
+                                                                              Waves I/O device or DSP server
+                                                                                           I/O
+
+
+
+
+                                                      1Gbit ethernet switch
+
+Fig. 2: WING コンソール、ホストコンピュータ、追加の I/O デバイスが「スター」ネットワークを形成
+
+
+4. ソースを SoundGrid に直接ルーティング                                                                                      Fig. 4: WSG ソースと出力グループ
+
+上記の設定のいずれかでデバイスを接続した後、WING コンソールとネットワーク内のすべての他のデバイスは、SoundGrid ソフトウェアの                                           WING チャンネルをチャンネルストリップ処理の一部またはすべてが適用された後に SoundGrid ネットワークに送信するには、ROUTING 画
+SETUP タブに表示されます。                                                                                                 面で USER SIGNAL を作成できます。USER SIGNAL は TAP ポイントまたは POST フェーダーで取得できます。信号は左右のチャンネル (L+R) また
+                                                                                                                 はそれらのいずれか一方 (L または R) を含むことができます。USER SIGNAL の作成方法については、WING コンソールクイックスタートガイド
+                                                                                                                 を参照してください。
+                                                                                                                 SoundGrid ソフトウェアでは、コンソールから来る 64 チャンネルが「ラック」にルーティングされ、そこに必要なプラグインがロードされま
+                                                                                                                 す。各ラックの出力は、コンソールに戻される 64 チャンネルのいずれかにルーティングされます。
+
+
+
+
+                                                                                                                 Fig. 5: Rack routing SuperRack SoundGrid
+
+
+
+
+Fig. 3: SuperRack SoundGrid SETUP タブ
+54   AoIP-WSG                                                                                                                                                            Quick Start Guide   55
+
+
+AoIP-WSG はじめに
+最後に、SOURCE GROUP WSG から対応するチャンネルを選択し、それを WING コンソールの所望のチャンネルのソースとして割り当てます。             ROUTING 画面では、SOURCE GROUP FX SENDS には FX ラックの全 16 スロットの送信チャンネルが含まれています。Slot 1 では EXTERNAL EFFECT が
+                                                                                       選択され、FX SEND 1L と 1R は SoundGrid ソフトウェアへの希望のチャンネルを通じて送信する必要があります。この例では、FX SEND 1L と
+                                                                                       1R はチャンネル 9 と 10 を介して送信されています。
+
+
+
+
+Fig. 6: SOURCE GROUP WSG をチャンネルに割り当てる
+
+
+5. SoundGrid を EXTERNAL FX として挿入                                                       Fig. 8: FX SENDS
+                                                                                       チャンネル 9 と 10 は、SoundGrid ソフトウェアを通じて希望のラックにルーティングされ、そこにプラグインが追加されます。SoundGrid ラ
+Waves プラグインは、WING 内の EXTERNAL エフェクトユニットを使用して、WING の任意のチャンネルにインサートポイントとして割り当てる          ックの出力は、利用可能な任意のチャンネルを介してコンソールに戻されます。この例では、ラックの出力はチャンネル 9 と 10 を介して
+ことができます。単一のチャンネルにロードされた場合、SoundGrid ソフトウェアはその単一のチャンネルの信号を処理します。また、                     戻され、それらはその後、EXTERNAL EFFECT RETURN 信号として選択されます (Fig. 7 参照)。
+バスのインサートポイントを通じてエフェクトがロードされた場合、複数のチャンネルを単一のプラグインインスタンスに送信すること
+もできます。
+以下の例では、EXTERNAL EFFECT が 16 の WING エフェクトスロットのスロット 1 にロードされ、その後、バス 1 のインサートポイント 1 にロー
+ドされました。
+
+
+
+
+Fig. 7: バス上のインサートポイントとして External をロード
+56   AoIP-WSG                                                                                                                                                                         Quick Start Guide   57
+
+
+AoIP-WSG 使用
+1. 介绍                                                                                            多重连接
+                                                                                                 可以通过配置 “星型” 网络来添加多个 SoundGrid 兼容设备, 如 Waves 服务器和接口, 其中所有设备都通过 1 Gigabit 以太网交换机互连
+WING SoundGrid 模块可以通过 CONTROL/AUDIO NETWORK 部分后面板上的任一以太网端口, 以 44.1 kHz 或 48 kHz 和 24 位的速度传输最多    (图 2)。 请参考 Waves 的文档获取兼容交换机的列表。
+64 个输入和 64 个输出通道。 互连设备也通过以太网连接进行同步。
+                                                                                                                                                                                         Host computer
+2. 安装
+可以通过在控制台内部安装 SoundGrid 模块来在 WING 上使用 Waves 插件。 请注意, 安装程序只能由认证服务中心执行。 请查看                         WING console
+behringer.com 寻找离您最近的服务提供商。
+要激活该模块，请在打开控制台时按住“ UTILITY ”键。CONSOLE OPTIONS 对话框将自动打开。输入“MOD -WSG”，然后点击“APPLY ”。
+安装内部模块后, 后面板上的两个以太网端口充当双冗余连接。 每个端口都传输 64 个输入和 64 个输出通道。
+
+         CONTROL/AUDIO NETWORK
+
+
+
+
+                                                                                                                                                                      Waves I/O device or DSP server
+                                                                                                                                                                                   I/O
+
+
+
+
+3. 网络设置                                                                                                                                       1Gbit ethernet switch
+单一连接                                                                                             图 2: WING 控制台、主机计算机和额外的 I/O 设备形成一个 “星型” 网络
+根据用户的需求, 可以进行不同的网络设置。 最简单的设置如下图 1 所示, 由 WING 控制台直接通过以太网线缆连接到计算机。
+                                                                                                 4. 将源直接路由到 SoundGrid
+                                                                                                 在连接了上述配置中的设备之后, WING 控制台和网络中的所有其他设备都会显示在 SoundGrid 软件的 SETUP 选项卡中。
+WING console
+
+
+
+                                                                                 Host computer
+
+
+
+
+图 1: WING 和主机计算机之间的直接连接
+
+在此设置中, Waves SoundGrid 软件必须允许主机计算机进行数字信号处理 (DSP), 无需 Waves DSP 服务器。 请参考 Waves 提供的文档来比较
+SoundGrid 软件规格。
+
+
+
+
+                                                                                                 图 3: SuperRack SoundGrid SETUP 选项卡
+58    AoIP-WSG                                                                                                                                                            Quick Start Guide   59
+
+
+AoIP-WSG 使用
+WING 控制台的 ROUTING 屏幕中的 “ WSG” 源和输出组允许将任何源分配给从控制台发送的 64 个通道中的任何一个, 以及将任何 64 个返                 最后, 选择 SOURCE GROUP WSG 中的相应通道, 并将其分配为 WING 控制台上所需通道的源。
+回通道分配给 WING 上的任何通道。 在下图中, 本地输入 1 到 8 已分配给 WSG 输出 1 到 8。 因此, 预放大器 1 到 8 的信号在通道处理之前
+被发送到 SoundGrid 网络。
+
+
+
+
+                                                                                              图 6: 将 SOURCE GROUP WSG 分配给一个通道
+
+图 4: WSG 源和输出组
+                                                                                              5. 将 SoundGrid 插入为 EXTERNAL FX
+要在应用了部分或全部通道条处理后将 WING 通道发送到 SoundGrid 网络, 可以在 ROUTING 屏幕上创建一个 USER SIGNAL 。 USER SIGNAL 可以
+在 TAP 点或 POST fader处获取。 信号可以包含左右两个通道 (L+R)或其中的一个 (L 或 R)。 请参考 WING 控制台快速入门指南以获取有关创            可以使用 WING 内的 EXTERNAL 效果单元将 Waves 插件分配给 WING 的任何通道的插入点。 当在单个通道上加载时, SoundGrid 软件处理该
+建 USER SIGNAL 的更多信息。                                                                          单个通道的信号。 或者, 当通过总线上的插入点加载效果时, 可以将多个通道发送到单个插件实例。
+
+在 SoundGrid 软件中, 来自控制台的 64 个通道被路由到加载了所需插件的 “机架” 中。 然后, 每个机架的输出被路由到发送回控制台的                     在下面的示例中, EXTERNAL EFFECT 已加载到 16 个 WING 效果插槽中的插槽 1 上, 然后加载到总线 1 的插入点 1 上。
+64 个通道中的一个。
+
+
+
+
+图 5: 机架路由 SuperRack SoundGrid
+
+
+
+
+                                                                                              图 7: 在总线上作为插入点加载的 External
+60     AoIP-WSG                                                                                                                                                                                                  Quick Start Guide   61
+
+
+AoIP-WSG 使用                                                                                           Specifications                                                             技术参数
+                                                                                                      Connectors                                                                 连接器
+在 ROUTING 屏幕上, SOURCE GROUP FX SENDS 包含 FX 机架所有 16 个插槽的发送通道。 对于插槽 1, 选择 EXTERNAL EFFECT, FX SEND 1L     Ethernet                           2 x RJ45                               以太网                2 个 RJ45
+和 1R 必须通过所需的通道发送到 SoundGrid 软件。 在此示例中, FX SEND 1L 和 1R 通过通道 9 和 10 发送。
+                                                                                                        USB                                1 x USB 2.0, type B                    USB                1 个 USB 2.0, B 型
+                                                                                                      Input/Output Characteristics                                               输入/输出特性
+                                                                                                        Channels of input/output           64, bidirectional                      输入/输出通道数           64, 双向
+                                                                                                        Sample rates                       44.1 / 48 kHz                          采样率                44.1 / 48 kHz
+                                                                                                        Sample word length                 24 bit                                 样本字长               24 位
+                                                                                                        Clock synchronization selectable   WING unit                              时钟同步可选             WING
+                                                                                                        Latency                            Platform / implementation dependent    延迟                 依赖于平台
+                                                                                                      Cable Length                                                               电缆长度
+
+                                                                                                        USB 2.0, twisted pair, shielded    2-5 m                                  USB 2.0， 双绞线， 屏蔽   2-5 m
+                                                                                                        Ethernet cat 5e                    100 m                                  以太网 5e 类           100 m
+
+
+
+
+图 8: FX SENDS
+
+通道 9 和 10 通过 SoundGrid 软件路由到所需的机架, 然后添加插件。 SoundGrid 机架的输出通过任何可用的通道发送回控制台。
+在此示例中, 机架的输出通过通道 9 和 10 发送回, 然后被选择为EXTERNAL EFFECT RETURN信号 (见图7)。
+62      AoIP-WSG                                                                                                                                                                                                                                                                                                                           Quick Start Guide   63
+
+
+Other important information                                                                                                                                                                     Other important information
+                                                                                                                                              Outras Informações
+              Important information                                           Informations importantes                                                                                                       Belangrijke informatie                                         Ważna informacja                                        其他的重要信息
+                                                                                                                                              Importantes
+
+1. Register online. Please register your new                    1. Enregistrez-vous en ligne. Prenez le                         1. Registre-se online. Por favor, registre seu                  1. Registreer online. Registreer uw nieuwe                     1. Zarejestrować online. Zarejestruj swój                     1. 在线注册。 购买后, 请访问我们的网站立
+Music Tribe equipment right after you purchase it by            temps d’enregistrer votre produit Music Tribe aussi vite        novo equipamento Music Tribe logo após a compra                 Music Tribe-apparatuur direct nadat u deze hebt gekocht        nowy sprzęt Music Tribe zaraz po zakupie na stronie           即注册新的 Music Tribe 设备。 使用我们简单
+visiting musictribe.com. Registering your purchase using        que possible sur le site Internet musictribe.com. Le fait       visitando o site musictribe.com Registrar sua compra            door naar musictribe.com te gaan. Door uw aankoop              musictribe.com. Zarejestrowanie zakupu za pomocą              的在线表格注册您的购买信息有助于我们更
+our simple online form helps us to process your repair          d’enregistrer le produit en ligne nous permet de gérer          usando nosso simples formulário online nos ajuda a              te registreren via ons eenvoudige online formulier,            naszego prostego formularza online pomaga nam szybciej        快，更有效地处理您的维修索赔。 另外, 请阅
+claims more quickly and efficiently. Also, read the terms       les réparations plus rapidement et plus efficacement.           processar seus pedidos de reparos com maior rapidez e           kunnen wij uw reparatieclaims sneller en efficiënter           i efektywniej rozpatrywać roszczenia dotyczące naprawy.       读我们保修的条款和条件 （如适用）。
+and conditions of our warranty, if applicable.                  Prenez également le temps de lire les termes et conditions      eficiência. Além disso, leia nossos termos e condições de       verwerken. Lees ook de voorwaarden van onze garantie,          Przeczytaj również warunki naszej gwarancji, jeśli dotyczy.
+                                                                de notre garantie.                                              garantia, caso seja necessário.                                 indien van toepassing.                                                                                                       2. 无法正常工作。 如果您所在地区没有
+2. Malfunction. Should your Music Tribe                                                                                                                                                                                                                        2. Awaria. Jeśli Twój autoryzowany sprzedawca                 Music Tribe 授权的经销商, 您可以联系您所
+Authorized Reseller not be located in your vicinity,            2. Dysfonctionnement. Si vous n’avez pas                        2. Funcionamento Defeituoso.                                    2. Storing. Mocht uw door Music Tribe                          Music Tribe nie znajduje się w pobliżu, możesz                在国家/地区的 Music Tribe 授权履行者, 其
+you may contact the Music Tribe Authorized Fulfiller for        de revendeur Music Tribe près de chez vous, contactez le        Caso seu fornecedor Music Tribe não esteja localizado           geautoriseerde wederverkoper niet bij u in de buurt zijn       skontaktować się z autoryzowanym dostawcą Music Tribe         联系方式在 behringer.com 的 “支持” 部分列
+your country listed under “Support” at musictribe.com.          distributeur Music Tribe de votre pays : consultez la liste     nas proximidades, você pode contatar um distribuidor            gevestigd, dan kunt u contact opnemen met de door Music        dla swojego kraju, wymienionym w sekcji „Wsparcie” na         出。 如果您的国家/地区未列出, 请检查您的
+Should your country not be listed, please check if your         des distributeurs de votre pays dans la page “Support”          Music Tribe para o seu país listado abaixo de “Suporte”         Tribe Authorized Fulfiller voor uw land vermeld onder          stronie musictribe.com. Jeśli Twojego kraju nie ma na         问题是否可以通过我们的 “在线支持” 解决,
+problem can be dealt with by our “Online Support” which         de notre site Internet musictribe.com. Si votre pays n’est      em musictribe.com. Se seu país não estiver na lista,            “Support” op musictribe.com. Als uw land niet in de lijst      liście, sprawdź, czy Twój problem może zostać rozwiązany      该选项也可以在 behringer.com 的 “支持” 部
+may also be found under “Support” at musictribe.com.            pas dans la liste, essayez de résoudre votre problème avec      favor checar se seu problema pode ser resolvido com o           staat, controleer dan of uw probleem kan worden opgelost       przez nasze „Wsparcie online”, które można również            分找到。 或者, 您也可以在退回产品之前在
+Alternatively, please submit an online warranty claim at        notre “aide en ligne” que vous trouverez également dans         nosso “Suporte Online” que também pode ser achado               door onze "Online Support", die u ook kunt vinden onder        znaleźć w sekcji „Wsparcie” na stronie musictribe.com.        behringer.com 提交在线保修索赔。
+musictribe.com BEFORE returning the product.                    la section “Support” du site musictribe.com. Vous pouvez        abaixo de “Suporte”em musictribe.com. Alternativamente,         "Support" op musictribe.com. U kunt ook een online             Alternatywnie, prześlij zgłoszenie gwarancyjne online na
+                                                                également nous faire parvenir directement votre demande         favor enviar uma solicitação de garantia online em              garantieclaim indienen op musictribe.com VOORDAT u het         musictribe.com PRZED zwrotem produktu.
+                                                                de réparation sous garantie par Internet sur le site            musictribe.com ANTES da devolução do produto.                   product retourneert.
+                                                                musictribe.com AVANT de nous renvoyer le produit.
+
+
+                                                                              Weitere wichtige
+              Aspectos importantes                                                                                                            Informazioni importanti                                        Viktig information                                             その他の重要な情報
+                                                                              Informationen
+
+1. Registro online. Le recomendamos que                         1. Online registrieren. Bitte registrieren Sie                  1. Registratevi online. Vi invitiamo a registrare               1. Registrera online. Registrera din nya Music                 1. ヒューズの格納部 / 電圧の選択:
+registre su nuevo aparato Music Tribe justo después de          Ihr neues Music Tribe-Gerät direkt nach dem Kauf auf der        il nuovo apparecchio Music Tribe subito dopo averlo             Tribe-utrustning direkt efter att du köpt den genom            ユニットをパワーソケットに接続する前
+su compra accediendo a la página web musictribe.com.            website musictribe.com. Wenn Sie Ihren Kauf mit unserem         acquistato visitando musictribe.com. La registrazione           att besöka musictribe.com. Att registrera ditt köp med         に、各モデルに対応した正しい主電源を
+El registro de su compra a través de nuestro sencillo           einfachen online Formular registrieren, können wir Ihre         dell'acquisto tramite il nostro semplice modulo online ci       vårt enkla onlineformulär hjälper oss att behandla dina        使用していることを確認してください。
+sistema online nos ayudará a resolver cualquier                 Reparaturansprüche schneller und effizienter bearbeiten.        consente di elaborare le richieste di riparazione in modo       reparationsanspråk snabbare och mer effektivt. Läs också       ユニットによっては、230 V と 120 V の
+incidencia que se presente a la mayor brevedad posible.         Lesen Sie bitte auch unsere Garantiebedingungen,                più rapido ed efficiente. Leggete anche i termini e le          villkoren i vår garanti, om tillämpligt.                       2 つの違うポジションを切り替えて使う、
+Además, aproveche para leer los términos y condiciones de       falls zutreffend.                                               condizioni della nostra garanzia, qualora applicabile.                                                                         ヒューズの格納部を備えているものがあ
+nuestra garantía, si es aplicable en su caso.                                                                                                                                                   2. Fel. Om din Music Tribe-auktoriserade återförsäljare        ります。正しくない値のヒューズは、
+                                                                2. Funktionsfehler. Sollte sich kein Music Tribe                2. Malfunzionamento. Nel caso in cui il                         inte finns i din närhet kan du kontakta Music Tribe            絶対に適切な値のヒューズに交換されて
+2. Averías. En el caso de que no exista un distribuidor         Händler in Ihrer Nähe befinden, können Sie den                  rivenditore autorizzato Music Tribe non si trovi nelle vostre   Authorized Fulfiller för ditt land listat under “Support” på   いる必要がありま す。
+Music Tribe en las inmediaciones, puede ponerse en              Music Tribe Vertrieb Ihres Landes kontaktieren, der auf         vicinanze, potete contattare il Music Tribe Authorized          musictribe.com. Om ditt land inte är listat, kontrollera om
+contacto con el distribuidor Music Tribe de su país,            musictribe.com unter „Support“ aufgeführt ist. Sollte Ihr       Fulfiller per il vostro paese, elencato in “Support”            ditt problem kan hanteras av vår “Onlinesupport” som           2. 故障: Music Tribe ディーラーがお客様
+que encontrará dentro del apartado “Support” de nuestra         Land nicht aufgelistet sein, prüfen Sie bitte, ob Ihr Problem   @ musictribe.com. Se la vostra nazione non è elencata,          också finns under “Support” på musictribe.com. Alternativt     のお近くにないときは、musictribe.com の
+página web musictribe.com. En caso de que su país no            von unserem „Online Support“ gelöst werden kann, den            controllate se il problema può essere risolto tramite il        kan du skicka in ett online-garantianspråk på musictribe.      “Support” 内に列記されている、お客様の国
+aparezca en ese listado, acceda a la sección “Online Support”   Sie ebenfalls auf musictribe.com unter „Support“ finden.        nostro “Online Support”che può anche essere trovato sotto       com INNAN du returnerar produkten.                             の Music Tribe ディストリビューターにコン
+(que también encontrará dentro del apartado “Support”           Alternativ reichen Sie bitte Ihren Garantieanspruch             “Support” @ musictribe.com. In alternativa, inviate una                                                                        タクトすることができます。お 客様の国
+de nuestra página web) y compruebe si su problema aparece       online auf musictribe.com ein, BEVOR Sie das                    richiesta di garanzia online su musictribe.com PRIMA di                                                                        がリストにない場合は、同じ musictribe.com
+descrito y solucionado allí. De forma alternativa, envíenos a   Produkt zurücksenden.                                           restituire il prodotto.                                                                                                        の “Support” 内にある “Online Support” でお客
+través de la página web una solicitud online de soporte en                                                                                                                                                                                                     様の問題が処理できないか、チェックし
+periodo de garantía ANTES de devolvernos el aparato.                                                                                                                                                                                                           てみてください。あるいは、商品を返送
+                                                                                                                                                                                                                                                               する前に、musictribe.com で、オンラインの
+                                                                                                                                                                                                                                                               保証請求を要請してください。
+64     AoIP-WSG                                                                                                                                                                      Quick Start Guide   65
+
+FEDERAL COMMUNICATIONS                                                                                           Correct disposal of this product: This symbol indicates that this
+                                                                                                                 product must not be disposed of with household waste,
+COMMISSION COMPLIANCE                                                                                            according to the WEEE Directive (2012/19/EU) and your
+                                                                                                                 national law. This product should be taken to a collection
+INFORMATION                                                                                                      center licensed for the recycling of waste electrical and
+                                                                                                                 electronic equipment (EEE). The mishandling of this type of
+                                                                                                                 waste could have a possible negative impact on the
+                                                                                                                 environment and human health due to potentially hazardous
+     Behringer                                                                                                   substances that are generally associated with EEE. At the same
+                                                                                         time, your cooperation in the correct disposal of this product will contribute to the
+     AoIP-WSG                                                                            efficient use of natural resources. For more information about where you can take
+                                                                                         your waste equipment for recycling, please contact your local city office, or your
+                                                                                         household waste collection service.
+Responsible Party Name:              Music Tribe Commercial NV Inc.
+Address:                             122 E. 42nd St.1,
+                                     8th Floor NY, NY 10168,
+                                     United States
+Email Address:                       legal@musictribe.com
+
+AoIP-WSG
+This equipment has been tested and found to comply with the limits for a Class B
+digital device, pursuant to part 15 of the FCC Rules. These limits are designed
+to provide reasonable protection against harmful interference in a residential
+installation. This equipment generates, uses and can radiate radio frequency
+energy and, if not installed and used in accordance with the instructions, may cause
+harmful interference to radio communications. However, there is no guarantee that
+interference will not occur in a particular installation. If this equipment does cause
+harmful interference to radio or television reception, which can be determined
+by turning the equipment off and on, the user is encouraged to try to correct the
+interference by one or more of the following measures:
+• Reorient or relocate the receiving antenna.
+• Increase the separation between the equipment and receiver.
+• Connect the equipment into an outlet on a circuit different from that to which the
+  receiver is connected.
+• Consult the dealer or an experienced radio/TV technician for help.
+
+This equipment complies with Part 15 of the FCC rules. Operation is subject to the
+following two conditions:
+(1) this device may not cause harmful interference, and
+(2) this device must accept any interference received, including interference that may
+cause undesired operation.
+Important information:
+Changes or modifications to the equipment not expressly approved by Music Tribe
+can void the user’s authority to use the equipment.
+
+
+
+
+Hereby, Music Tribe declares that this product is in compliance with General Product
+Safety Regulation (EU) 2023/988, Directive 2014/30/EU, Directive 2011/65/EU and
+Amendment 2015/863/EU, Directive 2012/19/EU, Regulation 519/2012 REACH SVHC
+and Directive 1907/2006/EC.
+Full text of EU DoC is available at https://community.musictribe.com/
+EU Representative: Music Tribe Brands DK A/S
+Address: Gammel Strand 44, DK-1202 København K, Denmark
+UK Representative: Music Tribe Brands UK Ltd.
+Address: 8th Floor, 20 Farringdon Street London EC4A 4AB, United Kingdom
+We Hear You
+

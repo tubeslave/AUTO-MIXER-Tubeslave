@@ -17,7 +17,7 @@ When you connect to the Wing mixer, the system automatically:
 4. For each insert, scans the FX module to get:
    - FX model name (e.g., "P-BASS", "PCORR", "C5-CMB")
    - All FX parameters (numbered 1-32)
-   - FX status (on/off, mix level)
+   - FX status (on/off, `fxmix` level)
 
 The scan runs in the background and typically completes in 5-8 seconds.
 
@@ -158,4 +158,5 @@ INFO:wing_client:  Channel 13: Post: FX4 (PCORR)
 
 - `example_fx_correction.py` - Complete example script
 - `check_channel_10.py` - Example of detailed channel inspection
-- WING Remote Protocols v3.0.5.pdf - Full FX parameter documentation
+- `Docs/Behringer_WING_Official/pdfs/WING_Remote_Protocols_FW_3.1_MediaValet.pdf` - Full FX parameter documentation
+- `Docs/Behringer_WING_Official/WING_RACK_OSC_FX_GUIDE.md` - local OSC/FX summary for this repo

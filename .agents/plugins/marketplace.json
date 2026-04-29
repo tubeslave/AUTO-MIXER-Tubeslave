@@ -1,0 +1,20 @@
+{
+  "name": "auto-mixer-local",
+  "interface": {
+    "displayName": "AUTO MIXER Local Plugins"
+  },
+  "plugins": [
+    {
+      "name": "telegram",
+      "source": {
+        "source": "local",
+        "path": "./plugins/telegram"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

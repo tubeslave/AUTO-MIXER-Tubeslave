@@ -45,6 +45,13 @@
 - EQ biquads: Audio EQ Cookbook (Robert Bristow-Johnson)
 - Компрессия: ratio = 1 + (max_ratio - 1) * factor (НЕ инвертировать)
 - Gate hysteresis: объявленный hysteresis ДОЛЖЕН применяться в GateProcessor
+- Ayaic Mix Monolith уровни — дефолт для gain staging и баланса при offline
+  сведении, саундчеках и live. Измерять не только отдельные источники, но и
+  суммарные stems/groups/buses: сначала выровнять слои внутри стема, затем
+  проверить и корректировать bus sum. Базовые planes: lead/main `-22 LUFS`,
+  strong sources и Drums/Bass/Guitars/BG Vocal buses `-25 LUFS`, tucked backing
+  vocals `-27 LUFS`, keys/synth/ambient `-30 LUFS`, FX/deep effects `-35 LUFS`,
+  doubles/layers примерно на 3 LU ниже группы. Live safety всегда важнее цели.
 
 ## Протоколы микшерных пультов
 ### Behringer WING Rack (OSC)
@@ -80,6 +87,8 @@
 8. ML classifier: заглушка с 4 типами ударных → полноценный классификатор на 25 классов (backend/ml/)
 9. НЕ добавлять зависимости без явной необходимости — если удалил пакет, агент добавит снова
 10. NumPy типы в JSON: np.float64 не сериализуется → convert_numpy_types() перед json.dumps()
+11. Ayaic level-plane balancing принят как правило: применять к источникам и
+    стемам/группам одновременно; не сводить только по isolated track LUFS.
 
 ## Контекст для LLM
 - При работе с DSP — сверяться с docs/CONVENTIONS.md (формулы, единицы измерения)

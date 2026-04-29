@@ -1,0 +1,59 @@
+Behringer WING-DANTE update instructions
+For updates with WING Firmware 3.0.6+ or AoIP-Dante module relocation
+
+
+
+Starting with WING Firmware 3.0.6, updated con gurations are required for both the internal Dante
+module and the external WING-DANTE expansion card.
+
+Follow these instructions to update the Dante module rmware in the following cases:
+
+      Updating the console to rmware 3.0.6 or higher while using the WING-DANTE expansion
+       card or the internal WING-DANTE AoIP module.
+      Relocating the AoIP module between the external WING-DANTE card slot and the internal
+       AoIP module slot in the WING console.
+
+Firmware update procedure
+
+   1. Download the correct rmware le from Behringer.com. The following les are available:
+          wing64x64_B_int_BK2 (internal module, Brooklyn II, console FW 3.0.6+)
+          wing64x64_B_int_BK3 (internal module, Brooklyn 3, console FW 3.0.6+)
+          wing-dante64_B_ext_BK2 (external expansion card, Brooklyn II, console FW 3.0.6+)
+          wing-dante64_B_ext_BK3 (external expansion card, Brooklyn 3, console FW 3.0.6+)
+
+   2. Connect the console to the DANTE network.
+
+   3. On Windows
+
+              Open Command Prompt (cmd)
+              Run the following command (including the quotation marks):
+
+               "C:\Program Files\Audinate\Dante Updater\Dante Updater.exe" --allow-override
+
+       On MacOS
+
+           a. Open the Terminal app.
+           b. Run the following command:
+
+               /Applications/Dante\ Updater.app/Contents/MacOS/nwjs --allow-override
+
+   4. Click the dropdown menu in the top-right corner, open ADVANCED SETTINGS and enable
+      the following options:
+
+           ✔ ALLOW IMPORTED FIRMWARE
+           ✔ Allow override of device matching
+
+       Click on APPLY.
+5. Navigate to LIBRARY › IMPORTED FILES. Click on IMPORT FIRMWARE and select the rmware
+    le you downloaded in step 1.
+
+6. Go to the HOME tab and select the Dante module or expansion card in the IMPORTED
+   FIRMWARE FILES list.
+
+7. Click on UPDATE SELECTED DEVICES, check the box “I understand that audio will be
+   interrupted” and click UPDATE NOW.
+
+8. Wait for the update process to complete.
+
+9. Once prompted, reboot the Dante module.
+

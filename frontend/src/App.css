@@ -180,6 +180,29 @@ body {
   width: 100%;
 }
 
+.App.remote-mode {
+  display: block;
+  min-height: 100vh;
+  background: #0e1012;
+}
+
+.App.remote-mode .sidebar,
+.App.remote-mode .topbar {
+  display: none;
+}
+
+.App.remote-mode .main-content {
+  min-height: 100vh;
+  display: block;
+  overflow: visible;
+}
+
+.App.remote-mode .tab-content {
+  max-width: none;
+  min-height: 100vh;
+  padding: 0;
+}
+
 /* ========== CONNECT PAGE ========== */
 .connect-page {
   display: flex;

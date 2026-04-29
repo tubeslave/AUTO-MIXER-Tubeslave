@@ -43,6 +43,85 @@ class WingClient(MixerClientBase):
         
         logger.info(f"WingClient initialized for {ip}:{port}")
 
+    @staticmethod
+    def _coerce_bool(value: Any) -> bool:
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "on", "yes"}
+        return bool(value)
+
+    @staticmethod
+    def _coerce_float(value: Any, default: float = 0.0) -> float:
+        try:
+            if value is None:
+                return default
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _parse_dca_assignments(tags: Any) -> list:
+        """Parse WING DCA assignment tags (#D1..#D16) from a tags field."""
+        assignments = set()
+
+        def visit(item: Any):
+            if item is None:
+                return
+            if isinstance(item, (list, tuple, set)):
+                for nested in item:
+                    visit(nested)
+                return
+            text = str(item).replace(",", " ").replace(";", " ")
+            for token in text.split():
+                token = token.strip().upper()
+                if not token.startswith("#D"):
+                    continue
+                suffix = token[2:]
+                if suffix.isdigit():
+                    dca = int(suffix)
+                    if 1 <= dca <= 16:
+                        assignments.add(dca)
+
+        visit(tags)
+        return sorted(assignments)
+
+    @classmethod
+    def _is_active_send(cls, send: Dict[str, Any]) -> bool:
+        if not cls._coerce_bool(send.get("on")):
+            return False
+        level = cls._coerce_float(send.get("level_db"), -144.0)
+        return level > -143.0
+
+    def _normalize_fx_slot(self, fx_slot: str) -> tuple[str, str]:
+        """Return canonical FX slot label and numeric suffix."""
+        slot = str(fx_slot).upper()
+        if slot.startswith("FX"):
+            fx_num = slot[2:]
+            return slot, fx_num
+        return f"FX{slot}", slot
+
+    def _insert_base(self, target_type: str, target: int, position: str) -> str:
+        """Build OSC base path for pre/post inserts on supported target types."""
+        type_map = {
+            "channel": "ch",
+            "ch": "ch",
+            "aux": "aux",
+            "bus": "bus",
+            "main": "main",
+            "matrix": "mtx",
+            "mtx": "mtx",
+        }
+        pos_map = {
+            "pre": "preins",
+            "post": "postins",
+        }
+        target_key = str(target_type).lower()
+        position_key = str(position).lower()
+        if target_key not in type_map:
+            raise ValueError(f"Unsupported insert target type: {target_type}")
+        if position_key not in pos_map:
+            raise ValueError(f"Unsupported insert position: {position}")
+        return f"/{type_map[target_key]}/{int(target)}/{pos_map[position_key]}"
+
     def connect(self, timeout: float = 5.0) -> bool:
         """
         Connect to Wing mixer and validate connection
@@ -382,12 +461,12 @@ class WingClient(MixerClientBase):
     
     def _scan_fx_module(self, fx_slot: str):
         """Scan an FX module to get its model and parameters"""
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
-        
+        _, fx_num = self._normalize_fx_slot(fx_slot)
+
         # Query FX model (most important)
         self.send(f"/fx/{fx_num}/mdl")
         self.send(f"/fx/{fx_num}/on")
-        self.send(f"/fx/{fx_num}/mix")
+        self.send(f"/fx/{fx_num}/fxmix")
         self.send(f"/fx/{fx_num}/")  # Root node
         time.sleep(0.05)
         
@@ -556,10 +635,13 @@ class WingClient(MixerClientBase):
     
     def set_compressor_threshold(self, channel: int, threshold: float):
         """Set compressor threshold (dB, range: -60..0)"""
-        self.send(f"/ch/{channel}/dyn/thr", threshold)
+        self.send(f"/ch/{channel}/dyn/thr26", threshold)
     
     def get_compressor_threshold(self, channel: int) -> Optional[float]:
         """Get compressor threshold"""
+        value = self.state.get(f"/ch/{channel}/dyn/thr26")
+        if value is not None:
+            return value
         return self.state.get(f"/ch/{channel}/dyn/thr")
     
     def set_compressor_ratio(self, channel: int, ratio: str):
@@ -792,7 +874,10 @@ class WingClient(MixerClientBase):
     def set_compressor(self, channel: int, threshold: float = None, ratio: str = None,
                       knee: int = None, attack: float = None, hold: float = None,
                       release: float = None, gain: float = None, mix: float = None,
-                      det: str = None, env: str = None, auto: int = None):
+                      det: str = None, env: str = None, auto: int = None,
+                      threshold_db: float = None, attack_ms: float = None,
+                      release_ms: float = None, makeup_db: float = None,
+                      enabled: bool = None):
         """
         Set compressor/dynamics parameters
         
@@ -812,9 +897,22 @@ class WingClient(MixerClientBase):
             auto: Auto switch (0/1)
         """
         base = f"/ch/{channel}/dyn"
+        if enabled is not None:
+            self.send(f"{base}/on", 1 if enabled else 0)
+            time.sleep(0.01)
+        if threshold is None:
+            threshold = threshold_db
+        if attack is None:
+            attack = attack_ms
+        if release is None:
+            release = release_ms
+        if gain is None:
+            gain = makeup_db
+        if isinstance(ratio, (int, float)):
+            ratio = f"{float(ratio):.1f}"
         # Small delay between OSC commands to ensure mixer processes them
         if threshold is not None:
-            self.send(f"{base}/thr", threshold)
+            self.send(f"{base}/thr26", threshold)
             time.sleep(0.01)
         if ratio is not None:
             self.send(f"{base}/ratio", ratio)
@@ -897,6 +995,9 @@ class WingClient(MixerClientBase):
     def get_main_fader(self, main: int = 1) -> Optional[float]:
         """Get main fader value"""
         address = f"/main/{main}/fdr"
+        if self.is_connected:
+            self.send(address)
+            time.sleep(0.05)
         return self.state.get(address)
 
     def set_main_fader(self, main: int, value: float):
@@ -906,11 +1007,20 @@ class WingClient(MixerClientBase):
     def get_dca_fader(self, dca: int) -> Optional[float]:
         """Get DCA fader value"""
         address = f"/dca/{dca}/fdr"
-        return self.state.get(address)
+        if self.is_connected:
+            self.send(address)
+            time.sleep(0.05)
+        value = self.state.get(address)
+        return float(value) if value is not None else None
 
     def set_dca_fader(self, dca: int, value: float):
         """Set DCA fader value"""
-        self.send(f"/dca/{dca}/fdr", value)
+        db_value = max(-144.0, min(10.0, float(value)))
+        self.send(f"/dca/{dca}/fdr", db_value)
+
+    def set_dca_level(self, dca: int, value: float):
+        """Compatibility wrapper for safety actions controlling DCA level."""
+        return self.set_dca_fader(dca, value)
     
     def set_dca_mute(self, dca: int, value: int):
         """Set DCA mute (0=unmuted, 1=muted)"""
@@ -920,7 +1030,17 @@ class WingClient(MixerClientBase):
     
     def set_bus_fader(self, bus: int, value: float):
         """Set bus fader value (dB, -144..10)"""
-        self.send(f"/bus/{bus}/fdr", value)
+        db_value = max(-144.0, min(10.0, float(value)))
+        self.send(f"/bus/{bus}/fdr", db_value)
+
+    def get_bus_fader(self, bus: int) -> Optional[float]:
+        """Get bus fader value."""
+        address = f"/bus/{bus}/fdr"
+        if self.is_connected:
+            self.send(address)
+            time.sleep(0.05)
+        value = self.state.get(address)
+        return float(value) if value is not None else None
     
     def set_bus_mute(self, bus: int, value: int):
         """Set bus mute (0=unmuted, 1=muted)"""
@@ -933,17 +1053,71 @@ class WingClient(MixerClientBase):
     def set_bus_eq_on(self, bus: int, on: int):
         """Enable/disable bus EQ (0=off, 1=on)"""
         self.send(f"/bus/{bus}/eq/on", on)
+
+    def get_bus_eq_band_gain(self, bus: int, band: int) -> Optional[float]:
+        """Get bus EQ band gain."""
+        address = f"/bus/{bus}/eq/{band}g"
+        if self.is_connected:
+            self.send(address)
+            time.sleep(0.05)
+        value = self.state.get(address)
+        return float(value) if value is not None else None
+
+    def get_bus_eq_band_frequency(self, bus: int, band: int) -> Optional[float]:
+        """Get bus EQ band frequency."""
+        address = f"/bus/{bus}/eq/{band}f"
+        if self.is_connected:
+            self.send(address)
+            time.sleep(0.05)
+        value = self.state.get(address)
+        return float(value) if value is not None else None
     
     def set_bus_eq_band(self, bus: int, band: int, freq: float = None, gain: float = None, q: float = None):
-        """Set bus EQ band (1-6) parameters"""
-        if band < 1 or band > 6:
-            raise ValueError("Bus EQ band must be 1-6")
+        """Set bus EQ band (1-8) parameters"""
+        if band < 1 or band > 8:
+            raise ValueError("Bus EQ band must be 1-8")
         if freq is not None:
             self.send(f"/bus/{bus}/eq/{band}f", freq)
         if gain is not None:
             self.send(f"/bus/{bus}/eq/{band}g", gain)
         if q is not None:
             self.send(f"/bus/{bus}/eq/{band}q", q)
+
+    def set_bus_compressor(
+        self,
+        bus: int,
+        threshold_db: float = None,
+        ratio: float = None,
+        attack_ms: float = None,
+        release_ms: float = None,
+        makeup_db: float = None,
+        enabled: bool = None,
+    ):
+        """Set bus dynamics parameters with WING bus threshold address."""
+        base = f"/bus/{bus}/dyn"
+        if enabled is not None:
+            self.send(f"{base}/on", 1 if enabled else 0)
+            time.sleep(0.01)
+        if threshold_db is not None:
+            self.send(f"{base}/thr37", threshold_db)
+            time.sleep(0.01)
+        if ratio is not None:
+            ratio_value = f"{float(ratio):.1f}" if isinstance(ratio, (int, float)) else str(ratio)
+            self.send(f"{base}/ratio", ratio_value)
+            time.sleep(0.01)
+        if attack_ms is not None:
+            self.send(f"{base}/att", attack_ms)
+            time.sleep(0.01)
+        if release_ms is not None:
+            self.send(f"{base}/rel", release_ms)
+            time.sleep(0.01)
+        if makeup_db is not None:
+            self.send(f"{base}/gain", makeup_db)
+            time.sleep(0.01)
+
+    def set_bus_compressor_gain(self, bus: int, gain: float):
+        """Set bus compressor make-up gain."""
+        self.send(f"/bus/{bus}/dyn/gain", gain)
     
     # ========== Main Methods ==========
     
@@ -958,6 +1132,32 @@ class WingClient(MixerClientBase):
     def set_main_eq_on(self, main: int, on: int):
         """Enable/disable main EQ (0=off, 1=on)"""
         self.send(f"/main/{main}/eq/on", on)
+
+    def set_main_eq_band(self, main: int, band: int, freq: float = None, gain: float = None, q: float = None):
+        """Set main EQ band (1-8) parameters."""
+        if band < 1 or band > 8:
+            raise ValueError("Main EQ band must be 1-8")
+        if freq is not None:
+            self.send(f"/main/{main}/eq/{band}f", freq)
+        if gain is not None:
+            self.send(f"/main/{main}/eq/{band}g", gain)
+        if q is not None:
+            self.send(f"/main/{main}/eq/{band}q", q)
+
+    def set_matrix_eq_on(self, matrix: int, on: int):
+        """Enable/disable matrix EQ (0=off, 1=on)."""
+        self.send(f"/mtx/{matrix}/eq/on", on)
+
+    def set_matrix_eq_band(self, matrix: int, band: int, freq: float = None, gain: float = None, q: float = None):
+        """Set matrix EQ band (1-8) parameters."""
+        if band < 1 or band > 8:
+            raise ValueError("Matrix EQ band must be 1-8")
+        if freq is not None:
+            self.send(f"/mtx/{matrix}/eq/{band}f", freq)
+        if gain is not None:
+            self.send(f"/mtx/{matrix}/eq/{band}g", gain)
+        if q is not None:
+            self.send(f"/mtx/{matrix}/eq/{band}q", q)
     
     # ========== Send Methods ==========
     
@@ -972,7 +1172,7 @@ class WingClient(MixerClientBase):
             parameter: Parameter number (1-32)
             value: Parameter value
         """
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
+        _, fx_num = self._normalize_fx_slot(fx_slot)
         self.send(f"/fx/{fx_num}/{parameter}", value)
     
     def set_fx_model(self, fx_slot: str, model: str):
@@ -983,22 +1183,148 @@ class WingClient(MixerClientBase):
             fx_slot: FX slot (e.g., 'FX1', 'FX13')
             model: FX model name (e.g., 'P-BASS', 'REVERB', 'PCORR')
         """
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
+        _, fx_num = self._normalize_fx_slot(fx_slot)
         self.send(f"/fx/{fx_num}/mdl", model)
     
     def set_fx_on(self, fx_slot: str, on: int):
         """Enable/disable FX module (0=off, 1=on)"""
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
+        _, fx_num = self._normalize_fx_slot(fx_slot)
         self.send(f"/fx/{fx_num}/on", on)
-    
+
     def set_fx_mix(self, fx_slot: str, mix: float):
         """Set FX mix percentage (0-100)"""
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
-        self.send(f"/fx/{fx_num}/mix", mix)
+        _, fx_num = self._normalize_fx_slot(fx_slot)
+        self.send(f"/fx/{fx_num}/fxmix", mix)
+
+    def query_fx_slot(self, fx_slot: str):
+        """Query primary FX slot metadata from the console."""
+        _, fx_num = self._normalize_fx_slot(fx_slot)
+        for suffix in ("mdl", "on", "fxmix", "$esrc", "$emode", "$a_chn", "$a_pos"):
+            self.send(f"/fx/{fx_num}/{suffix}")
+
+    def get_fx_slot_info(self, fx_slot: str) -> Dict[str, Any]:
+        """Return cached FX slot information using official FW 3.1 paths."""
+        slot, fx_num = self._normalize_fx_slot(fx_slot)
+        return {
+            "slot": slot,
+            "model": self.state.get(f"/fx/{fx_num}/mdl"),
+            "on": self.state.get(f"/fx/{fx_num}/on"),
+            "mix": self.state.get(f"/fx/{fx_num}/fxmix"),
+            "source": self.state.get(f"/fx/{fx_num}/$esrc"),
+            "mode": self.state.get(f"/fx/{fx_num}/$emode"),
+            "assigned_channel": self.state.get(f"/fx/{fx_num}/$a_chn"),
+            "assigned_position": self.state.get(f"/fx/{fx_num}/$a_pos"),
+        }
+
+    def set_insert(self, target_type: str, target: int, position: str, slot: str = "NONE", on: Optional[int] = None, mode: Optional[str] = None):
+        """Assign or clear an insert slot on channel/aux/bus/main/matrix."""
+        base = self._insert_base(target_type, target, position)
+        if on is not None:
+            self.send(f"{base}/on", on)
+        if mode is not None and position.lower() == "post":
+            self.send(f"{base}/mode", mode)
+        self.send(f"{base}/ins", str(slot).upper())
+
+    def query_insert(self, target_type: str, target: int, position: str):
+        """Query insert state for supported channel types."""
+        base = self._insert_base(target_type, target, position)
+        self.send(f"{base}/on")
+        if position.lower() == "post":
+            try:
+                self.send(f"{base}/mode")
+            except Exception:
+                pass
+            try:
+                self.send(f"{base}/w")
+            except Exception:
+                pass
+        self.send(f"{base}/ins")
+        self.send(f"{base}/$stat")
+
+    def get_insert(self, target_type: str, target: int, position: str) -> Dict[str, Any]:
+        """Return cached insert state and linked FX metadata."""
+        base = self._insert_base(target_type, target, position)
+        result: Dict[str, Any] = {
+            "target_type": str(target_type).lower(),
+            "target": int(target),
+            "position": str(position).lower(),
+            "on": self.state.get(f"{base}/on"),
+            "slot": self.state.get(f"{base}/ins"),
+            "status": self.state.get(f"{base}/$stat"),
+        }
+        if position.lower() == "post":
+            result["mode"] = self.state.get(f"{base}/mode")
+            weight = self.state.get(f"{base}/w")
+            if weight is not None:
+                result["weight"] = weight
+        slot = result.get("slot")
+        if slot and slot != "NONE":
+            result["fx_module"] = self._get_fx_module_info(slot)
+        else:
+            result["fx_module"] = None
+        return result
+
+    def _active_insert_or_none(self, target_type: str, target: int, position: str):
+        """Preserve legacy semantics: return None when no insert is assigned."""
+        insert = self.get_insert(target_type, target, position)
+        slot = insert.get("slot")
+        if insert.get("on") == 1 and slot and slot != "NONE":
+            return insert
+        return None
+
+    def get_bus_inserts(self, bus: int) -> Dict[str, Any]:
+        return {
+            "pre_insert": self._active_insert_or_none("bus", bus, "pre"),
+            "post_insert": self._active_insert_or_none("bus", bus, "post"),
+        }
+
+    def get_main_inserts(self, main: int) -> Dict[str, Any]:
+        return {
+            "pre_insert": self._active_insert_or_none("main", main, "pre"),
+            "post_insert": self._active_insert_or_none("main", main, "post"),
+        }
+
+    def get_matrix_inserts(self, matrix: int) -> Dict[str, Any]:
+        return {
+            "pre_insert": self._active_insert_or_none("matrix", matrix, "pre"),
+            "post_insert": self._active_insert_or_none("matrix", matrix, "post"),
+        }
+
+    def set_fx_return_level(self, bus: int, level_db: float):
+        """Set an FX return bus level in dB when returns are mapped to buses."""
+        self.send(f"/bus/{bus}/fdr", level_db)
+
+    def set_reverb_send(self, channel: int, level_db: float, send_bus: int = 13):
+        """Compatibility wrapper used by AutoReverb/AutoFX planners."""
+        self.set_channel_send(channel, send_bus, level=level_db, on=1, mode="POST")
+
+    def set_reverb_params(
+        self,
+        channel: int,
+        reverb_type: str,
+        decay_time: float,
+        predelay: float,
+        brightness: float,
+        density: float,
+        hpf: float,
+        lpf: float,
+        fx_slot: str = "FX1",
+    ):
+        """Compatibility wrapper for shared reverb FX parameter setup."""
+        model = str(reverb_type).upper()
+        self.set_fx_model(fx_slot, model)
+        self.set_fx_on(fx_slot, 1)
+        self.set_fx_mix(fx_slot, 100.0)
+        self.set_fx_parameter(fx_slot, 1, decay_time)
+        self.set_fx_parameter(fx_slot, 2, predelay)
+        self.set_fx_parameter(fx_slot, 3, density)
+        self.set_fx_parameter(fx_slot, 4, brightness)
+        self.set_fx_parameter(fx_slot, 5, hpf)
+        self.set_fx_parameter(fx_slot, 6, lpf)
     
     def get_fx_parameter(self, fx_slot: str, parameter: int):
         """Get an FX module parameter value"""
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
+        _, fx_num = self._normalize_fx_slot(fx_slot)
         return self.state.get(f'/fx/{fx_num}/{parameter}')
     
     def set_channel_send(self, channel: int, send: int, level: float = None, on: int = None,
@@ -1055,58 +1381,25 @@ class WingClient(MixerClientBase):
         Returns:
             Dict with 'pre_insert' and 'post_insert' info including FX module details
         """
-        ch = channel
-        result = {
-            'pre_insert': None,
-            'post_insert': None
+        return {
+            'pre_insert': self._active_insert_or_none("channel", channel, "pre"),
+            'post_insert': self._active_insert_or_none("channel", channel, "post"),
         }
-        
-        preins_on = self.state.get(f'/ch/{ch}/preins/on')
-        preins_slot = self.state.get(f'/ch/{ch}/preins/ins')
-        preins_stat = self.state.get(f'/ch/{ch}/preins/$stat')
-        
-        if preins_on == 1 and preins_slot and preins_slot != 'NONE':
-            fx_info = self._get_fx_module_info(preins_slot)
-            result['pre_insert'] = {
-                'on': True,
-                'slot': preins_slot,
-                'status': preins_stat,
-                'fx_module': fx_info
-            }
-        
-        postins_on = self.state.get(f'/ch/{ch}/postins/on')
-        postins_slot = self.state.get(f'/ch/{ch}/postins/ins')
-        postins_mode = self.state.get(f'/ch/{ch}/postins/mode')
-        postins_stat = self.state.get(f'/ch/{ch}/postins/$stat')
-        postins_w = self.state.get(f'/ch/{ch}/postins/w')
-        
-        if postins_on == 1 and postins_slot and postins_slot != 'NONE':
-            fx_info = self._get_fx_module_info(postins_slot)
-            result['post_insert'] = {
-                'on': True,
-                'slot': postins_slot,
-                'mode': postins_mode,
-                'status': postins_stat,
-                'weight': postins_w,
-                'fx_module': fx_info
-            }
-        
-        return result
     
     def _get_fx_module_info(self, fx_slot: str) -> Dict[str, Any]:
         """Get FX module information including model and parameters"""
-        fx_num = fx_slot.replace('FX', '') if fx_slot.startswith('FX') else fx_slot
-        
+        slot, fx_num = self._normalize_fx_slot(fx_slot)
+
         fx_model = self.state.get(f'/fx/{fx_num}/mdl')
         fx_on = self.state.get(f'/fx/{fx_num}/on')
-        fx_mix = self.state.get(f'/fx/{fx_num}/mix')
+        fx_mix = self.state.get(f'/fx/{fx_num}/fxmix')
         fx_node = self.state.get(f'/fx/{fx_num}/')
         
         # Get all FX parameters
         fx_params = {}
         for key, value in self.state.items():
             if key.startswith(f'/fx/{fx_num}/') and key not in [
-                f'/fx/{fx_num}/mdl', f'/fx/{fx_num}/on', f'/fx/{fx_num}/mix',
+                f'/fx/{fx_num}/mdl', f'/fx/{fx_num}/on', f'/fx/{fx_num}/fxmix',
                 f'/fx/{fx_num}/', f'/fx/{fx_num}/name', f'/fx/{fx_num}/type',
                 f'/fx/{fx_num}/node'
             ]:
@@ -1115,7 +1408,7 @@ class WingClient(MixerClientBase):
                     fx_params[int(param_name)] = value
         
         return {
-            'slot': fx_slot,
+            'slot': slot,
             'model': fx_model,
             'on': fx_on,
             'mix': fx_mix,
@@ -1578,6 +1871,311 @@ class WingClient(MixerClientBase):
 
     def set_gain(self, channel: int, value_db: float):
         self.set_channel_gain(channel, value_db)
+
+    def set_hpf(self, channel: int, freq: float, enabled: bool = True):
+        self.set_low_cut(channel, enabled=1 if enabled else 0, frequency=freq)
+
+    def set_pan(self, channel: int, pan: float):
+        self.set_channel_pan(channel, pan)
+
+    def set_polarity(self, channel: int, inverted: bool):
+        self.set_channel_phase_invert(channel, 1 if inverted else 0)
+
+    def get_polarity(self, channel: int) -> bool:
+        address = f"/ch/{channel}/in/set/inv"
+        if self.is_connected:
+            self.send(address)
+            time.sleep(0.05)
+        return bool(self.state.get(address) or 0)
+
+    def set_delay(self, channel: int, delay_ms: float, enabled: bool = True):
+        if enabled:
+            self.set_channel_delay(channel, delay_ms, mode="MS")
+        else:
+            self.send(f"/ch/{channel}/in/set/dlyon", 0)
+
+    def get_delay(self, channel: int) -> float:
+        address = f"/ch/{channel}/in/set/dly"
+        if self.is_connected:
+            self.send(address)
+            time.sleep(0.05)
+        value = self.state.get(address)
+        return float(value) if value is not None else 0.0
+
+    def set_send_level(self, channel: int, send_bus: int, level_db: float, channel_type: str = "input"):
+        self.set_channel_send(channel, send_bus, level=level_db)
+
+    def reset_channel_eq(self, channel: int):
+        self.set_eq_on(channel, 0)
+        self.send(f"/ch/{channel}/eq/lg", 0.0)
+        for band in range(1, 5):
+            self.send(f"/ch/{channel}/eq/{band}g", 0.0)
+        self.send(f"/ch/{channel}/eq/hg", 0.0)
+
+    def reset_channel_hpf(self, channel: int):
+        self.set_low_cut(channel, enabled=0, frequency=20.0)
+
+    def reset_channel_dynamics(self, channel: int):
+        self.set_compressor_on(channel, 0)
+        self.set_gate_on(channel, 0)
+
+    def reset_channel_processing(self, channel: int):
+        self.reset_channel_eq(channel)
+        self.reset_channel_hpf(channel)
+        self.reset_channel_dynamics(channel)
+        self.set_polarity(channel, False)
+        self.set_delay(channel, 0.0, enabled=False)
+
+    def get_bus_settings(self, bus: int) -> Dict[str, Any]:
+        """Read processing and assignment state for a WING bus."""
+        query_addresses = [
+            f"/bus/{bus}/name",
+            f"/bus/{bus}/$name",
+            f"/bus/{bus}/mute",
+            f"/bus/{bus}/fdr",
+            f"/bus/{bus}/pan",
+            f"/bus/{bus}/wid",
+            f"/bus/{bus}/busmono",
+            f"/bus/{bus}/eq/on",
+            f"/bus/{bus}/dyn/on",
+            f"/bus/{bus}/dyn/mdl",
+            f"/bus/{bus}/dyn/thr37",
+            f"/bus/{bus}/dyn/ratio",
+            f"/bus/{bus}/dyn/knee",
+            f"/bus/{bus}/dyn/det",
+            f"/bus/{bus}/dyn/att",
+            f"/bus/{bus}/dyn/rel",
+            f"/bus/{bus}/dyn/gain",
+            f"/bus/{bus}/dyn/mix",
+            f"/bus/{bus}/main/1/on",
+            f"/bus/{bus}/main/1/lvl",
+            f"/bus/{bus}/main/1/pre",
+            f"/bus/{bus}/tags",
+        ]
+        for band in range(1, 9):
+            query_addresses.extend(
+                [
+                    f"/bus/{bus}/eq/{band}f",
+                    f"/bus/{bus}/eq/{band}g",
+                    f"/bus/{bus}/eq/{band}q",
+                ]
+            )
+
+        for address in query_addresses:
+            self.send(address)
+        time.sleep(0.12)
+
+        eq_bands = []
+        for band in range(1, 9):
+            eq_bands.append(
+                (
+                    self.state.get(f"/bus/{bus}/eq/{band}f"),
+                    self.state.get(f"/bus/{bus}/eq/{band}g"),
+                    self.state.get(f"/bus/{bus}/eq/{band}q"),
+                )
+            )
+
+        tags = self.state.get(f"/bus/{bus}/tags")
+        return {
+            "bus": bus,
+            "name": self.state.get(f"/bus/{bus}/$name") or self.state.get(f"/bus/{bus}/name") or "",
+            "fader_db": self.state.get(f"/bus/{bus}/fdr"),
+            "muted": self.state.get(f"/bus/{bus}/mute"),
+            "pan": self.state.get(f"/bus/{bus}/pan"),
+            "width": self.state.get(f"/bus/{bus}/wid"),
+            "busmono": self.state.get(f"/bus/{bus}/busmono"),
+            "eq_on": self.state.get(f"/bus/{bus}/eq/on"),
+            "eq_bands": eq_bands,
+            "compressor_enabled": self.state.get(f"/bus/{bus}/dyn/on"),
+            "compressor_model": self.state.get(f"/bus/{bus}/dyn/mdl"),
+            "compressor_threshold_db": self.state.get(f"/bus/{bus}/dyn/thr37"),
+            "compressor_ratio": self.state.get(f"/bus/{bus}/dyn/ratio"),
+            "compressor_knee": self.state.get(f"/bus/{bus}/dyn/knee"),
+            "compressor_detector": self.state.get(f"/bus/{bus}/dyn/det"),
+            "compressor_attack_ms": self.state.get(f"/bus/{bus}/dyn/att"),
+            "compressor_release_ms": self.state.get(f"/bus/{bus}/dyn/rel"),
+            "compressor_makeup_db": self.state.get(f"/bus/{bus}/dyn/gain"),
+            "compressor_mix_pct": self.state.get(f"/bus/{bus}/dyn/mix"),
+            "main_send": {
+                "on": self.state.get(f"/bus/{bus}/main/1/on"),
+                "level_db": self.state.get(f"/bus/{bus}/main/1/lvl"),
+                "pre": self.state.get(f"/bus/{bus}/main/1/pre"),
+            },
+            "tags": tags,
+            "dca_assignments": self._parse_dca_assignments(tags),
+        }
+
+    def get_dca_settings(self, dca: int) -> Dict[str, Any]:
+        """Read state for a WING DCA group."""
+        query_addresses = [
+            f"/dca/{dca}/name",
+            f"/dca/{dca}/mute",
+            f"/dca/{dca}/fdr",
+            f"/dca/{dca}/col",
+            f"/dca/{dca}/icon",
+            f"/dca/{dca}/mon",
+        ]
+        for address in query_addresses:
+            self.send(address)
+        time.sleep(0.1)
+
+        return {
+            "dca": dca,
+            "name": self.state.get(f"/dca/{dca}/name") or "",
+            "muted": self.state.get(f"/dca/{dca}/mute"),
+            "fader_db": self.state.get(f"/dca/{dca}/fdr"),
+            "color": self.state.get(f"/dca/{dca}/col"),
+            "icon": self.state.get(f"/dca/{dca}/icon"),
+            "monitor": self.state.get(f"/dca/{dca}/mon"),
+        }
+
+    def get_channel_settings(self, channel: int) -> Dict[str, Any]:
+        query_addresses = [
+            f"/ch/{channel}/fdr",
+            f"/ch/{channel}/mute",
+            f"/ch/{channel}/in/set/trim",
+            f"/ch/{channel}/in/set/inv",
+            f"/ch/{channel}/in/set/dlyon",
+            f"/ch/{channel}/in/set/dly",
+            f"/ch/{channel}/in/conn/grp",
+            f"/ch/{channel}/in/conn/in",
+            f"/ch/{channel}/in/conn/altgrp",
+            f"/ch/{channel}/in/conn/altin",
+            f"/ch/{channel}/pan",
+            f"/ch/{channel}/flt/lc",
+            f"/ch/{channel}/flt/lcf",
+            f"/ch/{channel}/eq/on",
+            f"/ch/{channel}/dyn/on",
+            f"/ch/{channel}/dyn/mdl",
+            f"/ch/{channel}/dyn/thr26",
+            f"/ch/{channel}/dyn/thr",
+            f"/ch/{channel}/dyn/ratio",
+            f"/ch/{channel}/dyn/att",
+            f"/ch/{channel}/dyn/rel",
+            f"/ch/{channel}/dyn/gain",
+            f"/ch/{channel}/dyn/mix",
+            f"/ch/{channel}/dyn/det",
+            f"/ch/{channel}/dyn/gr",
+            f"/ch/{channel}/dyn/$gr",
+            f"/ch/{channel}/gate/on",
+            f"/ch/{channel}/gate/mdl",
+            f"/ch/{channel}/gate/thr",
+            f"/ch/{channel}/gate/range",
+            f"/ch/{channel}/gate/att",
+            f"/ch/{channel}/gate/hld",
+            f"/ch/{channel}/gate/rel",
+            f"/ch/{channel}/gate/acc",
+            f"/ch/{channel}/gate/ratio",
+            f"/ch/{channel}/main/1/on",
+            f"/ch/{channel}/main/1/lvl",
+            f"/ch/{channel}/main/1/pre",
+            f"/ch/{channel}/tags",
+        ]
+        for band in range(1, 5):
+            query_addresses.extend(
+                [
+                    f"/ch/{channel}/eq/{band}f",
+                    f"/ch/{channel}/eq/{band}g",
+                    f"/ch/{channel}/eq/{band}q",
+                ]
+            )
+        for send in range(1, 17):
+            query_addresses.extend(
+                [
+                    f"/ch/{channel}/send/{send}/on",
+                    f"/ch/{channel}/send/{send}/lvl",
+                    f"/ch/{channel}/send/{send}/pon",
+                    f"/ch/{channel}/send/{send}/mode",
+                    f"/ch/{channel}/send/{send}/plink",
+                    f"/ch/{channel}/send/{send}/pan",
+                ]
+            )
+
+        for address in query_addresses:
+            self.send(address)
+
+        # Give the receiver thread a short window to populate state from WING replies.
+        time.sleep(0.12)
+
+        eq_bands = []
+        for band in range(1, 5):
+            eq_bands.append(
+                (
+                    self.state.get(f"/ch/{channel}/eq/{band}f"),
+                    self.state.get(f"/ch/{channel}/eq/{band}g"),
+                    self.state.get(f"/ch/{channel}/eq/{band}q"),
+                )
+            )
+
+        sends = []
+        active_bus_sends = []
+        for send in range(1, 17):
+            base = f"/ch/{channel}/send/{send}"
+            send_state = {
+                "bus": send,
+                "on": self.state.get(f"{base}/on"),
+                "level_db": self.state.get(f"{base}/lvl"),
+                "pre_on": self.state.get(f"{base}/pon"),
+                "mode": self.state.get(f"{base}/mode"),
+                "plink": self.state.get(f"{base}/plink"),
+                "pan": self.state.get(f"{base}/pan"),
+            }
+            send_state["active"] = self._is_active_send(send_state)
+            sends.append(send_state)
+            if send_state["active"]:
+                active_bus_sends.append(send_state)
+
+        tags = self.state.get(f"/ch/{channel}/tags")
+
+        return {
+            "channel": channel,
+            "name": self.get_channel_name(channel),
+            "fader_db": self.get_fader(channel),
+            "muted": self.get_mute(channel),
+            "gain_db": self.get_channel_gain(channel) or 0.0,
+            "pan": self.get_channel_pan(channel),
+            "polarity_inverted": self.state.get(f"/ch/{channel}/in/set/inv"),
+            "delay_enabled": self.state.get(f"/ch/{channel}/in/set/dlyon"),
+            "delay_ms": self.state.get(f"/ch/{channel}/in/set/dly"),
+            "input_routing": {
+                "main_group": self.state.get(f"/ch/{channel}/in/conn/grp"),
+                "main_channel": self.state.get(f"/ch/{channel}/in/conn/in"),
+                "alt_group": self.state.get(f"/ch/{channel}/in/conn/altgrp"),
+                "alt_channel": self.state.get(f"/ch/{channel}/in/conn/altin"),
+            },
+            "main_send": {
+                "on": self.state.get(f"/ch/{channel}/main/1/on"),
+                "level_db": self.state.get(f"/ch/{channel}/main/1/lvl"),
+                "pre": self.state.get(f"/ch/{channel}/main/1/pre"),
+            },
+            "sends": sends,
+            "active_bus_sends": active_bus_sends,
+            "tags": tags,
+            "dca_assignments": self._parse_dca_assignments(tags),
+            "hpf_enabled": self.state.get(f"/ch/{channel}/flt/lc"),
+            "hpf_freq": self.state.get(f"/ch/{channel}/flt/lcf"),
+            "eq_on": self.get_eq_on(channel),
+            "eq_bands": eq_bands,
+            "compressor_enabled": self.get_compressor_on(channel),
+            "compressor_model": self.state.get(f"/ch/{channel}/dyn/mdl"),
+            "compressor_threshold_db": self.get_compressor_threshold(channel),
+            "compressor_ratio": self.get_compressor_ratio(channel),
+            "compressor_attack_ms": self.state.get(f"/ch/{channel}/dyn/att"),
+            "compressor_release_ms": self.state.get(f"/ch/{channel}/dyn/rel"),
+            "compressor_makeup_db": self.get_compressor_gain(channel),
+            "compressor_mix_pct": self.state.get(f"/ch/{channel}/dyn/mix"),
+            "compressor_detector": self.state.get(f"/ch/{channel}/dyn/det"),
+            "compressor_gr_db": self.get_compressor_gr(channel),
+            "gate_enabled": self.state.get(f"/ch/{channel}/gate/on"),
+            "gate_model": self.state.get(f"/ch/{channel}/gate/mdl"),
+            "gate_threshold_db": self.state.get(f"/ch/{channel}/gate/thr"),
+            "gate_range_db": self.state.get(f"/ch/{channel}/gate/range"),
+            "gate_attack_ms": self.state.get(f"/ch/{channel}/gate/att"),
+            "gate_hold_ms": self.state.get(f"/ch/{channel}/gate/hld"),
+            "gate_release_ms": self.state.get(f"/ch/{channel}/gate/rel"),
+            "gate_accent": self.state.get(f"/ch/{channel}/gate/acc"),
+            "gate_ratio": self.state.get(f"/ch/{channel}/gate/ratio"),
+        }
 
     def recall_scene(self, scene_number: int):
         self.load_snap_by_index(scene_number)

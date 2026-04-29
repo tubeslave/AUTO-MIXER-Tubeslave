@@ -1,0 +1,33 @@
+{
+  "dataset_id": "demo-set-v1",
+  "version": "demo-set-v1",
+  "targets": {
+    "channel_classifier": {
+      "dataset_id": "demo-classifier-v1",
+      "dataset_url": "https://example.com/data/channel_classifier_train.jsonl"
+    },
+    "gain_pan_predictor": {
+      "dataset_id": "demo-gain-pan-v1",
+      "dataset_url": "https://example.com/data/gain_pan_train.jsonl",
+      "dataset_file": "models/training_datasets/gain_pan_train.jsonl"
+    },
+    "mix_console": {
+      "dataset_id": "demo-mix-console-v1",
+      "dataset_url": "https://example.com/data/mix_console_train.npz"
+    }
+  },
+  "learning_resources": [
+    {
+      "type": "articles",
+      "url": "https://www.nature.com/articles/audio"
+    },
+    {
+      "type": "books",
+      "url": "https://openlibrary.org/works/OL123456W/Example"
+    },
+    {
+      "type": "videos",
+      "url": "https://archive.org/details/example"
+    }
+  ]
+}

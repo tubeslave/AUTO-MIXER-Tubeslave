@@ -1,0 +1,12 @@
+source_knowledge:
+  enabled: false
+  mode: shadow
+  sources_path: backend/source_knowledge/data/sources.yaml
+  rules_path: backend/source_knowledge/data/rules.jsonl
+  log_path: ~/Desktop/Ai LOGS/source_grounded_decisions.jsonl
+  queue_maxsize: 256
+  min_rule_confidence: 0.55
+  allow_unsourced_rules: false
+  log_retrievals: true
+  log_feedback: true
+  default_limit: 8

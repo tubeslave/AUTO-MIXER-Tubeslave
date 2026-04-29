@@ -69,6 +69,7 @@ class StyleProfile:
     stereo_width: float = 0.0  # 0..1 where 0=mono, 1=full stereo
     loudness_lufs: float = -14.0
     crest_factor: float = 10.0  # Peak to RMS ratio in dB
+    instrument_settings_mode: str = "absolute"
     per_instrument_settings: Dict[str, InstrumentStyle] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -79,6 +80,7 @@ class StyleProfile:
             "stereo_width": round(self.stereo_width, 3),
             "loudness_lufs": round(self.loudness_lufs, 1),
             "crest_factor": round(self.crest_factor, 1),
+            "instrument_settings_mode": self.instrument_settings_mode,
             "per_instrument_settings": {
                 k: v.to_dict() for k, v in self.per_instrument_settings.items()
             },
@@ -95,6 +97,17 @@ SPECTRAL_BANDS = {
     "high_mid": (2000, 6000),
     "presence": (6000, 12000),
     "brilliance": (12000, 20000),
+}
+
+
+NEUTRAL_SPECTRAL_BALANCE = {
+    "sub_bass": -24.0,
+    "bass": -12.0,
+    "low_mid": -14.0,
+    "mid": -11.5,
+    "high_mid": -14.5,
+    "presence": -19.5,
+    "brilliance": -24.5,
 }
 
 
@@ -147,7 +160,7 @@ class StyleTransfer:
             mono = reference_audio.astype(np.float64)
             stereo = None
 
-        profile = StyleProfile(name=name)
+        profile = StyleProfile(name=name, instrument_settings_mode="relative")
 
         # 1. Spectral balance
         profile.spectral_balance = self._analyze_spectral_balance(mono, sr)
@@ -172,6 +185,8 @@ class StyleTransfer:
         else:
             profile.crest_factor = 0.0
 
+        profile.per_instrument_settings = self._infer_instrument_settings(profile)
+
         logger.info(
             f"Extracted style '{name}': DR={profile.dynamic_range:.1f}dB, "
             f"width={profile.stereo_width:.2f}, LUFS={profile.loudness_lufs:.1f}"
@@ -184,6 +199,7 @@ class StyleTransfer:
         channel_audios: Dict[str, np.ndarray],
         channel_types: Dict[str, str],
         sr: int = 48000,
+        blend_instrument_settings: bool = False,
     ) -> Dict[str, Dict[str, Any]]:
         """
         Generate mixing parameters for channels to match a style profile.
@@ -223,7 +239,12 @@ class StyleTransfer:
         for ch_name, audio in channel_audios.items():
             inst_type = channel_types.get(ch_name, "other")
             params = self._compute_channel_params(
-                audio, inst_type, style_profile, spectral_correction, sr
+                audio,
+                inst_type,
+                style_profile,
+                spectral_correction,
+                sr,
+                blend_instrument_settings=blend_instrument_settings,
             )
             mixing_params[ch_name] = params
 
@@ -264,6 +285,7 @@ class StyleTransfer:
             stereo_width=data.get("stereo_width", 0.0),
             loudness_lufs=data.get("loudness_lufs", -14.0),
             crest_factor=data.get("crest_factor", 10.0),
+            instrument_settings_mode=data.get("instrument_settings_mode", "absolute"),
         )
 
         for inst_name, inst_data in data.get("per_instrument_settings", {}).items():
@@ -525,6 +547,240 @@ class StyleTransfer:
 
         return round(lufs, 1)
 
+    @staticmethod
+    def _clamp(value: float, lo: float, hi: float) -> float:
+        return float(min(max(value, lo), hi))
+
+    def _spectral_delta(self, profile: StyleProfile, band: str) -> float:
+        current = float(profile.spectral_balance.get(band, NEUTRAL_SPECTRAL_BALANCE[band]))
+        return current - NEUTRAL_SPECTRAL_BALANCE[band]
+
+    def _infer_instrument_settings(self, profile: StyleProfile) -> Dict[str, InstrumentStyle]:
+        """Infer bounded per-instrument targets from an audio reference profile."""
+        low_weight = self._spectral_delta(profile, "sub_bass") * 0.55 + self._spectral_delta(profile, "bass")
+        low_mid = self._spectral_delta(profile, "low_mid")
+        mid = self._spectral_delta(profile, "mid")
+        high_mid = self._spectral_delta(profile, "high_mid")
+        presence = self._spectral_delta(profile, "presence")
+        brilliance = self._spectral_delta(profile, "brilliance")
+        brightness = presence * 0.8 + brilliance * 0.6
+        tightness = self._clamp((14.0 - float(profile.dynamic_range)) / 8.0, -0.5, 1.35)
+        width = self._clamp(float(profile.stereo_width), 0.0, 1.0)
+
+        settings: Dict[str, InstrumentStyle] = {}
+
+        settings["vocals"] = InstrumentStyle(
+            instrument_type="vocals",
+            gain_db=round(self._clamp(0.35 + mid * 0.08 + high_mid * 0.12 + presence * 0.10, -1.0, 1.8), 3),
+            eq_low_shelf_db=round(self._clamp(-0.25 - max(low_weight, 0.0) * 0.10, -1.4, 0.4), 3),
+            eq_low_mid_db=round(self._clamp(-0.20 - max(low_mid, 0.0) * 0.12, -1.5, 0.5), 3),
+            eq_mid_db=round(self._clamp(mid * 0.10, -0.8, 1.0), 3),
+            eq_high_mid_db=round(self._clamp(0.45 + high_mid * 0.18 + presence * 0.10, -0.8, 2.3), 3),
+            eq_high_shelf_db=round(self._clamp(0.15 + brightness * 0.14, -0.9, 1.8), 3),
+            compression_ratio=round(self._clamp(2.8 + tightness * 1.5, 2.2, 5.8), 3),
+            compression_threshold_db=round(self._clamp(-20.0 - tightness * 5.0, -30.0, -14.0), 3),
+            gate_threshold_db=round(self._clamp(-56.0 + tightness * 4.0, -58.0, -42.0), 3),
+            pan=0.0,
+            bus_send_level=round(self._clamp(-18.0 + width * 5.5, -22.0, -11.0), 3),
+        )
+        settings["kick"] = InstrumentStyle(
+            instrument_type="kick",
+            gain_db=round(self._clamp(0.35 + low_weight * 0.11, -0.8, 1.6), 3),
+            eq_low_shelf_db=round(self._clamp(0.55 + low_weight * 0.18, -0.5, 2.4), 3),
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.10, -1.4, 0.5), 3),
+            eq_mid_db=round(self._clamp(-0.10 + mid * 0.05, -0.8, 0.8), 3),
+            eq_high_mid_db=round(self._clamp(0.25 + high_mid * 0.14 + presence * 0.08, -0.6, 2.0), 3),
+            eq_high_shelf_db=round(self._clamp(brightness * 0.05, -0.4, 0.8), 3),
+            compression_ratio=round(self._clamp(4.0 + tightness * 1.4, 3.2, 6.4), 3),
+            compression_threshold_db=round(self._clamp(-18.0 - tightness * 4.5, -30.0, -12.0), 3),
+            gate_threshold_db=round(self._clamp(-46.0 + tightness * 5.0, -50.0, -32.0), 3),
+            pan=0.0,
+            bus_send_level=-96.0,
+        )
+        settings["snare"] = InstrumentStyle(
+            instrument_type="snare",
+            gain_db=round(self._clamp(0.20 + mid * 0.05 + high_mid * 0.10, -0.8, 1.4), 3),
+            eq_low_shelf_db=0.0,
+            eq_low_mid_db=round(self._clamp(0.10 - max(low_mid, 0.0) * 0.08, -0.8, 1.0), 3),
+            eq_mid_db=round(self._clamp(mid * 0.08, -0.6, 0.8), 3),
+            eq_high_mid_db=round(self._clamp(0.40 + high_mid * 0.16 + presence * 0.05, -0.6, 2.0), 3),
+            eq_high_shelf_db=round(self._clamp(brightness * 0.05, -0.4, 0.8), 3),
+            compression_ratio=round(self._clamp(3.3 + tightness * 1.1, 2.5, 5.4), 3),
+            compression_threshold_db=round(self._clamp(-18.0 - tightness * 4.0, -28.0, -13.0), 3),
+            gate_threshold_db=round(self._clamp(-48.0 + tightness * 5.0, -54.0, -34.0), 3),
+            pan=0.0,
+            bus_send_level=round(self._clamp(-22.0 + width * 4.0, -24.0, -14.0), 3),
+        )
+        settings["hihat"] = InstrumentStyle(
+            instrument_type="hihat",
+            gain_db=round(self._clamp(-0.20 - max(brightness, 0.0) * 0.08, -1.8, 0.6), 3),
+            eq_low_shelf_db=0.0,
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.06, -0.8, 0.3), 3),
+            eq_mid_db=0.0,
+            eq_high_mid_db=round(self._clamp(high_mid * 0.05, -1.0, 1.0), 3),
+            eq_high_shelf_db=round(self._clamp(-max(brightness, 0.0) * 0.14 + min(brightness, 0.0) * 0.06, -2.0, 1.0), 3),
+            compression_ratio=round(self._clamp(1.4 + tightness * 0.35, 1.1, 2.3), 3),
+            compression_threshold_db=round(self._clamp(-18.0 - tightness * 2.5, -24.0, -12.0), 3),
+            gate_threshold_db=round(self._clamp(-60.0 + tightness * 4.0, -60.0, -42.0), 3),
+            pan=round(self._clamp(0.30 + width * 0.30, 0.20, 0.72), 3),
+            bus_send_level=round(self._clamp(-24.0 + width * 4.0, -24.0, -16.0), 3),
+        )
+        settings["toms"] = InstrumentStyle(
+            instrument_type="toms",
+            gain_db=round(self._clamp(0.10 + low_weight * 0.03, -0.8, 1.0), 3),
+            eq_low_shelf_db=round(self._clamp(0.15 + low_weight * 0.08, -0.5, 1.2), 3),
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.08, -1.0, 0.4), 3),
+            eq_mid_db=0.0,
+            eq_high_mid_db=round(self._clamp(0.20 + high_mid * 0.10, -0.6, 1.5), 3),
+            eq_high_shelf_db=0.0,
+            compression_ratio=round(self._clamp(2.8 + tightness * 0.9, 2.0, 4.8), 3),
+            compression_threshold_db=round(self._clamp(-18.0 - tightness * 3.0, -26.0, -12.0), 3),
+            gate_threshold_db=round(self._clamp(-52.0 + tightness * 5.0, -56.0, -36.0), 3),
+            pan=round(self._clamp(0.36 + width * 0.28, 0.22, 0.78), 3),
+            bus_send_level=round(self._clamp(-24.0 + width * 3.0, -24.0, -16.0), 3),
+        )
+        settings["overheads"] = InstrumentStyle(
+            instrument_type="overheads",
+            gain_db=round(self._clamp(-0.25 - max(brightness, 0.0) * 0.06, -1.8, 0.8), 3),
+            eq_low_shelf_db=round(self._clamp(-max(low_weight, 0.0) * 0.05, -0.8, 0.2), 3),
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.08, -1.0, 0.4), 3),
+            eq_mid_db=0.0,
+            eq_high_mid_db=round(self._clamp(high_mid * 0.04, -1.0, 0.8), 3),
+            eq_high_shelf_db=round(self._clamp(-max(brightness, 0.0) * 0.12 + min(brightness, 0.0) * 0.05, -2.2, 0.8), 3),
+            compression_ratio=round(self._clamp(1.3 + tightness * 0.30, 1.0, 2.0), 3),
+            compression_threshold_db=round(self._clamp(-16.0 - tightness * 2.0, -22.0, -10.0), 3),
+            gate_threshold_db=round(self._clamp(-60.0 + tightness * 3.0, -60.0, -46.0), 3),
+            pan=round(self._clamp(0.44 + width * 0.34, 0.30, 0.92), 3),
+            bus_send_level=round(self._clamp(-22.0 + width * 4.0, -24.0, -14.0), 3),
+        )
+        settings["bass"] = InstrumentStyle(
+            instrument_type="bass",
+            gain_db=round(self._clamp(0.10 + low_weight * 0.09, -1.0, 1.3), 3),
+            eq_low_shelf_db=round(self._clamp(0.55 + low_weight * 0.20, -0.4, 2.2), 3),
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.06, -1.0, 0.5), 3),
+            eq_mid_db=round(self._clamp(mid * 0.08, -0.8, 1.0), 3),
+            eq_high_mid_db=round(self._clamp(0.10 + high_mid * 0.06, -0.6, 1.2), 3),
+            eq_high_shelf_db=0.0,
+            compression_ratio=round(self._clamp(3.6 + tightness * 1.3, 2.6, 6.2), 3),
+            compression_threshold_db=round(self._clamp(-20.0 - tightness * 4.0, -30.0, -14.0), 3),
+            gate_threshold_db=-60.0,
+            pan=0.0,
+            bus_send_level=-96.0,
+        )
+        settings["electric_guitar"] = InstrumentStyle(
+            instrument_type="electric_guitar",
+            gain_db=round(self._clamp(-0.10 + mid * 0.05 + high_mid * 0.06, -1.2, 1.0), 3),
+            eq_low_shelf_db=round(self._clamp(-max(low_weight, 0.0) * 0.06, -1.0, 0.3), 3),
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.10, -1.4, 0.4), 3),
+            eq_mid_db=round(self._clamp(mid * 0.08, -0.7, 1.0), 3),
+            eq_high_mid_db=round(self._clamp(high_mid * 0.10 + presence * 0.04, -0.8, 1.6), 3),
+            eq_high_shelf_db=round(self._clamp(brightness * 0.05, -0.7, 0.9), 3),
+            compression_ratio=round(self._clamp(2.0 + tightness * 0.7, 1.4, 3.6), 3),
+            compression_threshold_db=round(self._clamp(-18.0 - tightness * 2.5, -24.0, -12.0), 3),
+            gate_threshold_db=round(self._clamp(-60.0 + tightness * 2.0, -60.0, -50.0), 3),
+            pan=round(self._clamp(0.36 + width * 0.30, 0.20, 0.82), 3),
+            bus_send_level=round(self._clamp(-22.0 + width * 3.5, -24.0, -14.0), 3),
+        )
+        settings["acoustic_guitar"] = InstrumentStyle(
+            instrument_type="acoustic_guitar",
+            gain_db=round(self._clamp(-0.15 + mid * 0.06, -1.2, 0.8), 3),
+            eq_low_shelf_db=round(self._clamp(-max(low_weight, 0.0) * 0.05, -0.8, 0.2), 3),
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.08, -1.0, 0.4), 3),
+            eq_mid_db=round(self._clamp(mid * 0.08, -0.6, 0.8), 3),
+            eq_high_mid_db=round(self._clamp(0.15 + high_mid * 0.08, -0.8, 1.3), 3),
+            eq_high_shelf_db=round(self._clamp(brightness * 0.06, -0.8, 1.0), 3),
+            compression_ratio=round(self._clamp(1.9 + tightness * 0.6, 1.4, 3.0), 3),
+            compression_threshold_db=round(self._clamp(-19.0 - tightness * 2.5, -25.0, -14.0), 3),
+            gate_threshold_db=round(self._clamp(-60.0 + tightness * 1.5, -60.0, -52.0), 3),
+            pan=round(self._clamp(0.28 + width * 0.24, 0.15, 0.72), 3),
+            bus_send_level=round(self._clamp(-20.0 + width * 4.0, -24.0, -14.0), 3),
+        )
+        settings["keys"] = InstrumentStyle(
+            instrument_type="keys",
+            gain_db=round(self._clamp(-0.10 + mid * 0.04, -1.0, 0.8), 3),
+            eq_low_shelf_db=round(self._clamp(low_weight * 0.04, -0.6, 0.8), 3),
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.06, -0.8, 0.5), 3),
+            eq_mid_db=round(self._clamp(mid * 0.06, -0.6, 0.8), 3),
+            eq_high_mid_db=round(self._clamp(high_mid * 0.08, -0.8, 1.2), 3),
+            eq_high_shelf_db=round(self._clamp(brightness * 0.06, -0.8, 1.0), 3),
+            compression_ratio=round(self._clamp(1.8 + tightness * 0.5, 1.2, 2.8), 3),
+            compression_threshold_db=round(self._clamp(-18.0 - tightness * 2.0, -24.0, -12.0), 3),
+            gate_threshold_db=-60.0,
+            pan=round(self._clamp(0.32 + width * 0.28, 0.18, 0.82), 3),
+            bus_send_level=round(self._clamp(-20.0 + width * 4.5, -24.0, -13.0), 3),
+        )
+        settings["strings"] = InstrumentStyle(
+            instrument_type="strings",
+            gain_db=round(self._clamp(-0.15 + mid * 0.04, -1.2, 0.9), 3),
+            eq_low_shelf_db=round(self._clamp(-max(low_weight, 0.0) * 0.05, -0.8, 0.2), 3),
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.06, -0.8, 0.4), 3),
+            eq_mid_db=round(self._clamp(mid * 0.06, -0.6, 0.8), 3),
+            eq_high_mid_db=round(self._clamp(high_mid * 0.06, -0.6, 1.0), 3),
+            eq_high_shelf_db=round(self._clamp(brightness * 0.06, -0.8, 1.0), 3),
+            compression_ratio=round(self._clamp(1.6 + tightness * 0.4, 1.1, 2.5), 3),
+            compression_threshold_db=round(self._clamp(-18.0 - tightness * 1.5, -22.0, -12.0), 3),
+            gate_threshold_db=-60.0,
+            pan=round(self._clamp(0.34 + width * 0.28, 0.18, 0.82), 3),
+            bus_send_level=round(self._clamp(-18.0 + width * 5.0, -24.0, -12.0), 3),
+        )
+        settings["brass"] = InstrumentStyle(
+            instrument_type="brass",
+            gain_db=round(self._clamp(0.0 + mid * 0.05 + high_mid * 0.05, -1.0, 1.0), 3),
+            eq_low_shelf_db=0.0,
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.05, -0.8, 0.4), 3),
+            eq_mid_db=round(self._clamp(mid * 0.07, -0.6, 0.8), 3),
+            eq_high_mid_db=round(self._clamp(high_mid * 0.08, -0.6, 1.2), 3),
+            eq_high_shelf_db=round(self._clamp(brightness * 0.04, -0.6, 0.8), 3),
+            compression_ratio=round(self._clamp(2.0 + tightness * 0.5, 1.4, 3.0), 3),
+            compression_threshold_db=round(self._clamp(-18.0 - tightness * 2.0, -24.0, -12.0), 3),
+            gate_threshold_db=-60.0,
+            pan=round(self._clamp(0.26 + width * 0.22, 0.12, 0.68), 3),
+            bus_send_level=round(self._clamp(-20.0 + width * 4.0, -24.0, -14.0), 3),
+        )
+        settings["woodwinds"] = InstrumentStyle(
+            instrument_type="woodwinds",
+            gain_db=round(self._clamp(-0.05 + mid * 0.04, -1.0, 0.8), 3),
+            eq_low_shelf_db=0.0,
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.05, -0.8, 0.4), 3),
+            eq_mid_db=round(self._clamp(mid * 0.06, -0.6, 0.8), 3),
+            eq_high_mid_db=round(self._clamp(high_mid * 0.06, -0.6, 1.0), 3),
+            eq_high_shelf_db=round(self._clamp(brightness * 0.04, -0.6, 0.8), 3),
+            compression_ratio=round(self._clamp(1.8 + tightness * 0.4, 1.2, 2.8), 3),
+            compression_threshold_db=round(self._clamp(-19.0 - tightness * 1.5, -23.0, -13.0), 3),
+            gate_threshold_db=-60.0,
+            pan=round(self._clamp(0.20 + width * 0.18, 0.08, 0.55), 3),
+            bus_send_level=round(self._clamp(-20.0 + width * 4.0, -24.0, -14.0), 3),
+        )
+        settings["percussion"] = InstrumentStyle(
+            instrument_type="percussion",
+            gain_db=round(self._clamp(-0.10 + high_mid * 0.05, -1.0, 0.8), 3),
+            eq_low_shelf_db=0.0,
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.06, -0.8, 0.4), 3),
+            eq_mid_db=0.0,
+            eq_high_mid_db=round(self._clamp(high_mid * 0.08, -0.8, 1.2), 3),
+            eq_high_shelf_db=round(self._clamp(brightness * 0.05, -0.8, 1.0), 3),
+            compression_ratio=round(self._clamp(1.6 + tightness * 0.4, 1.1, 2.6), 3),
+            compression_threshold_db=round(self._clamp(-18.0 - tightness * 2.0, -24.0, -12.0), 3),
+            gate_threshold_db=round(self._clamp(-58.0 + tightness * 4.0, -60.0, -42.0), 3),
+            pan=round(self._clamp(0.26 + width * 0.22, 0.10, 0.72), 3),
+            bus_send_level=round(self._clamp(-22.0 + width * 3.5, -24.0, -15.0), 3),
+        )
+        settings["other"] = InstrumentStyle(
+            instrument_type="other",
+            gain_db=0.0,
+            eq_low_shelf_db=0.0,
+            eq_low_mid_db=round(self._clamp(-max(low_mid, 0.0) * 0.04, -0.6, 0.2), 3),
+            eq_mid_db=0.0,
+            eq_high_mid_db=round(self._clamp(high_mid * 0.04, -0.5, 0.8), 3),
+            eq_high_shelf_db=round(self._clamp(brightness * 0.04, -0.6, 0.8), 3),
+            compression_ratio=round(self._clamp(1.8 + tightness * 0.4, 1.2, 2.8), 3),
+            compression_threshold_db=round(self._clamp(-18.0 - tightness * 2.0, -24.0, -12.0), 3),
+            gate_threshold_db=-60.0,
+            pan=round(self._clamp(0.18 + width * 0.20, 0.0, 0.62), 3),
+            bus_send_level=round(self._clamp(-22.0 + width * 3.0, -24.0, -15.0), 3),
+        )
+        return settings
+
     def _compute_channel_params(
         self,
         audio: np.ndarray,
@@ -532,6 +788,7 @@ class StyleTransfer:
         style_profile: StyleProfile,
         spectral_correction: Dict[str, float],
         sr: int,
+        blend_instrument_settings: bool = False,
     ) -> Dict[str, Any]:
         """
         Compute mixing parameters for a single channel based on the style profile.
@@ -579,7 +836,7 @@ class StyleTransfer:
         }
         offset = instrument_offsets.get(instrument_type, -4.0)
 
-        if inst_style:
+        if inst_style and not blend_instrument_settings:
             params["fader_db"] = inst_style.gain_db
             params["pan"] = inst_style.pan
             params["gate_threshold"] = inst_style.gate_threshold_db
@@ -602,7 +859,7 @@ class StyleTransfer:
         }
 
         eq_bands = []
-        if inst_style:
+        if inst_style and not blend_instrument_settings:
             eq_values = [
                 ("low_shelf", 100.0, inst_style.eq_low_shelf_db),
                 ("peak", 400.0, inst_style.eq_low_mid_db),
@@ -648,7 +905,7 @@ class StyleTransfer:
             "acoustic_guitar": {"ratio": 2.0, "threshold_db": -20.0, "attack_ms": 15.0, "release_ms": 100.0},
         }
 
-        if inst_style:
+        if inst_style and not blend_instrument_settings:
             params["compression"] = {
                 "ratio": inst_style.compression_ratio,
                 "threshold_db": inst_style.compression_threshold_db,
@@ -670,6 +927,37 @@ class StyleTransfer:
                 comp["threshold_db"] -= 5.0
 
             params["compression"] = comp
+
+        if inst_style and blend_instrument_settings:
+            params["fader_db"] = self._clamp(float(params.get("fader_db", 0.0)) + inst_style.gain_db, -96.0, 10.0)
+            params["pan"] = self._clamp(inst_style.pan, -1.0, 1.0)
+            params["gate_threshold"] = float(inst_style.gate_threshold_db)
+            params["bus_send"] = {"1": float(inst_style.bus_send_level)}
+
+            eq_values = [
+                ("low_shelf", 100.0, inst_style.eq_low_shelf_db),
+                ("peak", 400.0, inst_style.eq_low_mid_db),
+                ("peak", 1000.0, inst_style.eq_mid_db),
+                ("peak", 4000.0, inst_style.eq_high_mid_db),
+                ("high_shelf", 10000.0, inst_style.eq_high_shelf_db),
+            ]
+            for band_type, freq, gain in eq_values:
+                if abs(gain) <= 0.1:
+                    continue
+                params["eq_bands"].append({
+                    "frequency": freq,
+                    "gain_db": round(self._clamp(gain, -6.0, 6.0), 1),
+                    "q": 1.0 if band_type != "peak" else 1.2,
+                    "type": band_type,
+                })
+
+            base_comp = params.get("compression", {}) or {}
+            params["compression"] = {
+                "ratio": round(self._clamp(float(base_comp.get("ratio", 2.0)) + max(0.0, inst_style.compression_ratio - 1.5) * 0.45, 1.0, 20.0), 3),
+                "threshold_db": round(self._clamp(float(base_comp.get("threshold_db", -20.0)) + (inst_style.compression_threshold_db + 20.0) * 0.45, -40.0, 0.0), 3),
+                "attack_ms": float(base_comp.get("attack_ms", 10.0)),
+                "release_ms": float(base_comp.get("release_ms", 100.0)),
+            }
 
         return params
 

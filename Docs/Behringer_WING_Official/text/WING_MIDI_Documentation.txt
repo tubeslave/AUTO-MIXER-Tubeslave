@@ -1,0 +1,60 @@
+                                                                                       DAW Documentation
+
+
+MIDI Remote-Control using WING Port 4
+
+CC to Channel Mapping (for FADER, MUTE, PAN). FADER on MIDI CH1, MUTE on MIDI CH2, PAN on MIDI CH3:
+
+ CC12..31 Channel 1..20
+ CC44..63 Channel 21..40
+ CC70..77 Aux 1..8
+ CC78..93 Bus 1..16
+ CC94/95 Main 1/2
+ CC102/103  Main 3/4
+ CC104..111 Matrix 1..8
+
+
+DCA/Mute Groups. DCA Fader on MIDI CH4, DCA Mute and Mute Group MUTE on MIDI CH5:
+
+ CC12..27   DCA 1..16
+ CC28..31   Mute Group 1..4
+ CC44..47   Mute Group 5..8
+
+
+FX Parameter Control (FX1 on MIDI CH9 .. FX8 on MIDI CH16):
+
+ CC12 Insert ON/OFF
+ CC13 FX Mix
+ CC14 FX Model
+ CC15..31 FX Parameter 1..17
+ CC44..58 FX Parameter 18..32
+
+
+FX Parameter Control (FX9 on MIDI CH9 .. FX16 on MIDI CH16):
+
+ CC70 Insert ON/OFF
+ CC71 FX Mix
+ CC72 FX Model
+ CC73..95 FX Parameter 1..23
+ CC102..110 FX Parameter 24..32
+
+
+Custom Controls Remote (RX only, user layers 1..16) on MIDI CH6:
+
+ CC12..15   Layer 1 Rotaries    Note0..7 Layer 1 Buttons (upper row, lower row)
+ CC16..19   Layer 2 Rotaries    Note8..15 Layer 2 Buttons (upper row, lower row)
+ CC20..23   Layer 3 Rotaries    Note16..23 Layer 3 Buttons (upper row, lower row)
+ CC24..27   Layer 4 Rotaries    Note24..31 Layer 4 Buttons (upper row, lower row)
+ CC28..31   Layer 5 Rotaries    Note32..39 Layer 5 Buttons (upper row, lower row)
+ CC44..47   Layer 6 Rotaries    Note40..47 Layer 6 Buttons (upper row, lower row)
+ CC48..51   Layer 7 Rotaries    Note48..55 Layer 7 Buttons (upper row, lower row)
+ CC52..55   Layer 8 Rotaries    Note56..63 Layer 8 Buttons (upper row, lower row)
+ CC56..59   Layer 9 Rotaries    Note64..71 Layer 9 Buttons (upper row, lower row)
+ CC60..63   Layer 10 Rotaries   Note72..79 Layer 10 Buttons (upper row, lower row)
+ CC70..73   Layer 11 Rotaries   Note80..87 Layer 11 Buttons (upper row, lower row)
+ CC74..77   Layer 12 Rotaries   Note88..95 Layer 12 Buttons (upper row, lower row)
+ CC78..81   Layer 13 Rotaries   Note96..103 Layer 13 Buttons (upper row, lower row)
+ CC82..85   Layer 14 Rotaries   Note104..111 Layer 14 Buttons (upper row, lower row)
+ CC86..89   Layer 15 Rotaries   Note112..119 Layer 15 Buttons (upper row, lower row)
+ CC90..93   Layer 16 Rotaries   Note120..127 Layer 16 Buttons (upper row, lower row)
+

@@ -103,7 +103,8 @@ class RuleEngine:
             priority=RulePriority.HIGH,
             condition=lambda state: (
                 state.get('instrument') == 'lead_vocal' and
-                state.get('lufs_momentary', -100) < state.get('mix_lufs', -100) - 2
+                _has_strong_signal(state) and
+                state.get('lufs_momentary', -100) < _vocal_target_lufs(state) - 0.5
             ),
             action=lambda state: RuleResult(
                 rule_name='vocal_presence',
@@ -111,11 +112,15 @@ class RuleEngine:
                 action='adjust_gain',
                 parameters={
                     'channel': state.get('channel_id', 0),
-                    'target_relative_db': 0.0,
+                    'adjustment_db': _vocal_presence_adjustment_db(state),
+                    'target_lufs': _vocal_target_lufs(state),
                 },
                 priority=RulePriority.HIGH,
                 confidence=0.8,
-                reason='Lead vocal below mix level by more than 2dB LUFS'
+                reason=(
+                    f"Lead vocal at {state.get('lufs_momentary', -100):.1f} LUFS "
+                    f"is below target {_vocal_target_lufs(state):.1f} LUFS"
+                )
             )
         ))
 
@@ -146,34 +151,25 @@ class RuleEngine:
         # Rule: Dynamic range control — compress when range too wide
         self.rules.append(Rule(
             name='dynamic_range',
-            description='Apply compression when dynamic range exceeds 24dB',
+            description='Apply instrument-aware compression when dynamic range exceeds the source target',
             priority=RulePriority.MEDIUM,
-            condition=lambda state: state.get('dynamic_range_db', 0) > 24,
-            action=lambda state: RuleResult(
-                rule_name='dynamic_range',
-                triggered=True,
-                action='adjust_compressor',
-                parameters={
-                    'channel': state.get('channel_id', 0),
-                    'threshold_db': state.get('lufs_momentary', -20) + 6,
-                    'ratio': 3.0,
-                    'attack_ms': 10.0,
-                    'release_ms': 100.0,
-                },
-                priority=RulePriority.MEDIUM,
-                confidence=0.7,
-                reason=f"Dynamic range {state.get('dynamic_range_db', 0):.1f}dB exceeds 24dB target"
-            )
+            condition=lambda state: _needs_dynamic_range_control(state),
+            action=lambda state: _dynamic_range_action(state),
         ))
 
         # Rule: Gain staging — maintain proper headroom
         self.rules.append(Rule(
             name='gain_staging',
-            description='Ensure proper gain staging with -12dB peak target',
+            description='Ensure proper instrument-aware gain staging headroom',
             priority=RulePriority.HIGH,
             condition=lambda state: (
-                state.get('peak_db', -100) > -6 or
-                state.get('peak_db', -100) < -30
+                (
+                    state.get('peak_db', -100) > _gain_staging_hot_threshold_db(state) or
+                    (
+                        _has_strong_signal(state) and
+                        state.get('peak_db', -100) < _gain_staging_cold_threshold_db(state)
+                    )
+                )
             ),
             action=lambda state: RuleResult(
                 rule_name='gain_staging',
@@ -181,56 +177,38 @@ class RuleEngine:
                 action='adjust_gain',
                 parameters={
                     'channel': state.get('channel_id', 0),
-                    'target_peak_db': -12.0,
-                    'adjustment_db': -12.0 - state.get('peak_db', -12),
+                    'target_peak_db': _gain_staging_target_peak_db(state),
+                    'adjustment_db': _gain_staging_target_peak_db(state) - state.get(
+                        'peak_db',
+                        _gain_staging_target_peak_db(state),
+                    ),
                 },
                 priority=RulePriority.HIGH,
                 confidence=0.85,
-                reason=f"Peak level at {state.get('peak_db', 0):.1f}dB (target: -12dB)"
+                reason=(
+                    f"Peak level at {state.get('peak_db', 0):.1f}dB "
+                    f"(target: {_gain_staging_target_peak_db(state):.1f}dB)"
+                )
             )
         ))
 
         # Rule: Mute unused channels to reduce noise floor
         self.rules.append(Rule(
             name='mute_unused',
-            description='Mute channels with no signal to reduce noise floor',
+            description='Mute only close-mic sources that are safe to auto-mute when idle',
             priority=RulePriority.LOW,
-            condition=lambda state: (
-                state.get('rms_db', -100) < -60 and
-                not state.get('is_muted', False) and
-                state.get('channel_armed', True)
-            ),
-            action=lambda state: RuleResult(
-                rule_name='mute_unused',
-                triggered=True,
-                action='mute_channel',
-                parameters={'channel': state.get('channel_id', 0)},
-                priority=RulePriority.LOW,
-                confidence=0.6,
-                reason='No signal detected (RMS < -60dB), muting to reduce noise'
-            ),
+            condition=lambda state: _should_auto_mute_idle_channel(state),
+            action=lambda state: _mute_unused_action(state),
             cooldown_sec=5.0,
         ))
 
         # Rule: Unmute when signal returns
         self.rules.append(Rule(
             name='unmute_active',
-            description='Unmute channels when signal returns above threshold',
+            description='Unmute only channels that were auto-muted and are safe for auto-mute',
             priority=RulePriority.HIGH,
-            condition=lambda state: (
-                state.get('rms_db', -100) > -40 and
-                state.get('is_muted', False) and
-                state.get('auto_muted', False)
-            ),
-            action=lambda state: RuleResult(
-                rule_name='unmute_active',
-                triggered=True,
-                action='unmute_channel',
-                parameters={'channel': state.get('channel_id', 0)},
-                priority=RulePriority.HIGH,
-                confidence=0.8,
-                reason=f"Signal returned (RMS: {state.get('rms_db', 0):.1f}dB), unmuting channel"
-            ),
+            condition=lambda state: _should_auto_unmute_channel(state),
+            action=lambda state: _unmute_active_action(state),
             cooldown_sec=0.5,
         ))
 
@@ -373,3 +351,294 @@ def _hpf_frequency_for_instrument(instrument: str) -> int:
         'cello': 50,
     }
     return hpf_map.get(instrument, 100)
+
+
+def _dynamic_range_profile_for_instrument(instrument: str) -> Optional[Dict[str, float]]:
+    instrument = (instrument or '').lower()
+    profiles: Dict[str, Dict[str, float]] = {
+        'lead_vocal': {
+            'max_dynamic_range_db': 18.0,
+            'threshold_offset_db': 4.5,
+            'ratio': 4.0,
+            'attack_ms': 6.0,
+            'release_ms': 95.0,
+        },
+        'backing_vocal': {
+            'max_dynamic_range_db': 20.0,
+            'threshold_offset_db': 4.5,
+            'ratio': 3.2,
+            'attack_ms': 8.0,
+            'release_ms': 105.0,
+        },
+        'kick': {
+            'max_dynamic_range_db': 24.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 4.0,
+            'attack_ms': 20.0,
+            'release_ms': 60.0,
+        },
+        'snare': {
+            'max_dynamic_range_db': 24.0,
+            'threshold_offset_db': 6.0,
+            'ratio': 3.0,
+            'attack_ms': 8.0,
+            'release_ms': 100.0,
+        },
+        'bass_guitar': {
+            'max_dynamic_range_db': 20.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 3.5,
+            'attack_ms': 15.0,
+            'release_ms': 150.0,
+        },
+        'acoustic_guitar': {
+            'max_dynamic_range_db': 22.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 2.5,
+            'attack_ms': 20.0,
+            'release_ms': 150.0,
+        },
+        'electric_guitar': {
+            'max_dynamic_range_db': 26.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 2.0,
+            'attack_ms': 25.0,
+            'release_ms': 140.0,
+        },
+        'keys_piano': {
+            'max_dynamic_range_db': 26.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 2.5,
+            'attack_ms': 20.0,
+            'release_ms': 150.0,
+        },
+        'organ': {
+            'max_dynamic_range_db': 22.0,
+            'threshold_offset_db': 4.0,
+            'ratio': 2.0,
+            'attack_ms': 20.0,
+            'release_ms': 150.0,
+        },
+        'rack_tom': {
+            'max_dynamic_range_db': 24.0,
+            'threshold_offset_db': 8.0,
+            'ratio': 3.0,
+            'attack_ms': 15.0,
+            'release_ms': 80.0,
+        },
+        'floor_tom': {
+            'max_dynamic_range_db': 24.0,
+            'threshold_offset_db': 8.0,
+            'ratio': 3.0,
+            'attack_ms': 15.0,
+            'release_ms': 80.0,
+        },
+    }
+    return profiles.get(instrument)
+
+
+def _needs_dynamic_range_control(state: Dict) -> bool:
+    profile = _dynamic_range_profile_for_instrument(state.get('instrument', ''))
+    if not profile or not _has_strong_signal(state):
+        return False
+    return state.get('dynamic_range_db', 0) > profile['max_dynamic_range_db']
+
+
+def _dynamic_range_action(state: Dict) -> RuleResult:
+    profile = _dynamic_range_profile_for_instrument(state.get('instrument', '')) or {
+        'max_dynamic_range_db': 24.0,
+        'threshold_offset_db': 6.0,
+        'ratio': 3.0,
+        'attack_ms': 10.0,
+        'release_ms': 100.0,
+    }
+    threshold_db = float(state.get('lufs_momentary', -20.0)) + profile['threshold_offset_db']
+    return RuleResult(
+        rule_name='dynamic_range',
+        triggered=True,
+        action='adjust_compressor',
+        parameters={
+            'channel': state.get('channel_id', 0),
+            'threshold_db': threshold_db,
+            'ratio': profile['ratio'],
+            'attack_ms': profile['attack_ms'],
+            'release_ms': profile['release_ms'],
+        },
+        priority=RulePriority.MEDIUM,
+        confidence=0.72,
+        reason=(
+            f"{state.get('instrument', 'source')} dynamic range "
+            f"{state.get('dynamic_range_db', 0):.1f}dB exceeds "
+            f"{profile['max_dynamic_range_db']:.1f}dB target"
+        ),
+    )
+
+
+def _auto_mute_profile_for_state(state: Dict) -> Optional[Dict[str, float]]:
+    instrument = (state.get('instrument') or '').lower()
+    allow_override = state.get('allow_auto_mute')
+    if allow_override is False:
+        return None
+
+    profiles: Dict[str, Dict[str, float]] = {
+        'kick': {'mute_below_db': -60.0, 'unmute_above_db': -40.0},
+        'snare': {'mute_below_db': -60.0, 'unmute_above_db': -40.0},
+        'rack_tom': {'mute_below_db': -60.0, 'unmute_above_db': -40.0},
+        'floor_tom': {'mute_below_db': -60.0, 'unmute_above_db': -40.0},
+        'percussion': {'mute_below_db': -62.0, 'unmute_above_db': -42.0},
+    }
+    if instrument in profiles:
+        return profiles[instrument]
+    if allow_override is True:
+        return {'mute_below_db': -60.0, 'unmute_above_db': -40.0}
+    return None
+
+
+def _should_auto_mute_idle_channel(state: Dict) -> bool:
+    profile = _auto_mute_profile_for_state(state)
+    if not profile:
+        return False
+    return (
+        state.get('rms_db', -100) < profile['mute_below_db'] and
+        not state.get('is_muted', False) and
+        state.get('channel_armed', True)
+    )
+
+
+def _should_auto_unmute_channel(state: Dict) -> bool:
+    profile = _auto_mute_profile_for_state(state)
+    if not profile:
+        return False
+    return (
+        state.get('rms_db', -100) > profile['unmute_above_db'] and
+        state.get('is_muted', False) and
+        state.get('auto_muted', False)
+    )
+
+
+def _mute_unused_action(state: Dict) -> RuleResult:
+    profile = _auto_mute_profile_for_state(state) or {'mute_below_db': -60.0}
+    return RuleResult(
+        rule_name='mute_unused',
+        triggered=True,
+        action='mute_channel',
+        parameters={'channel': state.get('channel_id', 0)},
+        priority=RulePriority.LOW,
+        confidence=0.7,
+        reason=(
+            f"{state.get('instrument', 'source')} is below "
+            f"{profile['mute_below_db']:.0f}dB RMS and is safe to auto-mute while idle"
+        ),
+    )
+
+
+def _unmute_active_action(state: Dict) -> RuleResult:
+    profile = _auto_mute_profile_for_state(state) or {'unmute_above_db': -40.0}
+    return RuleResult(
+        rule_name='unmute_active',
+        triggered=True,
+        action='unmute_channel',
+        parameters={'channel': state.get('channel_id', 0)},
+        priority=RulePriority.HIGH,
+        confidence=0.8,
+        reason=(
+            f"{state.get('instrument', 'source')} returned above "
+            f"{profile['unmute_above_db']:.0f}dB RMS, unmuting channel"
+        ),
+    )
+
+
+def _has_actionable_signal(state: Dict) -> bool:
+    """Guard non-safety rules from reacting to digital silence."""
+    if state.get('feedback_detected', False):
+        return True
+    if state.get('channel_armed', False):
+        return True
+    try:
+        peak_db = float(state.get('peak_db', -200.0))
+    except (TypeError, ValueError):
+        peak_db = -200.0
+    try:
+        rms_db = float(state.get('rms_db', -200.0))
+    except (TypeError, ValueError):
+        rms_db = -200.0
+    return peak_db > -45.0 or rms_db > -50.0
+
+
+def _has_strong_signal(state: Dict) -> bool:
+    """Return True when the source is clearly present, not just leakage/noise."""
+    try:
+        peak_db = float(state.get('peak_db', -200.0))
+    except (TypeError, ValueError):
+        peak_db = -200.0
+    try:
+        rms_db = float(state.get('rms_db', -200.0))
+    except (TypeError, ValueError):
+        rms_db = -200.0
+    return peak_db > -45.0 and rms_db > -65.0
+
+
+def _vocal_target_lufs(state: Dict) -> float:
+    """Target lead-vocal loudness relative to the current instrument bed."""
+    if state.get('vocal_target_lufs') is not None:
+        try:
+            return float(state['vocal_target_lufs'])
+        except (TypeError, ValueError):
+            pass
+
+    try:
+        mix_lufs = float(state.get('mix_lufs', -100.0))
+    except (TypeError, ValueError):
+        mix_lufs = -100.0
+    try:
+        target_delta_db = float(state.get('vocal_target_delta_db', 2.0))
+    except (TypeError, ValueError):
+        target_delta_db = 2.0
+    return mix_lufs + target_delta_db
+
+
+def _vocal_presence_adjustment_db(state: Dict) -> float:
+    """Return a bounded upward move for vocal presence automation."""
+    try:
+        vocal_lufs = float(state.get('lufs_momentary', -100.0))
+    except (TypeError, ValueError):
+        vocal_lufs = -100.0
+    needed = _vocal_target_lufs(state) - vocal_lufs
+    if needed <= 0:
+        return 0.0
+    return max(0.5, min(3.0, needed))
+
+
+def _gain_staging_target_peak_db(state: Dict) -> float:
+    instrument = str(state.get('instrument', '') or '').lower()
+    targets = {
+        'kick': -8.0,
+        'snare': -9.0,
+        'rack_tom': -9.5,
+        'floor_tom': -9.5,
+        'bass_guitar': -8.5,
+        'synth_bass': -8.5,
+        'playback': -10.0,
+        'lead_vocal': -11.0,
+        'backing_vocal': -11.0,
+    }
+    return float(targets.get(instrument, -12.0))
+
+
+def _gain_staging_hot_threshold_db(state: Dict) -> float:
+    instrument = str(state.get('instrument', '') or '').lower()
+    target = _gain_staging_target_peak_db(state)
+    margins = {
+        'kick': 3.0,
+        'snare': 3.5,
+        'rack_tom': 4.0,
+        'floor_tom': 4.0,
+        'bass_guitar': 3.0,
+        'synth_bass': 3.0,
+        'playback': 4.0,
+    }
+    return float(target + margins.get(instrument, 6.0))
+
+
+def _gain_staging_cold_threshold_db(state: Dict) -> float:
+    return float(_gain_staging_target_peak_db(state) - 18.0)

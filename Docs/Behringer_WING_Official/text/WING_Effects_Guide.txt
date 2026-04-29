@@ -1,0 +1,1036 @@
+Effects Guide
+
+
+
+
+WING Firmware Version 3.0
+Processing and Effects Plug-in Guide
+
+
+
+
+V 0.0
+2   WING Effects Guide
+3   WING Effects Guide
+
+
+
+
+                    WING Effects Guide
+                    WING offers a huge variety of true-stereo effects plug-ins, some of which can be selected directly in all
+                    the channels’ EQ, Gate or Compressor slots – others can be assigned to one of the 16 slots of the virtual
+                    effects rack. This guide offers a description for each effect with advice on what function they specifically
+                    excel in.
+                    It starts with details of the 16-slot virtual effects rack accessible on the EFFECTS screen. The empty slots can
+                    be populated with your choice of premium and standard FX, and then be assigned to any of the channel or bus
+                    insert points, where you’d like to apply the effect.
+                    At the end, you will find descriptions of Gate, Compressor and EQ plug-ins that can replace the respective
+                    WING processing function in any channel.
+                    Note that these Gate, Compressor and EQ plug-ins do not affect the total channel processing latency at all.
+                    However, effects loaded into a channel’s insert point may introduce a very minimal delay. This may become
+                    relevant however, when applying External FX processing in an insert, e.g. through VST plug-ins running
+                    on a PC.
+4        WING Effects Guide: Effects Guide
+
+
+Table Of Contents
+WING Effects Guide......................................................... 3                               JAZZ CLEAN AMP. .................................................................. 19
+16-Slot Virtual Effects Rack............................................ 6                                  DELUXE AMP. ........................................................................... 20
+  Premium FX................................................................................... 6         Channel FX. ................................................................................. 20
+    HALL/ROOM/CHAMBER/PLATE/                                                                                SOUL ANALOGUE. .................................................................. 20
+    CONCERT/AMBIENCE............................................................... 6                       EVEN 88 FORMANT. ............................................................... 20
+    VSS3 REVERB. ............................................................................. 6            EVEN 84...................................................................................... 21
+    VINTAGE ROOM......................................................................... 6                 FORTISSIMO 110...................................................................... 21
+    VINTAGE REVERB....................................................................... 7                 PULSAR....................................................................................... 21
+    VINTAGE PLATE.......................................................................... 7               MACH EQ4................................................................................. 21
+    BLUE PLATE................................................................................. 7           EVEN CHANNEL.......................................................................22
+    GATED REVERB. ......................................................................... 7               SOUL CHANNEL.......................................................................22
+    REVERSE REVERB....................................................................... 8                 VINTAGE CHANNEL. ...............................................................22
+    DELAY/REVERB........................................................................... 8               BUS CHANNEL..........................................................................23
+    SHIMMER REVERB..................................................................... 8                   MASTERING. .............................................................................23
+    SPRING REVERB. ........................................................................ 8               EXTERNAL EFFECT..................................................................23
+    DIMENSION CRS........................................................................ 9             Gate Plug-ins................................................................. 24
+    STEREO CHORUS....................................................................... 9                  GATE/EXPANDER. ................................................................... 24
+    STEREO FLANGER. .................................................................... 9                  DUCKER...................................................................................... 24
+    STEREO DELAY......................................................................... 10                SOUL 9000 GATE.....................................................................25
+    ULTRATAP DELAY.................................................................... 10                   EVEN 88 GATE. .........................................................................25
+    TAPE DELAY. ............................................................................. 11            DRAW MORE 241. ...................................................................25
+    OILCAN DELAY......................................................................... 11                BDX902 DEESSER. ...................................................................25
+    BBD DELAY................................................................................ 11            76 LIMITER AMP. ..................................................................... 26
+    STEREO PITCH. ......................................................................... 11              LA LEVELER. .............................................................................. 26
+    DUAL PITCH. ............................................................................. 12            SOURCE EXTRACTOR. ........................................................... 26
+  Standard FX................................................................................. 12           WAVE DESIGNER. .................................................................... 26
+    GRAPHIC EQ. ............................................................................ 12             AUTO RIDER.............................................................................. 26
+    PIA 560 GEQ.............................................................................. 12            SOUL WARMTH PRE............................................................... 27
+    SPEAKER MANAGER............................................................... 13                       DYNAMIC EQ. ........................................................................... 27
+    TRIPLE DEQ. .............................................................................. 13       EQ Plug-ins. ................................................................... 28
+    COMBINATOR........................................................................... 13                WING EQ. ................................................................................... 28
+    PRECISION LIMITER. ............................................................... 14                   SOUL ANALOGUE. .................................................................. 28
+    2-BAND DEESSER. ................................................................... 14                  EVEN 88 FORMANT. ............................................................... 28
+    ULTRA ENHANCER.................................................................. 14                     EVEN 84...................................................................................... 28
+    EXCITER. ..................................................................................... 15       FORTISSIMO 110...................................................................... 28
+    PSYCHO BASS........................................................................... 16               PULSAR....................................................................................... 28
+    SUB OCTAVER........................................................................... 16               MACH EQ4................................................................................. 28
+    SUB MONSTER. ........................................................................ 16            Compressor Plug-ins. ................................................... 29
+    VELVET IMAGER....................................................................... 16                 WING COMPRESSOR.............................................................. 29
+    DOUBLE VOCAL. ..................................................................... 17                  WING EXPANDER. ................................................................... 29
+    PITCH FIX. .................................................................................. 17        BDX 160 COMP. .......................................................................30
+    ROTARY SPEAKER.................................................................... 17                   BDX 560 EASY. .........................................................................30
+    PHASER....................................................................................... 17        DRAW MORE COMP...............................................................30
+    TREMOLO/PANNER. ............................................................... 18                      RED3 COMPRESSOR...............................................................30
+    TAPE MACHINE. ....................................................................... 18                SOUL 9000. ............................................................................... 31
+    MOOD FILTER........................................................................... 18               SOUL BUS COMP..................................................................... 31
+    BODYREZ. .................................................................................. 18          EVEN COMP/LIM...................................................................... 31
+    RACK AMP. ................................................................................ 19           ETERNAL BLISS......................................................................... 31
+    UK ROCK AMP.......................................................................... 19                76 LIMITER AMP. ..................................................................... 32
+    ANGEL AMP. ............................................................................. 19
+5    WING Effects Guide: Effects Guide
+
+
+
+
+    LA LEVELER. .............................................................................. 32
+    FAIR KID...................................................................................... 32
+    NO-STRESSOR.......................................................................... 33
+    PIA2250 RACK. ......................................................................... 33
+    LTA100 LEVELER....................................................................... 33
+    WAVE DESIGNER. .................................................................... 33
+    AUTO RIDER.............................................................................. 33
+6      WING Effects Guide: 16-Slot Virtual Effects Rack
+
+
+16-Slot Virtual Effects Rack
+Premium FX
+Premium effects require external memory, for example for delay lines, which is only available in effects slots 1-8. Here you’ll find excellent reverb and creative
+delay effects, that are often used as “send effects” or “side-chain effects” in a reverb bus for example.
+
+HALL/ROOM/CHAMBER/PLATE/CONCERT/AMBIENCE
+
+
+
+
+These six reverb emulations are inspired by the algorithmic reverb unit Lexicon 480L. The specific parameters on each reverb algorithm will vary slightly. Click on the
+buttons on the bottom right corner to navigate the parameters.
+
+VSS3 REVERB
+
+
+
+
+The VSS3 REVERB is based on the TC Electronic REVERB 6000 unit and provides dozens of reverb, delay, and boundary effects. This unit is renowned for its “true stereo”
+reverb effects created by two independent processing chains for the left and right channels. Click the arrow on the top right-hand corner for additional controls,
+including specific parameters for early reflections and reverb tail, as well as modulation and general reverb controls.
+Multiple presets are available on the menu to the right of the device. To use a preset, align the desired preset with the yellow arrow and click on Load.
+
+VINTAGE ROOM
+
+
+
+
+VINTAGE ROOM is inspired by the Quantec QRS and simulates the reverberation that occurs when sound is recorded in a small room. Vintage Room breathes life into
+close mics on guitars and drums.
+The VU meter displays the input and output levels. REV DELAY sets the time delay between the dry signal and the reverb tail. DECAY sets the overall decay time for
+the reverb. ROOM SIZE controls the perceived size of the virtual room generating the reverb and DENSITY adjusts how the reflections are spaced in time. HI/LOW
+MULTIPLY adjusts the decay time of the high and low frequencies. ER DELAY L/R sets the time delay between the dry signal and the early reflections. ER LEVEL sets the
+loudness of the early reflections relative to the dry signal. Low-cut and high-cut filters applied to the input signal of the effect are also available. LEVEL adjusts the
+output signal’s amplitude.
+7      WING Effects Guide: 16-Slot Virtual Effects Rack
+
+VINTAGE REVERB
+
+
+
+
+Based on the legendary EMT250, Vintage Reverb delivers shimmering bright reverb that won’t drown out or overpower your live or recorded tracks. Use Vintage
+Reverb to sweeten vocals and snare drums without sacrificing clarity.
+The original EMT250 unit generated quad surround reverbs from mono input signals. Both output pairs were available via front and rear connectors. On Vintage
+Reverb, the buttons FRONT and BACK allow the user to select which pair will be used. FRONT is well-suited for vocals and other dynamic instruments. REAR is more
+commonly used for drums due to it being less reflective. An emulation of the input transformers can also be activated with the corresponding buttons.
+
+VINTAGE PLATE
+
+
+
+
+VINTAGE PLATE is an emulation of the classic EMT140 plate reverb. Low-cut filter, decay and pre delay controls are provided. The COLOUR knob provides tonal control
+over the generated reverb.
+
+BLUE PLATE
+
+
+
+
+BLUE PLATE is based on the plate algorithm of the Lexicon PCM70 digital effects processor. Standard Predelay, Size, Decay, Diffusion, low-cut, high-cut and modulation
+controls are provided. The Damping knob sets the frequency above which the damping will be active. The Xover knob controls the frequency below which the low
+frequency content will be modified according to the BassMult knob setting.
+
+GATED REVERB
+
+
+
+
+The gated reverb technique, widely popular during the 1980s, was originally achieved by adding a noise gate after a reverb so that the reverb tail would be cutoff
+abruptly after the signal level fell below the threshold. The GATED REVERB unit, inspired by the Lexicon 300/480L, creates the same effect by a special shaping of the
+reverb tail.
+8      WING Effects Guide: 16-Slot Virtual Effects Rack
+
+REVERSE REVERB
+
+
+
+
+Inspired by the Lexicon 300/480L, this effect emulates a reverse reverb by inverting the envelope of the reverb tail so that its volume grows over time. Use the swelling
+crescendo of the Reverse Reverb to add an ethereal quality to the desired tracks. The DECAY knob adjusts the time it takes for the reverb to completely dissipate after it
+has reached the peak of the volume swell. RISE controls how much the reverb amplitude will rise. DIFFUSE controls the initial reflection density. SPREAD controls how
+the reflection is distributed through the envelope of the reverb. A low-cut and two shelving filters are provided.
+
+DELAY/REVERB
+
+
+
+
+DELAY/REVERB is a device combining both effects based on the Lexicon PCM70 digital effects processor. The left panel provides controls for the delay, while the right
+panel controls the reverb effect. Both the dry signal and the delay’s output signal can drive the reverb. The Delay and Direct knobs control the level of each signal going
+into the reverb processor.
+
+SHIMMER REVERB
+
+
+
+
+A combination of emulated guitar pedals recreates the well-known “shimmer reverb effect”, popular among guitarists. The first pedal adds new harmonics to
+the original signal. The number of harmonics added is controlled by the SHIMMER knob. The progressive attenuation of each successive harmonic is controlled
+by the SHINE knob. When set at max, the harmonics are attenuated the least. The second pedal provides a reverb effect, and the third one offers a low-cut and a
+high-cut filter.
+
+SPRING REVERB
+
+
+
+
+Inspired by the Pioneer SR-202W from the 1970s, this effect adds the classic spring reverb tone to the desired tracks.
+9      WING Effects Guide: 16-Slot Virtual Effects Rack
+
+DIMENSION CRS
+
+
+
+
+Based on the Roland Dimension D SDD-320 unit, this effect adds depth and stereo width to individual tracks or complete mixes through modulation. The intensity of
+the modulation can be set with the OFF and 1 to 4 buttons. Even when the modulation is turned off, the unit will still add coloration to the signal. Mode 1 adds the
+least amount of modulation, while Mode 4 is the most intense. Multiple buttons can be engaged at the same time to achieve variations of each mode. The dry signal
+can be added to the processed signal by pressing the MIX button so that the DRY indicator is on.
+
+STEREO CHORUS
+
+
+
+
+STEREO CHORUS provides modulation, chorus and filters to create a wider, shimmering sound. Use it to thicken up background vocals, brass and
+woodwind instruments, or to create distinctive guitar tones.
+
+STEREO FLANGER
+
+
+
+
+Flanger emulates the comb filtering effect originally created by applying pressure against the flange of the reel on a tape recorder. This effect creates a unique
+“wobbly” sound that is quite dramatic when used on vocals and instruments.
+The FEEDBACK can be adjusted with positive and negative amounts and band-limited with the FEED HC (high-cut) and FEED LC (low-cut) knobs. The flanger pedal
+provides independent DELAY and DEPTH controls for the left and right channels. The modulation SPEED ranges from 0.05 Hz to 5 Hz. The PHASE knob allows to shift the
+phase relation between the modulation on the left and right channels.
+Additional low-cut and high-cut filters are available at the end of the chain.
+10     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+STEREO DELAY
+
+
+
+
+STEREO DELAY provides multiple controls to achieve a wide stereo presence in the stereo field, even with mono input signals.
+TIME adjusts the master delay time from 1 to 3000 milliseconds which can be then multiplied by the FACTOR knob. The delay time set by the TIME knob will remain
+unchanged when the FACTOR knob is set to 1. The PATTERN knob modifies the delay time by a factor specific to the left and right channels. For instance, when set to
+3/4:1, the left channel delay time will be multiplied by 3/4 while the right channel delay remains unchanged. When set to 1:3/2, the left channel delay time will remain
+unchanged while the right channel delay time is multiplied by 3/2.
+The OFFSET knob adjusts the time difference between the left and right delayed signals. Three feedback modes are available. STEREO provides separate feedback paths
+for the left and right channels. CROSS feeds the left channel back into the right channel and vice versa. MONO sums both feedback paths and sends the same summed
+signal to both stereo channels. The amount of feedback is set by the eponymous knob. Low and high-cut filters are available for the feedback loop. The low and
+high-cut filters to the right of the device are applied to the signal entering the effect unit.
+
+ULTRATAP DELAY
+
+
+
+
+ULTRATAP DELAY is inspired by the Korg SDD-3000 digital delay and provides flexible and straightforward control over each sound repetition. TIME sets the delay time
+from 1 to 2000 milliseconds. FACTOR multiplies the delay TIME by set values. PRE DELAY offsets all the repetitions by 0 to 500 milliseconds in relation to the dry signal.
+The number of repetitions is set with the REPEATS knob, which ranges from 1 to 16. Each repetition is represented in the graph on the top right-hand corner. The x-axis
+represents the time, while the y-axis represents the position in the stereo field. Positive values on the y-axis correspond to signals left of the center in the stereo field.
+Negative values on the y-axis correspond to signals right of the center in the stereo field.
+There are four panning patterns for the repetitions:
+    • MOVE: the panning moves in a linear way from one side to the other.
+    • JUMP: the panning alternates from hard left to hard right or vice versa.
+    • FOCUS: the repetitions start from hard left or right panning and alternate while the panning is progressively reduced until reaching the center.
+    • SPREAD: opposite of focus. The repetitions start panned center and alternate left and right while the panning progressively widens until reaching
+         hard left and right. Note that there must be three or more repetitions for a stereo effect to be achieved. The first two repetitions in SPREAD mode will
+         always be panned center.
+When the WIDTH knob is set to 0%, all repetitions will be panned center. When set to 100%, the first repetition is panned hard left (or the last repetition in
+SPREAD mode). When set to -100%, the first repetition is panned hard right (or the last repetition in SPREAD mode).
+SLOPE attenuates the repetitions. When set to -6 dB, the last repetition will be 6 dB quieter than the first one. When set to 6 dB, the first repetition will be 6 dB quieter
+than the last one. The attenuation is applied in a linear way to each repetition. The quieter a repetition is, the duller the yellow square that represents it in the graph.
+DIFFUSION emulates the sound of early reflections instead of the direct sound.
+Low and high-cut filters are also available.
+11     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+TAPE DELAY
+
+
+
+
+The WING TAPE-ECHO is based on the mid-1970s effects unit Roland RE-201 Space Echo. This device emulates the original mechanism of the Space Echo which created
+a delay by recording the input signal onto a tape and playing it back. Varying the tape speed resulted in different delay times. The use of a tape gave this unit its
+characteristic warm, mid-range rich timbre, now commonly used for slapback delays on vocals and electric guitars.
+Straightforward controls are provided: TIME, SUSTAIN (feedback), DRIVE and FLUTTER, which creates a stereo modulation effect.
+
+OILCAN DELAY
+
+
+
+
+OILCAN emulates the Tel-Ray Ad-N-Echo unit from the early 1960s. The original unit had a can-like container with a motor and filled with oil. The input signal was used
+to drive the movement of a rubber band inside the “can”. The waves in the oil produced reverb-like sounding “reflections” of the input signal.
+Straightforward controls are provided: TIME, SUSTAIN (feedback), WOBBLE (pitch modulation) and TONE.
+
+BBD DELAY
+
+
+
+
+BBD DELAY takes its name from the analog circuitry called “Bucket Brigade Device”, developed to substitute analog tape delays which were delicate and impractical to
+transport. This name is an analogy to firefighters passing water buckets along a line from the water source to the fire. In analog circuitry, the input signal was passed
+from one capacitor to another. Each capacitor took some time to charge and discharge, thus delaying the signal.
+BBD DELAY produces a dark delay tone, emulating the sound of analog BBD devices which applied low-pass filters to reduce the unwanted noise generated by the
+hundreds of capacitors comprising the circuit.
+
+STEREO PITCH
+
+
+
+
+Pitch shifting is often used in two different ways. First, a small amount of slightly pitch-shifted signal can be added to the original signal to create a “doubler” effect
+that thickens the timbre. Alternatively, the signal can be dramatically shifted an octave up or down and used as an additional layer in the mix.
+STEREO PITCH allows the signal to be pitch-shifted by semitones and cents, delayed and filtered. A dry/wet mix knob is also available.
+12     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+DUAL PITCH
+
+
+
+
+DUAL PITCH provides separate pitch shifting controls for the left and right channels. Each channel can be delayed, shifted by semitones/cents, attenuated/amplified
+and panned independently. The low-cut and high-cut filters apply to both channels.
+
+Standard FX
+These effects types do not require external memory and can be used in all of the 16 effects slots. Most of these effects are used as “insert effects” directly in channels
+or buses, like a graphic EQ in a monitoring bus, or a guitar amp simulation in the guitar input channel for example.
+
+GRAPHIC EQ
+
+
+
+
+A standard 31-band graphic equalizer between 20 Hz and 20 kHz. A maximum boost or cut of 15 dB is available for each band.
+The TRUE CURVE switch makes the gain and phase response smoother, especially when changes on adjacent bands are made.
+
+
+
+
+TRUE CURVE not engaged                                             TRUE CURVE engaged
+
+PIA 560 GEQ
+
+
+
+
+This graphic EQ is based on the API 560 and offers the same 10-bands, spaced an octave apart. Each filter’s bandwidth gets narrower as the applied
+gain/attenuation increases. The plug-in offers additional gain and dry/wet controls.
+13     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+SPEAKER MANAGER
+
+
+
+
+This processor is designed to provide necessary processing on output signals driving PA speakers, monitor wedges on stage or IEM systems. The FILTER section provides
+high-pass and low-pass filters with variable frequency. 10 different filter types are available for each band. A Tilt EQ with variable frequency and gain, continuous
+phase control from 0° to 180°, polarity inversion and precision delay are also available. The EQ applied in this section will be shown as a yellow curve on the graph to
+the right.
+The DYN EQ provides dynamic equalization controls. Two high-pass and two low-pass filter types and a parametric filter (BP, band-pass) are available. The gain
+applied by the dynamic equalizer can be applied to the signal either when it is above the threshold or when it is below the threshold, depending on the Above/Below
+switch position.
+The LIMITER tab offers Threshold, Release and RMS/Peak controls over a limiter. The gain reduction will be shown in the red meter.
+
+TRIPLE DEQ
+
+
+
+
+Three-band dynamic equalizer. Each band is accessible through the DEQ 1/2/3 buttons and provides independent controls. It is possible to choose whether the desired
+gain reduction or amplification will be applied when the signal is above or below the threshold.
+Shelving filters with different Q and a band pass filter are available. When the flat filter is selected, the device acts as a full-range compressor or expander.
+A single-band version of this processor is available in the GATE slot on each channel.
+
+COMBINATOR
+
+
+
+
+C5-COMBINATOR is a multiband compressor known for its effective and transparent results. The Attack and Release controls apply to all five bands. The Thresh,
+Gain and Ratio controls on the top right corner are also applied to all bands, whereas the Thresh, Gain and Width controls within the colored rectangle are only active
+for the selected band on screen. The Slope switch modifies the slope of the band-pass filters that conform the multiband compressor.
+Engage the Spectral Balance Control (SBC) to allow automatic gain balancing between the five bands. The SBC knob determines how fast this gain balancing will act.
+14     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+PRECISION LIMITER
+
+
+
+
+This plug-in offers precise peak control to avoid digital clipping and distortion. AUTOGAIN activates an additional long-term gain correction, allowing automatic gain
+control of signals with a wide dynamic range. SQUEEZE adds compression to the signal to add punch and drive depending on the amount you dial in.
+
+2-BAND DEESSER
+
+
+
+
+This device is based on the SPL Dual-Band De-Esser. It attenuates the sibilant frequencies by isolating them and adding them back to the signal with reversed polarity.
+The amount of signal with reversed polarity added back to the original audio, and hence the reduction in sibilance, is controlled by the LOW and HIGH knobs.
+The center frequency for the LOW filter can be set at 6.4 kHz (MALE) or 7.6 kHz (FEMALE). The HIGH filter’s center frequency is fixed at 11.2 kHz.
+When operating in M/S MODE, the knobs on the left control the processing on the mid channel and the knobs on the right, the side channel.
+
+ULTRA ENHANCER
+
+
+
+
+Exciters increase presence and intelligibility by adding harmonic overtones to the signal. Inspired by the SPL Vitalizer, ULTRA ENHANCER combines an aural exciter and
+stereo imager. Three bands are available for spectral excitement. The cutoff frequencies for the aural excitement are variable for the BASS and HIGH filters. The MID
+filter provides variable Q. Enable the SOLO button to listen only to the harmonics that are being added.
+The MONO and STEREO sections offer control over the level and panning of the signals common to both left and right channels (mono) and of the signals exclusive to
+the left or right channels (stereo). The differences between the signals exclusive to the left and right channels can be adjusted with the LMF SPREAD knob.
+15     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+EXCITER
+
+
+
+
+This effect is inspired by the Aphex Aural Exciter. The cutoff frequency of the high-pass filter in the sidechain before the harmonic generation is set with the TUNE knob.
+The graph below shows the frequency response of the output signal for three different TUNE settings (1 kHz, 5 kHz and 10 kHz). Note that there is a dip in the
+frequency response right before the harmonic generation. This is due to the recombination of the sidechain and the unprocessed input signal.
+
+
+
+
+The PEAK control accentuates the TUNE frequency, as shown in the graph below. However, the dip before the TUNE frequency also becomes more pronounced as the
+PEAK increases. For this example, the TUNE frequency remains constant at 1kHz.
+
+
+
+
+The ZERO FILL control compensates for the dip before the TUNE frequency. In the example below, both the TUNE and PEAK controls remain constant.
+Turning the TIMBRE knob counterclockwise adds more odd harmonics, while turning it clockwise adds more even harmonics. Adjust the amplitude of the harmonics
+added to the signal with the HARMONICS knob, and blend in the effected signal with the MIX knob. Disengage the DRY button to listen only to the harmonics that are
+being added.
+16     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+PSYCHO BASS
+
+
+
+
+Psycho Bass is a low-frequency enhancer that adds harmonics to the signal to trick the brain into thinking that it perceives low-frequencies that aren’t being played
+back. INTENSITY controls the level of the generated harmonics. X/O FREQUENCY sets the frequency below which the processing is applied. BASS GAIN attenuates the
+signal below the X/O frequency to compensate for the perceived volume increase due to the newly generated harmonics. SOLO temporarily filters out the frequencies
+above the X/O frequency.
+
+SUB OCTAVER
+
+
+
+
+This effect is based on the early 1980s guitar pedal BOSS Octave OC-2. It produces two tones an octave and two octaves below the original signal, respectively.
+Separate volume controls for each new tone, as well as a tone control (RANGE) are provided.
+
+SUB MONSTER
+
+
+
+
+The MIDAS SUB MONSTER plug-in is a subharmonic synthesizer used to accentuate a specific frequency, as well as two harmonics above it and two harmonics below it.
+The center frequency is defined with the Tune knob. Each fader controls the accentuation of the corresponding harmonic. Note that the center frequency is available on
+Band 3. A dry/wet mix knob is available.
+
+VELVET IMAGER
+
+
+
+
+VELVET IMAGER is a stereo imager that can increase the width of stereo signals or even recreate a stereo image with mono signals.
+MS-WIDTH controls the stereo width by modifying the level of the mid and side channels. STEREOIZE controls the overall amount of stereo processing created using the
+K-Stereo or Velvet mode. In K-Stereo mode, artificial reflections are added to the original signal. In Velvet mode, the phase between the harmonics on each channel is
+randomly shifted. In both modes, the effect is accentuated when engaging the DEEP button.
+A vectorscope and a phase correlation meter provide reliable monitoring of the phase correlation between the left and right channels.
+17     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+DOUBLE VOCAL
+
+
+
+
+DOUBLE VOCAL is a simple and effective doubler effect with five operating modes, dry/wet control and stereo spread control. Although originally designed for vocals,
+it can also add a pleasant doubling effect to other instruments.
+
+PITCH FIX
+
+
+
+
+This processor can be used for live pitch correction. SPEED determines how fast the out-of-tune note reaches the correct pitch. AMOUNT determines how much pitch-
+shifting is applied. For instance, a setting of SPEED=100 and AMOUNT=10 will result in slight pitch corrections being applied immediately. On the contrary, a setting of
+SPEED=10 and AMOUNT=100 will result in notes being pitch-shifted until the exact note is reached but this correction will be applied slowly. High SPEED settings can
+result in artifacts which are sometimes used for creative purposes.
+By default, all notes are active. However, any note can be disabled. When doing so, the PITCH FIX will not force the input signal to the closest active note.
+When a note is withing the range of the disabled note, it will be let through unprocessed.
+
+ROTARY SPEAKER
+
+
+
+
+This effect emulates the sound of a Leslie rotating speaker. Providing more flexibility than its electro-mechanical counterpart, it can be used on a variety of
+instruments and even vocals to create a whirling, psychedelic effect. Two different rotating rates can be set with the SLOW RATE and FAST RATE knobs. Use the FAST/
+SLOW/STOP switch to toggle between both speeds or stop rotation altogether. The ACCEL knobs adjust how quickly the rotating speed reaches its target value when
+switching between the SLOW and FAST RATE. Different acceleration values can be set for the bass speaker and horn. The volume balance between both is set with the
+BALANCE knob. DISTANCE adjusts how far the listening point is from the speaker. A dry/wet knob (MIX) is also provided.
+
+PHASER
+
+
+
+
+PHASER applies multiple sets of filters whose cutoff frequency is modulated, thus creating dips in the frequency response of the input signal. The result is a “swirling”
+effect. Use PHASER to make vocals and instruments sound ethereal and spaced-out.
+18     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+TREMOLO/PANNER
+
+
+
+
+TREMOLO/PANNER can be used to modulate the volume and panning of a signal. For mono effects, set the LFO PHASE L/R to 0°. Phase shifting the left and right
+LFOs will result in a panning effect. The envelope filter can also be modulated using the DEPTH and SPEED knobs to the left of the device.
+
+TAPE MACHINE
+
+
+
+
+This plug-in emulates the soft clipping and tonal characteristics of a multitrack 2-inch tape recorder. Two shelving filters, drive control and continuously
+adjustable tape speed control are available. Higher tape speeds tend to have more high-frequency content.
+
+MOOD FILTER
+
+
+
+
+Inspired by the Minimoog Model D synthesizer filter section, MOOD FILTER uses an LFO generator and an auto-envelope generator to control a VCF (voltage-
+controlled filter). This filter can be modulated either with the input signal’s envelope using the ENVELOPE section or with the LFO section. The filter itself can be
+configured in the FILTER section. Cutoff frequency, filter type, slope and resonance controls are provided. Note that shifting the left and right channel alignment
+of the LFO with the PHASE knob will result in a stereo filtering effect. Additional drive and mix controls are provided.
+
+BODYREZ
+
+
+
+
+BODYREZ is based on the pedal by TC Electronic. It is designed to restore the natural acoustic resonance of acoustic guitars, especially when using sub-optimal
+pickups. A more pristine sound is achieved by adding pre-defined filters and compression with a single knob.
+19     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+RACK AMP
+
+
+
+
+RACK AMP is inspired by the Tech21 SansAmp series. Like the original devices, RACK AMP emulates the preamplifier, power amplifier and speaker of a guitar amplifier.
+BUZZ, PUNCH and CRUNCH control the distortion of the low, mid and high frequencies, respectively. The DRIVE knob simulates tube distortion from a power
+amplifier stage. The CABINET switch can be turned off if the guitarist is already using a real cabinet, which allows the effect to function like a boost or distortion pedal.
+An additional pedal with low and high shelving filters is available.
+
+UK ROCK AMP
+
+
+
+
+UK ROCK AMP is inspired by the tone of classic Marshall guitar amplifiers, commonly used for classic rock tones. Standard controls are provided for the preamp and
+power amp stages. The cabinet emulation can be disabled if needed.
+Note that the SAG knob emulates the behavior of class AB tube power amplifiers. When operating at high volume, incoming signals with hard transients (fast attack
+and high amplitude) cause a sudden increase in the current being drawn. The power supply voltage drops slightly and then recovers. The resulting sound seems to
+have a swell effect.
+
+ANGEL AMP
+
+
+
+
+ANGEL AMP is inspired by the ENGL Fireball amp and commonly used for metal and other styles that need an aggressive distorted guitar tone. The SAG knob behaves in
+the same way as described above. The cabinet emulation can also be disengaged if needed.
+
+JAZZ CLEAN AMP
+
+
+
+
+JAZZ CLEAN AMP is inspired by the classic mid 1970s Roland JC-120, famous for its clean tone and analog chorus effect. Despite its name, this solid-state amp is suitable
+for a wide range of genres including funk, new wave and even metal.
+20     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+DELUXE AMP
+
+
+
+
+This amp is based on the famous 1960s Fender Deluxe Reverb. Like in the original tube amp, sounds ranging from crystal clear cleans to crunchy drives can be
+achieved with the VOLUME and OUTPUT GAIN which control the preamp and power amp gain stages, respectively. A SAG control is provided, as with all other tube
+amp emulations.
+
+Channel FX
+This category contains equalizers and channel strips, which combine multiple processors into an effect unit that uses a single slot in the EFFECTS screen and can be
+used as an “insert effect” in channels or buses.
+
+SOUL ANALOGUE
+
+
+
+
+4-band parametric EQ based on the SSL 4000E series console. This series is generally associated with mid-range clarity and punch. The frequencies available on the
+low-mid and high-mid bands can be modified with the ÷3 and ×3 buttons.
+
+EVEN 88 FORMANT
+
+
+
+
+4-band parametric EQ based on the equalizer section of the Neve 88 series consoles introduced in the early 2000s. This series is associated with both a rich low-end
+and high-end airiness. The LOW and HIGH filters can be either parametric or shelving filters. A Hi-Q switch allows its Q to be increased. The LOW MID and HIGH MID
+filters have continuously variable Q.
+21     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+EVEN 84
+
+
+
+
+3-band EQ based on the equalizer of the 1084 Neve preamp. This preamp followed the same design as the classic 1073 preamp but offering different frequencies for
+equalization. EVEN 84, just as the original unit, offers a HI-Q button to reduce the MID filter’s bandwidth.
+
+FORTISSIMO 110
+
+
+
+
+4-band parametric EQ based on the EQ section of the Focusrite ISA110 unit designed by Rupert Neve in 1985, which later became the Forte console. The frequencies
+available on the two parametric filters can be changed with the ×3 button.
+
+PULSAR
+
+
+
+
+The PULSAR P1a/M5 is inspired by the PULTEC EQP1-A and MEQ-5 units, renowned for their wide and gentle curves resulting in round, fat and musical tone-shaping.
+The MID EQ5 section offers three filters set on the mid-range, while the HI-LO EQ1 section focuses on the low and high-end portions of the spectrum.
+
+MACH EQ4
+
+
+
+
+6-band fixed-frequency equalizer based on the mäag EQ4. This unit provides minimal phase-shift and is known for its clear and present sound. The AIR FREQ control
+adds natural-sounding brightness.
+22     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+EVEN CHANNEL
+
+
+
+
+This plug-in emulates the signal-flow of a single channel strip in a Neve 88 series console, incorporating the EVEN 88 GATE, EVEN 88 FORMANT equalizer and
+EVEN COMPRESSOR/LIMITER.
+
+SOUL CHANNEL
+
+
+
+
+This plug-in emulates the signal-flow of a single channel strip in a hybrid 4000 and 9000 series SSL console, incorporating the SOUL 9000 GATE/EXPANDER,
+SOUL ANALOGUE equalizer from a 4000 series console and SOUL 9000 compressor.
+
+VINTAGE CHANNEL
+
+
+
+
+This channel combines three emulations of classic analog processors commonly associated with a rich warm tone: a fast FET compressor, gentle passive equalizer and
+an optical compressor. The FET compressor can be used to control quick transients before equalizing, while the optical compressor can be used for a gentler overall
+level control.
+23     WING Effects Guide: 16-Slot Virtual Effects Rack
+
+BUS CHANNEL
+
+
+
+
+The BUS CHANNEL combines three processors that add significant coloration: an SSL-inspired preamp with drive, a Neve 1084-inspired equalizer and a compressor
+inspired by the SSL-G Bus Compressor.
+
+MASTERING
+
+
+
+
+The MASTERING plug-in combines four units which are commonly used during mastering: tape saturation, a transparent-sounding equalizer, aural exciter/stereo
+imager, and limiter.
+
+EXTERNAL EFFECT
+
+
+
+
+Outboard analog or digital gear can easily be integrated into the signal path by using the EXTERNAL EFFECT plug-in. After inserting it in a channel, the signal can be
+sent to any digital or analog output by clicking on SEND. Conversely, any digital or analog signal can be fed into the RETURN.
+An FX MIX knob is provided to blend the processed and unprocessed signals. Note that the LATENCY knob should be adjusted to time-align both signals. The signal
+processed by the external effect will inevitably be delayed by a specific time, depending on the outboard processors’ characteristics.
+24     WING Effects Guide: Gate Plug-ins
+
+
+Gate Plug-ins
+GATE/EXPANDER
+
+
+
+
+GATE/EXPANDER is the default noise gate and downward expander on the WING console. It can work as a regular noise gate with a fixed gain reduction below the
+threshold (RANGE) or as a hybrid between a gate and a downward expander.
+When the RATIO is set to “gate”, the device will work as a noise gat. For instance, if the threshold is set at -10 dB and RANGE is 20.0 dB, all signals below -10 dB are
+attenuated by 20 dB. An input of -60 dB corresponds to an output of -80 dB; an input of -30 dB corresponds to an output of -50 dB, and so on.
+If RATIO is set to any other value than “gate”, the gain reduction will be applied in a proportional way as the signal falls below the threshold, until the full attenuation
+set by the RANGE is reached. The closer the input signal is to the threshold; the less attenuation is applied. The higher the ratio, the steeper the slope of the transfer
+function and thus, the closer the resulting sound to “normal gating”. For example, with a ratio of 1:2, if an input signal is 5 dB below threshold, the output signal
+will be 10 dB below threshold. With a ratio of 1:4, an input signal of 5 dB below threshold corresponds to an output of 20 dB below the threshold. In this setting,
+the plug-in is behaving as a downward expander until the full attenuation set at the RANGE is reached (20 dB in this case). For all signals below this point, a fixed
+attenuation is applied.
+
+DUCKER
+
+
+
+
+Duckers are used to achieve the “radio host talking over music” effect. Whenever the radio host talks, the music gets quieter.
+A ducker attenuates the signal by a fixed value once it goes over the threshold. Contrary to a compressor, which allows signals to exceed the threshold, but at a slower
+rate (as determined by the ratio), duckers apply sudden and fixed attenuation.
+To achieve the “radio host effect” described above, the ducker must be driven by a sidechain signal other than the one it is attenuating. For instance, the ducker is
+loaded onto the GATE section of the music channel, the speaker’s microphone is chosen as KEY SOURCE and the threshold is set so that it is exceeded every time the
+host speaks. Hence, the music is attenuated by the amount set with the RANGE knob.
+25     WING Effects Guide: Gate Plug-ins
+
+SOUL 9000 GATE
+
+
+
+
+SOUL 9000 GATE emulates the noise gate section included in each channel of the SSL 9000s series consoles. This gate can also work as a downward expander with a
+2:1 ratio (1:2, if following the nomenclature in the previous examples) by clicking on the EXPAND button.
+
+EVEN 88 GATE
+
+
+
+
+The EVEN 88 GATE emulates the noise gate section in each channel strip on the Neve 88 series consoles. A HYSTERESIS control is provided, which sets a difference in dB
+between the opening threshold and the closing threshold. For example, if the threshold is set to -30 dB with 10 dB hysteresis, the noise gate will open at -20 dB and
+close at -30 dB. This can help preserve the natural decay of the signals.
+If the HYSTERESIS knob is turned fully counterclockwise to the EXP setting, the gate acts as a downward expander.
+The THRESHOLD can be set from -40 dB to 0 dB with the corresponding knob. Engaging the -40 button shifts the threshold down by 40 dB.
+
+DRAW MORE 241
+
+
+
+
+Based on the noise gate/expander section of the Drawmer DL 241, this effect automatically adapts the ratio, depending on the input signal level. As the signal falls
+further below the threshold, the higher the ratio of the downward expander. Conversely, when the signal is close to the threshold, the ratio will be smaller, resulting in
+less attenuation.
+
+BDX902 DEESSER
+
+
+
+
+This effect is inspired by the dbx 902 de-esser. The FREQUENCY knob sets the center frequency of the sidechain filter and RANGE, how much it will be attenuated.
+If HF ONLY is disengaged, the whole input signal will be attenuated when the frequencies let through by the sidechain filter go above the fixed threshold. If HF ONLY is
+engaged, only the higher frequency range set by the FREQUENCY knob will be attenuated.
+26     WING Effects Guide: Gate Plug-ins
+
+76 LIMITER AMP
+This effect is described in the Compressor section.
+
+LA LEVELER
+This effect is described in the Compressor section.
+
+SOURCE EXTRACTOR
+
+
+
+
+SOURCE EXTRACTOR is based on the 500 series version of the noise gate section in the Neve Portico 5045 channel strip. THRESHOLD and DEPTH (range) controls
+are provided. FAST enables a quicker attach time and PEAK toggles between RMS and peak detection. When in RMS mode, the attack times are 100 ms and 200 ms.
+When in peak mode, the attack times are 200 ms and 1s.
+
+WAVE DESIGNER
+
+
+
+
+Based on SPL’s Transient Designer, this effect allows you to modify a signal’s attack and sustain independently. It is often used to give drums, percussion and guitars a
+“snappier” sound by accentuating the attack.
+
+AUTO RIDER
+
+
+
+
+AUTO RIDER is designed to automatically “ride” the fader in the desired channel, so that the perceived volume remains relatively constant. THRESHOLD sets the level
+that the input signal must surpass to be processed at all. TARGET sets the desired output level. SPEED determines how quickly the adjustments will be made. RATIO sets
+how steep the transfer function of the output signal in relation to the input signal is. Lower values yield more subtle adjustments. HOLD determines the minimum time
+the fader adjustments must remain in place. RANGE sets the maximum amount of attenuation or amplification to be applied.
+27     WING Effects Guide: Gate Plug-ins
+
+SOUL WARMTH PRE
+
+
+
+
+The SOUL WARMTH PRE emulates the preamps developed by SSL on their Origin consoles. This emulation offers many tonal options ranging from a clean sounding
+preamp to aggressive clipping.
+The DRIVE knob controls how much the signal will be soft clipped. The HARMONICS knob controls the balance between 2nd (even) and 3rd (odd) order harmonics
+produced. The preamps on the original analog console produced odd harmonics. Even harmonics result in a thicker sound and taming of the original transients’ attack.
+
+DYNAMIC EQ
+
+
+
+
+This is a single-band version of the TRIPE DEQ dynamic equalizer described in the Rack Effects sections. It is also available in the DYN EQ tab of the SPEAKER PROCESSOR
+unit. Note that this standalone single-band dynamic equalizer is only available in the GATE section of individual channels.
+28     WING Effects Guide: EQ Plug-ins
+
+
+EQ Plug-ins
+WING EQ
+
+
+
+
+WING EQ is the default digital equalizer in the console. It is a six-band parametric EQ. Additionally, when the low-cut and high-cut filters found in the preamp section
+of the channel are active, their cutoff frequencies can be edited with the LC FREQ and HC FREQ controls.
+By default, the lowest and highest filters are labeled L and H and set to shelving filters. They can be changed to parametric filters on the SETTINGS page.
+The EQ can be bypassed with the ON/OFF switch. The EQ curve is yellow when active.
+
+SOUL ANALOGUE
+This effect is described in the Rack Effects section.
+
+EVEN 88 FORMANT
+This effect is described in the Rack Effects section.
+
+EVEN 84
+This effect is described in the Rack Effects section.
+
+FORTISSIMO 110
+This effect is described in the Rack Effects section.
+
+PULSAR
+This effect is described in the Rack Effects section.
+
+MACH EQ4
+This effect is described in the Rack Effects section.
+29     WING Effects Guide: Compressor Plug-ins
+
+
+Compressor Plug-ins
+WING COMPRESSOR
+
+
+
+
+WING COMPRESSOR is the default digital compressor in the console. A transfer characteristics graph is provided to the left to easily visualize the signal and gain
+reduction. The input level is represented on the x-axis, while the output level is represented on the y-axis. Standard threshold, ratio and knee, controls are provided.
+Disengage AUTO ENV to manually set the compressor’s attack, hold and release parameters. The detection can also be set to peak or RMS.
+The signal used for the compressor’s sidechain can be chosen on the top left corner KEY SOURCE menu. Filters can also be applied to the sidechain, be it the same signal
+or another of the 40 input channels.
+
+WING EXPANDER
+
+
+
+
+WING EXPANDER works as a conventional downward expander. It is available in the COMP slot and is usually applied when a noise gate yields an overly
+aggressive sound. The RATIO behaves in the same way as described above.
+30     WING Effects Guide: Compressor Plug-ins
+
+BDX 160 COMP
+
+
+
+
+BDX 160 is based on the early 1970s dbx 160 VCA compressor. Known for its hard knee setting and aggressive sound, it’s often used on drum tracks or vocals that need
+that “in-your-face” sound. Straightforward threshold, ratio and make-up gain controls are available.
+
+BDX 560 EASY
+
+
+
+
+BDX 560 EASY is based on the dbx 560A, a 500 series version of the 160A, successor of the dbx 160. It features the same controls as the 560 but with an additional EASY
+option which softens the knee, resulting in a more subtle sounding compression.
+
+DRAW MORE COMP
+
+
+
+
+Based on the DRAWMER DL241, this compressor/limiter offers soft-knee compression and achieves a natural sound. ATTACK and RELEASE can be set to AUTO. The PEAK
+section offers a reliable and extremely fast limiter, suitable for the most demanding scenarios such as in channels feeding the PA system or in-ear-monitoring devices.
+
+RED3 COMPRESSOR
+
+
+
+
+This unit is based on the mid 1990s Focusrite Red3 compressor. Derived from the ISA compressor module, the RED compressor offers a natural sound even when
+significant compression is being applied.
+31     WING Effects Guide: Compressor Plug-ins
+
+SOUL 9000
+
+
+
+
+Based on the SSL 9000 series channel compressors, SOUL 9000 offers a more transparent sounding approach to the classic SSL tone.
+
+SOUL BUS COMP
+
+
+
+
+SOUL BUS COMP is based on the highly sought-after SSL 4000 G series bus compressor from the 1980s. It is often used to “glue” mixes together and give them a
+cohesive sound.
+
+EVEN COMP/LIM
+
+
+
+
+EVEN COMP/LIM is based on the Neve 33609 from the mid-1980s, which in turn drew from the classic 2254. The character of the compressor makes it suitable for mix
+bus applications. The limiter section is also useful when the EVEN COMP/LIM is the last processor in the mix bus.
+
+ETERNAL BLISS
+
+
+
+
+ETERNAL BLISS is based on the Elysia Xpressor. It offers a clear and open sound with fast transients sound due to its RMS peak detection and soft knee setting.
+Note that the Gr Limit knob determines the maximum gain reduction that will be applied. Once the gain reduction limit in dB has been reached, gain reduction will
+remain constant even if the input signal further exceeds the threshold.
+32     WING Effects Guide: Compressor Plug-ins
+
+76 LIMITER AMP
+
+
+
+
+Inspired by the UREI 1176 released in 1967, the 76 LIMITER AMP offers extremely quick attack times (under 1 millisecond) which allow for a wide range of sonic results
+ranging from subtle compression to squashed tracks.
+RATIO can be set to 4:1, 8:1, 12:1 or 20:1. Engineers used to press all buttons simultaneously on the analog unit to achieve extreme compression useful for room mics,
+for instance. This can be emulated by clicking on the ALL label.
+Note that the threshold is fixed. As an alternative, the INPUT knob can be adjusted to control how much the signal goes beyond the threshold. The OUTPUT knob is
+used to compensate for changes made either by the INPUT knob or by the gain reduction itself.
+The attack and release times get faster as the corresponding knobs are turned clockwise. ATTACK ranges from 800 µs at position 1, to 20 µs at position 7.
+RELEASE ranges from 1100 ms at position 1 to 50 ms at position 7.
+
+LA LEVELER
+
+
+
+
+LA LEVELER is based on the late 1960s Teletronix LA-2A optical (opto) compressor. An electroluminescent panel emitted light which got brighter as the input signal
+was louder. Then, a light-dependent resistor applied the gain reduction accordingly. This mechanism and its tube-based design resulted in a sonic character often
+favored for vocals.
+The LIMIT/COMPRESS switch adjusts the ratio, PEAK REDUCTION controls the sidechain gain and thus the gain reduction applied, and GAIN controls the output
+signal’s gain. The VU meter displays the gain reduction.
+
+FAIR KID
+
+
+
+
+FAIR KID emulates the legendary Fairchild 660 tube variable-mu compressor introduced in 1959. The ratio in variable-mu compressors is not constant but increases
+when more gain reduction is being applied. FAIR KID’s ratio ranges from 2:1 to 30:1.
+The gain reduction is controlled in conjunction by the THRESHOLD and DC BIAS knobs. When the THRESHOLD is turned fully counterclockwise, no gain reduction is
+applied. As the knob is turned clockwise, more gain reduction is applied. As the DC Bias knob is turned clockwise, the ratio is lowered, and the soft knee gets wider.
+The TIME CONSTANT knob determines the attack and release times as follows:
+
+      Time constant                   Attack                     Release
+             1                        200 µs                      300 ms
+             2                        200 µs                      800 ms
+             3                        400 µs                        2s
+             4                        800 µs                        5s
+             5                        200µs                      2 s-10 s
+             6                        400 µs                   300 ms-25 s
+33     WING Effects Guide: Compressor Plug-ins
+
+NO-STRESSOR
+
+
+
+
+Inspired by the Empirical Labs Distressor, this device is highly versatile. Its ratio ranges from 1.5:1 to 20:1. NUKE is an even higher ratio, commonly used for parallel
+compression or room mics. INPUT and OUTPUT knobs work just as the knobs in the 76 LIMITER AMP. The ATTACK ranges from 50 µs to 30 ms, while the RELEASE ranges
+from 50 ms to 3.5 s.
+
+PIA2250 RACK
+
+
+
+
+The PIA2250 RACK is based on the API 2500 bus compressor, renowned for the punch and cohesion it adds when used on the mix bus. Threshold, ratio, knee, attack
+and release controls are provided.
+The TYPE switch toggles between different compression styles: OLD is reminiscent of earlier API models while NEW features a more modern-sounding design.
+The attack times range from 30 µs to 30 ms, while the release times range from 50ms to 3s.
+
+LTA100 LEVELER
+
+
+
+
+LTA100 LEVELER is based on the 1980s Summit Audio TLA-100A known for its warm tone. Like the LA LEVELER, GAIN and GAIN REDUCTION controls are provided.
+However, the LTA100 LEVELER also offers variable ATTACK and RELEASE times.
+
+WAVE DESIGNER
+This effect was described in the Gate section.
+
+AUTO RIDER
+This effect was described in the Gate section.
+We Hear You
+
