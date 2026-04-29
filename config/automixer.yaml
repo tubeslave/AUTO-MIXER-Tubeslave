@@ -49,6 +49,43 @@ safety:
   true_peak_limit: -1.0
   max_notch_filters: 8
   max_notch_depth_db: -12.0
+decision_engine_v2:
+  enabled: false
+  dry_run: true
+  offline_experiment: false
+  knowledge_path: automixer/knowledge/mixing_knowledge_base.json
+  log_path: ~/Desktop/Ai LOGS/decision_engine_v2.jsonl
+  decision:
+    min_confidence: 0.55
+    max_actions_per_plan: 8
+    level_tolerance_lu: 1.5
+    max_gain_recommendation_db: 3.0
+    tonal_issue_threshold_db: 2.5
+    max_eq_recommendation_db: 2.0
+    crest_factor_threshold_db: 18.0
+    dynamic_range_threshold_db: 18.0
+    max_pan_recommendation: 0.2
+    true_peak_boost_ceiling_dbtp: -3.0
+  safety:
+    max_gain_change_db: 1.0
+    max_live_gain_increase_db: 0.5
+    min_gain_change_db: 0.25
+    max_eq_boost_db: 1.0
+    max_eq_cut_db: 3.0
+    max_eq_q: 4.0
+    min_eq_frequency_hz: 20.0
+    max_eq_frequency_hz: 20000.0
+    max_pan_step: 0.15
+    max_pan_abs: 1.0
+    max_compression_ratio: 4.0
+    max_compression_threshold_change_db: 6.0
+    min_interval_sec: 3.0
+    cooldown_sec: 2.0
+    hysteresis_db: 0.25
+    live_mode_blocks_abrupt_changes: true
+    true_peak_ceiling_dbtp: -1.0
+    dry_run: true
+    emergency_bypass: false
 autofoh:
   classifier:
     name_overrides:
