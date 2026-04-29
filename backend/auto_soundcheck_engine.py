@@ -91,6 +91,12 @@ from channel_recognizer import (
 )
 from config_manager import ConfigManager
 from feedback_detector import FeedbackDetector, FeedbackDetectorConfig, FeedbackEvent
+from heuristics.spectral_ceiling_eq import (
+    SpectralCeilingEQAnalyzer,
+    SpectralCeilingEQConfig,
+    format_spectral_ceiling_log,
+    merge_spectral_proposal_into_eq_bands,
+)
 from mixer_discovery import (
     discover_mixer_auto, discover_mixers, DiscoveredMixer,
 )
@@ -518,6 +524,17 @@ class AutoSoundcheckEngine:
         resolved_config_path = str(default_config_path) if default_config_path.exists() else config_path
         self.config_manager = ConfigManager(config_path=resolved_config_path)
         autofoh_config = self.config_manager.get_section("autofoh")
+        self.spectral_ceiling_eq_config = SpectralCeilingEQConfig.from_mapping(
+            self.config_manager.get_section("spectral_ceiling_eq")
+        )
+        try:
+            self.spectral_ceiling_eq_analyzer: Optional[SpectralCeilingEQAnalyzer] = (
+                SpectralCeilingEQAnalyzer(self.spectral_ceiling_eq_config)
+            )
+        except Exception as exc:
+            logger.warning("Spectral ceiling EQ disabled; profile load failed: %s", exc)
+            self.spectral_ceiling_eq_config.enabled = False
+            self.spectral_ceiling_eq_analyzer = None
         self.classifier_config = autofoh_config.get("classifier", {})
         autofoh_safety = autofoh_config.get("safety", {})
         autofoh_evaluation = autofoh_config.get("evaluation", {})
@@ -687,6 +704,7 @@ class AutoSoundcheckEngine:
         self.muq_eval_config = muq_eval_config
         self.muq_eval_service: Optional[Any] = None
         self._muq_pending_audio: Dict[int, Dict[str, Any]] = {}
+        self._last_muq_stem_drift: Dict[str, Any] = {}
         self.muq_eval_session_id = f"autofoh_{int(time.time())}"
         if bool(perceptual_config.get("enabled", False)):
             if PerceptualEvaluator is None:
@@ -1002,24 +1020,45 @@ class AutoSoundcheckEngine:
             return default
 
     def _load_muq_eval_config(self) -> Dict[str, Any]:
-        """Load MuQ-Eval config from ConfigManager and optional config/muq_eval.yaml."""
+        """Load MuQ-Eval config from ConfigManager and optional YAML drift profiles."""
 
         config = dict(self.config_manager.get_section("muq_eval") or {})
         config_path = Path(__file__).resolve().parents[1] / "config" / "muq_eval.yaml"
-        if not config_path.exists():
-            return config
+        drift_path = Path(__file__).resolve().parents[1] / "config" / "ewma_metrics.yaml"
         try:
             import yaml
-
-            with config_path.open(encoding="utf-8") as handle:
-                payload = yaml.safe_load(handle) or {}
         except Exception as exc:
-            logger.warning("MuQ-Eval config load skipped: %s", exc)
+            logger.warning("MuQ-Eval YAML config load skipped: %s", exc)
             return config
-        if isinstance(payload, dict) and isinstance(payload.get("muq_eval"), dict):
-            payload = payload["muq_eval"]
-        if isinstance(payload, dict):
-            config.update(payload)
+
+        if config_path.exists():
+            try:
+                with config_path.open(encoding="utf-8") as handle:
+                    payload = yaml.safe_load(handle) or {}
+            except Exception as exc:
+                logger.warning("MuQ-Eval config load skipped: %s", exc)
+            else:
+                if isinstance(payload, dict) and isinstance(payload.get("muq_eval"), dict):
+                    payload = payload["muq_eval"]
+                if isinstance(payload, dict):
+                    config.update(payload)
+
+        if drift_path.exists():
+            try:
+                with drift_path.open(encoding="utf-8") as handle:
+                    drift_payload = yaml.safe_load(handle) or {}
+            except Exception as exc:
+                logger.warning("EWMA drift config load skipped: %s", exc)
+            else:
+                if isinstance(drift_payload, dict) and isinstance(
+                    drift_payload.get("ewma_metrics"),
+                    dict,
+                ):
+                    drift_payload = drift_payload["ewma_metrics"]
+                if isinstance(drift_payload, dict):
+                    merged_drift = dict(config.get("stem_drift") or {})
+                    merged_drift.update(drift_payload)
+                    config["stem_drift"] = merged_drift
         return config
 
     def _perceptual_shadow_enabled(self) -> bool:
@@ -1150,6 +1189,85 @@ class AutoSoundcheckEngine:
             reward=muq_decision.reward,
         )
         return muq_decision
+
+    def update_muq_stem_score_batch(
+        self,
+        stem_scores: Dict[str, Any],
+        dt: Optional[float] = None,
+        params_by_stem: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Update per-stem MuQ EWMA drift metrics for visualization and freeze guards."""
+
+        service = getattr(self, "muq_eval_service", None)
+        if service is None or not hasattr(service, "update_stem_score_batch"):
+            return {"enabled": False, "stems": {}, "summary": "MuQ stem EWMA drift unavailable"}
+
+        result = service.update_stem_score_batch(
+            stem_scores,
+            dt,
+            params_by_stem=params_by_stem,
+        )
+        self._last_muq_stem_drift = dict(result or {})
+        if not result.get("enabled", False):
+            return result
+
+        self._log_autofoh_event("muq_stem_drift", drift=result)
+        summary = str(result.get("summary", "MuQ stem EWMA drift updated"))
+        attention = [
+            f"{stem}:{payload.get('state')}"
+            for stem, payload in result.get("stems", {}).items()
+            if payload.get("state") in {"WARN", "CRIT"}
+        ]
+        if attention:
+            summary = f"{summary}; attention={', '.join(attention)}"
+
+        self._emit_observation(
+            message=summary,
+            summary={"muq_stem_drift": result},
+            operation={
+                "type": "muq_stem_drift",
+                "osc_endpoint": self._muq_stem_drift_osc_endpoint(result),
+                "stems": result.get("stems", {}),
+                "frozen_stems": result.get("frozen_stems", {}),
+            },
+        )
+        return result
+
+    @staticmethod
+    def _muq_stem_drift_osc_endpoint(result: Dict[str, Any]) -> str:
+        for stem_result in result.get("stems", {}).values():
+            endpoint = str(stem_result.get("osc_endpoint", ""))
+            if endpoint:
+                return endpoint.rsplit("/", 1)[0]
+        return "/autofoh/muq_drift"
+
+    def _stem_ml_corrections_frozen(self, info: ChannelInfo) -> bool:
+        service = getattr(self, "muq_eval_service", None)
+        monitor = getattr(service, "stem_drift_monitor", None)
+        if service is None or monitor is None:
+            return False
+
+        frozen = getattr(monitor, "frozen_stems", lambda: {})()
+        if not frozen:
+            return False
+
+        candidates = [
+            str(info.source_role or ""),
+            str(info.preset or ""),
+            *(str(role) for role in (info.stem_roles or [])),
+        ]
+        candidate_groups = {
+            getattr(monitor, "infer_group", lambda value: str(value))(candidate)
+            for candidate in candidates
+            if candidate
+        }
+        for frozen_stem in frozen:
+            if frozen_stem in candidates:
+                return True
+            frozen_group = getattr(monitor, "infer_group", lambda value: str(value))(frozen_stem)
+            if frozen_group in candidate_groups:
+                return True
+        return False
 
     def _capture_perceptual_audio(self, channel_id: Optional[int]) -> Optional[np.ndarray]:
         if (
@@ -2010,6 +2128,8 @@ class AutoSoundcheckEngine:
     def _control_allowed(self, info: ChannelInfo, control_name: str) -> bool:
         if control_name in {"feedback_notch", "emergency_fader"}:
             return control_name in info.allowed_controls
+        if self._stem_ml_corrections_frozen(info):
+            return False
         return info.auto_corrections_enabled and control_name in info.allowed_controls
 
     def _log_processing_skip(self, ch: int, info: ChannelInfo, stage: str):
@@ -2601,6 +2721,10 @@ class AutoSoundcheckEngine:
                     skipped_count += 1
                     self._log_processing_skip(ch, info, "pre-analysis preserve")
                     continue
+                if self._stem_ml_corrections_frozen(info):
+                    skipped_count += 1
+                    self._log_processing_skip(ch, info, "MuQ stem freeze")
+                    continue
                 preserved_count += 1
                 info.was_reset = False
 
@@ -2642,6 +2766,10 @@ class AutoSoundcheckEngine:
             if not info.auto_corrections_enabled:
                 skipped_count += 1
                 self._log_processing_skip(ch, info, "reset")
+                continue
+            if self._stem_ml_corrections_frozen(info):
+                skipped_count += 1
+                self._log_processing_skip(ch, info, "MuQ stem freeze")
                 continue
 
             try:
@@ -3283,6 +3411,7 @@ class AutoSoundcheckEngine:
                 if ch in self.channels
                 and self.channels[ch].has_signal
                 and self.channels[ch].auto_corrections_enabled
+                and not self._stem_ml_corrections_frozen(self.channels[ch])
             ]
             if not source_infos:
                 continue
@@ -3955,6 +4084,9 @@ class AutoSoundcheckEngine:
             if not info.auto_corrections_enabled:
                 self._log_processing_skip(ch, info, "auto-processing")
                 continue
+            if self._stem_ml_corrections_frozen(info):
+                self._log_processing_skip(ch, info, "MuQ stem freeze")
+                continue
 
             preset = info.preset or "custom"
             had_proc = ""
@@ -4155,6 +4287,70 @@ class AutoSoundcheckEngine:
         except Exception as e:
             logger.warning(f"Ch {ch}: HPF failed: {e}")
 
+    def _build_spectral_ceiling_eq_proposal(
+        self,
+        ch: int,
+        info: ChannelInfo,
+        preset: str,
+    ):
+        if (
+            self.spectral_ceiling_eq_analyzer is None
+            or not self.spectral_ceiling_eq_config.enabled
+            or self.audio_capture is None
+        ):
+            return None
+
+        fft_size = int(self.autofoh_analysis_config.get("fft_size", 4096))
+        window_samples = max(self.block_size * 4, fft_size * 2)
+        try:
+            samples = np.asarray(
+                self.audio_capture.get_buffer(ch, window_samples),
+                dtype=np.float32,
+            ).reshape(-1)
+        except Exception as exc:
+            logger.debug("Ch %s: spectral ceiling audio capture failed: %s", ch, exc)
+            return None
+        if samples.size < max(1024, self.block_size // 2):
+            return None
+
+        lead_channel_ids = [
+            lead_ch for lead_ch in self._lead_channel_ids()
+            if lead_ch != ch and self.channels.get(lead_ch) is not None
+        ]
+        lead_confidence = 0.0
+        if lead_channel_ids:
+            lead_confidence = max(
+                float(self.channels[lead_ch].classification_confidence)
+                for lead_ch in lead_channel_ids
+            )
+
+        role = info.source_role or preset
+        return self.spectral_ceiling_eq_analyzer.analyze(
+            samples,
+            instrument_role=role,
+            sample_rate=self.sample_rate,
+            track_id=info.name or f"Ch {ch}",
+            role_confidence=float(info.classification_confidence or 0.0),
+            lead_vocal_active=bool(lead_channel_ids),
+            lead_vocal_confidence=lead_confidence,
+        )
+
+    def _log_spectral_ceiling_eq_proposal(
+        self,
+        proposal,
+        merge_report: Optional[Dict[str, Any]],
+    ) -> None:
+        if proposal is None:
+            return
+        if self.spectral_ceiling_eq_config.log_verbose:
+            logger.info("%s", format_spectral_ceiling_log(proposal, merge_report))
+        self._log_autofoh_event(
+            "spectral_ceiling_eq",
+            channel=proposal.track_id,
+            proposal=proposal.to_dict(),
+            merge_report=merge_report or {},
+        )
+
     def _apply_eq(
         self,
         ch: int,
@@ -4235,6 +4431,18 @@ class AutoSoundcheckEngine:
 
                 adapted_gain = max(-8.0, min(8.0, round(adapted_gain, 1)))
                 adapted_bands[i] = (freq, adapted_gain, q)
+
+        spectral_proposal = self._build_spectral_ceiling_eq_proposal(ch, info, preset)
+        spectral_merge_report = None
+        if spectral_proposal is not None:
+            adapted_bands, spectral_merge_report = merge_spectral_proposal_into_eq_bands(
+                adapted_bands,
+                spectral_proposal,
+            )
+            self._log_spectral_ceiling_eq_proposal(
+                spectral_proposal,
+                spectral_merge_report,
+            )
 
         try:
             sent_any = False
@@ -4814,6 +5022,8 @@ class AutoSoundcheckEngine:
     ):
         """Enable a bounded gate on close drum mics before tonal decisions."""
         if not info.auto_corrections_enabled:
+            return
+        if self._stem_ml_corrections_frozen(info):
             return
         if not self.auto_gate_close_mics:
             return
@@ -5524,6 +5734,9 @@ class AutoSoundcheckEngine:
         if not info.auto_corrections_enabled:
             self._log_processing_skip(ch, info, "single-channel auto-processing")
             return
+        if self._stem_ml_corrections_frozen(info):
+            self._log_processing_skip(ch, info, "MuQ stem freeze")
+            return
         preset = info.preset or "custom"
         try:
             try:
@@ -6049,6 +6262,16 @@ class AutoSoundcheckEngine:
                 else ""
             ),
             "muq_eval_log_path": str(self.muq_eval_config.get("log_path", "")),
+            "muq_stem_drift": (
+                self._last_muq_stem_drift
+                if self._last_muq_stem_drift
+                else (
+                    self.muq_eval_service.stem_drift_status()
+                    if self.muq_eval_service is not None
+                    and hasattr(self.muq_eval_service, "stem_drift_status")
+                    else {}
+                )
+            ),
             "shared_chat_mix_enabled": self.shared_chat_mix_config.enabled,
             "autofoh_log_enabled": self.autofoh_logging_enabled,
             "autofoh_log_path": str(self._default_autofoh_log_path()) if self.autofoh_logging_enabled else "",

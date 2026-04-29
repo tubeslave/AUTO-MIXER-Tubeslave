@@ -223,6 +223,62 @@ muq_eval:
   max_eq_gain_change_db_per_step: 1.0
   max_compressor_threshold_change_db_per_step: 2.0
   min_seconds_between_quality_decisions: 5.0
+  stem_drift:
+    enabled: false
+    freeze_normal_seconds: 5.0
+    default:
+      tau: 12.0
+      warn_T: 0.06
+      crit_T: 0.12
+      debounce_warn: 2.0
+      debounce_crit: 5.0
+    groups:
+      vox:
+        tau: 9.0
+        warn_T: 0.05
+        crit_T: 0.10
+        debounce_warn: 1.5
+        debounce_crit: 4.0
+      drums:
+        tau: 7.0
+        warn_T: 0.07
+        crit_T: 0.14
+        debounce_warn: 1.2
+        debounce_crit: 4.0
+      bass:
+        tau: 10.0
+        warn_T: 0.06
+        crit_T: 0.12
+      guitars:
+        tau: 12.0
+        warn_T: 0.06
+        crit_T: 0.12
+      keys:
+        tau: 14.0
+        warn_T: 0.06
+        crit_T: 0.12
+      fx:
+        tau: 18.0
+        warn_T: 0.08
+        crit_T: 0.16
+        debounce_warn: 2.5
+      bus:
+        tau: 15.0
+        warn_T: 0.05
+        crit_T: 0.10
+        debounce_crit: 4.0
+    frequency_masks:
+      vox:
+        low_mid_300_800:
+          band_hz: [300, 800]
+          tau: 7.0
+          warn_T: 0.04
+          crit_T: 0.08
+          debounce_warn: 1.2
+          debounce_crit: 3.0
+    visualization:
+      osc_endpoint: /autofoh/muq_drift
+      emit_observation: true
 source_knowledge:
   enabled: false
   mode: shadow
@@ -235,6 +291,22 @@ source_knowledge:
   log_retrievals: true
   log_feedback: true
   default_limit: 8
+spectral_ceiling_eq:
+  enabled: true
+  dry_run: false
+  correction_strength: 0.4
+  smoothing_octaves: 0.333
+  reference_freq_hz: 1000
+  max_bands_per_track: 5
+  min_confidence_to_apply: 0.65
+  allow_master_bus_eq: true
+  master_bus_max_abs_gain_db: 1.0
+  max_abs_gain_db: 3.0
+  max_q: 2.0
+  min_band_gain_db: 0.25
+  mix_amount: 1.0
+  log_verbose: true
+  profiles_path: configs/spectral_ceiling_profiles.yaml
 logging:
   level: INFO
   json_output: false
