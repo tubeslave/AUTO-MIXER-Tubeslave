@@ -52,6 +52,11 @@
   strong sources и Drums/Bass/Guitars/BG Vocal buses `-25 LUFS`, tucked backing
   vocals `-27 LUFS`, keys/synth/ambient `-30 LUFS`, FX/deep effects `-35 LUFS`,
   doubles/layers примерно на 3 LU ниже группы. Live safety всегда важнее цели.
+- Основной offline pipeline: no-reference стандарт с Ayaic balance,
+  Gate, bounded source/drum-bus compression до финального gain при
+  необходимости, FX15-style section/mod space и `spectral_ceiling_eq` как
+  главный spectral guard. Не использовать `AIR_MINUS_0_80`, финальный limiter,
+  soft clipper, master-bus compressor или reference matching без явного запроса.
 
 ## Протоколы микшерных пультов
 ### Behringer WING Rack (OSC)
@@ -89,6 +94,9 @@
 10. NumPy типы в JSON: np.float64 не сериализуется → convert_numpy_types() перед json.dumps()
 11. Ayaic level-plane balancing принят как правило: применять к источникам и
     стемам/группам одновременно; не сводить только по isolated track LUFS.
+12. Стандартный offline pipeline принят как основной: no-reference,
+    `spectral_ceiling_eq` вместо внешнего match EQ по умолчанию, без
+    `AIR_MINUS_0_80` и без финального limiter/soft clipper.
 
 ## Контекст для LLM
 - При работе с DSP — сверяться с docs/CONVENTIONS.md (формулы, единицы измерения)
