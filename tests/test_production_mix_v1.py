@@ -795,6 +795,35 @@ def test_muq_excluded_prohibits_large_remix():
     assert "review_required_muq_excluded_large_remix" in decision.rejected[0]["reasons"]
 
 
+def test_muq_excluded_prohibits_large_remix_candidate_type_even_with_few_actions():
+    config = load_production_mix_config()
+    baseline = _baseline_eval(config)
+    action = MixAction(
+        action_type=ACTION_COMPRESSION,
+        target="Lead Vox",
+        channel_id=4,
+        parameters=_compression_params(),
+        rationale="track compression recipe",
+        stage="track_compression_recipe",
+    )
+    candidate = _candidate_eval(
+        config,
+        MixCandidate(
+            "track_compression_large_remix",
+            "musical_recipe_track_compression",
+            actions=[action],
+            metadata={"candidate_type": "large_remix"},
+        ),
+        final_delta=0.05,
+        warnings=["muq_eval_fallback_excluded_from_final_score"],
+    )
+
+    decision = ProductionMixDecisionEngine(config).decide([baseline, candidate], mode="offline")
+
+    assert not decision.accepted
+    assert "review_required_muq_excluded_large_remix" in decision.rejected[0]["reasons"]
+
+
 def test_fixed_song_repa_group_targets_not_applied_to_different_song():
     config = load_production_mix_config()
     action = MixAction(

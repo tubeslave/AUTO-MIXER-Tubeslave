@@ -197,7 +197,11 @@ class ProductionMixDecisionEngine:
                 reasons.extend(f"critical_degradation:{name}" for name in item.critical_degradations)
         if candidate_type != "reference_taste" and self._final_delta(item) < 0.01 and len(item.candidate.actions) > 10:
             reasons.append("review_required_small_final_delta_many_actions")
-        if candidate_type != "reference_taste" and muq_unavailable and self._is_large_remix_without_muq(item):
+        if (
+            candidate_type != "reference_taste"
+            and muq_unavailable
+            and (candidate_type == "large_remix" or self._is_large_remix_without_muq(item))
+        ):
             reasons.append("review_required_muq_excluded_large_remix")
         if self._uses_fixed_reference_group_targets(item):
             reasons.append("fixed_reference_group_targets_not_allowed_for_new_song")
