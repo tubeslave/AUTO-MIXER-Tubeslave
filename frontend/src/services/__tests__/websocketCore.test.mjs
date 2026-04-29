@@ -113,6 +113,25 @@ test('disconnect() disables scheduled reconnect after close', async () => {
   assert.equal(FakeWebSocket.instances.length, 1);
 });
 
+test('stale close does not clear an active replacement socket', async () => {
+  const transport = createTransport();
+
+  const firstConnect = transport.connect();
+  const staleSocket = FakeWebSocket.instances[0];
+  staleSocket.open();
+  await firstConnect;
+
+  transport.ws = null;
+  const secondConnect = transport.connect();
+  const activeSocket = FakeWebSocket.instances[1];
+  activeSocket.open();
+  await secondConnect;
+
+  staleSocket.close();
+
+  assert.equal(transport.ws, activeSocket);
+});
+
 test('send() serializes messages when socket is open', async () => {
   const transport = createTransport();
   const connectPromise = transport.connect();

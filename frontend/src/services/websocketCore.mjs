@@ -86,9 +86,10 @@ export class BaseWebSocketTransport {
       let settled = false;
 
       try {
-        this.ws = new this.WebSocketImpl(this.url);
+        const socket = new this.WebSocketImpl(this.url);
+        this.ws = socket;
 
-        this.ws.onopen = () => {
+        socket.onopen = () => {
           console.log('WebSocket connected');
           if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
@@ -99,7 +100,7 @@ export class BaseWebSocketTransport {
           resolve();
         };
 
-        this.ws.onmessage = (event) => {
+        socket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
             console.log('WebSocket message received:', data.type, data);
@@ -109,7 +110,7 @@ export class BaseWebSocketTransport {
           }
         };
 
-        this.ws.onerror = (error) => {
+        socket.onerror = (error) => {
           console.error('WebSocket error:', error);
           if (!settled) {
             this.connectPromise = null;
@@ -118,7 +119,10 @@ export class BaseWebSocketTransport {
           }
         };
 
-        this.ws.onclose = () => {
+        socket.onclose = () => {
+          if (this.ws !== socket) {
+            return;
+          }
           console.log('WebSocket disconnected');
           this.ws = null;
           this.connectPromise = null;
@@ -157,8 +161,11 @@ export class BaseWebSocketTransport {
       this.reconnectTimer = null;
     }
     if (this.ws) {
-      this.ws.close();
+      const socket = this.ws;
       this.ws = null;
+      socket.close();
+      this.connectPromise = null;
+      this.notifyListeners('disconnected', {});
     }
   }
 

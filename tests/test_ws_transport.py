@@ -55,6 +55,13 @@ async def test_send_json_returns_false_for_closed_connection():
 
 
 @pytest.mark.asyncio
+async def test_send_json_returns_none_for_non_disconnect_errors():
+    ws = FakeWebSocket(fail_with=ValueError("boom"))
+    ok = await send_json(ws, {"x": 1}, converter=lambda data: data)
+    assert ok is None
+
+
+@pytest.mark.asyncio
 async def test_broadcast_json_returns_disconnected_clients():
     alive = FakeWebSocket()
     dead = FakeWebSocket(fail_with=FakeClosedError())
@@ -64,4 +71,17 @@ async def test_broadcast_json_returns_disconnected_clients():
 
     disconnected = await broadcast_json([alive, dead], {"type": "ping"}, sender=sender)
     assert dead in disconnected
+    assert alive.sent == ['{"type": "ping"}']
+
+
+@pytest.mark.asyncio
+async def test_broadcast_json_keeps_clients_on_non_disconnect_errors():
+    alive = FakeWebSocket()
+    flaky = FakeWebSocket(fail_with=ValueError("boom"))
+
+    async def sender(client, message):
+        return await send_json(client, message, converter=lambda data: data)
+
+    disconnected = await broadcast_json([alive, flaky], {"type": "ping"}, sender=sender)
+    assert disconnected == []
     assert alive.sent == ['{"type": "ping"}']

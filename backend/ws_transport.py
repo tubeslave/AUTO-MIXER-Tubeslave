@@ -39,7 +39,7 @@ async def send_json(
     *,
     converter: Callable[[Any], Any],
     logger_: logging.Logger | None = None,
-) -> bool:
+) -> bool | None:
     """Serialize and send one JSON message, returning success/failure."""
     active_logger = logger_ or logger
     try:
@@ -48,9 +48,10 @@ async def send_json(
     except Exception as exc:
         if is_connection_closed_error(exc):
             active_logger.debug("Send failed (client closed): %s", exc)
+            return False
         else:
             active_logger.error("Error sending to client: %s", exc)
-        return False
+            return None
 
 
 async def broadcast_json(
