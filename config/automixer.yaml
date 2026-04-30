@@ -15,21 +15,9 @@ mixer:
 audio:
   sample_rate: 48000
   block_size: 1024
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-  channels: 64
-  source: "soundgrid"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
-  device_name: ""
-=======
   channels: 48
   source: "soundgrid"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
   device_name: "soundgrid"  # pattern to match (e.g. "Waves SoundGrid", "soundgrid")
->>>>>>> Incoming (Background Agent changes)
-=======
-  channels: 48
-  source: "soundgrid"  # soundgrid, dante, sounddevice, test_sine, test_pink_noise, silence
-  device_name: "soundgrid"  # pattern to match (e.g. "Waves SoundGrid", "soundgrid")
->>>>>>> Incoming (Background Agent changes)
   buffer_seconds: 5.0
 
 websocket:
@@ -79,3 +67,45 @@ soundcheck:
   analysis_seconds: 3.0
   analysis_timeout_seconds: 30.0
   gain_correction_max_db: 12.0
+
+autoeq:
+  enabled: false
+  mode: "offline"
+  safety_profile: "conservative"
+  apply_static_eq: true
+  apply_dynamic_eq: true
+  apply_group_eq: true
+  apply_master_eq: false
+  report_only: false
+  osc_dry_run: true
+  osc_apply: false
+  live_limits:
+    max_static_gain_db: 1.5
+    max_dynamic_cut_db: 3.0
+    max_dynamic_boost_db: 1.0
+    max_master_eq_db: 0.75
+    max_filters_per_channel: 3
+    max_dynamic_filters_per_channel: 2
+    min_confidence_to_apply: 0.6
+    half_strength_confidence_until: 0.8
+    smoothing_ms: 1000
+    hold_time_ms: 2000
+  offline_limits:
+    max_static_gain_db: 3.0
+    max_dynamic_cut_db: 5.0
+    max_dynamic_boost_db: 1.5
+    max_master_eq_db: 1.5
+    max_filters_per_channel: 5
+    max_dynamic_filters_per_channel: 3
+    min_confidence_to_apply: 0.55
+  priorities:
+    lead_vocal: 100
+    kick: 90
+    snare: 85
+    bass: 85
+    back_vocal: 65
+    guitar: 55
+    accordion: 55
+    playback: 50
+    overheads: 45
+    cymbals: 40

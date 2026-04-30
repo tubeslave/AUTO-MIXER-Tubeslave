@@ -107,6 +107,22 @@ Use wider Q (0.5-1.5) for boosts. Keep boosts under 4 dB whenever possible.
 - **Attack**: 5-15 ms (preserve initial crack)
 - **Release**: 80-120 ms
 - **Gain Reduction**: 3-6 dB
+- **Ayaic preset balance**: identify top and bottom as separate layer mics,
+  then validate the summed snare stem. Snare T / Top targets `-26 LUFS`;
+  Snare B / Bottom targets `-35 LUFS`; the summed `Snare T + Snare B`
+  stem targets `-25 LUFS`. If the isolated mic targets and summed stem target
+  disagree, the summed `Snare = -25 LUFS` target wins.
+
+### Ayaic Stereo L/R Preset Rule
+- For any Ayaic preset named `X L` / `X R` or `X Left` / `X Right`, each
+  isolated side target is `3 LUFS` below the matching summed preset `X`.
+- Formula: if `X = N LUFS`, then `X L = N - 3 LUFS` and
+  `X R = N - 3 LUFS`.
+- Examples: `Guitar = -25 LUFS` means `Guitar L = -28 LUFS` and
+  `Guitar R = -28 LUFS`; `Playback = -25 LUFS` means
+  `Playback L = -28 LUFS` and `Playback R = -28 LUFS`.
+- If an isolated-channel fallback conflicts with this rule, the stereo-pair
+  rule and summed-stem validation `X L + X R -> X` win.
 
 ### Bass Guitar
 - **Threshold**: -18 to -14 dBFS
@@ -171,12 +187,19 @@ The standard vocal processing chain order for live sound:
 2. EQ: HPF 60-80 Hz, boost fundamental (100-200 Hz, +2 dB), cut mud (400 Hz, -3 dB), boost attack (3-5 kHz, +2 dB)
 3. Compressor: 3:1, 15 ms attack, 80 ms release
 4. Pan: Rack toms left-center, floor tom right-center (audience perspective)
+5. Ayaic preset balance: `Tom` targets `-25 LUFS`; `F Tom` / `Floor Tom`
+   targets `-25 LUFS`. Do not use the previous logged `-22 LUFS` target for
+   these Ayaic presets; `-25 LUFS` wins over generic tom fallback targets.
 
 ### Overheads
 1. No gate (ambient mics)
 2. EQ: HPF 150 Hz (remove low bleed), gentle cut 400 Hz (-2 dB), boost 10 kHz (+2 dB)
 3. Light compression: 2:1, 20 ms attack, 150 ms release
 4. Pan: Hard left and right (L=-0.8, R=+0.8) or spaced
+5. Ayaic preset balance: `Overhead L` / `OH L` targets `-38 LUFS`;
+   `Overhead R` / `OH R` targets `-38 LUFS`; the summed `Overheads` stem
+   targets `-35 LUFS`. If isolated overhead targets and summed stem target
+   disagree, the summed `Overheads = -35 LUFS` target wins.
 
 ## Bass Guitar Techniques
 
