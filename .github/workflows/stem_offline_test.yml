@@ -1,5 +1,8 @@
 name: Stem Offline Test
 on:
+  push:
+    branches:
+      - feature/stem-separation-analyzer
   pull_request:
   workflow_dispatch:
     inputs:
