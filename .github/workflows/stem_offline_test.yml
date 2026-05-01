@@ -2,29 +2,59 @@ name: Stem Offline Test
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      run_real_model:
+        description: 'Reserved for future real Demucs/ONNX integration'
+        required: false
+        default: 'false'
+
 jobs:
   test:
     runs-on: ubuntu-latest
     env:
       STEM_SEPARATION_TEST_MODE: mock
+      STEM_SEPARATION_ENABLE_REAL_MODEL: false
       OSC_DISABLED: true
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install -r backend/requirements.txt
-      - run: pytest -q || true
-      - name: generate mock audio
+
+      - name: Install lightweight audio/test deps
         run: |
-          python - <<EOF
-import numpy as np, soundfile as sf
-sr=44100
-t=np.linspace(0,5,sr*5)
-audio=np.sin(2*np.pi*440*t)*0.2
-sf.write('stem_mock.wav',audio,sr)
+          python -m pip install --upgrade pip
+          pip install numpy soundfile pytest
+
+      - name: Run stem training loop tests
+        run: pytest -q tests/test_stem_training_loop.py
+
+      - name: Run offline stem training loop
+        run: |
+          python -m mix_agent.stem_training_loop \
+            --generate-fixture \
+            --splitter mock \
+            --out artifacts/stem_training_loop
+
+      - name: Verify OSC was disabled in report
+        run: |
+          python - <<'EOF'
+import json
+from pathlib import Path
+report = json.loads(Path('artifacts/stem_training_loop/stem_training_report.json').read_text())
+assert report['osc_disabled'] is True
+assert report['splitter_mode'] == 'mock'
+print('score_before=', report['score_before'])
+print('score_after=', report['score_after'])
+print('actions=', report['actions'])
 EOF
+
       - uses: actions/upload-artifact@v4
         with:
-          name: stem-audio
-          path: stem_mock.wav
+          name: stem-training-loop-result
+          path: |
+            artifacts/stem_training_loop/stem_training_fixture.wav
+            artifacts/stem_training_loop/stem_training_fixed_mix.wav
+            artifacts/stem_training_loop/stem_training_report.json
