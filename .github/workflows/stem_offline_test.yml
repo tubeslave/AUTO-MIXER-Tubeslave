@@ -41,7 +41,7 @@ jobs:
             --splitter mock \
             --out artifacts/stem_training_loop
 
-      - name: Verify OSC was disabled in report
+      - name: Verify OSC disabled in report
         run: |
           python - <<'EOF'
 import json
