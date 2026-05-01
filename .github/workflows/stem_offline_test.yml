@@ -1,0 +1,30 @@
+name: Stem Offline Test
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      STEM_SEPARATION_TEST_MODE: mock
+      OSC_DISABLED: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r backend/requirements.txt
+      - run: pytest -q || true
+      - name: generate mock audio
+        run: |
+          python - <<EOF
+import numpy as np, soundfile as sf
+sr=44100
+t=np.linspace(0,5,sr*5)
+audio=np.sin(2*np.pi*440*t)*0.2
+sf.write('stem_mock.wav',audio,sr)
+EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stem-audio
+          path: stem_mock.wav
