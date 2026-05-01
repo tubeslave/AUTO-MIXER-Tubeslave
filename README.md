@@ -13,6 +13,24 @@ python -m mix_agent suggest --stems ./stems --genre rock --out ./suggestions.jso
 python -m mix_agent apply --stems ./stems --suggestions ./suggestions.json --out ./renders/conservative_mix.wav
 ```
 
+### Offline stem-aware training loop
+
+Экспериментальный offline-only цикл для проверки идеи `mix -> split -> analyze -> fix -> compare`:
+
+```bash
+OSC_DISABLED=true PYTHONPATH=. python -m mix_agent.stem_training_loop \
+  --generate-fixture \
+  --splitter mock \
+  --out artifacts/stem_training_loop
+```
+
+Артефакты:
+- `stem_training_fixture.wav` — синтетический тестовый микс.
+- `stem_training_fixed_mix.wav` — результат после безопасных stem-aware gain правок.
+- `stem_training_report.json` — метрики stems, индексы masking/low-end conflict, действия и score before/after.
+
+Важно: по умолчанию используется deterministic mock splitter, а не Demucs/ONNX. Это сделано специально, чтобы CI не скачивал тяжёлые модели и не ломал live pipeline. Модуль жёстко требует `OSC_DISABLED=true` и не создаёт OSC-клиент.
+
 Фасад не заменяет микс-инженера и не считает одну метрику признаком качества.
 Он строит dashboard из независимых оценок, объясняет каждую рекомендацию,
 пишет Markdown/JSON отчёты и применяет offline только малые обратимые операции.
@@ -35,7 +53,8 @@ AUTO MIXER Tubeslave/
 │   │   ├── components/   # Компоненты GUI
 │   │   ├── services/     # WebSocket-сервис
 │   │   └── App.js
-│   └── package.json
+├── mix_agent/            # Offline analysis/apply/research facade
+├── tests/                # Automated tests
 ├── config/               # Конфигурационные файлы
 │   └── default_config.json
 ├── presets/              # Сохраненные пресеты микса
