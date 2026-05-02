@@ -35,6 +35,7 @@ from channel_recognizer import scan_and_recognize, recognize_instrument_spectral
 from auto_eq import AutoEQController, InstrumentProfiles, MultiChannelAutoEQController
 from phase_alignment import PhaseAlignmentController
 from auto_fader import AutoFaderController
+from arrangement_automation import ArrangementAutomationController
 from auto_compressor import AutoCompressorController
 from backup_channels import backup_channel
 from restore_channels import restore_from_backup_using_client
@@ -125,6 +126,9 @@ class AutoMixerServer:
         
         # Auto Fader controller
         self.auto_fader_controller: Optional[AutoFaderController] = None
+
+        # Arrangement-aware level automation controller
+        self.arrangement_automation_controller: Optional[ArrangementAutomationController] = None
         
         # Track last known fader values for relative changes
         self.last_fader_values: dict[int, float] = {}
@@ -221,6 +225,15 @@ class AutoMixerServer:
             except Exception as e:
                 logger.error(f"Error stopping Auto Fader: {e}")
             self.auto_fader_controller = None
+
+        # Stop Arrangement Automation
+        if self.arrangement_automation_controller:
+            try:
+                self.arrangement_automation_controller.stop()
+                logger.info("Arrangement automation stopped")
+            except Exception as e:
+                logger.error(f"Error stopping arrangement automation: {e}")
+            self.arrangement_automation_controller = None
         
         # Stop Auto Soundcheck
         if self.auto_soundcheck_running:
@@ -2734,6 +2747,156 @@ class AutoMixerServer:
         st["live_mode"] = self.live_mode
         st["freeze"] = self.auto_fader_controller.get_freeze_status()
         return st
+
+    def get_arrangement_automation_status(self) -> dict:
+        """Get current Arrangement-Aware Level Automation status."""
+        if not self.arrangement_automation_controller:
+            return {
+                "active": False,
+                "enabled": False,
+                "live_apply_enabled": False,
+                "analysis_only_mode": True,
+                "current_section": "unknown",
+                "arrangement_density_index": 0.0,
+                "density_label": "sparse",
+            }
+        status = self.arrangement_automation_controller.get_status()
+        status["active"] = bool(self.arrangement_automation_controller.channels)
+        return status
+
+    async def start_arrangement_automation(
+        self,
+        websocket,
+        channels: List[int] = None,
+        channel_mapping: Dict = None,
+        channel_names: Dict = None,
+        settings: Dict = None,
+    ):
+        """Start arrangement-aware analysis. Live OSC apply stays opt-in."""
+        if not channels:
+            await self.send_to_client(websocket, {
+                "type": "arrangement_automation_status",
+                "status_type": "error",
+                "active": False,
+                "error": "Missing channels",
+            })
+            return
+
+        try:
+            loop = asyncio.get_running_loop()
+
+            def on_status_update(state):
+                try:
+                    loop.call_soon_threadsafe(
+                        lambda: asyncio.create_task(self.broadcast({
+                            "type": "arrangement_automation_status",
+                            "status_type": "state_update",
+                            "arrangement_automation_state": state,
+                        }))
+                    )
+                except Exception as e:
+                    logger.error(f"Error broadcasting arrangement automation state: {e}")
+
+            self.arrangement_automation_controller = ArrangementAutomationController(
+                mixer_client=self.mixer_client,
+                config=self.config,
+                audio_capture=self.audio_capture,
+                status_callback=on_status_update,
+            )
+            state = self.arrangement_automation_controller.start(
+                channels=[int(ch) for ch in channels],
+                channel_mapping=channel_mapping or {},
+                channel_names={int(k): v for k, v in (channel_names or {}).items()},
+                settings=settings or {},
+            )
+            await self.send_to_client(websocket, {
+                "type": "arrangement_automation_status",
+                "status_type": "started",
+                "active": True,
+                "arrangement_automation_state": state,
+            })
+        except Exception as e:
+            logger.error(f"Error starting arrangement automation: {e}", exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "arrangement_automation_status",
+                "status_type": "error",
+                "active": False,
+                "error": str(e),
+            })
+
+    async def stop_arrangement_automation(self, websocket):
+        """Stop arrangement-aware level automation."""
+        try:
+            if self.arrangement_automation_controller:
+                self.arrangement_automation_controller.stop()
+            await self.send_to_client(websocket, {
+                "type": "arrangement_automation_status",
+                "status_type": "stopped",
+                "active": False,
+            })
+        except Exception as e:
+            logger.error(f"Error stopping arrangement automation: {e}", exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "arrangement_automation_status",
+                "status_type": "error",
+                "error": str(e),
+            })
+
+    async def run_arrangement_automation_tick(self, websocket, data: Dict = None):
+        """Run a single arrangement automation cycle for analysis/testing."""
+        if not self.arrangement_automation_controller:
+            await self.send_to_client(websocket, {
+                "type": "arrangement_automation_status",
+                "status_type": "error",
+                "active": False,
+                "error": "Arrangement automation not initialized",
+            })
+            return
+        try:
+            data = data or {}
+            state = self.arrangement_automation_controller.process_once(
+                metrics_by_channel=data.get("metrics_by_channel"),
+                band_energy_by_channel=data.get("band_energy_by_channel"),
+            )
+            await self.send_to_client(websocket, {
+                "type": "arrangement_automation_status",
+                "status_type": "state_update",
+                "active": True,
+                "arrangement_automation_state": state,
+            })
+        except Exception as e:
+            logger.error(f"Error running arrangement automation tick: {e}", exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "arrangement_automation_status",
+                "status_type": "error",
+                "error": str(e),
+            })
+
+    async def set_arrangement_automation_live_apply(
+        self,
+        websocket,
+        enabled: bool,
+        analysis_only_mode: Optional[bool] = None,
+    ):
+        """Enable/disable live apply. This never bypasses the safety limiter."""
+        if not self.arrangement_automation_controller:
+            await self.send_to_client(websocket, {
+                "type": "arrangement_automation_status",
+                "status_type": "error",
+                "active": False,
+                "error": "Arrangement automation not initialized",
+            })
+            return
+        state = self.arrangement_automation_controller.set_live_apply(
+            enabled=enabled,
+            analysis_only_mode=analysis_only_mode,
+        )
+        await self.send_to_client(websocket, {
+            "type": "arrangement_automation_status",
+            "status_type": "live_apply_changed",
+            "active": True,
+            "arrangement_automation_state": state,
+        })
     
     def get_ready_for_live_status(self) -> dict:
         """Checklist: ready for live (all systems calibrated, no clipping)."""

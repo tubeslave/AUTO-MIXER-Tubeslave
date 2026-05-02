@@ -9,6 +9,8 @@ from automixer.production_mix_v1.ayaic_offline_pipeline import (
     CORRECTIVE_EQ_METHODS,
     DEFAULT_CORRECTIVE_EQ_METHOD,
     _analyze_bleed_activity,
+    _autoeq_instrument,
+    _bleed_analysis_instrument,
     _apply_corrective_eq,
     _apply_hpf_lpf_correction,
     _apply_phase_delay_from_overheads,
@@ -16,10 +18,13 @@ from automixer.production_mix_v1.ayaic_offline_pipeline import (
     _apply_pair_levels,
     _apply_track_levels,
     _ayaic_bus_target_lufs,
+    _corrective_eq_instrument,
+    _drum_instrument,
     _instrument_group,
     _lufs,
     _lufs_method,
     _offline_hpf_lpf_plan,
+    _project_channel_role,
     _normalize_corrective_eq_method,
     _sum_audio,
     _track_target_lufs,
@@ -33,6 +38,9 @@ def test_track_targets_include_ayaic_summed_stem_rules():
     assert _track_target_lufs("OH L.wav") == -38.0
     assert _track_target_lufs("Guitar L.wav") == -28.0
     assert _track_target_lufs("Playback R.wav") == -28.0
+    assert _track_target_lufs("Accordion.wav") == -28.0
+    assert _track_target_lufs("BACKS L.wav") == -28.0
+    assert _track_target_lufs("ROOM DR L.wav") == -45.0
 
 
 def test_master_target_and_loudness_method_are_integrated_lufs():
@@ -59,6 +67,29 @@ def test_instrument_group_uses_user_defined_bus_layout():
     assert _instrument_group("Guitar L.wav") == "guitars"
     assert _instrument_group("Vocal.wav") == "vocals"
     assert _instrument_group("Back Vox L.wav") == "back_vocals"
+    assert _instrument_group("BACKS L.wav") == "back_vocals"
+    assert _instrument_group("ROOM DR L.wav") == "drums"
+
+
+def test_mix_folder_names_map_to_expected_ayaic_profiles():
+    backs_plan = _offline_hpf_lpf_plan("BACKS L.wav")
+    room_plan = _offline_hpf_lpf_plan("ROOM DR L.wav")
+
+    assert backs_plan["instrument"] == "backing_vocal"
+    assert backs_plan["hpf_hz"] == 110.0
+    assert backs_plan["lpf_hz"] == 9500.0
+    assert _corrective_eq_instrument("BACKS L.wav") == "backing_vocal"
+    assert _autoeq_instrument("BACKS L.wav") == "back_vocal"
+    assert _project_channel_role("BACKS L.wav") == "back_vocal"
+    assert _bleed_analysis_instrument("BACKS L.wav") == "backing_vocal"
+
+    assert _drum_instrument("ROOM DR L.wav") == "room"
+    assert room_plan["instrument"] == "room"
+    assert room_plan["hpf_hz"] == 80.0
+    assert room_plan["lpf_hz"] == 6500.0
+    assert _corrective_eq_instrument("ROOM DR L.wav") == "room"
+    assert _autoeq_instrument("ROOM DR L.wav") == "room"
+    assert _project_channel_role("ROOM DR L.wav") == "room"
 
 
 def test_group_level_correction_reaches_target_without_gain_clip():
@@ -126,6 +157,51 @@ def test_pair_levels_are_separate_from_channel_levels():
     assert pair_report[0]["post_sum_lufs"] == pytest.approx(-25.0, abs=0.02)
 
 
+def test_pair_lufs_uses_drums_lead_vocal_and_backs_buses():
+    sample_rate = 48_000
+    time = np.arange(sample_rate, dtype=np.float32) / sample_rate
+    sine = np.sin(2.0 * np.pi * 440.0 * time).astype(np.float32) * 0.04
+    stems = [
+        _stem("KICK", sine, sample_rate, 1),
+        _stem("SNARE", sine * 0.9, sample_rate, 2),
+        _stem("OH L", sine * 0.6, sample_rate, 3),
+        _stem("OH R", sine * 0.6, sample_rate, 4),
+        _stem("Hi-Hat", sine * 0.3, sample_rate, 5),
+        _stem("Ride", sine * 0.25, sample_rate, 6),
+        _stem("ROOM DR L", sine * 0.1, sample_rate, 7),
+        _stem("ROOM DR R", sine * 0.1, sample_rate, 8),
+        _stem("Katya VOX", sine * 0.5, sample_rate, 9),
+        _stem("Sergey Vox", sine * 0.4, sample_rate, 10),
+        _stem("Slava Vox", sine * 0.35, sample_rate, 11),
+        _stem("BACKS L", sine * 0.25, sample_rate, 12),
+        _stem("BACKS R", sine * 0.25, sample_rate, 13),
+    ]
+
+    report = _apply_pair_levels(stems)
+    by_stem = {item["stem"]: item for item in report}
+
+    assert "Overheads" not in by_stem
+    assert "Snare" not in by_stem
+    assert by_stem["Drums Bus"]["target_lufs"] == -25.0
+    assert set(by_stem["Drums Bus"]["members"]) == {
+        "KICK.wav",
+        "SNARE.wav",
+        "OH L.wav",
+        "OH R.wav",
+        "Hi-Hat.wav",
+        "Ride.wav",
+        "ROOM DR L.wav",
+        "ROOM DR R.wav",
+    }
+    assert by_stem["Drums Bus"]["post_sum_lufs"] == pytest.approx(-25.0, abs=0.02)
+    assert by_stem["Lead Vocal Bus"]["target_lufs"] == -22.0
+    assert set(by_stem["Lead Vocal Bus"]["members"]) == {"Katya VOX.wav", "Sergey Vox.wav", "Slava Vox.wav"}
+    assert by_stem["Lead Vocal Bus"]["post_sum_lufs"] == pytest.approx(-22.0, abs=0.02)
+    assert by_stem["Backs Bus"]["target_lufs"] == -28.0
+    assert set(by_stem["Backs Bus"]["members"]) == {"BACKS L.wav", "BACKS R.wav"}
+    assert by_stem["Backs Bus"]["post_sum_lufs"] == pytest.approx(-28.0, abs=0.02)
+
+
 def test_hpf_lpf_correction_uses_offline_filter_targets():
     sample_rate = 48_000
     time = np.arange(sample_rate, dtype=np.float32) / sample_rate
@@ -163,18 +239,56 @@ def test_corrective_eq_methods_are_ported_from_offline_pipeline():
         "frequency_cross_profile",
         "project_corrective",
         "project_corrective_hybrid",
+        "contextual_deep_eq",
     )
     assert _normalize_corrective_eq_method("classify-track") == "profile"
     assert _normalize_corrective_eq_method("4-3-1") == "frequency_cross_profile"
     assert _normalize_corrective_eq_method("project-corrective-eq") == "project_corrective"
     assert _normalize_corrective_eq_method("project-hybrid") == "project_corrective_hybrid"
-    assert DEFAULT_CORRECTIVE_EQ_METHOD == "project_corrective_hybrid"
+    assert _normalize_corrective_eq_method("deep-eq") == "contextual_deep_eq"
+    assert DEFAULT_CORRECTIVE_EQ_METHOD == "contextual_deep_eq"
     profile = _apply_corrective_eq([stem], method="profile")
 
     assert profile["method"] == "profile"
     assert profile["source"]["source_function"] == "classify_track"
     assert profile["applied_band_count"] == 3
     assert stem.corrective_eq_notes[0]["bands"][0]["frequency_hz"] == 200.0
+
+
+def test_contextual_deep_eq_allows_large_moves_with_critic_notes():
+    sample_rate = 48_000
+    time = np.arange(sample_rate * 2, dtype=np.float32) / sample_rate
+    vocal = (
+        0.12 * np.sin(2.0 * np.pi * 260.0 * time)
+        + 0.01 * np.sin(2.0 * np.pi * 3000.0 * time)
+    ).astype(np.float32)
+    guitar = (
+        0.12 * np.sin(2.0 * np.pi * 320.0 * time)
+        + 0.10 * np.sin(2.0 * np.pi * 3100.0 * time)
+    ).astype(np.float32)
+    stems = [
+        _stem("Vocal", vocal, sample_rate, 1),
+        _stem("Guitar L", guitar, sample_rate, 2),
+    ]
+    stems[0].group = "vocals"
+    stems[1].group = "guitars"
+
+    report = _apply_corrective_eq(stems, method="contextual_deep_eq")
+
+    assert report["method"] == "contextual_deep_eq"
+    assert report["source"]["name"] == "Contextual Deep EQ"
+    assert report["analysis"]["critic_notes"]
+    assert any(
+        abs(band["gain_db"]) > 2.2
+        for action in report["actions"]
+        for band in action["bands"]
+    )
+    assert any(
+        "regret_score" in band
+        for action in report["actions"]
+        for band in action["bands"]
+    )
+    assert report["analysis"]["after"]["channel_diagnostics"]
 
 
 def test_project_corrective_eq_uses_primary_role_and_group_diagnostics():
@@ -271,16 +385,20 @@ def test_pipeline_skips_group_levels_by_default(tmp_path):
 
     assert result.summary["pipeline_stages"] == [
         "bleed_primary_signal_detection",
-        "ayaic_channel_levels_pre_phase",
+        "arrangement_input_levels_pre_phase",
         "phase_delay_from_overhead_pair",
         "offline_hpf_lpf_correction",
-        "corrective_eq_project_corrective_hybrid",
+        "corrective_eq_contextual_deep_eq",
         "ayaic_channel_pair_levels_post_corrective_eq",
         "ayaic_master_level",
     ]
     assert result.summary["settings"]["corrective_eq_method"] == DEFAULT_CORRECTIVE_EQ_METHOD
+    assert result.summary["settings"]["input_leveling_method"] == "arrangement_aware"
     assert result.summary["settings"]["skip_group_levels"] is True
     assert result.summary["pre_phase_channel_levels"]
+    assert result.summary["pre_phase_channel_levels"][0]["type"] == "arrangement_aware_input_level"
+    assert result.summary["pre_phase_channel_levels"][0]["replacement_for"] == "ayaic_channel_levels_pre_phase"
+    assert "arrangement_density_index" in result.summary["pre_phase_channel_levels"][0]
     assert result.summary["hpf_lpf_correction"]
     assert result.summary["settings"]["autoeq_enabled"] is False
     assert result.summary["autoeq_settings"]["enabled"] is False
@@ -370,7 +488,7 @@ def test_pipeline_can_apply_431_corrective_eq_chain_before_final_levels(tmp_path
 
     assert result.summary["pipeline_stages"] == [
         "bleed_primary_signal_detection",
-        "ayaic_channel_levels_pre_phase",
+        "arrangement_input_levels_pre_phase",
         "phase_delay_from_overhead_pair",
         "offline_hpf_lpf_correction",
         "corrective_eq_frequency_cross_profile",
@@ -405,7 +523,7 @@ def test_pipeline_can_apply_project_corrective_eq_before_final_levels(tmp_path):
 
     assert result.summary["pipeline_stages"] == [
         "bleed_primary_signal_detection",
-        "ayaic_channel_levels_pre_phase",
+        "arrangement_input_levels_pre_phase",
         "phase_delay_from_overhead_pair",
         "offline_hpf_lpf_correction",
         "corrective_eq_project_corrective",
@@ -441,7 +559,7 @@ def test_pipeline_can_apply_project_corrective_hybrid_eq_before_final_levels(tmp
 
     assert result.summary["pipeline_stages"] == [
         "bleed_primary_signal_detection",
-        "ayaic_channel_levels_pre_phase",
+        "arrangement_input_levels_pre_phase",
         "phase_delay_from_overhead_pair",
         "offline_hpf_lpf_correction",
         "corrective_eq_project_corrective_hybrid",

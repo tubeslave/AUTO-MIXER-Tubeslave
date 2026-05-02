@@ -126,6 +126,94 @@
       "auto_panner_enabled": false,
       "auto_reverb_enabled": false
     },
+    "arrangement_automation": {
+      "enabled": true,
+      "live_apply_enabled": false,
+      "analysis_only_mode": true,
+      "min_confidence_for_live_apply": 0.65,
+      "very_low_confidence": 0.3,
+      "max_step_db_per_tick": 0.25,
+      "deadband_db": 0.1,
+      "section_hold_time_sec": 3.0,
+      "density_smoothing_sec": 2.0,
+      "activity_threshold_db": -50.0,
+      "activity_attack_hold_sec": 0.3,
+      "activity_release_hold_sec": 1.0,
+      "noise_margin_db": 10.0,
+      "update_interval_ms": 250,
+      "run_background_loop": true,
+      "fader_ceiling_db": 0.0,
+      "log_decisions": true,
+      "max_channels": 40,
+      "role_limits": {
+        "lead_vocal": {
+          "min_db": -4,
+          "max_db": 4,
+          "attack_sec": 1.0,
+          "release_sec": 3.0
+        },
+        "backing_vocal": {
+          "min_db": -5,
+          "max_db": 5,
+          "attack_sec": 1.5,
+          "release_sec": 4.0
+        },
+        "rhythm_guitar": {
+          "min_db": -6,
+          "max_db": 3,
+          "attack_sec": 2.0,
+          "release_sec": 5.0
+        },
+        "lead_guitar": {
+          "min_db": -6,
+          "max_db": 5,
+          "attack_sec": 1.5,
+          "release_sec": 4.0
+        },
+        "bass": {
+          "min_db": -3,
+          "max_db": 3,
+          "attack_sec": 2.0,
+          "release_sec": 6.0
+        },
+        "kick": {
+          "min_db": -3,
+          "max_db": 3,
+          "attack_sec": 2.0,
+          "release_sec": 6.0
+        },
+        "snare": {
+          "min_db": -3,
+          "max_db": 3,
+          "attack_sec": 2.0,
+          "release_sec": 6.0
+        },
+        "overhead": {
+          "min_db": -4,
+          "max_db": 4,
+          "attack_sec": 2.5,
+          "release_sec": 6.0
+        },
+        "keys": {
+          "min_db": -5,
+          "max_db": 3,
+          "attack_sec": 2.0,
+          "release_sec": 5.0
+        },
+        "pad": {
+          "min_db": -5,
+          "max_db": 3,
+          "attack_sec": 3.0,
+          "release_sec": 6.0
+        },
+        "unknown": {
+          "min_db": -2,
+          "max_db": 2,
+          "attack_sec": 3.0,
+          "release_sec": 6.0
+        }
+      }
+    },
     "bleed_protection": {
       "enabled": true,
       "update_interval_ms": 200,

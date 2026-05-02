@@ -2,7 +2,7 @@
 
 Pipeline order:
 1. Bleed-aware primary signal detection.
-2. Ayaic channel levels measured on primary signal windows.
+2. Arrangement-aware input levels measured on primary signal windows.
 3. Overhead-pair delay/phase, then close drum mic delay/phase from the aligned overhead group.
 4. Offline HPF/LPF correction.
 5. Optional offline Corrective EQ.
@@ -26,6 +26,7 @@ from typing import Any
 
 import numpy as np
 
+from .arrangement_input_levels import ARRANGEMENT_INPUT_LEVEL_STAGE, apply_arrangement_input_levels
 from .autoeq import AutoEQEngine, AutoEQSettings, AutoEQTrack
 from .models import amp_to_db, db_to_amp, ensure_stereo, jsonable
 
@@ -34,7 +35,7 @@ AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff", ".flac"}
 DEFAULT_MASTER_TARGET_LUFS = -20.0
 DEFAULT_MASTER_CEILING_DBFS = None
 DEFAULT_MAX_PHASE_DELAY_MS = 10.0
-DEFAULT_CORRECTIVE_EQ_METHOD = "project_corrective_hybrid"
+DEFAULT_CORRECTIVE_EQ_METHOD = "contextual_deep_eq"
 CORRECTIVE_EQ_METHODS = (
     "none",
     "profile",
@@ -44,6 +45,7 @@ CORRECTIVE_EQ_METHODS = (
     "frequency_cross_profile",
     "project_corrective",
     "project_corrective_hybrid",
+    "contextual_deep_eq",
 )
 AYAIC_BUS_GROUP_TARGETS = {
     "drums": -25.0,
@@ -171,6 +173,32 @@ PROJECT_CORRECTIVE_HYBRID_EQ_TARGET_SOURCE = {
         "Adds selective drum bleed-control cuts only on close drum microphones.",
         "Applies one shared safety/dedup limiter; boosts are not applied.",
         "Dynamic EQ candidates are reported only; this offline render applies static EQ bands.",
+    ],
+}
+CONTEXTUAL_DEEP_EQ_TARGET_SOURCE = {
+    "name": "Contextual Deep EQ",
+    "source": "local role-aware, masking-aware deep EQ optimizer",
+    "references": [
+        {
+            "name": "W3C Audio EQ Cookbook",
+            "url": "https://www.w3.org/TR/audio-eq-cookbook/",
+            "use": "stable peaking biquad coefficient model",
+        },
+        {
+            "name": "Autonomous multitrack equalization based on masking reduction",
+            "url": "https://www.researchgate.net/publication/277935370_Autonomous_Multitrack_Equalization_Based_on_Masking_Reduction",
+            "use": "cross-channel masking reduction as an automatic mixing strategy",
+        },
+        {
+            "name": "Cross-adaptive processing as musical intervention",
+            "url": "https://www.frontiersin.org/journals/digital-humanities/articles/10.3389/fdigh.2018.00017/full",
+            "use": "cross-adaptive listening between channels",
+        },
+    ],
+    "notes": [
+        "Allows larger corrective moves than project_corrective_hybrid.",
+        "Hard limits only reject invalid/unstable filter geometry.",
+        "Large or risky EQ moves are applied with critic notes and regret_score instead of being silently blocked.",
     ],
 }
 OFFLINE_PROFILE_CORRECTIVE_EQ_BANDS = {
@@ -327,7 +355,15 @@ def run_ayaic_offline_pipeline(
     sample_rate = stems[0].sample_rate
     _align_stems(stems)
     bleed_report = _analyze_bleed_activity(stems)
-    pre_phase_channel_report = _apply_track_levels(stems, stage="pre_phase_channel_ayaic")
+    pre_phase_channel_report = apply_arrangement_input_levels(
+        stems,
+        stage=ARRANGEMENT_INPUT_LEVEL_STAGE,
+        lufs_fn=_lufs,
+        peak_fn=_peak_dbfs,
+        primary_audio_fn=_stem_primary_loudness_audio,
+        band_energy_fn=_band_energy_for_rendered,
+        db_to_amp_fn=db_to_amp,
+    )
     phase_stage_report = _apply_phase_delay_from_overheads(stems, max_delay_ms=max_phase_delay_ms)
     primary_shift_report = _shift_primary_loudness_ranges_for_applied_delays(stems)
     hpf_lpf_report = _apply_hpf_lpf_correction(stems)
@@ -392,7 +428,7 @@ def run_ayaic_offline_pipeline(
         "source_dir": str(Path(input_dir).expanduser()),
         "pipeline_stages": [
             "bleed_primary_signal_detection",
-            "ayaic_channel_levels_pre_phase",
+            ARRANGEMENT_INPUT_LEVEL_STAGE,
             "phase_delay_from_overhead_pair",
             "offline_hpf_lpf_correction",
             *(["autoeq_engine"] if autoeq_enabled else []),
@@ -425,6 +461,7 @@ def run_ayaic_offline_pipeline(
             "autoeq_mode": autoeq_mode,
             "autoeq_report_only": bool(autoeq_report_only),
             "loudness_method": _lufs_method(),
+            "input_leveling_method": "arrangement_aware",
             "track_loudness_scope": "primary signal windows when bleed detector is available",
         },
         "bleed_detection": bleed_report,
@@ -770,7 +807,7 @@ def _apply_corrective_eq(stems: list[AyaicStem], *, method: str) -> dict[str, An
 
     if method == "frequency_window":
         analysis["after"] = _frequency_window_snapshot(stems)["windows"]
-    if method in {"project_corrective", "project_corrective_hybrid"}:
+    if method in {"project_corrective", "project_corrective_hybrid", "contextual_deep_eq"}:
         analysis["after"] = _project_corrective_snapshot(stems)
 
     return {
@@ -815,6 +852,12 @@ def _normalize_corrective_eq_method(method: str) -> str:
         "hybrid_project": "project_corrective_hybrid",
         "project_hybrid": "project_corrective_hybrid",
         "project_corrective_hybrid_eq": "project_corrective_hybrid",
+        "deep": "contextual_deep_eq",
+        "deep_eq": "contextual_deep_eq",
+        "contextual": "contextual_deep_eq",
+        "contextual_eq": "contextual_deep_eq",
+        "contextual_deep": "contextual_deep_eq",
+        "arrangement_eq": "contextual_deep_eq",
     }
     key = aliases.get(key, key)
     if key not in CORRECTIVE_EQ_METHODS:
@@ -846,6 +889,8 @@ def _corrective_eq_source(method: str) -> dict[str, Any] | None:
         return PROJECT_CORRECTIVE_EQ_TARGET_SOURCE
     if method == "project_corrective_hybrid":
         return PROJECT_CORRECTIVE_HYBRID_EQ_TARGET_SOURCE
+    if method == "contextual_deep_eq":
+        return CONTEXTUAL_DEEP_EQ_TARGET_SOURCE
     return None
 
 
@@ -865,6 +910,8 @@ def _corrective_eq_bands_by_channel(
         return _project_corrective_eq_bands(stems)
     if method == "project_corrective_hybrid":
         return _project_corrective_hybrid_eq_bands(stems)
+    if method == "contextual_deep_eq":
+        return _contextual_deep_eq_bands(stems)
     return {}, {}
 
 
@@ -1753,6 +1800,392 @@ def _project_corrective_hybrid_eq_bands(stems: list[AyaicStem]) -> tuple[dict[in
     }
 
 
+def _contextual_deep_eq_bands(stems: list[AyaicStem]) -> tuple[dict[int, list[dict[str, Any]]], dict[str, Any]]:
+    snapshot_before = _project_corrective_snapshot(stems)
+    channel_diagnostics = {
+        int(item["channel"]): item
+        for item in snapshot_before["channel_diagnostics"]
+    }
+    stem_by_channel = {stem.channel_id: stem for stem in stems}
+    bands_by_channel: dict[int, list[dict[str, Any]]] = {}
+    rejected: list[dict[str, Any]] = []
+    critic_notes: list[dict[str, Any]] = []
+    conflicts: list[dict[str, Any]] = []
+
+    lead_vocal_channels = {
+        ch
+        for ch, item in channel_diagnostics.items()
+        if item.get("role") == "lead_vocal"
+    }
+    lead_presence = max(
+        (float(channel_diagnostics[ch].get("presence_db", -100.0)) for ch in lead_vocal_channels),
+        default=-100.0,
+    )
+    lead_mid = max(
+        (float(channel_diagnostics[ch].get("mid_db", -100.0)) for ch in lead_vocal_channels),
+        default=-100.0,
+    )
+
+    def add_band(
+        stem: AyaicStem,
+        *,
+        frequency_hz: float,
+        gain_db: float,
+        q: float,
+        reason: str,
+        confidence: float,
+        source: str,
+        target: str,
+        metric: str,
+        allow_boost: bool = True,
+    ) -> None:
+        diagnostic = channel_diagnostics.get(stem.channel_id, {})
+        _contextual_add_eq_band(
+            bands_by_channel,
+            rejected,
+            critic_notes,
+            stem,
+            diagnostic=diagnostic,
+            frequency_hz=frequency_hz,
+            gain_db=gain_db,
+            q=q,
+            reason=reason,
+            confidence=confidence,
+            source=source,
+            target=target,
+            metric=metric,
+            allow_boost=allow_boost,
+        )
+
+    for stem in stems:
+        diagnostic = channel_diagnostics.get(stem.channel_id, {})
+        role = str(diagnostic.get("role") or _project_channel_role(stem.name))
+        low_end_db = float(diagnostic.get("low_end_db", -100.0))
+        low_mid_db = float(diagnostic.get("low_mid_db", -100.0))
+        mid_db = float(diagnostic.get("mid_db", -100.0))
+        presence_db = float(diagnostic.get("presence_db", -100.0))
+        high_db = float(diagnostic.get("high_db", -100.0))
+        air_db = float(diagnostic.get("air_db", -100.0))
+        primary_lufs = float(diagnostic.get("primary_lufs", -120.0))
+
+        if role in {"guitar", "accordion", "keys", "playback", "back_vocal"} and lead_vocal_channels:
+            presence_margin = presence_db - (lead_presence - 10.0)
+            if presence_margin > 0.0:
+                gain = -(1.2 + min(5.2, presence_margin * 0.28))
+                add_band(
+                    stem,
+                    frequency_hz=3100.0,
+                    gain_db=gain,
+                    q=1.25 if role != "back_vocal" else 1.05,
+                    reason=f"{role} masks lead vocal presence; carve foreground space instead of raising the vocal first",
+                    confidence=float(np.clip(0.68 + presence_margin * 0.025, 0.68, 0.96)),
+                    source="contextual_lead_vocal_masking",
+                    target="1.5-4 kHz lead vocal intelligibility",
+                    metric=f"masker_presence_db={presence_db:.2f}, lead_presence_db={lead_presence:.2f}, margin_db={presence_margin:.2f}",
+                )
+                conflicts.append(
+                    {
+                        "type": "lead_vocal_presence_masking",
+                        "masked_channel": sorted(lead_vocal_channels),
+                        "masker_channel": stem.channel_id,
+                        "masker_file": Path(stem.path).name,
+                        "margin_db": round(presence_margin, 3),
+                    }
+                )
+            mid_margin = mid_db - (lead_mid - 7.0)
+            if mid_margin > 0.0 and role != "back_vocal":
+                add_band(
+                    stem,
+                    frequency_hz=1050.0,
+                    gain_db=-(0.9 + min(3.4, mid_margin * 0.22)),
+                    q=1.05,
+                    reason=f"{role} crowds vocal body/core mids; broad cut improves lead readability",
+                    confidence=float(np.clip(0.62 + mid_margin * 0.02, 0.62, 0.9)),
+                    source="contextual_vocal_body_masking",
+                    target="700-1500 Hz vocal body space",
+                    metric=f"masker_mid_db={mid_db:.2f}, lead_mid_db={lead_mid:.2f}, margin_db={mid_margin:.2f}",
+                )
+
+        if role == "lead_vocal":
+            mud_margin = low_mid_db - (mid_db - 4.0)
+            if mud_margin > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=260.0,
+                    gain_db=-(0.9 + min(4.2, mud_margin * 0.24)),
+                    q=1.0,
+                    reason="lead vocal low-mid buildup reduces intelligibility; clean mud before presence shaping",
+                    confidence=float(np.clip(0.66 + mud_margin * 0.018, 0.66, 0.9)),
+                    source="contextual_vocal_mud",
+                    target="180-350 Hz vocal mud",
+                    metric=f"low_mid_db={low_mid_db:.2f}, mid_db={mid_db:.2f}, mud_margin_db={mud_margin:.2f}",
+                )
+            clarity_deficit = max(0.0, mid_db - presence_db - 2.0)
+            if clarity_deficit > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=2850.0,
+                    gain_db=0.8 + min(5.2, clarity_deficit * 0.22),
+                    q=0.95,
+                    reason="lead vocal presence is low relative to body; broad boost restores intelligibility after masking cuts",
+                    confidence=float(np.clip(0.62 + clarity_deficit * 0.018, 0.62, 0.86)),
+                    source="contextual_vocal_presence_restore",
+                    target="2-4 kHz vocal clarity",
+                    metric=f"mid_db={mid_db:.2f}, presence_db={presence_db:.2f}, deficit_db={clarity_deficit:.2f}",
+                )
+            sibilance_margin = max(high_db, air_db) - (presence_db + 3.0)
+            if sibilance_margin > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=7200.0,
+                    gain_db=-(0.8 + min(3.8, sibilance_margin * 0.22)),
+                    q=1.35,
+                    reason="lead vocal sibilance/air is high relative to presence; de-ess style static trim",
+                    confidence=float(np.clip(0.64 + sibilance_margin * 0.02, 0.64, 0.9)),
+                    source="contextual_vocal_sibilance",
+                    target="5-9 kHz vocal sibilance",
+                    metric=f"high_air_db={max(high_db, air_db):.2f}, presence_db={presence_db:.2f}, margin_db={sibilance_margin:.2f}",
+                )
+
+        elif role in {"back_vocal"}:
+            mud_margin = low_mid_db - (mid_db - 4.0)
+            if mud_margin > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=280.0,
+                    gain_db=-(0.9 + min(3.2, mud_margin * 0.2)),
+                    q=1.0,
+                    reason="backing vocal low mids make the stack cloudy; keep support below lead vocal",
+                    confidence=float(np.clip(0.62 + mud_margin * 0.018, 0.62, 0.86)),
+                    source="contextual_back_vocal_cleanup",
+                    target="200-400 Hz backing vocal mud",
+                    metric=f"low_mid_db={low_mid_db:.2f}, mid_db={mid_db:.2f}, margin_db={mud_margin:.2f}",
+                )
+
+        elif role == "kick":
+            punch_deficit = max(0.0, low_mid_db - low_end_db - 3.0)
+            if punch_deficit > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=285.0,
+                    gain_db=-(1.0 + min(4.5, punch_deficit * 0.25)),
+                    q=1.1,
+                    reason="kick boxiness is high relative to low fundamental; cut mud before any attack boost",
+                    confidence=float(np.clip(0.66 + punch_deficit * 0.02, 0.66, 0.9)),
+                    source="contextual_kick_boxiness",
+                    target="220-350 Hz kick boxiness",
+                    metric=f"low_mid_db={low_mid_db:.2f}, low_end_db={low_end_db:.2f}, margin_db={punch_deficit:.2f}",
+                )
+            attack_deficit = max(0.0, low_end_db - presence_db - 9.0)
+            if attack_deficit > 0.0 and primary_lufs > -80.0:
+                add_band(
+                    stem,
+                    frequency_hz=4200.0,
+                    gain_db=0.7 + min(4.0, attack_deficit * 0.18),
+                    q=1.0,
+                    reason="kick attack is low relative to low end; add beater definition if headroom allows",
+                    confidence=float(np.clip(0.58 + attack_deficit * 0.015, 0.58, 0.8)),
+                    source="contextual_kick_attack_restore",
+                    target="3-5 kHz kick attack",
+                    metric=f"low_end_db={low_end_db:.2f}, presence_db={presence_db:.2f}, deficit_db={attack_deficit:.2f}",
+                )
+
+        elif role == "bass":
+            bass_mud = low_mid_db - (low_end_db - 5.0)
+            if bass_mud > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=260.0,
+                    gain_db=-(1.0 + min(4.4, bass_mud * 0.24)),
+                    q=0.95,
+                    reason="bass low-mid buildup masks kick and vocal body; broad cut keeps foundation clear",
+                    confidence=float(np.clip(0.66 + bass_mud * 0.02, 0.66, 0.9)),
+                    source="contextual_bass_low_mid_control",
+                    target="180-350 Hz bass mud",
+                    metric=f"low_mid_db={low_mid_db:.2f}, low_end_db={low_end_db:.2f}, margin_db={bass_mud:.2f}",
+                )
+            definition_deficit = max(0.0, low_end_db - mid_db - 10.0)
+            if definition_deficit > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=850.0,
+                    gain_db=0.6 + min(3.8, definition_deficit * 0.18),
+                    q=0.85,
+                    reason="bass note definition is weak compared with low end; broad mid lift helps translation",
+                    confidence=float(np.clip(0.58 + definition_deficit * 0.015, 0.58, 0.8)),
+                    source="contextual_bass_definition",
+                    target="700-1100 Hz bass note definition",
+                    metric=f"low_end_db={low_end_db:.2f}, mid_db={mid_db:.2f}, deficit_db={definition_deficit:.2f}",
+                )
+
+        elif role in {"snare", "snare_top", "snare_bottom"}:
+            box_margin = max(low_mid_db, mid_db) - (presence_db - 4.0)
+            if box_margin > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=780.0 if role != "snare_bottom" else 920.0,
+                    gain_db=-(0.9 + min(4.2, box_margin * 0.22)),
+                    q=1.25,
+                    reason=f"{role} boxiness is high against attack; cut body resonance enough to matter",
+                    confidence=float(np.clip(0.64 + box_margin * 0.018, 0.64, 0.88)),
+                    source="contextual_snare_boxiness",
+                    target="600-950 Hz snare boxiness",
+                    metric=f"box_margin_db={box_margin:.2f}",
+                )
+            attack_deficit = max(0.0, mid_db - presence_db - 3.0)
+            if attack_deficit > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=4500.0,
+                    gain_db=0.7 + min(4.0, attack_deficit * 0.18),
+                    q=1.0,
+                    reason=f"{role} attack is dull relative to body; restore crack after boxiness control",
+                    confidence=float(np.clip(0.58 + attack_deficit * 0.016, 0.58, 0.82)),
+                    source="contextual_snare_attack_restore",
+                    target="3-6 kHz snare attack",
+                    metric=f"mid_db={mid_db:.2f}, presence_db={presence_db:.2f}, deficit_db={attack_deficit:.2f}",
+                )
+
+        elif role in {"tom", "floor_tom"}:
+            mud_margin = low_mid_db - (low_end_db - 6.0)
+            if mud_margin > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=330.0 if role == "tom" else 285.0,
+                    gain_db=-(0.9 + min(4.0, mud_margin * 0.22)),
+                    q=1.0,
+                    reason=f"{role} low-mid buildup masks shell tone; deep broad cut is allowed when evidence is strong",
+                    confidence=float(np.clip(0.62 + mud_margin * 0.018, 0.62, 0.86)),
+                    source="contextual_tom_mud",
+                    target="250-400 Hz tom mud",
+                    metric=f"low_mid_db={low_mid_db:.2f}, low_end_db={low_end_db:.2f}, margin_db={mud_margin:.2f}",
+                )
+            cymbal_bleed = high_db - (mid_db + 3.0)
+            if cymbal_bleed > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=6500.0,
+                    gain_db=-(0.8 + min(4.0, cymbal_bleed * 0.22)),
+                    q=1.1,
+                    reason=f"{role} close mic has cymbal spill; cut high bleed more decisively than hybrid mode",
+                    confidence=float(np.clip(0.6 + cymbal_bleed * 0.018, 0.6, 0.84)),
+                    source="contextual_tom_bleed",
+                    target="5-8 kHz cymbal spill",
+                    metric=f"high_db={high_db:.2f}, mid_db={mid_db:.2f}, margin_db={cymbal_bleed:.2f}",
+                )
+
+        elif role in {"overhead", "room"}:
+            wash_margin = low_mid_db - (mid_db - 4.0)
+            if wash_margin > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=360.0,
+                    gain_db=-(0.9 + min(3.4, wash_margin * 0.2)),
+                    q=0.9,
+                    reason=f"{role} low-mid wash muddies drum image; linked-style cleanup per stem",
+                    confidence=float(np.clip(0.62 + wash_margin * 0.016, 0.62, 0.84)),
+                    source="contextual_overhead_wash",
+                    target="250-500 Hz cymbal/room wash",
+                    metric=f"low_mid_db={low_mid_db:.2f}, mid_db={mid_db:.2f}, margin_db={wash_margin:.2f}",
+                )
+            harsh_margin = max(high_db, air_db) - (presence_db + 2.5)
+            if harsh_margin > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=7600.0,
+                    gain_db=-(0.9 + min(4.2, harsh_margin * 0.22)),
+                    q=1.0,
+                    reason=f"{role} harshness/air is excessive relative to presence; control cymbal top",
+                    confidence=float(np.clip(0.62 + harsh_margin * 0.018, 0.62, 0.86)),
+                    source="contextual_overhead_harshness",
+                    target="5-9 kHz cymbal harshness",
+                    metric=f"high_air_db={max(high_db, air_db):.2f}, presence_db={presence_db:.2f}, margin_db={harsh_margin:.2f}",
+                )
+
+        elif role in {"guitar", "accordion", "keys", "playback"}:
+            mud_margin = low_mid_db - (mid_db - 3.0)
+            if mud_margin > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=320.0,
+                    gain_db=-(0.9 + min(4.6, mud_margin * 0.24)),
+                    q=0.95,
+                    reason=f"{role} low-mid buildup crowds arrangement; deep cleanup allowed after ADI/input staging",
+                    confidence=float(np.clip(0.62 + mud_margin * 0.018, 0.62, 0.88)),
+                    source="contextual_music_bed_mud",
+                    target="250-500 Hz accompaniment mud",
+                    metric=f"low_mid_db={low_mid_db:.2f}, mid_db={mid_db:.2f}, margin_db={mud_margin:.2f}",
+                )
+            fizz_margin = high_db - (presence_db + 3.0)
+            if fizz_margin > 0.0:
+                add_band(
+                    stem,
+                    frequency_hz=6500.0,
+                    gain_db=-(0.8 + min(4.0, fizz_margin * 0.22)),
+                    q=1.0,
+                    reason=f"{role} top end is fizzy relative to presence; reduce abrasive layer",
+                    confidence=float(np.clip(0.6 + fizz_margin * 0.018, 0.6, 0.84)),
+                    source="contextual_music_bed_fizz",
+                    target="5-8 kHz accompaniment fizz",
+                    metric=f"high_db={high_db:.2f}, presence_db={presence_db:.2f}, margin_db={fizz_margin:.2f}",
+                )
+            presence_deficit = max(0.0, mid_db - presence_db - 6.0)
+            if presence_deficit > 0.0 and role in {"accordion", "keys", "guitar"}:
+                add_band(
+                    stem,
+                    frequency_hz=2200.0,
+                    gain_db=0.5 + min(3.6, presence_deficit * 0.16),
+                    q=0.85,
+                    reason=f"{role} lacks articulation after cleanup; broad boost is allowed but critic will flag excess",
+                    confidence=float(np.clip(0.55 + presence_deficit * 0.015, 0.55, 0.78)),
+                    source="contextual_music_bed_articulation",
+                    target="1.8-3 kHz instrument articulation",
+                    metric=f"mid_db={mid_db:.2f}, presence_db={presence_db:.2f}, deficit_db={presence_deficit:.2f}",
+                )
+
+    _contextual_link_stereo_pairs(bands_by_channel, stems, critic_notes)
+    actions_preview = []
+    for channel, bands in sorted(bands_by_channel.items()):
+        stem = stem_by_channel.get(channel)
+        if stem is None:
+            continue
+        actions_preview.extend(
+            {
+                "channel": channel,
+                "file": Path(stem.path).name,
+                "instrument": _autoeq_instrument(stem.name),
+                **_round_eq_band(band),
+            }
+            for band in bands
+        )
+
+    return bands_by_channel, {
+        "enabled": True,
+        "method": "contextual_deep_eq",
+        "before": snapshot_before,
+        "channel_diagnostics": snapshot_before["channel_diagnostics"],
+        "group_diagnostics": snapshot_before["group_diagnostics"],
+        "detected_conflicts": conflicts,
+        "rejected_candidates": rejected,
+        "critic_notes": critic_notes,
+        "actions_preview": actions_preview,
+        "limits": {
+            "max_cut_db": 12.0,
+            "max_boost_db": 9.0,
+            "max_filters_per_channel": 7,
+            "max_q": 6.0,
+            "hard_blocks": ["invalid_frequency", "unstable_q", "boost_headroom_extreme"],
+            "critic_after_db": 5.0,
+        },
+        "notes": [
+            "Contextual Deep EQ is not a flat target matcher.",
+            "Large EQ moves are allowed when role/masking evidence is strong.",
+            "Regret score and critic notes flag risky decisions without over-constraining the method.",
+            "Post-corrective channel/pair levels remain responsible for level compensation.",
+        ],
+    }
+
+
 def _project_hybrid_add_eq_band(
     bands_by_channel: dict[int, list[dict[str, Any]]],
     rejected: list[dict[str, Any]],
@@ -1870,7 +2303,7 @@ def _project_hybrid_add_eq_band(
 
 
 def _project_hybrid_role_limits(role: str) -> dict[str, float]:
-    if role == "overhead":
+    if role in {"overhead", "room"}:
         return {"max_cut_db": 1.1, "max_filters": 3.0, "max_q": 2.0}
     if role in {"lead_vocal", "back_vocal"}:
         return {"max_cut_db": 1.2, "max_filters": 3.0, "max_q": 2.0}
@@ -1879,6 +2312,295 @@ def _project_hybrid_role_limits(role: str) -> dict[str, float]:
     if role in {"snare", "snare_top", "snare_bottom", "tom", "floor_tom"}:
         return {"max_cut_db": 1.6, "max_filters": 4.0, "max_q": 2.2}
     return {"max_cut_db": 1.6, "max_filters": 4.0, "max_q": 2.0}
+
+
+def _contextual_add_eq_band(
+    bands_by_channel: dict[int, list[dict[str, Any]]],
+    rejected: list[dict[str, Any]],
+    critic_notes: list[dict[str, Any]],
+    stem: AyaicStem,
+    *,
+    diagnostic: dict[str, Any],
+    frequency_hz: float,
+    gain_db: float,
+    q: float,
+    reason: str,
+    confidence: float,
+    source: str,
+    target: str,
+    metric: str,
+    allow_boost: bool,
+) -> bool:
+    role = str(diagnostic.get("role") or _project_channel_role(stem.name))
+    limits = _contextual_role_limits(role)
+    freq = float(frequency_hz)
+    requested_gain = float(gain_db)
+    requested_q = float(q)
+    if freq <= 20.0 or freq >= min(float(stem.sample_rate) * 0.48, 20_000.0):
+        rejected.append(_contextual_rejection(stem, freq, requested_gain, requested_q, "invalid_frequency", confidence, source, target))
+        return False
+    if requested_q < 0.25 or requested_q > 18.0:
+        rejected.append(_contextual_rejection(stem, freq, requested_gain, requested_q, "unstable_q", confidence, source, target))
+        return False
+    if requested_gain > 0.0 and not allow_boost:
+        rejected.append(_contextual_rejection(stem, freq, requested_gain, requested_q, "boost_not_allowed_for_this_decision", confidence, source, target))
+        return False
+
+    gain = float(np.clip(requested_gain, -limits["max_cut_db"], limits["max_boost_db"]))
+    peak_dbfs = float(diagnostic.get("peak_dbfs", _peak_dbfs(stem.audio)))
+    if gain > 0.0 and peak_dbfs + gain > 6.0:
+        rejected.append(_contextual_rejection(stem, freq, gain, requested_q, "boost_headroom_extreme", confidence, source, target))
+        return False
+    if gain > 0.0 and peak_dbfs + gain > -1.0:
+        critic_notes.append(
+            {
+                "channel": stem.channel_id,
+                "file": Path(stem.path).name,
+                "severity": "high",
+                "reason": "boost_may_reduce_headroom_before_post_levels",
+                "frequency_hz": round(freq, 2),
+                "gain_db": round(gain, 3),
+                "peak_dbfs": round(peak_dbfs, 3),
+                "note": "Allowed for offline render, but master/post-level safety must absorb the headroom cost.",
+            }
+        )
+
+    if abs(gain) < 0.25:
+        rejected.append(_contextual_rejection(stem, freq, gain, requested_q, "candidate_below_minimum_audible_move", confidence, source, target))
+        return False
+
+    q_limited = float(np.clip(requested_q, 0.35, limits["max_q"]))
+    regret_score, notes = _contextual_regret_score(
+        role=role,
+        gain_db=gain,
+        q=q_limited,
+        frequency_hz=freq,
+        confidence=confidence,
+        peak_dbfs=peak_dbfs,
+    )
+    for note in notes:
+        critic_notes.append(
+            {
+                "channel": stem.channel_id,
+                "file": Path(stem.path).name,
+                "severity": note["severity"],
+                "reason": note["reason"],
+                "frequency_hz": round(freq, 2),
+                "gain_db": round(gain, 3),
+                "q": round(q_limited, 3),
+                "regret_score": round(regret_score, 4),
+                "note": note["note"],
+            }
+        )
+
+    bands = bands_by_channel.setdefault(stem.channel_id, [])
+    for existing in bands:
+        if abs(math.log2(float(existing["frequency_hz"]) / freq)) < 0.2:
+            existing.setdefault("evidence", [])
+            existing["evidence"].append({"source": source, "gain_db": round(gain, 3), "regret_score": round(regret_score, 4)})
+            if abs(gain) > abs(float(existing["gain_db"])):
+                existing.update(
+                    {
+                        "gain_db": round(gain, 3),
+                        "q": round(q_limited, 3),
+                        "reason": reason,
+                        "confidence": round(float(confidence), 3),
+                        "role": role,
+                        "source": source,
+                        "target": target,
+                        "metric": metric,
+                        "regret_score": round(regret_score, 4),
+                        "critic_notes": notes,
+                    }
+                )
+            return True
+
+    if len(bands) >= int(limits["max_filters"]):
+        weakest = min(bands, key=lambda item: abs(float(item["gain_db"])) * float(item.get("confidence", 0.5)))
+        incoming_strength = abs(gain) * float(confidence)
+        weakest_strength = abs(float(weakest["gain_db"])) * float(weakest.get("confidence", 0.5))
+        if incoming_strength <= weakest_strength:
+            rejected.append(_contextual_rejection(stem, freq, gain, q_limited, "max_filters_kept_stronger_existing_bands", confidence, source, target))
+            return False
+        critic_notes.append(
+            {
+                "channel": stem.channel_id,
+                "file": Path(stem.path).name,
+                "severity": "medium",
+                "reason": "max_filters_replaced_weaker_band",
+                "frequency_hz": round(freq, 2),
+                "gain_db": round(gain, 3),
+                "note": "Deep EQ kept the stronger move and removed a weaker existing band.",
+            }
+        )
+        bands.remove(weakest)
+
+    bands.append(
+        {
+            "frequency_hz": freq,
+            "gain_db": round(gain, 3),
+            "q": round(q_limited, 3),
+            "reason": reason,
+            "confidence": round(float(confidence), 3),
+            "role": role,
+            "source": source,
+            "target": target,
+            "metric": metric,
+            "regret_score": round(regret_score, 4),
+            "critic_notes": notes,
+            "evidence": [{"source": source, "gain_db": round(gain, 3), "regret_score": round(regret_score, 4)}],
+        }
+    )
+    return True
+
+
+def _contextual_rejection(
+    stem: AyaicStem,
+    frequency_hz: float,
+    gain_db: float,
+    q: float,
+    reason: str,
+    confidence: float,
+    source: str,
+    target: str,
+) -> dict[str, Any]:
+    return {
+        "channel": stem.channel_id,
+        "file": Path(stem.path).name,
+        "frequency_hz": round(float(frequency_hz), 2),
+        "gain_db": round(float(gain_db), 3),
+        "q": round(float(q), 3),
+        "reason": reason,
+        "confidence": round(float(confidence), 3),
+        "source": source,
+        "target": target,
+    }
+
+
+def _contextual_role_limits(role: str) -> dict[str, float]:
+    if role in {"overhead", "room"}:
+        return {"max_cut_db": 10.0, "max_boost_db": 4.0, "max_filters": 6.0, "max_q": 4.5}
+    if role in {"lead_vocal", "back_vocal"}:
+        return {"max_cut_db": 10.0, "max_boost_db": 7.0, "max_filters": 7.0, "max_q": 5.0}
+    if role in {"kick", "bass"}:
+        return {"max_cut_db": 12.0, "max_boost_db": 7.0, "max_filters": 7.0, "max_q": 5.0}
+    if role in {"snare", "snare_top", "snare_bottom", "tom", "floor_tom"}:
+        return {"max_cut_db": 12.0, "max_boost_db": 8.0, "max_filters": 7.0, "max_q": 5.5}
+    return {"max_cut_db": 12.0, "max_boost_db": 6.0, "max_filters": 7.0, "max_q": 5.0}
+
+
+def _contextual_regret_score(
+    *,
+    role: str,
+    gain_db: float,
+    q: float,
+    frequency_hz: float,
+    confidence: float,
+    peak_dbfs: float,
+) -> tuple[float, list[dict[str, str]]]:
+    abs_gain = abs(float(gain_db))
+    score = 0.0
+    score += max(0.0, (abs_gain - 4.0) / 8.0) * 0.42
+    score += max(0.0, (float(q) - 3.0) / 5.0) * 0.2
+    score += max(0.0, (0.7 - float(confidence)) / 0.7) * 0.18
+    if gain_db > 0.0:
+        score += 0.12
+        if peak_dbfs + gain_db > -1.0:
+            score += 0.22
+    if role in {"overhead", "room"} and gain_db > 0.0:
+        score += 0.2
+    if frequency_hz > 5000.0 and gain_db > 4.0:
+        score += 0.16
+    if frequency_hz < 120.0 and gain_db > 4.0:
+        score += 0.18
+    score = float(np.clip(score, 0.0, 1.0))
+
+    notes: list[dict[str, str]] = []
+    if abs_gain >= 6.0:
+        notes.append(
+            {
+                "severity": "high" if abs_gain >= 9.0 else "medium",
+                "reason": "large_eq_move",
+                "note": "Large EQ move allowed; verify that it solves a role/masking problem rather than forcing a target curve.",
+            }
+        )
+    if gain_db > 0.0 and peak_dbfs + gain_db > -1.0:
+        notes.append(
+            {
+                "severity": "high",
+                "reason": "boost_headroom_risk",
+                "note": "Boost can push the channel above normal headroom before post-corrective leveling.",
+            }
+        )
+    if q > 4.5:
+        notes.append(
+            {
+                "severity": "medium",
+                "reason": "narrow_filter",
+                "note": "High-Q EQ can sound resonant; use only when the evidence points to a narrow problem.",
+            }
+        )
+    if role in {"overhead", "room"} and gain_db > 0.0:
+        notes.append(
+            {
+                "severity": "medium",
+                "reason": "overhead_boost_risk",
+                "note": "Boosting cymbal/room channels can exaggerate bleed and harshness.",
+            }
+        )
+    return score, notes
+
+
+def _contextual_link_stereo_pairs(
+    bands_by_channel: dict[int, list[dict[str, Any]]],
+    stems: list[AyaicStem],
+    critic_notes: list[dict[str, Any]],
+) -> None:
+    pairs = (
+        ("Guitar", ("guitar l", "guitar r")),
+        ("Playback", ("playback l", "playback r")),
+        ("Back Vox", ("back vox l", "back vox r")),
+        ("Overheads", ("oh l", "oh r")),
+    )
+    by_key = {_name_key(stem.name): stem for stem in stems}
+    for label, keys in pairs:
+        members = [by_key[key] for key in keys if key in by_key]
+        if len(members) != 2:
+            continue
+        first_bands = bands_by_channel.get(members[0].channel_id, [])
+        second_bands = bands_by_channel.get(members[1].channel_id, [])
+        if not first_bands and not second_bands:
+            continue
+        merged = _contextual_merge_pair_bands([first_bands, second_bands])
+        for stem in members:
+            bands_by_channel[stem.channel_id] = [
+                {**band, "linked_group": label, "reason": f"{band.get('reason', '')} Linked stereo pair policy."}
+                for band in merged
+            ]
+        critic_notes.append(
+            {
+                "channel": [stem.channel_id for stem in members],
+                "file": [Path(stem.path).name for stem in members],
+                "severity": "low",
+                "reason": "linked_stereo_pair_eq",
+                "note": f"{label} EQ bands were mirrored to preserve stereo image.",
+            }
+        )
+
+
+def _contextual_merge_pair_bands(band_sets: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    for band in [item for bands in band_sets for item in bands]:
+        for existing in merged:
+            if abs(math.log2(float(existing["frequency_hz"]) / float(band["frequency_hz"]))) < 0.18:
+                if abs(float(band["gain_db"])) > abs(float(existing["gain_db"])):
+                    existing.update(dict(band))
+                existing.setdefault("evidence", [])
+                existing["evidence"].extend(band.get("evidence", []))
+                break
+        else:
+            merged.append(dict(band))
+    return sorted(merged, key=lambda item: float(item["frequency_hz"]))[:7]
 
 
 def _project_hybrid_dynamic_candidates(
@@ -2030,6 +2752,8 @@ def _project_channel_role(name: str) -> str:
     instrument = _autoeq_instrument(name)
     if instrument in {"overhead_l", "overhead_r", "overhead_pair", "hi_hat", "ride"}:
         return "overhead"
+    if instrument == "room":
+        return "room"
     if instrument in {"snare_top", "snare_bottom"}:
         return instrument
     if instrument in {"tom", "rack_tom"}:
@@ -2173,7 +2897,7 @@ def _project_add_eq_band(
 
 
 def _project_role_limits(role: str) -> dict[str, float]:
-    if role == "overhead":
+    if role in {"overhead", "room"}:
         return {"max_cut_db": 1.4, "max_boost_db": 0.0, "max_filters": 3.0, "max_q": 2.0}
     if role in {"lead_vocal", "back_vocal"}:
         return {"max_cut_db": 1.6, "max_boost_db": 0.0, "max_filters": 4.0, "max_q": 2.2}
@@ -2190,7 +2914,24 @@ def _round_eq_band(band: dict[str, Any]) -> dict[str, Any]:
         "gain_db": round(float(band["gain_db"]), 2),
         "q": round(float(band["q"]), 2),
     }
-    for key in ("reason", "window", "band", "priority", "source_count", "share_before", "confidence", "role", "component", "source", "target", "metric", "evidence"):
+    for key in (
+        "reason",
+        "window",
+        "band",
+        "priority",
+        "source_count",
+        "share_before",
+        "confidence",
+        "role",
+        "component",
+        "source",
+        "target",
+        "metric",
+        "evidence",
+        "regret_score",
+        "critic_notes",
+        "linked_group",
+    ):
         if key in band:
             value = band[key]
             out[key] = round(float(value), 4) if isinstance(value, float) else value
@@ -2215,7 +2956,7 @@ def _offline_filter_instrument(name: str) -> str:
         return "snare"
     if drum:
         return drum
-    if "back vox" in key or "bgv" in key or "back vocal" in key:
+    if _is_backing_vocal_key(key):
         return "backing_vocal"
     if "vox" in key or "vocal" in key:
         return "lead_vocal"
@@ -2498,16 +3239,11 @@ def _apply_pair_levels(stems: list[AyaicStem]) -> list[dict[str, Any]]:
 
 
 def _validate_summed_ayaic_stems(stems: list[AyaicStem]) -> list[dict[str, Any]]:
-    groups = {
-        "Snare": (("snare t", "snare top", "snare b", "snare bottom"), -25.0),
-        "Overheads": (("oh l", "oh r", "overhead l", "overhead r"), -35.0),
-        "Guitar": (("guitar l", "guitar r", "gtr l", "gtr r"), -25.0),
-        "Playback": (("playback l", "playback r"), -25.0),
-        "Back Vox": (("back vox l", "back vox r", "bgv l", "bgv r"), -25.0),
-    }
     report = []
-    for label, (needles, target) in groups.items():
-        members = [stem for stem in stems if _name_key(stem.name) in needles]
+    for spec in _summed_lufs_group_specs():
+        label = str(spec["label"])
+        target = float(spec["target_lufs"])
+        members = _summed_lufs_group_members(stems, spec)
         if len(members) < 2:
             continue
         summed, measurement = _combined_primary_loudness_audio(members)
@@ -2534,6 +3270,59 @@ def _validate_summed_ayaic_stems(stems: list[AyaicStem]) -> list[dict[str, Any]]
             }
         )
     return report
+
+
+def _summed_lufs_group_specs() -> list[dict[str, Any]]:
+    return [
+        {
+            "label": "Drums Bus",
+            "target_lufs": -25.0,
+            "kind": "drums_bus",
+            "note": "All drum-channel summed LUFS, including overheads, hi-hat, ride, room, and close mics.",
+        },
+        {
+            "label": "Guitar",
+            "target_lufs": -25.0,
+            "kind": "exact_names",
+            "names": ("guitar l", "guitar r", "gtr l", "gtr r"),
+        },
+        {
+            "label": "Playback",
+            "target_lufs": -25.0,
+            "kind": "exact_names",
+            "names": ("playback l", "playback r"),
+        },
+        {
+            "label": "Lead Vocal Bus",
+            "target_lufs": -22.0,
+            "kind": "lead_vocal_bus",
+            "note": "All non-backing lead vocal channels summed together.",
+        },
+        {
+            "label": "Backs Bus",
+            "target_lufs": -28.0,
+            "kind": "backing_vocal_bus",
+            "note": "Backing vocals stay separate from Lead Vocal Bus.",
+        },
+    ]
+
+
+def _summed_lufs_group_members(stems: list[AyaicStem], spec: dict[str, Any]) -> list[AyaicStem]:
+    kind = str(spec.get("kind") or "")
+    if kind == "exact_names":
+        names = set(str(name) for name in (spec.get("names") or ()))
+        return [stem for stem in stems if _name_key(stem.name) in names]
+    if kind == "drums_bus":
+        return [stem for stem in stems if _instrument_group(stem.name) == "drums"]
+    if kind == "lead_vocal_bus":
+        return [
+            stem for stem in stems
+            if _offline_filter_instrument(stem.name) == "lead_vocal"
+            and not _is_backing_vocal_key(_name_key(stem.name))
+        ]
+    if kind == "backing_vocal_bus":
+        return [stem for stem in stems if _is_backing_vocal_key(_name_key(stem.name))]
+    return []
 
 
 def _apply_phase_delay_from_overheads(stems: list[AyaicStem], *, max_delay_ms: float) -> dict[str, Any]:
@@ -2886,6 +3675,8 @@ def _drum_instrument(name: str) -> str | None:
     key = _name_key(name)
     if key in {"oh l", "oh r", "overhead l", "overhead r"} or "overhead" in key:
         return "overhead"
+    if "room" in key:
+        return "room"
     if "kick" in key:
         return "kick"
     if "snare" in key:
@@ -2905,10 +3696,10 @@ def _drum_instrument(name: str) -> str | None:
 
 def _bleed_analysis_instrument(name: str) -> str | None:
     drum = _drum_instrument(name)
-    if drum and drum != "overhead":
+    if drum and drum not in {"overhead", "room"}:
         return drum
     key = _name_key(name)
-    if "back vox" in key or "bgv" in key or "back vocal" in key:
+    if _is_backing_vocal_key(key):
         return "backing_vocal"
     if "vox" in key or "vocal" in key:
         return "lead_vocal"
@@ -3722,26 +4513,30 @@ def _track_target_lufs(name: str) -> float:
         return -35.0
     if key in {"oh l", "oh r", "overhead l", "overhead r"}:
         return -38.0
+    if "room" in key:
+        return -45.0
     if key.endswith(" l") or key.endswith(" r"):
         base = key[:-2]
-        if base in {"guitar", "gtr", "playback", "back vox", "bgv"}:
+        if base in {"guitar", "gtr", "playback", "back vox", "bgv", "backs"}:
             return -28.0
+    if "accordion" in key:
+        return -28.0
     if "hat" in key or "ride" in key or "cymbal" in key:
         return -35.0
-    if any(token in key for token in ("kick", "bass", "tom", "accordion", "guitar", "playback")):
+    if any(token in key for token in ("kick", "bass", "tom", "guitar", "playback")):
         return -25.0
-    if "back vox" in key or "bgv" in key:
+    if _is_backing_vocal_key(key):
         return -25.0
     return -25.0
 
 
 def _instrument_group(name: str) -> str:
     key = _name_key(name)
-    if "back vox" in key or "bgv" in key or "back vocal" in key:
+    if _is_backing_vocal_key(key):
         return "back_vocals"
     if any(token in key for token in ("vocal", "vox")):
         return "vocals"
-    if any(token in key for token in ("oh ", "overhead", "hat", "ride", "cymbal", "kick", "snare", "tom")):
+    if any(token in key for token in ("oh ", "overhead", "room", "hat", "ride", "cymbal", "kick", "snare", "tom")):
         return "drums"
     if "bass" in key:
         return "bass"
@@ -3959,6 +4754,16 @@ def _corrcoef(first: np.ndarray, second: np.ndarray) -> float:
 
 def _name_key(name: str) -> str:
     return " ".join(Path(name).stem.lower().replace("_", " ").replace("-", " ").split())
+
+
+def _is_backing_vocal_key(key: str) -> bool:
+    return (
+        "back vox" in key
+        or "back vocal" in key
+        or "bgv" in key
+        or key == "backs"
+        or key.startswith("backs ")
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
