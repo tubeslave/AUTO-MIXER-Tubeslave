@@ -1,0 +1,17 @@
+{
+  "name": "automixer-mcp-director",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local MCP Paperclip Director for AUTO-MIXER-Tubeslave.",
+  "type": "commonjs",
+  "bin": {
+    "automixer-mcp-director": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "smoke": "node smoke_test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
