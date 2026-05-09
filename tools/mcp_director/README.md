@@ -1,50 +1,65 @@
-# AUTO-MIXER MCP Director
+# Automixer MCP Director
 
-Local stdio MCP server for routing GPT/Codex work into Paperclip-style task and report artifacts.
+This MCP server exposes tools for:
 
-## Tools
+- `create_task` — создать задачу в `.paperclip/tasks/`
+- `run_agent` — подготовить задачу для агента (DSP / ML / Refactor / Analyzer)
+- `run_full_review` — запустить полный multi-agent обзор
+- `git_report` — сгенерировать отчёт по git-статусу
+- `telegram_notify` — отправить уведомление в Telegram
 
-- `create_task`: writes `.paperclip/tasks/*.json`.
-- `run_agent`: creates a task and writes a DSP/ML/Refactor/Analyzer report. By default it is dry-run and does not invoke Codex.
-- `run_full_review`: creates per-agent tasks and a combined review report.
-- `git_report`: writes a read-only git report to `.paperclip/reports/*.md`.
-- `telegram_notify`: writes a notification report and only calls Telegram when `dryRun:false`.
-
-## Safety Defaults
-
-- External side effects default to `dryRun:true`.
-- Codex CLI execution, when explicitly enabled with `dryRun:false`, uses `codex exec -s read-only`.
-- If `codex` is not in `PATH`, `run_agent` writes a manual Markdown fallback task under `.paperclip/reports`.
-- The server refuses to write Paperclip artifacts on `main`, `master`, `production`, `prod`, or `release`.
-- Set `MCP_DIRECTOR_REQUIRED_BRANCH=feature/mcp-director` if you want to hard-pin writes to this branch.
-- The server never uses shell interpolation for git/Codex/Telegram calls.
-
-## Run Locally
+## Install
 
 ```bash
-cd /Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main
-node tools/mcp_director/server.js
+cd tools/mcp_director
+npm install
+npm start
 ```
 
-## Connect To Codex
-
-From any terminal:
+## Environment
 
 ```bash
-codex mcp add --env MCP_DIRECTOR_REPO=/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main automixer-director -- node /Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/mcp_director/server.js
-codex mcp list
-codex mcp get automixer-director
+export AUTOMIXER_PROJECT_DIR="/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main"
+export TELEGRAM_BOT_TOKEN="your_bot_token"
+export TELEGRAM_CHAT_ID="your_chat_id"
 ```
 
-Optional stricter branch guard:
+## Codex MCP config
 
-```bash
-codex mcp add --env MCP_DIRECTOR_REPO=/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main --env MCP_DIRECTOR_REQUIRED_BRANCH=feature/mcp-director automixer-director -- node /Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/mcp_director/server.js
+Add a local MCP server command:
+
+```json
+{
+  "mcpServers": {
+    "automixer-paperclip-director": {
+      "command": "node",
+      "args": ["/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/mcp_director/server.js"],
+      "env": {
+        "AUTOMIXER_PROJECT_DIR": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main"
+      }
+    }
+  }
+}
 ```
 
-## Verify
+## Architecture
 
-```bash
-cd /Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/mcp_director
-npm run smoke
+```
+iPhone GPT Chat / Codex
+        ↓
+       MCP
+        ↓
+  Paperclip Director  ←  этот сервер
+        ↓
+ ┌───────────────┐
+ │ Codex Agents  │
+ │ DSP Agent     │
+ │ ML Agent      │
+ │ Refactor      │
+ │ Analyzer      │
+ └───────────────┘
+        ↓
+ Git Branches / Reports
+        ↓
+  Telegram / GPT Chat
 ```
