@@ -30,6 +30,7 @@ def register_handlers(server):
             websocket,
             enabled=bool(data.get("live_apply_enabled", False)),
             analysis_only_mode=data.get("analysis_only_mode"),
+            confirm_live_apply=data.get("confirm_live_apply"),
         )
 
     return {

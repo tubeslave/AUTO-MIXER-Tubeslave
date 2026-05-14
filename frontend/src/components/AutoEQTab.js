@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import websocketService from '../services/websocket';
 import './AutoEQTab.css';
 import SignalHint from './SignalHint';

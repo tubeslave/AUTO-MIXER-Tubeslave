@@ -1,165 +1,193 @@
 # Архитектура AUTO-MIXER-Tubeslave
 
-## Обзор
+## Статус документа
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (React/Electron)                  │
-│  Components: EQ, Compressor, Fader, Gate, Panner, Reverb,   │
-│              Soundcheck, GainStaging, CrossAdaptiveEQ        │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ WebSocket (ws://localhost:8765)
-┌──────────────────────▼──────────────────────────────────────┐
-│                   server.py (координатор)                     │
-│  - Регистрирует handlers из backend/handlers/                │
-│  - WebSocket маршрутизация сообщений                         │
-│  - convert_numpy_types() для JSON сериализации               │
-└───┬──────────┬──────────┬──────────┬────────────────────────┘
-    │          │          │          │
-┌───▼───┐ ┌───▼───┐ ┌───▼────┐ ┌───▼──────────────┐
-│Handlers│ │Agents │ │   AI   │ │    ML Pipeline   │
-│ (14)   │ │       │ │        │ │                  │
-└───┬────┘ └───┬───┘ └───┬────┘ └───┬──────────────┘
-    │          │          │          │
-┌───▼──────────▼──────────▼──────────▼────────────────────────┐
-│              Core Services Layer                              │
-│  ThreadSafeMixerState │ AudioCapture │ FeedbackDetector      │
-│  ConfigManager        │ SessionManager│ Auth + TLS           │
-└───┬──────────────────────────────────┬──────────────────────┘
-    │                                  │
-┌───▼──────────┐              ┌────────▼──────────┐
-│  WingClient  │              │   DLiveClient     │
-│  (OSC/UDP)   │              │   (MIDI/TCP)      │
-│  port 2223   │              │   port 51328      │
-└──────────────┘              └───────────────────┘
-```
+Этот документ описывает текущее архитектурное состояние репозитория и должен читаться вместе с:
 
-## Слои
+- `docs/runtime_ownership_matrix.md`
+- `docs/current_architecture_map.md`
+- `docs/console_write_safety_policy.md`
 
-### 1. Frontend Layer
-- **React 18** + **Electron** для desktop
-- Компоненты в `frontend/src/components/` — по табу на каждый модуль автоматизации
-- Связь с backend через единый WebSocket на порт 8765
-- State management: локальный React state, синхронизация через WS messages
+Если между этим документом и кодом есть расхождение, источником истины для runtime ownership и console-write semantics считаются документы выше.
 
-### 2. WebSocket Handlers (`backend/handlers/`)
-Каждый handler — отдельный модуль, регистрируется через `register_all_handlers()`:
+## Краткий обзор
 
-| Handler | Файл | Ответственность |
-|---------|------|-----------------|
-| Audio | `audio_handlers.py` | Аудио устройства, capture, уровни |
-| Automation | `automation_handlers.py` | Управление модулями автоматизации |
-| Channel Scan | `channel_scan_handlers.py` | Сканирование каналов, распознавание |
-| Compressor | `compressor_handlers.py` | Auto-compressor параметры |
-| Connection | `connection_handlers.py` | Подключение к пульту |
-| EQ | `eq_handlers.py` | Auto-EQ, cross-adaptive EQ |
-| Fader | `fader_handlers.py` | Auto-fader, LUFS-based |
-| Gain Staging | `gain_staging_handlers.py` | LUFS gain staging |
-| Mixer | `mixer_handlers.py` | Общие операции с пультом |
-| Phase | `phase_handlers.py` | GCC-PHAT фазовое выравнивание |
-| Routing | `routing_handlers.py` | Dante/аналоговый маршрутизация |
-| Snapshot | `snapshot_handlers.py` | Загрузка/сохранение снапшотов |
-| Soundcheck | `soundcheck_handlers.py` | Автоматический саундчек |
-| Voice | `voice_handlers.py` | Голосовое управление |
+- Canonical live coordinator: `backend/server.py`
+- Canonical live input trim path: `backend/server.py -> backend/arrangement_automation/live_input_trim_controller.py`
+- `automixer/production_mix_v1` — offline-first pipeline, не live runtime
+- `backend/auto_soundcheck_engine.py` — active but overlapping path, не canonical live runtime
+- Panic stop is not system-wide
 
-### 3. Agent System (`backend/agents/`)
-Multi-agent с координатором:
+Этот репозиторий больше не следует описывать как один единый canonical runtime. В нём есть несколько пересекающихся live, offline, research и legacy surfaces.
 
-```
-Coordinator
-├── GainAgent      — LUFS gain staging, trim
-├── EQAgent        — Параметрический EQ, HPF, cross-adaptive
-└── FaderAgent     — Авто-фейдеры, баланс, приоритеты
-```
+## Live / Offline Split
 
-- `base_agent.py` — ABC с жизненным циклом (IDLE → RUNNING → PAUSED → STOPPED)
-- `coordinator.py` — оркестратор: разрешает конфликты между агентами, лимит действий/цикл
-- Каждый агент работает в своём asyncio task, общается через ThreadSafeMixerState
+### Active Live Runtime
 
-### 4. AI Layer (`backend/ai/`)
-- `agent.py` — LLM Orchestrator: получает состояние микса, вызывает function calling
-- `knowledge_base.py` — ChromaDB + sentence-transformers для RAG
-- `llm_client.py` — абстракция над Ollama (локальный llama3) и Perplexity API
-- `rule_engine.py` — детерминированный fallback, когда LLM недоступен
-- Knowledge: `ai/knowledge/` — instrument_profiles, mixing_rules, troubleshooting, wing_osc_reference
+- `frontend/src/services/websocket.js`: основной UI transport к backend runtime
+- `backend/server.py`: основной live runtime coordinator
+- `backend/handlers/`: WebSocket handler surface
+- `backend/audio_capture.py`: shared live audio input service
+- `backend/live_apply.py`: текущий gated write service для approved manual scope
+- `backend/arrangement_automation/live_input_trim_controller.py`: canonical live input trim path
+- `backend/wing_client.py` и `backend/osc/enhanced_osc_client.py`: live console transport layer
 
-### 5. ML Pipeline (`backend/ml/`)
-PyTorch модели для intelligent mixing:
+### Active Offline Runtime
 
-| Модуль | Назначение |
-|--------|-----------|
-| `channel_classifier.py` | Классификация инструментов (25 классов) по спектру |
-| `gain_pan_predictor.py` | SE-based предиктор gain/pan по спектральным фичам |
-| `style_transfer.py` | Перенос стиля микса с референса |
-| `neural_mix_extractor.py` | Извлечение параметров (gain, EQ, comp) из dry/wet |
-| `differentiable_console.py` | Дифференцируемая модель микшерного пульта |
-| `processing_graph.py` | Модульный граф обработки с gradient optimization |
-| `losses.py` | Аудио loss-функции (spectral, LUFS, multi-resolution STFT) |
-| `lufs_targets.py` | Per-instrument LUFS targets |
-| `drc_onset.py` | DRC onset peak statistics |
-| `mix_quality.py` | Perceptual mix quality metric |
-| `eq_normalization.py` | EQ normalization pipeline |
-| `subgroup_mixer.py` | Subgroup mixing pipeline |
-| `reference_profiles.py` | Референсные профили по жанрам |
+- `automixer/production_mix_v1/__main__.py`
+- `automixer/production_mix_v1/pipeline.py`
+- `automixer/production_mix_v1/osc_queue.py`
 
-### 6. Core Services
+Этот путь считается offline-first и не должен описываться как live runtime.
 
-#### ThreadSafeMixerState (`thread_safety.py`)
-- `asyncio.Lock` для всех мутаций
-- Copy-on-read: `get_snapshot()` возвращает глубокую копию
-- `StateSnapshot` — immutable dataclass с timestamp
+### Active But Overlapping
 
-#### AudioCapture (`audio_capture.py`)
-- Единый сервис захвата аудио (Dante, SoundDevice, тестовые генераторы)
-- Ring buffer на N секунд
-- Subscribe pattern: модули подписываются на аудио-блоки
-- **Все модули используют AudioCapture. НЕ создавать свои PyAudio потоки.**
+- `start_soundcheck.py -> backend/auto_soundcheck_engine.py`
+- `backend/auto_fader.py`
+- `backend/arrangement_automation/controller.py`
 
-#### FeedbackDetector (`feedback_detector.py`)
-- FFT peak tracking для обнаружения обратной связи (< 50 мс)
-- Автоматический notch EQ (до 8 фильтров/канал, глубина до -12 дB)
-- Fallback: снижение фейдера если notch недостаточен
-- Абсолютный приоритет над другими агентами
+Эти поверхности активны в коде, но не являются canonical live runtime и не должны автоматически считаться approved live-control paths.
 
-#### ConfigManager (`config_manager.py`)
-- YAML-based конфигурация (`config/automixer.yaml`)
-- Hot-reload через watchdog (FileSystemEventHandler)
-- Валидация схемы при загрузке
+### Legacy / Unclear
 
-### 7. Mixer Clients
+- snapshot/load/reset utility scripts
+- `backend/handlers/snapshot_handlers.py` direct utility surface
+- `backend/auto_fader_v2/` ownership remains unclear
+- `mix_agent/` remains unclear/incomplete in the current workspace snapshot
 
-#### MixerClientBase (`mixer_client_base.py`)
-ABC определяет интерфейс: connect, disconnect, send, subscribe, get_state, set_fader, get_fader, set_eq, set_compressor, и др.
+### Research / Experimental
 
-#### WingClient (`wing_client.py`)
-- OSC/UDP на порт 2223 (инициация через 'WING?' на 2222)
-- Keepalive: XREMOTE каждые 5 сек
-- Throttle: ≤ 10 OSC/сек на адрес
-- Fader mapping: 0.0 = -∞, 0.7498 = 0 dB, 1.0 = +10 dB
+- `ai_mixing_pipeline/`
+- `backend/ai/`
+- `backend/ml/`
+- parts of `backend/auto_fader_v2/`
 
-#### DLiveClient (`dlive_client.py`)
-- MIDI over TCP на порт 51328/51329
-- NRPN 14-bit для faders, EQ, compressor
-- SysEx для расширенных параметров
-- Fader mapping: 0x0000 = -∞, 0x2AAA = 0 dB, 0x3FFF = +10 dB
+Research or experimental presence в репозитории не означает approval for live console control.
 
-## Потоки данных
+## Canonical Live Runtime
 
-### Саундчек (автоматический)
-```
-AudioCapture → ChannelClassifier → GainAgent (LUFS) → EQAgent (HPF + parametric)
-    → AutoCompressor → FeedbackDetector → MixerClient (OSC/MIDI) → Console
-```
+### Main Coordinator
 
-### Концерт (real-time)
-```
-AudioCapture → FeedbackDetector (приоритет!) → Coordinator
-    → [GainAgent | EQAgent | FaderAgent] → ThreadSafeMixerState
-    → MixerClient → Console
-```
+`backend/server.py` является canonical live coordinator.
 
-### AI-управляемый режим
-```
-User query → AI Agent → Knowledge Base (RAG) → LLM (function calling)
-    → Agents/Handlers → MixerClient → Console
-```
+Он отвечает за:
+
+- создание mixer client;
+- регистрацию handler surface;
+- lifecycles controller-ов;
+- audio capture lifecycle;
+- voice and automation entrypoints;
+- integration surface между frontend UI и live console control.
+
+### Canonical Live Input Trim
+
+Canonical live input trim path:
+
+`backend/server.py -> backend/arrangement_automation/live_input_trim_controller.py`
+
+Этот path считается canonical только для current live input trim ownership. Это не означает, что весь live write surface вокруг него автоматически approved.
+
+## Console-Write Boundaries
+
+### Approved Gated Path
+
+Текущий approved gated path узкий:
+
+- manual `set_fader`
+- manual `set_gain`
+- only through `LiveApplyService`
+
+Этот approved scope не должен описываться шире без отдельного approval.
+
+### Blocked-At-Gate Paths
+
+- manual `set_eq`
+- manual `set_compressor`
+
+Эти операции имеют handler surface, но не должны описываться как approved real-write paths.
+
+### Direct Bypass Paths
+
+- `backend/auto_fader.py`
+- `backend/arrangement_automation/controller.py`
+- write-capable sections of `backend/auto_soundcheck_engine.py`
+- snapshot/load/save utility and script surfaces
+
+Direct bypass path не должен описываться как gated только потому, что он использует существующий mixer client или соседствует с approved runtime path.
+
+### Emergency Exception Candidate
+
+- `backend/feedback_detector.py`
+- `backend/auto_soundcheck_engine.py::_handle_feedback_event`
+
+Feedback detector path должен описываться только как safety-critical emergency exception candidate. Это не approved exception.
+
+### Operator-Only Legacy Tools
+
+- `backend/restore_channels.py`
+- `backend/load_snap.py`
+- `backend/load_snap_v2.py`
+- `backend/load_snap_final.py`
+- `backend/find_and_load_snap.py`
+- `backend/scan_and_load_snap.py`
+- `backend/reset_all_channels.py`
+- `backend/reset_modules_trim_faders.py`
+- `backend/reset_mixer.sh`
+
+Эти paths следует считать operator-only legacy tools, а не частью approved live runtime.
+
+## Safety Semantics
+
+### Panic Stop
+
+- Panic stop is not system-wide
+- Current documented panic-stop semantics cover only manual `LiveApplyService` paths
+
+Нельзя описывать текущую систему так, будто все live writes already protected panic-stop logic.
+
+### Feedback Detector
+
+- feedback detector is a safety-critical emergency exception candidate
+- it is not an approved exception
+- it requires separate policy review before any live-scope expansion
+
+### Offline Sender Attachment
+
+- offline real sender attachment is not approved without unified console-write gate and separate approval
+- `automixer/production_mix_v1` не является live runtime
+- offline pipelines не должны описываться как approved for real console use только потому, что у них есть queue or sender plumbing
+
+## Architectural Notes
+
+### Frontend And Handler Surface
+
+- UI входит через WebSocket layer
+- handler surface остаётся важной частью live runtime map
+- presence of a handler does not equal approval for real console writes
+
+### Audio Path
+
+- `backend/audio_capture.py` остаётся shared capture service for live analyzers and automation
+- live modules должны reuse this service instead of creating parallel capture ownership
+
+### Transport Layer
+
+- Wing transport remains the main live-console target surface
+- `backend/osc/enhanced_osc_client.py` is a transport wrapper, not a policy gate
+- transport availability does not imply approved write scope
+
+## Open Decisions
+
+Следующие формулировки намеренно не закрыты этим документом и остаются open decisions:
+
+- whether feedback reaction path should ever become an approved emergency exception
+- whether operator-only legacy utility tools should remain available or later move into archival/removal planning
+- whether any offline pipeline may ever attach to a real sender, and under which unified gate model
+- whether canonical live input trim should later become explicitly approved write scope
+- whether a true global panic-stop capability should ever be designed and approved separately
+
+## Related Documents
+
+- `docs/runtime_ownership_matrix.md`
+- `docs/current_architecture_map.md`
+- `docs/console_write_safety_policy.md`

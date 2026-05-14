@@ -7,3 +7,94 @@
 .positive { color: #3fb950; }
 .negative { color: #f85149; }
 .has-signal td:first-child { border-left: 2px solid #3fb950; }
+.autogain-supervision-card {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(22, 27, 34, 0.96), rgba(13, 17, 23, 0.96));
+}
+.autogain-supervision-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.autogain-supervision-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f0f6fc;
+}
+.autogain-badge,
+.autogain-status-pill,
+.autogain-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.autogain-badge,
+.autogain-status-pill {
+  padding: 5px 10px;
+}
+.autogain-chip {
+  padding: 4px 9px;
+  background: #161b22;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+}
+.autogain-badge.idle,
+.autogain-status-pill.idle,
+.autogain-status-pill.neutral {
+  background: #1f2937;
+  color: #d1d5db;
+}
+.autogain-badge.dry-run {
+  background: rgba(31, 111, 235, 0.18);
+  color: #79c0ff;
+}
+.autogain-badge.live-ready,
+.autogain-status-pill.warning,
+.autogain-chip.warning {
+  background: rgba(240, 136, 62, 0.18);
+  color: #f2cc60;
+}
+.autogain-badge.live-applying,
+.autogain-status-pill.success,
+.autogain-chip.trusted {
+  background: rgba(63, 185, 80, 0.18);
+  color: #56d364;
+}
+.autogain-status-pill.danger,
+.autogain-chip.untrusted {
+  background: rgba(248, 81, 73, 0.16);
+  color: #ff7b72;
+}
+.autogain-supervision-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.autogain-status-text {
+  color: #8b949e;
+  font-size: 0.86rem;
+}
+.autogain-confirmation-banner {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(240, 136, 62, 0.12);
+  border: 1px solid rgba(240, 136, 62, 0.35);
+  color: #f2cc60;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.autogain-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

@@ -19,6 +19,11 @@ from wing_client import WingClient
 import time
 import logging
 import sys
+from maintenance_cli_guard import (
+    extract_maintenance_cli_args,
+    validate_maintenance_cli_request,
+    format_block_message,
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -269,7 +274,33 @@ def reset_all_channels(auto_confirm=False):
 
 
 if __name__ == "__main__":
-    import sys
-    # Разрешить автоматическое подтверждение с флагом --yes
-    auto_confirm = '--yes' in sys.argv or '-y' in sys.argv
+    try:
+        args, maintenance_ctx = extract_maintenance_cli_args(sys.argv[1:])
+    except ValueError:
+        print("Использование: python3 reset_modules_trim_faders.py [IP] [PORT]")
+        print("  --confirm-maintenance")
+        print("  --rollback-snapshot PATH")
+        print("  --yes")
+        print("  --dry-run")
+        raise SystemExit(1)
+
+    auto_confirm = "--yes" in sys.argv[1:] or "-y" in sys.argv[1:]
+    approved, reason = validate_maintenance_cli_request(
+        operation="reset_all_functions",
+        confirm_maintenance=maintenance_ctx["confirm_maintenance"],
+        rollback_snapshot_path=maintenance_ctx["rollback_snapshot_path"],
+        dry_run=maintenance_ctx["dry_run"],
+    )
+    if not approved:
+        logger.error(format_block_message(reason))
+        raise SystemExit(1)
+
+    if maintenance_ctx["dry_run"]:
+        logger.info("Dry run: reset_all_channels skipped (rollback plan required for real execution)")
+        raise SystemExit(0)
+
+    # Поддержка аргументов позиционно после вырезания maintenance-флагов.
+    if args:
+        # Восстановить совместимость: IP и порт передаются как ранее.
+        sys.argv = [sys.argv[0]] + args
     reset_all_channels(auto_confirm=auto_confirm)

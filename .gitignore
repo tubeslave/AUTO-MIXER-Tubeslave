@@ -77,3 +77,4 @@ backend/venv/
 .claude/
 GitHub/
 sessions/test_*.json
+production_mix_v1_out/

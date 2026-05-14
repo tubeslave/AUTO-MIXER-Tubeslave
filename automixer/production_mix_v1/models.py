@@ -224,6 +224,7 @@ class OSCCommand:
     action: dict[str, Any] = field(default_factory=dict)
     dry_run_only: bool = True
     rationale: str = ""
+    replay_correlation_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return jsonable(asdict(self))

@@ -2659,9 +2659,47 @@ class AutoEQController:
         }
 
 
-def room_analysis_stub(sample_rate: int = 48000) -> Dict[str, Any]:
-    """Placeholder for Room Analysis (RTA with pink noise). Not implemented; returns stub result."""
-    return {"implemented": False, "message": "Room analysis (RTA) not implemented", "sample_rate": sample_rate}
+def room_analysis_stub(
+    sample_rate: int = 48000,
+    impulse_response: Optional[np.ndarray] = None,
+    measurement_result: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """
+    Dry-run room analysis bridge.
+
+    If a measurement result or impulse response is provided, reuse the system
+    measurement room-response analyzer. Otherwise return the supported schema so
+    callers know this path is implemented but requires measurement data.
+    """
+    from system_measurement import analyze_room_response
+
+    if measurement_result is not None:
+        room = getattr(measurement_result, "room_analysis", None)
+        if room is not None:
+            payload = room.to_dict() if hasattr(room, "to_dict") else dict(room)
+            payload.update({"implemented": True, "dry_run_only": True, "sample_rate": sample_rate})
+            return payload
+        impulse_response = getattr(measurement_result, "impulse_response", impulse_response)
+
+    if impulse_response is not None and len(impulse_response) > 0:
+        payload = analyze_room_response(np.asarray(impulse_response), sample_rate=sample_rate).to_dict()
+        payload.update({"implemented": True, "dry_run_only": True, "sample_rate": sample_rate})
+        return payload
+
+    return {
+        "implemented": True,
+        "dry_run_only": True,
+        "message": "Room analysis is available but requires a measurement_result or impulse_response input.",
+        "sample_rate": sample_rate,
+        "supported_environments": [
+            "dry",
+            "reflective_hall",
+            "conference_room",
+            "noisy_venue",
+            "live_stage",
+            "mixed",
+        ],
+    }
 
 
 def resolve_frequency_conflicts(corrections_per_channel: Dict[int, List[EQBand]], low_band_freq_range: Tuple[float, float] = (100.0, 200.0)) -> Dict[int, List[EQBand]]:

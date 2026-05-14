@@ -29,8 +29,13 @@ from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from scipy.fft import fft, ifft
-from scipy.signal import convolve, correlate, find_peaks
+from scipy.signal import butter, convolve, correlate, find_peaks, sosfiltfilt
 from scipy.interpolate import interp1d
+
+from room_compensation_planner import (
+    RoomCompensationPlanner,
+    build_room_compensation_operator_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +66,7 @@ class MeasurementPosition:
     y: float
     height: float
     mic_response: np.ndarray = field(default_factory=lambda: np.array([]))
+    impulse_response: np.ndarray = field(default_factory=lambda: np.array([]))
     timestamp: float = 0.0
     quality_score: float = 0.0
     
@@ -123,12 +129,78 @@ class RT60Data:
 
 
 @dataclass
+class BandDecayMetric:
+    """Per-band decay and clarity proxy."""
+    band_hz: float
+    rt60_s: float
+    early_late_ratio_db: float
+
+    def to_dict(self) -> Dict[str, float]:
+        return {
+            'band_hz': float(self.band_hz),
+            'rt60_s': float(self.rt60_s),
+            'early_late_ratio_db': float(self.early_late_ratio_db),
+        }
+
+
+@dataclass
+class SpeechClarityData:
+    """Speech clarity proxy derived from early/late energy."""
+    c50_db: float = 0.0
+    d50: float = 0.0
+    clarity_score: float = 0.0
+
+    def to_dict(self) -> Dict[str, float]:
+        return {
+            'c50_db': float(self.c50_db),
+            'd50': float(self.d50),
+            'clarity_score': float(self.clarity_score),
+        }
+
+
+@dataclass
+class RoomAnalysisResult:
+    """Dry-run room-response analysis output."""
+    environment: str = "unknown"
+    confidence: float = 0.0
+    candidate_scores: Dict[str, float] = field(default_factory=dict)
+    avg_rt60_s: float = 0.0
+    low_rt60_s: float = 0.0
+    mid_rt60_s: float = 0.0
+    high_rt60_s: float = 0.0
+    resonance_persistence: float = 0.0
+    coloration_delta_db: float = 0.0
+    noise_floor_db: float = 0.0
+    coherence_mean: float = 0.0
+    speech_clarity: SpeechClarityData = field(default_factory=SpeechClarityData)
+    band_decay: List[BandDecayMetric] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'environment': self.environment,
+            'confidence': float(self.confidence),
+            'candidate_scores': {key: float(value) for key, value in self.candidate_scores.items()},
+            'avg_rt60_s': float(self.avg_rt60_s),
+            'low_rt60_s': float(self.low_rt60_s),
+            'mid_rt60_s': float(self.mid_rt60_s),
+            'high_rt60_s': float(self.high_rt60_s),
+            'resonance_persistence': float(self.resonance_persistence),
+            'coloration_delta_db': float(self.coloration_delta_db),
+            'noise_floor_db': float(self.noise_floor_db),
+            'coherence_mean': float(self.coherence_mean),
+            'speech_clarity': self.speech_clarity.to_dict(),
+            'band_decay': [item.to_dict() for item in self.band_decay],
+        }
+
+
+@dataclass
 class MeasurementResult:
     """Complete measurement result."""
     magnitude_response: FrequencyResponse = field(default_factory=FrequencyResponse)
     phase_response: FrequencyResponse = field(default_factory=FrequencyResponse)
     impulse_response: np.ndarray = field(default_factory=lambda: np.ndarray([]))
     rt60: RT60Data = field(default_factory=RT60Data)
+    room_analysis: RoomAnalysisResult = field(default_factory=RoomAnalysisResult)
     positions: List[MeasurementPosition] = field(default_factory=list)
     timestamp: float = 0.0
     overall_quality: float = 0.0
@@ -139,9 +211,315 @@ class MeasurementResult:
             'phase': self.phase_response.phase_deg.tolist(),
             'frequencies': self.magnitude_response.frequencies.tolist(),
             'rt60': self.rt60.to_dict(),
+            'room_analysis': self.room_analysis.to_dict(),
             'positions': [p.to_dict() for p in self.positions],
             'quality': self.overall_quality
         }
+
+
+class RoomResponseAnalyzer:
+    """Extract room-response metrics and classify the acoustic environment."""
+
+    OCTAVE_BANDS = [63, 125, 250, 500, 1000, 2000, 4000, 8000]
+    SPEECH_LOW_HZ = 500.0
+    SPEECH_HIGH_HZ = 4000.0
+
+    def __init__(self, sample_rate: int = 48000, fft_size: int = 65536):
+        self.sample_rate = sample_rate
+        self.fft_size = fft_size
+
+    def analyze(
+        self,
+        impulse_response: np.ndarray,
+        magnitude_db: Optional[np.ndarray] = None,
+        frequencies: Optional[np.ndarray] = None,
+        coherence: Optional[np.ndarray] = None,
+        rt60_data: Optional[RT60Data] = None,
+        overall_quality: float = 1.0,
+    ) -> RoomAnalysisResult:
+        room = RoomAnalysisResult()
+        ir = np.asarray(impulse_response, dtype=np.float64)
+        if ir.ndim != 1 or ir.size == 0:
+            return room
+
+        if rt60_data is None or not rt60_data.rt60:
+            rt60_data = self.calculate_rt60(ir)
+
+        if magnitude_db is None or frequencies is None or len(magnitude_db) == 0 or len(frequencies) == 0:
+            magnitude_db, frequencies = self.calculate_magnitude_response(ir)
+
+        band_decay = self._calculate_band_decay(ir, rt60_data)
+        room.band_decay = band_decay
+        room.avg_rt60_s = float(np.median(rt60_data.rt60)) if rt60_data.rt60 else 0.0
+        room.low_rt60_s = self._band_group_average(rt60_data, max_band=250.0)
+        room.mid_rt60_s = self._band_group_average(rt60_data, min_band=500.0, max_band=2000.0)
+        room.high_rt60_s = self._band_group_average(rt60_data, min_band=4000.0)
+        room.coherence_mean = float(np.mean(coherence)) if coherence is not None and len(coherence) else float(overall_quality)
+        room.noise_floor_db = self._estimate_noise_floor_db(ir)
+        room.coloration_delta_db = self._calculate_coloration_delta_db(magnitude_db, frequencies)
+        room.resonance_persistence = self._calculate_resonance_persistence(magnitude_db, frequencies, rt60_data)
+        room.speech_clarity = self._calculate_speech_clarity(ir)
+
+        scores = self._classify(room, overall_quality)
+        room.candidate_scores = scores
+        ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+        if ranked:
+            room.environment = ranked[0][0]
+            room.confidence = float(ranked[0][1])
+        return room
+
+    def calculate_magnitude_response(self, impulse_response: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        padded = np.zeros(self.fft_size)
+        padded[:min(len(impulse_response), self.fft_size)] = impulse_response[:min(len(impulse_response), self.fft_size)]
+        spectrum = fft(padded)
+        magnitude = np.abs(spectrum[:self.fft_size // 2])
+        magnitude_db = 20 * np.log10(magnitude + 1e-10)
+        frequencies = np.linspace(0, self.sample_rate / 2, len(magnitude))
+        return magnitude_db, frequencies
+
+    def calculate_coherence(self, impulse_responses: List[np.ndarray]) -> np.ndarray:
+        if not impulse_responses:
+            return np.array([])
+
+        spectra: List[np.ndarray] = []
+        for response in impulse_responses:
+            padded = np.zeros(self.fft_size)
+            padded[:min(len(response), self.fft_size)] = response[:min(len(response), self.fft_size)]
+            spectra.append(np.abs(fft(padded)[:self.fft_size // 2]))
+
+        if len(spectra) == 1:
+            response = np.asarray(impulse_responses[0], dtype=np.float64)
+            early = np.sum(response[:max(1, int(0.02 * self.sample_rate))] ** 2)
+            late = np.sum(response[max(1, int(0.02 * self.sample_rate)):] ** 2) + 1e-12
+            scalar = float(np.clip(early / (early + late), 0.35, 0.99))
+            return np.full(self.fft_size // 2, scalar, dtype=np.float64)
+
+        mag_stack = np.vstack(spectra)
+        mean_mag = np.mean(mag_stack, axis=0)
+        std_mag = np.std(mag_stack, axis=0)
+        coherence = mean_mag / (mean_mag + std_mag + 1e-9)
+        coherence = np.clip(coherence, 0.0, 1.0)
+        kernel = np.ones(9, dtype=np.float64) / 9.0
+        return np.convolve(coherence, kernel, mode='same')
+
+    def calculate_rt60(self, impulse_response: np.ndarray) -> RT60Data:
+        rt60_data = RT60Data()
+        for band in self.OCTAVE_BANDS:
+            band_signal = self._band_limit_signal(
+                impulse_response,
+                band / np.sqrt(2.0),
+                min(self.sample_rate / 2.0 - 1.0, band * np.sqrt(2.0)),
+            )
+            rt60_data.bands.append(float(band))
+            rt60_data.rt60.append(float(self._estimate_rt60_seconds(band_signal)))
+        return rt60_data
+
+    def _band_limit_signal(self, signal: np.ndarray, low_hz: float, high_hz: float) -> np.ndarray:
+        signal = np.asarray(signal, dtype=np.float64)
+        if signal.size == 0:
+            return np.array([], dtype=np.float64)
+        low = max(10.0, float(low_hz))
+        high = min(float(high_hz), self.sample_rate / 2.0 - 50.0)
+        if high <= low:
+            return signal.copy()
+        sos = butter(4, [low, high], btype='bandpass', fs=self.sample_rate, output='sos')
+        return sosfiltfilt(sos, signal)
+
+    def _estimate_rt60_seconds(self, signal: np.ndarray) -> float:
+        if signal.size == 0:
+            return 0.1
+        energy = np.square(np.asarray(signal, dtype=np.float64))
+        if not np.any(energy > 1e-12):
+            return 0.1
+        schroeder = np.cumsum(energy[::-1])[::-1]
+        schroeder /= schroeder[0] + 1e-12
+        schroeder_db = 10.0 * np.log10(schroeder + 1e-12)
+
+        start = np.where(schroeder_db <= -5.0)[0]
+        end = np.where(schroeder_db <= -25.0)[0]
+        if len(start) > 0 and len(end) > 0 and end[0] > start[0]:
+            idx = np.arange(start[0], end[0] + 1)
+            slope, intercept = np.polyfit(idx / self.sample_rate, schroeder_db[idx], 1)
+            if slope < -1e-6:
+                rt60 = -60.0 / slope
+                return float(np.clip(rt60, 0.08, 5.0))
+
+        alt_end = np.where(schroeder_db <= -15.0)[0]
+        if len(start) > 0 and len(alt_end) > 0 and alt_end[0] > start[0]:
+            delta_t = (alt_end[0] - start[0]) / self.sample_rate
+            return float(np.clip(delta_t * 6.0, 0.08, 5.0))
+
+        direct = np.argmax(np.abs(signal))
+        tail_energy = np.sum(energy[direct:])
+        if tail_energy <= 1e-12:
+            return 0.1
+        threshold = energy[direct] * 1e-6
+        below = np.where(energy[direct:] <= threshold)[0]
+        if len(below) > 0:
+            return float(np.clip(below[0] / self.sample_rate, 0.08, 5.0))
+        return 1.0
+
+    def _calculate_band_decay(self, impulse_response: np.ndarray, rt60_data: RT60Data) -> List[BandDecayMetric]:
+        band_metrics: List[BandDecayMetric] = []
+        early_samples = max(1, int(0.05 * self.sample_rate))
+        for band, rt60_s in zip(rt60_data.bands, rt60_data.rt60):
+            band_signal = self._band_limit_signal(
+                impulse_response,
+                band / np.sqrt(2.0),
+                min(self.sample_rate / 2.0 - 1.0, band * np.sqrt(2.0)),
+            )
+            early = np.sum(np.square(band_signal[:early_samples])) + 1e-12
+            late = np.sum(np.square(band_signal[early_samples:])) + 1e-12
+            ratio_db = 10.0 * np.log10(early / late)
+            band_metrics.append(BandDecayMetric(float(band), float(rt60_s), float(ratio_db)))
+        return band_metrics
+
+    def _calculate_speech_clarity(self, impulse_response: np.ndarray) -> SpeechClarityData:
+        speech_signal = self._band_limit_signal(impulse_response, self.SPEECH_LOW_HZ, self.SPEECH_HIGH_HZ)
+        early_samples = max(1, int(0.05 * self.sample_rate))
+        early = np.sum(np.square(speech_signal[:early_samples])) + 1e-12
+        late = np.sum(np.square(speech_signal[early_samples:])) + 1e-12
+        total = early + late
+        c50_db = 10.0 * np.log10(early / late)
+        d50 = early / total
+        clarity_score = np.clip((c50_db + 6.0) / 12.0, 0.0, 1.0) * 0.7 + np.clip(d50, 0.0, 1.0) * 0.3
+        return SpeechClarityData(float(c50_db), float(d50), float(np.clip(clarity_score, 0.0, 1.0)))
+
+    def _estimate_noise_floor_db(self, impulse_response: np.ndarray) -> float:
+        ir = np.asarray(impulse_response, dtype=np.float64)
+        if ir.size == 0:
+            return -120.0
+        tail = ir[-max(1, int(0.02 * self.sample_rate)):]
+        peak = np.max(np.abs(ir)) + 1e-12
+        tail_rms = np.sqrt(np.mean(np.square(tail))) + 1e-12
+        return float(20.0 * np.log10(tail_rms / peak))
+
+    def _calculate_coloration_delta_db(self, magnitude_db: np.ndarray, frequencies: np.ndarray) -> float:
+        mask = (frequencies >= 125.0) & (frequencies <= 8000.0)
+        if not np.any(mask):
+            return 0.0
+        selected = magnitude_db[mask]
+        if selected.size < 5:
+            return 0.0
+        kernel = np.ones(17, dtype=np.float64) / 17.0
+        smoothed = np.convolve(selected, kernel, mode='same')
+        deviation = smoothed - np.median(smoothed)
+        return float(np.sqrt(np.mean(np.square(deviation))))
+
+    def _calculate_resonance_persistence(self, magnitude_db: np.ndarray, frequencies: np.ndarray, rt60_data: RT60Data) -> float:
+        mask = (frequencies >= 80.0) & (frequencies <= 4000.0)
+        if np.any(mask):
+            selected = magnitude_db[mask]
+            baseline = np.median(selected)
+            deviations = selected - baseline
+            peaks, properties = find_peaks(deviations, height=3.0, distance=12)
+            peak_strength = float(np.mean(properties['peak_heights'])) if len(peaks) else 0.0
+        else:
+            peak_strength = 0.0
+        spread = float(np.std(rt60_data.rt60)) if rt60_data.rt60 else 0.0
+        low_mid_delta = max(0.0, self._band_group_average(rt60_data, max_band=250.0) - self._band_group_average(rt60_data, min_band=500.0, max_band=2000.0))
+        score = 0.35 * np.clip(peak_strength / 9.0, 0.0, 1.0)
+        score += 0.35 * np.clip(spread / 0.6, 0.0, 1.0)
+        score += 0.30 * np.clip(low_mid_delta / 0.5, 0.0, 1.0)
+        return float(np.clip(score, 0.0, 1.0))
+
+    def _band_group_average(self, rt60_data: RT60Data, min_band: float = 0.0, max_band: Optional[float] = None) -> float:
+        values = [
+            value
+            for band, value in zip(rt60_data.bands, rt60_data.rt60)
+            if band >= min_band and (max_band is None or band <= max_band)
+        ]
+        return float(np.mean(values)) if values else 0.0
+
+    def _classify(self, room: RoomAnalysisResult, overall_quality: float) -> Dict[str, float]:
+        rt60 = room.avg_rt60_s
+        clarity = room.speech_clarity.clarity_score
+        noise = room.noise_floor_db
+        coherence = room.coherence_mean
+        coloration = room.coloration_delta_db
+        resonance = room.resonance_persistence
+        low_rt60 = room.low_rt60_s
+        mid_rt60 = room.mid_rt60_s
+        quiet_factor = np.clip(((-noise) - 28.0) / 24.0, 0.0, 1.0)
+        noisy_factor = np.clip((noise + 28.0) / 18.0, 0.0, 1.0)
+
+        raw_scores = {
+            'dry': (
+                0.45 * np.clip((0.55 - rt60) / 0.45, 0.0, 1.0)
+                + 0.30 * clarity
+                + 0.10 * quiet_factor
+                + 0.15 * np.clip((1.0 - coloration / 6.0), 0.0, 1.0)
+            ) * (0.7 + 0.3 * quiet_factor),
+            'reflective_hall': (
+                0.45 * np.clip((rt60 - 1.1) / 1.2, 0.0, 1.0)
+                + 0.20 * np.clip((0.5 - clarity) / 0.5, 0.0, 1.0)
+                + 0.20 * np.clip((low_rt60 - mid_rt60 + 0.2) / 0.8, 0.0, 1.0)
+                + 0.15 * np.clip(coherence, 0.0, 1.0)
+            ) * (0.35 + 0.65 * quiet_factor) * (0.45 + 0.55 * coherence),
+            'conference_room': (
+                0.35 * (1.0 - min(1.0, abs(rt60 - 0.65) / 0.4))
+                + 0.25 * clarity
+                + 0.20 * np.clip(resonance, 0.0, 1.0)
+                + 0.20 * np.clip((coloration - 2.0) / 5.0, 0.0, 1.0)
+            ) * (0.65 + 0.35 * quiet_factor),
+            'noisy_venue': (
+                0.50 * noisy_factor
+                + 0.25 * np.clip((0.72 - coherence) / 0.35, 0.0, 1.0)
+                + 0.20 * np.clip((0.7 - overall_quality) / 0.5, 0.0, 1.0)
+                + 0.10 * np.clip((0.5 - clarity) / 0.5, 0.0, 1.0)
+            ),
+            'live_stage': (
+                0.30 * (1.0 - min(1.0, abs(rt60 - 0.55) / 0.45))
+                + 0.20 * np.clip((low_rt60 - mid_rt60 + 0.1) / 0.5, 0.0, 1.0)
+                + 0.20 * np.clip((0.88 - coherence) / 0.3, 0.0, 1.0)
+                + 0.15 * np.clip((noise + 40.0) / 20.0, 0.0, 1.0)
+                + 0.15 * np.clip(resonance, 0.0, 1.0)
+            ) * (0.65 + 0.35 * noisy_factor),
+        }
+
+        best_non_mixed = max(raw_scores.values()) if raw_scores else 0.0
+        sorted_raw = sorted(raw_scores.values(), reverse=True)
+        gap = sorted_raw[0] - sorted_raw[1] if len(sorted_raw) > 1 else sorted_raw[0] if sorted_raw else 0.0
+        raw_scores['mixed'] = (
+            0.20
+            + 0.35 * np.clip((0.14 - gap) / 0.14, 0.0, 1.0)
+            + 0.25 * np.clip(coloration / 8.0, 0.0, 1.0)
+            + 0.20 * np.clip(abs(low_rt60 - room.high_rt60_s) / 0.8, 0.0, 1.0)
+        )
+
+        total = sum(max(0.0, value) for value in raw_scores.values()) or 1.0
+        normalized = {key: float(max(0.0, value) / total) for key, value in raw_scores.items()}
+
+        top_label = max(normalized, key=normalized.get)
+        top_score = normalized[top_label]
+        second_score = max((score for label, score in normalized.items() if label != top_label), default=0.0)
+        if top_label != 'mixed' and (top_score < 0.34 or (top_score - second_score) < 0.06):
+            normalized['mixed'] = max(normalized['mixed'], top_score)
+            total = sum(normalized.values()) or 1.0
+            normalized = {key: float(value / total) for key, value in normalized.items()}
+
+        return normalized
+
+
+def analyze_room_response(
+    impulse_response: np.ndarray,
+    sample_rate: int = 48000,
+    magnitude_db: Optional[np.ndarray] = None,
+    frequencies: Optional[np.ndarray] = None,
+    coherence: Optional[np.ndarray] = None,
+    rt60_data: Optional[RT60Data] = None,
+    overall_quality: float = 1.0,
+) -> RoomAnalysisResult:
+    """Convenience wrapper for dry-run room-response analysis."""
+    analyzer = RoomResponseAnalyzer(sample_rate=sample_rate)
+    return analyzer.analyze(
+        impulse_response=impulse_response,
+        magnitude_db=magnitude_db,
+        frequencies=frequencies,
+        coherence=coherence,
+        rt60_data=rt60_data,
+        overall_quality=overall_quality,
+    )
 
 
 @dataclass
@@ -269,6 +647,7 @@ class SystemMeasurement:
     def __init__(self, sample_rate: int = 48000, fft_size: int = 65536):
         self.sample_rate = sample_rate
         self.fft_size = fft_size
+        self.room_response_analyzer = RoomResponseAnalyzer(sample_rate=sample_rate, fft_size=fft_size)
         
         self.sweep_generator = SineSweepGenerator(sample_rate)
         self.state = MeasurementState.IDLE
@@ -335,6 +714,7 @@ class SystemMeasurement:
             y=position[1],
             height=position[2],
             mic_response=recorded_signal,
+            impulse_response=impulse_response,
             timestamp=time.time()
         )
         
@@ -397,7 +777,7 @@ class SystemMeasurement:
             return MeasurementResult()
         
         # Average responses from all positions
-        avg_response = self._average_responses()
+        avg_response = self._average_impulse_responses()
         
         # Calculate frequency response
         magnitude, phase, freqs, coherence = self._calculate_frequency_response(avg_response)
@@ -409,15 +789,25 @@ class SystemMeasurement:
         result = MeasurementResult()
         result.magnitude_response.frequencies = freqs
         result.magnitude_response.magnitude_db = magnitude
+        result.magnitude_response.coherence = coherence
         result.phase_response.frequencies = freqs
         result.phase_response.phase_deg = phase
         result.phase_response.coherence = coherence
+        result.impulse_response = avg_response
         result.rt60 = rt60_data
         result.positions = self.recorded_responses.copy()
         result.timestamp = time.time()
         
         # Overall quality
         result.overall_quality = np.mean([p.quality_score for p in self.recorded_responses])
+        result.room_analysis = self.room_response_analyzer.analyze(
+            impulse_response=avg_response,
+            magnitude_db=magnitude,
+            frequencies=freqs,
+            coherence=coherence,
+            rt60_data=rt60_data,
+            overall_quality=result.overall_quality,
+        )
         
         self.state = MeasurementState.COMPLETE
         
@@ -426,20 +816,20 @@ class SystemMeasurement:
         
         return result
     
-    def _average_responses(self) -> np.ndarray:
+    def _average_impulse_responses(self) -> np.ndarray:
         """Average impulse responses from all positions (spatial averaging)."""
-        # For simplicity, average in time domain
-        # In production: use complex averaging in frequency domain
-        
-        max_len = max(len(p.mic_response) for p in self.recorded_responses)
+        sources = [
+            p.impulse_response if len(p.impulse_response) > 0 else p.mic_response
+            for p in self.recorded_responses
+        ]
+        max_len = max(len(response) for response in sources)
         averaged = np.zeros(max_len)
         
-        for pos in self.recorded_responses:
-            # Pad to same length
-            response = np.pad(pos.mic_response, (0, max_len - len(pos.mic_response)))
+        for response in sources:
+            response = np.pad(response, (0, max_len - len(response)))
             averaged += response
         
-        averaged /= len(self.recorded_responses)
+        averaged /= max(1, len(sources))
         
         return averaged
     
@@ -463,48 +853,17 @@ class SystemMeasurement:
         # Frequencies (use same length as magnitude)
         freqs = np.linspace(0, self.sample_rate/2, len(magnitude))
         
-        # Coherence (simplified - in production use multiple measurements)
-        coherence = np.ones_like(magnitude) * 0.95
+        coherence = self.room_response_analyzer.calculate_coherence(
+            [p.impulse_response if len(p.impulse_response) > 0 else p.mic_response for p in self.recorded_responses]
+        )
+        if len(coherence) != len(magnitude):
+            coherence = np.ones_like(magnitude) * 0.95
         
         return magnitude_db, phase_deg, freqs, coherence
     
     def _calculate_rt60(self, response: np.ndarray) -> RT60Data:
         """Calculate RT60 from impulse response using Schroeder integration."""
-        rt60_data = RT60Data()
-        
-        # Octave bands
-        bands = [63, 125, 250, 500, 1000, 2000, 4000, 8000]
-        
-        for band in bands:
-            # In production: bandpass filter and calculate RT60
-            # Simplified: estimate based on overall decay
-            
-            # Schroeder integration (backward cumulative sum of squared IR)
-            squared = response ** 2
-            schroeder = np.cumsum(squared[::-1])[::-1]
-            schroeder_db = 10 * np.log10(schroeder + 1e-10)
-            
-            # Find -60dB point
-            if len(schroeder_db) > 0:
-                max_db = schroeder_db[0]
-                idx_60db = np.where(schroeder_db <= max_db - 60)[0]
-                
-                if len(idx_60db) > 0:
-                    rt60 = idx_60db[0] / self.sample_rate
-                else:
-                    # Estimate from -30dB
-                    idx_30db = np.where(schroeder_db <= max_db - 30)[0]
-                    if len(idx_30db) > 0:
-                        rt60 = 2 * (idx_30db[0] / self.sample_rate)  # T30 * 2
-                    else:
-                        rt60 = 1.0  # Default
-            else:
-                rt60 = 1.0
-            
-            rt60_data.bands.append(band)
-            rt60_data.rt60.append(min(rt60, 5.0))  # Cap at 5 seconds
-        
-        return rt60_data
+        return self.room_response_analyzer.calculate_rt60(response)
 
 
 class CorrectionCalculator:
@@ -623,9 +982,11 @@ class SystemMeasurementController:
         
         self.measurement = SystemMeasurement(sample_rate)
         self.correction_calculator = CorrectionCalculator()
+        self.room_compensation_planner = RoomCompensationPlanner()
         
         self.last_result: Optional[MeasurementResult] = None
         self.applied_corrections: List[EQCorrection] = []
+        self.last_room_compensation_plan = None
         
         logger.info("SystemMeasurementController initialized")
     
@@ -660,15 +1021,24 @@ class SystemMeasurementController:
         # Calculate corrections
         corrections = self.correction_calculator.calculate_corrections(result)
         self.applied_corrections = corrections
+        plan = self.room_compensation_planner.plan(result, corrections)
+        self.last_room_compensation_plan = plan
         
         return {
             'status': 'complete',
             'quality': result.overall_quality,
             'rt60': result.rt60.to_dict(),
+            'room_analysis': result.room_analysis.to_dict(),
             'num_corrections': len(corrections),
             'corrections': [c.to_dict() for c in corrections],
             'frequencies': result.magnitude_response.frequencies.tolist(),
-            'magnitude': result.magnitude_response.magnitude_db.tolist()
+            'magnitude': result.magnitude_response.magnitude_db.tolist(),
+            'recommended_target': plan.recommended_target,
+            'room_compensation_plan': plan.to_dict(),
+            'room_compensation_operator_payload': build_room_compensation_operator_payload(
+                plan,
+                event_type='room_compensation_plan',
+            ),
         }
     
     def apply_corrections(self, target_bus: TargetBus, bus_id: int) -> bool:

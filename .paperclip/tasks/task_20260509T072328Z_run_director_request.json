@@ -1,0 +1,60 @@
+{
+  "id": "33d2539e-6f7c-4b6a-8b6f-8b5d3f7f9f30",
+  "source": "codex_session_guarded_artifact",
+  "sourceTool": "manual_director_record",
+  "projectRoot": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+  "createdAt": "2026-05-09T07:23:28Z",
+  "title": "Add Paperclip Connect run_director MCP tool",
+  "mode": "implementation_plan",
+  "requestedDryRun": true,
+  "dryRun": true,
+  "dryRunEnforced": true,
+  "sourceCodeChangesAllowed": false,
+  "codexAsExecutorAllowed": false,
+  "externalLlmAllowedForInternalRoles": false,
+  "writesAllowed": [
+    ".paperclip/tasks",
+    ".paperclip/reports"
+  ],
+  "requestedSourceFiles": [
+    "tools/mcp_remote_gateway/server.js",
+    "tools/mcp_remote_gateway/test.sh"
+  ],
+  "sourceFilesModified": [],
+  "directorDecision": "Implementation is blocked under the current write policy because adding run_director requires changing tools/mcp_remote_gateway/server.js and tools/mcp_remote_gateway/test.sh, while the instruction allows writes only under .paperclip/tasks and .paperclip/reports.",
+  "prompt": "Задача: добавить в Paperclip Connect новый tool `run_director`, который НЕ использует Codex как исполнителя. Проект: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`. Цель: GPT Chat должен отправлять задание директору Paperclip, директор должен сам раздать подзадачи внутренним ролям, собрать результат, записать task/report и вернуть полный отчёт обратно в тот же GPT Chat. Рабочая схема: GPT Chat -> Paperclip Connect -> MCP gateway -> run_director -> Paperclip Director -> локальные роли -> report -> ответ в GPT Chat. Важно: Codex НЕ должен запускаться как исполнитель. Shell-команды для изменения кода запрещены. Git commit/checkout запрещены. Исходный код проекта не менять. Разрешены записи только в .paperclip/tasks и .paperclip/reports. Нужно добавить run_director в tools/mcp_remote_gateway/server.js, tools/list и test.sh, принудительно dryRun=true, dryRunEnforced=true, sourceCodeChangesAllowed=false, создавать task/report и возвращать directorReport прямо в GPT Chat.",
+  "roleAssignments": [
+    {
+      "role": "Director",
+      "assignment": "Own the final decision, enforce dry-run policy, coordinate role outputs, build task/report artifacts, and return directorReport in structuredContent."
+    },
+    {
+      "role": "DSP Agent",
+      "assignment": "Analyze audio/DSP implications from the prompt without changing code or calling external LLMs."
+    },
+    {
+      "role": "ML Agent",
+      "assignment": "Analyze ML/data/evaluation assumptions from the prompt without changing code or calling external LLMs."
+    },
+    {
+      "role": "Refactor Agent",
+      "assignment": "Identify isolated implementation steps for server.js/test.sh while preserving existing gateway behavior."
+    },
+    {
+      "role": "Analyzer Agent",
+      "assignment": "Summarize current git branch/status and test implications."
+    },
+    {
+      "role": "Safety Agent",
+      "assignment": "Verify dryRunEnforced=true, sourceCodeChangesAllowed=false, no Codex execution, no commit/checkout, and writes limited to Paperclip artifacts."
+    }
+  ],
+  "nextSteps": [
+    "Get explicit approval to modify tools/mcp_remote_gateway/server.js and tools/mcp_remote_gateway/test.sh.",
+    "Implement run_director in the gateway without spawning Codex or external LLMs.",
+    "Add run_director to tools/list through server.registerTool.",
+    "Extend test.sh to call run_director and verify task/report/directorReport policy fields.",
+    "Run npm install only if writes outside .paperclip are approved, otherwise skip it.",
+    "Run node --check server.js and ./test.sh after implementation."
+  ]
+}

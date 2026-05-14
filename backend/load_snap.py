@@ -7,6 +7,11 @@ import sys
 import time
 import logging
 from wing_client import WingClient
+from maintenance_cli_guard import (
+    extract_maintenance_cli_args,
+    validate_maintenance_cli_request,
+    format_block_message,
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -58,7 +63,17 @@ def load_snap(client: WingClient, snap_name: str, max_index: int = 200):
 
 def main():
     """Основная функция"""
-    if len(sys.argv) < 3:
+    try:
+        args, maintenance_ctx = extract_maintenance_cli_args(sys.argv[1:])
+    except ValueError as exc:
+        print(str(exc))
+        print("Использование: python3 load_snap.py <IP> <SNAP_NAME> [MAX_INDEX]")
+        print("  --confirm-maintenance")
+        print("  --rollback-snapshot PATH")
+        print("  --dry-run")
+        return 1
+
+    if len(args) < 2:
         print("Использование:")
         print("  python3 load_snap.py <IP> <SNAP_NAME>")
         print("")
@@ -69,15 +84,34 @@ def main():
         print("Пример:")
         print("  python3 load_snap.py 192.168.1.102 'HULI REPA AC'")
         return 1
-    
-    ip = sys.argv[1] if len(sys.argv) > 1 else "192.168.1.102"
-    snap_name = sys.argv[2] if len(sys.argv) > 2 else None
-    max_index = int(sys.argv[3]) if len(sys.argv) > 3 else 200
+
+    ip = args[0] if len(args) > 0 else "192.168.1.102"
+    snap_name = args[1] if len(args) > 1 else None
+    max_index = int(args[2]) if len(args) > 2 else 200
     
     if not snap_name:
         print("Ошибка: необходимо указать имя snapshot")
         print("Использование: python3 load_snap.py <IP> <SNAP_NAME> [MAX_INDEX]")
         return 1
+
+    approved, reason = validate_maintenance_cli_request(
+        operation="load_snapshot",
+        confirm_maintenance=maintenance_ctx["confirm_maintenance"],
+        rollback_snapshot_path=maintenance_ctx["rollback_snapshot_path"],
+        dry_run=maintenance_ctx["dry_run"],
+    )
+    if not approved:
+        logger.error(format_block_message(reason))
+        return 1
+
+    if maintenance_ctx["dry_run"]:
+        logger.info(
+            "Dry run: would load snapshot '%s' on %s (max_index=%s)",
+            snap_name,
+            ip,
+            max_index,
+        )
+        return 0
     
     logger.info(f"Подключение к пульту {ip}...")
     client = WingClient(ip=ip, port=2223)

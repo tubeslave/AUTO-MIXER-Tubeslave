@@ -7,6 +7,11 @@ import sys
 import time
 import logging
 from wing_client import WingClient
+from maintenance_cli_guard import (
+    extract_maintenance_cli_args,
+    validate_maintenance_cli_request,
+    format_block_message,
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -14,7 +19,17 @@ logger = logging.getLogger(__name__)
 
 def main():
     """Основная функция"""
-    if len(sys.argv) < 3:
+    try:
+        args, maintenance_ctx = extract_maintenance_cli_args(sys.argv[1:])
+    except ValueError as exc:
+        print(str(exc))
+        print("Использование: python3 load_snap_final.py <IP> <SNAP_NAME_OR_INDEX> [MAX_INDEX]")
+        print("  --confirm-maintenance")
+        print("  --rollback-snapshot PATH")
+        print("  --dry-run")
+        return 1
+
+    if len(args) < 2:
         print("Использование:")
         print("  python3 load_snap_final.py <IP> <SNAP_NAME_OR_INDEX> [MAX_INDEX]")
         print("")
@@ -29,9 +44,23 @@ def main():
         print("  python3 load_snap_final.py 192.168.1.102 'HULI REPA AC' 500")
         return 1
     
-    ip = sys.argv[1]
-    snap_param = sys.argv[2]
-    max_index = int(sys.argv[3]) if len(sys.argv) > 3 else 500
+    ip = args[0]
+    snap_param = args[1]
+    max_index = int(args[2]) if len(args) > 2 else 500
+
+    approved, reason = validate_maintenance_cli_request(
+        operation="load_snapshot",
+        confirm_maintenance=maintenance_ctx["confirm_maintenance"],
+        rollback_snapshot_path=maintenance_ctx["rollback_snapshot_path"],
+        dry_run=maintenance_ctx["dry_run"],
+    )
+    if not approved:
+        logger.error(format_block_message(reason))
+        return 1
+
+    if maintenance_ctx["dry_run"]:
+        logger.info("Dry run: would load snapshot '%s' on %s", snap_param, ip)
+        return 0
     
     # Проверяем, является ли параметр числом (индексом)
     try:

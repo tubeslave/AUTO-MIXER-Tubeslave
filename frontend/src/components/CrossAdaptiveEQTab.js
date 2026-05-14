@@ -7,7 +7,6 @@ function CrossAdaptiveEQTab({ selectedChannels, availableChannels, selectedDevic
   const [active, setActive] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [eqAdjustments, setEqAdjustments] = useState({});
-  const [bandAnalysis, setBandAnalysis] = useState({});
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState({
     reductionStrength: 0.5, frequencyBands: 6, updateInterval: 500,
@@ -19,7 +18,6 @@ function CrossAdaptiveEQTab({ selectedChannels, availableChannels, selectedDevic
       if (data.message) setStatusMessage(data.message);
       if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
       if (data.eq_adjustments) setEqAdjustments(data.eq_adjustments);
-      if (data.band_analysis) setBandAnalysis(data.band_analysis);
     };
     websocketService.on('cross_adaptive_eq_status', handle);
     websocketService.getCrossAdaptiveEQStatus();

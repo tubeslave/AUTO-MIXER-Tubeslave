@@ -1,0 +1,21 @@
+{
+  "id": "e502ceb0-1fb8-4a31-83b0-157c0e25fab9",
+  "source": "mcp_remote_gateway",
+  "sourceTool": "run_agent",
+  "projectRoot": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+  "createdAt": "2026-05-08T18:16:26.347Z",
+  "title": "smoke dry-run agent request",
+  "agent": "smoke",
+  "prompt": "Record a dry-run agent request without editing project source code.",
+  "metadata": {},
+  "requestedDryRun": false,
+  "dryRun": true,
+  "dryRunEnforced": true,
+  "policy": {
+    "writesAllowed": [
+      ".paperclip/tasks",
+      ".paperclip/reports"
+    ],
+    "sourceCodeChangesAllowed": false
+  }
+}

@@ -23,7 +23,13 @@ def register_handlers(server):
         await server.apply_phase_corrections(websocket, data.get("measurements"))
 
     async def handle_reset_phase_delay(websocket, data):
-        await server.reset_phase_delay(websocket, data.get("channels"))
+        await server.request_reset_phase_delay(
+            websocket,
+            data.get("channels"),
+            dry_run=data.get("dry_run"),
+            confirm_maintenance=bool(data.get("confirm_maintenance", False)),
+            rollback_snapshot_path=data.get("rollback_snapshot_path"),
+        )
 
     async def handle_get_phase_alignment_status(websocket, data):
         await server.send_to_client(websocket, {

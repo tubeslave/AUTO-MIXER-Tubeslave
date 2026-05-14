@@ -50,6 +50,8 @@ class OSCManager:
         send_port: int = 2223,
         recv_port: int = 2223,
         throttle_hz: float = 10.0,
+        shadow_mode_enabled: bool = False,
+        shadow_event_sink: Optional[Callable[[dict[str, Any]], None]] = None,
     ):
         self.ip = ip
         self.send_port = send_port
@@ -64,6 +66,8 @@ class OSCManager:
         self._send_count = 0
         self._recv_count = 0
         self._wing_client = None
+        self._shadow_mode_enabled = bool(shadow_mode_enabled)
+        self._shadow_event_sink = shadow_event_sink
 
     @property
     def connected(self) -> bool:
@@ -84,6 +88,11 @@ class OSCManager:
         """
         self._wing_client = wing_client
         self._connected = wing_client.is_connected
+        if hasattr(wing_client, "configure_shadow_transport"):
+            wing_client.configure_shadow_transport(
+                enabled=self._shadow_mode_enabled,
+                event_sink=self._shadow_event_sink,
+            )
         if self._connected:
             self._state = wing_client.state
             logger.info(f"OSCManager connected via WingClient to {self.ip}")
@@ -126,6 +135,56 @@ class OSCManager:
                 with self._lock:
                     self._state[address] = values[0] if len(values) == 1 else values
         return result
+
+    def configure_shadow_transport(
+        self,
+        *,
+        enabled: bool | None = None,
+        event_sink: Optional[Callable[[dict[str, Any]], None]] = None,
+    ) -> None:
+        if enabled is not None:
+            self._shadow_mode_enabled = bool(enabled)
+        if event_sink is not None:
+            self._shadow_event_sink = event_sink
+        if self._wing_client and hasattr(self._wing_client, "configure_shadow_transport"):
+            self._wing_client.configure_shadow_transport(
+                enabled=self._shadow_mode_enabled,
+                event_sink=self._shadow_event_sink,
+            )
+
+    def is_shadow_mode_enabled(self) -> bool:
+        if self._wing_client and hasattr(self._wing_client, "is_shadow_mode_enabled"):
+            return bool(self._wing_client.is_shadow_mode_enabled())
+        return bool(self._shadow_mode_enabled)
+
+    def set_transport_context(
+        self,
+        *,
+        audit_id: str = "",
+        replay_correlation_id: str = "",
+        source: str = "",
+        operation: str = "",
+        channel: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        if self._wing_client and hasattr(self._wing_client, "set_transport_context"):
+            self._wing_client.set_transport_context(
+                audit_id=audit_id,
+                replay_correlation_id=replay_correlation_id,
+                source=source,
+                operation=operation,
+                channel=channel,
+                metadata=metadata,
+            )
+
+    def clear_transport_context(self) -> None:
+        if self._wing_client and hasattr(self._wing_client, "clear_transport_context"):
+            self._wing_client.clear_transport_context()
+
+    def consume_shadow_transport_event(self) -> dict[str, Any] | None:
+        if self._wing_client and hasattr(self._wing_client, "consume_shadow_transport_event"):
+            return self._wing_client.consume_shadow_transport_event()
+        return None
 
     def query(self, address: str) -> Any:
         """Send a query (no value) and return cached state."""
@@ -182,4 +241,5 @@ class OSCManager:
             "recv_count": self._recv_count,
             "cached_params": len(self._state),
             "subscriptions": len(self._callbacks),
+            "shadow_mode_enabled": self.is_shadow_mode_enabled(),
         }

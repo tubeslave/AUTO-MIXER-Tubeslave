@@ -10,6 +10,7 @@ Covers:
 """
 
 import time
+import threading
 from unittest.mock import patch, MagicMock, PropertyMock
 
 import pytest
@@ -100,6 +101,62 @@ class TestOSCThrottle:
             client.send("/ch/1/fdr")
             client.send("/ch/1/fdr")
             # No assertion needed — just ensure no exception is raised
+
+    def test_shadow_mode_blocks_mutation_and_emits_would_send_event(self):
+        events = []
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client.configure_shadow_transport(enabled=True, event_sink=events.append)
+            client.set_transport_context(
+                audit_id="audit-shadow-1",
+                replay_correlation_id="corr::wing::1",
+                source="unit_test",
+                operation="set_fader",
+                channel=1,
+                metadata={"path": "test"},
+            )
+
+            result = client.send("/ch/1/fdr", -5.0)
+
+            assert result is False
+            assert client.get_last_send_status() == "shadow_blocked"
+            client.sock.sendto.assert_not_called()
+            assert events[-1]["audit_id"] == "audit-shadow-1"
+            assert events[-1]["replay_correlation_id"] == "corr::wing::1"
+            assert events[-1]["address"] == "/ch/1/fdr"
+            assert events[-1]["values"] == [-5.0]
+            assert client.consume_shadow_transport_event()["audit_id"] == "audit-shadow-1"
+
+    def test_shadow_mode_preserves_query_transport(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client.configure_shadow_transport(enabled=True)
+
+            result = client.send("/ch/1/fdr")
+
+            assert result is True
+            assert client.get_last_send_status() == "sent"
+            client.sock.sendto.assert_called_once()
 
 
 class TestStateManagement:
@@ -245,6 +302,7 @@ class TestConnectionLifecycle:
 
             result = client.send("/ch/1/fdr", 0.5)
             assert result is False
+            assert client.get_last_send_status() == "disconnected"
 
     def test_send_updates_local_state(self):
         """Sending a value should update the local state cache."""
@@ -264,3 +322,156 @@ class TestConnectionLifecycle:
 
             client.send("/ch/1/fdr", 0.75)
             assert client.state.get("/ch/1/fdr") == 0.75
+
+    def test_set_fader_returns_send_result(self):
+        """set_fader() should expose whether the OSC send succeeded."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+
+            with patch.object(client, "send", return_value=False) as mocked_send:
+                result = client.set_fader(1, -12.0)
+
+            assert result is False
+            mocked_send.assert_called_once_with("/ch/1/fdr", -12.0)
+
+    def test_send_throttled_sets_last_send_status(self):
+        """Throttle should expose a distinct send status."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client.set_osc_throttle(enabled=True, hz=10.0)
+
+            assert client.send("/ch/1/fdr", 0.5) is True
+            assert client.send("/ch/1/fdr", 0.6) is False
+            assert client.get_last_send_status() == "throttled"
+
+    def test_confirm_manual_write_confirms_fresh_query_response(self):
+        """Confirmed status requires a fresh callback after the query send."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+
+            def fake_send(address, *values):
+                client._last_send_status = "sent"
+                if not values:
+                    threading.Timer(
+                        0.01,
+                        lambda: client._handle_message(address, "-10.0 dB", 0.5, -10.0),
+                    ).start()
+                return True
+
+            with patch.object(client, "send", side_effect=fake_send):
+                result = client.confirm_manual_write("set_fader", 1, -10.0, timeout_ms=100)
+
+            assert result["readback_status"] == "confirmed"
+            assert result["confirmed_value"] == -10.0
+            assert result["failure_reason"] is None
+            assert result["verification_id"]
+
+    def test_confirm_manual_write_times_out_with_old_cached_value(self):
+        """Old cached state must not close a new verification."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client.state["/ch/1/fdr"] = -10.0
+            client._state_timestamps["/ch/1/fdr"] = time.time()
+
+            with patch.object(client, "send", return_value=True):
+                result = client.confirm_manual_write("set_fader", 1, -10.0, timeout_ms=20)
+
+            assert result["readback_status"] == "timeout"
+            assert result["confirmed_value"] is None
+            assert result["failure_reason"] == "readback_timeout"
+
+    def test_confirm_manual_write_detects_mismatch(self):
+        """A fresh but different readback must report mismatch."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+
+            def fake_send(address, *values):
+                client._last_send_status = "sent"
+                if not values:
+                    threading.Timer(
+                        0.01,
+                        lambda: client._handle_message(address, "-30.0 dB", 0.1, -30.0),
+                    ).start()
+                return True
+
+            with patch.object(client, "send", side_effect=fake_send):
+                result = client.confirm_manual_write("set_fader", 1, -10.0, timeout_ms=100)
+
+            assert result["readback_status"] == "mismatch"
+            assert result["confirmed_value"] == -30.0
+            assert result["failure_reason"] == "readback_mismatch"
+
+    def test_confirm_manual_write_exposes_query_send_failure(self):
+        """A readback-query send failure must stay explicit for the caller."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+
+            def fake_send(address, *values):
+                client._last_send_status = "failed"
+                return False
+
+            with patch.object(client, "send", side_effect=fake_send):
+                result = client.confirm_manual_write("set_gain", 1, 6.0, timeout_ms=100)
+
+            assert result["readback_status"] == "timeout"
+            assert result["confirmed_value"] is None
+            assert result["failure_reason"] == "failed"
+            assert result["verification_id"]

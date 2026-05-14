@@ -11,6 +11,27 @@ from typing import Any
 from ai_mixing_pipeline.models import DecisionResult, MixCandidate, SafetyResult, jsonable
 
 
+def _collect_replay_correlation_ids(*payloads: Any) -> list[str]:
+    found: list[str] = []
+
+    def _visit(value: Any) -> None:
+        if isinstance(value, dict):
+            candidate = value.get("replay_correlation_id")
+            if candidate:
+                text = str(candidate)
+                if text not in found:
+                    found.append(text)
+            for nested in value.values():
+                _visit(nested)
+        elif isinstance(value, (list, tuple, set)):
+            for nested in value:
+                _visit(nested)
+
+    for payload in payloads:
+        _visit(payload)
+    return found
+
+
 def write_json(path: str | Path, payload: Any) -> Path:
     target = Path(path).expanduser()
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -40,6 +61,10 @@ def write_decision_log(
                 "mode": mode,
                 "candidate_id": candidate.candidate_id,
                 "actions": [action.to_dict() for action in candidate.actions],
+                "replay_correlation_ids": _collect_replay_correlation_ids(
+                    candidate.to_dict(),
+                    [action.to_dict() for action in candidate.actions],
+                ),
                 "critic_scores": evaluations.get(candidate.candidate_id, {}),
                 "final_score": decision.final_scores.get(candidate.candidate_id, 0.0),
                 "safety_passed": bool(safety.passed if safety else False),
@@ -108,6 +133,10 @@ def write_accepted_rejected_actions(
             "candidate_id": candidate.candidate_id,
             "label": candidate.label,
             "actions": [action.to_dict() for action in candidate.actions],
+            "replay_correlation_ids": _collect_replay_correlation_ids(
+                candidate.to_dict(),
+                [action.to_dict() for action in candidate.actions],
+            ),
             "safety": safety.to_dict() if safety else None,
             "final_score": decision.final_scores.get(candidate.candidate_id, 0.0),
         }
@@ -165,6 +194,11 @@ def write_summary_report(
         lines.append(f"- Render: `{render_paths.get(candidate.candidate_id, '')}`")
         lines.append(f"- Final score: `{decision.final_scores.get(candidate.candidate_id, 0.0):.6f}`")
         lines.append(f"- Safety: `{'passed' if safety and safety.passed else 'blocked'}`")
+        correlation_ids = _collect_replay_correlation_ids(
+            candidate.to_dict(),
+            [action.to_dict() for action in candidate.actions],
+        )
+        lines.append(f"- Replay correlation IDs: `{', '.join(correlation_ids) if correlation_ids else 'none'}`")
         if safety:
             level = (safety.metrics.get("level", {}) or {}) if isinstance(safety.metrics, dict) else {}
             lines.append(

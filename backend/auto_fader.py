@@ -28,6 +28,11 @@ from scipy import signal
 from enum import Enum
 from dataclasses import dataclass, field
 
+try:
+    from live_apply import LiveApplyRequest, LiveApplyService
+except ImportError:
+    from backend.live_apply import LiveApplyRequest, LiveApplyService
+
 # Import LUFS components from existing module
 from lufs_gain_staging import LUFSMeter, TruePeakMeter, KWeightingFilter, AGCEnvelope
 
@@ -826,7 +831,9 @@ class AutoFaderController:
                  chunk_size: int = 2048,
                  config: Optional[Dict[str, Any]] = None,
                  bleed_service=None,
-                 audio_capture=None):
+                 audio_capture=None,
+                 live_apply_service: Optional[LiveApplyService] = None,
+                 confirm_live_apply: bool = True):
 
         self.mixer_client = mixer_client
         self.sample_rate = sample_rate
@@ -834,6 +841,8 @@ class AutoFaderController:
         self._audio_capture = audio_capture
         self.config = config or {}
         self.bleed_service = bleed_service
+        self.live_apply_service = live_apply_service or LiveApplyService()
+        self.confirm_live_apply = bool(confirm_live_apply)
         
         # Загрузка конфигурации
         auto_fader_config = self.config.get('automation', {}).get('auto_fader', {})
@@ -931,6 +940,11 @@ class AutoFaderController:
         """Exclude channel from auto-control for the given seconds."""
         self.channel_freeze_until[mixer_channel] = time.time() + max(0.0, seconds)
         logger.info(f"Channel {mixer_channel} frozen for {seconds:.1f}s")
+
+    def set_confirm_live_apply(self, confirm_live_apply: bool):
+        """Update whether live fader writes are explicitly approved."""
+        self.confirm_live_apply = bool(confirm_live_apply)
+        logger.info(f"Auto fader confirm_live_apply: {self.confirm_live_apply}")
     
     def get_freeze_status(self) -> Dict[str, Any]:
         """Return current freeze state for UI."""
@@ -941,6 +955,36 @@ class AutoFaderController:
             "frozen_channels": frozen_channels,
             "freeze_cooldown_seconds": self.freeze_cooldown_seconds,
         }
+
+    def _apply_fader_target(
+        self,
+        mixer_channel: int,
+        target_db: float,
+        *,
+        source: str,
+        current_value: Optional[float] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        min_value: float = -60.0,
+        max_value: float = 10.0,
+    ):
+        if not self.mixer_client or not self.mixer_client.is_connected:
+            logger.warning("Mixer client unavailable for auto fader live apply")
+            return None
+        return self.live_apply_service.apply(
+            LiveApplyRequest(
+                source=source,
+                operation="set_fader",
+                channel=int(mixer_channel),
+                value=float(target_db),
+                dry_run=False,
+                confirm_live_apply=bool(self.confirm_live_apply),
+                current_value=current_value,
+                min_value=min_value,
+                max_value=max_value,
+                metadata=dict(metadata or {}),
+            ),
+            self.mixer_client,
+        )
     
     def start(self,
               device_id: int,
@@ -1534,14 +1578,41 @@ class AutoFaderController:
                         try:
                             if iteration % 50 == 0:
                                 logger.info(f"Setting fader: mixer_ch={mixer_ch}, dB={new_fader_db:.2f}")
-                            
-                            self.mixer_client.set_channel_fader(mixer_ch, new_fader_db)
-                            
-                            # Обновляем состояние для всех каналов с этим mixer_channel
+
+                            current_value = None
                             for audio_ch, state in self.channels.items():
                                 if state.mixer_channel == mixer_ch:
-                                    state.current_fader = new_fader_db
-                                
+                                    current_value = float(state.current_fader)
+                                    break
+
+                            result = self._apply_fader_target(
+                                mixer_ch,
+                                new_fader_db,
+                                source="auto_fader_realtime",
+                                current_value=current_value,
+                                metadata={
+                                    "iteration": int(iteration),
+                                    "mode": "realtime",
+                                },
+                            )
+                            if result and result.accepted and not result.dry_run:
+                                applied_value = float(
+                                    result.confirmed_value
+                                    if result.confirmed_value is not None
+                                    else result.desired_value
+                                    if result.desired_value is not None
+                                    else new_fader_db
+                                )
+                                # Обновляем состояние для всех каналов с этим mixer_channel
+                                for audio_ch, state in self.channels.items():
+                                    if state.mixer_channel == mixer_ch:
+                                        state.current_fader = applied_value
+                            elif result:
+                                logger.info(
+                                    "Auto fader realtime live apply blocked ch%s: %s",
+                                    mixer_ch,
+                                    result.blocked_reason or result.failure_reason or "not_accepted",
+                                )
                         except Exception as e:
                             logger.error(f"Error setting fader for channel {mixer_ch}: {e}", exc_info=True)
                 
@@ -1967,21 +2038,45 @@ class AutoFaderController:
                     continue
                 if state.mixer_channel in self.channel_freeze_until and self.channel_freeze_until[state.mixer_channel] > time.time():
                     continue
-                self.mixer_client.set_channel_fader(state.mixer_channel, new_db)
-                
-                state.current_fader = new_db
-                applied_count += 1
-                
-                applied_details[int(audio_ch)] = {
-                    'mixer_channel': int(state.mixer_channel),
-                    'previous_db': float(current_db),
-                    'new_db': float(new_db),
-                    'applied_correction': float(correction)
-                }
-                
-                logger.info(f"Channel {state.mixer_channel} ({state.instrument_type}): "
-                           f"{current_db:.2f} -> {new_db:.2f} dB "
-                           f"(correction={correction:+.1f})")
+
+                result = self._apply_fader_target(
+                    state.mixer_channel,
+                    new_db,
+                    source="auto_fader_auto_balance",
+                    current_value=current_db,
+                    metadata={
+                        "audio_channel": int(audio_ch),
+                        "mode": "auto_balance",
+                        "correction_db": float(correction),
+                    },
+                )
+                if result and result.accepted and not result.dry_run:
+                    applied_value = float(
+                        result.confirmed_value
+                        if result.confirmed_value is not None
+                        else result.desired_value
+                        if result.desired_value is not None
+                        else new_db
+                    )
+                    state.current_fader = applied_value
+                    applied_count += 1
+
+                    applied_details[int(audio_ch)] = {
+                        'mixer_channel': int(state.mixer_channel),
+                        'previous_db': float(current_db),
+                        'new_db': float(applied_value),
+                        'applied_correction': float(applied_value - current_db)
+                    }
+
+                    logger.info(f"Channel {state.mixer_channel} ({state.instrument_type}): "
+                               f"{current_db:.2f} -> {applied_value:.2f} dB "
+                               f"(correction={correction:+.1f})")
+                elif result:
+                    logger.info(
+                        "Auto balance live apply blocked ch%s: %s",
+                        state.mixer_channel,
+                        result.blocked_reason or result.failure_reason or "not_accepted",
+                    )
                 
             except Exception as e:
                 logger.error(f"Error applying balance to channel {state.mixer_channel}: {e}")
@@ -2242,7 +2337,8 @@ class AutoFaderController:
             'ratio': float(self.ratio),
             'channels_count': int(len(self.channels)),
             'auto_balance_result': auto_balance_result,
-            'auto_balance_pass': int(self.auto_balance_pass)
+            'auto_balance_pass': int(self.auto_balance_pass),
+            'confirm_live_apply': bool(self.confirm_live_apply),
         }
     
     def _db_to_normalized(self, db: float) -> float:

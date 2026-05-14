@@ -1,0 +1,36 @@
+{
+  "id": "2dc2ef70-d596-4660-87b6-bbefc968184c",
+  "source": "mcp_remote_gateway",
+  "sourceTool": "create_task",
+  "projectRoot": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+  "createdAt": "2026-05-09T06:46:44.481Z",
+  "title": "Connection check from GPT Chat",
+  "agent": "automixer",
+  "prompt": "Verify that GPT Chat can create Paperclip tasks through MCP.",
+  "metadata": {},
+  "requestedDryRun": true,
+  "dryRun": true,
+  "dryRunEnforced": true,
+  "sourceCodeChangesAllowed": false,
+  "policy": {
+    "dryRun": true,
+    "dryRunEnforced": true,
+    "writesAllowed": [
+      ".paperclip/tasks",
+      ".paperclip/reports"
+    ],
+    "sourceCodeChangesAllowed": false,
+    "shellCommandsAllowed": [
+      "git branch --show-current",
+      "git status --short --branch",
+      "git rev-parse --show-toplevel",
+      "git log -1 --oneline"
+    ],
+    "prohibitedActions": [
+      "source code changes",
+      "dangerous shell commands",
+      "git commit",
+      "git checkout"
+    ]
+  }
+}

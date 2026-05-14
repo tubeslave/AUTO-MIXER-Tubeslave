@@ -7,6 +7,11 @@ import threading
 import time
 from typing import Any, Callable, Dict, Iterable, Optional
 
+try:
+    from live_apply import LiveApplyRequest, LiveApplyService
+except ImportError:
+    from backend.live_apply import LiveApplyRequest, LiveApplyService
+
 from .activity_detector import ActivityDetector
 from .arrangement_density import ArrangementDensityAnalyzer
 from .automation_logger import AutomationDecisionLogger
@@ -29,11 +34,13 @@ class ArrangementAutomationController:
         config: Optional[Dict[str, Any]] = None,
         audio_capture=None,
         status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        live_apply_service: Optional[LiveApplyService] = None,
     ):
         self.mixer_client = mixer_client
         self.config = config or {}
         self.audio_capture = audio_capture
         self.status_callback = status_callback
+        self.live_apply_service = live_apply_service or LiveApplyService()
 
         self.cfg = self._get_cfg(self.config)
         role_limits = self.cfg.get("role_limits", {})
@@ -64,6 +71,8 @@ class ArrangementAutomationController:
         self.enabled = bool(self.cfg.get("enabled", True))
         self.live_apply_enabled = bool(self.cfg.get("live_apply_enabled", False))
         self.analysis_only_mode = bool(self.cfg.get("analysis_only_mode", True))
+        self.confirm_live_apply = bool(self.cfg.get("confirm_live_apply", False))
+        self.fader_ceiling_db = float(self.cfg.get("fader_ceiling_db", 0.0))
         self.channels: list[int] = []
         self.channel_mapping: Dict[int, int] = {}
         self.roles = {}
@@ -89,6 +98,11 @@ class ArrangementAutomationController:
                 settings.get("analysis_only_mode", self.analysis_only_mode)
             )
             self.enabled = bool(settings.get("enabled", self.enabled))
+            self.confirm_live_apply = self._resolve_confirm_live_apply(
+                enabled=self.live_apply_enabled,
+                analysis_only_mode=self.analysis_only_mode,
+                explicit=settings.get("confirm_live_apply"),
+            )
 
         self.channels = [int(ch) for ch in channels]
         raw_mapping = channel_mapping or {}
@@ -96,6 +110,16 @@ class ArrangementAutomationController:
             {int(k): int(v) for k, v in raw_mapping.items()}
             if raw_mapping
             else {ch: ch for ch in self.channels}
+        )
+        explicit_confirm = None
+        if settings and "confirm_live_apply" in settings:
+            explicit_confirm = settings.get("confirm_live_apply")
+        elif "confirm_live_apply" in self.cfg:
+            explicit_confirm = self.cfg.get("confirm_live_apply")
+        self.confirm_live_apply = self._resolve_confirm_live_apply(
+            enabled=self.live_apply_enabled,
+            analysis_only_mode=self.analysis_only_mode,
+            explicit=explicit_confirm,
         )
         names = channel_names or self._read_channel_names(self.channel_mapping.values())
         self.roles = {
@@ -112,6 +136,7 @@ class ArrangementAutomationController:
             "enabled": self.enabled,
             "live_apply_enabled": self.live_apply_enabled,
             "analysis_only_mode": self.analysis_only_mode,
+            "confirm_live_apply": self.confirm_live_apply,
             "roles": {ch: role.to_dict() for ch, role in self.roles.items()},
             "base_fader_positions": dict(self.base_fader_positions),
             "message": "arrangement automation started",
@@ -136,7 +161,6 @@ class ArrangementAutomationController:
         self._thread = None
         self.channels = []
         self.roles = {}
-        self.base_fader_positions = {}
         self.safety_limiter.reset()
         self.started_at = None
         self.last_state = self._empty_state()
@@ -247,6 +271,7 @@ class ArrangementAutomationController:
         self,
         enabled: bool,
         analysis_only_mode: Optional[bool] = None,
+        confirm_live_apply: Optional[bool] = None,
     ) -> Dict[str, Any]:
         was_applying = self.live_apply_enabled and not self.analysis_only_mode
         next_analysis_only = (
@@ -260,8 +285,14 @@ class ArrangementAutomationController:
         self.live_apply_enabled = bool(enabled)
         if analysis_only_mode is not None:
             self.analysis_only_mode = bool(analysis_only_mode)
+        self.confirm_live_apply = self._resolve_confirm_live_apply(
+            enabled=self.live_apply_enabled,
+            analysis_only_mode=self.analysis_only_mode,
+            explicit=confirm_live_apply,
+        )
         self.last_state["live_apply_enabled"] = self.live_apply_enabled
         self.last_state["analysis_only_mode"] = self.analysis_only_mode
+        self.last_state["confirm_live_apply"] = self.confirm_live_apply
         return self.get_status()
 
     def _apply_safe_offsets(
@@ -279,10 +310,41 @@ class ArrangementAutomationController:
             if channel_id in blocked_offsets:
                 continue
             base = self.base_fader_positions.get(channel_id, 0.0)
-            target = min(0.0, base + float(offset_db))
+            # The ceiling is a maximum allowed target level (e.g., -4.6 dB).
+            # Offset application can only raise values toward the ceiling, never
+            # below it, so we must take the maximum of proposed vs ceiling.
+            target = max(self.fader_ceiling_db, base + float(offset_db))
             try:
-                self.mixer_client.set_channel_fader(channel_id, target)
-                applied[channel_id] = round(target, 4)
+                result = self.live_apply_service.apply(
+                    LiveApplyRequest(
+                        source="arrangement_automation",
+                        operation="set_fader",
+                        channel=channel_id,
+                        value=target,
+                        dry_run=False,
+                        confirm_live_apply=bool(self.confirm_live_apply),
+                        current_value=base,
+                        max_value=self.fader_ceiling_db,
+                        metadata={
+                            "offset_db": float(offset_db),
+                            "base_fader_db": float(base),
+                        },
+                    ),
+                    self.mixer_client,
+                )
+                if result.accepted and not result.dry_run:
+                    confirmed_value = (
+                        float(result.confirmed_value)
+                        if result.confirmed_value is not None
+                        else float(result.desired_value if result.desired_value is not None else target)
+                    )
+                    applied[channel_id] = round(confirmed_value, 4)
+                else:
+                    logger.info(
+                        "Arrangement automation live apply blocked ch%s: %s",
+                        channel_id,
+                        result.blocked_reason or result.failure_reason or "not_accepted",
+                    )
             except Exception as exc:
                 logger.error("Arrangement automation OSC apply failed ch%s: %s", channel_id, exc)
         return applied
@@ -305,12 +367,23 @@ class ArrangementAutomationController:
         bands = {}
         for audio_ch, mixer_ch in self.channel_mapping.items():
             spectrum = self.audio_capture.get_spectrum(audio_ch)
-            freqs = spectrum.get("freqs")
+            freqs = spectrum.get("frequencies")
             magnitudes = spectrum.get("magnitude_db")
             if freqs is None or magnitudes is None:
                 continue
             bands[mixer_ch] = self._coarse_bands(freqs, magnitudes)
         return bands
+
+    @staticmethod
+    def _resolve_confirm_live_apply(
+        *,
+        enabled: bool,
+        analysis_only_mode: bool,
+        explicit: Any,
+    ) -> bool:
+        if explicit is not None:
+            return bool(explicit)
+        return bool(enabled and not analysis_only_mode)
 
     @staticmethod
     def _coarse_bands(freqs, magnitudes) -> Dict[str, float]:
@@ -386,6 +459,7 @@ class ArrangementAutomationController:
             "enabled": False,
             "live_apply_enabled": False,
             "analysis_only_mode": True,
+            "confirm_live_apply": False,
             "current_section": "unknown",
             "section_confidence": 0.0,
             "arrangement_density_index": 0.0,

@@ -1,0 +1,5 @@
+- Do not break working pipeline
+- Do not overwrite DSP blindly
+- Always log important changes
+- Always validate before finalizing
+- Ask before large architectural changes

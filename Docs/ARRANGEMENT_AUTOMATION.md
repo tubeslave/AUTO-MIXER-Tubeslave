@@ -84,17 +84,37 @@ no boost to that stem.
 ```text
 bleed_primary_signal_detection
 arrangement_input_levels_pre_phase
-phase_delay_from_overhead_pair
+snare_bleed_phase_alignment
 offline_hpf_lpf_correction
 corrective_eq_contextual_deep_eq
-ayaic_channel_pair_levels_post_...
+contextual_compression
+musical_panning
+musical_output_balance
 ayaic_master_level
 ```
 
 The report stores the first-stage decisions in `pre_phase_channel_levels`.
 Each entry includes role, section, ADI, masking score, requested offset, safe
-offset, applied gain, and safety reasons. Later Ayaic pair/master stages remain
-unchanged unless explicitly disabled by CLI options.
+offset, applied gain, and safety reasons. Later EQ, compression, musical output
+balance, and master stages remain explainable in their own report blocks.
+
+The phase stage is documented separately in
+`Docs/GLOBAL_PHASE_ALIGNMENT.md`. It now uses snare-bleed arrival alignment
+first, with a global bleed/correlation graph fallback when snare evidence is
+not reliable.
+
+The compression stage is documented separately in
+`Docs/CONTEXTUAL_COMPRESSION.md`. It uses a style/tempo-aware target-GR solver
+and a critic pass before musical output balancing.
+
+The panning stage is documented separately in `Docs/MUSICAL_PANNING.md`. It
+places center anchors, stereo pairs, drums, support vocals, and music-bed
+sources before final output balancing.
+
+The output balance stage is documented separately in
+`Docs/MUSICAL_OUTPUT_BALANCE.md`. It replaces final Ayaic channel/pair LUFS
+matching with a mix-anchor output solver for foreground, foundation, support,
+and image/air sources.
 
 ## Contextual Deep EQ
 

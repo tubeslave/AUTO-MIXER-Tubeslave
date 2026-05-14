@@ -8,6 +8,7 @@ from .writers import (
     write_summary_report,
 )
 from .decision_report_writer import write_decision_layer_reports
+from .shadow_report_writer import write_shadow_mode_reports
 
 __all__ = [
     "write_accepted_rejected_actions",
@@ -16,4 +17,5 @@ __all__ = [
     "write_decision_layer_reports",
     "write_json",
     "write_summary_report",
+    "write_shadow_mode_reports",
 ]

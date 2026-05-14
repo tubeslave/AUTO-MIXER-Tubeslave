@@ -1,8 +1,10 @@
 """Tests for config_manager module."""
-import pytest
 import os
 import sys
 import tempfile
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
@@ -65,6 +67,21 @@ class TestConfigManager:
             assert cm.get('audio.sample_rate') == 48000
         finally:
             os.unlink(yaml_path)
+
+    def test_repo_automixer_yaml_defaults_soundcheck_to_dry_run(self):
+        """The shipped YAML config must keep headless soundcheck non-applying by default."""
+        try:
+            import yaml
+        except ImportError:
+            pytest.skip("PyYAML not installed")
+
+        repo_root = Path(__file__).resolve().parents[2]
+        config_path = repo_root / "config" / "automixer.yaml"
+
+        with config_path.open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+
+        assert data["soundcheck"]["auto_apply"] is False
 
     def test_get_section_returns_deep_copy(self):
         """get_section returns a deep copy that doesn't mutate the config."""

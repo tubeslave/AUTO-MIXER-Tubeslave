@@ -1,0 +1,201 @@
+{
+  "artifact_signature": "9c265b975eb914d02dacfc4ee01d54055bb40bec54ae872c1d15dcc6d62618c9",
+  "artifact_type": "deterministic_replay_timeline",
+  "dry_run_only": true,
+  "live_mixer_writes": false,
+  "metadata": {
+    "scenario": "deterministic_trace_v1"
+  },
+  "proposal_count": 2,
+  "run_signature": "6c7e405f2527b6e63fdc1bc350f6aab266d9cf36c14996132ba0f96a4bd1d73d",
+  "schema_version": "replay_trace/v1",
+  "selected_proposal_id": "feedback::notch::5::fb1",
+  "timeline": [
+    {
+      "action_type": "notch",
+      "analyst_observation": {
+        "frequency_hz": 2500.0
+      },
+      "auto_apply_blocked": true,
+      "current_state": {
+        "magnitude_db": 0.0
+      },
+      "dry_run_only": true,
+      "event_signature": "9ca44b67082dff758a4749b0c6a1f0a40d0a5f57588a28ef0be2e99a796f2615",
+      "family": "feedback_mitigation",
+      "metadata": {
+        "action": "notch",
+        "channel": 5
+      },
+      "proposal_id": "feedback::notch::5::fb1",
+      "replay_correlation_id": "replay::feedback_mitigation::76d87ac287743c13",
+      "replay_signature": "81fa0c5983e604de9ce1731142f4bca5076a49b80a41a31e1b6aacd9c8876366",
+      "requested_state": {
+        "gain_db": -7.0,
+        "q": 4.0
+      },
+      "safety": {
+        "max_q": 8.0,
+        "operator_override_required": true
+      },
+      "seq": 1,
+      "source_system": "feedback_detector",
+      "stage": "analyzer",
+      "target": {
+        "channel": 5,
+        "frequency_hz": 2500.0
+      }
+    },
+    {
+      "critic_name": "safety",
+      "critic_result": {
+        "safety_score": 0.88,
+        "warnings": [
+          "operator_override_required"
+        ]
+      },
+      "event_signature": "21deab7da6190601d1ba50cc1ab8aaa0428437063d171549ce0c2bb3eddfa3dc",
+      "family": "feedback_mitigation",
+      "proposal_id": "feedback::notch::5::fb1",
+      "replay_correlation_id": "replay::feedback_mitigation::76d87ac287743c13",
+      "replay_signature": "81fa0c5983e604de9ce1731142f4bca5076a49b80a41a31e1b6aacd9c8876366",
+      "seq": 2,
+      "stage": "critic"
+    },
+    {
+      "action_type": "set_gain_db",
+      "analyst_observation": {
+        "source_payload": {
+          "confidence": 0.82,
+          "current_trim_db": -3.0,
+          "metadata": {
+            "max_step_db": 1.0
+          },
+          "mixer_channel": 12,
+          "reason": "prototype_gain",
+          "recommended_target_trim_db": -1.5,
+          "replay_correlation_id": "corr::auto_soundcheck_engine::12",
+          "role": "lead_vocal",
+          "source": "auto_soundcheck_engine"
+        }
+      },
+      "auto_apply_blocked": false,
+      "current_state": {
+        "gain_db": -3.0
+      },
+      "dry_run_only": true,
+      "event_signature": "78bbed5c57ac0aa99498d3c08b897b9f4dc8221f0b532e39c2a44e0867d02579",
+      "family": "gain_adjustment",
+      "metadata": {
+        "analysis_state": "idle",
+        "reason": "prototype_gain",
+        "role": "lead_vocal"
+      },
+      "proposal_id": "gain::auto_soundcheck_engine::12::lead_vocal::v1",
+      "replay_correlation_id": "corr::auto_soundcheck_engine::12",
+      "replay_signature": "034e3a60a6a4d529af7f764697cf3380e6d618be4053e02f990749f5aff517f1",
+      "requested_state": {
+        "delta_db": 1.5,
+        "gain_db": -1.5
+      },
+      "safety": {
+        "bounded_by": "none",
+        "max_step_db": 1.0
+      },
+      "seq": 3,
+      "source_system": "auto_soundcheck_engine",
+      "stage": "analyzer",
+      "target": {
+        "channel": 12,
+        "kind": "gain"
+      }
+    },
+    {
+      "critic_name": "clarity",
+      "critic_result": {
+        "confidence": 0.91,
+        "delta": {
+          "overall": 0.14
+        },
+        "metadata": {
+          "detail": "safe"
+        },
+        "scores": {
+          "overall": 0.61
+        }
+      },
+      "event_signature": "adca6384252297d96c8a181e086e60baa62934fdb4457618407f2338a244b347",
+      "family": "gain_adjustment",
+      "proposal_id": "gain::auto_soundcheck_engine::12::lead_vocal::v1",
+      "replay_correlation_id": "corr::auto_soundcheck_engine::12",
+      "replay_signature": "034e3a60a6a4d529af7f764697cf3380e6d618be4053e02f990749f5aff517f1",
+      "seq": 4,
+      "stage": "critic"
+    },
+    {
+      "confidence_weighted_score": 0.46648799999999996,
+      "event_signature": "eab07c7691f34c3989ec85675ec69c21ed4956d3749d32bafb43c53af70e01f6",
+      "family": "feedback_mitigation",
+      "proposal_id": "feedback::notch::5::fb1",
+      "rank": 1,
+      "replay_correlation_id": "replay::feedback_mitigation::76d87ac287743c13",
+      "replay_signature": "81fa0c5983e604de9ce1731142f4bca5076a49b80a41a31e1b6aacd9c8876366",
+      "score_breakdown": {
+        "confidence": 0.62,
+        "confidence_weighted_score": 0.46648799999999996,
+        "critic_breakdown": {
+          "final_score": 0.88,
+          "normalized_weights": {
+            "safety": 1.0
+          },
+          "values": {
+            "safety": 0.88
+          }
+        },
+        "critic_values": {
+          "safety": 0.88
+        },
+        "final_score": 0.88,
+        "normalized_weights": {
+          "safety": 1.0
+        }
+      },
+      "selected": true,
+      "seq": 5,
+      "stage": "decision"
+    },
+    {
+      "confidence_weighted_score": 0.1148,
+      "event_signature": "b9fc67b3dcc16fc0d060e23e46f4ecf7de41a3c6971f55fd485a7ee07d04e6c5",
+      "family": "gain_adjustment",
+      "proposal_id": "gain::auto_soundcheck_engine::12::lead_vocal::v1",
+      "rank": 2,
+      "replay_correlation_id": "corr::auto_soundcheck_engine::12",
+      "replay_signature": "034e3a60a6a4d529af7f764697cf3380e6d618be4053e02f990749f5aff517f1",
+      "score_breakdown": {
+        "confidence": 0.82,
+        "confidence_weighted_score": 0.1148,
+        "critic_breakdown": {
+          "final_score": 0.14,
+          "normalized_weights": {
+            "clarity": 1.0
+          },
+          "values": {
+            "clarity": 0.14
+          }
+        },
+        "critic_values": {
+          "clarity": 0.14
+        },
+        "final_score": 0.14,
+        "normalized_weights": {
+          "clarity": 1.0
+        }
+      },
+      "selected": false,
+      "seq": 6,
+      "stage": "decision"
+    }
+  ],
+  "timeline_event_count": 6
+}

@@ -7,7 +7,6 @@ function AutoPannerTab({ selectedChannels, availableChannels, selectedDevice, au
   const [running, setRunning] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [panPositions, setPanPositions] = useState({});
-  const [showSettings, setShowSettings] = useState(false);
   const [genre, setGenre] = useState('rock');
 
   useEffect(() => {

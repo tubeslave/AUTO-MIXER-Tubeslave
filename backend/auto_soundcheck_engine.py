@@ -3,10 +3,11 @@ Auto Soundcheck Engine — headless orchestrator for automatic mixing.
 
 Connects to mixer (dLive or WING), detects audio device (SoundGrid/Dante),
 reads channel names, recognizes instruments, waits for audio signals,
-and automatically applies gain staging, EQ, compressor, and fader corrections
-without user confirmation.
+and can apply gain staging, EQ, compressor, and fader corrections when
+explicit live-apply confirmation is enabled.
 
-This is the main entry point for fully automatic operation.
+This module is a headless/offline-oriented path. The canonical live backend
+AutoGain runtime is `backend/server.py -> LiveInputTrimController`.
 """
 
 import asyncio
@@ -21,6 +22,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
+from autogain_contract import AutoGainRecommendation
 from audio_capture import (
     AudioCapture, AudioSourceType, AudioDeviceType,
     detect_audio_device, find_device_by_name, list_audio_devices,
@@ -358,11 +360,12 @@ class AutoSoundcheckEngine:
         sample_rate: int = 48000,
         block_size: int = 1024,
         buffer_seconds: float = 5.0,
-        auto_apply: bool = True,
+        auto_apply: bool = False,
         auto_discover: bool = True,
         scan_subnet: bool = True,
         on_state_change: Optional[Callable] = None,
         on_channel_update: Optional[Callable] = None,
+        feedback_emergency_apply: bool = False,
     ):
         self.mixer_type = mixer_type
         self.mixer_ip = mixer_ip
@@ -377,6 +380,7 @@ class AutoSoundcheckEngine:
         self.auto_apply = auto_apply
         self.auto_discover = auto_discover
         self.scan_subnet = scan_subnet
+        self.feedback_emergency_apply = feedback_emergency_apply
 
         self.mixer_client = None
         self.audio_capture: Optional[AudioCapture] = None
@@ -401,7 +405,9 @@ class AutoSoundcheckEngine:
         target = f"{mixer_type or '?'}@{mixer_ip or 'auto'}:{mixer_port or 'auto'}"
         logger.info(
             f"AutoSoundcheckEngine: {mode}, target={target}, "
-            f"channels={num_channels}, sr={sample_rate}"
+            f"channels={num_channels}, sr={sample_rate}, "
+            f"live_apply={'enabled' if auto_apply else 'disabled'}, "
+            f"feedback_emergency_apply={'enabled' if feedback_emergency_apply else 'disabled'}"
         )
 
     def _set_state(self, new_state: EngineState, message: str = ""):
@@ -690,6 +696,7 @@ class AutoSoundcheckEngine:
                 channel=ch,
                 fader_db=fader_db,
                 muted=muted,
+                gain_db=float(raw_settings.get("gain_db", 0.0) or 0.0),
                 had_processing=has_processing,
                 raw_settings=raw_settings,
             )
@@ -1681,6 +1688,14 @@ class AutoSoundcheckEngine:
 
     def _handle_feedback_event(self, ch: int, event: FeedbackEvent):
         """React to a feedback event by applying notch or reducing fader."""
+        if not self.feedback_emergency_apply:
+            logger.warning(
+                "FEEDBACK policy blocked direct mixer reaction "
+                f"(ch={ch} action={event.action} freq={event.frequency_hz:.0f}Hz); "
+                "require feedback emergency approval"
+            )
+            return
+
         logger.warning(
             f"FEEDBACK Ch {ch}: {event.action} at {event.frequency_hz:.0f}Hz "
             f"({event.magnitude_db:.1f}dB)"
@@ -1875,6 +1890,10 @@ class AutoSoundcheckEngine:
             "state": self.state.value,
             "mixer_type": self.mixer_type,
             "mixer_ip": self.mixer_ip,
+            "live_apply_enabled": self.auto_apply,
+            "dry_run": not self.auto_apply,
+            "feedback_reaction_enabled": self.feedback_emergency_apply,
+            "feedback_reaction_policy": "emergency_only" if self.feedback_emergency_apply else "blocked",
             "mixer_connected": self.mixer_client.is_connected if self.mixer_client else False,
             "audio_running": self.audio_capture.running if self.audio_capture else False,
             "audio_device": audio_device_info,
@@ -1885,6 +1904,98 @@ class AutoSoundcheckEngine:
             "discovered": discovery_info,
             "channels": channels_info,
         }
+
+    def get_gain_recommendations(self) -> Dict[int, Dict[str, Any]]:
+        """Return shared AutoGain recommendations without sending mixer commands."""
+        recommendations: Dict[int, Dict[str, Any]] = {}
+        for ch, info in self.channels.items():
+            if not info.has_signal:
+                continue
+            recommendation = self._build_gain_recommendation(ch, info)
+            recommendations[ch] = recommendation.to_dict()
+        return recommendations
+
+    def _build_gain_recommendation(self, ch: int, info: ChannelInfo) -> AutoGainRecommendation:
+        preset = info.preset or "custom"
+        current_trim = float(info.original_snapshot.gain_db) if info.original_snapshot else 0.0
+
+        if info.metrics and info.metrics.level.true_peak_dbtp > -90:
+            true_peak = float(info.metrics.level.true_peak_dbtp)
+            rms = float(info.metrics.level.rms_db)
+            crest = float(info.metrics.level.crest_factor_db)
+            confidence = 0.8 if info.recognized else 0.65
+        else:
+            true_peak = float(info.peak_db)
+            rms = float(info.rms_db)
+            crest = true_peak - rms if rms > -90 else 0.0
+            confidence = 0.5 if info.recognized else 0.35
+
+        if true_peak <= -90.0:
+            return AutoGainRecommendation(
+                channel=ch,
+                mixer_channel=ch,
+                source="auto_soundcheck_engine",
+                current_trim_db=round(current_trim, 3),
+                recommended_target_trim_db=round(current_trim, 3),
+                delta_db=0.0,
+                reason="no_signal_detected",
+                confidence=0.0,
+                limited_by="no_signal",
+                blocked_reason="no_signal_detected",
+                role=preset,
+                analysis_state=self.state.value,
+                live_apply_safe=False,
+                dry_run_only=not self.auto_apply,
+                level_source="audio_capture",
+                metrics={"true_peak_dbtp": true_peak, "rms_db": rms, "crest_factor_db": crest},
+                metadata={"trim_bounds_db": {"min": -12.0, "max": 12.0}},
+            )
+
+        target_peak = float(INSTRUMENT_TARGET_INPUT_DB.get(preset, -12.0))
+        if crest > 18.0:
+            target_peak += 3.0
+        elif crest < 6.0:
+            target_peak -= 2.0
+
+        target_trim = max(-12.0, min(12.0, target_peak - true_peak))
+        limited_by = "none"
+        reason = "input_peak_alignment"
+        if abs(target_trim - (target_peak - true_peak)) > 1e-6:
+            limited_by = "gain_bounds"
+            reason = "input_gain_bounds"
+        if true_peak + target_trim > -1.0:
+            target_trim = max(-12.0, min(12.0, -1.0 - true_peak))
+            limited_by = "true_peak_ceiling"
+            reason = "true_peak_ceiling_guard"
+
+        return AutoGainRecommendation(
+            channel=ch,
+            mixer_channel=ch,
+            source="auto_soundcheck_engine",
+            current_trim_db=round(current_trim, 3),
+            recommended_target_trim_db=round(target_trim, 3),
+            delta_db=round(target_trim - current_trim, 3),
+            reason=reason,
+            confidence=round(confidence, 4),
+            limited_by=limited_by,
+            blocked_reason="",
+            role=preset,
+            analysis_state=self.state.value,
+            live_apply_safe=bool(self.auto_apply),
+            dry_run_only=not self.auto_apply,
+            level_source="audio_capture",
+            metrics={
+                "true_peak_dbtp": round(true_peak, 3),
+                "rms_db": round(rms, 3),
+                "crest_factor_db": round(crest, 3),
+                "target_peak_dbfs": round(target_peak, 3),
+            },
+            metadata={
+                "recognized": bool(info.recognized),
+                "trim_bounds_db": {"min": -12.0, "max": 12.0},
+                "auto_apply_enabled": bool(self.auto_apply),
+            },
+        )
 
 
 # ── CLI entry point ──────────────────────────────────────────────
@@ -1914,14 +2025,26 @@ def main():
                         help="Number of input channels (default: 48)")
     parser.add_argument("--sample-rate", type=int, default=48000,
                         help="Sample rate (default: 48000)")
-    parser.add_argument("--no-apply", action="store_true",
-                        help="Analyze only, do not apply corrections")
+    parser.add_argument("--live-apply", action="store_true",
+                        help="Explicitly allow the engine to send corrections to the mixer after analysis")
+    parser.add_argument(
+        "--allow-feedback-emergency",
+        action="store_true",
+        help=(
+            "Allow emergency-only feedback reactions (notch/fader reduction) "
+            "during monitoring"
+        ),
+    )
+    parser.add_argument("--no-apply", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--log-level", default="INFO",
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     parser.add_argument("--scan-only", action="store_true",
                         help="Only scan for mixers, do not connect")
 
     args = parser.parse_args()
+
+    if args.live_apply and args.no_apply:
+        parser.error("Use either --live-apply or --no-apply, not both.")
 
     logging.basicConfig(
         level=getattr(logging, args.log_level),
@@ -1953,9 +2076,10 @@ def main():
         audio_device_name=args.audio_device,
         num_channels=args.channels,
         sample_rate=args.sample_rate,
-        auto_apply=not args.no_apply,
+        auto_apply=bool(args.live_apply),
         auto_discover=auto_discover,
         scan_subnet=args.full_scan,
+        feedback_emergency_apply=bool(args.allow_feedback_emergency),
         on_state_change=on_state,
         on_channel_update=on_channel,
     )
@@ -1969,7 +2093,9 @@ def main():
     print(f"  Mixer: {mixer_desc}")
     print(f"  Audio: {args.audio_device or 'auto-detect'}")
     print(f"  Channels: {args.channels}")
-    print(f"  Auto-apply: {not args.no_apply}")
+    print(f"  Live apply: {bool(args.live_apply)}")
+    print(f"  Feedback emergency apply: {bool(args.allow_feedback_emergency)}")
+    print(f"  Dry run: {not bool(args.live_apply)}")
     print(f"  Auto-discover: {auto_discover}")
     print("=" * 60)
     print()

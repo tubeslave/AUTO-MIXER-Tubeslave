@@ -9,6 +9,27 @@ import csv
 import json
 
 
+def _collect_replay_correlation_ids(*payloads: Any) -> list[str]:
+    found: list[str] = []
+
+    def _visit(value: Any) -> None:
+        if isinstance(value, dict):
+            candidate = value.get("replay_correlation_id")
+            if candidate:
+                text = str(candidate)
+                if text not in found:
+                    found.append(text)
+            for nested in value.values():
+                _visit(nested)
+        elif isinstance(value, (list, tuple, set)):
+            for nested in value:
+                _visit(nested)
+
+    for payload in payloads:
+        _visit(payload)
+    return found
+
+
 def write_decision_layer_reports(
     reports_dir: str | Path,
     *,
@@ -77,6 +98,10 @@ def _write_decision_log(
                 "mode": "offline_test",
                 "candidate_id": candidate.candidate_id,
                 "actions": [action.to_dict() for action in candidate.actions],
+                "replay_correlation_ids": _collect_replay_correlation_ids(
+                    candidate.to_dict(),
+                    [action.to_dict() for action in candidate.actions],
+                ),
                 "critic_scores": critic_scores.get(candidate.candidate_id, {}),
                 "final_score": decision.get("final_scores", {}).get(candidate.candidate_id, 0.0),
                 "safety_passed": bool(safety.get("passed", False)),
@@ -138,6 +163,10 @@ def _write_actions(
             "candidate_id": candidate.candidate_id,
             "description": candidate.description,
             "actions": [action.to_dict() for action in candidate.actions],
+            "replay_correlation_ids": _collect_replay_correlation_ids(
+                candidate.to_dict(),
+                [action.to_dict() for action in candidate.actions],
+            ),
             "safety": safety_results.get(candidate.candidate_id, {}),
             "final_score": decision.get("final_scores", {}).get(candidate.candidate_id, 0.0),
         }
@@ -199,6 +228,11 @@ def _write_summary(
         lines.append(f"- Render: `{render_results.get(candidate.candidate_id, {}).get('path', '')}`")
         lines.append(f"- Final score: `{decision.get('final_scores', {}).get(candidate.candidate_id, 0.0):.6f}`")
         lines.append(f"- Safety: `{'passed' if safety.get('passed') else 'blocked'}`")
+        correlation_ids = _collect_replay_correlation_ids(
+            candidate.to_dict(),
+            [action.to_dict() for action in candidate.actions],
+        )
+        lines.append(f"- Replay correlation IDs: `{', '.join(correlation_ids) if correlation_ids else 'none'}`")
         if safety.get("reasons"):
             lines.append(f"- Rejection reasons: `{', '.join(safety.get('reasons', []))}`")
         lines.append(f"- Actions: `{len(candidate.actions)}`")

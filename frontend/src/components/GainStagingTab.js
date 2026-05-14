@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import websocketService from '../services/websocket';
 import './GainStagingTab.css';
 import SignalHint from './SignalHint';
+import AutoGainSupervisionCard from './AutoGainSupervisionCard';
+import { deriveAutoGainSupervision } from './autoGainSupervision';
 
 const SIGNAL_PRESETS = {
   kick: { name: 'Kick' }, snare: { name: 'Snare' }, tom: { name: 'Tom' },
@@ -49,6 +51,10 @@ function GainStagingTab({ selectedChannels, availableChannels, selectedDevice, a
   const [statusMessage, setStatusMessage] = useState('');
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
+  const [liveInputTrimState, setLiveInputTrimState] = useState(null);
+  const [latestLiveApplyResult, setLatestLiveApplyResult] = useState(null);
+  const [readyForLive, setReadyForLive] = useState(null);
+  const [freezeStatus, setFreezeStatus] = useState(null);
 
   useEffect(() => {
     const handleStatus = (data) => {
@@ -89,30 +95,56 @@ function GainStagingTab({ selectedChannels, availableChannels, selectedDevice, a
     const handleSettingsLoaded = (data) => {
       if (data.settings?.gainStaging) setSettings(s => ({ ...s, ...data.settings.gainStaging }));
     };
+    const handleLiveInputTrimStatus = (data) => {
+      if (data.live_input_trim_state) {
+        setLiveInputTrimState(data.live_input_trim_state);
+      }
+    };
+    const handleLiveApplyResult = (data) => {
+      if (data.target_type === 'channel_gain' || data.operation === 'set_gain') {
+        setLatestLiveApplyResult(data);
+      }
+    };
+    const handleReadyForLive = (data) => setReadyForLive(data);
+    const handleFreezeStatus = (data) => setFreezeStatus(data);
 
     websocketService.on('gain_staging_status', handleStatus);
     websocketService.on('mixer_channel_names', handleNames);
     websocketService.on('all_settings_loaded', handleSettingsLoaded);
+    websocketService.on('live_input_trim_status', handleLiveInputTrimStatus);
+    websocketService.on('live_apply_result', handleLiveApplyResult);
+    websocketService.on('ready_for_live', handleReadyForLive);
+    websocketService.on('freeze_status', handleFreezeStatus);
     websocketService.getGainStagingStatus();
+    websocketService.getLiveInputTrimStatus();
+    websocketService.getReadyForLive();
+    websocketService.getFreezeStatus();
     websocketService.loadAllSettings();
 
     return () => {
       websocketService.off('gain_staging_status', handleStatus);
       websocketService.off('mixer_channel_names', handleNames);
       websocketService.off('all_settings_loaded', handleSettingsLoaded);
+      websocketService.off('live_input_trim_status', handleLiveInputTrimStatus);
+      websocketService.off('live_apply_result', handleLiveApplyResult);
+      websocketService.off('ready_for_live', handleReadyForLive);
+      websocketService.off('freeze_status', handleFreezeStatus);
     };
   }, [selectedChannels]);
 
   useEffect(() => {
-    const s = {};
-    selectedChannels.forEach(id => {
-      if (channelSettings[id]) { s[id] = channelSettings[id]; }
-      else {
-        const ch = availableChannels.find(c => c.id === id);
-        s[id] = { preset: ch?.name ? recognizeSignalType(ch.name) : 'custom' };
-      }
+    setChannelSettings(prev => {
+      const next = {};
+      selectedChannels.forEach(id => {
+        if (prev[id]) {
+          next[id] = prev[id];
+        } else {
+          const ch = availableChannels.find(c => c.id === id);
+          next[id] = { preset: ch?.name ? recognizeSignalType(ch.name) : 'custom' };
+        }
+      });
+      return next;
     });
-    setChannelSettings(s);
   }, [selectedChannels, availableChannels]);
 
   const handleToggle = () => {
@@ -148,6 +180,12 @@ function GainStagingTab({ selectedChannels, availableChannels, selectedDevice, a
     return ch?.name || `Ch ${id}`;
   };
   const fmtDb = (v) => { if (v == null || v === -60) return '--'; return `${v >= 0 ? '+' : ''}${v.toFixed(1)}`; };
+  const supervisionSummary = deriveAutoGainSupervision({
+    liveInputTrimState,
+    latestLiveApplyResult,
+    readyForLive,
+    freezeStatus,
+  });
 
   if (selectedChannels.length === 0) {
     return (<div><SignalHint moduleKey="gain_staging" /><div className="no-channels">Выберите каналы на вкладке Connect</div></div>);
@@ -156,6 +194,7 @@ function GainStagingTab({ selectedChannels, availableChannels, selectedDevice, a
   return (
     <div className="gain-staging-tab">
       <SignalHint moduleKey="gain_staging" />
+      <AutoGainSupervisionCard summary={supervisionSummary} />
       <div className="module-card">
         <div className="module-actions">
           <button className={`btn-start ${running ? 'stop' : 'go'}`} onClick={handleToggle}

@@ -3,11 +3,16 @@
 Pipeline order:
 1. Bleed-aware primary signal detection.
 2. Arrangement-aware input levels measured on primary signal windows.
-3. Overhead-pair delay/phase, then close drum mic delay/phase from the aligned overhead group.
+3. Global bleed/correlation phase-delay alignment.
 4. Offline HPF/LPF correction.
 5. Optional offline Corrective EQ.
-6. Ayaic channel and pair levels measured after filters and Corrective EQ.
-7. Ayaic master level.
+6. Optional contextual compression.
+7. Musical panning after dynamics and before final output balance.
+8. Musical output balance measured after filters/EQ/compression/panning.
+9. Snare top/bottom coherence guard.
+10. Snare top/bottom relative balance.
+11. Post-balance panorama width restoration.
+12. Ayaic master level.
 
 BUS/group level correction is available as an explicit opt-in, but the fixed clean
 pipeline uses channel/pair levels and the master level only.
@@ -28,6 +33,33 @@ import numpy as np
 
 from .arrangement_input_levels import ARRANGEMENT_INPUT_LEVEL_STAGE, apply_arrangement_input_levels
 from .autoeq import AutoEQEngine, AutoEQSettings, AutoEQTrack
+from .contextual_compression import (
+    CONTEXTUAL_COMPRESSION_STAGE,
+    DEFAULT_CONTEXTUAL_COMPRESSION_STYLE,
+    apply_contextual_compression,
+)
+from .musical_panning import (
+    DEFAULT_MUSICAL_PANNING_STYLE,
+    MUSICAL_PANNING_STAGE,
+    apply_musical_panning,
+)
+from .musical_panorama_width import (
+    MUSICAL_PANORAMA_WIDTH_STAGE,
+    apply_musical_panorama_width,
+)
+from .musical_output_balance import (
+    DEFAULT_MUSICAL_BALANCE_STYLE,
+    MUSICAL_OUTPUT_BALANCE_STAGE,
+    apply_musical_output_balance,
+)
+from .snare_top_bottom_balance import (
+    SNARE_TOP_BOTTOM_BALANCE_STAGE,
+    apply_snare_top_bottom_balance,
+)
+from .snare_pair_coherence import (
+    SNARE_PAIR_COHERENCE_STAGE,
+    apply_snare_pair_coherence,
+)
 from .models import amp_to_db, db_to_amp, ensure_stereo, jsonable
 
 
@@ -49,6 +81,7 @@ CORRECTIVE_EQ_METHODS = (
 )
 AYAIC_BUS_GROUP_TARGETS = {
     "drums": -25.0,
+    "snare": -25.0,
     "bass": -25.0,
     "playback": -25.0,
     "accordion": -25.0,
@@ -56,12 +89,13 @@ AYAIC_BUS_GROUP_TARGETS = {
     "vocals": -22.0,
     "back_vocals": -28.0,
 }
-AYAIC_BUS_GROUP_ORDER = ("drums", "bass", "playback", "accordion", "guitars", "vocals", "back_vocals")
+AYAIC_BUS_GROUP_ORDER = ("drums", "snare", "bass", "playback", "accordion", "guitars", "vocals", "back_vocals")
 AYAIC_BUS_GROUP_TARGET_SOURCE = {
     "name": "User-defined SONG REPA Ayaic bus targets",
     "url": None,
     "notes": [
         "Drums bus: -25 LUFS",
+        "Snare pair bus: -25 LUFS",
         "Bass bus: -25 LUFS",
         "Playback bus: -25 LUFS",
         "Accordion bus: -25 LUFS",
@@ -317,6 +351,8 @@ class AyaicStem:
     notes: list[dict[str, Any]] = field(default_factory=list)
     pan_notes: list[dict[str, Any]] = field(default_factory=list)
     corrective_eq_notes: list[dict[str, Any]] = field(default_factory=list)
+    compression_notes: list[dict[str, Any]] = field(default_factory=list)
+    output_balance_notes: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -344,6 +380,16 @@ def run_ayaic_offline_pipeline(
     autoeq_mode: str = "offline",
     autoeq_report_only: bool = False,
     autoeq_config: dict[str, Any] | None = None,
+    compression_enabled: bool = True,
+    compression_style: str = DEFAULT_CONTEXTUAL_COMPRESSION_STYLE,
+    compression_bpm: float | None = None,
+    compression_report_only: bool = False,
+    panning_enabled: bool = True,
+    panning_style: str = DEFAULT_MUSICAL_PANNING_STYLE,
+    panning_report_only: bool = False,
+    output_balance_enabled: bool = True,
+    output_balance_style: str = DEFAULT_MUSICAL_BALANCE_STYLE,
+    output_balance_report_only: bool = False,
 ) -> AyaicPipelineResult:
     corrective_eq_method = _normalize_corrective_eq_method(corrective_eq_method)
     stems = _load_stems(input_dir)
@@ -366,6 +412,7 @@ def run_ayaic_offline_pipeline(
     )
     phase_stage_report = _apply_phase_delay_from_overheads(stems, max_delay_ms=max_phase_delay_ms)
     primary_shift_report = _shift_primary_loudness_ranges_for_applied_delays(stems)
+    snare_pair_coherence_report = apply_snare_pair_coherence(stems)
     hpf_lpf_report = _apply_hpf_lpf_correction(stems)
     autoeq_report = _apply_autoeq_engine(
         stems,
@@ -375,17 +422,92 @@ def run_ayaic_offline_pipeline(
         config=autoeq_config,
     )
     corrective_eq_report = _apply_corrective_eq(stems, method=corrective_eq_method)
-    if corrective_eq_method == "none":
-        post_phase_channel_report = _apply_track_levels(stems, stage="post_phase_filter_channel_ayaic")
-        pre_corrective_pair_report = _apply_pair_levels(stems)
-        post_corrective_channel_report: list[dict[str, Any]] = []
-        post_corrective_pair_report: list[dict[str, Any]] = []
+    compression_report = apply_contextual_compression(
+        stems,
+        style=compression_style,
+        bpm=compression_bpm,
+        report_only=compression_report_only or not compression_enabled,
+        role_fn=_project_channel_role,
+        primary_audio_fn=_stem_primary_loudness_audio,
+        lufs_fn=_lufs,
+        peak_fn=_peak_dbfs,
+    ) if compression_enabled or compression_report_only else {
+        "enabled": False,
+        "applied": False,
+        "stage": CONTEXTUAL_COMPRESSION_STAGE,
+        "reason": "contextual_compression_disabled",
+        "channels": [],
+    }
+    if panning_enabled or panning_report_only:
+        panning_report = apply_musical_panning(
+            stems,
+            style=panning_style,
+            report_only=panning_report_only or not panning_enabled,
+            role_fn=_project_channel_role,
+            primary_audio_fn=_stem_primary_loudness_audio,
+            lufs_fn=_lufs,
+            peak_fn=_peak_dbfs,
+            band_energy_fn=_band_energy_for_rendered,
+        )
     else:
-        post_phase_channel_report = []
-        pre_corrective_pair_report = []
-        post_corrective_channel_report = _apply_track_levels(stems, stage="post_corrective_eq_channel_ayaic")
-        post_corrective_pair_report = _apply_pair_levels(stems)
-    final_pair_report = post_corrective_pair_report or pre_corrective_pair_report
+        panning_report = {
+            "enabled": False,
+            "applied": False,
+            "stage": MUSICAL_PANNING_STAGE,
+            "reason": "musical_panning_disabled",
+            "channel_pans": [],
+            "pair_pans": [],
+        }
+    if output_balance_enabled or output_balance_report_only:
+        output_balance_report = apply_musical_output_balance(
+            stems,
+            style=output_balance_style,
+            report_only=output_balance_report_only or not output_balance_enabled,
+            role_fn=_project_channel_role,
+            primary_audio_fn=_stem_primary_loudness_audio,
+            lufs_fn=_lufs,
+            peak_fn=_peak_dbfs,
+            band_energy_fn=_band_energy_for_rendered,
+        )
+    else:
+        output_balance_report = {
+            "enabled": False,
+            "applied": False,
+            "stage": MUSICAL_OUTPUT_BALANCE_STAGE,
+            "reason": "musical_output_balance_disabled",
+            "channel_offsets": [],
+            "bus_offsets": [],
+        }
+    snare_top_bottom_report = apply_snare_top_bottom_balance(
+        stems,
+        primary_audio_fn=_stem_primary_loudness_audio,
+        lufs_fn=_lufs,
+        peak_fn=_peak_dbfs,
+        report_only=output_balance_report_only or not output_balance_enabled,
+    )
+    if panning_report.get("enabled"):
+        panorama_width_report = apply_musical_panorama_width(
+            stems,
+            report_only=panning_report_only or not panning_enabled,
+            role_fn=_project_channel_role,
+            lufs_fn=_lufs,
+            peak_fn=_peak_dbfs,
+        )
+    else:
+        panorama_width_report = {
+            "enabled": False,
+            "applied": False,
+            "stage": MUSICAL_PANORAMA_WIDTH_STAGE,
+            "reason": "musical_panning_disabled",
+            "channel_width": [],
+        }
+    post_phase_channel_report: list[dict[str, Any]] = []
+    pre_corrective_pair_report: list[dict[str, Any]] = []
+    post_corrective_channel_report: list[dict[str, Any]] = []
+    post_corrective_pair_report: list[dict[str, Any]] = []
+    post_compression_channel_report = output_balance_report.get("channel_offsets", [])
+    post_compression_pair_report = output_balance_report.get("bus_offsets", [])
+    final_pair_report = post_compression_pair_report
     if skip_group_levels:
         group_report = [
             {
@@ -415,6 +537,11 @@ def run_ayaic_offline_pipeline(
             target_lufs=master_target_lufs,
             ceiling_dbfs=master_ceiling_dbfs,
         )
+    phase_stage_name = (
+        "snare_bleed_phase_alignment"
+        if phase_stage_report.get("snare_bleed_alignment", {}).get("enabled")
+        else "global_bleed_phase_alignment"
+    )
 
     out = Path(output_dir).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -429,17 +556,20 @@ def run_ayaic_offline_pipeline(
         "pipeline_stages": [
             "bleed_primary_signal_detection",
             ARRANGEMENT_INPUT_LEVEL_STAGE,
-            "phase_delay_from_overhead_pair",
+            phase_stage_name,
+            *([SNARE_PAIR_COHERENCE_STAGE] if snare_pair_coherence_report.get("enabled") else []),
             "offline_hpf_lpf_correction",
             *(["autoeq_engine"] if autoeq_enabled else []),
             *(
-                [
-                    f"corrective_eq_{corrective_eq_method}",
-                    "ayaic_channel_pair_levels_post_corrective_eq",
-                ]
+                [f"corrective_eq_{corrective_eq_method}"]
                 if corrective_eq_method != "none"
-                else ["ayaic_channel_pair_levels_post_phase_filter"]
+                else []
             ),
+            *([CONTEXTUAL_COMPRESSION_STAGE] if compression_report.get("enabled") else []),
+            *([MUSICAL_PANNING_STAGE] if panning_report.get("enabled") else []),
+            *([MUSICAL_OUTPUT_BALANCE_STAGE] if output_balance_report.get("enabled") else []),
+            *([SNARE_TOP_BOTTOM_BALANCE_STAGE] if snare_top_bottom_report.get("enabled") else []),
+            *([MUSICAL_PANORAMA_WIDTH_STAGE] if panorama_width_report.get("enabled") else []),
             *(["ayayc_instrument_group_levels"] if not skip_group_levels else []),
             *(["ayaic_master_level"] if not skip_master_level else []),
         ],
@@ -460,6 +590,21 @@ def run_ayaic_offline_pipeline(
             "autoeq_enabled": bool(autoeq_enabled),
             "autoeq_mode": autoeq_mode,
             "autoeq_report_only": bool(autoeq_report_only),
+            "contextual_compression_enabled": bool(compression_enabled),
+            "contextual_compression_report_only": bool(compression_report_only),
+            "contextual_compression_style": str(compression_style),
+            "contextual_compression_bpm": (
+                float(compression_bpm) if compression_bpm is not None else None
+            ),
+            "musical_panning_enabled": bool(panning_enabled),
+            "musical_panning_report_only": bool(panning_report_only),
+            "musical_panning_style": str(panning_style),
+            "musical_output_balance_enabled": bool(output_balance_enabled),
+            "musical_output_balance_report_only": bool(output_balance_report_only),
+            "musical_output_balance_style": str(output_balance_style),
+            "snare_pair_coherence_enabled": bool(snare_pair_coherence_report.get("enabled")),
+            "snare_top_bottom_balance_enabled": bool(snare_top_bottom_report.get("enabled")),
+            "musical_panorama_width_enabled": bool(panorama_width_report.get("enabled")),
             "loudness_method": _lufs_method(),
             "input_leveling_method": "arrangement_aware",
             "track_loudness_scope": "primary signal windows when bleed detector is available",
@@ -477,13 +622,30 @@ def run_ayaic_offline_pipeline(
         "autoeq_validation_summary": autoeq_report.get("autoeq_validation_summary", {}),
         "autoeq_osc_commands": autoeq_report.get("autoeq_osc_commands", []),
         "corrective_eq": corrective_eq_report,
+        "contextual_compression": compression_report,
+        "compression": compression_report,
+        "musical_panning": panning_report,
+        "panning": panning_report,
+        "musical_output_balance": output_balance_report,
+        "output_balance": output_balance_report,
+        "snare_pair_coherence": snare_pair_coherence_report,
+        "snare_top_bottom_balance": snare_top_bottom_report,
+        "musical_panorama_width": panorama_width_report,
+        "panorama_width": panorama_width_report,
         "pre_phase_channel_levels": pre_phase_channel_report,
         "post_phase_channel_levels": post_phase_channel_report,
         "post_phase_filter_channel_levels": post_phase_channel_report,
         "pre_corrective_eq_pair_levels": pre_corrective_pair_report,
         "post_corrective_eq_channel_levels": post_corrective_channel_report,
         "post_corrective_eq_pair_levels": post_corrective_pair_report,
-        "channel_levels": [*pre_phase_channel_report, *post_phase_channel_report, *post_corrective_channel_report],
+        "post_compression_channel_levels": post_compression_channel_report,
+        "post_compression_pair_levels": post_compression_pair_report,
+        "channel_levels": [
+            *pre_phase_channel_report,
+            *post_phase_channel_report,
+            *post_corrective_channel_report,
+            *post_compression_channel_report,
+        ],
         "pair_levels": final_pair_report,
         "track_levels": [
             *pre_phase_channel_report,
@@ -491,10 +653,13 @@ def run_ayaic_offline_pipeline(
             *pre_corrective_pair_report,
             *post_corrective_channel_report,
             *post_corrective_pair_report,
+            *post_compression_channel_report,
         ],
         "phase_delay_order": phase_stage_report["order"],
         "overhead_pair_alignment": phase_stage_report["overhead_pair_alignment"],
         "phase_alignment": phase_stage_report["phase_alignment"],
+        "global_phase_alignment": phase_stage_report.get("global_phase_alignment", {}),
+        "snare_bleed_alignment": phase_stage_report.get("snare_bleed_alignment", {}),
         "drum_pan_rule": phase_stage_report["drum_pan_rule"],
         "group_levels": group_report,
         "master_level": master_report,
@@ -3326,14 +3491,13 @@ def _summed_lufs_group_members(stems: list[AyaicStem], spec: dict[str, Any]) -> 
 
 
 def _apply_phase_delay_from_overheads(stems: list[AyaicStem], *, max_delay_ms: float) -> dict[str, Any]:
-    overhead_pair_report = _apply_overhead_pair_phase_alignment(stems, max_delay_ms=max_delay_ms)
-    phase_report = _apply_drum_phase_alignment(stems, max_delay_ms=max_delay_ms)
-    return {
-        "order": ["apply_overhead_pair_phase_alignment", "apply_drum_phase_alignment"],
-        "overhead_pair_alignment": overhead_pair_report,
-        "phase_alignment": phase_report,
-        "drum_pan_rule": {"enabled": False, "reason": "panning_not_used_in_phase_delay_stage"},
-    }
+    snare_report = _apply_snare_bleed_phase_alignment(stems, max_delay_ms=max_delay_ms)
+    if snare_report.get("snare_bleed_alignment", {}).get("enabled"):
+        return snare_report
+    fallback = _apply_global_bleed_phase_alignment(stems, max_delay_ms=max_delay_ms)
+    fallback["order"] = ["snare_bleed_phase_alignment_fallback", *fallback.get("order", [])]
+    fallback["snare_bleed_alignment"] = snare_report.get("snare_bleed_alignment", snare_report)
+    return fallback
 
 
 def _apply_overhead_pair_phase_alignment(stems: list[AyaicStem], *, max_delay_ms: float) -> dict[str, Any]:
@@ -3499,6 +3663,1207 @@ def _apply_drum_phase_alignment(
         reports.append(note)
 
     return reports
+
+
+def _apply_snare_bleed_phase_alignment(stems: list[AyaicStem], *, max_delay_ms: float) -> dict[str, Any]:
+    """Align reliable snare bleed arrivals, leaving the latest mic at 0 ms."""
+    if len(stems) < 2:
+        return _disabled_snare_bleed_report("not_enough_channels")
+
+    sample_rate = stems[0].sample_rate
+    for stem in stems:
+        if stem.sample_rate != sample_rate:
+            raise ValueError(f"{Path(stem.path).name}: sample rate mismatch {stem.sample_rate} != {sample_rate}")
+
+    reference_stem = _snare_reference_stem(stems)
+    if reference_stem is None:
+        return _disabled_snare_bleed_report("snare_reference_not_found")
+
+    event_starts = _snare_event_starts(stems, sample_rate)
+    if not event_starts:
+        return _disabled_snare_bleed_report(
+            "snare_events_not_found",
+            reference_stem=reference_stem,
+        )
+
+    original = {
+        stem.channel_id: {
+            "audio": ensure_stereo(stem.audio).copy(),
+            "delay_ms": float(stem.delay_ms),
+            "phase_invert": bool(stem.phase_invert),
+        }
+        for stem in stems
+    }
+    reference_signal = _snare_alignment_signal(reference_stem)
+    candidates: list[dict[str, Any]] = [
+        {
+            "channel": reference_stem.channel_id,
+            "file": Path(reference_stem.path).name,
+            "role": _project_channel_role(reference_stem.name),
+            "arrival_ms": 0.0,
+            "delay_samples": 0.0,
+            "psr": 99.0,
+            "confidence": 1.0,
+            "coherence": 1.0,
+            "delay_stability_ms": 0.0,
+            "window_count": len(event_starts),
+            "corr_current": 1.0,
+            "corr_flipped": -1.0,
+            "source": "snare_reference",
+        }
+    ]
+    rejected: list[dict[str, Any]] = []
+    for stem in stems:
+        if stem.channel_id == reference_stem.channel_id:
+            continue
+        role = _project_channel_role(stem.name)
+        if not _snare_bleed_candidate_allowed(role):
+            rejected.append(
+                {
+                    "channel": stem.channel_id,
+                    "file": Path(stem.path).name,
+                    "role": role,
+                    "reason": "not_a_microphone_snare_bleed_candidate",
+                }
+            )
+            continue
+        measurement = _snare_bleed_arrival_measurement(
+            reference_signal,
+            _snare_alignment_signal(stem),
+            sample_rate,
+            starts=event_starts,
+            max_delay_ms=max_delay_ms,
+        )
+        reason = _snare_bleed_rejection_reason(measurement, role)
+        payload = {
+            "channel": stem.channel_id,
+            "file": Path(stem.path).name,
+            "role": role,
+            **measurement,
+        }
+        if reason:
+            payload["reason"] = reason
+            rejected.append(_round_snare_bleed_item(payload))
+            continue
+        candidates.append(payload)
+
+    reliable = [item for item in candidates if str(item.get("source")) == "snare_reference" or item.get("arrival_ms") is not None]
+    if len(reliable) < 2:
+        return _disabled_snare_bleed_report(
+            "not_enough_reliable_snare_bleed_mics",
+            reference_stem=reference_stem,
+            candidates=candidates,
+            rejected=rejected,
+            event_starts=event_starts,
+        )
+
+    latest = max(reliable, key=lambda item: (float(item["arrival_ms"]), float(item.get("confidence", 0.0))))
+    latest_arrival_ms = float(latest["arrival_ms"])
+    delays = {
+        int(item["channel"]): max(0.0, latest_arrival_ms - float(item["arrival_ms"]))
+        for item in reliable
+    }
+    limited_channels = []
+    for channel, delay_ms in list(delays.items()):
+        if delay_ms > max_delay_ms:
+            delays[channel] = max_delay_ms
+            limited_channels.append(channel)
+
+    before_score = _snare_bleed_alignment_score(
+        stems,
+        channels=sorted(delays),
+        zero_channel=int(latest["channel"]),
+        starts=event_starts,
+        sample_rate=sample_rate,
+        zero_arrival_ms=latest_arrival_ms,
+    )
+    actions = _apply_snare_bleed_delays_and_polarity(
+        stems,
+        delays,
+        zero_channel=int(latest["channel"]),
+        zero_arrival_ms=latest_arrival_ms,
+        event_starts=event_starts,
+        sample_rate=sample_rate,
+        max_delay_ms=max_delay_ms,
+        limited_channels=set(limited_channels),
+    )
+    after_score = _snare_bleed_alignment_score(
+        stems,
+        channels=sorted(delays),
+        zero_channel=int(latest["channel"]),
+        starts=event_starts,
+        sample_rate=sample_rate,
+        zero_arrival_ms=latest_arrival_ms,
+    )
+    rollback = bool(actions and after_score < before_score - 0.03)
+    if rollback:
+        for stem in stems:
+            saved = original[stem.channel_id]
+            stem.audio = saved["audio"].copy()
+            stem.delay_ms = float(saved["delay_ms"])
+            stem.phase_invert = bool(saved["phase_invert"])
+        for action in actions:
+            action["rolled_back"] = True
+            action["rollback_reason"] = "snare_bleed_alignment_score_worse_after_delay"
+        after_score = _snare_bleed_alignment_score(
+            stems,
+            channels=sorted(delays),
+            zero_channel=int(latest["channel"]),
+            starts=event_starts,
+            sample_rate=sample_rate,
+            zero_arrival_ms=latest_arrival_ms,
+        )
+
+    alignment = {
+        "enabled": True,
+        "method": "snare_bleed_phase_alignment",
+        "reference_file": Path(reference_stem.path).name,
+        "reference_channel": reference_stem.channel_id,
+        "zero_ms_source": str(latest["file"]),
+        "zero_ms_channel": int(latest["channel"]),
+        "zero_ms_rule": "latest_reliable_snare_arrival_is_0ms",
+        "latest_arrival_ms": round(latest_arrival_ms, 4),
+        "event_count": len(event_starts),
+        "reliable_mic_count": len(reliable),
+        "candidate_mics": [_round_snare_bleed_item(item) for item in reliable],
+        "rejected_mics": rejected[:80],
+        "limited_channels": sorted(limited_channels),
+        "before_alignment_score": round(float(before_score), 4),
+        "after_alignment_score": round(float(after_score), 4),
+        "alignment_score_delta": round(float(after_score - before_score), 4),
+        "rollback": rollback,
+        "notes": [
+            "Snare transients are measured in every reliable microphone channel.",
+            "The microphone with the latest reliable snare arrival stays at 0 ms.",
+            "Earlier arrivals receive positive offline fractional delay.",
+            "Polarity is checked only after delay alignment.",
+        ],
+    }
+    report = {
+        "order": [
+            "detect_snare_transients",
+            "measure_snare_bleed_arrivals",
+            "select_latest_snare_arrival_zero_ms",
+            "apply_fractional_delay_and_polarity",
+            "validate_snare_bleed_alignment",
+        ],
+        "overhead_pair_alignment": _snare_bleed_overhead_report(stems, reliable, delays, latest),
+        "phase_alignment": actions,
+        "global_phase_alignment": {
+            "enabled": False,
+            "reason": "snare_bleed_phase_alignment_used",
+            "fallback_available": True,
+        },
+        "snare_bleed_alignment": alignment,
+        "drum_pan_rule": {"enabled": False, "reason": "panning_not_used_in_phase_delay_stage"},
+    }
+    for stem in stems:
+        if stem.channel_id in delays:
+            stem.notes.append(
+                {
+                    "type": "snare_bleed_phase_alignment",
+                    "delay_ms": round(stem.delay_ms, 4),
+                    "phase_invert": bool(stem.phase_invert),
+                    "zero_ms_source": str(latest["file"]),
+                    "rolled_back": rollback,
+                }
+            )
+    return report
+
+
+def _disabled_snare_bleed_report(
+    reason: str,
+    *,
+    reference_stem: AyaicStem | None = None,
+    candidates: list[dict[str, Any]] | None = None,
+    rejected: list[dict[str, Any]] | None = None,
+    event_starts: list[int] | None = None,
+) -> dict[str, Any]:
+    return {
+        "order": ["snare_bleed_phase_alignment"],
+        "overhead_pair_alignment": {"enabled": False, "reason": reason},
+        "phase_alignment": [],
+        "global_phase_alignment": {"enabled": False, "reason": reason},
+        "snare_bleed_alignment": {
+            "enabled": False,
+            "method": "snare_bleed_phase_alignment",
+            "reason": reason,
+            "reference_file": Path(reference_stem.path).name if reference_stem else None,
+            "reference_channel": reference_stem.channel_id if reference_stem else None,
+            "event_count": len(event_starts or []),
+            "candidate_mics": [_round_snare_bleed_item(item) for item in candidates or []],
+            "rejected_mics": rejected or [],
+        },
+        "drum_pan_rule": {"enabled": False, "reason": "panning_not_used_in_phase_delay_stage"},
+    }
+
+
+def _snare_reference_stem(stems: list[AyaicStem]) -> AyaicStem | None:
+    snare_stems = [stem for stem in stems if _drum_instrument(stem.name) == "snare"]
+    if not snare_stems:
+        return None
+    preferred_keys = {"snare t", "snare top", "snare"}
+    return next((stem for stem in snare_stems if _name_key(stem.name) in preferred_keys), snare_stems[0])
+
+
+def _snare_alignment_signal(stem: AyaicStem) -> np.ndarray:
+    # Snare alignment is explicitly about leakage across microphones, so it
+    # must use the full rendered stem rather than primary-loudness windows.
+    mono = _mono(stem.audio)
+    focused = _highpass(mono, stem.sample_rate, 120.0)
+    focused = _lowpass(focused, stem.sample_rate, 6500.0)
+    return np.asarray(focused, dtype=np.float32)
+
+
+def _snare_bleed_candidate_allowed(role: str) -> bool:
+    return role not in {"playback"}
+
+
+def _snare_bleed_arrival_measurement(
+    reference: np.ndarray,
+    target: np.ndarray,
+    sample_rate: int,
+    *,
+    starts: list[int],
+    max_delay_ms: float,
+) -> dict[str, Any]:
+    window_len = max(1024, int(0.170 * sample_rate))
+    measurements: list[dict[str, float]] = []
+    for start in starts:
+        window = min(len(reference) - start, len(target) - start, window_len)
+        if window < max(512, window_len // 3):
+            continue
+        ref_seg = reference[start:start + window]
+        tgt_seg = target[start:start + window]
+        fft_size = _next_power_of_two(len(ref_seg))
+        if fft_size != len(ref_seg):
+            ref_seg = np.pad(ref_seg, (0, fft_size - len(ref_seg)))
+            tgt_seg = np.pad(tgt_seg, (0, fft_size - len(tgt_seg)))
+        measurement = _gcc_phat_measurement(
+            ref_seg,
+            tgt_seg,
+            sample_rate,
+            fft_size=fft_size,
+            max_delay_ms=max_delay_ms,
+        )
+        delay_ms = float(measurement["delay_ms"])
+        if not np.isfinite(delay_ms) or abs(abs(delay_ms) - max_delay_ms) < 0.05:
+            continue
+        corr_current, corr_flipped = _corr_for_measured_delay(ref_seg, tgt_seg, delay_ms, sample_rate)
+        measurements.append(
+            {
+                **measurement,
+                "arrival_ms": delay_ms,
+                "start": float(start),
+                "corr_current": float(corr_current),
+                "corr_flipped": float(corr_flipped),
+                "corr_abs": float(max(abs(corr_current), abs(corr_flipped))),
+            }
+        )
+
+    if not measurements:
+        return {
+            "arrival_ms": None,
+            "delay_samples": None,
+            "psr": 0.0,
+            "confidence": 0.0,
+            "coherence": 0.0,
+            "delay_stability_ms": 999.0,
+            "window_count": 0,
+            "corr_current": 0.0,
+            "corr_flipped": 0.0,
+        }
+    arrivals = np.array([float(item["arrival_ms"]) for item in measurements], dtype=np.float64)
+    median_arrival = float(np.median(arrivals))
+    selected = min(measurements, key=lambda item: abs(float(item["arrival_ms"]) - median_arrival))
+    stability = float(np.median(np.abs(arrivals - median_arrival))) if len(arrivals) > 1 else 0.0
+    psr = float(np.median([float(item["psr"]) for item in measurements]))
+    confidence = float(np.median([float(item["confidence"]) for item in measurements]))
+    coherence = float(np.median([float(item["coherence"]) for item in measurements]))
+    corr_current = float(np.median([float(item["corr_current"]) for item in measurements]))
+    corr_flipped = float(np.median([float(item["corr_flipped"]) for item in measurements]))
+    corr_abs = max(abs(corr_current), abs(corr_flipped))
+    stability_score = max(0.0, min(1.0, 1.0 - stability / max(0.35, max_delay_ms * 0.25)))
+    combined_confidence = 0.45 * confidence + 0.30 * min(1.0, corr_abs / 0.45) + 0.25 * stability_score
+    return {
+        "arrival_ms": median_arrival,
+        "delay_samples": median_arrival * sample_rate / 1000.0,
+        "psr": psr,
+        "confidence": float(max(0.0, min(1.0, combined_confidence))),
+        "raw_confidence": confidence,
+        "coherence": coherence,
+        "corr_abs": corr_abs,
+        "delay_stability_ms": stability,
+        "window_count": len(measurements),
+        "representative_start_sample": int(selected["start"]),
+        "corr_current": corr_current,
+        "corr_flipped": corr_flipped,
+    }
+
+
+def _snare_bleed_rejection_reason(measurement: dict[str, Any], role: str) -> str | None:
+    if measurement.get("arrival_ms") is None:
+        return "no_valid_snare_bleed_windows"
+    windows = int(measurement.get("window_count", 0))
+    confidence = float(measurement.get("confidence", 0.0))
+    corr_abs = float(measurement.get("corr_abs", max(abs(float(measurement.get("corr_current", 0.0))), abs(float(measurement.get("corr_flipped", 0.0))))))
+    psr = float(measurement.get("psr", 0.0))
+    stability = float(measurement.get("delay_stability_ms", 999.0))
+    drum_or_ambience = role in {"kick", "snare", "snare_top", "snare_bottom", "tom", "floor_tom", "overhead", "room"}
+    if windows == 1 and confidence >= 0.55 and corr_abs >= 0.20 and psr >= 0.7:
+        return None
+    if windows < (1 if drum_or_ambience else 2):
+        return "not_enough_snare_bleed_windows"
+    if stability > (1.8 if drum_or_ambience else 1.15):
+        return "snare_arrival_unstable_across_hits"
+    if psr < (0.55 if drum_or_ambience else 1.0):
+        return "weak_snare_gcc_peak"
+    if confidence < (0.20 if drum_or_ambience else 0.34):
+        return "confidence_below_snare_bleed_threshold"
+    if corr_abs < (0.08 if drum_or_ambience else 0.16):
+        return "correlation_below_snare_bleed_threshold"
+    return None
+
+
+def _apply_snare_bleed_delays_and_polarity(
+    stems: list[AyaicStem],
+    delays: dict[int, float],
+    *,
+    zero_channel: int,
+    zero_arrival_ms: float,
+    event_starts: list[int],
+    sample_rate: int,
+    max_delay_ms: float,
+    limited_channels: set[int],
+) -> list[dict[str, Any]]:
+    channel_to_stem = {stem.channel_id: stem for stem in stems}
+    actions: list[dict[str, Any]] = []
+    for channel, delay_ms in sorted(delays.items()):
+        stem = channel_to_stem[channel]
+        if delay_ms > 0.05:
+            stem.audio = _delay_audio_fractional(stem.audio, delay_ms, sample_rate)
+            stem.delay_ms += delay_ms
+        actions.append(
+            {
+                "channel": channel,
+                "file": Path(stem.path).name,
+                "instrument": _project_channel_role(stem.name),
+                "reference": "snare_bleed_latest_arrival",
+                "operation_order": ["fractional_delay_first", "polarity_check_second"],
+                "phase_reference": "snare_bleed_transient_arrival",
+                "reference_rule": "latest_reliable_snare_arrival_is_zero_ms",
+                "zero_ms_source_channel": zero_channel,
+                "zero_ms_source": Path(channel_to_stem[zero_channel].path).name,
+                "applied_delay_ms": round(float(stem.delay_ms), 4),
+                "applied_incremental_delay_ms": round(float(delay_ms), 4),
+                "delay_limited_by_max_phase_delay": channel in limited_channels,
+                "phase_invert": bool(stem.phase_invert),
+                "phase_invert_applied": False,
+                "rolled_back": False,
+            }
+        )
+
+    zero_signal = _snare_alignment_signal(channel_to_stem[zero_channel])
+    polarity_starts = [
+        int(np.clip(start + _samples_from_ms(max(0.0, zero_arrival_ms), sample_rate), 0, max(0, len(zero_signal) - 1)))
+        for start in event_starts
+    ]
+    for action in actions:
+        channel = int(action["channel"])
+        if channel == zero_channel:
+            action["corr_current"] = None
+            action["corr_flipped"] = None
+            continue
+        stem = channel_to_stem[channel]
+        target = _snare_alignment_signal(stem)
+        polarity = _snare_polarity_decision(
+            zero_signal,
+            target,
+            sample_rate,
+            starts=polarity_starts,
+            max_lag_ms=min(max_delay_ms, 1.5),
+        )
+        if polarity["should_invert"]:
+            stem.audio = -stem.audio
+            stem.phase_invert = not stem.phase_invert
+            action["phase_invert"] = bool(stem.phase_invert)
+            action["phase_invert_applied"] = True
+        action["corr_current"] = round(float(polarity["current_corr"]), 4)
+        action["corr_flipped"] = round(float(polarity["flipped_corr"]), 4)
+        action["polarity_best_lag_ms"] = round(float(polarity["best_lag_ms"]), 4)
+    return [
+        action for action in actions
+        if action["applied_incremental_delay_ms"] > 0.05 or action.get("phase_invert_applied")
+    ]
+
+
+def _snare_bleed_alignment_score(
+    stems: list[AyaicStem],
+    *,
+    channels: list[int],
+    zero_channel: int,
+    starts: list[int],
+    sample_rate: int,
+    zero_arrival_ms: float,
+) -> float:
+    channel_to_stem = {stem.channel_id: stem for stem in stems}
+    if zero_channel not in channel_to_stem:
+        return 0.0
+    zero_signal = _snare_alignment_signal(channel_to_stem[zero_channel])
+    window = max(512, int(0.170 * sample_rate))
+    shifted_starts = [
+        int(np.clip(start + _samples_from_ms(max(0.0, zero_arrival_ms), sample_rate), 0, max(0, len(zero_signal) - window)))
+        for start in starts
+    ]
+    scores = []
+    for channel in channels:
+        if channel == zero_channel or channel not in channel_to_stem:
+            continue
+        target = _snare_alignment_signal(channel_to_stem[channel])
+        values = []
+        for start in shifted_starts:
+            end = min(start + window, len(zero_signal), len(target))
+            if end - start < window // 3:
+                continue
+            values.append(abs(_norm_corr(zero_signal[start:end], target[start:end])))
+        if values:
+            scores.append(float(np.median(values)))
+    return float(np.median(scores)) if scores else 0.0
+
+
+def _snare_bleed_overhead_report(
+    stems: list[AyaicStem],
+    reliable: list[dict[str, Any]],
+    delays: dict[int, float],
+    latest: dict[str, Any],
+) -> dict[str, Any]:
+    overheads = [stem for stem in stems if _drum_instrument(stem.name) == "overhead"]
+    if not overheads:
+        return {
+            "enabled": False,
+            "reason": "overhead_pair_not_found",
+            "rule": "snare_bleed_latest_arrival_zero_ms",
+            "zero_ms_source": str(latest["file"]),
+        }
+    reliable_by_channel = {int(item["channel"]): item for item in reliable}
+    return {
+        "enabled": any(stem.channel_id in reliable_by_channel for stem in overheads),
+        "rule": "snare_bleed_latest_arrival_zero_ms",
+        "phase_reference": "snare_transient_bleed",
+        "reference_rule": "latest_reliable_snare_arrival_is_zero_ms",
+        "zero_ms_source": str(latest["file"]),
+        "zero_ms_channel": int(latest["channel"]),
+        "overheads": [
+            {
+                "channel": stem.channel_id,
+                "file": Path(stem.path).name,
+                "reliable": stem.channel_id in reliable_by_channel,
+                "arrival_ms": round(float(reliable_by_channel[stem.channel_id]["arrival_ms"]), 4)
+                if stem.channel_id in reliable_by_channel else None,
+                "applied_delay_ms": round(float(delays.get(stem.channel_id, 0.0)), 4),
+            }
+            for stem in overheads
+        ],
+    }
+
+
+def _round_snare_bleed_item(item: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in item.items():
+        if isinstance(value, float):
+            out[key] = round(value, 4)
+        elif isinstance(value, np.floating):
+            out[key] = round(float(value), 4)
+        else:
+            out[key] = value
+    return out
+
+
+def _apply_global_bleed_phase_alignment(stems: list[AyaicStem], *, max_delay_ms: float) -> dict[str, Any]:
+    """Align all strongly correlated bleed/shared-mic groups, not only drums."""
+    if len(stems) < 2:
+        return {
+            "order": ["global_bleed_phase_alignment"],
+            "overhead_pair_alignment": {"enabled": False, "reason": "not_enough_channels"},
+            "phase_alignment": [],
+            "global_phase_alignment": {"enabled": False, "reason": "not_enough_channels"},
+            "drum_pan_rule": {"enabled": False, "reason": "panning_not_used_in_phase_delay_stage"},
+        }
+
+    sample_rate = stems[0].sample_rate
+    for stem in stems:
+        if stem.sample_rate != sample_rate:
+            raise ValueError(f"{Path(stem.path).name}: sample rate mismatch {stem.sample_rate} != {sample_rate}")
+
+    original = {
+        stem.channel_id: {
+            "audio": ensure_stereo(stem.audio).copy(),
+            "delay_ms": float(stem.delay_ms),
+            "phase_invert": bool(stem.phase_invert),
+        }
+        for stem in stems
+    }
+    phase_signals = {stem.channel_id: _phase_alignment_signal(stem) for stem in stems}
+    edges, rejected_edges = _global_phase_candidate_edges(
+        stems,
+        phase_signals,
+        sample_rate=sample_rate,
+        max_delay_ms=max_delay_ms,
+    )
+    if not edges:
+        return {
+            "order": ["build_global_bleed_correlation_graph"],
+            "overhead_pair_alignment": _global_overhead_report(stems, [], {}),
+            "phase_alignment": [],
+            "global_phase_alignment": {
+                "enabled": False,
+                "method": "global_bleed_phase_alignment",
+                "reason": "no_reliable_correlation_edges",
+                "candidate_edge_count": 0,
+                "rejected_edges": rejected_edges,
+            },
+            "drum_pan_rule": {"enabled": False, "reason": "panning_not_used_in_phase_delay_stage"},
+        }
+
+    components = _global_phase_components(stems, edges)
+    solved_offsets = _solve_global_phase_offsets(stems, edges, components, max_delay_ms=max_delay_ms)
+    before_score = _global_phase_graph_score(stems, edges)
+    actions = _apply_global_phase_offsets_and_polarity(
+        stems,
+        edges,
+        solved_offsets,
+        sample_rate=sample_rate,
+    )
+    after_score = _global_phase_graph_score(stems, edges)
+    improvement = after_score - before_score
+    rollback = bool(actions and improvement < -0.015)
+    if rollback:
+        for stem in stems:
+            saved = original[stem.channel_id]
+            stem.audio = saved["audio"].copy()
+            stem.delay_ms = float(saved["delay_ms"])
+            stem.phase_invert = bool(saved["phase_invert"])
+        after_score = _global_phase_graph_score(stems, edges)
+        for action in actions:
+            action["rolled_back"] = True
+            action["rollback_reason"] = "global_correlation_score_worse_after_alignment"
+
+    overhead_report = _global_overhead_report(stems, edges, solved_offsets)
+    report = {
+        "order": [
+            "build_global_bleed_correlation_graph",
+            "solve_global_delay_offsets",
+            "apply_fractional_delay_and_polarity",
+            "validate_global_phase_alignment",
+        ],
+        "overhead_pair_alignment": overhead_report,
+        "phase_alignment": actions,
+        "global_phase_alignment": {
+            "enabled": True,
+            "method": "global_bleed_phase_alignment",
+            "reference_scope": "all_high_correlation_bleed_edges",
+            "candidate_edge_count": len(edges),
+            "rejected_edge_count": len(rejected_edges),
+            "components": components,
+            "solved_offsets_ms": {
+                str(channel): round(float(offset), 4)
+                for channel, offset in sorted(solved_offsets.items())
+            },
+            "before_graph_score": round(before_score, 4),
+            "after_graph_score": round(after_score, 4),
+            "graph_score_delta": round(after_score - before_score, 4),
+            "rollback": rollback,
+            "edges": [_round_global_phase_edge(edge) for edge in edges],
+            "rejected_edges": rejected_edges[:80],
+            "notes": [
+                "Uses all reliable cross-channel bleed/correlation edges, not only drums.",
+                "Relative negative offsets are converted into non-negative offline delays per connected component.",
+                "Fractional delay is applied offline; live implementations must map to mixer delay resolution.",
+                "Room/overhead natural spacing is protected by stricter confidence and lower edge weights.",
+            ],
+        },
+        "drum_pan_rule": {"enabled": False, "reason": "panning_not_used_in_phase_delay_stage"},
+    }
+    for stem in stems:
+        if stem.channel_id in solved_offsets:
+            stem.notes.append(
+                {
+                    "type": "global_bleed_phase_alignment",
+                    "delay_ms": round(stem.delay_ms, 4),
+                    "phase_invert": bool(stem.phase_invert),
+                    "component": _component_index_for_channel(components, stem.channel_id),
+                    "rolled_back": rollback,
+                }
+            )
+    return report
+
+
+def _phase_alignment_signal(stem: AyaicStem) -> np.ndarray:
+    mono = _mono(_stem_primary_loudness_audio(stem))
+    if len(mono) < int(0.5 * stem.sample_rate):
+        mono = _mono(stem.audio)
+    return _highpass(mono, stem.sample_rate, 40.0)
+
+
+def _global_phase_candidate_edges(
+    stems: list[AyaicStem],
+    phase_signals: dict[int, np.ndarray],
+    *,
+    sample_rate: int,
+    max_delay_ms: float,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    edges: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
+    for left_index, left_stem in enumerate(stems):
+        for right_stem in stems[left_index + 1:]:
+            relation = _phase_pair_relation(left_stem, right_stem)
+            left_role = _project_channel_role(left_stem.name)
+            right_role = _project_channel_role(right_stem.name)
+            measurement = _global_phase_pair_measurement(
+                phase_signals[left_stem.channel_id],
+                phase_signals[right_stem.channel_id],
+                sample_rate,
+                max_delay_ms=max_delay_ms,
+            )
+            source_stem = left_stem
+            target_stem = right_stem
+            source_role = left_role
+            target_role = right_role
+            if (
+                relation == "drum_bleed_reference"
+                and _is_phase_ambience_role(left_role)
+                and _is_phase_close_drum_role(right_role)
+            ):
+                source_stem = right_stem
+                target_stem = left_stem
+                source_role = right_role
+                target_role = left_role
+                measurement = {
+                    **measurement,
+                    "delay_ms": -float(measurement["delay_ms"]),
+                    "delay_samples": -float(measurement["delay_samples"]),
+                }
+            reason = _global_phase_edge_rejection_reason(measurement, relation)
+            payload = {
+                "source_channel": source_stem.channel_id,
+                "target_channel": target_stem.channel_id,
+                "source_file": Path(source_stem.path).name,
+                "target_file": Path(target_stem.path).name,
+                "source_role": source_role,
+                "target_role": target_role,
+                "relation": relation,
+                **measurement,
+            }
+            if reason:
+                payload["reason"] = reason
+                rejected.append(_round_global_phase_edge(payload))
+                continue
+            weight = _global_phase_edge_weight(measurement, relation)
+            edge = {
+                **payload,
+                "desired_target_minus_source_delay_ms": -float(measurement["delay_ms"]),
+                "weight": weight,
+            }
+            edges.append(edge)
+    edges.sort(key=lambda item: (-float(item["weight"]), item["source_channel"], item["target_channel"]))
+    return edges, rejected
+
+
+def _is_phase_close_drum_role(role: str) -> bool:
+    return role in {"kick", "snare", "snare_top", "snare_bottom", "tom", "floor_tom"}
+
+
+def _is_phase_ambience_role(role: str) -> bool:
+    return role in {"overhead", "room"}
+
+
+def _phase_pair_relation(first: AyaicStem, second: AyaicStem) -> str:
+    first_key = _name_key(first.name)
+    second_key = _name_key(second.name)
+    first_role = _project_channel_role(first.name)
+    second_role = _project_channel_role(second.name)
+    if _stereo_pair_base(first_key) and _stereo_pair_base(first_key) == _stereo_pair_base(second_key):
+        return "linked_stereo_pair"
+    if (
+        _is_phase_close_drum_role(first_role) and _is_phase_ambience_role(second_role)
+        or _is_phase_close_drum_role(second_role) and _is_phase_ambience_role(first_role)
+    ):
+        return "drum_bleed_reference"
+    if first.group == second.group and first.group:
+        return f"same_group:{first.group}"
+    if first_role in {"overhead", "room"} or second_role in {"overhead", "room"}:
+        return "ambience_bleed_reference"
+    if first_role == second_role:
+        return f"same_role:{first_role}"
+    return "cross_bleed"
+
+
+def _stereo_pair_base(key: str) -> str | None:
+    for suffix in (" l", " r", " left", " right"):
+        if key.endswith(suffix):
+            return key[: -len(suffix)]
+    return None
+
+
+def _global_phase_pair_measurement(
+    reference: np.ndarray,
+    target: np.ndarray,
+    sample_rate: int,
+    *,
+    max_delay_ms: float,
+) -> dict[str, Any]:
+    starts = _shared_active_segment_starts(reference, target, sample_rate)
+    window_len = int(2.0 * sample_rate)
+    measurements: list[dict[str, float]] = []
+    for start in starts:
+        window = min(len(reference) - start, len(target) - start, window_len)
+        if window < int(0.35 * sample_rate):
+            continue
+        ref_seg = reference[start : start + window]
+        tgt_seg = target[start : start + window]
+        fft_size = _next_power_of_two(len(ref_seg))
+        if fft_size != len(ref_seg):
+            ref_seg = np.pad(ref_seg, (0, fft_size - len(ref_seg)))
+            tgt_seg = np.pad(tgt_seg, (0, fft_size - len(tgt_seg)))
+        measurement = _gcc_phat_measurement(
+            ref_seg,
+            tgt_seg,
+            sample_rate,
+            fft_size=fft_size,
+            max_delay_ms=max_delay_ms,
+        )
+        delay_ms = float(measurement["delay_ms"])
+        if not np.isfinite(delay_ms) or abs(abs(delay_ms) - max_delay_ms) < 0.05:
+            continue
+        corr_current, corr_flipped = _corr_for_measured_delay(
+            ref_seg,
+            tgt_seg,
+            delay_ms,
+            sample_rate,
+        )
+        measurements.append(
+            {
+                **measurement,
+                "start": float(start),
+                "corr_current": float(corr_current),
+                "corr_flipped": float(corr_flipped),
+                "corr_abs": float(max(abs(corr_current), abs(corr_flipped))),
+            }
+        )
+
+    if not measurements:
+        return {
+            "delay_ms": 0.0,
+            "delay_samples": 0.0,
+            "psr": 0.0,
+            "confidence": 0.0,
+            "coherence": 0.0,
+            "delay_stability_ms": 999.0,
+            "window_count": 0,
+            "corr_current": 0.0,
+            "corr_flipped": 0.0,
+            "polarity_hint": "normal",
+        }
+
+    delays = np.array([float(item["delay_ms"]) for item in measurements], dtype=np.float64)
+    median_delay = float(np.median(delays))
+    selected = min(measurements, key=lambda item: abs(float(item["delay_ms"]) - median_delay))
+    stability = float(np.median(np.abs(delays - median_delay))) if len(delays) > 1 else 0.0
+    psr = float(np.median([float(item["psr"]) for item in measurements]))
+    corr_current = float(np.median([float(item["corr_current"]) for item in measurements]))
+    corr_flipped = float(np.median([float(item["corr_flipped"]) for item in measurements]))
+    corr_abs = max(abs(corr_current), abs(corr_flipped))
+    stability_score = max(0.0, min(1.0, 1.0 - stability / max(0.5, max_delay_ms * 0.35)))
+    psr_score = max(0.0, min(1.0, psr / 8.0))
+    confidence = 0.52 * min(1.0, corr_abs / 0.55) + 0.25 * psr_score + 0.23 * stability_score
+    return {
+        "delay_ms": median_delay,
+        "delay_samples": median_delay * sample_rate / 1000.0,
+        "psr": psr,
+        "confidence": float(max(0.0, min(1.0, confidence))),
+        "coherence": corr_abs,
+        "delay_stability_ms": stability,
+        "window_count": len(measurements),
+        "representative_start_sample": int(selected["start"]),
+        "corr_current": corr_current,
+        "corr_flipped": corr_flipped,
+        "polarity_hint": "invert" if corr_flipped > corr_current + 0.04 and abs(corr_flipped) > 0.12 else "normal",
+    }
+
+
+def _shared_active_segment_starts(first: np.ndarray, second: np.ndarray, sample_rate: int, count: int = 8) -> list[int]:
+    n = min(len(first), len(second))
+    if n <= int(0.35 * sample_rate):
+        return [0]
+    window = min(n, max(1024, int(2.0 * sample_rate)))
+    hop = max(512, window // 3)
+    scored: list[tuple[float, int]] = []
+    first_arr = np.asarray(first[:n], dtype=np.float32)
+    second_arr = np.asarray(second[:n], dtype=np.float32)
+    for start in range(0, max(1, n - window + 1), hop):
+        end = start + window
+        first_rms = _rms_linear(first_arr[start:end])
+        second_rms = _rms_linear(second_arr[start:end])
+        shared = min(first_rms, second_rms)
+        total = first_rms + second_rms
+        if shared <= db_to_amp(-70.0) or total <= db_to_amp(-68.0):
+            continue
+        scored.append((shared * total, start))
+    if not scored:
+        return _active_segment_starts(first_arr + second_arr, sample_rate, count=count)
+    starts = [start for _, start in sorted(scored, reverse=True)[:count]]
+    return sorted(set(starts))
+
+
+def _corr_for_measured_delay(reference: np.ndarray, target: np.ndarray, delay_ms: float, sample_rate: int) -> tuple[float, float]:
+    if delay_ms < 0.0:
+        ref = np.asarray(reference, dtype=np.float32)
+        tgt = _delay_mono_fractional(target, -delay_ms, sample_rate)
+    else:
+        ref = _delay_mono_fractional(reference, delay_ms, sample_rate)
+        tgt = np.asarray(target, dtype=np.float32)
+    current = _norm_corr(ref, tgt)
+    flipped = _norm_corr(ref, -tgt)
+    return current, flipped
+
+
+def _global_phase_edge_rejection_reason(measurement: dict[str, Any], relation: str) -> str | None:
+    confidence = float(measurement.get("confidence", 0.0))
+    coherence = float(measurement.get("coherence", 0.0))
+    stability = float(measurement.get("delay_stability_ms", 999.0))
+    windows = int(measurement.get("window_count", 0))
+    psr = float(measurement.get("psr", 0.0))
+    if windows <= 0:
+        return "no_valid_windows"
+    if relation == "drum_bleed_reference":
+        if float(measurement.get("delay_ms", 0.0)) < 0.15:
+            return "close_mic_not_earlier_than_bleed_reference"
+        if windows == 1 and confidence >= 0.30 and coherence >= 0.25 and psr >= 0.65:
+            return None
+        if windows < 3:
+            return "not_enough_stable_bleed_windows"
+        if stability > 1.35:
+            return "delay_unstable_across_windows"
+        if psr < 0.65:
+            return "weak_gcc_peak"
+        if confidence < 0.18:
+            return "confidence_below_global_phase_threshold"
+        if coherence < 0.012:
+            return "correlation_below_bleed_threshold"
+        return None
+    if relation.startswith("same_group:drums") and windows >= 3:
+        if stability <= 0.75 and psr >= 1.2 and confidence >= 0.25 and coherence >= 0.04:
+            return None
+    min_confidence = 0.34
+    min_coherence = 0.18
+    if relation in {"ambience_bleed_reference", "cross_bleed"}:
+        min_confidence = 0.40
+        min_coherence = 0.24
+    if relation == "linked_stereo_pair":
+        min_confidence = 0.30
+        min_coherence = 0.16
+    if confidence < min_confidence:
+        return "confidence_below_global_phase_threshold"
+    if coherence < min_coherence:
+        return "correlation_below_bleed_threshold"
+    if stability > 2.25 and windows > 1:
+        return "delay_unstable_across_windows"
+    if psr < 0.5 and coherence < 0.35:
+        return "weak_gcc_peak"
+    return None
+
+
+def _global_phase_edge_weight(measurement: dict[str, Any], relation: str) -> float:
+    weight = float(measurement.get("confidence", 0.0))
+    weight *= 0.65 + 0.7 * float(measurement.get("coherence", 0.0))
+    if relation == "linked_stereo_pair":
+        weight *= 1.2
+    elif relation == "drum_bleed_reference":
+        weight *= 0.82
+    elif relation.startswith("same_group"):
+        weight *= 1.1
+    elif relation == "ambience_bleed_reference":
+        weight *= 0.72
+    elif relation == "cross_bleed":
+        weight *= 0.85
+    return round(float(max(0.01, min(2.0, weight))), 4)
+
+
+def _global_phase_components(stems: list[AyaicStem], edges: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    channels = {stem.channel_id for stem in stems}
+    parent = {channel: channel for channel in channels}
+
+    def find(channel: int) -> int:
+        while parent[channel] != channel:
+            parent[channel] = parent[parent[channel]]
+            channel = parent[channel]
+        return channel
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    for edge in edges:
+        union(int(edge["source_channel"]), int(edge["target_channel"]))
+    grouped: dict[int, list[int]] = {}
+    for channel in channels:
+        grouped.setdefault(find(channel), []).append(channel)
+    channel_to_stem = {stem.channel_id: stem for stem in stems}
+    components = []
+    for index, members in enumerate(sorted(grouped.values(), key=lambda item: (-len(item), min(item)))):
+        if len(members) < 2:
+            continue
+        anchor = _global_phase_anchor([channel_to_stem[channel] for channel in members])
+        components.append(
+            {
+                "index": index,
+                "channels": sorted(members),
+                "files": [Path(channel_to_stem[channel].path).name for channel in sorted(members)],
+                "anchor_channel": anchor.channel_id,
+                "anchor_file": Path(anchor.path).name,
+            }
+        )
+    return components
+
+
+def _global_phase_anchor(component_stems: list[AyaicStem]) -> AyaicStem:
+    role_rank = {
+        "overhead": 0,
+        "room": 1,
+        "lead_vocal": 2,
+        "kick": 3,
+        "snare": 4,
+        "bass": 5,
+        "guitar": 6,
+        "accordion": 6,
+        "keys": 6,
+        "playback": 7,
+        "back_vocal": 8,
+    }
+    return sorted(
+        component_stems,
+        key=lambda stem: (role_rank.get(_project_channel_role(stem.name), 20), stem.channel_id),
+    )[0]
+
+
+def _solve_global_phase_offsets(
+    stems: list[AyaicStem],
+    edges: list[dict[str, Any]],
+    components: list[dict[str, Any]],
+    *,
+    max_delay_ms: float,
+) -> dict[int, float]:
+    offsets: dict[int, float] = {}
+    component_by_channel = {
+        channel: component
+        for component in components
+        for channel in component["channels"]
+    }
+    edge_by_component: dict[int, list[dict[str, Any]]] = {}
+    for edge in edges:
+        component = component_by_channel.get(int(edge["source_channel"]))
+        if component and int(edge["target_channel"]) in component["channels"]:
+            edge_by_component.setdefault(int(component["index"]), []).append(edge)
+
+    for component in components:
+        channels = list(component["channels"])
+        anchor = int(component["anchor_channel"])
+        variables = [channel for channel in channels if channel != anchor]
+        if not variables:
+            offsets[anchor] = 0.0
+            continue
+        variable_index = {channel: idx for idx, channel in enumerate(variables)}
+        rows = []
+        values = []
+        for edge in edge_by_component.get(int(component["index"]), []):
+            row = np.zeros(len(variables), dtype=np.float64)
+            src = int(edge["source_channel"])
+            tgt = int(edge["target_channel"])
+            if tgt != anchor:
+                row[variable_index[tgt]] += 1.0
+            if src != anchor:
+                row[variable_index[src]] -= 1.0
+            weight = math.sqrt(float(edge.get("weight", 1.0)))
+            rows.append(row * weight)
+            values.append(float(edge["desired_target_minus_source_delay_ms"]) * weight)
+        if not rows:
+            for channel in channels:
+                offsets[channel] = 0.0
+            continue
+        solution, *_ = np.linalg.lstsq(np.vstack(rows), np.asarray(values, dtype=np.float64), rcond=None)
+        relative = {anchor: 0.0}
+        for channel, idx in variable_index.items():
+            relative[channel] = float(solution[idx])
+        min_offset = min(relative.values())
+        shifted = {channel: value - min_offset for channel, value in relative.items()}
+        max_offset = max(shifted.values()) if shifted else 0.0
+        if max_offset > max_delay_ms:
+            scale = max_delay_ms / max_offset
+            shifted = {channel: value * scale for channel, value in shifted.items()}
+        for channel, value in shifted.items():
+            offsets[channel] = round(float(max(0.0, min(max_delay_ms, value))), 5)
+    return offsets
+
+
+def _apply_global_phase_offsets_and_polarity(
+    stems: list[AyaicStem],
+    edges: list[dict[str, Any]],
+    offsets: dict[int, float],
+    *,
+    sample_rate: int,
+) -> list[dict[str, Any]]:
+    channel_to_stem = {stem.channel_id: stem for stem in stems}
+    actions: list[dict[str, Any]] = []
+    for channel, delay_ms in sorted(offsets.items()):
+        stem = channel_to_stem[channel]
+        if delay_ms > 0.05:
+            stem.audio = _delay_audio_fractional(stem.audio, delay_ms, sample_rate)
+            stem.delay_ms += delay_ms
+        action_edges = [
+            edge for edge in edges
+            if int(edge["source_channel"]) == channel or int(edge["target_channel"]) == channel
+        ]
+        action = {
+            "channel": channel,
+            "file": Path(stem.path).name,
+            "instrument": _project_channel_role(stem.name),
+            "reference": "global_bleed_correlation_graph",
+            "operation_order": ["fractional_delay_first", "polarity_check_second"],
+            "phase_reference": "weighted_correlation_component",
+            "measured_edge_count": len(action_edges),
+            "applied_delay_ms": round(float(stem.delay_ms), 4),
+            "applied_incremental_delay_ms": round(float(delay_ms), 4),
+            "phase_invert": bool(stem.phase_invert),
+            "rolled_back": False,
+        }
+        actions.append(action)
+
+    delayed_signals = {stem.channel_id: _phase_alignment_signal(stem) for stem in stems}
+    for action in actions:
+        channel = int(action["channel"])
+        neighbor_offsets = [
+            float(offsets.get(int(edge["target_channel"]), 0.0))
+            if int(edge["source_channel"]) == channel
+            else float(offsets.get(int(edge["source_channel"]), 0.0))
+            for edge in edges
+            if int(edge["source_channel"]) == channel or int(edge["target_channel"]) == channel
+        ]
+        if (
+            float(action["applied_incremental_delay_ms"]) <= 0.05
+            and any(offset > 0.05 for offset in neighbor_offsets)
+        ):
+            action["phase_invert_applied"] = False
+            action["corr_current"] = None
+            action["corr_flipped"] = None
+            continue
+        normal_score = 0.0
+        flipped_score = 0.0
+        total_weight = 0.0
+        for edge in edges:
+            if int(edge["source_channel"]) != channel and int(edge["target_channel"]) != channel:
+                continue
+            other_channel = int(edge["target_channel"]) if int(edge["source_channel"]) == channel else int(edge["source_channel"])
+            corr = _norm_corr(delayed_signals[other_channel], delayed_signals[channel])
+            weight = float(edge.get("weight", 1.0))
+            normal_score += weight * corr
+            flipped_score += weight * (-corr)
+            total_weight += weight
+        if total_weight <= 0.0:
+            continue
+        normal_score /= total_weight
+        flipped_score /= total_weight
+        stem = channel_to_stem[channel]
+        if abs(flipped_score) > 0.12 and flipped_score > normal_score + 0.04:
+            stem.audio = -stem.audio
+            stem.phase_invert = not stem.phase_invert
+            delayed_signals[channel] = -delayed_signals[channel]
+            action["phase_invert"] = bool(stem.phase_invert)
+            action["phase_invert_applied"] = True
+        else:
+            action["phase_invert_applied"] = False
+        action["corr_current"] = round(float(normal_score), 4)
+        action["corr_flipped"] = round(float(flipped_score), 4)
+    return [action for action in actions if action["applied_incremental_delay_ms"] > 0.05 or action.get("phase_invert_applied")]
+
+
+def _global_phase_graph_score(stems: list[AyaicStem], edges: list[dict[str, Any]]) -> float:
+    if not edges:
+        return 0.0
+    signals = {stem.channel_id: _phase_alignment_signal(stem) for stem in stems}
+    total = 0.0
+    total_weight = 0.0
+    for edge in edges:
+        source = int(edge["source_channel"])
+        target = int(edge["target_channel"])
+        weight = float(edge.get("weight", 1.0))
+        corr = _norm_corr(signals[source], signals[target])
+        total += weight * corr
+        total_weight += weight
+    return float(total / max(total_weight, 1e-12))
+
+
+def _round_global_phase_edge(edge: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in edge.items():
+        if isinstance(value, float):
+            out[key] = round(value, 4)
+        elif isinstance(value, np.floating):
+            out[key] = round(float(value), 4)
+        elif isinstance(value, np.integer):
+            out[key] = int(value)
+        else:
+            out[key] = value
+    return out
+
+
+def _global_overhead_report(
+    stems: list[AyaicStem],
+    edges: list[dict[str, Any]],
+    offsets: dict[int, float],
+) -> dict[str, Any]:
+    pair = _overhead_lr(stems)
+    if not pair:
+        return {"enabled": False, "reason": "overhead_pair_not_found"}
+    left, right = pair
+    edge = next(
+        (
+            item for item in edges
+            if {int(item["source_channel"]), int(item["target_channel"])} == {left.channel_id, right.channel_id}
+        ),
+        None,
+    )
+    adjusted = left if offsets.get(left.channel_id, 0.0) > offsets.get(right.channel_id, 0.0) else right
+    zero = left if offsets.get(left.channel_id, 0.0) <= offsets.get(right.channel_id, 0.0) else right
+    return {
+        "enabled": edge is not None,
+        "rule": "global_bleed_phase_alignment_overhead_edge",
+        "operation_order": ["global_graph_solve", "fractional_delay", "polarity_check"],
+        "phase_reference": "global_bleed_correlation_graph",
+        "reference_rule": "component_minimum_delay_is_zero_ms",
+        "left_file": Path(left.path).name,
+        "right_file": Path(right.path).name,
+        "zero_ms_source": Path(zero.path).name,
+        "farthest_overhead_file": Path(zero.path).name,
+        "adjusted_file": Path(adjusted.path).name,
+        "measured_right_vs_left_delay_ms": round(float(edge["delay_ms"]), 3) if edge else None,
+        "applied_left_delay_ms": round(float(left.delay_ms), 4),
+        "applied_right_delay_ms": round(float(right.delay_ms), 4),
+        "psr_db": round(float(edge["psr"]), 2) if edge and np.isfinite(edge["psr"]) else None,
+        "confidence": round(float(edge["confidence"]), 3) if edge else None,
+        "coherence": round(float(edge["coherence"]), 3) if edge else None,
+        "phase_invert_applied": bool(left.phase_invert or right.phase_invert),
+        "phase_inverted_file": Path(left.path).name if left.phase_invert else (Path(right.path).name if right.phase_invert else None),
+        "corr_current": round(float(edge["corr_current"]), 3) if edge else None,
+        "corr_flipped": round(float(edge["corr_flipped"]), 3) if edge else None,
+    }
+
+
+def _component_index_for_channel(components: list[dict[str, Any]], channel_id: int) -> int | None:
+    for component in components:
+        if channel_id in component["channels"]:
+            return int(component["index"])
+    return None
 
 
 def _apply_overhead_anchored_drum_panning(stems: list[AyaicStem], *, drum_monos: dict[int, np.ndarray]) -> dict[str, Any]:
@@ -4227,7 +5592,7 @@ def _gcc_phat_measurement(
     excluded = np.abs(limited).copy()
     excluded[max(0, peak_idx - vicinity) : min(len(excluded), peak_idx + vicinity + 1)] = 0.0
     second_peak = float(np.max(excluded)) if excluded.size else 0.0
-    psr = 20.0 * math.log10(abs(interpolated_peak_value) / (second_peak + eps))
+    psr = 20.0 * math.log10(max(abs(interpolated_peak_value), eps) / (second_peak + eps))
 
     energy_product = math.sqrt(float(np.sum(ref_frame**2) * np.sum(tgt_frame**2)))
     correlation_peak = float(np.clip(abs(interpolated_peak_value) / (energy_product + eps), 0.0, 1.0))
@@ -4252,6 +5617,39 @@ def _gcc_phat_measurement(
 
 def _samples_from_ms(delay_ms: float, sample_rate: int) -> int:
     return int(round(max(0.0, delay_ms) * sample_rate / 1000.0))
+
+
+def _delay_audio_fractional(audio: np.ndarray, delay_ms: float, sample_rate: int) -> np.ndarray:
+    delay_samples = max(0.0, float(delay_ms)) * float(sample_rate) / 1000.0
+    arr = ensure_stereo(audio).astype(np.float32, copy=False)
+    if delay_samples <= 1e-4:
+        return arr.copy()
+    if delay_samples >= arr.shape[0]:
+        return np.zeros_like(arr, dtype=np.float32)
+    positions = np.arange(arr.shape[0], dtype=np.float64) - delay_samples
+    base = np.arange(arr.shape[0], dtype=np.float64)
+    out = np.zeros_like(arr, dtype=np.float32)
+    for channel_index in range(arr.shape[1]):
+        out[:, channel_index] = np.interp(
+            positions,
+            base,
+            arr[:, channel_index],
+            left=0.0,
+            right=0.0,
+        ).astype(np.float32)
+    return out
+
+
+def _delay_mono_fractional(audio: np.ndarray, delay_ms: float, sample_rate: int) -> np.ndarray:
+    delay_samples = max(0.0, float(delay_ms)) * float(sample_rate) / 1000.0
+    arr = np.asarray(audio, dtype=np.float32)
+    if delay_samples <= 1e-4:
+        return arr.copy()
+    if delay_samples >= len(arr):
+        return np.zeros_like(arr, dtype=np.float32)
+    positions = np.arange(len(arr), dtype=np.float64) - delay_samples
+    base = np.arange(len(arr), dtype=np.float64)
+    return np.interp(positions, base, arr, left=0.0, right=0.0).astype(np.float32)
 
 
 def _delay_mono(audio: np.ndarray, samples: int) -> np.ndarray:
@@ -4659,6 +6057,8 @@ def _stem_report(stem: AyaicStem) -> dict[str, Any]:
         "phase_notes": stem.notes,
         "pan_notes": stem.pan_notes,
         "corrective_eq_notes": stem.corrective_eq_notes,
+        "compression_notes": stem.compression_notes,
+        "output_balance_notes": stem.output_balance_notes,
     }
 
 

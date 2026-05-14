@@ -1,0 +1,36 @@
+{
+  "id": "b29cdc2d-cb9f-4ae6-bff3-d65ac0987bcd",
+  "source": "mcp_remote_gateway",
+  "sourceTool": "run_agent",
+  "projectRoot": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+  "createdAt": "2026-05-09T07:02:31.274Z",
+  "title": "director dry-run agent request",
+  "agent": "director",
+  "prompt": "Статус Paperclip artifacts принят.\n\nВижу, что последние task/report файлы создаются в .paperclip/tasks и .paperclip/reports, а режим остаётся безопасным:\n- dryRunEnforced=true;\n- sourceCodeChangesAllowed=false.\n\nПродолжаем только audit/report workflow.\n\nСледующая задача:\nподготовь documentation-only audit report по AutoFaderController на основе ранее утверждённого checklist.\n\nКод не менять.\nLiveApplyService не расширять.\nAutoFaderController не мигрировать.\nНовые tests не писать.\nНовые mutation paths не подключать.\n\nScope:\n- backend/auto_fader.py\n- любые места, где AutoFaderController создаётся, запускается, останавливается или вызывает mixer/OSC writes\n- связанные handlers/server entrypoints только для чтения\n\nНужно ответить:\n1. Где AutoFaderController создаётся, запускается и останавливается.\n2. Какие entrypoints могут его включить.\n3. Какие методы могут отправлять реальные mixer/OSC writes.\n4. Через какой client идут writes.\n5. Есть ли dry-run / analysis-only mode.\n6. Есть ли explicit confirm gate.\n7. Есть ли readback confirmation.\n8. Есть ли panic stop / freeze / emergency stop coverage.\n9. Какие range limits, step limits, cooldowns и confidence gates уже есть.\n10. Какие writes обходят LiveApplyService.\n11. Какие UI/API команды могут включить live fader automation.\n12. Какие tests уже покрывают AutoFaderController.\n13. Какие tests отсутствуют.\n14. Какие условия должны быть выполнены перед любой будущей миграцией AutoFaderController.\n15. Какой самый маленький безопасный следующий шаг после audit.\n\nФормат:\n- короткий вывод;\n- таблица file/function/action/safety/risk/recommendation;\n- existing protections;\n- missing protections;\n- required tests before migration;\n- что категорически нельзя делать без моего разрешения.",
+  "metadata": {},
+  "requestedDryRun": true,
+  "dryRun": true,
+  "dryRunEnforced": true,
+  "sourceCodeChangesAllowed": false,
+  "policy": {
+    "dryRun": true,
+    "dryRunEnforced": true,
+    "writesAllowed": [
+      ".paperclip/tasks",
+      ".paperclip/reports"
+    ],
+    "sourceCodeChangesAllowed": false,
+    "shellCommandsAllowed": [
+      "git branch --show-current",
+      "git status --short --branch",
+      "git rev-parse --show-toplevel",
+      "git log -1 --oneline"
+    ],
+    "prohibitedActions": [
+      "source code changes",
+      "dangerous shell commands",
+      "git commit",
+      "git checkout"
+    ]
+  }
+}

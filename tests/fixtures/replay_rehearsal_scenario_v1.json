@@ -1,0 +1,311 @@
+{
+  "metadata": {
+    "notes": "Replay-only supervised rehearsal fixture",
+    "owner": "TUB-316",
+    "scenario_class": "supervised_live_rehearsal"
+  },
+  "operator": {
+    "approval_scope": "replay_only",
+    "display_name": "FOH Dmitry",
+    "experience_tier": "senior",
+    "metadata": {
+      "escalation_preference": "early_for_safety"
+    },
+    "operator_id": "operator::foh_dmitry",
+    "role": "chief_engineer"
+  },
+  "scenario_id": "rehearsal::slice1::baseline",
+  "schema_version": "replay_rehearsal_scenario/v1",
+  "session": {
+    "artist": "Test Ensemble",
+    "dry_run_only": true,
+    "live_mixer_writes": false,
+    "metadata": {
+      "set_name": "Festival Warmup"
+    },
+    "rehearsal_date": "2026-05-14",
+    "session_id": "session::2026-05-14::warmup",
+    "show_id": "show::festival::warmup"
+  },
+  "stages": [
+    {
+      "goals": [
+        "confirm operator dry-run boundary",
+        "confirm baseline manifest availability"
+      ],
+      "label": "Pre-show boundary check",
+      "metadata": {
+        "entry_condition": "operator_logged_in"
+      },
+      "ordinal": 1,
+      "replay_correlation_ids": [
+        "corr::rehearsal::pre_show"
+      ],
+      "required_artifacts": [
+        "baseline_manifest",
+        "safety_brief"
+      ],
+      "safety_brief_version": "console_write_safety_policy/v1",
+      "stage": "pre_show",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": true,
+          "metric": "dry_run_only",
+          "notes": "All rehearsal fixtures must remain replay-only",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "channel_inventory_ref": "inventory::festival_warmup::v1",
+      "goals": [
+        "capture deterministic channel context",
+        "prepare soundcheck observations"
+      ],
+      "label": "Soundcheck preparation",
+      "metadata": {
+        "source": "fixture_inventory"
+      },
+      "ordinal": 2,
+      "replay_correlation_ids": [
+        "corr::rehearsal::soundcheck"
+      ],
+      "required_artifacts": [
+        "channel_inventory",
+        "input_roles"
+      ],
+      "stage": "soundcheck",
+      "telemetry_expectations": [
+        {
+          "comparator": "lte",
+          "expected": 0.0,
+          "metric": "unexpected_live_mutations",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": "count"
+        }
+      ]
+    },
+    {
+      "goals": [
+        "validate replay checkpoint linkage",
+        "verify manifest policy consistency"
+      ],
+      "label": "Replay validation",
+      "metadata": {
+        "validator_family": "policy_consistency"
+      },
+      "ordinal": 3,
+      "replay_correlation_ids": [
+        "corr::rehearsal::replay_validation"
+      ],
+      "required_artifacts": [
+        "graph_checkpoint",
+        "trim_snapshot",
+        "validator_report"
+      ],
+      "stage": "replay_validation",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": true,
+          "metric": "validator_passed",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ],
+      "validator_schema_version": "replay_policy_validation/v1"
+    },
+    {
+      "comparison_window_sec": 180,
+      "goals": [
+        "compare operator baseline against AI ranking",
+        "preserve deterministic report traces"
+      ],
+      "label": "Shadow mode comparison",
+      "metadata": {
+        "comparison_target": "operator_vs_ai"
+      },
+      "ordinal": 4,
+      "replay_correlation_ids": [
+        "corr::rehearsal::shadow_mode"
+      ],
+      "required_artifacts": [
+        "shadow_report",
+        "timeline_artifact"
+      ],
+      "stage": "shadow_mode",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": false,
+          "metric": "live_mixer_writes",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "approval_required": true,
+      "goals": [
+        "capture operator disposition",
+        "record approve versus rollback choice"
+      ],
+      "label": "Operator review",
+      "metadata": {
+        "review_surface": "shadow_report_writer"
+      },
+      "ordinal": 5,
+      "replay_correlation_ids": [
+        "corr::rehearsal::operator_review"
+      ],
+      "required_artifacts": [
+        "operator_review_packet"
+      ],
+      "stage": "operator_review",
+      "telemetry_expectations": [
+        {
+          "comparator": "gte",
+          "expected": 1.0,
+          "metric": "operator_decision_count",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": "count"
+        }
+      ]
+    },
+    {
+      "goals": [
+        "preserve last known-good manifest",
+        "reconstruct rollback path deterministically"
+      ],
+      "label": "Rollback planning",
+      "metadata": {
+        "rollback_reason": "validator_or_operator_request"
+      },
+      "ordinal": 6,
+      "replay_correlation_ids": [
+        "corr::rehearsal::rollback"
+      ],
+      "required_artifacts": [
+        "rollback_simulation_report"
+      ],
+      "rollback_target_manifest_id": "replay_manifest::known_good_baseline",
+      "stage": "rollback",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": true,
+          "metric": "rollback_state_reconstructible",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "escalation_policy": "reviewer_notified_no_transport",
+      "goals": [
+        "raise safety-relevant disagreements",
+        "avoid any transport escalation"
+      ],
+      "label": "Escalation review",
+      "metadata": {
+        "notify_roles": [
+          "chief_engineer",
+          "cto_architecture_owner"
+        ]
+      },
+      "ordinal": 7,
+      "replay_correlation_ids": [
+        "corr::rehearsal::escalation"
+      ],
+      "required_artifacts": [
+        "escalation_packet"
+      ],
+      "stage": "escalation",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": false,
+          "metric": "transport_activation_attempted",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "fallback_mode": "minimal_safe_automation",
+      "goals": [
+        "preserve fallback choice",
+        "keep replay artifacts sufficient for reconstruction"
+      ],
+      "label": "Fallback path",
+      "metadata": {
+        "fallback_virtual_mixer": "allowed"
+      },
+      "ordinal": 8,
+      "replay_correlation_ids": [
+        "corr::rehearsal::fallback"
+      ],
+      "required_artifacts": [
+        "fallback_choice"
+      ],
+      "stage": "fallback",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": "minimal_safe_automation",
+          "metric": "fallback_mode",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "goals": [
+        "summarize deterministic rehearsal outcome",
+        "record follow-up tasks without live coupling"
+      ],
+      "label": "Post-show review",
+      "metadata": {
+        "follow_up_bucket": "slice1"
+      },
+      "ordinal": 9,
+      "replay_correlation_ids": [
+        "corr::rehearsal::post_show_review"
+      ],
+      "report_schema_version": "replay_shadow_report/v1",
+      "required_artifacts": [
+        "summary_report"
+      ],
+      "stage": "post_show_review",
+      "telemetry_expectations": [
+        {
+          "comparator": "gte",
+          "expected": 1.0,
+          "metric": "follow_up_items",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": "count"
+        }
+      ]
+    }
+  ],
+  "venue": {
+    "capacity": 850,
+    "metadata": {
+      "monitor_world": "stereo_iems"
+    },
+    "room_profile": "indoor_reflective_medium",
+    "timezone": "Europe/Moscow",
+    "venue_id": "venue::club_m9",
+    "venue_name": "Club M9"
+  }
+}

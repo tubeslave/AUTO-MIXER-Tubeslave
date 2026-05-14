@@ -21,6 +21,9 @@ from scipy import signal
 from enum import Enum
 from dataclasses import dataclass, field
 
+from autogain_contract import AutoGainRecommendation, clamp_target_trim
+from live_apply import LiveApplyRequest, LiveApplyService
+
 logger = logging.getLogger(__name__)
 
 
@@ -627,7 +630,10 @@ class LUFSGainStagingController:
                  chunk_size: int = 2048,
                  config: Optional[Dict[str, Any]] = None,
                  bleed_service=None,
-                 audio_capture=None):
+                 audio_capture=None,
+                 live_apply_service: Optional[LiveApplyService] = None,
+                 dry_run: bool = True,
+                 confirm_live_apply: bool = False):
 
         self.mixer_client = mixer_client
         self.sample_rate = sample_rate
@@ -645,12 +651,17 @@ class LUFSGainStagingController:
         self.true_peak_limit = agc_config.get('true_peak_limit', -1.0)
         self.max_gain_db = agc_config.get('max_gain_db', 12.0)
         self.min_gain_db = agc_config.get('min_gain_db', -12.0)
+        self.max_apply_step_db = float(agc_config.get('max_apply_step_db', 3.0))
         self.ratio = agc_config.get('ratio', 4.0)
         self.attack_ms = agc_config.get('attack_ms', 50.0)
         self.release_ms = agc_config.get('release_ms', 500.0)
         self.hold_ms = agc_config.get('hold_ms', 200.0)
         self.gate_threshold_lufs = agc_config.get('gate_threshold_lufs', -50.0)
         self.update_interval = agc_config.get('update_interval_ms', 100) / 1000.0
+        self.live_apply_service = live_apply_service or LiveApplyService()
+        self.apply_dry_run = bool(dry_run)
+        self.confirm_live_apply = bool(confirm_live_apply)
+        self.last_apply_results: Dict[int, Dict[str, Any]] = {}
         
         # Centralized bleed detection service
         self.bleed_service = bleed_service
@@ -713,6 +724,52 @@ class LUFSGainStagingController:
         
         logger.info(f"LUFSGainStagingController initialized: target={self.target_lufs} LUFS, "
                    f"ratio={self.ratio}:1, attack={self.attack_ms}ms, release={self.release_ms}ms")
+
+    def _apply_trim_change(
+        self,
+        mixer_ch: int,
+        target_trim: float,
+        *,
+        source: str,
+        current_trim: Optional[float] = None,
+        min_value: Optional[float] = None,
+        max_value: Optional[float] = None,
+        max_step: Optional[float] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
+        if current_trim is None:
+            current_trim = self.mixer_client.get_channel_gain(mixer_ch) or 0.0
+
+        request = LiveApplyRequest(
+            source=source,
+            operation="set_gain",
+            channel=int(mixer_ch),
+            value=float(target_trim),
+            dry_run=self.apply_dry_run,
+            confirm_live_apply=bool(self.confirm_live_apply),
+            current_value=float(current_trim),
+            min_value=min_value,
+            max_value=max_value,
+            max_step=max_step,
+            metadata=metadata or {},
+        )
+        result = self.live_apply_service.apply(request, self.mixer_client)
+        self.last_apply_results[int(mixer_ch)] = {
+            "accepted": result.accepted,
+            "dry_run": result.dry_run,
+            "blocked_reason": result.blocked_reason,
+            "send_status": result.send_status,
+            "readback_status": result.readback_status,
+            "desired_value": result.desired_value,
+            "confirmed_value": result.confirmed_value,
+            "audit_id": result.audit_id,
+            "replay_correlation_id": result.replay_correlation_id,
+            "guard_reasons": list(result.guard_reasons),
+            "source": source,
+            "requested_value": float(target_trim),
+            "current_trim_db": float(current_trim),
+        }
+        return result
     
     def start(self, 
               device_id: int,
@@ -1032,13 +1089,37 @@ class LUFSGainStagingController:
                                             # Ограничиваем диапазон (в live_mode не глубже min_trim_db_live)
                                             new_trim = max(effective_min_trim, new_trim)
                                             
-                                            # Применяем новый Trim
                                             logger.info(f"Reducing Trim for channel {mixer_ch}: "
                                                        f"{current_trim:.1f} -> {new_trim:.1f} dB")
-                                            self.mixer_client.set_channel_gain(mixer_ch, new_trim)
-                                            
-                                            # Проверяем фактический Trim после применения
-                                            actual_trim = self.mixer_client.get_channel_gain(mixer_ch) or new_trim
+                                            apply_result = self._apply_trim_change(
+                                                mixer_ch,
+                                                new_trim,
+                                                source="auto_gain_peak_staging",
+                                                current_trim=current_trim,
+                                                min_value=effective_min_trim,
+                                                max_value=18.0,
+                                                max_step=self.trim_reduction_step_db,
+                                                metadata={
+                                                    "audio_channel": int(audio_ch),
+                                                    "peak_threshold_dbtp": float(peak_threshold),
+                                                    "true_peak_dbtp": float(result['true_peak']),
+                                                    "live_mode": bool(self.live_mode),
+                                                },
+                                            )
+                                            if not apply_result.accepted or apply_result.dry_run:
+                                                logger.info(
+                                                    "Channel %s: peak staging trim not applied (%s, dry_run=%s)",
+                                                    mixer_ch,
+                                                    apply_result.blocked_reason or apply_result.failure_reason or "not_accepted",
+                                                    apply_result.dry_run,
+                                                )
+                                                continue
+
+                                            actual_trim = (
+                                                float(apply_result.confirmed_value)
+                                                if apply_result.confirmed_value is not None
+                                                else (self.mixer_client.get_channel_gain(mixer_ch) or new_trim)
+                                            )
                                             
                                             # Определяем остановку коррекции
                                             last_trim = self.last_trim_value.get(mixer_ch, current_trim)
@@ -1081,10 +1162,32 @@ class LUFSGainStagingController:
                 if not self.peak_staging_mode and trim_updates and self.mixer_client and not self.automation_frozen:
                     for mixer_ch, new_trim in trim_updates.items():
                         try:
-                            # Ограничиваем диапазон
-                            new_trim = max(-18.0, min(18.0, new_trim))
-                            self.mixer_client.set_channel_gain(mixer_ch, new_trim)
-                            logger.info(f"Channel {mixer_ch}: TRIM -> {new_trim:.1f} dB")
+                            current_trim = self.mixer_client.get_channel_gain(mixer_ch) or 0.0
+                            apply_result = self._apply_trim_change(
+                                mixer_ch,
+                                new_trim,
+                                source="auto_gain_lufs_realtime",
+                                current_trim=current_trim,
+                                min_value=-18.0,
+                                max_value=18.0,
+                                max_step=self.max_apply_step_db,
+                                metadata={
+                                    "mode": "lufs_realtime",
+                                },
+                            )
+                            if apply_result.accepted:
+                                logger.info(
+                                    "Channel %s: gated TRIM -> %.1f dB (dry_run=%s)",
+                                    mixer_ch,
+                                    float(apply_result.desired_value if apply_result.desired_value is not None else new_trim),
+                                    apply_result.dry_run,
+                                )
+                            else:
+                                logger.info(
+                                    "Channel %s: realtime TRIM blocked (%s)",
+                                    mixer_ch,
+                                    apply_result.blocked_reason or apply_result.failure_reason,
+                                )
                         except Exception as e:
                             logger.error(f"Error setting TRIM for channel {mixer_ch}: {e}")
                 
@@ -1173,6 +1276,9 @@ class LUFSGainStagingController:
             'target_lufs': float(self.target_lufs),
             'true_peak_limit': float(self.true_peak_limit),
             'ratio': float(self.ratio),
+            'apply_dry_run': self.apply_dry_run,
+            'confirm_live_apply': self.confirm_live_apply,
+            'last_apply_results': dict(self.last_apply_results),
             'channels': int(len(self.channels)),
             'levels': levels
         }
@@ -1264,7 +1370,10 @@ class SafeGainCalibrator:
     def __init__(self,
                  mixer_client=None,
                  sample_rate: int = 48000,
-                 config: Optional[Dict[str, Any]] = None):
+                 config: Optional[Dict[str, Any]] = None,
+                 live_apply_service: Optional[LiveApplyService] = None,
+                 dry_run: bool = True,
+                 confirm_live_apply: bool = False):
 
         self.mixer_client = mixer_client
         self.sample_rate = sample_rate
@@ -1277,6 +1386,7 @@ class SafeGainCalibrator:
         self.noise_gate_threshold = cal_config.get('noise_gate_threshold', -40.0)
         self.min_signal_presence = cal_config.get('min_signal_presence', 0.05)
         self.learning_duration = cal_config.get('learning_duration_sec', 30.0)  # По умолчанию 30 секунд
+        self.max_apply_step_db = float(cal_config.get('max_apply_step_db', 3.0))
         logger.info(f"SafeGainCalibrator initialized with learning_duration={self.learning_duration} seconds")
 
         # Channel settings for preset-based metrics
@@ -1295,6 +1405,10 @@ class SafeGainCalibrator:
         self.learning_progress: float = 0.0
 
         self.suggestions: Dict[int, Dict[str, Any]] = {}
+        self.last_apply_results: Dict[int, Dict[str, Any]] = {}
+        self.live_apply_service = live_apply_service or LiveApplyService()
+        self.apply_dry_run = bool(dry_run)
+        self.confirm_live_apply = bool(confirm_live_apply)
 
         self.on_progress_update: Optional[Callable] = None
         self.on_suggestions_ready: Optional[Callable] = None
@@ -1460,7 +1574,56 @@ class SafeGainCalibrator:
 
         return self.suggestions.copy()
 
-    def apply_corrections(self, channel_ids: Optional[List[int]] = None) -> bool:
+    def get_recommendations(self) -> Dict[int, Dict[str, Any]]:
+        """Return shared AutoGain recommendation objects for ready channels."""
+        if self.state != AnalysisState.READY:
+            logger.warning(f"Recommendations not ready yet. Current state: {self.state}")
+            return {}
+
+        recommendations: Dict[int, Dict[str, Any]] = {}
+        for audio_ch, suggestion in self.suggestions.items():
+            mixer_ch = self.channel_mapping.get(audio_ch, audio_ch)
+            current_trim = self._read_current_trim(mixer_ch)
+            target_trim, delta_db = clamp_target_trim(
+                current_trim,
+                float(suggestion.get("suggested_gain_db", 0.0)),
+                -24.0,
+                24.0,
+            )
+            limited_by = str(suggestion.get("limited_by", "none"))
+            recommendation = AutoGainRecommendation(
+                channel=mixer_ch,
+                audio_channel=audio_ch,
+                mixer_channel=mixer_ch,
+                source="safe_gain_calibrator",
+                current_trim_db=round(current_trim, 3),
+                recommended_target_trim_db=round(target_trim, 3),
+                delta_db=round(delta_db, 3),
+                reason=self._recommendation_reason(limited_by),
+                confidence=round(self._recommendation_confidence(audio_ch, limited_by), 4),
+                limited_by=limited_by,
+                blocked_reason="silent_channel" if limited_by == "silent_channel" else "",
+                analysis_state=self.state.value,
+                live_apply_safe=False,
+                dry_run_only=True,
+                level_source="audio_capture",
+                metrics={
+                    "integrated_lufs": float(suggestion.get("lufs", -100.0)),
+                    "true_peak_dbtp": float(suggestion.get("peak_db", -100.0)),
+                    "crest_factor_db": float(suggestion.get("crest_factor_db", 0.0)),
+                    "signal_presence_percent": float(suggestion.get("signal_presence", 0.0)),
+                },
+                metadata={
+                    "samples_analyzed": int(suggestion.get("samples_analyzed", 0)),
+                    "active_samples": int(suggestion.get("active_samples", 0)),
+                    "apply_mode": "manual_review_required",
+                    "trim_bounds_db": {"min": -24.0, "max": 24.0},
+                },
+            )
+            recommendations[audio_ch] = recommendation.to_dict()
+        return recommendations
+
+    def apply_corrections(self, channel_ids: Optional[List[int]] = None) -> Dict[str, Any]:
         """
         Применение рекомендованных коррекций к микшеру.
 
@@ -1472,17 +1635,19 @@ class SafeGainCalibrator:
         """
         if self.state != AnalysisState.READY:
             logger.error(f"Cannot apply corrections: state is {self.state}, must be READY")
-            return False
+            return {"accepted_count": 0, "blocked_count": 0, "results": {}}
 
         if not self.mixer_client:
             logger.error("Cannot apply corrections: no mixer client")
-            return False
+            return {"accepted_count": 0, "blocked_count": 0, "results": {}}
 
         channels_to_apply = channel_ids if channel_ids else list(self.suggestions.keys())
 
         self.state = AnalysisState.APPLYING
 
-        applied_count = 0
+        accepted_count = 0
+        blocked_count = 0
+        results: Dict[int, Dict[str, Any]] = {}
         for ch_id in channels_to_apply:
             if ch_id not in self.suggestions:
                 logger.warning(f"No suggestion for channel {ch_id}, skipping")
@@ -1492,33 +1657,107 @@ class SafeGainCalibrator:
             gain = suggestion['suggested_gain_db']
 
             mixer_ch = self.channel_mapping.get(ch_id, ch_id)
+            current_trim = 0.0
+            new_trim = 0.0
 
             try:
                 current_trim = self.mixer_client.get_channel_gain(mixer_ch) or 0.0
                 new_trim = current_trim + gain
-
-                new_trim = np.clip(new_trim, -24.0, 24.0)
-
-                self.mixer_client.set_channel_gain(mixer_ch, new_trim)
-                logger.info(f"Channel {mixer_ch}: TRIM {current_trim:.1f} -> {new_trim:.1f} dB "
-                           f"(gain={gain:+.1f}dB)")
-                applied_count += 1
+                request = LiveApplyRequest(
+                    source="auto_gain_safe_calibrator",
+                    operation="set_gain",
+                    channel=mixer_ch,
+                    value=float(new_trim),
+                    dry_run=self.apply_dry_run,
+                    confirm_live_apply=bool(self.confirm_live_apply),
+                    current_value=float(current_trim),
+                    min_value=-18.0,
+                    max_value=18.0,
+                    max_step=self.max_apply_step_db,
+                    metadata={
+                        "audio_channel": int(ch_id),
+                        "suggested_gain_db": float(gain),
+                        "learning_duration_sec": float(self.learning_duration),
+                    },
+                )
+                apply_result = self.live_apply_service.apply(request, self.mixer_client)
+                results[mixer_ch] = {
+                    "accepted": apply_result.accepted,
+                    "dry_run": apply_result.dry_run,
+                    "blocked_reason": apply_result.blocked_reason,
+                    "send_status": apply_result.send_status,
+                    "readback_status": apply_result.readback_status,
+                    "desired_value": apply_result.desired_value,
+                    "confirmed_value": apply_result.confirmed_value,
+                    "audit_id": apply_result.audit_id,
+                    "replay_correlation_id": apply_result.replay_correlation_id,
+                    "guard_reasons": list(apply_result.guard_reasons),
+                    "suggested_gain_db": float(gain),
+                    "current_trim_db": float(current_trim),
+                }
+                if apply_result.accepted:
+                    accepted_count += 1
+                    logger.info(
+                        f"Channel {mixer_ch}: gated TRIM request {current_trim:.1f} -> "
+                        f"{float(apply_result.desired_value or new_trim):.1f} dB "
+                        f"(gain={gain:+.1f}dB, dry_run={apply_result.dry_run})"
+                    )
+                else:
+                    blocked_count += 1
+                    logger.info(
+                        "Channel %s: gated TRIM blocked (%s)",
+                        mixer_ch,
+                        apply_result.blocked_reason or apply_result.failure_reason,
+                    )
 
             except Exception as e:
                 logger.error(f"Failed to apply correction to channel {mixer_ch}: {e}")
+                blocked_count += 1
+                results[mixer_ch] = {
+                    "accepted": False,
+                    "dry_run": bool(self.apply_dry_run),
+                    "blocked_reason": f"exception:{e}",
+                    "send_status": "failed",
+                    "readback_status": "not_requested",
+                    "desired_value": float(new_trim),
+                    "confirmed_value": None,
+                    "audit_id": "",
+                    "replay_correlation_id": "",
+                    "guard_reasons": [],
+                    "suggested_gain_db": float(gain),
+                    "current_trim_db": float(current_trim),
+                }
 
         self.state = AnalysisState.IDLE
+        self.last_apply_results = dict(results)
 
-        logger.info(f"Corrections applied: {applied_count}/{len(channels_to_apply)} channels")
+        logger.info(
+            "Corrections evaluated through live apply gate: accepted=%s blocked=%s total=%s",
+            accepted_count,
+            blocked_count,
+            len(channels_to_apply),
+        )
 
         if self.on_progress_update:
             self.on_progress_update({
                 'state': self.state.value,
                 'progress': 1.0,
-                'message': f'Applied {applied_count} corrections'
+                'message': f'Accepted {accepted_count} corrections, blocked {blocked_count}',
+                'apply_summary': {
+                    'accepted_count': accepted_count,
+                    'blocked_count': blocked_count,
+                    'dry_run': bool(self.apply_dry_run),
+                    'confirm_live_apply': bool(self.confirm_live_apply),
+                },
             })
 
-        return applied_count > 0
+        return {
+            "accepted_count": accepted_count,
+            "blocked_count": blocked_count,
+            "dry_run": bool(self.apply_dry_run),
+            "confirm_live_apply": bool(self.confirm_live_apply),
+            "results": results,
+        }
 
     def reset(self):
         """Сброс калибратора в IDLE состояние."""
@@ -1542,8 +1781,39 @@ class SafeGainCalibrator:
             'suggestions_ready': len(self.suggestions) > 0,
             'target_lufs': self.target_lufs,
             'max_peak_limit': self.max_peak_limit,
-            'learning_duration': self.learning_duration
+            'learning_duration': self.learning_duration,
+            'apply_dry_run': self.apply_dry_run,
+            'confirm_live_apply': self.confirm_live_apply,
+            'last_apply_results': dict(self.last_apply_results),
         }
+
+    def _read_current_trim(self, mixer_channel: int) -> float:
+        if not self.mixer_client or not hasattr(self.mixer_client, "get_channel_gain"):
+            return 0.0
+        try:
+            value = self.mixer_client.get_channel_gain(mixer_channel)
+            if value is None:
+                return 0.0
+            return float(value)
+        except Exception:
+            return 0.0
+
+    def _recommendation_confidence(self, audio_channel: int, limited_by: str) -> float:
+        if limited_by == "silent_channel":
+            return 0.0
+        stats = self.channels.get(audio_channel)
+        if stats is None:
+            return 0.0
+        return max(0.0, min(1.0, float(stats.signal_presence_ratio)))
+
+    @staticmethod
+    def _recommendation_reason(limited_by: str) -> str:
+        return {
+            "silent_channel": "insufficient_main_signal",
+            "peak": "safe_gain_peak_limited",
+            "lufs": "safe_gain_lufs_target",
+            "lufs_priority": "safe_gain_lufs_priority",
+        }.get(limited_by, "safe_gain_analysis")
     
     def update_settings(self, settings: Dict[str, Any]):
         """Обновить настройки калибратора."""

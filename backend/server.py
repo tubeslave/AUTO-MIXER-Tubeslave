@@ -35,7 +35,11 @@ from channel_recognizer import scan_and_recognize, recognize_instrument_spectral
 from auto_eq import AutoEQController, InstrumentProfiles, MultiChannelAutoEQController
 from phase_alignment import PhaseAlignmentController
 from auto_fader import AutoFaderController
-from arrangement_automation import ArrangementAutomationController
+from arrangement_automation import (
+    ArrangementAutomationController,
+    LiveInputTrimController,
+    WingMeterReader,
+)
 from auto_compressor import AutoCompressorController
 from backup_channels import backup_channel
 from restore_channels import restore_from_backup_using_client
@@ -48,6 +52,16 @@ from feedback_detector import FeedbackDetector
 from auto_soundcheck_engine import AutoSoundcheckEngine
 from mixer_discovery import discover_mixers, discover_mixer_auto, DiscoveredMixer
 from handlers import register_all_handlers
+from live_apply import (
+    LiveApplyRequest,
+    LiveApplyService,
+    build_live_apply_operator_payload,
+)
+from maintenance_gate import (
+    MaintenanceActionRequest,
+    MaintenanceGate,
+    build_maintenance_operator_payload,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -108,6 +122,8 @@ class AutoMixerServer:
         self.connection_mode: Optional[str] = None  # 'wing', 'dlive', or 'mixing_station'
         
         self.connected_clients: Set[WebSocketServerProtocol] = set()
+        self.live_apply_service = LiveApplyService()
+        self.maintenance_gate = MaintenanceGate()
         
         # Voice control
         self.voice_control: Optional[VoiceControl] = None
@@ -129,6 +145,9 @@ class AutoMixerServer:
 
         # Arrangement-aware level automation controller
         self.arrangement_automation_controller: Optional[ArrangementAutomationController] = None
+
+        # Realtime arrangement-aware input trim controller
+        self.live_input_trim_controller: Optional[LiveInputTrimController] = None
         
         # Track last known fader values for relative changes
         self.last_fader_values: dict[int, float] = {}
@@ -234,6 +253,15 @@ class AutoMixerServer:
             except Exception as e:
                 logger.error(f"Error stopping arrangement automation: {e}")
             self.arrangement_automation_controller = None
+
+        # Stop Live Input Trim
+        if self.live_input_trim_controller:
+            try:
+                self.live_input_trim_controller.stop()
+                logger.info("Live input trim stopped")
+            except Exception as e:
+                logger.error(f"Error stopping live input trim: {e}")
+            self.live_input_trim_controller = None
         
         # Stop Auto Soundcheck
         if self.auto_soundcheck_running:
@@ -970,6 +998,11 @@ class AutoMixerServer:
     
     def get_gain_staging_status(self) -> dict:
         """Get current gain staging status."""
+        if self.live_input_trim_controller:
+            return self._gain_staging_status_from_live_input_trim(
+                self.live_input_trim_controller.get_status()
+            )
+
         # Если используется SafeGainCalibrator, возвращаем его статус
         if self.safe_gain_calibrator:
             safe_status = self.safe_gain_calibrator.get_status()
@@ -983,6 +1016,10 @@ class AutoMixerServer:
                 "suggestions_ready": safe_status.get('suggestions_ready', False),
                 "target_lufs": safe_status.get('target_lufs'),
                 "max_peak_limit": safe_status.get('max_peak_limit'),
+                "live_apply_enabled": False,
+                "analysis_only_mode": True,
+                "confirm_live_apply": bool(safe_status.get("confirm_live_apply", False)),
+                "review_required": bool(safe_status.get("suggestions_ready", False)),
                 "live_mode": self.live_mode,
                 "automation_frozen": False
             }
@@ -995,6 +1032,78 @@ class AutoMixerServer:
         st["automation_frozen"] = getattr(self.gain_staging, "automation_frozen", False)
         st["safe_gain_mode"] = False
         return st
+
+    def get_gain_staging_recommendations(self) -> dict:
+        """Expose read-only AutoGain recommendations for the active gain-staging path."""
+        if self.live_input_trim_controller:
+            state = self.live_input_trim_controller.get_status()
+            return self._build_recommendation_surface(
+                source="live_input_trim_controller",
+                active=bool(state.get("active", False)),
+                live_apply_enabled=bool(state.get("live_apply_enabled", False)),
+                dry_run=bool(state.get("analysis_only_mode", True)),
+                recommendations=self.live_input_trim_controller.get_recommendations(),
+            )
+
+        if self.safe_gain_calibrator:
+            safe_status = self.safe_gain_calibrator.get_status()
+            return self._build_recommendation_surface(
+                source="safe_gain_calibrator",
+                active=safe_status.get("state") != "idle",
+                live_apply_enabled=False,
+                dry_run=True,
+                recommendations=self.safe_gain_calibrator.get_recommendations(),
+            )
+
+        return self._build_recommendation_surface(
+            source=None,
+            active=False,
+            live_apply_enabled=False,
+            dry_run=True,
+            recommendations={},
+        )
+
+    def _build_recommendation_surface(
+        self,
+        *,
+        source: Optional[str],
+        active: bool,
+        live_apply_enabled: bool,
+        dry_run: bool,
+        recommendations: Dict[Any, Any],
+    ) -> Dict[str, Any]:
+        """Normalize read-only recommendation payloads across server surfaces."""
+        normalized = convert_numpy_types(recommendations or {})
+        return {
+            "active": bool(active),
+            "source": source,
+            "live_apply_enabled": bool(live_apply_enabled),
+            "dry_run": bool(dry_run),
+            "recommendation_count": len(normalized),
+            "recommendations": normalized,
+        }
+
+    def _build_safe_gain_ready_payload(self, suggestions: Dict[int, Dict[str, Any]]) -> Dict[str, Any]:
+        """Build the review-only payload emitted when SafeGain analysis completes."""
+        surface = self._build_recommendation_surface(
+            source="safe_gain_calibrator",
+            active=bool(self.safe_gain_calibrator),
+            live_apply_enabled=False,
+            dry_run=True,
+            recommendations=(
+                self.safe_gain_calibrator.get_recommendations()
+                if self.safe_gain_calibrator
+                else {}
+            )
+        )
+        return {
+            "type": "gain_staging_status",
+            "status_type": "safe_gain_ready",
+            "suggestions": suggestions,
+            "review_required": True,
+            "message": "Analysis complete. Manual review required before any console write.",
+            **surface,
+        }
     
     async def update_safe_gain_settings(self, settings: dict):
         """Обновить настройки Safe Gain Calibration."""
@@ -1019,10 +1128,266 @@ class AutoMixerServer:
             "type": "safe_gain_settings_updated",
             "settings": settings
         })
+
+    def _extract_channel_names_from_settings(
+        self,
+        channels: list = None,
+        channel_settings: dict = None,
+        channel_mapping: dict = None,
+    ) -> Dict[int, str]:
+        """Translate legacy gain-staging settings into mixer-channel names."""
+        names: Dict[int, str] = {}
+        settings_by_channel = channel_settings or {}
+        mapping = channel_mapping or {}
+        for channel in channels or []:
+            audio_ch = int(channel) if isinstance(channel, str) else channel
+            mixer_ch = mapping.get(audio_ch, audio_ch)
+            raw_settings = (
+                settings_by_channel.get(audio_ch)
+                or settings_by_channel.get(str(audio_ch))
+                or {}
+            )
+            channel_name = (
+                raw_settings.get("scannedName")
+                or raw_settings.get("name")
+                or raw_settings.get("channelName")
+            )
+            if channel_name:
+                names[int(mixer_ch)] = str(channel_name).strip()
+        return names
+
+    def _legacy_realtime_settings_to_live_input_trim(
+        self,
+        dry_run: bool = True,
+        confirm_live_apply: bool = False,
+    ) -> Dict[str, Any]:
+        """Convert legacy SafeGain flags to the canonical live-trim gating model."""
+        live_apply_enabled = bool(not dry_run and confirm_live_apply)
+        return {
+            "live_apply_enabled": live_apply_enabled,
+            "analysis_only_mode": not live_apply_enabled,
+            "confirm_live_apply": bool(confirm_live_apply),
+        }
+
+    def _gain_staging_status_from_live_input_trim(
+        self,
+        state: Optional[Dict[str, Any]],
+        *,
+        status_type: Optional[str] = None,
+        message: Optional[str] = None,
+        error: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Map canonical live-input-trim state into the legacy gain-staging payload."""
+        live_state = convert_numpy_types(state or {})
+        translated_channels: Dict[int, Dict[str, Any]] = {}
+        for raw_channel, channel_state in (live_state.get("channels") or {}).items():
+            mixer_ch = int(raw_channel)
+            peak_dbfs = float(channel_state.get("last_peak_dbfs", -120.0))
+            true_peak_dbtp = float(channel_state.get("last_true_peak_dbtp", peak_dbfs))
+            signal_present = bool(
+                channel_state.get("main_signal_confidence", 0.0) >= 0.15
+                or channel_state.get("main_signal_windows", 0) > 0
+                or channel_state.get("state") not in {"waiting_for_signal", "idle"}
+            )
+            translated_channels[mixer_ch] = {
+                "measured_peak": peak_dbfs,
+                "true_peak": true_peak_dbtp,
+                "lufs": float(channel_state.get("last_rms_db", -120.0)),
+                "gain": float(channel_state.get("current_trim_db", 0.0)),
+                "status": channel_state.get("state", "idle"),
+                "signal_present": signal_present,
+                "blocked_reason": channel_state.get("blocked_reason", ""),
+                "waiting_reason": channel_state.get("waiting_reason", ""),
+                "role": channel_state.get("role", "unknown"),
+                "name": channel_state.get("channel_name", f"Ch {mixer_ch}"),
+            }
+
+        payload = {
+            "active": bool(live_state.get("active", False)),
+            "realtime_enabled": bool(live_state.get("active", False)),
+            "safe_gain_mode": False,
+            "live_mode": self.live_mode,
+            "automation_frozen": False,
+            "live_apply_enabled": bool(live_state.get("live_apply_enabled", False)),
+            "analysis_only_mode": bool(live_state.get("analysis_only_mode", True)),
+            "confirm_live_apply": bool(live_state.get("confirm_live_apply", False)),
+            "meter_status": live_state.get("meter_status", {}),
+            "channels_count": len(translated_channels),
+            "channels": translated_channels,
+        }
+        payload["message"] = message or live_state.get("message", "idle")
+        if status_type:
+            payload["status_type"] = status_type
+        if error:
+            payload["error"] = error
+        return payload
+
+    def _build_live_input_trim_status_callback(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        *,
+        emit_gain_staging_compat: bool = False,
+    ):
+        """Broadcast canonical live-trim state, plus legacy gain-staging updates when needed."""
+
+        def on_status_update(state):
+            live_message = {
+                "type": "live_input_trim_status",
+                "status_type": "state_update",
+                "live_input_trim_state": convert_numpy_types(state),
+            }
+
+            def emit():
+                asyncio.create_task(self.broadcast(live_message))
+                if emit_gain_staging_compat:
+                    asyncio.create_task(self.broadcast({
+                        "type": "gain_staging_status",
+                        **self._gain_staging_status_from_live_input_trim(
+                            state,
+                            status_type="levels_update",
+                        ),
+                    }))
+
+            try:
+                loop.call_soon_threadsafe(emit)
+            except Exception as e:
+                logger.error(f"Error broadcasting live input trim state: {e}")
+
+        return on_status_update
+
+    def _stop_legacy_realtime_correction_runtime(self) -> None:
+        """Stop the legacy SafeGain/LUFS runtime without emitting websocket updates."""
+        if self.safe_gain_calibrator:
+            if hasattr(self, "_safe_gain_audio_thread_stop"):
+                self._safe_gain_audio_thread_stop.set()
+            if (
+                hasattr(self, "_safe_gain_audio_thread")
+                and self._safe_gain_audio_thread.is_alive()
+            ):
+                self._safe_gain_audio_thread.join(timeout=1.0)
+            self.safe_gain_calibrator.reset()
+            self.safe_gain_calibrator = None
+
+        if self.gain_staging:
+            if getattr(self.gain_staging, "realtime_correction_enabled", False):
+                self.gain_staging.stop_realtime_correction()
+            if getattr(self.gain_staging, "is_active", False):
+                self.gain_staging.stop()
+
+    async def _start_live_input_trim_runtime(
+        self,
+        *,
+        websocket=None,
+        channels: List[int] = None,
+        channel_mapping: Dict = None,
+        channel_names: Dict = None,
+        settings: Dict = None,
+        device_id: Any = None,
+        emit_gain_staging_compat: bool = False,
+        gain_staging_status_type: str = "realtime_correction_started",
+    ) -> Optional[Dict[str, Any]]:
+        """Start the canonical live-input-trim runtime, optionally mirroring legacy events."""
+        if not channels:
+            error = "Missing channels"
+            live_message = {
+                "type": "live_input_trim_status",
+                "status_type": "error",
+                "active": False,
+                "error": error,
+            }
+            if websocket:
+                await self.send_to_client(websocket, live_message)
+            else:
+                await self.broadcast(live_message)
+            if emit_gain_staging_compat:
+                await self.broadcast({
+                    "type": "gain_staging_status",
+                    **self._gain_staging_status_from_live_input_trim(
+                        {},
+                        error=error,
+                    ),
+                })
+            return None
+
+        try:
+            settings = settings or {}
+            self._stop_legacy_realtime_correction_runtime()
+            self._ensure_audio_capture_for_live_input_trim(
+                channels,
+                channel_mapping or {},
+                settings,
+                device_id,
+            )
+            loop = asyncio.get_running_loop()
+            on_status_update = self._build_live_input_trim_status_callback(
+                loop,
+                emit_gain_staging_compat=emit_gain_staging_compat,
+            )
+
+            if self.live_input_trim_controller:
+                self.live_input_trim_controller.stop()
+
+            self.live_input_trim_controller = LiveInputTrimController(
+                mixer_client=self.mixer_client,
+                config=self.config,
+                audio_capture=self.audio_capture,
+                meter_reader=WingMeterReader(self.mixer_client, self.config),
+                status_callback=on_status_update,
+                live_apply_service=self.live_apply_service,
+            )
+            state = self.live_input_trim_controller.start(
+                channels=[int(ch) for ch in channels],
+                channel_mapping=channel_mapping or {},
+                channel_names={int(k): v for k, v in (channel_names or {}).items()},
+                settings=settings,
+            )
+
+            live_message = {
+                "type": "live_input_trim_status",
+                "status_type": "started",
+                "active": True,
+                "live_input_trim_state": convert_numpy_types(state),
+            }
+            if websocket:
+                await self.send_to_client(websocket, live_message)
+            else:
+                await self.broadcast(live_message)
+
+            if emit_gain_staging_compat:
+                await self.broadcast({
+                    "type": "gain_staging_status",
+                    **self._gain_staging_status_from_live_input_trim(
+                        state,
+                        status_type=gain_staging_status_type,
+                    ),
+                })
+            return state
+        except Exception as e:
+            logger.error(f"Error starting live input trim: {e}", exc_info=True)
+            live_message = {
+                "type": "live_input_trim_status",
+                "status_type": "error",
+                "active": False,
+                "error": str(e),
+            }
+            if websocket:
+                await self.send_to_client(websocket, live_message)
+            else:
+                await self.broadcast(live_message)
+            if emit_gain_staging_compat:
+                await self.broadcast({
+                    "type": "gain_staging_status",
+                    **self._gain_staging_status_from_live_input_trim(
+                        {},
+                        error=str(e),
+                    ),
+                })
+            return None
     
-    async def start_realtime_correction(self, device_id: str = None, channels: list = None, 
-                                        channel_settings: dict = None, channel_mapping: dict = None,
-                                        mode: str = "lufs", learning_duration_sec: float = None):
+    async def _start_realtime_correction_legacy(self, device_id: str = None, channels: list = None,
+                                                channel_settings: dict = None, channel_mapping: dict = None,
+                                                mode: str = "lufs", learning_duration_sec: float = None,
+                                                dry_run: bool = True, confirm_live_apply: bool = False):
         """Start Safe Gain Staging calibration (новый метод: анализ → одноразовое применение)."""
         logger.info("Starting Safe Gain Staging calibration (new method)...")
         
@@ -1081,7 +1446,10 @@ class AutoMixerServer:
             self.safe_gain_calibrator = SafeGainCalibrator(
                 mixer_client=self.mixer_client,
                 sample_rate=sample_rate,
-                config=self.config
+                config=self.config,
+                live_apply_service=self.live_apply_service,
+                dry_run=bool(dry_run),
+                confirm_live_apply=bool(confirm_live_apply),
             )
             
             # Логируем значение после создания калибратора
@@ -1107,27 +1475,13 @@ class AutoMixerServer:
                 )
             
             def on_suggestions_ready(suggestions: dict):
-                message = {
-                    "type": "gain_staging_status",
-                    "status_type": "safe_gain_ready",
-                    "suggestions": suggestions,
-                    "message": "Analysis complete. Applying corrections..."
-                }
+                message = self._build_safe_gain_ready_payload(suggestions)
                 loop.call_soon_threadsafe(
                     lambda msg=message: asyncio.create_task(self.broadcast(msg))
                 )
-                # Автоматически применяем коррекции после завершения анализа
-                if self.safe_gain_calibrator:
-                    applied = self.safe_gain_calibrator.apply_corrections()
-                    if applied:
-                        logger.info("Safe Gain corrections applied automatically")
-                        loop.call_soon_threadsafe(
-                            lambda: asyncio.create_task(self.broadcast({
-                                "type": "gain_staging_status",
-                                "status_type": "safe_gain_applied",
-                                "message": "Corrections applied successfully"
-                            }))
-                        )
+                logger.info(
+                    "Safe Gain analysis finished; recommendations are review-only until an explicit apply path is invoked"
+                )
             
             self.safe_gain_calibrator.on_progress_update = on_progress_update
             self.safe_gain_calibrator.on_suggestions_ready = on_suggestions_ready
@@ -1145,10 +1499,16 @@ class AutoMixerServer:
                 self.gain_staging = LUFSGainStagingController(
                     mixer_client=self.mixer_client,
                     config=self.config,
-                    bleed_service=self.bleed_service
+                    bleed_service=self.bleed_service,
+                    live_apply_service=self.live_apply_service,
+                    dry_run=bool(dry_run),
+                    confirm_live_apply=bool(confirm_live_apply),
                 )
             else:
                 self.gain_staging.mixer_client = self.mixer_client
+                self.gain_staging.live_apply_service = self.live_apply_service
+                self.gain_staging.apply_dry_run = bool(dry_run)
+                self.gain_staging.confirm_live_apply = bool(confirm_live_apply)
             
             # Convert channel_settings and channel_mapping for audio analyzer
             converted_settings = {}
@@ -1274,36 +1634,74 @@ class AutoMixerServer:
                 "realtime_enabled": False,
                 "error": f"Error: {str(e)}"
             })
+
+    async def start_realtime_correction(self, device_id: str = None, channels: list = None,
+                                        channel_settings: dict = None, channel_mapping: dict = None,
+                                        mode: str = "lufs", learning_duration_sec: float = None,
+                                        dry_run: bool = True, confirm_live_apply: bool = False):
+        """Compatibility entrypoint routed to the canonical live-input-trim runtime."""
+        del mode, learning_duration_sec
+        if not self.mixer_client or not self.mixer_client.is_connected:
+            await self.broadcast({
+                "type": "gain_staging_status",
+                "active": False,
+                "realtime_enabled": False,
+                "error": "Mixer not connected",
+            })
+            return
+
+        if not device_id or not channels or not channel_settings:
+            await self.broadcast({
+                "type": "gain_staging_status",
+                "active": False,
+                "realtime_enabled": False,
+                "error": "Missing required parameters: device_id, channels, or channel_settings",
+            })
+            logger.warning("Missing required parameters for canonical AutoGain runtime")
+            return
+
+        channel_names = self._extract_channel_names_from_settings(
+            channels=channels,
+            channel_settings=channel_settings,
+            channel_mapping=channel_mapping,
+        )
+        settings = self._legacy_realtime_settings_to_live_input_trim(
+            dry_run=dry_run,
+            confirm_live_apply=confirm_live_apply,
+        )
+        await self._start_live_input_trim_runtime(
+            channels=channels,
+            channel_mapping=channel_mapping or {},
+            channel_names=channel_names,
+            settings=settings,
+            device_id=device_id,
+            emit_gain_staging_compat=True,
+            gain_staging_status_type="realtime_correction_started",
+        )
     
     async def stop_realtime_correction(self):
         """Stop Safe Gain calibration or real-time TRIM correction."""
         logger.info("Stopping gain staging...")
-        
-        # Останавливаем SafeGainCalibrator если активен
-        if self.safe_gain_calibrator:
-            logger.info("Stopping Safe Gain calibration...")
-            # Останавливаем поток обработки аудио
-            if hasattr(self, '_safe_gain_audio_thread_stop'):
-                self._safe_gain_audio_thread_stop.set()
-            if hasattr(self, '_safe_gain_audio_thread') and self._safe_gain_audio_thread.is_alive():
-                self._safe_gain_audio_thread.join(timeout=1.0)
-            self.safe_gain_calibrator.reset()
-            self.safe_gain_calibrator = None
-        
-        # Останавливаем аудио анализатор
-        if self.gain_staging:
-            if self.gain_staging.realtime_correction_enabled:
-                self.gain_staging.stop_realtime_correction()
-            if self.gain_staging.is_active:
-                self.gain_staging.stop()
-        
+
+        if self.live_input_trim_controller:
+            self.live_input_trim_controller.stop()
+            self.live_input_trim_controller = None
+            await self.broadcast({
+                "type": "live_input_trim_status",
+                "status_type": "stopped",
+                "active": False,
+            })
+        else:
+            self._stop_legacy_realtime_correction_runtime()
+
         await self.broadcast({
             "type": "gain_staging_status",
             "active": False,
             "realtime_enabled": False,
+            "status_type": "realtime_correction_stopped",
             "message": "Gain staging stopped"
         })
-        
+
         logger.info("Real-time correction stopped")
     
     async def scan_and_recognize_channels(self, websocket, channels: list):
@@ -1455,7 +1853,7 @@ class AutoMixerServer:
                 "channel_names": {}
             })
     
-    async def reset_trim(self, websocket, channels: list):
+    async def reset_trim(self, websocket, channels: list, *, emit_result: bool = True):
         """
         Reset TRIM to 0dB for selected channels.
         
@@ -1466,22 +1864,26 @@ class AutoMixerServer:
         logger.info(f"Resetting TRIM to 0dB for channels: {channels}")
         
         if not self.mixer_client or not self.mixer_client.is_connected:
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "reset_trim_result",
                 "success": False,
                 "error": "Mixer not connected",
                 "channels": channels
-            })
-            return
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
         
         if not channels:
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "reset_trim_result",
                 "success": False,
                 "error": "No channels specified",
                 "channels": []
-            })
-            return
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
         
         # Use asyncio.wait_for to prevent hanging
         async def reset_trim_task():
@@ -1597,7 +1999,7 @@ class AutoMixerServer:
                 logger.info(f"TRIM reset verification: {verification_success}/{len(channels)} channels verified")
             
             # Send response immediately
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "reset_trim_result",
                 "success": success_count > 0,
                 "success_count": success_count,
@@ -1605,33 +2007,133 @@ class AutoMixerServer:
                 "failed_channels": failed_channels,
                 "results": results,
                 "message": f"Reset TRIM to 0dB for {success_count}/{len(channels)} channels"
-            })
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
             
             logger.info(f"TRIM reset completed: {success_count}/{len(channels)} channels successful")
             if failed_channels:
                 logger.warning(f"Failed to reset TRIM for channels: {failed_channels}")
+            return payload
         
         try:
             # Set 5 second timeout to prevent hanging
-            await asyncio.wait_for(reset_trim_task(), timeout=5.0)
+            return await asyncio.wait_for(reset_trim_task(), timeout=5.0)
         except asyncio.TimeoutError:
             logger.error("Timeout while resetting TRIM")
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "reset_trim_result",
                 "success": False,
                 "error": "Operation timed out",
                 "channels": channels
-            })
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
         except Exception as e:
             logger.error(f"Error resetting TRIM: {e}", exc_info=True)
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "reset_trim_result",
                 "success": False,
                 "error": str(e),
                 "channels": channels
-            })
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
+
+    async def request_reset_trim(
+        self,
+        websocket,
+        channels: list,
+        *,
+        dry_run: bool | None = None,
+        confirm_maintenance: bool = False,
+        rollback_snapshot_path: str | None = None,
+        source: str = "manual_ui",
+    ):
+        request = MaintenanceActionRequest(
+            source=source,
+            operation="reset_trim",
+            dry_run=dry_run,
+            confirm_maintenance=confirm_maintenance,
+            rollback_snapshot_path=rollback_snapshot_path,
+            target={"channels": list(channels or [])},
+        )
+        result = self.maintenance_gate.evaluate(request, mixer_client=self.mixer_client)
+        if not result.accepted or result.dry_run:
+            await self.send_to_client(
+                websocket,
+                build_maintenance_operator_payload(
+                    result,
+                    event_type="reset_trim_result",
+                    extra={"success": False, "channels": list(channels or [])},
+                ),
+            )
+            return result
+        execution_payload = await self.reset_trim(websocket, channels, emit_result=False)
+        success = bool(execution_payload.get("success"))
+        self.maintenance_gate.mark_execution(
+            result,
+            send_result=success,
+            failure_reason=None if success else execution_payload.get("error", "maintenance_execution_failed"),
+        )
+        await self.send_to_client(
+            websocket,
+            build_maintenance_operator_payload(
+                result,
+                event_type="reset_trim_result",
+                extra=execution_payload,
+            ),
+        )
+        return result
+
+    async def request_bypass_mixer(
+        self,
+        websocket,
+        *,
+        dry_run: bool | None = None,
+        confirm_maintenance: bool = False,
+        rollback_snapshot_path: str | None = None,
+        source: str = "manual_ui",
+    ):
+        request = MaintenanceActionRequest(
+            source=source,
+            operation="bypass_mixer",
+            dry_run=dry_run,
+            confirm_maintenance=confirm_maintenance,
+            rollback_snapshot_path=rollback_snapshot_path,
+            target={"channels": list(range(1, 41))},
+        )
+        result = self.maintenance_gate.evaluate(request, mixer_client=self.mixer_client)
+        if not result.accepted or result.dry_run:
+            await self.send_to_client(
+                websocket,
+                build_maintenance_operator_payload(
+                    result,
+                    event_type="bypass_result",
+                    extra={"success": False, "success_count": 0, "total_count": 40, "failed_channels": []},
+                ),
+            )
+            return result
+        execution_payload = await self.bypass_mixer(websocket, emit_result=False)
+        success = bool(execution_payload.get("success"))
+        self.maintenance_gate.mark_execution(
+            result,
+            send_result=success,
+            failure_reason=None if success else execution_payload.get("error", "maintenance_execution_failed"),
+        )
+        await self.send_to_client(
+            websocket,
+            build_maintenance_operator_payload(
+                result,
+                event_type="bypass_result",
+                extra=execution_payload,
+            ),
+        )
+        return result
     
-    async def bypass_mixer(self, websocket):
+    async def bypass_mixer(self, websocket, *, emit_result: bool = True):
         """
         Bypass mixer: Disable all modules and set faders to 0dB for all 40 channels.
         
@@ -1641,20 +2143,24 @@ class AutoMixerServer:
         logger.info("Starting bypass operation: disabling all modules and setting faders to 0dB")
         
         if not self.mixer_client or not self.mixer_client.is_connected:
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "bypass_result",
                 "success": False,
                 "error": "Mixer not connected"
-            })
-            return
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
         
         if not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "bypass_result",
                 "success": False,
                 "error": "Bypass operation only supported for Wing mixer"
-            })
-            return
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
         
         async def bypass_task():
             success_count = 0
@@ -1706,44 +2212,56 @@ class AutoMixerServer:
                         logger.error(f"Error bypassing channel {ch}: {e}", exc_info=True)
                 
                 # Send response
-                await self.send_to_client(websocket, {
+                payload = {
                     "type": "bypass_result",
                     "success": success_count > 0,
                     "success_count": success_count,
                     "total_count": 40,
                     "failed_channels": failed_channels,
                     "message": f"Bypass completed: {success_count}/40 channels processed"
-                })
+                }
+                if emit_result:
+                    await self.send_to_client(websocket, payload)
                 
                 logger.info(f"Bypass operation completed: {success_count}/40 channels successful")
                 if failed_channels:
                     logger.warning(f"Failed to bypass channels: {failed_channels}")
+                return payload
                     
             except Exception as e:
                 logger.error(f"Error in bypass operation: {e}", exc_info=True)
-                await self.send_to_client(websocket, {
+                payload = {
                     "type": "bypass_result",
                     "success": False,
                     "error": str(e)
-                })
+                }
+                if emit_result:
+                    await self.send_to_client(websocket, payload)
+                return payload
         
         # Run bypass task with timeout
         try:
-            await asyncio.wait_for(bypass_task(), timeout=30.0)
+            return await asyncio.wait_for(bypass_task(), timeout=30.0)
         except asyncio.TimeoutError:
             logger.error("Bypass operation timed out")
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "bypass_result",
                 "success": False,
                 "error": "Operation timed out"
-            })
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
         except Exception as e:
             logger.error(f"Error executing bypass: {e}", exc_info=True)
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "bypass_result",
                 "success": False,
                 "error": str(e)
-            })
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
     
     # ========== Auto-EQ Methods ==========
     
@@ -2000,27 +2518,31 @@ class AutoMixerServer:
             "error": "Mixer not connected"
         })
 
-    async def reset_all_eq(self, websocket, data: dict = None):
+    async def reset_all_eq(self, websocket, data: dict = None, *, emit_result: bool = True):
         """Reset EQ to flat for multiple channels."""
         if data is None:
             data = {}
         
         channels = data.get("channels", [])
         if not channels:
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "reset_all_eq_result",
                 "success": False,
                 "error": "No channels specified"
-            })
-            return
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
         
         if not self.mixer_client or not hasattr(self.mixer_client, 'send'):
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "reset_all_eq_result",
                 "success": False,
                 "error": "Mixer not connected"
-            })
-            return
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
         
         logger.info(f"Reset All EQ: Resetting {len(channels)} channels")
         reset_count = 0
@@ -2056,24 +2578,78 @@ class AutoMixerServer:
             if errors:
                 message += f". Errors: {len(errors)}"
             
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "reset_all_eq_result",
                 "success": success,
                 "reset_count": reset_count,
                 "total_count": len(channels),
                 "message": message,
                 "errors": errors if errors else None
-            })
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
             
             logger.info(f"Reset All EQ: Completed. Reset {reset_count}/{len(channels)} channels")
+            return payload
             
         except Exception as e:
             logger.error(f"Reset All EQ: Unexpected error: {e}", exc_info=True)
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "reset_all_eq_result",
                 "success": False,
                 "error": str(e)
-            })
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
+
+    async def request_reset_all_eq(
+        self,
+        websocket,
+        data: dict | None = None,
+        *,
+        dry_run: bool | None = None,
+        confirm_maintenance: bool = False,
+        rollback_snapshot_path: str | None = None,
+        source: str = "manual_ui",
+    ):
+        payload = dict(data or {})
+        channels = list(payload.get("channels", []) or [])
+        request = MaintenanceActionRequest(
+            source=source,
+            operation="reset_all_eq",
+            dry_run=dry_run,
+            confirm_maintenance=confirm_maintenance,
+            rollback_snapshot_path=rollback_snapshot_path,
+            target={"channels": channels},
+        )
+        result = self.maintenance_gate.evaluate(request, mixer_client=self.mixer_client)
+        if not result.accepted or result.dry_run:
+            await self.send_to_client(
+                websocket,
+                build_maintenance_operator_payload(
+                    result,
+                    event_type="reset_all_eq_result",
+                    extra={"success": False, "channels": channels},
+                ),
+            )
+            return result
+        execution_payload = await self.reset_all_eq(websocket, payload, emit_result=False)
+        success = bool(execution_payload.get("success"))
+        self.maintenance_gate.mark_execution(
+            result,
+            send_result=success,
+            failure_reason=None if success else execution_payload.get("error", "maintenance_execution_failed"),
+        )
+        await self.send_to_client(
+            websocket,
+            build_maintenance_operator_payload(
+                result,
+                event_type="reset_all_eq_result",
+                extra=execution_payload,
+            ),
+        )
+        return result
 
     async def start_multi_channel_auto_eq(self, websocket, device_id: str = None, channels_config: List[Dict] = None, mode: str = 'soundcheck'):
         """Start multi-channel Auto-EQ analysis.
@@ -2672,23 +3248,27 @@ class AutoMixerServer:
         logger.info(f"Applied corrections directly to {applied_count} channels")
         return applied_count > 0
     
-    async def reset_phase_delay(self, websocket, channels: List[int] = None):
+    async def reset_phase_delay(self, websocket, channels: List[int] = None, *, emit_result: bool = True):
         """Reset and disable all phase inversions and delays on specified channels."""
         if not self.mixer_client or not self.mixer_client.is_connected:
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "phase_alignment_reset_result",
                 "success": False,
                 "error": "Mixer not connected"
-            })
-            return
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
         
         if not channels or len(channels) == 0:
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "phase_alignment_reset_result",
                 "success": False,
                 "error": "No channels specified"
-            })
-            return
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
         
         try:
             # Если контроллер инициализирован, используем его метод
@@ -2698,19 +3278,71 @@ class AutoMixerServer:
                 # Иначе сбрасываем напрямую через mixer_client
                 success = await self._reset_phase_delay_direct(channels)
             
-            await self.broadcast({
+            payload = {
                 "type": "phase_alignment_reset_result",
                 "success": success,
                 "message": f"Phase and delay reset for {len(channels)} channels" if success else "Failed to reset phase/delay"
-            })
+            }
+            if emit_result:
+                await self.broadcast(payload)
+            return payload
         
         except Exception as e:
             logger.error(f"Error resetting phase/delay: {e}", exc_info=True)
-            await self.send_to_client(websocket, {
+            payload = {
                 "type": "phase_alignment_reset_result",
                 "success": False,
                 "error": str(e)
-            })
+            }
+            if emit_result:
+                await self.send_to_client(websocket, payload)
+            return payload
+
+    async def request_reset_phase_delay(
+        self,
+        websocket,
+        channels: List[int] | None = None,
+        *,
+        dry_run: bool | None = None,
+        confirm_maintenance: bool = False,
+        rollback_snapshot_path: str | None = None,
+        source: str = "manual_ui",
+    ):
+        request = MaintenanceActionRequest(
+            source=source,
+            operation="reset_phase_delay",
+            dry_run=dry_run,
+            confirm_maintenance=confirm_maintenance,
+            rollback_snapshot_path=rollback_snapshot_path,
+            target={"channels": list(channels or [])},
+        )
+        result = self.maintenance_gate.evaluate(request, mixer_client=self.mixer_client)
+        if not result.accepted or result.dry_run:
+            await self.send_to_client(
+                websocket,
+                build_maintenance_operator_payload(
+                    result,
+                    event_type="phase_alignment_reset_result",
+                    extra={"success": False, "channels": list(channels or [])},
+                ),
+            )
+            return result
+        execution_payload = await self.reset_phase_delay(websocket, channels, emit_result=False)
+        success = bool(execution_payload.get("success"))
+        self.maintenance_gate.mark_execution(
+            result,
+            send_result=success,
+            failure_reason=None if success else execution_payload.get("error", "maintenance_execution_failed"),
+        )
+        await self.send_to_client(
+            websocket,
+            build_maintenance_operator_payload(
+                result,
+                event_type="phase_alignment_reset_result",
+                extra=execution_payload,
+            ),
+        )
+        return result
     
     async def _reset_phase_delay_direct(self, channels: List[int]):
         """Reset phase and delay directly through mixer client."""
@@ -2802,6 +3434,7 @@ class AutoMixerServer:
                 config=self.config,
                 audio_capture=self.audio_capture,
                 status_callback=on_status_update,
+                live_apply_service=self.live_apply_service,
             )
             state = self.arrangement_automation_controller.start(
                 channels=[int(ch) for ch in channels],
@@ -2877,6 +3510,7 @@ class AutoMixerServer:
         websocket,
         enabled: bool,
         analysis_only_mode: Optional[bool] = None,
+        confirm_live_apply: Optional[bool] = None,
     ):
         """Enable/disable live apply. This never bypasses the safety limiter."""
         if not self.arrangement_automation_controller:
@@ -2890,6 +3524,7 @@ class AutoMixerServer:
         state = self.arrangement_automation_controller.set_live_apply(
             enabled=enabled,
             analysis_only_mode=analysis_only_mode,
+            confirm_live_apply=confirm_live_apply,
         )
         await self.send_to_client(websocket, {
             "type": "arrangement_automation_status",
@@ -2897,6 +3532,205 @@ class AutoMixerServer:
             "active": True,
             "arrangement_automation_state": state,
         })
+
+    def get_live_input_trim_status(self) -> dict:
+        """Get current realtime input-trim controller status."""
+        if not self.live_input_trim_controller:
+            return {
+                "active": False,
+                "enabled": False,
+                "live_apply_enabled": False,
+                "analysis_only_mode": True,
+                "confirm_live_apply": False,
+                "channels": {},
+                "message": "idle",
+            }
+        return self.live_input_trim_controller.get_status()
+
+    def get_auto_engine_gain_recommendations(self) -> dict:
+        """Expose read-only gain recommendations from the headless auto-engine."""
+        if not self.auto_soundcheck_engine:
+            return self._build_recommendation_surface(
+                source="auto_soundcheck_engine",
+                active=False,
+                live_apply_enabled=False,
+                dry_run=True,
+                recommendations={},
+            )
+
+        status = self.auto_soundcheck_engine.get_status()
+        return self._build_recommendation_surface(
+            source="auto_soundcheck_engine",
+            active=status.get("state") == "running",
+            live_apply_enabled=bool(status.get("live_apply_enabled", False)),
+            dry_run=bool(status.get("dry_run", True)),
+            recommendations=self.auto_soundcheck_engine.get_gain_recommendations(),
+        )
+
+    def get_live_input_trim_recommendations(self) -> dict:
+        """Expose read-only recommendations from the live input trim controller."""
+        if not self.live_input_trim_controller:
+            return self._build_recommendation_surface(
+                source="live_input_trim_controller",
+                active=False,
+                live_apply_enabled=False,
+                dry_run=True,
+                recommendations={},
+            )
+
+        state = self.live_input_trim_controller.get_status()
+        return self._build_recommendation_surface(
+            source="live_input_trim_controller",
+            active=bool(state.get("active", False)),
+            live_apply_enabled=bool(state.get("live_apply_enabled", False)),
+            dry_run=bool(state.get("analysis_only_mode", True)),
+            recommendations=self.live_input_trim_controller.get_recommendations(),
+        )
+
+    async def start_live_input_trim(
+        self,
+        websocket,
+        channels: List[int] = None,
+        channel_mapping: Dict = None,
+        channel_names: Dict = None,
+        settings: Dict = None,
+        device_id: Any = None,
+    ):
+        """Start realtime arrangement-aware input trim staging."""
+        await self._start_live_input_trim_runtime(
+            websocket=websocket,
+            channels=channels,
+            channel_mapping=channel_mapping,
+            channel_names=channel_names,
+            settings=settings,
+            device_id=device_id,
+            emit_gain_staging_compat=False,
+        )
+
+    async def stop_live_input_trim(self, websocket):
+        """Stop realtime input trim staging."""
+        try:
+            if self.live_input_trim_controller:
+                self.live_input_trim_controller.stop()
+                self.live_input_trim_controller = None
+            await self.send_to_client(websocket, {
+                "type": "live_input_trim_status",
+                "status_type": "stopped",
+                "active": False,
+            })
+        except Exception as e:
+            logger.error(f"Error stopping live input trim: {e}", exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "live_input_trim_status",
+                "status_type": "error",
+                "error": str(e),
+            })
+
+    async def run_live_input_trim_tick(self, websocket, data: Dict = None):
+        """Run one realtime input-trim tick for tests or manual stepping."""
+        if not self.live_input_trim_controller:
+            await self.send_to_client(websocket, {
+                "type": "live_input_trim_status",
+                "status_type": "error",
+                "active": False,
+                "error": "Live input trim not initialized",
+            })
+            return
+        try:
+            data = data or {}
+            audio_by_channel = None
+            if data.get("audio_by_channel"):
+                audio_by_channel = {
+                    int(ch): np.asarray(samples, dtype=np.float32)
+                    for ch, samples in data["audio_by_channel"].items()
+                }
+            state = self.live_input_trim_controller.process_once(
+                audio_by_channel=audio_by_channel,
+                timestamp=data.get("timestamp"),
+            )
+            await self.send_to_client(websocket, {
+                "type": "live_input_trim_status",
+                "status_type": "state_update",
+                "active": True,
+                "live_input_trim_state": convert_numpy_types(state),
+            })
+        except Exception as e:
+            logger.error(f"Error running live input trim tick: {e}", exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "live_input_trim_status",
+                "status_type": "error",
+                "error": str(e),
+            })
+
+    async def set_live_input_trim_live_apply(
+        self,
+        websocket,
+        enabled: bool,
+        analysis_only_mode: Optional[bool] = None,
+        confirm_live_apply: Optional[bool] = None,
+    ):
+        """Enable/disable live trim apply without bypassing safety gates."""
+        if not self.live_input_trim_controller:
+            await self.send_to_client(websocket, {
+                "type": "live_input_trim_status",
+                "status_type": "error",
+                "active": False,
+                "error": "Live input trim not initialized",
+            })
+            return
+        state = self.live_input_trim_controller.set_live_apply(
+            enabled=enabled,
+            analysis_only_mode=analysis_only_mode,
+            confirm_live_apply=confirm_live_apply,
+        )
+        await self.send_to_client(websocket, {
+            "type": "live_input_trim_status",
+            "status_type": "live_apply_changed",
+            "active": True,
+            "live_input_trim_state": convert_numpy_types(state),
+        })
+
+    def _ensure_audio_capture_for_live_input_trim(
+        self,
+        channels: List[int],
+        channel_mapping: Dict,
+        settings: Dict[str, Any],
+        device_id: Any = None,
+    ) -> None:
+        """Start shared AudioCapture if the app has not started it yet."""
+        if self.audio_capture and getattr(self.audio_capture, "running", False):
+            return
+
+        max_channel = max([int(ch) for ch in channels] + [1])
+        for key, value in (channel_mapping or {}).items():
+            max_channel = max(max_channel, int(key), int(value))
+        num_channels = int(settings.get("num_channels", max(16, max_channel)))
+        sample_rate = int(settings.get("sample_rate", 48_000))
+        block_size = int(settings.get("block_size", 1024))
+        buffer_seconds = float(settings.get("buffer_seconds", 10.0))
+        source = str(settings.get("source_type", "sounddevice")).lower()
+        source_map = {
+            "sounddevice": AudioSourceType.SOUNDDEVICE,
+            "dante": AudioSourceType.DANTE,
+            "soundgrid": AudioSourceType.SOUNDGRID,
+            "test_sine": AudioSourceType.TEST_SINE,
+            "test_pink_noise": AudioSourceType.TEST_PINK_NOISE,
+            "silence": AudioSourceType.SILENCE,
+        }
+        source_type = source_map.get(source, AudioSourceType.SOUNDDEVICE)
+        device_name = device_id or settings.get("device_name")
+        if isinstance(device_name, str) and device_name.isdigit():
+            device_name = int(device_name)
+
+        self.audio_capture = AudioCapture(
+            num_channels=num_channels,
+            sample_rate=sample_rate,
+            buffer_seconds=buffer_seconds,
+            block_size=block_size,
+            source_type=source_type,
+            device_name=device_name,
+        )
+        self.audio_capture.start()
     
     def get_ready_for_live_status(self) -> dict:
         """Checklist: ready for live (all systems calibrated, no clipping)."""
@@ -2944,9 +3778,37 @@ class AutoMixerServer:
             logger.error(f"Create snapshot error: {e}", exc_info=True)
             await self.send_to_client(websocket, {"type": "snapshot_result", "success": False, "error": str(e)})
     
-    async def restore_snapshot(self, websocket, snapshot_path: str = None):
+    async def restore_snapshot(
+        self,
+        websocket,
+        snapshot_path: str = None,
+        *,
+        dry_run: bool | None = None,
+        confirm_maintenance: bool = False,
+        rollback_snapshot_path: str | None = None,
+        source: str = "manual_ui",
+    ):
         """Restore from last snapshot (undo)."""
         path = snapshot_path or self._last_snapshot_path
+        request = MaintenanceActionRequest(
+            source=source,
+            operation="restore_snapshot",
+            dry_run=dry_run,
+            confirm_maintenance=confirm_maintenance,
+            rollback_snapshot_path=rollback_snapshot_path,
+            target={"snapshot_path": path},
+        )
+        result = self.maintenance_gate.evaluate(request, mixer_client=self.mixer_client)
+        if not result.accepted or result.dry_run:
+            await self.send_to_client(
+                websocket,
+                build_maintenance_operator_payload(
+                    result,
+                    event_type="restore_result",
+                    extra={"success": False, "path": path},
+                ),
+            )
+            return
         if not path or not os.path.isfile(path):
             await self.send_to_client(websocket, {"type": "restore_result", "success": False, "error": "No snapshot file"})
             return
@@ -2957,10 +3819,30 @@ class AutoMixerServer:
             await asyncio.get_running_loop().run_in_executor(
                 None, lambda: restore_from_backup_using_client(self.mixer_client, path, skip_confirm=True)
             )
-            await self.send_to_client(websocket, {"type": "restore_result", "success": True, "path": path})
+            self.maintenance_gate.mark_execution(result, send_result=True)
+            await self.send_to_client(
+                websocket,
+                build_maintenance_operator_payload(
+                    result,
+                    event_type="restore_result",
+                    extra={"success": True, "path": path},
+                ),
+            )
         except Exception as e:
             logger.error(f"Restore snapshot error: {e}", exc_info=True)
-            await self.send_to_client(websocket, {"type": "restore_result", "success": False, "error": str(e)})
+            self.maintenance_gate.mark_execution(
+                result,
+                send_result=False,
+                failure_reason=str(e),
+            )
+            await self.send_to_client(
+                websocket,
+                build_maintenance_operator_payload(
+                    result,
+                    event_type="restore_result",
+                    extra={"success": False, "error": str(e), "path": path},
+                ),
+            )
     
     async def start_realtime_fader(self, websocket, device_id: str = None,
                                     channels: List[int] = None,
@@ -3005,7 +3887,9 @@ class AutoMixerServer:
                 mixer_client=self.mixer_client,
                 sample_rate=48000,
                 config=self.config,
-                bleed_service=self.bleed_service
+                bleed_service=self.bleed_service,
+                live_apply_service=self.live_apply_service,
+                confirm_live_apply=bool(settings.get("confirmLiveApply", True)),
             )
             
             # Apply settings
@@ -3190,7 +4074,9 @@ class AutoMixerServer:
                 mixer_client=self.mixer_client,
                 sample_rate=48000,
                 config=self.config,
-                bleed_service=self.bleed_service
+                bleed_service=self.bleed_service,
+                live_apply_service=self.live_apply_service,
+                confirm_live_apply=False,
             )
             
             # Set up callbacks
@@ -3306,7 +4192,7 @@ class AutoMixerServer:
                 "error": str(e)
             })
     
-    async def apply_auto_balance(self, websocket):
+    async def apply_auto_balance(self, websocket, confirm_live_apply: bool = False):
         """Apply Auto Balance results to mixer."""
         logger.info("Applying Auto Balance")
         
@@ -3319,6 +4205,7 @@ class AutoMixerServer:
                 })
                 return
             
+            self.auto_fader_controller.set_confirm_live_apply(confirm_live_apply)
             success = self.auto_fader_controller.apply_auto_balance()
             
             if success:
@@ -3549,9 +4436,38 @@ class AutoMixerServer:
 
     # ========== Auto Soundcheck Methods ==========
     
-    async def reset_all_functions_to_defaults(self, websocket, channels: List[int]):
+    async def reset_all_functions_to_defaults(
+        self,
+        websocket,
+        channels: List[int],
+        *,
+        dry_run: bool | None = None,
+        confirm_maintenance: bool = False,
+        rollback_snapshot_path: str | None = None,
+        source: str = "auto_soundcheck_cycle",
+    ):
         """Reset all functions to default state for selected channels."""
         logger.info(f"Resetting all functions to defaults for channels: {channels}")
+
+        request = MaintenanceActionRequest(
+            source=source,
+            operation="reset_all_functions",
+            dry_run=dry_run,
+            confirm_maintenance=confirm_maintenance,
+            rollback_snapshot_path=rollback_snapshot_path,
+            target={"channels": list(channels or [])},
+        )
+        gate_result = self.maintenance_gate.evaluate(request, mixer_client=self.mixer_client)
+        if not gate_result.accepted or gate_result.dry_run:
+            await self.send_to_client(
+                websocket,
+                build_maintenance_operator_payload(
+                    gate_result,
+                    event_type="reset_all_functions_result",
+                    extra={"success": False, "channels": list(channels or [])},
+                ),
+            )
+            return
         
         if not channels or len(channels) == 0:
             logger.warning("No channels provided for reset")
@@ -3570,6 +4486,16 @@ class AutoMixerServer:
                     except Exception as e:
                         logger.warning(f"Error stopping gain staging: {e}")
                 stop_tasks.append(asyncio.create_task(stop_gain_staging()))
+
+            if self.live_input_trim_controller:
+                async def stop_live_input_trim():
+                    try:
+                        self.live_input_trim_controller.stop()
+                        self.live_input_trim_controller = None
+                        logger.info("Live input trim stopped")
+                    except Exception as e:
+                        logger.warning(f"Error stopping live input trim: {e}")
+                stop_tasks.append(asyncio.create_task(stop_live_input_trim()))
             
             if self.phase_alignment_controller:
                 async def stop_phase_alignment():
@@ -3610,7 +4536,7 @@ class AutoMixerServer:
             # Reset TRIM to 0dB (with timeout and error handling)
             logger.info("Resetting TRIM to 0dB...")
             try:
-                await asyncio.wait_for(self.reset_trim(websocket, channels), timeout=15.0)
+                await asyncio.wait_for(self.reset_trim(websocket, channels, emit_result=False), timeout=15.0)
                 logger.info("TRIM reset completed")
             except asyncio.TimeoutError:
                 logger.warning("TRIM reset timed out after 15s, continuing...")
@@ -3646,7 +4572,7 @@ class AutoMixerServer:
             # Reset EQ to flat (with timeout)
             logger.info("Resetting EQ to flat...")
             try:
-                await asyncio.wait_for(self.reset_all_eq(websocket, {"channels": channels}), timeout=15.0)
+                await asyncio.wait_for(self.reset_all_eq(websocket, {"channels": channels}, emit_result=False), timeout=15.0)
                 logger.info("EQ reset completed")
             except asyncio.TimeoutError:
                 logger.warning("EQ reset timed out after 15s, continuing...")
@@ -3657,7 +4583,7 @@ class AutoMixerServer:
             # Reset phase/delay (with timeout)
             logger.info("Resetting phase/delay...")
             try:
-                await asyncio.wait_for(self.reset_phase_delay(websocket, channels), timeout=15.0)
+                await asyncio.wait_for(self.reset_phase_delay(websocket, channels, emit_result=False), timeout=15.0)
                 logger.info("Phase/delay reset completed")
             except asyncio.TimeoutError:
                 logger.warning("Phase/delay reset timed out after 15s, continuing...")
@@ -3666,16 +4592,38 @@ class AutoMixerServer:
             await asyncio.sleep(0.3)
             
             logger.info("All functions reset to defaults successfully")
+            self.maintenance_gate.mark_execution(gate_result, send_result=True)
+            await self.send_to_client(
+                websocket,
+                build_maintenance_operator_payload(
+                    gate_result,
+                    event_type="reset_all_functions_result",
+                    extra={"success": True, "channels": list(channels or [])},
+                ),
+            )
             
         except Exception as e:
             logger.error(f"Error resetting functions to defaults: {e}", exc_info=True)
             import traceback
             logger.error(traceback.format_exc())
             # Don't raise - continue with cycle even if reset fails
+            self.maintenance_gate.mark_execution(
+                gate_result,
+                send_result=False,
+                failure_reason=str(e),
+            )
+            await self.send_to_client(
+                websocket,
+                build_maintenance_operator_payload(
+                    gate_result,
+                    event_type="reset_all_functions_result",
+                    extra={"success": False, "error": str(e), "channels": list(channels or [])},
+                ),
+            )
     
     async def start_auto_soundcheck(self, websocket, device_id: str = None, channels: list = None,
                                     channel_settings: dict = None, channel_mapping: dict = None,
-                                    timings: dict = None):
+                                    timings: dict = None, live_apply_enabled: bool = False):
         """Start automatic soundcheck cycle."""
         logger.info("=" * 60)
         logger.info("RECEIVED start_auto_soundcheck MESSAGE")
@@ -3745,6 +4693,7 @@ class AutoMixerServer:
         
         self.auto_soundcheck_running = True
         self.auto_soundcheck_websocket = websocket
+        requested_live_apply = bool(live_apply_enabled)
         
         # Send initial status immediately before starting task
         await self._send_soundcheck_status(websocket, None, 0, 0, "Soundcheck cycle starting...")
@@ -3755,7 +4704,7 @@ class AutoMixerServer:
         try:
             self.auto_soundcheck_task = asyncio.create_task(
                 self._run_auto_soundcheck_cycle(websocket, device_id, channels, channel_settings, 
-                                               channel_mapping, timings)
+                                               channel_mapping, timings, requested_live_apply)
             )
             logger.info("Auto soundcheck cycle task created successfully")
             
@@ -3796,6 +4745,13 @@ class AutoMixerServer:
             self.auto_soundcheck_task = None
         
         # Stop all active controllers
+        if self.live_input_trim_controller:
+            try:
+                self.live_input_trim_controller.stop()
+                self.live_input_trim_controller = None
+            except:
+                pass
+
         if self.gain_staging:
             try:
                 self.gain_staging.stop()
@@ -4019,7 +4975,8 @@ class AutoMixerServer:
         await self.broadcast({"type": "auto_compressor_status", "manual_applied": ch})
     
     async def _run_auto_soundcheck_cycle(self, websocket, device_id: str, channels: list,
-                                         channel_settings: dict, channel_mapping: dict, timings: dict):
+                                         channel_settings: dict, channel_mapping: dict, timings: dict,
+                                         live_apply_enabled: bool = False):
         """Execute the full auto soundcheck cycle."""
         try:
             logger.info("=" * 60)
@@ -4108,9 +5065,19 @@ class AutoMixerServer:
             logger.info(f"Before start_realtime_correction: mixer_client={self.mixer_client is not None}, mixer_connected={self.mixer_client.is_connected if self.mixer_client else False}")
             
             try:
-                await self.start_realtime_correction(device_id, channels, channel_settings, channel_mapping)
+                await self.start_realtime_correction(
+                    device_id,
+                    channels,
+                    channel_settings,
+                    channel_mapping,
+                    dry_run=not live_apply_enabled,
+                    confirm_live_apply=live_apply_enabled,
+                )
                 logger.info("start_realtime_correction completed successfully")
-                logger.info(f"After start_realtime_correction: gain_staging={self.gain_staging is not None}, is_active={self.gain_staging.is_active if self.gain_staging else False}, is_audio_stream_active={self.gain_staging.is_audio_stream_active if self.gain_staging else False}")
+                logger.info(
+                    "After start_realtime_correction: live_input_trim_active=%s",
+                    self.live_input_trim_controller is not None,
+                )
             except Exception as e:
                 logger.error(f"Error starting realtime correction: {e}", exc_info=True)
                 await self._send_soundcheck_status(websocket, "gain_staging", 0, 0, f"Error starting GAIN STAGING: {str(e)}", error=str(e))
@@ -4130,10 +5097,10 @@ class AutoMixerServer:
                 await self.stop_realtime_correction()
                 logger.info("stop_realtime_correction completed successfully")
                 
-                # TRIM corrections are already applied on the mixer in real-time by gain staging.
-                # Do NOT re-read from WingClient cache (get_channel_gain returns stale values
-                # because send() doesn't update the state cache).
-                logger.info("GAIN STAGING corrections already applied on mixer in real-time, preserving values")
+                if live_apply_enabled:
+                    logger.info("Canonical AutoGain runtime applied live trim updates during soundcheck")
+                else:
+                    logger.info("Canonical AutoGain runtime stayed in dry-run mode during soundcheck")
                 
                 # Fully stop gain staging to release audio device for next steps (phase alignment)
                 if self.gain_staging:
@@ -4296,7 +5263,10 @@ class AutoMixerServer:
             await asyncio.sleep(1)
             
             # Apply auto balance corrections
-            await self.apply_auto_balance(websocket)
+            await self.apply_auto_balance(
+                websocket,
+                confirm_live_apply=bool(live_apply_enabled),
+            )
             await self._send_soundcheck_status(websocket, "auto_fader", 100, 0, "AUTO FADER complete")
             await asyncio.sleep(1)
             
@@ -4313,6 +5283,12 @@ class AutoMixerServer:
             await self._send_soundcheck_status(websocket, None, 0, 0, f"Error: {str(e)}", error=str(e))
         finally:
             logger.info("Auto soundcheck cycle finished, cleaning up...")
+            if self.live_input_trim_controller:
+                try:
+                    self.live_input_trim_controller.stop()
+                    self.live_input_trim_controller = None
+                except Exception as e:
+                    logger.warning(f"Error stopping live input trim during cleanup: {e}")
             self.auto_soundcheck_running = False
             self.auto_soundcheck_task = None
             self.auto_soundcheck_websocket = None
@@ -4369,53 +5345,80 @@ class AutoMixerServer:
         
         try:
             cmd_type = command.get("type")
+            channel = command.get("channel")
+
+            async def broadcast_live_apply_result(result, *, extra: Optional[Dict[str, Any]] = None):
+                payload = build_live_apply_operator_payload(
+                    result,
+                    event_type="voice_command_result",
+                    extra={
+                        "command": cmd_type,
+                        **(extra or {}),
+                    },
+                )
+                await self.broadcast(payload)
+
+            async def broadcast_blocked(reason: str, *, extra: Optional[Dict[str, Any]] = None):
+                payload = {
+                    "type": "voice_command_result",
+                    "command": cmd_type,
+                    "channel": channel,
+                    "accepted": False,
+                    "blocked": True,
+                    "blocked_reason": reason,
+                    "dry_run_only": True,
+                    "send_result": None,
+                    "send_status": "not_sent",
+                    "readback_status": "not_requested",
+                    "live_apply_source": "voice_control",
+                }
+                if extra:
+                    payload.update(extra)
+                await self.broadcast(payload)
             
             if cmd_type == "set_fader":
-                channel = command.get("channel")
                 value = command.get("value", 0.5)
-                self.mixer_client.set_channel_fader(channel, value)
-                await self.broadcast({
-                    "type": "voice_command_executed",
-                    "command": cmd_type,
-                    "channel": channel,
-                    "value": value
-                })
+                result = self.live_apply_service.apply(
+                    LiveApplyRequest(
+                        source="voice_control",
+                        operation="set_fader",
+                        channel=int(channel),
+                        value=float(value),
+                        dry_run=command.get("dry_run"),
+                        confirm_live_apply=bool(command.get("confirm_live_apply", False)),
+                        replay_correlation_id=str(command.get("replay_correlation_id", "")),
+                        metadata={"command_type": cmd_type},
+                    ),
+                    self.mixer_client,
+                )
+                if result.accepted and not result.dry_run:
+                    self.last_fader_values[int(channel)] = float(result.desired_value)
+                await broadcast_live_apply_result(result)
                 
             elif cmd_type == "set_gain":
-                channel = command.get("channel")
                 value = command.get("value", 0.0)
-                self.mixer_client.set_channel_gain(channel, value)
-                await self.broadcast({
-                    "type": "voice_command_executed",
-                    "command": cmd_type,
-                    "channel": channel,
-                    "value": value
-                })
+                result = self.live_apply_service.apply(
+                    LiveApplyRequest(
+                        source="voice_control",
+                        operation="set_gain",
+                        channel=int(channel),
+                        value=float(value),
+                        dry_run=command.get("dry_run"),
+                        confirm_live_apply=bool(command.get("confirm_live_apply", False)),
+                        replay_correlation_id=str(command.get("replay_correlation_id", "")),
+                        metadata={"command_type": cmd_type},
+                    ),
+                    self.mixer_client,
+                )
+                await broadcast_live_apply_result(result)
                 
             elif cmd_type == "load_snap":
-                snap_name = command.get("snap_name")
-                if isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    success = self.mixer_client.load_snap(snap_name)
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "snap_name": snap_name,
-                        "success": success
-                    })
+                await broadcast_blocked("unsupported_voice_operation")
                     
             elif cmd_type == "mute_channel":
-                channel = command.get("channel")
-                muted = command.get("muted", True)
-                # Note: Add mute method to mixer_client if not exists
-                await self.broadcast({
-                    "type": "voice_command_executed",
-                    "command": cmd_type,
-                    "channel": channel,
-                    "muted": muted
-                })
+                await broadcast_blocked("unsupported_voice_operation")
                 
             elif cmd_type == "volume_up":
-                channel = command.get("channel")
                 db_change = command.get("db", 3)  # Get dB value directly (default 3 dB)
                 if channel is not None:
                     # Try to get current value from tracked values first, then from mixer
@@ -4430,30 +5433,33 @@ class AutoMixerServer:
                     if current_db is not None:
                         # Add dB directly (Wing uses dB values)
                         new_db = min(10.0, current_db + db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
-                        # Update tracked value
-                        self.last_fader_values[channel] = new_db
-                        logger.info(f"Increased channel {channel} fader: {current_db:.1f} dB -> {new_db:.1f} dB (+{db_change} dB)")
+                        logger.info(f"Calculated increase for channel {channel} fader: {current_db:.1f} dB -> {new_db:.1f} dB (+{db_change} dB)")
                     else:
                         # Fallback: use last known or default to 0
                         last_known = self.last_fader_values.get(channel, 0.0)
                         new_db = min(10.0, last_known + db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
-                        self.last_fader_values[channel] = new_db
-                        logger.info(f"Increased channel {channel} fader by {db_change} dB (to {new_db:.1f} dB, using tracked value)")
+                        logger.info(f"Calculated increase for channel {channel} fader by {db_change} dB (to {new_db:.1f} dB, using tracked value)")
                     
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "db_change": db_change,
-                        "new_db": new_db
-                    })
+                    result = self.live_apply_service.apply(
+                        LiveApplyRequest(
+                            source="voice_control",
+                            operation="set_fader",
+                            channel=int(channel),
+                            value=float(new_db),
+                            dry_run=command.get("dry_run"),
+                            confirm_live_apply=bool(command.get("confirm_live_apply", False)),
+                            replay_correlation_id=str(command.get("replay_correlation_id", "")),
+                            metadata={"command_type": cmd_type, "db_change": db_change},
+                        ),
+                        self.mixer_client,
+                    )
+                    if result.accepted and not result.dry_run:
+                        self.last_fader_values[int(channel)] = float(result.desired_value)
+                    await broadcast_live_apply_result(result, extra={"db_change": db_change, "new_db": new_db})
                 else:
                     logger.warning(f"volume_up command ignored: channel is None")
                     
             elif cmd_type == "volume_down":
-                channel = command.get("channel")
                 db_change = command.get("db", 3)  # Get dB value directly (default 3 dB)
                 if channel is not None:
                     # Try to get current value from tracked values first, then from mixer
@@ -4468,109 +5474,46 @@ class AutoMixerServer:
                     if current_db is not None:
                         # Subtract dB directly (Wing uses dB values)
                         new_db = max(-144.0, current_db - db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
-                        # Update tracked value
-                        self.last_fader_values[channel] = new_db
-                        logger.info(f"Decreased channel {channel} fader: {current_db:.1f} dB -> {new_db:.1f} dB (-{db_change} dB)")
+                        logger.info(f"Calculated decrease for channel {channel} fader: {current_db:.1f} dB -> {new_db:.1f} dB (-{db_change} dB)")
                     else:
                         # Fallback: use last known or default to 0
                         last_known = self.last_fader_values.get(channel, 0.0)
                         new_db = max(-144.0, last_known - db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
-                        self.last_fader_values[channel] = new_db
-                        logger.info(f"Decreased channel {channel} fader by {db_change} dB (to {new_db:.1f} dB, using tracked value)")
+                        logger.info(f"Calculated decrease for channel {channel} fader by {db_change} dB (to {new_db:.1f} dB, using tracked value)")
                     
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "db_change": db_change,
-                        "new_db": new_db
-                    })
+                    result = self.live_apply_service.apply(
+                        LiveApplyRequest(
+                            source="voice_control",
+                            operation="set_fader",
+                            channel=int(channel),
+                            value=float(new_db),
+                            dry_run=command.get("dry_run"),
+                            confirm_live_apply=bool(command.get("confirm_live_apply", False)),
+                            replay_correlation_id=str(command.get("replay_correlation_id", "")),
+                            metadata={"command_type": cmd_type, "db_change": db_change},
+                        ),
+                        self.mixer_client,
+                    )
+                    if result.accepted and not result.dry_run:
+                        self.last_fader_values[int(channel)] = float(result.desired_value)
+                    await broadcast_live_apply_result(result, extra={"db_change": db_change, "new_db": new_db})
                 else:
                     logger.warning(f"volume_down command ignored: channel is None")
             
             elif cmd_type == "eq_on":
-                channel = command.get("channel")
-                on = command.get("on", 1)
-                if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    self.mixer_client.set_eq_on(channel, on)
-                    logger.info(f"Set EQ {'on' if on else 'off'} for channel {channel}")
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "on": on
-                    })
+                await broadcast_blocked("unsupported_voice_operation")
             
             elif cmd_type == "eq_band_up" or cmd_type == "eq_band_down":
-                channel = command.get("channel")
-                band = command.get("band")
-                db_change = command.get("db", 3)
-                if channel is not None and band and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    # Get current gain
-                    band_gain_key = f"{band}g" if band in ["1", "2", "3", "4"] else ("lg" if band == "low" else "hg")
-                    current_gain = self.mixer_client.get_eq_band_gain(channel, band_gain_key) or 0.0
-                    
-                    if cmd_type == "eq_band_up":
-                        new_gain = min(15.0, current_gain + db_change)
-                    else:
-                        new_gain = max(-15.0, current_gain - db_change)
-                    
-                    self.mixer_client.set_eq_band_gain(channel, band_gain_key, new_gain)
-                    logger.info(f"Set EQ band {band} for channel {channel}: {current_gain:.1f} dB -> {new_gain:.1f} dB")
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "band": band,
-                        "new_gain": new_gain
-                    })
+                await broadcast_blocked("unsupported_voice_operation")
             
             elif cmd_type == "compressor_on":
-                channel = command.get("channel")
-                on = command.get("on", 1)
-                if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    self.mixer_client.set_compressor_on(channel, on)
-                    logger.info(f"Set compressor {'on' if on else 'off'} for channel {channel}")
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "on": on
-                    })
+                await broadcast_blocked("unsupported_voice_operation")
             
             elif cmd_type == "compressor_threshold":
-                channel = command.get("channel")
-                threshold = command.get("threshold")
-                if channel is not None and threshold is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    self.mixer_client.set_compressor_threshold(channel, threshold)
-                    logger.info(f"Set compressor threshold for channel {channel}: {threshold:.1f} dB")
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "threshold": threshold
-                    })
+                await broadcast_blocked("unsupported_voice_operation")
             
             elif cmd_type == "compressor_gain_up" or cmd_type == "compressor_gain_down":
-                channel = command.get("channel")
-                db_change = command.get("db", 3)
-                if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    current_gain = self.mixer_client.get_compressor_gain(channel) or 0.0
-                    if cmd_type == "compressor_gain_up":
-                        new_gain = min(12.0, current_gain + db_change)
-                    else:
-                        new_gain = max(-6.0, current_gain - db_change)
-                    
-                    self.mixer_client.set_compressor_gain(channel, new_gain)
-                    logger.info(f"Set compressor gain for channel {channel}: {current_gain:.1f} dB -> {new_gain:.1f} dB")
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "new_gain": new_gain
-                    })
+                await broadcast_blocked("unsupported_voice_operation")
             
             logger.info("=" * 60)
             logger.info(f"✅ EXECUTED VOICE COMMAND: {cmd_type}")

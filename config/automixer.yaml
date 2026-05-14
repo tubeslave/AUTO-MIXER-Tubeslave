@@ -62,11 +62,57 @@ session:
 
 # Auto Soundcheck Engine settings
 soundcheck:
-  auto_apply: true
+  auto_apply: false
   signal_threshold_db: -50.0
   analysis_seconds: 3.0
   analysis_timeout_seconds: 30.0
   gain_correction_max_db: 12.0
+
+live_input_trim:
+  enabled: true
+  live_apply_enabled: false
+  analysis_only_mode: true
+  level_source: "wing_meter"
+  require_meter_for_live_apply: true
+  require_meter_for_analysis: true
+  wing_meter_enabled: true
+  native_meter_enabled: true
+  native_meter_tcp_port: 2222
+  native_meter_report_id: 1095588145
+  native_values_per_channel: 8
+  native_meter_renew_interval_sec: 2.0
+  meter_activity_fallback: true
+  usb_silence_dbfs: -90.0
+  meter_stale_timeout_sec: 0.75
+  meter_subscribe_interval_ms: 100
+  meter_query_timeout_sec: 0.08
+  meter_query_interval_sec: 0.75
+  meter_peak_to_rms_margin_db: 12.0
+  meter_subscribe_paths:
+    - "/$meters/subscribe"
+    - "/meters/subscribe"
+  meter_input_paths:
+    - "/$meters/ch/{ch}/in"
+    - "/meters/ch/{ch}/in"
+  update_interval_ms: 250
+  analysis_window_sec: 0.5
+  min_main_signal_confidence: 0.65
+  high_bleed_ratio: 0.45
+  max_step_db_per_tick: 0.25
+  max_boost_step_db: 0.15
+  deadband_db: 0.1
+  apply_cooldown_sec: 1.0
+  trim_min_db: -18.0
+  trim_max_db: 18.0
+  hot_peak_threshold_dbfs: -3.0
+  hot_peak_target_dbfs: -6.0
+  true_peak_ceiling_dbtp: -1.0
+  regular_cut_requires_ready: true
+  block_regular_trim_on_bleed: true
+  percussive_peak_mode: true
+  percussive_boost_margin_db: 1.0
+  percussive_min_crest_db: 10.0
+  limit_release_margin_db: 1.0
 
 autoeq:
   enabled: false

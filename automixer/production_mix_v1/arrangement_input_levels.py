@@ -39,6 +39,7 @@ ARRANGEMENT_INPUT_LEVEL_STAGE = "arrangement_input_levels_pre_phase"
 REPLACED_STAGE = "ayaic_channel_levels_pre_phase"
 DEFAULT_TRUE_PEAK_CEILING_DBTP = -1.0
 DEFAULT_OFFLINE_MAX_STATIC_STEP_DB = 4.0
+OVERHEAD_MAX_INPUT_CUT_DB = -0.75
 
 
 def apply_arrangement_input_levels(
@@ -172,7 +173,11 @@ def apply_arrangement_input_levels(
         activity = activities[channel_id]
         measurement = measurements[channel_id]
         planned_offset = planned[channel_id]
-        safe_offset = float(safety.safe_offsets.get(channel_id, 0.0))
+        planner_safe_offset = float(safety.safe_offsets.get(channel_id, 0.0))
+        safe_offset, role_guard_reason = _offline_input_role_guard(
+            role.role,
+            planner_safe_offset,
+        )
         final_gain, peak_reason = _apply_peak_headroom_limit(
             safe_offset,
             float(measurement["true_peak_dbtp"]),
@@ -184,6 +189,8 @@ def apply_arrangement_input_levels(
             stem.track_gain_db += final_gain
 
         reasons = list(safety.reasons.get(channel_id, []))
+        if role_guard_reason:
+            reasons.append(role_guard_reason)
         if peak_reason:
             reasons.append(peak_reason)
         masking_source = masking_by_channel.get(channel_id)
@@ -224,6 +231,7 @@ def apply_arrangement_input_levels(
                 "pre_true_peak_dbtp": round(float(measurement["true_peak_dbtp"]), 3),
                 "true_peak_ceiling_dbtp": round(float(true_peak_ceiling_dbtp), 3),
                 "requested_offset_db": round(planned_offset.requested_offset_db, 3),
+                "planner_safe_offset_db": round(planner_safe_offset, 3),
                 "safe_offset_db": round(safe_offset, 3),
                 "gain_db": round(final_gain, 3),
                 "post_lufs": round(_sum_level(float(measurement["measured_lufs"]), final_gain), 3),
@@ -244,6 +252,20 @@ def apply_arrangement_input_levels(
         )
 
     return report
+
+
+def _offline_input_role_guard(role: str, safe_offset_db: float) -> tuple[float, str | None]:
+    """Keep ambience mics from being mixed away during the input staging pass.
+
+    Arrangement input staging replaces the old Ayaic pre-phase leveler, so it
+    should create headroom and rough musical order, not solve the final drum
+    image balance. Overhead audibility is decided later by the output-balance
+    stage after EQ, compression, panning, and phase correction are known.
+    """
+
+    if role == "overhead" and safe_offset_db < OVERHEAD_MAX_INPUT_CUT_DB:
+        return OVERHEAD_MAX_INPUT_CUT_DB, "offline_overhead_air_preservation_floor"
+    return safe_offset_db, None
 
 
 def _measurement_audio(stem: Any, primary_audio_fn: Callable[[Any], np.ndarray]) -> np.ndarray:

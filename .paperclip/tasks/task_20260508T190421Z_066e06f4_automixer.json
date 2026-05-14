@@ -1,0 +1,21 @@
+{
+  "id": "0a40fc56-f1cd-4040-9058-f8d1e1129944",
+  "source": "mcp_remote_gateway",
+  "sourceTool": "create_task",
+  "projectRoot": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+  "createdAt": "2026-05-08T19:04:21.712Z",
+  "title": "DSP analysis: EQ decision logic in AUTO-MIXER-Tubeslave",
+  "agent": "automixer",
+  "prompt": "Analyze EQ decision logic in AUTO-MIXER-Tubeslave.\n\nConstraints:\n- Do not modify files.\n- Perform analysis only.\n- Keep dryRun true.",
+  "metadata": {},
+  "requestedDryRun": true,
+  "dryRun": true,
+  "dryRunEnforced": false,
+  "policy": {
+    "writesAllowed": [
+      ".paperclip/tasks",
+      ".paperclip/reports"
+    ],
+    "sourceCodeChangesAllowed": false
+  }
+}

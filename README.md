@@ -2,6 +2,37 @@
 
 Приложение для автоматического микширования с использованием микшерного пульта **Behringer Wing Rack** (fw 3.0.5) через протокол OSC.
 
+## Current Status
+
+- Репозиторий содержит live backend, offline-first pipeline и research/legacy surfaces.
+- Canonical live coordinator: `backend/server.py`
+- `automixer/production_mix_v1` = offline-first pipeline, не live runtime.
+- Актуальная runtime ownership и safety semantics зафиксированы в отдельных документах, а не в этом README.
+
+## Safety Status
+
+- Approved live write scope сейчас только manual `set_fader` / `set_gain` через `LiveApplyService`.
+- Dry-run is the default expectation for real console write paths.
+- Real apply requires explicit confirmation and confirmed readback.
+- Panic stop is not system-wide.
+- `LiveApplyService` does not cover every live write.
+
+Отдельного review/approval требуют:
+
+- `AutoFader`
+- arrangement automation
+- live input trim expansion
+- `auto_soundcheck` live apply expansion
+- feedback detector exception
+- offline real sender attachment
+
+## Source Of Truth Docs
+
+- `docs/runtime_ownership_matrix.md`
+- `docs/current_architecture_map.md`
+- `docs/console_write_safety_policy.md`
+- `Docs/ARCHITECTURE.md`
+
 ## Структура проекта
 
 ```
@@ -25,6 +56,8 @@ AUTO MIXER Tubeslave/
 ```
 
 ## Возможности (Этап 1)
+
+Ниже перечислены пользовательские и исторически накопленные поверхности проекта. Этот раздел не должен читаться как подтверждение того, что все automation paths approved for real live console use.
 
 ### Реализовано:
 - ✅ OSC-клиент с двусторонней синхронизацией с Wing Rack

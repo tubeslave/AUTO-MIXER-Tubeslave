@@ -119,23 +119,12 @@ class DifferentiableMixingConsole(nn.Module):
         self.pan = DifferentiablePan(n_channels)
 
     def forward(self, channels):
-        stacked = []
+        processed = []
         for i in range(min(self.n_channels, len(channels))):
             x = channels[i]
             if x.dim() == 1:
                 x = x.unsqueeze(0)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-            stacked.append(x)
-        batch = torch.cat(stacked, dim=0)  # (n_channels, samples)
-        batch = self.eq(batch)
-        batch = self.compressor(batch)
-        batch = self.gain(batch)
-        processed = [batch[i:i + 1] for i in range(batch.shape[0])]
-        mix = batch.sum(dim=0, keepdim=True)
-=======
-=======
->>>>>>> Incoming (Background Agent changes)
+
             # Process through per-channel slice of EQ, compressor, gain
             n_fft = x.shape[-1]
             X = torch.fft.rfft(x)
@@ -169,8 +158,10 @@ class DifferentiableMixingConsole(nn.Module):
             x = x * gain_lin
 
             processed.append(x)
+        if not processed:
+            return torch.zeros(1, 0), []
+
         mix = sum(processed)
->>>>>>> Incoming (Background Agent changes)
         return mix, processed
 
     def get_parameters_dict(self):

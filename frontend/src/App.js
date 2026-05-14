@@ -66,11 +66,12 @@ function App() {
   const [routingChannelCount, setRoutingChannelCount] = useState(64);
 
   useEffect(() => {
-    websocketService.on('connection_status', (data) => {
+    const handleConnectionStatus = (data) => {
       setConnecting(false);
       setMixerConnected(data.connected);
       if (data.connected) {
-        setStatusMessage(`Wing: ${mixerIp}`);
+        const endpoint = data.ip || data.host || data.mode || 'connected';
+        setStatusMessage(`Mixer: ${endpoint}`);
       } else {
         if (data.error) {
           setStatusMessage(`Ошибка: ${data.error}`);
@@ -78,9 +79,10 @@ function App() {
           setStatusMessage('Отключен');
         }
       }
-    });
+    };
+    websocketService.on('connection_status', handleConnectionStatus);
 
-    websocketService.on('audio_devices', (data) => {
+    const handleAudioDevices = (data) => {
       setAudioDevices(data.devices || []);
       if (data.devices && data.devices.length > 0) {
         const danteDevice = data.devices.find(device =>
@@ -90,15 +92,17 @@ function App() {
         setSelectedDevice(deviceToSelect.id);
         setAvailableChannels(deviceToSelect.channels || []);
       }
-    });
+    };
+    websocketService.on('audio_devices', handleAudioDevices);
 
-    websocketService.on('bypass_result', (data) => {
+    const handleBypassResult = (data) => {
       if (data.error) {
         setStatusMessage(`Bypass: ${data.error}`);
       } else if (data.success) {
         setStatusMessage(`Bypass OK: ${data.success_count}/40`);
       }
-    });
+    };
+    websocketService.on('bypass_result', handleBypassResult);
 
     const isDefaultChannelName = (name) => {
       if (!name || !name.trim()) return true;
@@ -113,7 +117,7 @@ function App() {
       return defaultPatterns.some(pattern => pattern.test(trimmedName));
     };
 
-    websocketService.on('mixer_channel_names', (data) => {
+    const handleMixerChannelNames = (data) => {
       if (data.error) {
         setStatusMessage(`Scan: ${data.error}`);
         return;
@@ -155,13 +159,15 @@ function App() {
           return updatedChannels;
         });
       }
-    });
+    };
+    websocketService.on('mixer_channel_names', handleMixerChannelNames);
 
-    websocketService.on('disconnected', () => {
+    const handleDisconnected = () => {
       setServerConnected(false);
       setMixerConnected(false);
       setStatusMessage('Переподключение...');
-    });
+    };
+    websocketService.on('disconnected', handleDisconnected);
 
     const handleAllSettingsLoaded = (data) => {
       if (data.settings && data.settings.mixer) {
@@ -172,9 +178,10 @@ function App() {
     };
     websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
 
-    websocketService.on('dante_routing', (data) => {
+    const handleDanteRouting = (data) => {
       if (data.routing_scheme) setRoutingScheme(data.routing_scheme);
-    });
+    };
+    websocketService.on('dante_routing', handleDanteRouting);
 
     websocketService.connect()
       .then(() => {
@@ -190,13 +197,13 @@ function App() {
       });
 
     return () => {
-      websocketService.off('connection_status', () => {});
-      websocketService.off('audio_devices', () => {});
-      websocketService.off('bypass_result', () => {});
-      websocketService.off('mixer_channel_names', () => {});
-      websocketService.off('disconnected', () => {});
+      websocketService.off('connection_status', handleConnectionStatus);
+      websocketService.off('audio_devices', handleAudioDevices);
+      websocketService.off('bypass_result', handleBypassResult);
+      websocketService.off('mixer_channel_names', handleMixerChannelNames);
+      websocketService.off('disconnected', handleDisconnected);
       websocketService.off('all_settings_loaded', handleAllSettingsLoaded);
-      websocketService.off('dante_routing', () => {});
+      websocketService.off('dante_routing', handleDanteRouting);
       websocketService.disconnect();
     };
   }, []);

@@ -6,8 +6,10 @@ import threading
 import logging
 import time
 from typing import Callable, Dict, Any, Optional
+import uuid
 
 from mixer_client_base import MixerClientBase
+from shadow_transport import ShadowTransportInterceptor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,6 +35,7 @@ class WingClient(MixerClientBase):
         
         self.state = {}
         self.callbacks = {}
+        self._state_timestamps: Dict[str, float] = {}
         
         self.is_connected = False
         
@@ -40,8 +43,46 @@ class WingClient(MixerClientBase):
         self._osc_throttle_enabled = True
         self._osc_throttle_hz = 10.0  # Default: 10 Hz = 100ms minimum interval
         self._osc_last_send_time: Dict[str, float] = {}  # address -> last send time
-        
+        self._last_send_status = "not_sent"
+        self._shadow_transport = ShadowTransportInterceptor(client_name="WingClient")
+
         logger.info(f"WingClient initialized for {ip}:{port}")
+
+    def configure_shadow_transport(
+        self,
+        *,
+        enabled: bool | None = None,
+        event_sink: Callable[[dict[str, Any]], None] | None = None,
+    ) -> None:
+        self._shadow_transport.configure(enabled=enabled, event_sink=event_sink)
+
+    def is_shadow_mode_enabled(self) -> bool:
+        return bool(self._shadow_transport.enabled)
+
+    def set_transport_context(
+        self,
+        *,
+        audit_id: str = "",
+        replay_correlation_id: str = "",
+        source: str = "",
+        operation: str = "",
+        channel: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        self._shadow_transport.set_context(
+            audit_id=audit_id,
+            replay_correlation_id=replay_correlation_id,
+            source=source,
+            operation=operation,
+            channel=channel,
+            metadata=metadata,
+        )
+
+    def clear_transport_context(self) -> None:
+        self._shadow_transport.clear_context()
+
+    def consume_shadow_transport_event(self) -> dict[str, Any] | None:
+        return self._shadow_transport.consume_last_event()
 
     def connect(self, timeout: float = 5.0) -> bool:
         """
@@ -167,17 +208,8 @@ class WingClient(MixerClientBase):
         else:
             logger.debug(f"Received: {address} {args}")
         
-        # Wing returns [display_string, normalized_value, actual_value]
-        # For string values like names, use the first argument
-        if ('/name' in address or '/$name' in address) and args:
-            # $name returns the actual name string
-            self.state[address] = args[0] if args else ''
-        elif len(args) >= 3:
-            self.state[address] = args[2]  # Actual value
-        elif len(args) == 1:
-            self.state[address] = args[0]
-        else:
-            self.state[address] = args
+        self.state[address] = self._parse_response_value(address, args)
+        self._state_timestamps[address] = time.time()
         
         # Call registered callbacks
         if address in self.callbacks:
@@ -215,13 +247,21 @@ class WingClient(MixerClientBase):
         """
         if not self.is_connected:
             logger.warning("Not connected to Wing")
+            self._last_send_status = "disconnected"
             return False
         
         if not self.sock:
             logger.warning("Socket not available")
             self.is_connected = False
+            self._last_send_status = "disconnected"
             return False
-        
+
+        shadow_event = self._shadow_transport.intercept(address, values)
+        if shadow_event is not None:
+            logger.warning("Shadow mode blocked OSC mutation: %s", shadow_event)
+            self._last_send_status = "shadow_blocked"
+            return False
+
         # Throttle check: only for commands with values (not queries)
         if self._osc_throttle_enabled and values:
             current_time = time.time()
@@ -232,6 +272,7 @@ class WingClient(MixerClientBase):
                 if time_since_last < min_interval:
                     # Skip this command - too soon
                     logger.debug(f"OSC throttle: skipping {address} (last sent {time_since_last*1000:.1f}ms ago, min {min_interval*1000:.1f}ms)")
+                    self._last_send_status = "throttled"
                     return False
             
             self._osc_last_send_time[address] = current_time
@@ -243,6 +284,7 @@ class WingClient(MixerClientBase):
             msg = builder.build()
             self.sock.sendto(msg.dgram, (self.ip, self.port))
             logger.debug(f"Sent: {address} {values}")
+            self._last_send_status = "sent"
             # Update local state cache when setting values (not queries)
             if values:
                 if len(values) == 1:
@@ -255,18 +297,47 @@ class WingClient(MixerClientBase):
             if e.errno in (9, 57, 32):  # Bad file descriptor, Socket not connected, Broken pipe
                 logger.warning(f"Socket error, connection lost: {e}")
                 self.is_connected = False
+                self._last_send_status = "disconnected"
             else:
                 logger.error(f"Send OSError: {e}")
+                self._last_send_status = "failed"
             return False
         except Exception as e:
             logger.error(f"Send failed: {e}")
+            self._last_send_status = "failed"
             return False
+
+    def get_last_send_status(self) -> str:
+        return self._last_send_status
 
     def subscribe(self, address_pattern: str, callback: Callable):
         """Subscribe to OSC address changes"""
         if address_pattern not in self.callbacks:
             self.callbacks[address_pattern] = []
         self.callbacks[address_pattern].append(callback)
+
+    def unsubscribe(self, address_pattern: str, callback: Callable):
+        """Remove an OSC callback if it is currently subscribed."""
+        callbacks = self.callbacks.get(address_pattern)
+        if not callbacks:
+            return
+        try:
+            callbacks.remove(callback)
+        except ValueError:
+            return
+        if not callbacks:
+            self.callbacks.pop(address_pattern, None)
+
+    @staticmethod
+    def _parse_response_value(address: str, args) -> Any:
+        """Parse the common WING response tuple into the usable value."""
+        if ('/name' in address or '/$name' in address) and args:
+            return args[0]
+        if len(args) >= 3:
+            return args[2]
+        if len(args) == 1:
+            return args[0]
+        return args
 
     def _subscribe_to_updates(self):
         """Subscribe to Wing updates"""
@@ -430,7 +501,7 @@ class WingClient(MixerClientBase):
             db_value = 10.0
         
         logger.info(f"Setting fader /ch/{channel}/fdr = {db_value:.2f} dB")
-        self.send(address, db_value)
+        return self.send(address, db_value)
 
     def get_channel_mute(self, channel: int) -> Optional[int]:
         """Get channel mute state"""
@@ -446,6 +517,18 @@ class WingClient(MixerClientBase):
         """Get channel input trim/gain"""
         address = f"/ch/{channel}/in/set/trim"
         return self.state.get(address)
+
+    def get_channel_gain_live(self, channel: int, timeout: float = 0.35) -> Optional[float]:
+        """Query channel input trim from WING instead of trusting the local cache."""
+        address = f"/ch/{channel}/in/set/trim"
+        value = self.query_parameter(address, timeout=timeout)
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            logger.debug("Non-numeric trim response for ch%s: %r", channel, value)
+            return None
 
     def set_channel_gain(self, channel: int, value: float):
         """Set channel input trim/gain (dB, range: -18..18)"""
@@ -1140,10 +1223,117 @@ class WingClient(MixerClientBase):
                 }
         return channels
 
+    def query_parameter(self, address: str, timeout: float = 0.3) -> Optional[Any]:
+        """Query a parameter and wait for a fresh response, even if value is unchanged."""
+        if not self.is_connected:
+            return None
+
+        event = threading.Event()
+        result: Dict[str, Any] = {}
+
+        def on_response(response_address: str, *args):
+            result["value"] = self._parse_response_value(response_address, args)
+            event.set()
+
+        self.subscribe(address, on_response)
+        try:
+            if not self.send(address):
+                return None
+            if event.wait(max(0.0, float(timeout))):
+                return result.get("value")
+            return None
+        finally:
+            self.unsubscribe(address, on_response)
+
+    def confirm_manual_write(
+        self,
+        operation: str,
+        channel: int,
+        desired_value: float,
+        timeout_ms: int = 300,
+    ) -> Dict[str, Any]:
+        """Confirm manual fader/gain writes with a fresh readback query."""
+        address = {
+            "set_fader": f"/ch/{channel}/fdr",
+            "set_gain": f"/ch/{channel}/in/set/trim",
+        }.get(operation)
+        verification_id = str(uuid.uuid4())
+        if address is None:
+            return {
+                "verification_id": verification_id,
+                "readback_status": "unsupported",
+                "confirmed_value": None,
+                "failure_reason": "readback_unsupported",
+                "timeout_ms": timeout_ms,
+            }
+        if not self.is_connected or not self.sock:
+            return {
+                "verification_id": verification_id,
+                "readback_status": "disconnected",
+                "confirmed_value": None,
+                "failure_reason": "console_disconnected",
+                "timeout_ms": timeout_ms,
+            }
+
+        event = threading.Event()
+        result: Dict[str, Any] = {}
+        query_sent_at = 0.0
+        timeout_s = max(0.0, float(timeout_ms) / 1000.0)
+        tolerance = 0.01
+
+        def on_response(response_address: str, *args):
+            received_at = time.time()
+            if received_at < query_sent_at:
+                return
+            confirmed_value = self._parse_response_value(response_address, args)
+            try:
+                readback_status = (
+                    "confirmed"
+                    if abs(float(confirmed_value) - float(desired_value)) <= tolerance
+                    else "mismatch"
+                )
+            except (TypeError, ValueError):
+                readback_status = "mismatch"
+            result["confirmed_value"] = confirmed_value
+            result["readback_status"] = readback_status
+            event.set()
+
+        self.subscribe(address, on_response)
+        try:
+            query_sent_at = time.time()
+            if not self.send(address):
+                failure_reason = self.get_last_send_status()
+                readback_status = "disconnected" if failure_reason == "disconnected" else "timeout"
+                return {
+                    "verification_id": verification_id,
+                    "readback_status": readback_status,
+                    "confirmed_value": None,
+                    "failure_reason": failure_reason,
+                    "timeout_ms": timeout_ms,
+                }
+            if event.wait(timeout_s):
+                return {
+                    "verification_id": verification_id,
+                    "readback_status": result.get("readback_status", "mismatch"),
+                    "confirmed_value": result.get("confirmed_value"),
+                    "failure_reason": None if result.get("readback_status") == "confirmed" else "readback_mismatch",
+                    "timeout_ms": timeout_ms,
+                }
+            return {
+                "verification_id": verification_id,
+                "readback_status": "timeout",
+                "confirmed_value": None,
+                "failure_reason": "readback_timeout",
+                "timeout_ms": timeout_ms,
+            }
+        finally:
+            self.unsubscribe(address, on_response)
+
     def query(self, address: str) -> Optional[Any]:
         """Query a parameter and wait for response"""
-        self.send(address)
-        time.sleep(0.1)
+        value = self.query_parameter(address, timeout=0.3)
+        if value is not None:
+            return value
         return self.state.get(address)
     
     # ========== Routing Methods ==========
@@ -1562,7 +1752,7 @@ class WingClient(MixerClientBase):
 
     # ── MixerClientBase ABC bridge methods ──────────────────────
     def set_fader(self, channel: int, value_db: float):
-        self.set_channel_fader(channel, value_db)
+        return self.set_channel_fader(channel, value_db)
 
     def get_fader(self, channel: int) -> float:
         address = f"/ch/{channel}/fdr"
@@ -1577,7 +1767,7 @@ class WingClient(MixerClientBase):
         return bool(val) if val is not None else False
 
     def set_gain(self, channel: int, value_db: float):
-        self.set_channel_gain(channel, value_db)
+        return self.set_channel_gain(channel, value_db)
 
     def recall_scene(self, scene_number: int):
         self.load_snap_by_index(scene_number)

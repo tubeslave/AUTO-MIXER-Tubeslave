@@ -1,18 +1,57 @@
 """Mixer control message handlers (fader, gain, EQ band, compressor, state)."""
 
+from live_apply import (
+    LiveApplyRequest,
+    LiveApplyService,
+    build_live_apply_operator_payload,
+)
+
 
 def register_handlers(server):
+    if getattr(server, "live_apply_service", None) is None:
+        server.live_apply_service = LiveApplyService()
+
+    def build_live_apply_response(result):
+        return build_live_apply_operator_payload(
+            result,
+            event_type="live_apply_result",
+        )
+
     async def handle_set_fader(websocket, data):
         channel = data.get("channel")
         value = data.get("value")
-        if server.mixer_client:
-            server.mixer_client.set_channel_fader(channel, value)
+        result = server.live_apply_service.apply(
+            LiveApplyRequest(
+                source="manual_ui",
+                operation="set_fader",
+                channel=int(channel),
+                value=float(value),
+                dry_run=data.get("dry_run"),
+                confirm_live_apply=bool(data.get("confirm_live_apply", False)),
+                replay_correlation_id=str(data.get("replay_correlation_id", "")),
+                metadata={"handler": "set_fader"},
+            ),
+            server.mixer_client,
+        )
+        await server.send_to_client(websocket, build_live_apply_response(result))
 
     async def handle_set_gain(websocket, data):
         channel = data.get("channel")
         value = data.get("value")
-        if server.mixer_client:
-            server.mixer_client.set_channel_gain(channel, value)
+        result = server.live_apply_service.apply(
+            LiveApplyRequest(
+                source="manual_ui",
+                operation="set_gain",
+                channel=int(channel),
+                value=float(value),
+                dry_run=data.get("dry_run"),
+                confirm_live_apply=bool(data.get("confirm_live_apply", False)),
+                replay_correlation_id=str(data.get("replay_correlation_id", "")),
+                metadata={"handler": "set_gain"},
+            ),
+            server.mixer_client,
+        )
+        await server.send_to_client(websocket, build_live_apply_response(result))
 
     async def handle_set_eq(websocket, data):
         channel = data.get("channel")
@@ -20,20 +59,47 @@ def register_handlers(server):
         freq = data.get("freq")
         gain = data.get("gain")
         q = data.get("q")
-        if server.mixer_client:
-            server.mixer_client.set_eq_band(channel, band, freq, gain, q)
+        result = server.live_apply_service.apply(
+            LiveApplyRequest(
+                source="manual_ui",
+                operation="set_eq",
+                channel=int(channel),
+                value=0.0,
+                dry_run=data.get("dry_run"),
+                confirm_live_apply=bool(data.get("confirm_live_apply", False)),
+                replay_correlation_id=str(data.get("replay_correlation_id", "")),
+                metadata={
+                    "handler": "set_eq",
+                    "band": band,
+                    "freq": freq,
+                    "gain": gain,
+                    "q": q,
+                },
+            ),
+            server.mixer_client,
+        )
+        await server.send_to_client(websocket, build_live_apply_response(result))
 
     async def handle_set_compressor(websocket, data):
         channel = data.get("channel")
         params = data.get("params", {})
-        if server.mixer_client:
-            server.mixer_client.set_compressor(
-                channel,
-                params.get("threshold", 0),
-                params.get("ratio", 1),
-                params.get("attack", 0),
-                params.get("release", 0)
-            )
+        result = server.live_apply_service.apply(
+            LiveApplyRequest(
+                source="manual_ui",
+                operation="set_compressor",
+                channel=int(channel),
+                value=0.0,
+                dry_run=data.get("dry_run"),
+                confirm_live_apply=bool(data.get("confirm_live_apply", False)),
+                replay_correlation_id=str(data.get("replay_correlation_id", "")),
+                metadata={
+                    "handler": "set_compressor",
+                    "params": dict(params),
+                },
+            ),
+            server.mixer_client,
+        )
+        await server.send_to_client(websocket, build_live_apply_response(result))
 
     async def handle_get_state(websocket, data):
         if server.mixer_client:
