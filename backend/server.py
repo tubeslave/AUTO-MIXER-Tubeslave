@@ -185,6 +185,9 @@ class AutoMixerServer:
         self._manual_write_session_history: List[Dict[str, Any]] = []
         self._manual_write_session_step_counter = 0
 
+        self._wing_deployment_write_boundary_enabled = self._parse_env_bool(
+            os.getenv("AUTOMIXER_WING_DEPLOYMENT_WRITE_BOUNDARY_ENABLED", "true")
+        )
         
         # Snapshot for undo (path to last backup file)
         self._last_snapshot_path: Optional[str] = None
@@ -203,6 +206,72 @@ class AutoMixerServer:
             return float(value)
         except (TypeError, ValueError):
             return float(fallback)
+
+    def _is_wing_deployment_write_boundary_active(self) -> bool:
+        return (
+            self._wing_deployment_write_boundary_enabled
+            and self.connection_mode == "wing"
+            and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient))
+        )
+
+    async def _block_quarantined_wing_write_surface(
+        self,
+        websocket: Optional[WebSocketServerProtocol],
+        *,
+        surface: str,
+        result_type: str,
+        request: Optional[Dict[str, Any]] = None,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        if not self._is_wing_deployment_write_boundary_active():
+            return False
+
+        payload: Dict[str, Any] = {
+            "type": result_type,
+            "status": "blocked",
+            "success": False,
+            "reason": "deployment_write_surface_quarantined",
+            "surface": surface,
+            "message": (
+                "WING deployment path is limited to supervised manual fader/gain writes; "
+                f"{surface} is quarantined."
+            ),
+            "manual_write_supervision": self.get_manual_write_supervision_status(),
+        }
+        if request:
+            payload["request"] = request
+        if extra:
+            payload.update(extra)
+
+        self._record_manual_write_telemetry("deployment_boundary_blocked", payload)
+        logger.warning(
+            "Blocked quarantined WING deployment write surface",
+            extra={
+                "event": "wing_deployment_boundary_blocked",
+                "surface": surface,
+                "result_type": result_type,
+            },
+        )
+        if websocket is not None:
+            await self.send_to_client(websocket, payload)
+        return True
+
+    def get_manual_write_supervision_status(self) -> Dict[str, Any]:
+        status = {
+            "enabled": self._manual_write_supervision_enabled,
+            "armed": self._manual_writes_armed,
+            "panic_stopped": self._manual_write_panic_stopped,
+            "approval_required": True,
+            "cooldown_sec": self._manual_write_cooldown_sec,
+            "limits": {
+                "fader": [self._manual_write_fader_min_db, self._manual_write_fader_max_db],
+                "gain": [self._manual_write_gain_min_db, self._manual_write_gain_max_db],
+            },
+        }
+        wing_client = self._get_wing_write_client()
+        if wing_client and hasattr(wing_client, "get_write_gate_status"):
+            status["write_gate"] = wing_client.get_write_gate_status()
+        return status
 
     def _make_manual_write_session_id(self) -> str:
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
@@ -1576,6 +1645,26 @@ class AutoMixerServer:
                                         mode: str = "lufs", learning_duration_sec: float = None):
         """Start Safe Gain Staging calibration (новый метод: анализ → одноразовое применение)."""
         logger.info("Starting Safe Gain Staging calibration (new method)...")
+        if await self._block_quarantined_wing_write_surface(
+            None,
+            surface="start_realtime_correction",
+            result_type="gain_staging_status",
+            request={
+                "device_id": device_id,
+                "channels": channels or [],
+                "mode": mode,
+            },
+            extra={"active": False, "realtime_enabled": False},
+        ):
+            await self.broadcast({
+                "type": "gain_staging_status",
+                "active": False,
+                "realtime_enabled": False,
+                "status": "blocked",
+                "reason": "deployment_write_surface_quarantined",
+                "surface": "start_realtime_correction",
+            })
+            return
         
         # Check mixer connection
         if not self.mixer_client or not self.mixer_client.is_connected:
@@ -2015,6 +2104,13 @@ class AutoMixerServer:
             channels: List of channel numbers to reset (mixer channels)
         """
         logger.info(f"Resetting TRIM to 0dB for channels: {channels}")
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="reset_trim",
+            result_type="reset_trim_result",
+            request={"channels": channels},
+        ):
+            return
         
         if not self.mixer_client or not self.mixer_client.is_connected:
             await self.send_to_client(websocket, {
@@ -2190,6 +2286,12 @@ class AutoMixerServer:
             websocket: WebSocket connection to respond to
         """
         logger.info("Starting bypass operation: disabling all modules and setting faders to 0dB")
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="bypass_mixer",
+            result_type="bypass_result",
+        ):
+            return
         
         if not self.mixer_client or not self.mixer_client.is_connected:
             await self.send_to_client(websocket, {
@@ -2309,6 +2411,14 @@ class AutoMixerServer:
                             monitored_channels: List[int] = None):
         """Start Auto-EQ analysis for a channel."""
         monitored_channels = monitored_channels or []
+        auto_apply_forced_off = False
+        if self._is_wing_deployment_write_boundary_active() and auto_apply:
+            auto_apply = False
+            auto_apply_forced_off = True
+            logger.warning(
+                "Forced Auto-EQ auto_apply off for WING deployment boundary",
+                extra={"event": "wing_deployment_boundary_auto_apply_forced_off"},
+            )
         logger.info(f"Starting Auto-EQ: device={device_id}, channel={channel}, profile={profile}, monitored_channels={monitored_channels}")
         
         if not self.mixer_client or not self.mixer_client.is_connected:
@@ -2387,6 +2497,7 @@ class AutoMixerServer:
                     "channel": channel,
                     "profile": profile,
                     "auto_apply": auto_apply,
+                    "auto_apply_forced_off": auto_apply_forced_off,
                     "message": f"Auto-EQ started for channel {channel}"
                 })
                 logger.info(f"Auto-EQ started successfully for channel {channel}")
@@ -2441,6 +2552,13 @@ class AutoMixerServer:
     
     async def apply_eq_correction(self, websocket):
         """Apply calculated EQ corrections to the mixer."""
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="apply_eq_correction",
+            result_type="auto_eq_apply_result",
+        ):
+            return
+
         if not self.auto_eq_controller:
             await self.send_to_client(websocket, {
                 "type": "auto_eq_apply_result",
@@ -2470,6 +2588,13 @@ class AutoMixerServer:
         """Reset EQ to flat."""
         if data is None:
             data = {}
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="reset_eq",
+            result_type="auto_eq_reset_result",
+            request=data,
+        ):
+            return
         
         # Try to get channel from message, auto_eq_controller, or use default
         channel = None
@@ -2555,6 +2680,13 @@ class AutoMixerServer:
         """Reset EQ to flat for multiple channels."""
         if data is None:
             data = {}
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="reset_all_eq",
+            result_type="reset_all_eq_result",
+            request=data,
+        ):
+            return
         
         channels = data.get("channels", [])
         if not channels:
@@ -2777,6 +2909,14 @@ class AutoMixerServer:
     
     async def apply_channel_correction(self, websocket, channel: int = None):
         """Apply corrections for a specific channel."""
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="apply_channel_correction",
+            result_type="multi_channel_apply_result",
+            request={"channel": channel},
+        ):
+            return
+
         if not self.multi_channel_auto_eq_controller:
             await self.send_to_client(websocket, {
                 "type": "multi_channel_apply_result",
@@ -2814,6 +2954,13 @@ class AutoMixerServer:
     
     async def apply_all_corrections(self, websocket):
         """Apply corrections for all channels."""
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="apply_all_corrections",
+            result_type="multi_channel_apply_result",
+        ):
+            return
+
         if not self.multi_channel_auto_eq_controller:
             await self.send_to_client(websocket, {
                 "type": "multi_channel_apply_result",
@@ -3069,6 +3216,13 @@ class AutoMixerServer:
     async def apply_phase_corrections(self, websocket, measurements: dict = None):
         """Apply phase/delay corrections to mixer."""
         logger.info(f"apply_phase_corrections called. Measurements type: {type(measurements)}, value: {measurements}")
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="apply_phase_corrections",
+            result_type="phase_alignment_apply_result",
+            request={"measurements": measurements},
+        ):
+            return
         
         if not self.mixer_client or not self.mixer_client.is_connected:
             await self.send_to_client(websocket, {
@@ -3225,6 +3379,14 @@ class AutoMixerServer:
     
     async def reset_phase_delay(self, websocket, channels: List[int] = None):
         """Reset and disable all phase inversions and delays on specified channels."""
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="reset_phase_delay",
+            result_type="phase_alignment_reset_result",
+            request={"channels": channels or []},
+        ):
+            return
+
         if not self.mixer_client or not self.mixer_client.is_connected:
             await self.send_to_client(websocket, {
                 "type": "phase_alignment_reset_result",
@@ -3347,6 +3509,14 @@ class AutoMixerServer:
     
     async def restore_snapshot(self, websocket, snapshot_path: str = None):
         """Restore from last snapshot (undo)."""
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="restore_snapshot",
+            result_type="restore_result",
+            request={"snapshot_path": snapshot_path},
+        ):
+            return
+
         path = snapshot_path or self._last_snapshot_path
         if not path or not os.path.isfile(path):
             await self.send_to_client(websocket, {"type": "restore_result", "success": False, "error": "No snapshot file"})
@@ -3377,6 +3547,14 @@ class AutoMixerServer:
             settings = {}
         
         logger.info(f"Starting Real-Time Fader: device={device_id}, channels={channels}")
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="start_realtime_fader",
+            result_type="auto_fader_status",
+            request={"device_id": device_id, "channels": channels, "settings": settings},
+            extra={"status_type": "blocked", "active": False, "realtime_enabled": False},
+        ):
+            return
         
         if not self.mixer_client or not self.mixer_client.is_connected:
             await self.send_to_client(websocket, {
@@ -3710,6 +3888,13 @@ class AutoMixerServer:
     async def apply_auto_balance(self, websocket):
         """Apply Auto Balance results to mixer."""
         logger.info("Applying Auto Balance")
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="apply_auto_balance",
+            result_type="auto_fader_status",
+            extra={"status_type": "blocked", "active": False},
+        ):
+            return
         
         try:
             if not self.auto_fader_controller:
@@ -4084,6 +4269,14 @@ class AutoMixerServer:
         logger.info(f"channels: {channels}")
         logger.info(f"timings: {timings}")
         logger.info("=" * 60)
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="start_auto_soundcheck",
+            result_type="auto_soundcheck_status",
+            request={"device_id": device_id, "channels": channels or [], "timings": timings or {}},
+            extra={"is_running": False},
+        ):
+            return
         
         if self.auto_soundcheck_running:
             logger.warning("Auto soundcheck is already running")
@@ -4248,6 +4441,19 @@ class AutoMixerServer:
 
     async def start_auto_compressor(self, websocket, device_id, channels: list, channel_mapping: dict, channel_names: dict = None):
         """Start Auto Compressor: open audio capture (post-fader). Resets compressor params on selected channels."""
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="start_auto_compressor",
+            result_type="auto_compressor_status",
+            request={
+                "device_id": device_id,
+                "channels": channels or [],
+                "channel_mapping": channel_mapping or {},
+            },
+            extra={"active": False},
+        ):
+            return
+
         if not self.mixer_client or not self.mixer_client.is_connected:
             await self.send_to_client(websocket, {"type": "auto_compressor_status", "error": "Mixer not connected"})
             return
@@ -4351,6 +4557,13 @@ class AutoMixerServer:
         bpm=None
     ):
         """Run soundcheck: record each channel, analyze, adapt, apply."""
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="start_auto_compressor_soundcheck",
+            result_type="auto_compressor_status",
+        ):
+            return
+
         if not self.auto_compressor_controller or not self.auto_compressor_controller.is_active:
             await self.send_to_client(websocket, {"type": "auto_compressor_status", "error": "Start Auto Compressor first"})
             return
@@ -4372,6 +4585,13 @@ class AutoMixerServer:
         await self.broadcast({"type": "auto_compressor_status", "soundcheck_running": False})
     
     async def start_auto_compressor_live(self, websocket, auto_correct: bool = True):
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="start_auto_compressor_live",
+            result_type="auto_compressor_status",
+        ):
+            return
+
         if not self.auto_compressor_controller or not self.auto_compressor_controller.is_active:
             await self.send_to_client(websocket, {"type": "auto_compressor_status", "error": "Start Auto Compressor first"})
             return
@@ -4385,6 +4605,14 @@ class AutoMixerServer:
     
     async def set_auto_compressor_profile(self, websocket, channel, profile: str):
         """Apply preset profile (punch, control, gentle, etc.) for one channel."""
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="set_auto_compressor_profile",
+            result_type="auto_compressor_status",
+            request={"channel": channel, "profile": profile},
+        ):
+            return
+
         if not self.auto_compressor_controller or not self.mixer_client:
             await self.send_to_client(websocket, {"type": "auto_compressor_status", "error": "Not ready"})
             return
@@ -4407,6 +4635,14 @@ class AutoMixerServer:
     
     async def set_auto_compressor_manual(self, websocket, channel, params: dict):
         """Apply manual compressor params to one channel."""
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="set_auto_compressor_manual",
+            result_type="auto_compressor_status",
+            request={"channel": channel, "params": params or {}},
+        ):
+            return
+
         if not self.auto_compressor_controller or not self.mixer_client:
             await self.send_to_client(websocket, {"type": "auto_compressor_status", "error": "Not ready"})
             return
