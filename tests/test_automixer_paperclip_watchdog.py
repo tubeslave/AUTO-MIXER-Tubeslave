@@ -352,5 +352,72 @@ def test_dispatch_force_preview_never_patches_even_when_real_configured(tmp_path
     assert api.patch_calls == []
 
 
+def test_orchestration_preview_selects_allowlisted_agent_without_patch(tmp_path):
+    settings = make_dispatch_settings(
+        tmp_path,
+        enabled=False,
+        dry_run=False,
+        allowlist_agent_ids=["agent-safe-1", "agent-safe-2"],
+        agent_id=None,
+    )
+    api = FakePaperclipAPI()
+
+    decision = watchdog.run_orchestration_preview(settings, api=api, now=fixed_now())
+
+    assert decision.mode == "semi_auto_preview"
+    assert decision.result == "dry_run_preview"
+    assert decision.selected_agent_id == "agent-safe-1"
+    assert decision.selected_agent_reason == "first agent in explicit allowlist"
+    assert decision.approval_required is True
+    assert decision.dispatch_executed is False
+    assert api.patch_calls == []
+    assert decision.checks["dispatch_enabled"]["passed"] is True
+    assert decision.checks["dispatch_dry_run_off"]["passed"] is False
+    assert "AUTOMIXER_WATCHDOG_DISPATCH_DRY_RUN=false" in decision.approval_command
+    assert "AUTOMIXER_WATCHDOG_DISPATCH_AGENT_ID=agent-safe-1" in decision.approval_command
+
+
+def test_orchestration_report_proposes_approval_dispatch_command(tmp_path):
+    settings = make_dispatch_settings(
+        tmp_path,
+        enabled=False,
+        dry_run=False,
+        allowlist_agent_ids=["agent-safe-1"],
+        agent_id=None,
+    )
+    api = FakePaperclipAPI()
+
+    decision = watchdog.run_orchestration_preview(settings, api=api, now=fixed_now())
+
+    report_text = settings.reports_dir.joinpath("watchdog_dispatch_report.md").read_text(
+        encoding="utf-8"
+    )
+    assert decision.report_path == settings.reports_dir / "watchdog_dispatch_report.md"
+    assert "- approval_required: True" in report_text
+    assert "Preview passed. Real dispatch still requires explicit operator approval." in report_text
+    assert "approval_dispatch_command:" in report_text
+    assert "automixer_paperclip_watchdog.py dispatch" in report_text
+    assert api.patch_calls == []
+
+
+def test_orchestration_preview_blocks_without_allowlisted_agent(tmp_path):
+    settings = make_dispatch_settings(
+        tmp_path,
+        enabled=False,
+        dry_run=False,
+        allowlist_agent_ids=[],
+        agent_id=None,
+    )
+    api = FakePaperclipAPI()
+
+    decision = watchdog.run_orchestration_preview(settings, api=api, now=fixed_now())
+
+    assert decision.result == "blocked"
+    assert decision.selected_agent_id is None
+    assert decision.approval_command is None
+    assert decision.checks["agent_allowlisted"]["passed"] is False
+    assert api.patch_calls == []
+
+
 def fixed_now():
     return datetime(2026, 5, 14, 12, 0, 0, tzinfo=timezone.utc)

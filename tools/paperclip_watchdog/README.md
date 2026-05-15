@@ -72,6 +72,23 @@ AUTOMIXER_WATCHDOG_DISPATCH_ALLOWLIST_AGENT_IDS=<agent-id>
 
 Если `AUTOMIXER_WATCHDOG_DISPATCH_ISSUE_ID` не задан, watchdog попробует взять последний `last_issue_id` из `.paperclip/watchdog_state.json`.
 
+## Semi-auto orchestration
+
+Semi-auto режим сам выбирает первого agent из allowlist, делает dry-run preview, пишет report и печатает точную команду для approval-time dispatch. Он не отправляет `PATCH`, не вызывает wakeup и не трогает WING/OSC runtime:
+
+```bash
+python3 tools/paperclip_watchdog/automixer_paperclip_watchdog.py orchestrate
+```
+
+Для режима нужны:
+
+```bash
+AUTOMIXER_WATCHDOG_DISPATCH_ISSUE_ID=<issue-id>
+AUTOMIXER_WATCHDOG_DISPATCH_ALLOWLIST_AGENT_IDS=<safe-agent-id>[,<safe-agent-id-2>]
+```
+
+`AUTOMIXER_WATCHDOG_DISPATCH_AGENT_ID` можно не задавать: watchdog выберет первого agent из allowlist. Report сохраняется в `.paperclip/reports/watchdog_dispatch_report.md` и содержит `approval_dispatch_command`. Эту команду можно запускать только после явного approval оператора.
+
 ## Opt-in real dispatch
 
 Реальный dispatch разрешен только при явном opt-in:

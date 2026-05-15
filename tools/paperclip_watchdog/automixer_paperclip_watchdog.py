@@ -12,7 +12,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -346,6 +346,9 @@ class DispatchDecision:
     active_runs: list[dict[str, Any]] = field(default_factory=list)
     idempotency_key: str | None = None
     report_path: Path | None = None
+    approval_required: bool = False
+    approval_command: str | None = None
+    approval_note: str | None = None
 
     @property
     def message(self) -> str:
@@ -1065,6 +1068,55 @@ def run_dispatch(
     return decision
 
 
+def run_orchestration_preview(
+    settings: Settings,
+    *,
+    api: Any | None = None,
+    now: datetime | None = None,
+    logger: logging.Logger | None = None,
+) -> DispatchDecision:
+    now = now or datetime.now().astimezone()
+    selected_agent_id, selected_agent_reason = select_dispatch_agent(settings)
+    preview_settings = build_orchestration_preview_settings(settings, selected_agent_id)
+    decision = run_dispatch(
+        preview_settings,
+        api=api,
+        now=now,
+        logger=logger,
+        force_dry_run=True,
+    )
+    decision.mode = "semi_auto_preview"
+    decision.selected_agent_reason = selected_agent_reason
+    decision.approval_required = True
+    decision.approval_command = build_dispatch_approval_command(decision)
+    if decision.result == "dry_run_preview":
+        decision.approval_note = (
+            "Preview passed. Real dispatch still requires explicit operator approval."
+        )
+    else:
+        decision.approval_note = (
+            "Preview did not pass. Do not approve real dispatch until blocked checks are fixed."
+        )
+    decision.report_path = write_dispatch_report(settings, decision, now)
+    return decision
+
+
+def build_orchestration_preview_settings(
+    settings: Settings,
+    selected_agent_id: str | None,
+) -> Settings:
+    preview_policy = replace(
+        settings.dispatch_policy,
+        enabled=True,
+        dry_run=True,
+    )
+    return replace(
+        settings,
+        dispatch_policy=preview_policy,
+        dispatch_agent_id=selected_agent_id,
+    )
+
+
 def select_dispatch_agent(settings: Settings) -> tuple[str | None, str]:
     if settings.dispatch_agent_id:
         return settings.dispatch_agent_id, "explicit AUTOMIXER_WATCHDOG_DISPATCH_AGENT_ID"
@@ -1072,6 +1124,20 @@ def select_dispatch_agent(settings: Settings) -> tuple[str | None, str]:
     if allowlist:
         return allowlist[0], "first agent in explicit allowlist"
     return None, "no allowlisted agent configured"
+
+
+def build_dispatch_approval_command(decision: DispatchDecision) -> str | None:
+    if not decision.issue_id or not decision.selected_agent_id or not decision.idempotency_key:
+        return None
+    env_parts = {
+        "AUTOMIXER_WATCHDOG_DISPATCH_ENABLED": "true",
+        "AUTOMIXER_WATCHDOG_DISPATCH_DRY_RUN": "false",
+        "AUTOMIXER_WATCHDOG_DISPATCH_ISSUE_ID": decision.issue_id,
+        "AUTOMIXER_WATCHDOG_DISPATCH_AGENT_ID": decision.selected_agent_id,
+        "AUTOMIXER_WATCHDOG_DISPATCH_IDEMPOTENCY_KEY": decision.idempotency_key,
+    }
+    prefix = " ".join(f"{key}={shell_quote(value)}" for key, value in env_parts.items())
+    return f"{prefix} python3 tools/paperclip_watchdog/automixer_paperclip_watchdog.py dispatch"
 
 
 def build_dispatch_idempotency_key(
@@ -1185,6 +1251,7 @@ def build_dispatch_report(decision: DispatchDecision, now: datetime) -> str:
         f"- selected_agent_reason: {decision.selected_agent_reason}",
         f"- dispatch_allowed: {decision.dispatch_allowed}",
         f"- dispatch_executed: {decision.dispatch_executed}",
+        f"- approval_required: {decision.approval_required}",
         "",
         "## Safety Checks",
         f"- running_agents: {format_check(checks, 'running_agents')}",
@@ -1216,6 +1283,12 @@ def build_dispatch_report(decision: DispatchDecision, now: datetime) -> str:
     ]
     if decision.dispatch_executed:
         lines.append("- Review the assigned Paperclip issue and wait for the assigned agent run/report.")
+    elif decision.approval_required:
+        lines.append(f"- {decision.approval_note or 'Explicit approval is required before dispatch.'}")
+        if decision.approval_command:
+            lines.append(f"- approval_dispatch_command: `{decision.approval_command}`")
+        else:
+            lines.append("- approval_dispatch_command: unavailable until issue and agent are selected.")
     elif decision.result == "dry_run_preview":
         lines.append("- Dry-run preview passed; explicit opt-in is still required before real dispatch.")
     else:
@@ -1238,6 +1311,12 @@ def format_action_response(response: Any, error: str | None) -> str:
     if response is None:
         return "none"
     return json.dumps(response, ensure_ascii=False, sort_keys=True)
+
+
+def shell_quote(value: str) -> str:
+    if value and all(ch.isalnum() or ch in "._/:@%+=,-" for ch in value):
+        return value
+    return "'" + value.replace("'", "'\"'\"'") + "'"
 
 
 def is_local_paperclip_api(api_url: str) -> bool:
@@ -1513,6 +1592,18 @@ def command_dispatch(settings: Settings, logger: logging.Logger) -> int:
     return 1 if decision.result == "error" else 0
 
 
+def command_orchestrate(settings: Settings, logger: logging.Logger) -> int:
+    decision = run_orchestration_preview(settings, logger=logger)
+    print(decision.message)
+    if decision.report_path:
+        print(f"report: {decision.report_path}")
+    if decision.approval_command:
+        print(f"approval dispatch command: {decision.approval_command}")
+    else:
+        print("approval dispatch command: unavailable")
+    return 1 if decision.result == "error" else 0
+
+
 def command_pause(settings: Settings, logger: logging.Logger) -> int:
     settings.pause_path.parent.mkdir(parents=True, exist_ok=True)
     settings.pause_path.write_text(
@@ -1556,7 +1647,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Automixer Paperclip watchdog")
     parser.add_argument(
         "command",
-        choices=("once", "loop", "status", "dispatch-preview", "dispatch", "pause", "resume"),
+        choices=(
+            "once",
+            "loop",
+            "status",
+            "orchestrate",
+            "dispatch-preview",
+            "dispatch",
+            "pause",
+            "resume",
+        ),
         help="command to run",
     )
     return parser
@@ -1576,6 +1676,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_loop(settings, logger)
     if args.command == "status":
         return command_status(settings, logger)
+    if args.command == "orchestrate":
+        return command_orchestrate(settings, logger)
     if args.command == "dispatch-preview":
         return command_dispatch_preview(settings, logger)
     if args.command == "dispatch":
