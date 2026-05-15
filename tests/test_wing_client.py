@@ -9,10 +9,36 @@ Covers:
 - Connection and disconnection logic
 """
 
-import time
 from unittest.mock import patch, MagicMock, PropertyMock
 
 import pytest
+
+
+PYTHONOSC_MODULES = (
+    "pythonosc",
+    "pythonosc.udp_client",
+    "pythonosc.dispatcher",
+    "pythonosc.osc_server",
+    "pythonosc.osc_message_builder",
+    "pythonosc.osc_message",
+)
+
+
+def _mock_pythonosc_modules():
+    return {module: MagicMock() for module in PYTHONOSC_MODULES}
+
+
+@pytest.fixture
+def connected_supervised_wing_client():
+    with patch.dict("sys.modules", _mock_pythonosc_modules()):
+        from wing_client import WingClient
+
+        client = WingClient(ip="127.0.0.1", port=2223)
+        client.is_connected = True
+        client.sock = MagicMock()
+        client.set_osc_throttle(enabled=False)
+        client.arm_write_gate(reason="unit_test_arm")
+        yield client
 
 
 class TestOSCThrottle:
@@ -69,6 +95,7 @@ class TestOSCThrottle:
             client = WingClient(ip="127.0.0.1", port=2223)
             client.is_connected = True
             client.sock = MagicMock()
+            client._write_gate_enabled = False
             client.set_osc_throttle(enabled=True, hz=10.0)
 
             # First send should succeed
@@ -100,7 +127,6 @@ class TestOSCThrottle:
             client.send("/ch/1/fdr")
             client.send("/ch/1/fdr")
             # No assertion needed — just ensure no exception is raised
-
 
 class TestStateManagement:
     """Tests for WingClient state dict and callback management."""
@@ -187,7 +213,6 @@ class TestStateManagement:
             client._handle_message("/ch/1/$name", "Vocals")
             assert client.state["/ch/1/$name"] == "Vocals"
 
-
 class TestConnectionLifecycle:
     """Tests for connect/disconnect logic."""
 
@@ -242,6 +267,7 @@ class TestConnectionLifecycle:
             from wing_client import WingClient
             client = WingClient(ip="127.0.0.1", port=2223)
             client.is_connected = False
+            client._write_gate_enabled = False
 
             result = client.send("/ch/1/fdr", 0.5)
             assert result is False
@@ -260,7 +286,52 @@ class TestConnectionLifecycle:
             client = WingClient(ip="127.0.0.1", port=2223)
             client.is_connected = True
             client.sock = MagicMock()
+            client._write_gate_enabled = False
             client._osc_throttle_enabled = False  # Disable throttle
 
             client.send("/ch/1/fdr", 0.75)
             assert client.state.get("/ch/1/fdr") == 0.75
+
+
+class TestSupervisedWriteGate:
+    """Focused TUB-352 WING rollback/pre-read tests."""
+
+    def test_supervised_write_blocks_when_fresh_pre_read_is_unavailable(self, connected_supervised_wing_client):
+        client = connected_supervised_wing_client
+
+        with patch.object(client, "_wait_for_readback", return_value=None):
+            result = client.supervised_set_channel_gain(
+                1,
+                -3.0,
+                source="test",
+                reason="approved change",
+                approved=True,
+                approval_id="approval-gain-2",
+            )
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "pre_read_unavailable"
+        client.sock.sendto.assert_not_called()
+
+    def test_supervised_gain_readback_failure_rolls_back_and_emergency_stops(self, connected_supervised_wing_client):
+        client = connected_supervised_wing_client
+
+        with patch.object(client, "_wait_for_readback", side_effect=[0.0, -9.0, 0.0]):
+            result = client.supervised_set_channel_gain(
+                1,
+                -3.0,
+                source="test",
+                reason="approved gain change",
+                approved=True,
+                approval_id="approval-gain-rollback",
+            )
+
+        assert result["status"] == "error"
+        assert result["reason"] == "readback_mismatch"
+        assert result["old_value"] == 0.0
+        assert result["readback_value"] == -9.0
+        assert result["rollback"]["attempted"] is True
+        assert result["rollback"]["restored"] is True
+        assert result["rollback"]["readback_value"] == 0.0
+        assert client.sock.sendto.call_count == 2
+        assert client.get_write_gate_status()["state"] == "emergency_stopped"

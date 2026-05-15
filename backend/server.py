@@ -8,7 +8,7 @@ import signal
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Set, Optional, Union, List, Dict, Any
 import websockets
 import numpy as np
@@ -151,6 +151,40 @@ class AutoMixerServer:
         
         # Live concert mode: stricter limits, emergency stop
         self.live_mode = False
+
+        # Supervised manual/voice write safety (WING first-live hard gate)
+        self._manual_write_supervision_enabled = self._parse_env_bool(
+            os.getenv("AUTOMIXER_MANUAL_WRITE_SUPERVISION_ENABLED", "true")
+        )
+        self._manual_writes_armed = False
+        self._manual_write_panic_stopped = False
+        self._manual_write_cooldown_sec = float(os.getenv(
+            "AUTOMIXER_MANUAL_WRITE_COOLDOWN_SEC", "0.35"
+        ))
+        self._manual_write_fader_min_db = float(os.getenv(
+            "AUTOMIXER_MANUAL_WRITE_FADER_MIN_DB", "-80.0"
+        ))
+        self._manual_write_fader_max_db = float(os.getenv(
+            "AUTOMIXER_MANUAL_WRITE_FADER_MAX_DB", "6.0"
+        ))
+        self._manual_write_gain_min_db = float(os.getenv(
+            "AUTOMIXER_MANUAL_WRITE_GAIN_MIN_DB", "-12.0"
+        ))
+        self._manual_write_gain_max_db = float(os.getenv(
+            "AUTOMIXER_MANUAL_WRITE_GAIN_MAX_DB", "12.0"
+        ))
+        self._manual_write_last_ts: Dict[tuple[int, str], float] = {}
+        self._manual_write_telemetry: List[Dict[str, Any]] = []
+        self._manual_write_telemetry_limit = int(os.getenv(
+            "AUTOMIXER_MANUAL_WRITE_TELEMETRY_LIMIT", "200"
+        ))
+        self._manual_write_session_active = False
+        self._manual_write_session_id: Optional[str] = None
+        self._manual_write_session_label: Optional[str] = None
+        self._manual_write_session_started_at: Optional[str] = None
+        self._manual_write_session_history: List[Dict[str, Any]] = []
+        self._manual_write_session_step_counter = 0
+
         
         # Snapshot for undo (path to last backup file)
         self._last_snapshot_path: Optional[str] = None
@@ -163,6 +197,536 @@ class AutoMixerServer:
         self._dispatch = register_all_handlers(self)
 
         logger.info(f"AutoMixer Server initialized on {ws_host}:{ws_port}")
+
+    def _coerce_float(self, value, fallback: float) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return float(fallback)
+
+    def _make_manual_write_session_id(self) -> str:
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+        return f"wing-session-{timestamp}-{int(time.time() * 1000) % 1000:03d}"
+
+    def _summarize_manual_write_session_step(self, step: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "step_index": step.get("step_index"),
+            "channel": step.get("channel"),
+            "value_type": step.get("value_type"),
+            "requested_value": step.get("requested_value"),
+            "effective_value": step.get("effective_value"),
+            "old_value": step.get("old_value"),
+            "readback_value": step.get("readback_value"),
+            "approval_id": step.get("approval_id"),
+            "source": step.get("source"),
+            "reason_text": step.get("reason_text"),
+            "applied_at": step.get("applied_at"),
+        }
+
+    def get_manual_write_session_status(self) -> Dict[str, Any]:
+        last_step = self._manual_write_session_history[-1] if self._manual_write_session_history else None
+        return {
+            "active": self._manual_write_session_active,
+            "session_id": self._manual_write_session_id,
+            "session_label": self._manual_write_session_label,
+            "started_at": self._manual_write_session_started_at,
+            "step_count": len(self._manual_write_session_history),
+            "rollback_ready_count": len(self._manual_write_session_history),
+            "last_step": (
+                self._summarize_manual_write_session_step(last_step)
+                if last_step is not None
+                else None
+            ),
+        }
+
+    def start_manual_write_session(
+        self,
+        *,
+        session_label: Optional[str] = None,
+        reason: str = "",
+        reset: bool = False,
+    ) -> Dict[str, Any]:
+        if self._manual_write_session_history and not reset:
+            status = self.get_manual_write_session_status()
+            status.update({
+                "type": "manual_write_session",
+                "status": "blocked",
+                "reason": "session_already_active",
+                "requested_label": session_label,
+                "reason_text": str(reason or ""),
+            })
+            self._record_manual_write_telemetry("session_blocked", status)
+            return status
+
+        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        self._manual_write_session_active = True
+        self._manual_write_session_id = self._make_manual_write_session_id()
+        self._manual_write_session_label = session_label or self._manual_write_session_id
+        self._manual_write_session_started_at = timestamp
+        self._manual_write_session_history = []
+        self._manual_write_session_step_counter = 0
+        status = self.get_manual_write_session_status()
+        status.update({
+            "type": "manual_write_session",
+            "status": "started",
+            "reason": "session_started",
+            "reason_text": str(reason or ""),
+        })
+        self._record_manual_write_telemetry("session_started", status)
+        return status
+
+    def _record_manual_write_session_step(self, applied_gate: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if not self._manual_write_session_active:
+            return None
+        self._manual_write_session_step_counter += 1
+        step = {
+            "step_index": self._manual_write_session_step_counter,
+            "session_id": self._manual_write_session_id,
+            "session_label": self._manual_write_session_label,
+            "channel": applied_gate.get("channel"),
+            "value_type": applied_gate.get("value_type"),
+            "requested_value": applied_gate.get("requested_value"),
+            "effective_value": applied_gate.get("effective_value"),
+            "old_value": applied_gate.get("old_value"),
+            "readback_value": applied_gate.get("readback_value"),
+            "approval_id": applied_gate.get("approval_id"),
+            "source": applied_gate.get("source"),
+            "reason_text": applied_gate.get("reason_text"),
+            "applied_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        }
+        self._manual_write_session_history.append(step)
+        self._record_manual_write_telemetry(
+            "session_step_recorded",
+            {
+                "type": "manual_write_session",
+                **self.get_manual_write_session_status(),
+                "step": self._summarize_manual_write_session_step(step),
+            },
+        )
+        return step
+
+    def _record_manual_write_telemetry(self, event_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        event = {
+            "ts": time.time(),
+            "event_type": event_type,
+            "payload": payload,
+        }
+        self._manual_write_telemetry.append(event)
+        if len(self._manual_write_telemetry) > self._manual_write_telemetry_limit:
+            self._manual_write_telemetry = self._manual_write_telemetry[-self._manual_write_telemetry_limit :]
+        logger.info("manual_write_%s", event_type, extra={
+            "manual_write_event_type": event_type,
+            **payload
+        })
+        return event
+
+    def _manual_write_gate(
+        self,
+        *,
+        channel: Optional[int],
+        requested_value: float,
+        value_type: str,
+        source: str,
+        reason: Optional[str] = None,
+        approved: bool = False,
+        approval_id: Optional[str] = None,
+        bypass_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        if not self.connection_mode == "wing" or not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
+            return {
+                "allowed": True,
+                "reason": "non_wing_controller",
+                "effective_value": requested_value,
+                "source": source,
+                "value_type": value_type,
+                "channel": channel,
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        if not self._manual_write_supervision_enabled:
+            return {
+                "allowed": True,
+                "reason": "supervision_disabled",
+                "effective_value": requested_value,
+                "source": source,
+                "value_type": value_type,
+                "channel": channel,
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        if self._manual_write_panic_stopped or not self._manual_writes_armed:
+            return {
+                "allowed": False,
+                "reason": "manual_path_not_armed",
+                "source": source,
+                "value_type": value_type,
+                "channel": channel,
+                "requested_value": requested_value,
+                "effective_value": requested_value,
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        try:
+            normalized_channel = int(channel) if channel is not None else None
+        except (TypeError, ValueError):
+            normalized_channel = None
+
+        if normalized_channel is None or normalized_channel <= 0:
+            return {
+                "allowed": False,
+                "reason": "invalid_channel",
+                "source": source,
+                "value_type": value_type,
+                "channel": channel,
+                "requested_value": requested_value,
+                "effective_value": requested_value,
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+            }
+
+        now = time.time()
+        last_ts = self._manual_write_last_ts.get((normalized_channel, value_type), 0.0)
+        cooldown = self._manual_write_cooldown_sec
+        if cooldown > 0 and not bypass_cooldown and now - last_ts < cooldown:
+            return {
+                "allowed": False,
+                "reason": "cooldown",
+                "source": source,
+                "value_type": value_type,
+                "channel": normalized_channel,
+                "requested_value": requested_value,
+                "effective_value": requested_value,
+                "cooldown_sec": cooldown,
+                "retry_after_sec": max(0.0, cooldown - (now - last_ts)),
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        if value_type == "fader":
+            low = self._manual_write_fader_min_db
+            high = self._manual_write_fader_max_db
+        elif value_type == "gain":
+            low = self._manual_write_gain_min_db
+            high = self._manual_write_gain_max_db
+        else:
+            return {
+                "allowed": False,
+                "reason": "unsupported_value_type",
+                "source": source,
+                "value_type": value_type,
+                "channel": normalized_channel,
+                "requested_value": requested_value,
+                "effective_value": requested_value,
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        try:
+            requested_numeric = self._coerce_float(requested_value, 0.0)
+        except Exception:
+            return {
+                "allowed": False,
+                "reason": "non_numeric_value",
+                "source": source,
+                "value_type": value_type,
+                "channel": normalized_channel,
+                "requested_value": requested_value,
+                "effective_value": requested_value,
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        if not str(reason or "").strip():
+            return {
+                "allowed": False,
+                "reason": "reason_required",
+                "source": source,
+                "value_type": value_type,
+                "channel": normalized_channel,
+                "requested_value": requested_numeric,
+                "effective_value": requested_numeric,
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "reason_text": "",
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        if not approved:
+            return {
+                "allowed": False,
+                "reason": "approval_required",
+                "source": source,
+                "value_type": value_type,
+                "channel": normalized_channel,
+                "requested_value": requested_numeric,
+                "effective_value": requested_numeric,
+                "approved": False,
+                "approval_id": approval_id,
+                "reason_text": str(reason),
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        return {
+            "allowed": True,
+            "source": source,
+            "channel": normalized_channel,
+            "value_type": value_type,
+            "requested_value": requested_numeric,
+            "effective_value": max(low, min(high, requested_numeric)),
+            "limits": [low, high],
+            "reason": "ok",
+            "reason_text": str(reason),
+            "approved": True,
+            "approval_id": approval_id,
+            "bypass_cooldown": bool(bypass_cooldown),
+        }
+
+    def _get_wing_write_client(self) -> Optional[Union[EnhancedOSCClient, WingClient]]:
+        client = self.mixer_client
+        if self.connection_mode == "wing" and isinstance(client, (WingClient, EnhancedOSCClient)):
+            return client
+        return None
+
+    async def _apply_manual_console_write(
+        self,
+        websocket: Optional[WebSocketServerProtocol],
+        *,
+        channel: Optional[int],
+        value: float,
+        value_type: str,
+        source: str,
+        reason: Optional[str] = None,
+        approved: bool = False,
+        approval_id: Optional[str] = None,
+        bypass_cooldown: bool = False,
+        record_session: bool = True,
+    ) -> Dict[str, Any]:
+        gate = self._manual_write_gate(
+            channel=channel,
+            requested_value=value,
+            value_type=value_type,
+            source=source,
+            reason=reason,
+            approved=approved,
+            approval_id=approval_id,
+            bypass_cooldown=bypass_cooldown,
+        )
+        if gate["allowed"]:
+            self._record_manual_write_telemetry("attempted", gate)
+            try:
+                wing_client = self._get_wing_write_client()
+                if wing_client and hasattr(wing_client, "supervised_set_channel_fader") and hasattr(wing_client, "supervised_set_channel_gain"):
+                    if value_type == "fader":
+                        write_result = wing_client.supervised_set_channel_fader(
+                            gate["channel"],
+                            gate["effective_value"],
+                            source=source,
+                            reason=gate["reason_text"],
+                            approved=gate["approved"],
+                            approval_id=gate.get("approval_id"),
+                            bypass_cooldown=gate.get("bypass_cooldown", False),
+                        )
+                    elif value_type == "gain":
+                        write_result = wing_client.supervised_set_channel_gain(
+                            gate["channel"],
+                            gate["effective_value"],
+                            source=source,
+                            reason=gate["reason_text"],
+                            approved=gate["approved"],
+                            approval_id=gate.get("approval_id"),
+                            bypass_cooldown=gate.get("bypass_cooldown", False),
+                        )
+                    else:
+                        write_result = {"status": "blocked", "reason": "unsupported_value_type"}
+                else:
+                    if value_type == "fader":
+                        if hasattr(self.mixer_client, "set_channel_fader"):
+                            self.mixer_client.set_channel_fader(gate["channel"], gate["effective_value"])
+                        else:
+                            self.mixer_client.set_fader(channel, gate["effective_value"])
+                    elif value_type == "gain":
+                        if hasattr(self.mixer_client, "set_channel_gain"):
+                            self.mixer_client.set_channel_gain(gate["channel"], gate["effective_value"])
+                        else:
+                            self.mixer_client.set_gain(channel, gate["effective_value"])
+                    write_result = {"status": "applied", "effective_value": gate["effective_value"]}
+
+                gate.update(write_result)
+                if gate.get("status") == "applied":
+                    self._manual_write_last_ts[(gate["channel"], value_type)] = time.time()
+                    if record_session:
+                        self._record_manual_write_session_step(gate)
+                    event = self._record_manual_write_telemetry("applied", gate)
+                elif gate.get("status") == "blocked":
+                    event = self._record_manual_write_telemetry("blocked", gate)
+                else:
+                    event = self._record_manual_write_telemetry("error", gate)
+                if websocket is not None:
+                    message_type = {
+                        "applied": "manual_write_applied",
+                        "blocked": "manual_write_blocked",
+                    }.get(gate.get("status"), "manual_write_error")
+                    await self.send_to_client(websocket, {
+                        "type": message_type,
+                        "value_type": value_type,
+                        "status": gate.get("status"),
+                        "reason": gate.get("reason"),
+                        "request": gate,
+                    })
+                return {"status": gate.get("status"), "event": event, **gate}
+            except Exception as e:
+                gate["status"] = "error"
+                gate["error"] = str(e)
+                event = self._record_manual_write_telemetry("error", gate)
+                if websocket is not None:
+                    await self.send_to_client(websocket, {
+                        "type": "manual_write_error",
+                        "value_type": value_type,
+                        "error": str(e),
+                        "request": gate,
+                    })
+                return {"status": "error", "error": str(e), "event": event, **gate}
+        else:
+            gate["status"] = "blocked"
+            self._record_manual_write_telemetry("blocked", gate)
+            if websocket is not None:
+                await self.send_to_client(websocket, {
+                    "type": "manual_write_blocked",
+                    "reason": gate["reason"],
+                    "request": gate,
+                })
+            return {"status": "blocked", **gate}
+
+    async def rollback_manual_write_session(
+        self,
+        websocket: Optional[WebSocketServerProtocol],
+        *,
+        rollback_mode: str,
+        reason: Optional[str] = None,
+        approved: bool = False,
+        approval_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        mode = "rollback_all" if rollback_mode == "rollback_all" else "rollback_last"
+        history = self._manual_write_session_history
+        base_payload = {
+            "type": "manual_write_rollback",
+            "mode": mode,
+            "reason_text": str(reason or ""),
+            "approved": bool(approved),
+            "approval_id": approval_id,
+            "session": self.get_manual_write_session_status(),
+        }
+
+        if not self._manual_write_session_active or not history:
+            payload = {
+                **base_payload,
+                "status": "blocked",
+                "reason": "no_active_session",
+                "rolled_back_count": 0,
+                "remaining_step_count": len(history),
+                "rolled_back_steps": [],
+            }
+            self._record_manual_write_telemetry("rollback_blocked", payload)
+            if websocket is not None:
+                await self.send_to_client(websocket, {
+                    "type": "manual_write_rollback_blocked",
+                    **payload,
+                })
+            return payload
+
+        targets = list(reversed(history)) if mode == "rollback_all" else [history[-1]]
+        rolled_back_steps: List[Dict[str, Any]] = []
+        for target_step in targets:
+            rollback_result = await self._apply_manual_console_write(
+                None,
+                channel=target_step.get("channel"),
+                value=target_step.get("old_value"),
+                value_type=str(target_step.get("value_type")),
+                source=f"manual_session:{mode}",
+                reason=reason or f"{mode} {self._manual_write_session_label or ''}".strip(),
+                approved=approved,
+                approval_id=approval_id,
+                bypass_cooldown=True,
+                record_session=False,
+            )
+            step_payload = {
+                "original_step": self._summarize_manual_write_session_step(target_step),
+                "rollback_result": {
+                    "status": rollback_result.get("status"),
+                    "reason": rollback_result.get("reason"),
+                    "channel": rollback_result.get("channel"),
+                    "value_type": rollback_result.get("value_type"),
+                    "effective_value": rollback_result.get("effective_value"),
+                    "old_value": rollback_result.get("old_value"),
+                    "readback_value": rollback_result.get("readback_value"),
+                },
+            }
+            if rollback_result.get("status") != "applied":
+                payload = {
+                    **base_payload,
+                    "status": rollback_result.get("status", "error"),
+                    "reason": rollback_result.get("reason", "rollback_failed"),
+                    "rolled_back_count": len(rolled_back_steps),
+                    "remaining_step_count": len(self._manual_write_session_history),
+                    "rolled_back_steps": rolled_back_steps,
+                    "failed_step": step_payload,
+                    "session": self.get_manual_write_session_status(),
+                }
+                self._record_manual_write_telemetry("rollback_error", payload)
+                if websocket is not None:
+                    await self.send_to_client(websocket, {
+                        "type": (
+                            "manual_write_rollback_blocked"
+                            if payload["status"] == "blocked"
+                            else "manual_write_rollback_error"
+                        ),
+                        **payload,
+                    })
+                return payload
+
+            self._manual_write_session_history.pop()
+            rolled_back_steps.append(step_payload)
+
+        if not self._manual_write_session_history:
+            self._manual_write_session_active = False
+
+        payload = {
+            **base_payload,
+            "status": "applied",
+            "reason": "rollback_applied",
+            "rolled_back_count": len(rolled_back_steps),
+            "remaining_step_count": len(self._manual_write_session_history),
+            "rolled_back_steps": rolled_back_steps,
+            "session": self.get_manual_write_session_status(),
+        }
+        self._record_manual_write_telemetry("rollback_applied", payload)
+        if websocket is not None:
+            await self.send_to_client(websocket, {
+                "type": "manual_write_rollback_applied",
+                **payload,
+            })
+        return payload
+
+    @staticmethod
+    def _parse_env_bool(value: str) -> bool:
+        return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
     
     def cleanup_all_controllers(self):
         """Cleanup all active controllers - call before shutdown or on error."""

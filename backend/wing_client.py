@@ -2,9 +2,11 @@ from pythonosc import udp_client, dispatcher, osc_server
 from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_message import OscMessage
 import socket
+import os
 import threading
 import logging
 import time
+from contextlib import contextmanager
 from typing import Callable, Dict, Any, Optional
 
 from mixer_client_base import MixerClientBase
@@ -15,6 +17,14 @@ logger = logging.getLogger(__name__)
 
 class WingClient(MixerClientBase):
     """OSC client for Behringer Wing mixer - uses correct Wing OSC address format"""
+
+
+    WRITE_GATE_STATE_DISARMED = "disarmed"
+    WRITE_GATE_STATE_ARMED = "armed"
+    WRITE_GATE_STATE_EMERGENCY_STOPPED = "emergency_stopped"
+
+    WRITE_KIND_FADER = "fader"
+    WRITE_KIND_GAIN = "gain"
     
     def __init__(self, ip: str = "192.168.1.102", port: int = 2223):
         """
@@ -40,8 +50,334 @@ class WingClient(MixerClientBase):
         self._osc_throttle_enabled = True
         self._osc_throttle_hz = 10.0  # Default: 10 Hz = 100ms minimum interval
         self._osc_last_send_time: Dict[str, float] = {}  # address -> last send time
+
+
+        # Central supervised-write gate for any state-changing WING command.
+        self._write_gate_enabled = self._parse_env_bool(
+            os.getenv("AUTOMIXER_WING_WRITE_GATE_ENABLED", "true")
+        )
+        self._write_gate_state = self.WRITE_GATE_STATE_DISARMED
+        self._write_gate_allowed_kinds = {
+            self.WRITE_KIND_FADER,
+            self.WRITE_KIND_GAIN,
+        }
+        self._write_gate_requires_approval = True
+        self._write_gate_cooldown_sec = float(
+            os.getenv("AUTOMIXER_WING_WRITE_GATE_COOLDOWN_SEC", "0.35")
+        )
+        self._write_gate_readback_timeout_sec = float(
+            os.getenv("AUTOMIXER_WING_WRITE_GATE_READBACK_TIMEOUT_SEC", "0.25")
+        )
+        self._write_gate_readback_poll_sec = float(
+            os.getenv("AUTOMIXER_WING_WRITE_GATE_READBACK_POLL_SEC", "0.01")
+        )
+        self._write_gate_tolerance = {
+            self.WRITE_KIND_FADER: float(
+                os.getenv("AUTOMIXER_WING_WRITE_GATE_FADER_TOLERANCE_DB", "0.25")
+            ),
+            self.WRITE_KIND_GAIN: float(
+                os.getenv("AUTOMIXER_WING_WRITE_GATE_GAIN_TOLERANCE_DB", "0.25")
+            ),
+        }
+        self._write_gate_last_write_ts: Dict[tuple[int, str], float] = {}
+        self._write_gate_events: list[Dict[str, Any]] = []
+        self._write_gate_event_limit = int(
+            os.getenv("AUTOMIXER_WING_WRITE_GATE_EVENT_LIMIT", "200")
+        )
+        self._write_gate_last_reason = ""
+        self._supervised_write_depth = 0
         
         logger.info(f"WingClient initialized for {ip}:{port}")
+
+    @staticmethod
+    def _parse_env_bool(value: str) -> bool:
+        return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    def arm_write_gate(self, *, reason: str = "") -> Dict[str, Any]:
+        self._write_gate_state = self.WRITE_GATE_STATE_ARMED
+        self._write_gate_last_reason = str(reason or "")
+        status = self.get_write_gate_status()
+        status["reason"] = self._write_gate_last_reason or "arm"
+        self._record_write_gate_event("state_changed", status)
+        return status
+
+    def emergency_stop_writes(self, *, reason: str = "") -> Dict[str, Any]:
+        self._write_gate_state = self.WRITE_GATE_STATE_EMERGENCY_STOPPED
+        self._write_gate_last_reason = str(reason or "")
+        status = self.get_write_gate_status()
+        status["reason"] = self._write_gate_last_reason or "emergency_stop"
+        self._record_write_gate_event("emergency_stop", status)
+        return status
+
+    def get_write_gate_status(self) -> Dict[str, Any]:
+        return {
+            "enabled": self._write_gate_enabled,
+            "state": self._write_gate_state,
+            "allowed_kinds": sorted(self._write_gate_allowed_kinds),
+            "requires_approval": self._write_gate_requires_approval,
+            "cooldown_sec": self._write_gate_cooldown_sec,
+            "readback_timeout_sec": self._write_gate_readback_timeout_sec,
+            "last_reason": self._write_gate_last_reason,
+        }
+
+    @contextmanager
+    def _supervised_write_context(self):
+        self._supervised_write_depth += 1
+        try:
+            yield
+        finally:
+            self._supervised_write_depth = max(0, self._supervised_write_depth - 1)
+
+    def _record_write_gate_event(self, event_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        event = {
+            "ts": time.time(),
+            "event_type": event_type,
+            "payload": payload,
+        }
+        self._write_gate_events.append(event)
+        if len(self._write_gate_events) > self._write_gate_event_limit:
+            self._write_gate_events = self._write_gate_events[-self._write_gate_event_limit :]
+        logger.info("wing_write_gate_%s", event_type, extra={
+            "wing_write_gate_event_type": event_type,
+            **payload,
+        })
+        return event
+
+    def _numeric_values_match(self, expected: Any, actual: Any, tolerance: float) -> bool:
+        try:
+            return abs(float(expected) - float(actual)) <= tolerance
+        except (TypeError, ValueError):
+            return expected == actual
+
+    def _wait_for_readback(
+        self,
+        address: str,
+        timeout_sec: float,
+        *,
+        fallback_to_previous: bool = True,
+    ) -> Any:
+        marker = object()
+        previous = self.state.get(address, marker)
+        self.state[address] = marker
+        self.send(address)
+        deadline = time.time() + max(0.0, timeout_sec)
+        while time.time() < deadline:
+            current = self.state.get(address, marker)
+            if current is not marker:
+                return current
+            time.sleep(self._write_gate_readback_poll_sec)
+        current = self.state.get(address, marker)
+        if current is marker:
+            if previous is marker:
+                self.state.pop(address, None)
+                return None
+            self.state[address] = previous
+            if fallback_to_previous:
+                return previous
+            return None
+        return current
+
+    def _evaluate_supervised_write(
+        self,
+        *,
+        address: str,
+        write_kind: str,
+        channel: Optional[int],
+        source: str,
+        reason: str,
+        approved: bool,
+        requested_value: Any,
+        bypass_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        gate = {
+            "address": address,
+            "write_kind": write_kind,
+            "channel": channel,
+            "source": source,
+            "reason_text": str(reason or ""),
+            "approved": bool(approved),
+            "requested_value": requested_value,
+            "bypass_cooldown": bool(bypass_cooldown),
+        }
+        if not self._write_gate_enabled:
+            gate["allowed"] = True
+            gate["reason"] = "write_gate_disabled"
+            return gate
+        if self._write_gate_state != self.WRITE_GATE_STATE_ARMED:
+            gate["allowed"] = False
+            gate["reason"] = "write_gate_not_armed"
+            gate["write_gate_state"] = self._write_gate_state
+            return gate
+        if write_kind not in self._write_gate_allowed_kinds:
+            gate["allowed"] = False
+            gate["reason"] = "write_kind_not_allowed"
+            return gate
+        if self._write_gate_requires_approval and not approved:
+            gate["allowed"] = False
+            gate["reason"] = "approval_required"
+            return gate
+        if not str(reason or "").strip():
+            gate["allowed"] = False
+            gate["reason"] = "reason_required"
+            return gate
+        if channel is None or channel <= 0:
+            gate["allowed"] = False
+            gate["reason"] = "invalid_channel"
+            return gate
+        last_ts = self._write_gate_last_write_ts.get((channel, write_kind), 0.0)
+        if (
+            self._write_gate_cooldown_sec > 0
+            and not bypass_cooldown
+            and time.time() - last_ts < self._write_gate_cooldown_sec
+        ):
+            gate["allowed"] = False
+            gate["reason"] = "cooldown"
+            gate["retry_after_sec"] = max(
+                0.0,
+                self._write_gate_cooldown_sec - (time.time() - last_ts),
+            )
+            return gate
+        gate["allowed"] = True
+        gate["reason"] = "ok"
+        return gate
+
+    def _supervised_write(
+        self,
+        *,
+        address: str,
+        value: Any,
+        write_kind: str,
+        channel: Optional[int],
+        source: str,
+        reason: str,
+        approved: bool,
+        approval_id: Optional[str] = None,
+        bypass_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        gate = self._evaluate_supervised_write(
+            address=address,
+            write_kind=write_kind,
+            channel=channel,
+            source=source,
+            reason=reason,
+            approved=approved,
+            requested_value=value,
+            bypass_cooldown=bypass_cooldown,
+        )
+        gate["approval_id"] = approval_id
+        if not gate["allowed"]:
+            gate["status"] = "blocked"
+            self._record_write_gate_event("blocked", gate)
+            return gate
+        gate["old_value"] = self._wait_for_readback(
+            address,
+            self._write_gate_readback_timeout_sec,
+            fallback_to_previous=False,
+        )
+        if gate["old_value"] is None:
+            gate["status"] = "blocked"
+            gate["reason"] = "pre_read_unavailable"
+            self._record_write_gate_event("blocked", gate)
+            return gate
+
+        self._record_write_gate_event("attempted", gate)
+        with self._supervised_write_context():
+            sent = self.send(address, value)
+        if not sent:
+            gate["status"] = "error"
+            gate["reason"] = "transport_send_failed"
+            self._record_write_gate_event("error", gate)
+            return gate
+
+        readback = self._wait_for_readback(
+            address,
+            self._write_gate_readback_timeout_sec,
+            fallback_to_previous=False,
+        )
+        gate["readback_value"] = readback
+        tolerance = self._write_gate_tolerance.get(write_kind, 0.0)
+        if self._numeric_values_match(value, readback, tolerance):
+            gate["status"] = "applied"
+            gate["effective_value"] = value
+            self._write_gate_last_write_ts[(channel, write_kind)] = time.time()
+            self._record_write_gate_event("applied", gate)
+            return gate
+
+        rollback = {
+            "attempted": False,
+            "restored": False,
+            "old_value": gate["old_value"],
+            "readback_value": None,
+        }
+        if gate["old_value"] is not None:
+            rollback["attempted"] = True
+            with self._supervised_write_context():
+                rollback_sent = self.send(address, gate["old_value"])
+            if rollback_sent:
+                rollback_readback = self._wait_for_readback(
+                    address,
+                    self._write_gate_readback_timeout_sec,
+                    fallback_to_previous=False,
+                )
+                rollback["readback_value"] = rollback_readback
+                rollback["restored"] = self._numeric_values_match(
+                    gate["old_value"],
+                    rollback_readback,
+                    tolerance,
+                )
+        gate["rollback"] = rollback
+        gate["status"] = "error"
+        gate["reason"] = "readback_mismatch"
+        self.emergency_stop_writes(reason=f"readback_mismatch:{address}")
+        self._record_write_gate_event("error", gate)
+        return gate
+
+    def supervised_set_channel_fader(
+        self,
+        channel: int,
+        value: float,
+        *,
+        source: str,
+        reason: str,
+        approved: bool,
+        approval_id: Optional[str] = None,
+        bypass_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        return self._supervised_write(
+            address=f"/ch/{channel}/fdr",
+            value=float(value),
+            write_kind=self.WRITE_KIND_FADER,
+            channel=int(channel),
+            source=source,
+            reason=reason,
+            approved=approved,
+            approval_id=approval_id,
+            bypass_cooldown=bypass_cooldown,
+        )
+
+    def supervised_set_channel_gain(
+        self,
+        channel: int,
+        value: float,
+        *,
+        source: str,
+        reason: str,
+        approved: bool,
+        approval_id: Optional[str] = None,
+        bypass_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        return self._supervised_write(
+            address=f"/ch/{channel}/in/set/trim",
+            value=float(value),
+            write_kind=self.WRITE_KIND_GAIN,
+            channel=int(channel),
+            source=source,
+            reason=reason,
+            approved=approved,
+            approval_id=approval_id,
+            bypass_cooldown=bypass_cooldown,
+        )
+
 
     def connect(self, timeout: float = 5.0) -> bool:
         """
