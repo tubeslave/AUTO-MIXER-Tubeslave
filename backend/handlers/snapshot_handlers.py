@@ -6,6 +6,13 @@ from osc.enhanced_osc_client import EnhancedOSCClient
 
 def register_handlers(server):
     async def handle_load_snap(websocket, data):
+        if await server._block_quarantined_wing_write_surface(
+            websocket,
+            surface="load_snap",
+            result_type="load_snap_result",
+            request={"snap_name": data.get("snap_name")},
+        ):
+            return
         if server.mixer_client and isinstance(server.mixer_client, (WingClient, EnhancedOSCClient)):
             snap_name = data.get("snap_name")
             if snap_name:
@@ -17,6 +24,13 @@ def register_handlers(server):
                 })
 
     async def handle_save_snap(websocket, data):
+        if await server._block_quarantined_wing_write_surface(
+            websocket,
+            surface="save_snap",
+            result_type="save_snap_result",
+            request={"snap_name": data.get("snap_name")},
+        ):
+            return
         if server.mixer_client and isinstance(server.mixer_client, (WingClient, EnhancedOSCClient)):
             snap_name = data.get("snap_name")
             if snap_name:

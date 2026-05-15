@@ -11,6 +11,7 @@ import os
 import numpy as np
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
+from handlers import snapshot_handlers
 
 try:
     from server import convert_numpy_types, AutoMixerServer
@@ -764,3 +765,119 @@ class TestAutoMixerServerRuntimeErrors:
             "active": False,
             "error": "Failed to start audio capture"
         })
+
+
+class DummyWingLike:
+    def __init__(self):
+        self.is_connected = True
+        self.send = MagicMock()
+        self.set_channel_gain = MagicMock()
+        self.load_snap = MagicMock(return_value=True)
+        self.save_snap = MagicMock(return_value=True)
+        self.get_write_gate_status = MagicMock(return_value={"state": "unconfigured"})
+
+
+class DummyAutoEQController:
+    def __init__(self, mixer_client=None, bleed_service=None):
+        self.mixer_client = mixer_client
+        self.bleed_service = bleed_service
+        self.start_calls = []
+
+    def start(self, **kwargs):
+        self.start_calls.append(kwargs)
+        return True
+
+    def apply_to_mixer(self):
+        return True
+
+
+@pytest.fixture
+def dummy_wing_server():
+    with patch("server.WingClient", new=DummyWingLike), \
+         patch("server.EnhancedOSCClient", new=DummyWingLike), \
+         patch("server.BleedService"), \
+         patch.object(AutoMixerServer, "_load_config", return_value={}):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        server.connection_mode = "wing"
+        server.mixer_client = DummyWingLike()
+        yield server
+
+
+class TestWingDeploymentWriteBoundary:
+
+    @staticmethod
+    def _decode_last_message(websocket):
+        assert websocket.send.await_count >= 1
+        raw = websocket.send.await_args_list[-1].args[0]
+        return json.loads(raw)
+
+    @pytest.mark.asyncio
+    async def test_reset_trim_is_quarantined_for_wing(self, dummy_wing_server):
+        server = dummy_wing_server
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server.reset_trim(websocket, [1, 2])
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "reset_trim_result"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "deployment_write_surface_quarantined"
+        assert payload["surface"] == "reset_trim"
+        server.mixer_client.set_channel_gain.assert_not_called()
+        server.mixer_client.send.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_snapshot_load_is_quarantined_for_wing(self, dummy_wing_server):
+        server = dummy_wing_server
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = snapshot_handlers.register_handlers(server)
+
+        await handlers["load_snap"](websocket, {"snap_name": "SHOW_A"})
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "load_snap_result"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "deployment_write_surface_quarantined"
+        assert payload["surface"] == "load_snap"
+        server.mixer_client.load_snap.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_start_auto_eq_forces_auto_apply_off_for_wing_boundary(self, dummy_wing_server):
+        server = dummy_wing_server
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        with patch("server.AutoEQController", DummyAutoEQController):
+            await server.start_auto_eq(
+                websocket,
+                device_id="1",
+                channel=3,
+                profile="custom",
+                auto_apply=True,
+            )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "auto_eq_status"
+        assert payload["active"] is True
+        assert payload["auto_apply"] is False
+        assert payload["auto_apply_forced_off"] is True
+        assert server.auto_eq_controller.start_calls[-1]["auto_apply"] is False
+
+    @pytest.mark.asyncio
+    async def test_apply_eq_correction_is_quarantined_for_wing(self, dummy_wing_server):
+        server = dummy_wing_server
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        controller = MagicMock()
+        server.auto_eq_controller = controller
+
+        await server.apply_eq_correction(websocket)
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "auto_eq_apply_result"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "deployment_write_surface_quarantined"
+        assert payload["surface"] == "apply_eq_correction"
+        controller.apply_to_mixer.assert_not_called()
