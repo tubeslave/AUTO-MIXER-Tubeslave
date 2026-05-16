@@ -1,12 +1,48 @@
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.project_vector_index import automixer_chromadb_index as indexer
+
+
+class FakeCollection:
+    def __init__(self, records: list[indexer.SourceChunk]) -> None:
+        self.records = records
+
+    def get(self, include: list[str] | None = None) -> dict[str, Any]:
+        _ = include
+        return {
+            "ids": [record.record_id for record in self.records],
+            "documents": [record.document for record in self.records],
+            "metadatas": [record.metadata for record in self.records],
+        }
+
+    def query(
+        self,
+        *,
+        query_embeddings: list[list[float]],
+        n_results: int,
+        include: list[str] | None = None,
+    ) -> dict[str, Any]:
+        _ = include
+        query_embedding = query_embeddings[0]
+        scored: list[tuple[float, indexer.SourceChunk]] = []
+        for record in self.records:
+            similarity = sum(a * b for a, b in zip(query_embedding, record.embedding))
+            scored.append((similarity, record))
+        scored.sort(key=lambda item: item[0], reverse=True)
+        top = scored[:n_results]
+        return {
+            "ids": [[record.record_id for _score, record in top]],
+            "documents": [[record.document for _score, record in top]],
+            "metadatas": [[record.metadata for _score, record in top]],
+            "distances": [[max(0.0, 1.0 - score) for score, _record in top]],
+        }
 
 
 def test_iter_source_paths_excludes_secrets_and_external(tmp_path: Path) -> None:
@@ -213,3 +249,120 @@ def test_paperclip_chunk_summary_errors_redact_echoed_token(monkeypatch) -> None
     assert summary["errors"]
     assert secret not in "\n".join(summary["errors"])
     assert "<redacted>" in "\n".join(summary["errors"])
+
+
+def test_search_collection_prioritizes_wing_runtime_over_operator_readme(tmp_path: Path) -> None:
+    readme = tmp_path / "tools" / "automixer_operator" / "README.md"
+    readme.parent.mkdir(parents=True)
+    readme.write_text(
+        (
+            "Operator examples only.\n"
+            "Use vector-search with the sample phrase WING rollback readback.\n"
+        )
+        * 40,
+        encoding="utf-8",
+    )
+
+    write_gate = tmp_path / "backend" / "TUB-343-WING-Write-Gate-Report.md"
+    write_gate.parent.mkdir(parents=True)
+    write_gate.write_text(
+        "\n".join(
+            [
+                "# WING Write Gate",
+                "Supervised WING write gate with approval metadata.",
+                "Requires readback verification and rollback on mismatch.",
+                "Keeps live console writes dry-run or disarmed until supervised.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    wing_client = tmp_path / "backend" / "wing_client.py"
+    wing_client.write_text(
+        "\n".join(
+            [
+                "class WingClient:",
+                "    # live console runtime safety",
+                "    # throttle rate limit readback rollback supervised gate",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    records = indexer.build_source_chunks(tmp_path, [readme, write_gate, wing_client])
+    hits = indexer.search_collection(FakeCollection(records), "WING rollback readback", limit=5)
+
+    paths = [hit["metadata"]["source_path"] for hit in hits]
+    assert paths[0] in {
+        "backend/TUB-343-WING-Write-Gate-Report.md",
+        "backend/wing_client.py",
+    }
+    assert paths.count("tools/automixer_operator/README.md") == 1
+    assert paths.index("tools/automixer_operator/README.md") > 0
+
+
+def test_search_collection_prioritizes_paperclip_api_sources_for_api_queries() -> None:
+    paperclip_records = indexer.build_external_chunks(
+        '{"endpoint": "/api/companies", "payload": [{"id": "company-tub"}]}',
+        title="Paperclip companies",
+        category="paperclip_api",
+        source="paperclip:/api/companies",
+        source_type="paperclip_api",
+        indexed_at="2026-05-16T00:00:00+00:00",
+    )
+    wing_records = indexer.build_external_chunks(
+        "WING rollback readback write gate notes",
+        title="WING note",
+        category="operator_note",
+        source="manual:wing",
+        source_type="manual_note",
+        indexed_at="2026-05-16T00:00:00+00:00",
+    )
+
+    hits = indexer.search_collection(
+        FakeCollection(paperclip_records + wing_records),
+        "paperclip:/api/companies",
+        limit=3,
+    )
+
+    assert hits[0]["metadata"]["source_path"] == "paperclip:/api/companies"
+    assert hits[0]["metadata"]["source_type"] == "paperclip_api"
+
+
+def test_search_collection_prioritizes_safety_gate_reports_for_safety_queries(tmp_path: Path) -> None:
+    director = tmp_path / "Docs" / "PAPERCLIP_DIRECTOR_WORKFLOW.md"
+    director.parent.mkdir(parents=True)
+    director.write_text(
+        "Director notes mention explicit live-safety rules and issue drafting.",
+        encoding="utf-8",
+    )
+
+    write_gate = tmp_path / "backend" / "TUB-343-WING-Write-Gate-Report.md"
+    write_gate.parent.mkdir(parents=True)
+    write_gate.write_text(
+        "\n".join(
+            [
+                "# WING Supervised Write Gate Report",
+                "Safety gate for live console control.",
+                "Approval, cooldown, readback, rollback, and emergency stop are required.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    runtime = tmp_path / "backend" / "wing_client.py"
+    runtime.write_text(
+        "Wing runtime enforces throttle, write gate, cooldown, and emergency stop.",
+        encoding="utf-8",
+    )
+
+    readme = tmp_path / "tools" / "automixer_operator" / "README.md"
+    readme.parent.mkdir(parents=True)
+    readme.write_text("Sample vector-search examples for operators.", encoding="utf-8")
+
+    records = indexer.build_source_chunks(tmp_path, [director, write_gate, runtime, readme])
+    hits = indexer.search_collection(FakeCollection(records), "WING safety gate", limit=4)
+
+    top_paths = [hit["metadata"]["source_path"] for hit in hits[:2]]
+    assert "backend/TUB-343-WING-Write-Gate-Report.md" in top_paths
+    assert "backend/wing_client.py" in top_paths

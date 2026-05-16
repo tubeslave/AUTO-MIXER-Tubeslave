@@ -81,6 +81,7 @@ SECRET_FILENAMES = {
 }
 SECRET_SUFFIXES = (".key", ".pem", ".p12", ".pfx")
 TOKEN_RE = re.compile(r"[\w./:-]+", re.UNICODE)
+TOKEN_SPLIT_RE = re.compile(r"[^a-z0-9]+")
 SENSITIVE_JSON_KEY_RE = re.compile(
     r"(authorization|token|secret|api[_-]?key|private.*key|privatekeypem|keypem|password)",
     re.IGNORECASE,
@@ -94,6 +95,49 @@ SECRET_PATTERNS = (
     re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}\b"),
     re.compile(r"\bsk-proj-[A-Za-z0-9_\-]{16,}\b"),
 )
+WING_QUERY_TERMS = {"wing", "xremote", "osc", "readback", "rollback", "supervised", "console"}
+SAFETY_QUERY_TERMS = {
+    "approval",
+    "armed",
+    "cooldown",
+    "dry",
+    "dryrun",
+    "emergency",
+    "gate",
+    "panic",
+    "rate",
+    "readback",
+    "rollback",
+    "safety",
+    "stop",
+    "supervised",
+    "write",
+}
+PAPERCLIP_QUERY_TERMS = {"paperclip", "api", "companies", "agents", "issues", "dashboard"}
+LIVE_CONSOLE_TERMS = {"wing", "wing rack", "osc", "xremote", "/ch/", "/main/", "/bus/"}
+SAFETY_HIT_TERMS = {
+    "approval",
+    "armed",
+    "cooldown",
+    "disarmed",
+    "dry-run",
+    "dry run",
+    "emergency",
+    "panic",
+    "rate limit",
+    "readback",
+    "rollback",
+    "safety",
+    "supervised",
+    "throttle",
+    "write gate",
+}
+KEYWORD_EXACT_PHRASE_BONUS = 24.0
+KEYWORD_TOKEN_COVERAGE_BONUS = 30.0
+KEYWORD_ALL_TOKENS_BONUS = 8.0
+VECTOR_SCORE_SCALE = 12.0
+MIN_SEARCH_CANDIDATES = 12
+SEARCH_CANDIDATE_MULTIPLIER = 6
 
 
 @dataclass(frozen=True)
@@ -233,6 +277,132 @@ def chunk_text(
             break
         start = max(end - overlap_chars, start + 1)
     return chunks
+
+
+def extract_search_tokens(text: str) -> list[str]:
+    tokens: set[str] = set()
+    for token in TOKEN_RE.findall(text.lower()):
+        if len(token) > 1:
+            tokens.add(token)
+        for part in TOKEN_SPLIT_RE.split(token):
+            if len(part) > 1:
+                tokens.add(part)
+    return sorted(tokens)
+
+
+def classify_query_intent(query: str) -> dict[str, bool]:
+    tokens = set(extract_search_tokens(query))
+    return {
+        "wing": bool(tokens & WING_QUERY_TERMS),
+        "safety": bool(tokens & SAFETY_QUERY_TERMS),
+        "paperclip": bool(tokens & PAPERCLIP_QUERY_TERMS),
+        "live": "live" in tokens or "runtime" in tokens or "console" in tokens,
+        "supervised": "supervised" in tokens,
+    }
+
+
+def hit_priority_flags(metadata: dict[str, Any], document: str) -> dict[str, bool]:
+    source_path = str(metadata.get("source_path") or "").lower()
+    source_name = str(metadata.get("source_name") or "").lower()
+    category = str(metadata.get("category") or "").lower()
+    source_type = str(metadata.get("source_type") or "").lower()
+    haystack = f"{document}\n{source_path}\n{source_name}\n{category}".lower()
+    live_console = any(term in haystack for term in LIVE_CONSOLE_TERMS)
+    safety = any(term in haystack for term in SAFETY_HIT_TERMS)
+    backend_runtime = category in {"backend_code", "runtime_ai_knowledge", "replay_pipeline_code"}
+    report = category in {"tub_report", "paperclip_report"}
+    paperclip = source_type == "paperclip_api" or source_path.startswith("paperclip:")
+    return {
+        "backend_runtime": backend_runtime,
+        "live_console": live_console,
+        "paperclip": paperclip,
+        "report": report,
+        "safety": safety,
+    }
+
+
+def intent_boost(query_intent: dict[str, bool], flags: dict[str, bool]) -> float:
+    boost = 0.0
+    if query_intent["wing"]:
+        if flags["live_console"]:
+            boost += 24.0
+        if flags["backend_runtime"]:
+            boost += 10.0
+        if flags["report"]:
+            boost += 8.0
+    if query_intent["safety"] or query_intent["supervised"]:
+        if flags["safety"]:
+            boost += 22.0
+        if flags["report"]:
+            boost += 10.0
+        if flags["backend_runtime"]:
+            boost += 8.0
+    elif query_intent["live"] and flags["backend_runtime"]:
+        boost += 6.0
+    if query_intent["paperclip"] and flags["paperclip"]:
+        boost += 26.0
+    return boost
+
+
+def keyword_score_hit(
+    query: str,
+    metadata: dict[str, Any],
+    document: str,
+    *,
+    query_tokens: list[str] | None = None,
+    query_intent: dict[str, bool] | None = None,
+) -> float:
+    query_lower = query.lower().strip()
+    query_tokens = query_tokens or extract_search_tokens(query_lower)
+    if not query_tokens:
+        return 0.0
+    query_intent = query_intent or classify_query_intent(query_lower)
+    source_path = str(metadata.get("source_path") or "").lower()
+    source_name = str(metadata.get("source_name") or "").lower()
+    category = str(metadata.get("category") or "").lower()
+    haystack = f"{document}\n{source_path}\n{source_name}\n{category}".lower()
+    score = 0.0
+    if query_lower and query_lower in haystack:
+        score += KEYWORD_EXACT_PHRASE_BONUS
+
+    matched_tokens = 0
+    for token in query_tokens:
+        count = haystack.count(token)
+        if count:
+            matched_tokens += 1
+            token_weight = min(4.0, max(1.0, len(token) / 3.5))
+            score += min(2, count) * token_weight
+            if token in source_path:
+                score += 8.0
+            if token in source_name:
+                score += 6.0
+            if token in category:
+                score += 5.0
+    if matched_tokens:
+        coverage = matched_tokens / len(query_tokens)
+        score += KEYWORD_TOKEN_COVERAGE_BONUS * coverage
+        if matched_tokens == len(query_tokens):
+            score += KEYWORD_ALL_TOKENS_BONUS
+
+    score += intent_boost(query_intent, hit_priority_flags(metadata, document))
+    return score
+
+
+def dedupe_key(hit: dict[str, Any]) -> str:
+    metadata = hit.get("metadata") or {}
+    source_path = str(metadata.get("source_path") or "").strip()
+    if source_path:
+        return source_path
+    return str(hit.get("id") or "")
+
+
+def merged_rank_score(hit: dict[str, Any]) -> float:
+    keyword_score = float(hit.get("keyword_score") or 0.0)
+    distance = hit.get("distance")
+    vector_score = 0.0
+    if isinstance(distance, (int, float)):
+        vector_score = max(0.0, 1.0 - float(distance))
+    return keyword_score + vector_score * VECTOR_SCORE_SCALE
 
 
 def hash_embedding(text: str, *, dim: int = DEFAULT_EMBEDDING_DIM) -> list[float]:
@@ -713,22 +883,70 @@ def command_search(args: argparse.Namespace) -> int:
 
 
 def search_collection(collection: Any, query: str, *, limit: int) -> list[dict[str, Any]]:
-    keyword_hits = keyword_search_collection(collection, query, limit=limit)
-    if keyword_hits:
-        return keyword_hits
-    result = collection.query(
-        query_embeddings=[hash_embedding(query)],
-        n_results=limit,
-        include=["documents", "metadatas", "distances"],
+    candidate_limit = max(MIN_SEARCH_CANDIDATES, limit * SEARCH_CANDIDATE_MULTIPLIER)
+    keyword_hits = keyword_search_collection(collection, query, limit=candidate_limit)
+    try:
+        result = collection.query(
+            query_embeddings=[hash_embedding(query)],
+            n_results=candidate_limit,
+            include=["documents", "metadatas", "distances"],
+        )
+        vector_hits = normalize_search_results(result)
+    except Exception:
+        vector_hits = []
+
+    if not keyword_hits and not vector_hits:
+        return []
+
+    merged: dict[str, dict[str, Any]] = {}
+    for hit in vector_hits:
+        merged[str(hit.get("id") or len(merged))] = dict(hit)
+    for hit in keyword_hits:
+        hit_id = str(hit.get("id") or len(merged))
+        existing = merged.get(hit_id)
+        if existing is None:
+            merged[hit_id] = dict(hit)
+            continue
+        existing["keyword_score"] = max(
+            float(existing.get("keyword_score") or 0.0),
+            float(hit.get("keyword_score") or 0.0),
+        )
+        if existing.get("document") in (None, "") and hit.get("document") not in (None, ""):
+            existing["document"] = hit.get("document")
+        if not existing.get("metadata") and hit.get("metadata"):
+            existing["metadata"] = hit.get("metadata")
+
+    ranked = sorted(
+        merged.values(),
+        key=lambda hit: (
+            -merged_rank_score(hit),
+            str((hit.get("metadata") or {}).get("source_path") or ""),
+            int((hit.get("metadata") or {}).get("chunk_index") or 0),
+            str(hit.get("id") or ""),
+        ),
     )
-    return normalize_search_results(result)
+
+    unique_hits: list[dict[str, Any]] = []
+    seen_keys: set[str] = set()
+    for hit in ranked:
+        key = dedupe_key(hit)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        enriched = dict(hit)
+        enriched["rank_score"] = round(merged_rank_score(hit), 4)
+        unique_hits.append(enriched)
+        if len(unique_hits) >= limit:
+            break
+    return unique_hits
 
 
 def keyword_search_collection(collection: Any, query: str, *, limit: int) -> list[dict[str, Any]]:
     query_lower = query.lower().strip()
-    tokens = [token for token in TOKEN_RE.findall(query_lower) if len(token) > 1]
+    tokens = extract_search_tokens(query_lower)
     if not tokens:
         return []
+    query_intent = classify_query_intent(query_lower)
     try:
         payload = collection.get(include=["documents", "metadatas"])
     except Exception:
@@ -739,21 +957,13 @@ def keyword_search_collection(collection: Any, query: str, *, limit: int) -> lis
     scored: list[tuple[float, dict[str, Any]]] = []
     for idx, document in enumerate(documents):
         metadata = metadatas[idx] if idx < len(metadatas) and isinstance(metadatas[idx], dict) else {}
-        haystack = (str(document or "") + "\n" + " ".join(str(value) for value in metadata.values())).lower()
-        score = 0.0
-        if query_lower and query_lower in haystack:
-            score += 80.0
-        for token in tokens:
-            count = haystack.count(token)
-            if count:
-                score += min(20.0, count * min(4.0, len(token) / 2.5))
-        source_path = str(metadata.get("source_path") or "").lower()
-        category = str(metadata.get("category") or "").lower()
-        for token in tokens:
-            if token in source_path:
-                score += 10.0
-            if token in category:
-                score += 8.0
+        score = keyword_score_hit(
+            query_lower,
+            metadata,
+            str(document or ""),
+            query_tokens=tokens,
+            query_intent=query_intent,
+        )
         if score > 0:
             scored.append(
                 (
@@ -763,11 +973,18 @@ def keyword_search_collection(collection: Any, query: str, *, limit: int) -> lis
                         "document": document,
                         "metadata": metadata,
                         "distance": None,
-                        "keyword_score": score,
+                        "keyword_score": round(score, 4),
                     },
                 )
             )
-    scored.sort(key=lambda item: item[0], reverse=True)
+    scored.sort(
+        key=lambda item: (
+            -item[0],
+            str((item[1].get("metadata") or {}).get("source_path") or ""),
+            int((item[1].get("metadata") or {}).get("chunk_index") or 0),
+            str(item[1].get("id") or ""),
+        )
+    )
     return [hit for _score, hit in scored[:limit]]
 
 
