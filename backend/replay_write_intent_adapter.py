@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 from ai_mixing_pipeline.decision_layer.replay_proposal_ranking import (
     build_fader_proposals,
     build_gain_proposals,
+    build_speech_priority_arbitration_proposals,
     build_replay_graph_checkpoint,
     build_replay_timeline_artifact,
     rank_replay_proposals,
@@ -172,17 +173,89 @@ class ReplayWriteIntentAdapter:
             context_metadata=context_metadata,
         )
 
+    def emit_speech_priority_intent(
+        self,
+        *,
+        mixer_client: Any,
+        mixer_type: Optional[str],
+        target_bus: str,
+        current_state: dict[str, Any],
+        requested_state: dict[str, Any],
+        confidence: float,
+        context_metadata: Optional[dict[str, Any]] = None,
+        extra_payload: Optional[dict[str, Any]] = None,
+        replay_correlation_id: Optional[str] = None,
+    ) -> Optional[dict[str, Any]]:
+        payload = _compact(
+            {
+                "source": self.source_system,
+                "target_bus": str(target_bus or "main"),
+                "current_state": dict(current_state or {}),
+                "requested_state": dict(requested_state or {}),
+                "confidence": float(confidence),
+                "replay_correlation_id": replay_correlation_id
+                or self._next_correlation_id("speech_priority", str(target_bus or "main")),
+                "requires_confirmation": True,
+                "approval_status": "pending",
+                "live_apply": False,
+                "requested_live_write": True,
+                "auto_apply_blocked": True,
+                "safety": {
+                    "requires_confirmation": True,
+                    "approval_status": "pending",
+                    "write_intent_only": True,
+                    "console_family": "wing",
+                    "write_kind": "speech_arbitration",
+                },
+            }
+        )
+        if extra_payload:
+            payload.update(_compact(dict(extra_payload)))
+        payload["action_envelope"] = build_action_envelope(
+            envelope_id=f"speech_priority::{payload['replay_correlation_id']}",
+            source_system=self.source_system,
+            kind="speech_priority",
+            family="speech_arbitration",
+            action_type="speech_priority_update",
+            target={"bus": str(target_bus or "main")},
+            current_state=dict(current_state or {}),
+            requested_state=dict(requested_state or {}),
+            confidence=float(confidence),
+            replay_correlation_id=str(payload["replay_correlation_id"]),
+            context_metadata=context_metadata,
+            metadata=payload,
+            rationale={},
+            audit={"target_bus": str(target_bus or "main")},
+        )
+        payload["autonomy_mode"] = payload["action_envelope"]["autonomy_mode"]
+        payload["trust_gates"] = payload["action_envelope"]["trust_gates"]
+        payload["required_approval_level"] = payload["action_envelope"]["required_approval_level"]
+        payload["rollback_handle"] = payload["action_envelope"]["rollback_handle"]
+        payload["risk"] = payload["action_envelope"]["risk"]
+        return self._emit(
+            mixer_client=mixer_client,
+            mixer_type=mixer_type,
+            write_kind="speech_arbitration",
+            channel=None,
+            proposal_builder=build_speech_priority_arbitration_proposals,
+            proposal_arg_name="arbitration_payloads",
+            payload=payload,
+            context_metadata=context_metadata,
+            target_bus=str(target_bus or "main"),
+        )
+
     def _emit(
         self,
         *,
         mixer_client: Any,
         mixer_type: Optional[str],
         write_kind: str,
-        channel: int,
+        channel: Optional[int],
         proposal_builder,
         proposal_arg_name: str,
         payload: dict[str, Any],
         context_metadata: Optional[dict[str, Any]],
+        target_bus: Optional[str] = None,
     ) -> Optional[dict[str, Any]]:
         if not self._is_wing_target(mixer_client, mixer_type):
             return None
@@ -194,7 +267,8 @@ class ReplayWriteIntentAdapter:
             {
                 "source_system": self.source_system,
                 "write_kind": write_kind,
-                "mixer_channel": int(channel),
+                "mixer_channel": int(channel) if channel is not None else None,
+                "target_bus": target_bus,
                 "transport_decision": "dry_run_only",
                 "target_console": "wing",
                 **dict(context_metadata or {}),
@@ -210,28 +284,31 @@ class ReplayWriteIntentAdapter:
             ranking,
             metadata=metadata,
         )
-        record = {
-            "source_system": self.source_system,
-            "write_kind": write_kind,
-            "mixer_channel": int(channel),
-            "decision": "dry_run_only",
-            "allow_live_write": False,
-            "replay_correlation_id": proposal.replay_correlation_id,
-            "transport_policy": timeline_artifact["events"][0]["transport_policy"],
-            "live_mixer_writes": timeline_artifact["events"][0]["live_mixer_writes"],
-            "proposal": proposal.to_dict(),
-            "ranking": ranking.to_dict(),
-            "timeline_artifact": timeline_artifact,
-            "graph_checkpoint": graph_checkpoint.to_dict(),
-            "metadata": metadata,
-        }
+        record = _compact(
+            {
+                "source_system": self.source_system,
+                "write_kind": write_kind,
+                "mixer_channel": int(channel) if channel is not None else None,
+                "target_bus": target_bus,
+                "decision": "dry_run_only",
+                "allow_live_write": False,
+                "replay_correlation_id": proposal.replay_correlation_id,
+                "transport_policy": timeline_artifact["events"][0]["transport_policy"],
+                "live_mixer_writes": timeline_artifact["events"][0]["live_mixer_writes"],
+                "proposal": proposal.to_dict(),
+                "ranking": ranking.to_dict(),
+                "timeline_artifact": timeline_artifact,
+                "graph_checkpoint": graph_checkpoint.to_dict(),
+                "metadata": metadata,
+            }
+        )
         self._records.append(record)
         return record
 
-    def _next_correlation_id(self, write_kind: str, channel: int) -> str:
+    def _next_correlation_id(self, write_kind: str, target: int | str) -> str:
         return (
             f"corr::{self.source_system}::{write_kind}::"
-            f"ch{int(channel)}::{next(self._sequence)}"
+            f"{str(target)}::{next(self._sequence)}"
         )
 
     @staticmethod

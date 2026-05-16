@@ -112,6 +112,16 @@ class AutoFaderControllerV2:
         self.ducking_enabled = ducking_enabled
         self.ducking_amount_db = ducking_amount_db
         self.vocal_channels = vocal_channels
+        self.speech_priority_enabled = bool(
+            auto_fader_cfg.get("speech_priority_enabled", ducking_enabled)
+        )
+        self.speech_priority_bus = str(auto_fader_cfg.get("speech_priority_bus", "main"))
+        self.speech_priority_min_change_db = float(
+            auto_fader_cfg.get("speech_priority_min_change_db", 0.5)
+        )
+        self.speech_priority_weight_epsilon = float(
+            auto_fader_cfg.get("speech_priority_weight_epsilon", 0.05)
+        )
         self.vocal_activity_detector = VocalActivityDetector(
             threshold_lufs=-30.0,  # Default threshold for vocal activity
             attack_ms=ducking_attack_ms,
@@ -229,6 +239,7 @@ class AutoFaderControllerV2:
         self._peak_calibrating = False
         self._peak_cal_start_time = 0.0
         self._peak_cal_max: Dict[int, float] = {}  # ch_id -> max true_peak (dBTP) during collection
+        self._last_speech_priority_state: Optional[Dict[str, Any]] = None
         self._replay_write_intent_adapter = ReplayWriteIntentAdapter(
             source_system="auto_fader_v2"
         )
@@ -294,6 +305,129 @@ class AutoFaderControllerV2:
             context_metadata=self._build_replay_write_context(),
             extra_payload=extra_payload,
         )
+
+    def _emit_speech_priority_intent(
+        self,
+        *,
+        current_state: Dict[str, Any],
+        requested_state: Dict[str, Any],
+        priority_source: str,
+        environment_label: str,
+        duck_targets: List[int],
+        active_vocal_channels: List[int],
+        confidence: float,
+    ) -> Optional[Dict[str, Any]]:
+        if not self.mixer_client:
+            return None
+        return self._replay_write_intent_adapter.emit_speech_priority_intent(
+            mixer_client=self.mixer_client,
+            mixer_type=None,
+            target_bus=self.speech_priority_bus,
+            current_state=current_state,
+            requested_state=requested_state,
+            confidence=confidence,
+            context_metadata=self._build_replay_write_context(),
+            extra_payload={
+                "environment_label": environment_label,
+                "priority_source": priority_source,
+                "duck_targets": list(duck_targets),
+                "active_vocal_channels": list(active_vocal_channels),
+            },
+        )
+
+    @staticmethod
+    def _default_speech_priority_state() -> Dict[str, Any]:
+        return {
+            "environment": "music",
+            "duck_music_db": 0.0,
+            "speech_weight": 0.45,
+            "music_weight": 1.0,
+            "active_vocal_channels": [],
+            "duck_targets": [],
+            "priority_source": "none",
+        }
+
+    def _resolve_priority_source(self, vocal_levels: Dict[int, float]) -> str:
+        if not vocal_levels:
+            return "none"
+        dominant_channel = max(
+            vocal_levels.items(),
+            key=lambda item: (item[1], -item[0]),
+        )[0]
+        instrument = self.instrument_types.get(dominant_channel)
+        if instrument:
+            return f"{instrument}:ch{dominant_channel}"
+        return f"channel_{dominant_channel}"
+
+    def _speech_priority_state_changed(
+        self,
+        previous: Optional[Dict[str, Any]],
+        current: Dict[str, Any],
+    ) -> bool:
+        if previous is None:
+            return current.get("environment") == "speech"
+        if previous.get("environment") != current.get("environment"):
+            return True
+        if previous.get("priority_source") != current.get("priority_source"):
+            return True
+        if previous.get("active_vocal_channels") != current.get("active_vocal_channels"):
+            return True
+        if previous.get("duck_targets") != current.get("duck_targets"):
+            return True
+        if abs(float(previous.get("duck_music_db", 0.0)) - float(current.get("duck_music_db", 0.0))) >= self.speech_priority_min_change_db:
+            return True
+        if abs(float(previous.get("speech_weight", 0.0)) - float(current.get("speech_weight", 0.0))) >= self.speech_priority_weight_epsilon:
+            return True
+        if abs(float(previous.get("music_weight", 0.0)) - float(current.get("music_weight", 0.0))) >= self.speech_priority_weight_epsilon:
+            return True
+        return False
+
+    def _maybe_emit_speech_priority_arbitration(
+        self,
+        *,
+        vocal_levels: Dict[int, float],
+        duck_targets: List[int],
+        activity_level: float,
+        is_vocal_active: bool,
+    ) -> Optional[Dict[str, Any]]:
+        if not self.speech_priority_enabled or not self.mixer_client:
+            return None
+
+        normalized_activity = max(0.0, min(1.0, float(activity_level)))
+        current_state = dict(self._last_speech_priority_state or self._default_speech_priority_state())
+        requested_state = {
+            "environment": "speech" if is_vocal_active else "music",
+            "duck_music_db": round(
+                float(self.ducking_amount_db) * normalized_activity if is_vocal_active else 0.0,
+                4,
+            ),
+            "speech_weight": round(0.45 + (0.55 * normalized_activity), 4) if is_vocal_active else 0.45,
+            "music_weight": round(max(0.35, 1.0 - (0.65 * normalized_activity)), 4) if is_vocal_active else 1.0,
+            "active_vocal_channels": sorted(int(ch_id) for ch_id in vocal_levels.keys() if ch_id in self.vocal_channels),
+            "duck_targets": sorted(int(ch_id) for ch_id in duck_targets),
+            "priority_source": self._resolve_priority_source(vocal_levels) if is_vocal_active else "none",
+        }
+        if not self._speech_priority_state_changed(self._last_speech_priority_state, requested_state):
+            return None
+
+        intent = self._emit_speech_priority_intent(
+            current_state=current_state,
+            requested_state=requested_state,
+            priority_source=str(requested_state["priority_source"]),
+            environment_label="speech_focus" if is_vocal_active else "music_drive",
+            duck_targets=requested_state["duck_targets"],
+            active_vocal_channels=requested_state["active_vocal_channels"],
+            confidence=round(0.6 + (0.4 * normalized_activity), 4) if is_vocal_active else 0.75,
+        )
+        self._last_speech_priority_state = dict(requested_state)
+        if intent is not None:
+            logger.info(
+                "Speech-priority arbitration intent emitted "
+                f"(environment={requested_state['environment']}, "
+                f"duck_music_db={requested_state['duck_music_db']:.2f}, "
+                f"correlation={intent['replay_correlation_id']})"
+            )
+        return intent
 
     def _apply_guarded_fader_write(
         self,
@@ -1434,12 +1568,13 @@ class AutoFaderControllerV2:
                 # Check if any vocal is active
                 is_vocal_active = self.vocal_activity_detector.is_any_vocal_active(self.vocal_channels)
                 activity_level = self.vocal_activity_detector.get_activity_level(self.vocal_channels)
+                duck_targets = [
+                    ch_id for ch_id in adjustments.keys()
+                    if ch_id not in self.vocal_channels and ch_id not in self.reference_channels
+                ]
                 
                 if is_vocal_active:
                     # Apply ducking to non-vocal channels
-                    duck_targets = [ch_id for ch_id in adjustments.keys() 
-                                  if ch_id not in self.vocal_channels and ch_id not in self.reference_channels]
-                    
                     # Calculate ducking amount (scaled by activity level for smooth transition)
                     duck_amount = self.ducking_amount_db * activity_level
                     
@@ -1447,6 +1582,13 @@ class AutoFaderControllerV2:
                         # Add ducking to existing adjustment
                         adjustments[ch_id] = adjustments.get(ch_id, 0.0) + duck_amount
                         logger.debug(f"Ducking Ch{ch_id}: {duck_amount:.2f} dB (vocal active, level={activity_level:.2f})")
+
+                self._maybe_emit_speech_priority_arbitration(
+                    vocal_levels=vocal_levels,
+                    duck_targets=duck_targets,
+                    activity_level=activity_level,
+                    is_vocal_active=is_vocal_active,
+                )
 
         # Priority-based overload protection
         hierarchical_cuts = self.hierarchical_mixer.get_cuts(

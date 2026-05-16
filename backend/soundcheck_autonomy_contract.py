@@ -54,6 +54,7 @@ BASELINE_AUTONOMY_MODE_BY_KIND: Dict[str, AutonomyMode] = {
     "feedback_notch": AutonomyMode.OBSERVE_ONLY,
     "feedback_fader_reduce": AutonomyMode.OBSERVE_ONLY,
     "gain": AutonomyMode.SEMI_AUTONOMOUS_CALIBRATION,
+    "speech_priority": AutonomyMode.ASSISTED,
 }
 
 
