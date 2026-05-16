@@ -50,6 +50,7 @@ from auto_soundcheck_engine import AutoSoundcheckEngine
 from mixer_discovery import discover_mixers, discover_mixer_auto, DiscoveredMixer
 from handlers import register_all_handlers
 from wing_telemetry_recorder import WingTelemetryRecorder
+from gain_fader_runtime import build_gain_fader_runtime_summary
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1002,6 +1003,10 @@ class AutoMixerServer:
         deployment_boundary_active = bool(
             self.connection_mode != "wing" or self._is_wing_deployment_write_boundary_active()
         )
+        gain_fader_runtime = build_gain_fader_runtime_summary(
+            connection_mode=self.connection_mode,
+            wing_boundary_active=self._is_wing_deployment_write_boundary_active(),
+        )
         readback_confirmed = bool(
             latest_confirmed_payload
             and latest_confirmed_payload.get("status") == "applied"
@@ -1232,6 +1237,7 @@ class AutoMixerServer:
             "manual_write_session": session,
             "latest_confirmation": latest_confirmation,
             "latest_block": latest_block,
+            "gain_fader_runtime": gain_fader_runtime,
             "readiness": {
                 "pilot_ready": pilot_ready,
                 "checks": readiness_checks,
@@ -4210,6 +4216,10 @@ class AutoMixerServer:
         fader_available = bool(self.auto_fader_controller)
         no_clipping_measured = False
         ready = mixer_connected and gain_available and fader_available and no_clipping_measured
+        gain_fader_runtime = build_gain_fader_runtime_summary(
+            connection_mode=self.connection_mode,
+            wing_boundary_active=self._is_wing_deployment_write_boundary_active(),
+        )
         return {
             "ready": ready,
             "checks": {
@@ -4221,6 +4231,7 @@ class AutoMixerServer:
                 "no_clipping_reason": "Measured clipping verification is not implemented yet.",
                 "manual_write_supervision": self.get_manual_write_supervision_status(),
             },
+            "gain_fader_runtime": gain_fader_runtime,
         }
     
     async def create_snapshot(self, websocket, channels: list = None):

@@ -4,7 +4,11 @@ AUTO-MIXER Tubeslave — Quick Start Script.
 
 Launches the automatic soundcheck engine. By default it scans the network
 for WING (OSC broadcast) and dLive (MIDI/TCP probe) mixers, connects
-to the first one found, detects the audio device, and starts auto-mixing.
+to the first one found, detects the audio device, and starts soundcheck.
+
+Safety:
+- WING runs fail closed and emit dry-run artifacts only.
+- The only approved WING live-write path remains supervised manual fader/gain.
 
     python3 start_soundcheck.py                 # full auto-discover
     python3 start_soundcheck.py --scan-only     # just list found mixers

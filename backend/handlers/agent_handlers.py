@@ -1,82 +1,159 @@
 """AI MixingAgent WebSocket handlers."""
 
-import json
-
 
 def register_handlers(server):
+    def get_mixing_agent():
+        return getattr(server, "mixing_agent", None)
+
+    async def send_unavailable(websocket, response_type, command, **payload):
+        await server.send_to_client(websocket, {
+            "type": response_type,
+            "status": "unavailable",
+            "available": False,
+            "reason": "mixing_agent_runtime_not_initialized",
+            "command": command,
+            "error": "Mixing agent runtime is not attached to AutoMixerServer",
+            **payload,
+        })
+
     async def handle_get_agent_status(websocket, data):
-        if server.mixing_agent:
-            status = server.mixing_agent.get_status()
-            status["channel_summary"] = server.mixing_agent.get_channel_summary()
+        mixing_agent = get_mixing_agent()
+        if mixing_agent:
+            status = mixing_agent.get_status()
+            status["channel_summary"] = mixing_agent.get_channel_summary()
             await server.send_to_client(websocket, {
                 "type": "agent_status",
                 **status,
             })
         else:
-            await server.send_to_client(websocket, {
-                "type": "agent_status",
-                "is_running": False,
-                "error": "Agent not initialized",
-            })
+            await send_unavailable(
+                websocket,
+                "agent_status",
+                "get_agent_status",
+                is_running=False,
+            )
 
     async def handle_set_agent_mode(websocket, data):
         mode = data.get("mode", "suggest")
-        if server.mixing_agent:
-            await server.init_mixing_agent(mode=mode)
+        init_mixing_agent = getattr(server, "init_mixing_agent", None)
+        if callable(init_mixing_agent):
+            await init_mixing_agent(mode=mode)
             await server.send_to_client(websocket, {
                 "type": "agent_mode_changed",
                 "mode": mode,
+                "success": True,
             })
+        else:
+            await send_unavailable(
+                websocket,
+                "agent_mode_changed",
+                "set_agent_mode",
+                mode=mode,
+                success=False,
+            )
 
     async def handle_get_pending_actions(websocket, data):
-        if server.mixing_agent:
+        mixing_agent = get_mixing_agent()
+        if mixing_agent:
             await server.send_to_client(websocket, {
                 "type": "pending_actions",
-                "actions": server.mixing_agent.get_pending_actions(),
+                "actions": mixing_agent.get_pending_actions(),
             })
+        else:
+            await send_unavailable(
+                websocket,
+                "pending_actions",
+                "get_pending_actions",
+                actions=[],
+            )
 
     async def handle_approve_action(websocket, data):
         idx = data.get("index", -1)
-        if server.mixing_agent:
-            ok = server.mixing_agent.approve_action(idx)
+        mixing_agent = get_mixing_agent()
+        if mixing_agent:
+            ok = mixing_agent.approve_action(idx)
             await server.send_to_client(websocket, {
                 "type": "action_approved",
                 "index": idx,
                 "success": ok,
             })
+        else:
+            await send_unavailable(
+                websocket,
+                "action_approved",
+                "approve_action",
+                index=idx,
+                success=False,
+            )
 
     async def handle_approve_all(websocket, data):
-        if server.mixing_agent:
-            count = server.mixing_agent.approve_all_pending()
+        mixing_agent = get_mixing_agent()
+        if mixing_agent:
+            count = mixing_agent.approve_all_pending()
             await server.send_to_client(websocket, {
                 "type": "all_actions_approved",
                 "count": count,
             })
+        else:
+            await send_unavailable(
+                websocket,
+                "all_actions_approved",
+                "approve_all_actions",
+                count=0,
+                success=False,
+            )
 
     async def handle_dismiss_action(websocket, data):
         idx = data.get("index", -1)
-        if server.mixing_agent:
-            ok = server.mixing_agent.dismiss_action(idx)
+        mixing_agent = get_mixing_agent()
+        if mixing_agent:
+            ok = mixing_agent.dismiss_action(idx)
             await server.send_to_client(websocket, {
                 "type": "action_dismissed",
                 "index": idx,
                 "success": ok,
             })
+        else:
+            await send_unavailable(
+                websocket,
+                "action_dismissed",
+                "dismiss_action",
+                index=idx,
+                success=False,
+            )
 
     async def handle_dismiss_all(websocket, data):
-        if server.mixing_agent:
-            server.mixing_agent.dismiss_all_pending()
+        mixing_agent = get_mixing_agent()
+        if mixing_agent:
+            mixing_agent.dismiss_all_pending()
             await server.send_to_client(websocket, {
                 "type": "all_actions_dismissed",
+                "success": True,
             })
+        else:
+            await send_unavailable(
+                websocket,
+                "all_actions_dismissed",
+                "dismiss_all_actions",
+                success=False,
+            )
 
     async def handle_get_action_history(websocket, data):
         limit = data.get("limit", 50)
-        if server.mixing_agent:
+        mixing_agent = get_mixing_agent()
+        if mixing_agent:
             await server.send_to_client(websocket, {
                 "type": "action_history",
-                "history": server.mixing_agent.get_action_history(limit),
+                "history": mixing_agent.get_action_history(limit),
             })
+        else:
+            await send_unavailable(
+                websocket,
+                "action_history",
+                "get_action_history",
+                history=[],
+                limit=limit,
+            )
 
     async def handle_get_audio_status(websocket, data):
         if server.audio_capture:

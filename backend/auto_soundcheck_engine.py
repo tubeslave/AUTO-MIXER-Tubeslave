@@ -3,10 +3,12 @@ Auto Soundcheck Engine — headless orchestrator for automatic mixing.
 
 Connects to mixer (dLive or WING), detects audio device (SoundGrid/Dante),
 reads channel names, recognizes instruments, waits for audio signals,
-and automatically applies gain staging, EQ, compressor, and fader corrections
-without user confirmation.
+and computes gain staging, EQ, compressor, and fader corrections.
 
-This is the main entry point for fully automatic operation.
+Safety boundary:
+- dLive may still apply corrections when explicitly enabled.
+- WING headless mode is fail-closed by default: it emits dry-run
+  recommendations or replay intents and does not perform live console writes.
 """
 
 import asyncio
@@ -42,6 +44,7 @@ from signal_metrics import (
     InterChannelMetrics, LevelMetrics, DynamicsMetrics, SpectralMetrics,
 )
 from replay_write_intent_adapter import ReplayWriteIntentAdapter
+from soundcheck_recommendation_workflow import NoWriteSoundcheckRecommendationWorkflow
 
 logger = logging.getLogger(__name__)
 
@@ -375,9 +378,12 @@ class AutoSoundcheckEngine:
         self.sample_rate = sample_rate
         self.block_size = block_size
         self.buffer_seconds = buffer_seconds
-        self.auto_apply = auto_apply
+        self.requested_auto_apply = bool(auto_apply)
+        self.auto_apply = bool(auto_apply)
         self.auto_discover = auto_discover
         self.scan_subnet = scan_subnet
+        self.auto_apply_forced_off = False
+        self.auto_apply_forced_off_reason: Optional[str] = None
 
         self.mixer_client = None
         self.audio_capture: Optional[AudioCapture] = None
@@ -400,6 +406,9 @@ class AutoSoundcheckEngine:
         self._replay_write_intent_adapter = ReplayWriteIntentAdapter(
             source_system="auto_soundcheck_engine"
         )
+        self._soundcheck_recommendation_workflow: Optional[
+            NoWriteSoundcheckRecommendationWorkflow
+        ] = None
 
         mode = "auto-discover" if auto_discover and not mixer_ip else "manual"
         target = f"{mixer_type or '?'}@{mixer_ip or 'auto'}:{mixer_port or 'auto'}"
@@ -422,6 +431,12 @@ class AutoSoundcheckEngine:
         """Return replay write-intent records captured for WING dry-run safety."""
         return self._replay_write_intent_adapter.list_records()
 
+    def get_soundcheck_recommendation_bundle(self) -> Optional[Dict[str, Any]]:
+        """Return accumulated no-write recommendations for WING headless runs."""
+        if self._soundcheck_recommendation_workflow is None:
+            return None
+        return self._soundcheck_recommendation_workflow.build_bundle()
+
     def _build_replay_write_context(self) -> Dict[str, Any]:
         context = {
             "arrangement_id": getattr(self, "replay_arrangement_id", None),
@@ -430,6 +445,87 @@ class AutoSoundcheckEngine:
             "engine_state": self.state.value,
         }
         return {key: value for key, value in context.items() if value is not None}
+
+    def _build_soundcheck_recommendation_context(self) -> Dict[str, Any]:
+        context = {
+            "arrangement_id": getattr(self, "replay_arrangement_id", None),
+            "scene_id": getattr(self, "replay_scene_id", None),
+            "scene_label": getattr(self, "replay_scene_label", None),
+            "engine_state": self.state.value,
+            "mixer_type": self.mixer_type,
+            "mixer_ip": self.mixer_ip,
+            "requested_auto_apply": self.requested_auto_apply,
+            "effective_auto_apply": self.auto_apply,
+            "auto_apply_forced_off": self.auto_apply_forced_off,
+            "write_boundary": (
+                "wing_headless_no_write" if self._is_wing_target() else None
+            ),
+        }
+        return {key: value for key, value in context.items() if value is not None}
+
+    def _get_soundcheck_recommendation_workflow(
+        self,
+    ) -> NoWriteSoundcheckRecommendationWorkflow:
+        if self._soundcheck_recommendation_workflow is None:
+            self._soundcheck_recommendation_workflow = NoWriteSoundcheckRecommendationWorkflow(
+                source_system="auto_soundcheck_engine",
+                context_metadata=self._build_soundcheck_recommendation_context(),
+            )
+        return self._soundcheck_recommendation_workflow
+
+    def _is_wing_target(self) -> bool:
+        mixer_type = str(self.mixer_type or "").strip().lower()
+        if mixer_type == "wing":
+            return True
+        if self.mixer_client is None:
+            return False
+        type_name = type(self.mixer_client).__name__.lower()
+        module_name = type(self.mixer_client).__module__.lower()
+        return "wing" in type_name or "wing" in module_name
+
+    def _wing_headless_no_write_active(self) -> bool:
+        return self._is_wing_target()
+
+    def _enforce_wing_headless_no_write_defaults(self):
+        if not self._wing_headless_no_write_active():
+            return
+        if self.auto_apply:
+            self.auto_apply = False
+            self.auto_apply_forced_off = True
+            self.auto_apply_forced_off_reason = "wing_headless_no_write_default"
+            logger.warning(
+                "WING headless auto-apply forced off; emitting dry-run artifacts only"
+            )
+        if self.mixer_client and hasattr(self.mixer_client, "set_observation_mode"):
+            try:
+                self.mixer_client.set_observation_mode(
+                    True,
+                    reason="wing_headless_no_write_default",
+                )
+            except Exception as exc:
+                logger.warning("Failed to enable WING observation mode: %s", exc)
+
+    def _should_process_soundcheck_results(self) -> bool:
+        return self.auto_apply or self._wing_headless_no_write_active()
+
+    @staticmethod
+    def _compact_dict(payload: Dict[str, Any]) -> Dict[str, Any]:
+        return {key: value for key, value in payload.items() if value is not None}
+
+    def _build_recommendation_metadata(
+        self,
+        info: Optional[ChannelInfo],
+        preset: Optional[str],
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {}
+        if info is not None:
+            payload["channel_name"] = info.name
+        if preset:
+            payload["preset"] = preset
+        if extra:
+            payload.update(extra)
+        return self._compact_dict(payload)
 
     def _emit_fader_write_intent(
         self,
@@ -581,6 +677,7 @@ class AutoSoundcheckEngine:
                     ip=self.mixer_ip,
                     port=self.mixer_port,
                 )
+                self._enforce_wing_headless_no_write_defaults()
             else:
                 logger.error(f"Unsupported mixer type: {self.mixer_type}")
                 return False
@@ -787,6 +884,12 @@ class AutoSoundcheckEngine:
             EngineState.RESETTING,
             "Resetting channel processing to neutral..."
         )
+
+        if self._wing_headless_no_write_active():
+            logger.warning(
+                "WING headless reset skipped; broad reset writes are disabled in no-write mode"
+            )
+            return
 
         reset_count = 0
 
@@ -1062,6 +1165,25 @@ class AutoSoundcheckEngine:
                 adaptive_freq = max(base_freq * 0.8, 25.0)
 
         try:
+            if self._wing_headless_no_write_active():
+                self._get_soundcheck_recommendation_workflow().recommend_hpf(
+                    channel=ch,
+                    current_freq_hz=None,
+                    current_enabled=None,
+                    target_freq_hz=adaptive_freq,
+                    target_enabled=True,
+                    metadata=self._build_recommendation_metadata(info, preset),
+                    rationale={
+                        "source": "instrument_hpf_preset",
+                        "base_freq_hz": base_freq,
+                    },
+                )
+                logger.info(
+                    "Ch %s '%s': WING HPF write skipped; recommendation emitted",
+                    ch,
+                    info.name,
+                )
+                return
             if hasattr(self.mixer_client, 'set_hpf'):
                 self.mixer_client.set_hpf(ch, adaptive_freq, enabled=True)
                 if abs(adaptive_freq - base_freq) > 5:
@@ -1146,11 +1268,36 @@ class AutoSoundcheckEngine:
                 adapted_gain = max(-8.0, min(8.0, round(adapted_gain, 1)))
                 adapted_bands[i] = (freq, adapted_gain, q)
 
+        target_bands = [
+            {"band": band_idx, "freq_hz": freq, "gain_db": gain, "q": q}
+            for band_idx, (freq, gain, q) in enumerate(adapted_bands, start=1)
+            if band_idx <= 4
+        ]
+
         try:
-            for band_idx, (freq, gain, q) in enumerate(adapted_bands, start=1):
-                if band_idx > 4:
-                    break
-                self.mixer_client.set_eq_band(ch, band_idx, freq, gain, q)
+            if self._wing_headless_no_write_active():
+                self._get_soundcheck_recommendation_workflow().recommend_eq(
+                    channel=ch,
+                    current_bands=[],
+                    target_bands=target_bands,
+                    metadata=self._build_recommendation_metadata(info, preset),
+                    rationale={"source": "instrument_eq_preset"},
+                )
+                logger.info(
+                    "Ch %s '%s': WING EQ writes skipped; recommendation emitted",
+                    ch,
+                    info.name,
+                )
+                return
+
+            for band in target_bands:
+                self.mixer_client.set_eq_band(
+                    ch,
+                    band["band"],
+                    band["freq_hz"],
+                    band["gain_db"],
+                    band["q"],
+                )
 
             info.eq_applied = True
             changes = []
@@ -1459,6 +1606,11 @@ class AutoSoundcheckEngine:
                         f"Phase: {name_b} is inverted (corr={icm.cross_correlation:.3f}), "
                         f"flipping polarity"
                     )
+                    if self._wing_headless_no_write_active():
+                        logger.warning(
+                            "Phase: WING polarity write skipped in headless no-write mode"
+                        )
+                        continue
                     if hasattr(self.mixer_client, 'set_polarity'):
                         self.mixer_client.set_polarity(ch_b, True)
 
@@ -1469,6 +1621,11 @@ class AutoSoundcheckEngine:
                         f"Phase: applying {icm.delay_ms:.2f}ms delay "
                         f"to Ch {align_ch} (coherence={icm.coherence:.3f})"
                     )
+                    if self._wing_headless_no_write_active():
+                        logger.warning(
+                            "Phase: WING delay write skipped in headless no-write mode"
+                        )
+                        continue
                     if hasattr(self.mixer_client, 'set_delay'):
                         self.mixer_client.set_delay(align_ch, icm.delay_ms, enabled=True)
 
@@ -1536,6 +1693,20 @@ class AutoSoundcheckEngine:
                     pan = -spread + (2.0 * spread * idx / max(1, n - 1))
 
         try:
+            if self._wing_headless_no_write_active():
+                self._get_soundcheck_recommendation_workflow().recommend_pan(
+                    channel=ch,
+                    current_pan=0.0,
+                    target_pan=pan,
+                    metadata=self._build_recommendation_metadata(info, preset),
+                    rationale={"source": "instrument_pan_preset"},
+                )
+                logger.info(
+                    "Ch %s '%s': WING pan write skipped; recommendation emitted",
+                    ch,
+                    info.name,
+                )
+                return
             self.mixer_client.set_pan(ch, pan)
             logger.info(f"Ch {ch} '{info.name}': pan = {pan:+.0f}")
         except Exception as e:
@@ -1614,14 +1785,40 @@ class AutoSoundcheckEngine:
                 f"trans_density={transient_density:.1f}/s flux={spectral_flux:.3f}"
             )
 
+        target_settings = self._compact_dict(
+            {
+                "enabled": True,
+                "threshold_db": round(threshold, 1),
+                "ratio": round(ratio, 1),
+                "attack_ms": round(attack, 1),
+                "release_ms": round(release, 1),
+                "makeup_db": 0.0,
+            }
+        )
+
         try:
+            if self._wing_headless_no_write_active():
+                self._get_soundcheck_recommendation_workflow().recommend_compressor(
+                    channel=ch,
+                    current_settings={},
+                    target_settings=target_settings,
+                    metadata=self._build_recommendation_metadata(info, preset),
+                    rationale={"source": "instrument_compressor_preset"},
+                )
+                logger.info(
+                    "Ch %s '%s': WING compressor writes skipped; recommendation emitted",
+                    ch,
+                    info.name,
+                )
+                return
+
             result = self.mixer_client.set_compressor(
                 ch,
-                threshold_db=round(threshold, 1),
-                ratio=round(ratio, 1),
-                attack_ms=round(attack, 1),
-                release_ms=round(release, 1),
-                makeup_db=0.0,
+                threshold_db=target_settings["threshold_db"],
+                ratio=target_settings["ratio"],
+                attack_ms=target_settings["attack_ms"],
+                release_ms=target_settings["release_ms"],
+                makeup_db=target_settings["makeup_db"],
                 enabled=True,
             )
             if result is False:
@@ -1708,6 +1905,22 @@ class AutoSoundcheckEngine:
 
         for send_bus, level_db in adapted_sends:
             try:
+                if self._wing_headless_no_write_active():
+                    self._get_soundcheck_recommendation_workflow().recommend_fx_send(
+                        channel=ch,
+                        bus=send_bus,
+                        current_level_db=None,
+                        target_level_db=level_db,
+                        metadata=self._build_recommendation_metadata(info, preset),
+                        rationale={"source": "instrument_fx_send_preset"},
+                    )
+                    logger.info(
+                        "Ch %s '%s': WING FX send write skipped for bus %s; recommendation emitted",
+                        ch,
+                        info.name,
+                        send_bus,
+                    )
+                    continue
                 self.mixer_client.set_send_level(ch, send_bus, level_db)
             except Exception as e:
                 logger.warning(f"Ch {ch}: send bus {send_bus} failed: {e}")
@@ -1762,9 +1975,16 @@ class AutoSoundcheckEngine:
             return
         preset = info.preset or "custom"
         try:
-            self.mixer_client.reset_channel_processing(ch)
-            info.was_reset = True
-            time.sleep(0.3)
+            if self._wing_headless_no_write_active():
+                logger.info(
+                    "Ch %s '%s': WING reset skipped in headless no-write mode",
+                    ch,
+                    info.name,
+                )
+            else:
+                self.mixer_client.reset_channel_processing(ch)
+                info.was_reset = True
+                time.sleep(0.3)
 
             # Quick analysis pass (1.5s) for fresh metrics
             analyzer = SignalAnalyzer(ch, self.sample_rate, self.block_size)
@@ -1798,6 +2018,27 @@ class AutoSoundcheckEngine:
         if event.action == "notch" and hasattr(self.mixer_client, "set_eq_band"):
             band = 4
             try:
+                if self._wing_headless_no_write_active():
+                    info = self.channels.get(ch)
+                    self._get_soundcheck_recommendation_workflow().recommend_feedback_notch(
+                        channel=ch,
+                        frequency_hz=event.frequency_hz,
+                        gain_db=-6.0,
+                        q=10.0,
+                        metadata=self._build_recommendation_metadata(
+                            info,
+                            info.preset if info else None,
+                        ),
+                        rationale={
+                            "detected_magnitude_db": event.magnitude_db,
+                            "feedback_action": event.action,
+                        },
+                    )
+                    logger.warning(
+                        "FEEDBACK: Ch %s notch skipped; recommendation emitted",
+                        ch,
+                    )
+                    return
                 self.mixer_client.set_eq_band(ch, band, event.frequency_hz, -6.0, 10.0)
             except Exception:
                 pass
@@ -1857,6 +2098,8 @@ class AutoSoundcheckEngine:
             self._set_state(EngineState.ERROR, "Mixer connection failed")
             return False
 
+        self._enforce_wing_headless_no_write_defaults()
+
         # Steps 3-4: Scan and start audio
         if not self._start_audio():
             self._set_state(EngineState.ERROR, "Audio capture failed")
@@ -1875,7 +2118,7 @@ class AutoSoundcheckEngine:
         self._wait_and_analyze()
 
         # Step 10: Apply new corrections from scratch
-        if self.auto_apply:
+        if self._should_process_soundcheck_results():
             self._apply_corrections()
 
         self._set_state(EngineState.RUNNING, "Auto-soundcheck complete, monitoring...")
@@ -1938,6 +2181,13 @@ class AutoSoundcheckEngine:
                         logger.warning(f"Ch {ch}: restore fader write blocked or failed")
                         continue
                 if snap.muted:
+                    if self._wing_headless_no_write_active():
+                        logger.info(
+                            "Ch %s '%s': restore mute skipped in WING headless no-write mode",
+                            ch,
+                            info.name,
+                        )
+                        continue
                     result = self.mixer_client.set_mute(ch, True)
                     if result is False:
                         logger.warning(f"Ch {ch}: restore mute write blocked or failed")
@@ -2026,6 +2276,13 @@ class AutoSoundcheckEngine:
             "mixer_type": self.mixer_type,
             "mixer_ip": self.mixer_ip,
             "mixer_connected": self.mixer_client.is_connected if self.mixer_client else False,
+            "auto_apply_requested": self.requested_auto_apply,
+            "auto_apply_effective": self.auto_apply,
+            "auto_apply_forced_off": self.auto_apply_forced_off,
+            "auto_apply_forced_off_reason": self.auto_apply_forced_off_reason,
+            "wing_headless_no_write_active": self._wing_headless_no_write_active(),
+            "recommendation_bundle_available": self._soundcheck_recommendation_workflow
+            is not None,
             "audio_running": self.audio_capture.running if self.audio_capture else False,
             "audio_device": audio_device_info,
             "audio_devices_available": audio_devices_list,
@@ -2065,7 +2322,7 @@ def main():
     parser.add_argument("--sample-rate", type=int, default=48000,
                         help="Sample rate (default: 48000)")
     parser.add_argument("--no-apply", action="store_true",
-                        help="Analyze only, do not apply corrections")
+                        help="Analyze only; WING remains recommendation-only by default")
     parser.add_argument("--log-level", default="INFO",
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     parser.add_argument("--scan-only", action="store_true",
@@ -2119,7 +2376,9 @@ def main():
     print(f"  Mixer: {mixer_desc}")
     print(f"  Audio: {args.audio_device or 'auto-detect'}")
     print(f"  Channels: {args.channels}")
-    print(f"  Auto-apply: {not args.no_apply}")
+    print(f"  Auto-apply requested: {not args.no_apply}")
+    if args.mixer == "wing":
+        print("  WING boundary: headless no-write mode emits dry-run artifacts only")
     print(f"  Auto-discover: {auto_discover}")
     print("=" * 60)
     print()

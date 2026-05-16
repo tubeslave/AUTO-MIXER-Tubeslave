@@ -157,6 +157,61 @@ class TestAutoMixerServerInit:
         assert server._shutdown_event is None
 
 
+class TestDisconnectedAgentHandlers:
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("message", "expected_type", "expected_fields"),
+        [
+            (
+                {"type": "get_agent_status"},
+                "agent_status",
+                {"is_running": False},
+            ),
+            (
+                {"type": "get_pending_actions"},
+                "pending_actions",
+                {"actions": []},
+            ),
+            (
+                {"type": "approve_action", "index": 3},
+                "action_approved",
+                {"index": 3, "success": False},
+            ),
+            (
+                {"type": "set_agent_mode", "mode": "live"},
+                "agent_mode_changed",
+                {"mode": "live", "success": False},
+            ),
+        ],
+    )
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_dead_agent_commands_return_unavailable_responses(
+        self,
+        mock_bleed,
+        mock_config,
+        message,
+        expected_type,
+        expected_fields,
+    ):
+        server = AutoMixerServer()
+        assert not hasattr(server, "mixing_agent")
+        server.send_to_client = AsyncMock()
+
+        await server.handle_client_message(AsyncMock(), json.dumps(message))
+
+        server.send_to_client.assert_awaited_once()
+        _, payload = server.send_to_client.await_args.args
+        assert payload["type"] == expected_type
+        assert payload["status"] == "unavailable"
+        assert payload["available"] is False
+        assert payload["reason"] == "mixing_agent_runtime_not_initialized"
+        assert payload["error"] == "Mixing agent runtime is not attached to AutoMixerServer"
+        for key, value in expected_fields.items():
+            assert payload[key] == value
+
+
 class DummyWingLike:
     def __init__(self):
         self.set_channel_fader = MagicMock()
@@ -615,6 +670,8 @@ class TestSupervisedPilotCockpit:
         assert status["latest_confirmation"]["readback_value"] == -12.0
         assert status["manual_write_session"]["rollback_ready_count"] == 1
         assert status["pilot_ready"] is True
+        assert status["gain_fader_runtime"]["selected_runtime"]["id"] == "wing_supervised_soundcheck"
+        assert status["gain_fader_runtime"]["deployment_surface"] is True
         assert status["shadow_transport"]["disagreement_rate"] == 0.0
         assert status["shadow_transport"]["audit_coverage"]["coverage_rate"] == 1.0
         assert status["shadow_transport"]["confidence_trend"]["direction"] == "ai_above_operator"
@@ -644,6 +701,7 @@ class TestSupervisedPilotCockpit:
         assert status["primary_state"] == "blocked"
         assert status["state_flags"]["blocked"] is True
         assert status["shadow_transport"]["state"] == "blocked"
+        assert status["gain_fader_runtime"]["selected_runtime"]["id"] == "wing_supervised_soundcheck"
         assert "manual_write_panic_stopped" in escalation_codes
         assert "write_gate_emergency_stopped" in escalation_codes
         assert "shadow_transport_blocked" in escalation_codes
@@ -673,6 +731,7 @@ class TestSupervisedPilotCockpit:
         payload = json.loads(raw)
         assert payload["type"] == "supervised_pilot_status"
         assert payload["shadow_transport"]["available"] is True
+        assert payload["gain_fader_runtime"]["selected_runtime"]["id"] == "wing_supervised_soundcheck"
 
 
 class DummyAutoEQController:
