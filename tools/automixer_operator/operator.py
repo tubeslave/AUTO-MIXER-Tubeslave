@@ -34,6 +34,7 @@ DEFAULT_BRIDGE_CONTEXT_URL = "http://127.0.0.1:8788/v1/context/automixer"
 DEFAULT_BRIDGE_TIMEOUT_SECONDS = 1.0
 BRIDGE_TMUX_SESSION = "automixer_gpt_control_bridge"
 WATCHDOG_SCRIPT = Path("tools/paperclip_watchdog/automixer_paperclip_watchdog.py")
+VECTOR_INDEXER_SCRIPT = Path("tools/project_vector_index/automixer_chromadb_index.py")
 REPORT_FIELD_RE = re.compile(r"^- ([A-Za-z0-9_]+):\s*(.*)$")
 TERMINAL_ISSUE_STATUSES = {"done", "completed", "closed", "resolved", "cancelled", "canceled"}
 PREVIEW_ISSUE_STATUSES = "backlog,todo,in_progress,in_review,blocked"
@@ -43,6 +44,13 @@ SAFE_AGENT_ADAPTER_TYPE = "codex_local"
 SAFE_AGENT_STATUSES = {"idle", "available", "ready"}
 READ_ONLY_HTTP_METHODS = ("GET",)
 EXECUTABLE_WRITE_COMMANDS: tuple[str, ...] = ()
+VECTOR_OPERATOR_COMMANDS = {
+    "vector-index": "index",
+    "vector-search": "search",
+    "vector-add": "add",
+    "vector-stats": "stats",
+    "vector-paperclip-sync": "paperclip-sync",
+}
 
 
 @dataclass(frozen=True)
@@ -825,6 +833,34 @@ def command_monitor(config: OperatorConfig) -> int:
     return 0
 
 
+def command_vector_indexer(config: OperatorConfig, operator_command: str, extra_args: list[str]) -> int:
+    vector_command = VECTOR_OPERATOR_COMMANDS[operator_command]
+    script = config.project_root / VECTOR_INDEXER_SCRIPT
+    if not script.exists():
+        print(f"vector indexer unavailable: {script}")
+        return 1
+    cmd = [
+        sys.executable,
+        str(script),
+        vector_command,
+        "--project-root",
+        str(config.project_root),
+        *extra_args,
+    ]
+    result = subprocess.run(
+        cmd,
+        cwd=config.project_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+    return result.returncode
+
+
 def render_status(config: OperatorConfig, context: dict[str, Any]) -> str:
     lines = [
         "== Automixer Operator Status ==",
@@ -1393,8 +1429,18 @@ def build_parser() -> argparse.ArgumentParser:
             "cycle",
             "approve-template",
             "monitor",
+            "vector-index",
+            "vector-search",
+            "vector-add",
+            "vector-stats",
+            "vector-paperclip-sync",
         ),
         help="operator command to run",
+    )
+    parser.add_argument(
+        "args",
+        nargs=argparse.REMAINDER,
+        help="extra arguments passed to vector-* commands",
     )
     return parser
 
@@ -1423,6 +1469,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_approve_template(config)
     if args.command == "monitor":
         return command_monitor(config)
+    if args.command in VECTOR_OPERATOR_COMMANDS:
+        return command_vector_indexer(config, args.command, args.args)
     parser.error(f"unknown command: {args.command}")
     return 2
 

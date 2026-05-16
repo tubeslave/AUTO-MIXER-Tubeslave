@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -20,9 +21,16 @@ DEFAULT_BIND_HOST = "127.0.0.1"
 DEFAULT_PORT = 8788
 DEFAULT_PAPERCLIP_API_URL = "http://127.0.0.1:3100"
 DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(DEFAULT_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(DEFAULT_PROJECT_ROOT))
+
+from tools.project_vector_index import automixer_chromadb_index as vector_index  # noqa: E402
+
 ACTIVE_RUN_STATUSES = {"queued", "running", "active", "busy", "in_progress", "started", "working"}
 TERMINAL_RUN_STATUSES = {"done", "failed", "succeeded", "cancelled", "canceled", "finished"}
 REPORT_EXCERPT_CHARS = 2000
+DEFAULT_VECTOR_LIMIT = 5
+MAX_VECTOR_LIMIT = 10
 
 
 @dataclass(frozen=True)
@@ -31,6 +39,8 @@ class BridgeConfig:
     project_root: Path
     paperclip_company_id: str | None = None
     paperclip_timeout_seconds: float = 3.0
+    vector_persist_dir: str = vector_index.DEFAULT_PERSIST_DIR
+    vector_collection: str = vector_index.DEFAULT_COLLECTION
 
 
 class PaperclipClient:
@@ -60,6 +70,8 @@ def build_config_from_env(environ: dict[str, str] | None = None) -> BridgeConfig
         project_root=Path(env.get("AUTOMIXER_PROJECT_ROOT", str(DEFAULT_PROJECT_ROOT))).expanduser().resolve(),
         paperclip_company_id=env.get("PAPERCLIP_COMPANY_ID") or None,
         paperclip_timeout_seconds=parse_float(env.get("GPT_CONTROL_BRIDGE_PAPERCLIP_TIMEOUT_SECONDS"), 3.0),
+        vector_persist_dir=env.get("AUTOMIXER_VECTOR_PERSIST_DIR", vector_index.DEFAULT_PERSIST_DIR),
+        vector_collection=env.get("AUTOMIXER_VECTOR_COLLECTION", vector_index.DEFAULT_COLLECTION),
     )
 
 
@@ -73,8 +85,26 @@ def parse_float(value: str | None, default: float) -> float:
     return parsed if parsed > 0 else default
 
 
+def parse_positive_int(value: str | None, default: int) -> int:
+    if not value:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
+def first_param(params: dict[str, list[str]], key: str) -> str | None:
+    values = params.get(key)
+    if not values:
+        return None
+    return values[0]
+
+
 def health_payload() -> dict[str, Any]:
     return {
+        "knowledge_search_enabled": True,
         "ok": True,
         "read_only": True,
         "service": SERVICE_NAME,
@@ -141,9 +171,76 @@ def build_context(
             latest_report_path=report["path"],
         ),
         "safety_flags": safety_flags(),
+        "vector_index_summary": vector_index_summary(config),
         "watchdog_state_summary": state_summary,
     }
     return context
+
+
+def vector_index_summary(config: BridgeConfig) -> dict[str, Any]:
+    persist_dir = vector_index.parse_path(config.vector_persist_dir, config.project_root)
+    manifest_path = config.project_root / vector_index.DEFAULT_MANIFEST
+    summary: dict[str, Any] = {
+        "available": False,
+        "collection": config.vector_collection,
+        "persist_dir": str(persist_dir),
+        "read_only_endpoint": "/v1/knowledge/automixer/search?q=...",
+    }
+    if not persist_dir.exists():
+        summary["reason"] = "not_indexed"
+        return summary
+    try:
+        collection = vector_index.chroma_collection(persist_dir, config.vector_collection, reset=False)
+        summary["record_count"] = collection.count()
+        summary["available"] = True
+    except Exception as exc:
+        summary["reason"] = f"{type(exc).__name__}: {exc}"
+        return summary
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            summary["manifest"] = {
+                "indexed_at": manifest.get("indexed_at"),
+                "source_count": manifest.get("source_count"),
+                "record_count": manifest.get("record_count"),
+                "include_paperclip_reports": manifest.get("include_paperclip_reports"),
+            }
+        except (OSError, json.JSONDecodeError):
+            summary["manifest_error"] = "unreadable"
+    return summary
+
+
+def search_vector_index(config: BridgeConfig, query: str, limit: int = DEFAULT_VECTOR_LIMIT) -> dict[str, Any]:
+    query = query.strip()
+    if not query:
+        return {"available": False, "error": "query_required", "read_only": True}
+    limit = max(1, min(MAX_VECTOR_LIMIT, limit))
+    persist_dir = vector_index.parse_path(config.vector_persist_dir, config.project_root)
+    if not persist_dir.exists():
+        return {
+            "available": False,
+            "error": "vector_index_not_found",
+            "persist_dir": str(persist_dir),
+            "read_only": True,
+        }
+    try:
+        collection = vector_index.chroma_collection(persist_dir, config.vector_collection, reset=False)
+        hits = vector_index.search_collection(collection, query, limit=limit)
+    except Exception as exc:
+        return {
+            "available": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "persist_dir": str(persist_dir),
+            "read_only": True,
+        }
+    return {
+        "available": True,
+        "collection": config.vector_collection,
+        "query": query,
+        "read_only": True,
+        "results": hits,
+        "total": len(hits),
+    }
 
 
 def safe_get(client: Any, path: str, params: dict[str, Any] | None = None) -> tuple[Any, str | None]:
@@ -492,6 +589,16 @@ def make_handler(
                 return
             if parsed.path == "/v1/context/automixer":
                 self.send_json(200, build_context(config, client=factory(config)))
+                return
+            if parsed.path == "/v1/knowledge/automixer/stats":
+                self.send_json(200, vector_index_summary(config))
+                return
+            if parsed.path == "/v1/knowledge/automixer/search":
+                params = urllib.parse.parse_qs(parsed.query)
+                query = first_param(params, "q") or first_param(params, "query") or ""
+                limit = parse_positive_int(first_param(params, "limit"), DEFAULT_VECTOR_LIMIT)
+                payload = search_vector_index(config, query, limit=limit)
+                self.send_json(200 if payload.get("available") else 400, payload)
                 return
             self.send_json(404, {"error": "not_found", "read_only": True, "service": SERVICE_NAME})
 

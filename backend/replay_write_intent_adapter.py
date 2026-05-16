@@ -12,6 +12,7 @@ from ai_mixing_pipeline.decision_layer.replay_proposal_ranking import (
     build_replay_timeline_artifact,
     rank_replay_proposals,
 )
+from soundcheck_autonomy_contract import build_action_envelope
 
 
 def _compact(payload: dict[str, Any]) -> dict[str, Any]:
@@ -68,6 +69,27 @@ class ReplayWriteIntentAdapter:
         )
         if extra_payload:
             payload.update(_compact(dict(extra_payload)))
+        payload["action_envelope"] = build_action_envelope(
+            envelope_id=f"fader::{payload['replay_correlation_id']}",
+            source_system=self.source_system,
+            kind="fader",
+            family="fader_adjustment",
+            action_type="set_fader_db",
+            target={"mixer_channel": int(channel)},
+            current_state={"fader_db": float(current_fader_db)},
+            requested_state={"fader_db": float(target_fader_db)},
+            confidence=float(payload.get("confidence", 1.0)),
+            replay_correlation_id=str(payload["replay_correlation_id"]),
+            context_metadata=context_metadata,
+            metadata=payload,
+            rationale={},
+            audit={"readback_source": str(readback_source or "controller_snapshot")},
+        )
+        payload["autonomy_mode"] = payload["action_envelope"]["autonomy_mode"]
+        payload["trust_gates"] = payload["action_envelope"]["trust_gates"]
+        payload["required_approval_level"] = payload["action_envelope"]["required_approval_level"]
+        payload["rollback_handle"] = payload["action_envelope"]["rollback_handle"]
+        payload["risk"] = payload["action_envelope"]["risk"]
         return self._emit(
             mixer_client=mixer_client,
             mixer_type=mixer_type,
@@ -118,6 +140,27 @@ class ReplayWriteIntentAdapter:
         )
         if extra_payload:
             payload.update(_compact(dict(extra_payload)))
+        payload["action_envelope"] = build_action_envelope(
+            envelope_id=f"gain::{payload['replay_correlation_id']}",
+            source_system=self.source_system,
+            kind="input_gain",
+            family="gain_adjustment",
+            action_type="set_input_trim_db",
+            target={"mixer_channel": int(channel)},
+            current_state={"trim_db": float(current_trim_db)},
+            requested_state={"trim_db": float(target_trim_db)},
+            confidence=float(payload.get("confidence", 1.0)),
+            replay_correlation_id=str(payload["replay_correlation_id"]),
+            context_metadata=context_metadata,
+            metadata=payload,
+            rationale={},
+            audit={"readback_source": str(readback_source or "controller_snapshot")},
+        )
+        payload["autonomy_mode"] = payload["action_envelope"]["autonomy_mode"]
+        payload["trust_gates"] = payload["action_envelope"]["trust_gates"]
+        payload["required_approval_level"] = payload["action_envelope"]["required_approval_level"]
+        payload["rollback_handle"] = payload["action_envelope"]["rollback_handle"]
+        payload["risk"] = payload["action_envelope"]["risk"]
         return self._emit(
             mixer_client=mixer_client,
             mixer_type=mixer_type,

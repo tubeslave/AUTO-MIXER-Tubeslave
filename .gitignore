@@ -48,6 +48,9 @@ frontend/dist/
 *.log
 logs/
 
+# Local ChromaDB/vector indexes
+.chromadb/
+
 # OS
 Thumbs.db
 .DS_Store

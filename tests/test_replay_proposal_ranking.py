@@ -3,6 +3,7 @@ from __future__ import annotations
 from ai_mixing_pipeline.decision_layer.replay_proposal_ranking import (
     build_fader_proposals,
     build_gain_proposals,
+    build_speech_priority_arbitration_proposals,
     build_replay_timeline_artifact,
     build_operator_assistance_proposals,
     build_replay_graph_checkpoint,
@@ -168,3 +169,37 @@ def test_replay_timeline_artifact_preserves_auto_fader_inventory_metadata():
     assert artifact["events"][0]["source_payload"]["live_apply"] is True
     assert artifact["events"][0]["source_payload"]["readback_source"] == "console_state"
     assert artifact["events"][0]["source_payload"]["requires_confirmation"] is True
+
+
+def test_speech_priority_proposals_preserve_environment_metadata_in_timeline():
+    speech = build_speech_priority_arbitration_proposals(
+        arbitration_payloads=[
+            {
+                "source": "speech_priority_engine",
+                "target_bus": "main",
+                "current_state": {
+                    "duck_music_db": -2.0,
+                    "speech_weight": 0.6,
+                    "music_weight": 0.8,
+                },
+                "requested_state": {
+                    "duck_music_db": -6.0,
+                    "speech_weight": 1.0,
+                    "music_weight": 0.35,
+                    "environment": "speech",
+                },
+                "environment_label": "speech_focus",
+                "priority_source": "podium_mic",
+                "confidence": 0.97,
+                "replay_correlation_id": "corr::speech::timeline",
+            }
+        ]
+    )[0]
+    ranking = rank_replay_proposals([speech])
+
+    artifact = build_replay_timeline_artifact([speech], ranking, metadata={"scenario": "speech_environment"})
+
+    assert artifact["events"][0]["source_payload"]["environment_label"] == "speech_focus"
+    assert artifact["events"][0]["source_payload"]["priority_source"] == "podium_mic"
+    assert artifact["events"][0]["requested_state"]["environment"] == "speech"
+    assert artifact["events"][0]["target"]["bus"] == "main"

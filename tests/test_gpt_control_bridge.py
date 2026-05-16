@@ -78,6 +78,8 @@ def test_missing_reports_and_state_are_handled(tmp_path: Path) -> None:
     assert context["latest_watchdog_report_excerpt"] == ""
     assert context["watchdog_state_summary"]["exists"] is False
     assert context["watchdog_state_summary"]["valid_json"] is False
+    assert context["vector_index_summary"]["available"] is False
+    assert context["vector_index_summary"]["reason"] == "not_indexed"
 
 
 def test_company_resolution_prefers_tubeslave_automixer(tmp_path: Path) -> None:
@@ -230,6 +232,43 @@ def test_health_endpoint_over_http(tmp_path: Path) -> None:
     assert status == 200
     assert payload["ok"] is True
     assert payload["read_only"] is True
+    assert payload["knowledge_search_enabled"] is True
+
+
+def test_knowledge_stats_endpoint_over_http(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        bridge,
+        "vector_index_summary",
+        lambda _config: {"available": True, "record_count": 3, "read_only_endpoint": "/v1/knowledge/automixer/search?q=..."},
+    )
+
+    with running_server(make_config(tmp_path), FakePaperclipClient(make_routes())) as address:
+        status, payload = request_json("GET", address, "/v1/knowledge/automixer/stats")
+
+    assert status == 200
+    assert payload["available"] is True
+    assert payload["record_count"] == 3
+
+
+def test_knowledge_search_endpoint_over_http(tmp_path: Path, monkeypatch) -> None:
+    def fake_search(_config, query, limit=5):
+        return {
+            "available": True,
+            "query": query,
+            "total": 1,
+            "read_only": True,
+            "results": [{"document": "WING rollback proof", "metadata": {"source_path": "backend/TUB.md"}}],
+        }
+
+    monkeypatch.setattr(bridge, "search_vector_index", fake_search)
+
+    with running_server(make_config(tmp_path), FakePaperclipClient(make_routes())) as address:
+        status, payload = request_json("GET", address, "/v1/knowledge/automixer/search?q=WING+rollback&limit=2")
+
+    assert status == 200
+    assert payload["read_only"] is True
+    assert payload["query"] == "WING rollback"
+    assert payload["results"][0]["metadata"]["source_path"] == "backend/TUB.md"
 
 
 class running_server:

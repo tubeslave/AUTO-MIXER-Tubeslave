@@ -165,6 +165,27 @@ ai:
 # Collections: mixing_rules, instrument_profiles, troubleshooting, wing_osc_reference
 ```
 
+### ChromaDB (Project Vector Index)
+```bash
+# Rebuild local project-level index under .chromadb/
+python3 tools/project_vector_index/automixer_chromadb_index.py index
+
+# Include local Paperclip reports only when needed
+python3 tools/project_vector_index/automixer_chromadb_index.py index --include-paperclip-reports
+
+# Add manual information
+python3 tools/project_vector_index/automixer_chromadb_index.py add --title "Operator note" --text "..."
+
+# Sync Paperclip read-only summaries
+python3 tools/project_vector_index/automixer_chromadb_index.py paperclip-sync
+
+# Search indexed project knowledge
+python3 tools/project_vector_index/automixer_chromadb_index.py search "WING write gate rollback"
+```
+- Локальный, opt-in слой для сбора знаний проекта в ChromaDB.
+- Не вызывает Paperclip writes, WING/OSC, GitHub или live runtime.
+- `.env`, secret-файлы, `config/user_config.json`, `external/`, `node_modules/`, логи и generated artifacts исключаются.
+
 ---
 
 ## Библиотеки Python

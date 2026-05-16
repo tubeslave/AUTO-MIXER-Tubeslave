@@ -588,11 +588,50 @@ def test_no_write_routes_or_actions_exist():
         "cycle",
         "approve-template",
         "monitor",
+        "vector-index",
+        "vector-search",
+        "vector-add",
+        "vector-stats",
+        "vector-paperclip-sync",
     }
     assert "dispatch" not in command_action.choices
     assert "approve" not in command_action.choices
     assert "wakeup" not in command_action.choices
     assert automixer_operator.EXECUTABLE_WRITE_COMMANDS == ()
+
+
+def test_vector_indexer_command_wraps_local_chromadb_tool(tmp_path, monkeypatch, capsys):
+    script = tmp_path / "tools" / "project_vector_index" / "automixer_chromadb_index.py"
+    script.parent.mkdir(parents=True)
+    script.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    calls = []
+
+    def fake_run(cmd, cwd, text, capture_output, check):
+        calls.append(
+            {
+                "cmd": cmd,
+                "cwd": cwd,
+                "text": text,
+                "capture_output": capture_output,
+                "check": check,
+            }
+        )
+        return subprocess.CompletedProcess(cmd, 0, stdout='{"record_count": 1}\n', stderr="")
+
+    monkeypatch.setattr(automixer_operator.subprocess, "run", fake_run)
+
+    exit_code = automixer_operator.command_vector_indexer(
+        make_config(tmp_path),
+        "vector-index",
+        ["--dry-run"],
+    )
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert calls[0]["cmd"][1] == str(script)
+    assert calls[0]["cmd"][2:5] == ["index", "--project-root", str(tmp_path)]
+    assert "--dry-run" in calls[0]["cmd"]
+    assert '"record_count": 1' in output
 
 
 def test_missing_reports_and_state_are_handled_gracefully(tmp_path, capsys):

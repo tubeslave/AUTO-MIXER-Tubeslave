@@ -36,7 +36,10 @@ def test_shadow_mode_reports_follow_fixture_schema_and_preserve_dry_run_evidence
         assert comparison["selected_family"] == expected["selected_family"]
         assert comparison["operator_count"] == expected["operator_count"]
         assert comparison["ai_count"] == expected["ai_count"]
-        assert comparison["operator_action_capture"]["proposal_id"] == expected["operator_action_capture_id"]
+        if expected["operator_action_capture_id"] is None:
+            assert comparison["operator_action_capture"] is None
+        else:
+            assert comparison["operator_action_capture"]["proposal_id"] == expected["operator_action_capture_id"]
         assert comparison["ai_would_do_this"]["proposal_id"] == expected["ai_would_do_this_id"]
         assert [item["code"] for item in comparison["disagreements"]] == expected["disagreement_codes"]
         assert comparison["disagreement_summary"]["disagreement_rate"] == expected["disagreement_rate"]
@@ -45,8 +48,11 @@ def test_shadow_mode_reports_follow_fixture_schema_and_preserve_dry_run_evidence
         assert comparison["evidence"]["live_mixer_writes"] is False
         assert comparison["evidence"]["replay_correlation_ids"] == case["manifest"]["replay_correlation_ids"]
 
-        for key, value in expected["operator_source_payload"].items():
-            assert comparison["operator_action_capture"]["source_payload"][key] == value
+        if expected["operator_source_payload"] is None:
+            assert comparison["operator_action_capture"] is None
+        else:
+            for key, value in expected["operator_source_payload"].items():
+                assert comparison["operator_action_capture"]["source_payload"][key] == value
         for key, value in expected["ai_source_payload"].items():
             assert comparison["ai_would_do_this"]["source_payload"][key] == value
 

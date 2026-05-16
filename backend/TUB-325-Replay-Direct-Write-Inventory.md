@@ -49,25 +49,37 @@ Current safety posture:
 Current direct write calls:
 - `backend/auto_fader.py`
   - read/query path: `send("/ch/.../fdr")`
-  - write path: `set_channel_fader(...)`
+  - write path: `set_channel_fader(...)` via replay-intent guard on WING
 
 Current safety posture:
 - readback/query is safe
-- write attempts still bypass any shared replay-intent manifest layer
-- blocked WING writes are visible only through transport-level gate telemetry
+- WING auto-balance and realtime fader writes emit replay/write-intent artifacts before any live write attempt
+- blocked WING writes remain visible through transport-level gate telemetry
 
 ### Auto-fader v2 controller
 
 Current direct write calls:
 - `backend/auto_fader_v2/controller.py`
-  - `set_channel_fader(...)`
   - `set_gate_on(...)`
   - `set_channel_pan(...)`
   - AutoPanner and AutoReverb mixer application helpers
 
 Current safety posture:
-- these paths depend on the mixer client implementation for write safety
-- they are not yet normalized into a single dry-run proposal family with correlation ids and write-intent evidence
+- WING fader writes now fail closed through the same replay-intent adapter used by legacy auto-fader:
+  - startup reset to `0 dB`
+  - peak-calibration fader targets
+  - adaptive-noise-gate fader fallback when no dedicated gate setter exists
+  - steady-state `_send_fader_command(...)` automation writes
+- those WING fader paths now emit replay artifacts with:
+  - `replay_correlation_id`
+  - arrangement / scene metadata from `config.replay_write_intent`
+  - explicit `readback_source`
+  - post-limit requested target dB, so ceiling semantics are preserved in the artifact
+- remaining non-fader surfaces still depend on mixer-client / transport blocking:
+  - `set_gate_on(...)`
+  - `set_channel_pan(...)`
+  - spectral-masking and cross-adaptive `set_eq_band(...)`
+  - AutoPanner and AutoReverb mixer application helpers
 
 ## What is stable after this pass
 
@@ -78,6 +90,7 @@ Current safety posture:
   - `live_apply`
   - `readback_source`
   - confirmation flags preserved in `source_payload`
+- WING `auto_fader_v2` fader writes now share the same dry-run-first inventory contract as legacy `auto_fader`
 - direct WING setter blocking already had tests for fader/gain classification
 - this pass keeps the blocked-write inventory contract explicit: channel, write kind, requested value, source, and supervision reason
 
@@ -91,7 +104,7 @@ The main unresolved gap is architectural, not transport-level:
 That means:
 - WING safety is currently enforced by blocking, throttling, cooldown, approval, and readback
 - deterministic replay exists for proposal artifacts
-- but the two systems are not yet joined for legacy automation surfaces
+- but the two systems are not yet fully joined for non-fader legacy automation surfaces
 
 ## Recommended next safe tasks
 

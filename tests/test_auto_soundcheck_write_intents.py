@@ -43,3 +43,9 @@ def test_auto_soundcheck_gain_emits_replay_intent_and_skips_live_wing_write():
     assert payload["readback_source"] == "analysis_snapshot"
     assert payload["requires_confirmation"] is True
     assert payload["recommended_target_trim_db"] < 0.0
+    assert payload["autonomy_mode"] == "semi_autonomous_calibration"
+    assert payload["required_approval_level"] == "operator_required"
+    assert payload["action_envelope"]["transport_policy"] == "dry_run_only"
+    assert payload["action_envelope"]["trust_gates"]["summary"]["effective_autonomy_mode"] == (
+        "semi_autonomous_calibration"
+    )

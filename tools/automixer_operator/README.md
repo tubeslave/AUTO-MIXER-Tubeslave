@@ -175,6 +175,31 @@ python3 tools/automixer_operator/operator.py monitor
 
 Reads active runs, the latest watchdog report, issue status, run status, and comments/report data where Paperclip exposes them. It does not change the issue, does not wake agents, and does not launch new work.
 
+## Project Vector Index
+
+The ChromaDB project index is a local read/write knowledge store under `.chromadb/`.
+It is separate from Paperclip dispatch and live console automation.
+
+```bash
+python3 tools/automixer_operator/operator.py vector-index
+python3 tools/automixer_operator/operator.py vector-search "WING rollback readback"
+python3 tools/automixer_operator/operator.py vector-add --title "Operator note" --text "..."
+python3 tools/automixer_operator/operator.py vector-stats
+python3 tools/automixer_operator/operator.py vector-paperclip-sync
+```
+
+The direct indexer is also available:
+
+```bash
+python3 tools/project_vector_index/automixer_chromadb_index.py index
+python3 tools/project_vector_index/automixer_chromadb_index.py search "WING rollback readback"
+python3 tools/project_vector_index/automixer_chromadb_index.py add --title "Operator note" --text "..."
+python3 tools/project_vector_index/automixer_chromadb_index.py paperclip-sync
+```
+
+Use `--include-paperclip-reports` only when local `.paperclip/reports/` should be
+indexed into ChromaDB.
+
 ## Hard Blocks
 
 This operator intentionally has no executable command for:

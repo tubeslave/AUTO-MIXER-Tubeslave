@@ -176,6 +176,8 @@ Deterministic offline fixture cases live in
 Current scenarios:
 1. `operator_selected_shadow_override`
 2. `ai_selected_ready_shadow_run`
+3. `speech_environment_ai_only_shadow_run`
+4. `music_environment_ai_only_shadow_run`
 
 Each fixture pins:
 - replay manifest

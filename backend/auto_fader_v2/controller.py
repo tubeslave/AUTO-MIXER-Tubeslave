@@ -13,7 +13,7 @@ import logging
 import asyncio
 import os
 import time
-from typing import Dict, Optional, Callable, Any
+from typing import Dict, Optional, Callable, Any, List
 from enum import Enum
 
 # Debug log path: use AUTO_MIXER_DEBUG_LOG env or project .cursor/debug.log (no hardcoded user paths)
@@ -44,6 +44,7 @@ from cross_adaptive_eq import CrossAdaptiveEQ
 from partial_loudness import SimplifiedPartialLoudness
 from auto_panner import AutoPanner
 from auto_reverb import AutoReverb
+from replay_write_intent_adapter import ReplayWriteIntentAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +229,9 @@ class AutoFaderControllerV2:
         self._peak_calibrating = False
         self._peak_cal_start_time = 0.0
         self._peak_cal_max: Dict[int, float] = {}  # ch_id -> max true_peak (dBTP) during collection
+        self._replay_write_intent_adapter = ReplayWriteIntentAdapter(
+            source_system="auto_fader_v2"
+        )
     
     def set_automation_frozen(self, frozen: bool):
         """Freeze or unfreeze all automation (no fader commands when frozen)."""
@@ -250,6 +254,76 @@ class AutoFaderControllerV2:
             "frozen_channels": frozen_channels,
             "freeze_cooldown_seconds": self.freeze_cooldown_seconds,
         }
+
+    def get_replay_write_intents(self) -> List[Dict[str, Any]]:
+        """Return replay write-intent records captured for WING dry-run safety."""
+        return self._replay_write_intent_adapter.list_records()
+
+    def _build_replay_write_context(self) -> Dict[str, Any]:
+        replay_config = dict(self.config.get("replay_write_intent") or {})
+        context = {
+            "arrangement_id": replay_config.get("arrangement_id"),
+            "scene_id": replay_config.get("scene_id"),
+            "scene_label": replay_config.get("scene_label"),
+            "automation_mode": self.mode.value if isinstance(self.mode, OperationMode) else str(self.mode),
+            "controller_mode": self.controller_mode,
+        }
+        return {key: value for key, value in context.items() if value is not None}
+
+    def _emit_fader_write_intent(
+        self,
+        *,
+        channel_id: int,
+        current_db: float,
+        target_db: float,
+        readback_source: str,
+    ) -> Optional[Dict[str, Any]]:
+        if not self.mixer_client:
+            return None
+        extra_payload = {
+            "instrument_type": self.instrument_types.get(channel_id),
+            "selected_for_realtime": channel_id in self.selected_channels,
+        }
+        return self._replay_write_intent_adapter.emit_fader_intent(
+            mixer_client=self.mixer_client,
+            mixer_type=None,
+            channel=channel_id,
+            current_fader_db=current_db,
+            target_fader_db=target_db,
+            readback_source=readback_source,
+            context_metadata=self._build_replay_write_context(),
+            extra_payload=extra_payload,
+        )
+
+    def _apply_guarded_fader_write(
+        self,
+        *,
+        channel_id: int,
+        current_db: float,
+        target_db: float,
+        readback_source: str,
+    ) -> tuple[bool, Optional[Dict[str, Any]]]:
+        if not self.mixer_client:
+            return False, None
+
+        intent = self._emit_fader_write_intent(
+            channel_id=channel_id,
+            current_db=current_db,
+            target_db=target_db,
+            readback_source=readback_source,
+        )
+        if intent is not None and not intent["allow_live_write"]:
+            logger.info(
+                "WING auto_fader_v2 write skipped; replay intent emitted "
+                f"(channel={channel_id}, correlation={intent['replay_correlation_id']}, "
+                f"source={readback_source}, target_db={target_db:.2f})"
+            )
+            return False, intent
+
+        self.mixer_client.set_channel_fader(channel_id, target_db)
+        self._last_sent_fader[channel_id] = target_db
+        self._last_send_time[channel_id] = time.time()
+        return True, intent
     
     def _capture_initial_faders(self):
         """Capture current fader positions as baseline for gain sharing."""
@@ -332,8 +406,17 @@ class AutoFaderControllerV2:
                     self._gate_closed_channels[channel_id] = True
                 elif hasattr(self.mixer_client, "set_channel_fader"):
                     # Fallback for setups without gate OSC control.
-                    self.mixer_client.set_channel_fader(channel_id, -120.0)
-                    self._gate_closed_channels[channel_id] = True
+                    current_db = self.mixer_client.get_channel_fader(channel_id)
+                    if current_db is None:
+                        current_db = 0.0
+                    applied, _ = self._apply_guarded_fader_write(
+                        channel_id=channel_id,
+                        current_db=float(current_db),
+                        target_db=-120.0,
+                        readback_source="noise_gate_fallback",
+                    )
+                    if applied:
+                        self._gate_closed_channels[channel_id] = True
         else:
             self._inactive_since.pop(channel_id, None)
             if self._gate_closed_channels.get(channel_id, False):
@@ -495,6 +578,7 @@ class AutoFaderControllerV2:
         
         reset_count = 0
         initial_values = {}
+        skipped_channels = []
         for ch_id in self.selected_channels:
             try:
                 # #region agent log
@@ -518,9 +602,17 @@ class AutoFaderControllerV2:
                         }) + "\n")
                 except: pass
                 # #endregion
-                
+
                 # Set fader to 0 dB
-                self.mixer_client.set_channel_fader(ch_id, 0.0)
+                applied, intent = self._apply_guarded_fader_write(
+                    channel_id=ch_id,
+                    current_db=float(initial_val) if initial_val is not None else 0.0,
+                    target_db=0.0,
+                    readback_source="startup_fader_reset",
+                )
+                if not applied and intent is not None:
+                    skipped_channels.append(ch_id)
+                    continue
                 # CRITICAL: Force update local cache to 0.0 immediately
                 # This prevents reading old values after reset
                 if hasattr(self.mixer_client, 'state'):
@@ -529,8 +621,14 @@ class AutoFaderControllerV2:
                 reset_count += 1
             except Exception as e:
                 logger.error(f"Failed to reset channel {ch_id}: {e}")
-        
+
         logger.info(f"✅ Reset {reset_count}/{len(self.selected_channels)} faders to 0 dB")
+        if skipped_channels:
+            logger.info(
+                "Skipped live startup reset on WING; replay intents emitted for channels %s",
+                skipped_channels,
+            )
+            return
         # Give mixer time to apply changes and verify
         import time
         time.sleep(0.8)  # Increased wait time
@@ -920,9 +1018,12 @@ class AutoFaderControllerV2:
                          f"fader: {current_fader:.1f} -> {new_fader_db:.1f}")
 
             if self.mixer_client:
-                self.mixer_client.set_channel_fader(ch_id, new_fader_db)
-                self._last_sent_fader[ch_id] = new_fader_db
-                self._last_send_time[ch_id] = now
+                self._apply_guarded_fader_write(
+                    channel_id=ch_id,
+                    current_db=float(current_fader),
+                    target_db=float(new_fader_db),
+                    readback_source="peak_calibration_snapshot",
+                )
 
         # Transition to normal realtime mode
         self._peak_calibrating = False
@@ -1614,11 +1715,14 @@ class AutoFaderControllerV2:
             except: pass
             # #endregion
             
-            # Send OSC command
-            self.mixer_client.set_channel_fader(channel_id, new_db)
-            import time
-            self._last_sent_fader[channel_id] = new_db
-            self._last_send_time[channel_id] = time.time()
+            applied, _ = self._apply_guarded_fader_write(
+                channel_id=channel_id,
+                current_db=float(current_db),
+                target_db=float(new_db),
+                readback_source="controller_state",
+            )
+            if not applied:
+                return
             logger.info(f"Channel {channel_id}: {current_db:.2f} dB -> {new_db:.2f} dB (adjustment: {adjustment_db:+.2f} dB)")
         except Exception as e:
             logger.error(f"Error sending fader command for channel {channel_id}: {e}", exc_info=True)
