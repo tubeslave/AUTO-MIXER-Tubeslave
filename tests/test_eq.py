@@ -9,6 +9,7 @@ Covers:
 
 import numpy as np
 import pytest
+from unittest.mock import patch
 
 from auto_eq import EQBand, SpectrumAnalyzer
 
@@ -112,3 +113,57 @@ class TestEQCorrectionGeneration:
         assert result.peak_freq < 300.0, (
             f"Peak should be near 100 Hz, got {result.peak_freq:.1f}"
         )
+
+
+class DummySpectrumAnalyzer:
+    """Spectrum analyzer stub that avoids opening audio devices in controller tests."""
+
+    def __init__(self, *args, **kwargs):
+        self.started = False
+        self.stopped = False
+
+    def start(self, channel=None, on_spectrum_callback=None):
+        self.started = True
+        self.channel = channel
+        self.on_spectrum_callback = on_spectrum_callback
+        return True
+
+    def stop(self):
+        self.stopped = True
+
+
+class TestMultiChannelAutoEQController:
+    """Tests for multi-channel Auto-EQ runtime compatibility."""
+
+    def test_start_multi_channel_accepts_live_mode_without_audio_device(self):
+        from auto_eq import MultiChannelAutoEQController
+
+        controller = MultiChannelAutoEQController()
+
+        with patch("auto_eq.SpectrumAnalyzer", DummySpectrumAnalyzer):
+            started = controller.start_multi_channel(
+                device_id=1,
+                channels_config=[{"channel": 1, "profile": "custom", "auto_apply": False}],
+                mode="live",
+            )
+
+        assert started is True
+        assert controller.mode == "live"
+        assert controller.active_channels[1]["mode"] == "live"
+        assert controller.active_channels[1]["auto_apply"] is False
+
+    def test_start_multi_channel_normalizes_unknown_mode_to_soundcheck(self):
+        from auto_eq import MultiChannelAutoEQController
+
+        controller = MultiChannelAutoEQController()
+
+        with patch("auto_eq.SpectrumAnalyzer", DummySpectrumAnalyzer):
+            started = controller.start_multi_channel(
+                device_id=1,
+                channels_config=[{"channel": 2, "profile": "custom", "auto_apply": False}],
+                mode="unsafe-live-write",
+            )
+
+        assert started is True
+        assert controller.mode == "soundcheck"
+        assert controller.active_channels[2]["mode"] == "soundcheck"
