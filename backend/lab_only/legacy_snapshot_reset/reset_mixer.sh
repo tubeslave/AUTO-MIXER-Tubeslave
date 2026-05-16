@@ -1,15 +1,16 @@
 #!/bin/bash
-# Скрипт для сброса настроек пульта (микшера)
+# Legacy lab-only wrapper for full mixer reset scripts.
 
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # Загрузить IP из конфига по умолчанию
 DEFAULT_IP="192.168.1.100"
 DEFAULT_PORT="2223"
 
-if [ -f "../config/default_config.json" ]; then
-    DEFAULT_IP=$(python3 -c "import json; f=open('../config/default_config.json'); c=json.load(f); print(c.get('wing', {}).get('default_ip', '$DEFAULT_IP'))" 2>/dev/null || echo "$DEFAULT_IP")
-    DEFAULT_PORT=$(python3 -c "import json; f=open('../config/default_config.json'); c=json.load(f); print(c.get('wing', {}).get('receive_port', '$DEFAULT_PORT'))" 2>/dev/null || echo "$DEFAULT_PORT")
+if [ -f "$REPO_ROOT/config/default_config.json" ]; then
+    DEFAULT_IP=$(python3 -c "import json; f=open('$REPO_ROOT/config/default_config.json'); c=json.load(f); print(c.get('wing', {}).get('default_ip', '$DEFAULT_IP'))" 2>/dev/null || echo "$DEFAULT_IP")
+    DEFAULT_PORT=$(python3 -c "import json; f=open('$REPO_ROOT/config/default_config.json'); c=json.load(f); print(c.get('wing', {}).get('receive_port', '$DEFAULT_PORT'))" 2>/dev/null || echo "$DEFAULT_PORT")
 fi
 
 # Использовать переданные аргументы или значения по умолчанию
@@ -36,4 +37,5 @@ fi
 
 echo ""
 echo "Запуск скрипта сброса..."
-python3 reset_modules_trim_faders.py "$IP" "$PORT"
+cd "$REPO_ROOT" || exit 1
+python3 -m backend.lab_only.legacy_snapshot_reset.reset_modules_trim_faders "$IP" "$PORT"

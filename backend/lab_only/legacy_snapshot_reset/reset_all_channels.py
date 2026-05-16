@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Test script: Reset all 40 channels to default settings
+Legacy lab-only full-channel reset script.
 - Set trim = 0 dB
 - Set fader = 0 dB
 - Turn off all modules (EQ, Compressor, Gate)
 - Reset all module parameters to defaults
 - Turn off inserts
 """
-from wing_client import WingClient
+from backend.wing_client import WingClient
 import time
 import logging
 

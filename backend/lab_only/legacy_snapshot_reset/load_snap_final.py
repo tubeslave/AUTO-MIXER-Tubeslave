@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Финальная версия загрузки snapshot по имени или индексу
+Legacy lab-only snapshot loader by name or index.
 """
 
 import sys
 import time
 import logging
-from wing_client import WingClient
+from backend.wing_client import WingClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -16,17 +16,17 @@ def main():
     """Основная функция"""
     if len(sys.argv) < 3:
         print("Использование:")
-        print("  python3 load_snap_final.py <IP> <SNAP_NAME_OR_INDEX> [MAX_INDEX]")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.load_snap_final <IP> <SNAP_NAME_OR_INDEX> [MAX_INDEX]")
         print("")
         print("Примеры:")
         print("  # Загрузка по имени:")
-        print("  python3 load_snap_final.py 192.168.1.102 'HULI REPA AC'")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.load_snap_final 192.168.1.102 'HULI REPA AC'")
         print("")
         print("  # Загрузка по индексу:")
-        print("  python3 load_snap_final.py 192.168.1.102 5")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.load_snap_final 192.168.1.102 5")
         print("")
         print("  # С указанием максимального индекса для поиска:")
-        print("  python3 load_snap_final.py 192.168.1.102 'HULI REPA AC' 500")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.load_snap_final 192.168.1.102 'HULI REPA AC' 500")
         return 1
     
     ip = sys.argv[1]

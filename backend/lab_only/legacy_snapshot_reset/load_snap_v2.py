@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Загрузка snapshot/scene по имени используя правильные адреса из документации
+Legacy lab-only snapshot loader experiment using documented addresses.
 """
 
 import sys
 import time
 import logging
-from wing_client import WingClient
+from backend.wing_client import WingClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -134,10 +134,10 @@ def main():
     """Основная функция"""
     if len(sys.argv) < 3:
         print("Использование:")
-        print("  python3 load_snap_v2.py <IP> <SNAP_NAME>")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.load_snap_v2 <IP> <SNAP_NAME>")
         print("")
         print("Пример:")
-        print("  python3 load_snap_v2.py 192.168.1.102 'HULI REPA AC'")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.load_snap_v2 192.168.1.102 'HULI REPA AC'")
         return 1
     
     ip = sys.argv[1]

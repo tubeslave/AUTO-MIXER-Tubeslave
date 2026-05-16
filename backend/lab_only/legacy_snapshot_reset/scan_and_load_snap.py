@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Сканирование snapshots по номерам и загрузка по имени
+Legacy lab-only snapshot scanner and loader.
 """
 
 import sys
 import time
 import logging
-from wing_client import WingClient
+from backend.wing_client import WingClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -167,11 +167,11 @@ def main():
     """Основная функция"""
     if len(sys.argv) < 3:
         print("Использование:")
-        print("  python3 scan_and_load_snap.py <IP> <SNAP_NAME> [MAX_SNAPSHOTS]")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.scan_and_load_snap <IP> <SNAP_NAME> [MAX_SNAPSHOTS]")
         print("")
         print("Пример:")
-        print("  python3 scan_and_load_snap.py 192.168.1.102 'HULI REPA AC'")
-        print("  python3 scan_and_load_snap.py 192.168.1.102 'HULI REPA AC' 500")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.scan_and_load_snap 192.168.1.102 'HULI REPA AC'")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.scan_and_load_snap 192.168.1.102 'HULI REPA AC' 500")
         return 1
     
     ip = sys.argv[1]

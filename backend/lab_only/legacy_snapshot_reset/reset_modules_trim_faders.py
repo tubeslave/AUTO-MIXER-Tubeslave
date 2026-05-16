@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Скрипт для полного сброса всех модулей, их параметров, trim и фейдеров на всех каналах:
+Legacy lab-only script for resetting modules, trim, and faders on all channels.
 
 Модули и их параметры:
 - EQ: выключен, все полосы (low shelf, bands 1-4, high shelf) gain=0, mix=100%
@@ -15,7 +15,9 @@
 - Fader = 0дБ
 - Pan = 0 (центр)
 """
-from wing_client import WingClient
+from pathlib import Path
+
+from backend.wing_client import WingClient
 import time
 import logging
 import sys
@@ -181,8 +183,7 @@ def reset_all_channels(auto_confirm=False):
     try:
         import os
         import json
-        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
-                                  'config', 'default_config.json')
+        config_path = Path(__file__).resolve().parents[3] / "config" / "default_config.json"
         if os.path.exists(config_path):
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Поиск snapshot по имени через перебор индексов и загрузка
+Legacy lab-only snapshot scanner and loader by name.
 """
 
 import sys
 import time
 import logging
-from wing_client import WingClient
+from backend.wing_client import WingClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -190,11 +190,11 @@ def main():
     """Основная функция"""
     if len(sys.argv) < 3:
         print("Использование:")
-        print("  python3 find_and_load_snap.py <IP> <SNAP_NAME> [MAX_INDEX]")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.find_and_load_snap <IP> <SNAP_NAME> [MAX_INDEX]")
         print("")
         print("Пример:")
-        print("  python3 find_and_load_snap.py 192.168.1.102 'HULI REPA AC'")
-        print("  python3 find_and_load_snap.py 192.168.1.102 'HULI REPA AC' 500")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.find_and_load_snap 192.168.1.102 'HULI REPA AC'")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.find_and_load_snap 192.168.1.102 'HULI REPA AC' 500")
         return 1
     
     ip = sys.argv[1]

@@ -42,7 +42,7 @@ Anything else should be clearly classified as one of:
 | Experimental auto-fader v2 | `backend/auto_fader_v2/controller.py` and optional `get_freeze_status` fields | Test-covered and partially reused by helper services, but not instantiated by the primary server bootstrap | Keep experimental and unwired | Do not expose in pilot UI; only revisit after it can replace legacy gain/fader behind the same replay-intent contract |
 | Mixing-agent runtime | `backend/handlers/agent_handlers.py` compatibility commands | Handler names still exist, but the server does not attach a `mixing_agent`; commands return explicit `status: unavailable` | Keep fail-closed compatibility only | Do not add UI; archive or remove only after the command surface is no longer needed for compatibility |
 | Snapshot load/save/restore WebSocket surface | `load_snap`, `save_snap`, `restore_snapshot` | WebSocket handlers still exist, but WING deployment blocking quarantines the mutating paths | Keep quarantined | Keep out of pilot UI; if retained for operators, require explicit runbook-driven use outside the generic tab flow |
-| Standalone snapshot/reset scripts | `load_snap.py`, `load_snap_v2.py`, `load_snap_final.py`, `find_and_load_snap.py`, `scan_and_load_snap.py`, `reset_all_channels.py`, `reset_modules_trim_faders.py` | Multiple direct-write operator scripts remain in `backend/` and can be mistaken for supported runtime entrypoints | Mark lab-only and archive candidates | Move behind a lab/legacy namespace or add an explicit archive banner before pilot operators touch the repo |
+| Standalone snapshot/reset scripts | `backend/lab_only/legacy_snapshot_reset/*` | Direct-write operator scripts are archived behind a lab-only namespace instead of sitting at `backend/` root | Archived as lab-only | Keep out of pilot runbooks and require intentional `python3 -m backend.lab_only.legacy_snapshot_reset...` invocation |
 | Status-only effect tabs | Auto Panner, Auto Reverb, Auto Gate, Auto Effects, Cross-Adaptive EQ | Already fail-closed in frontend and backend status endpoints | Keep as-is | No urgent work beyond preserving the disabled state |
 | Duplicate analyzer/ML research modules | `backend/style_transfer.py` vs `backend/ml/style_transfer.py`, `backend/neural_mix_extractor.py` vs `backend/ml/neural_mix_extractor.py`, `backend/processing_graph.py` vs `backend/ml/processing_graph.py` | Real duplicate implementations exist, but they are not the current operator-facing deployment path | Defer until after pilot | Consolidate later with tests and ownership decisions; do not mix this cleanup into the pilot freeze |
 
@@ -63,16 +63,16 @@ Anything else should be clearly classified as one of:
 
 ### 3. Archive or relabel as lab-only
 
-- `load_snap.py`
-- `load_snap_v2.py`
-- `load_snap_final.py`
-- `find_and_load_snap.py`
-- `scan_and_load_snap.py`
-- `reset_all_channels.py`
-- `reset_modules_trim_faders.py`
+- `backend/lab_only/legacy_snapshot_reset/load_snap.py`
+- `backend/lab_only/legacy_snapshot_reset/load_snap_v2.py`
+- `backend/lab_only/legacy_snapshot_reset/load_snap_final.py`
+- `backend/lab_only/legacy_snapshot_reset/find_and_load_snap.py`
+- `backend/lab_only/legacy_snapshot_reset/scan_and_load_snap.py`
+- `backend/lab_only/legacy_snapshot_reset/reset_all_channels.py`
+- `backend/lab_only/legacy_snapshot_reset/reset_modules_trim_faders.py`
 - `server.py.bak`
 
-These are the strongest candidates for a lab-only namespace because they look executable and authoritative, but they are not the approved supervised pilot runtime.
+These direct-write scripts are now parked behind the lab-only namespace because they look executable and authoritative, but they are not the approved supervised pilot runtime.
 
 ## Evidence Summary By Surface
 
@@ -104,6 +104,6 @@ These are the strongest candidates for a lab-only namespace because they look ex
 
 1. Remove or clearly label the WING-facing start controls in `AutoSoundcheckTab` and `AutoFaderTab`.
 2. Add a small runtime badge in the operator UI using `gain_fader_runtime.selected_runtime` so the pilot surface states which runtime is active.
-3. Add one `LAB-ONLY` archive note or move the standalone snapshot/reset scripts under a legacy folder.
+3. Done on 2026-05-17: moved the standalone snapshot/reset scripts under `backend/lab_only/legacy_snapshot_reset/`.
 4. Add a voice-runtime note in the UI or runbook that states `VoiceControlSherpa` is primary and `VoiceControlV2` is fallback, while other voice backends are non-pilot.
 5. After the pilot, consolidate duplicate analyzer research modules only with tests and clear ownership, not during the freeze window.

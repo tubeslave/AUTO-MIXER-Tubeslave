@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Загрузка snapshot/scene по имени
+Legacy lab-only snapshot loader by name.
 """
 
 import sys
 import time
 import logging
-from wing_client import WingClient
+from backend.wing_client import WingClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -60,14 +60,14 @@ def main():
     """Основная функция"""
     if len(sys.argv) < 3:
         print("Использование:")
-        print("  python3 load_snap.py <IP> <SNAP_NAME>")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.load_snap <IP> <SNAP_NAME>")
         print("")
         print("Параметры:")
         print("  IP        - IP адрес пульта (по умолчанию: 192.168.1.102)")
         print("  SNAP_NAME - Имя snapshot для загрузки")
         print("")
         print("Пример:")
-        print("  python3 load_snap.py 192.168.1.102 'HULI REPA AC'")
+        print("  python3 -m backend.lab_only.legacy_snapshot_reset.load_snap 192.168.1.102 'HULI REPA AC'")
         return 1
     
     ip = sys.argv[1] if len(sys.argv) > 1 else "192.168.1.102"
@@ -76,7 +76,7 @@ def main():
     
     if not snap_name:
         print("Ошибка: необходимо указать имя snapshot")
-        print("Использование: python3 load_snap.py <IP> <SNAP_NAME> [MAX_INDEX]")
+        print("Использование: python3 -m backend.lab_only.legacy_snapshot_reset.load_snap <IP> <SNAP_NAME> [MAX_INDEX]")
         return 1
     
     logger.info(f"Подключение к пульту {ip}...")
