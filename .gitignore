@@ -50,6 +50,7 @@ logs/
 
 # Local ChromaDB/vector indexes
 .chromadb/
+.paperclip/
 
 # OS
 Thumbs.db

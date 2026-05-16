@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tubeslave.automixer-vector-paperclip-sync</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>python3</string>
+    <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/project_vector_index/automixer_vector_paperclip_sync.py</string>
+    <string>once</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StartInterval</key>
+  <integer>900</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/logs/automixer_vector_paperclip_sync.launchd.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/logs/automixer_vector_paperclip_sync.launchd.err.log</string>
+</dict>
+</plist>
