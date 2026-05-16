@@ -57,6 +57,10 @@ presets/*.json
 !presets/.gitkeep
 
 # Config overrides
+.env
+.env.*
+!.env.example
+.secret
 config/user_config.json
 
 # Temporary files

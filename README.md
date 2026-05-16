@@ -70,6 +70,14 @@ cd frontend
 npm install
 ```
 
+### 3. Локальные переменные окружения
+
+```bash
+cp .env.example .env
+```
+
+Заполняйте `.env` только локально. Не коммитьте реальные ключи в репозиторий.
+
 ## Запуск
 
 ### 1. Запуск Backend-сервера
@@ -125,6 +133,8 @@ npm start
 - Настроек модулей автоматизации
 - Safety Limits (защита от перегрузок)
 
+LLM-параметры можно переопределять через локальный `.env` или переменные среды с префиксом `AUTOMIXER_`.
+
 ## Тестирование OSC-связи
 
 Используйте тестовый скрипт для проверки подключения:
@@ -153,6 +163,7 @@ python test_wing_connection.py
 - [Behringer Wing OSC Implementation](https://wiki.munichmakerlab.de/wiki/Behringer_Wing)
 - [Mixing Secrets for the Small Studio - Mike Senior](https://www.cambridge-mt.com/ms/mix-book/)
 - [Sound Systems: Design and Optimization - Bob McCarthy](https://bobmccarthy.com/)
+- [Docs/secrets-rotation.md](Docs/secrets-rotation.md) - порядок ротации секрета после инцидента с tracked `.env`
 
 ## Поддержка
 
