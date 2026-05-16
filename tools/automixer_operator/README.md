@@ -41,6 +41,8 @@ Shows:
 - agents summary;
 - blocked/todo/in_progress queue counters when Paperclip dashboard data is available;
 - `.paperclip/watchdog_state.json` summary;
+- latest reporting summary path/category;
+- latest reporting digest + continuity marker;
 - latest watchdog report path;
 - `recommended_next_action`.
 

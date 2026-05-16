@@ -32,6 +32,7 @@ TERMINAL_RUN_STATUSES = {"done", "failed", "succeeded", "cancelled", "canceled",
 REPORT_EXCERPT_CHARS = 2000
 DEFAULT_VECTOR_LIMIT = 5
 MAX_VECTOR_LIMIT = 10
+RECENT_REPORT_LIMIT = 5
 
 
 @dataclass(frozen=True)
@@ -151,7 +152,10 @@ def build_context(
             agents_summary = missing
             active_runs_summary = missing
 
-    report = latest_report(config.project_root)
+    watchdog_report = latest_watchdog_report(config.project_root)
+    reporting_summary = latest_reporting_summary(config.project_root)
+    reports = recent_reports(config.project_root)
+    continuity = reporting_continuity(reports)
     state_summary = watchdog_state_summary(config.project_root)
 
     context = {
@@ -160,16 +164,23 @@ def build_context(
         "company_id": company_id,
         "company_id_source": company_id_source,
         "dashboard_summary": dashboard_summary,
-        "latest_watchdog_report_excerpt": report["excerpt"],
-        "latest_watchdog_report_path": report["path"],
+        "latest_reporting_summary": reporting_summary,
+        "latest_reporting_summary_excerpt": reporting_summary["excerpt"],
+        "latest_reporting_summary_heading": reporting_summary["heading"],
+        "latest_reporting_summary_path": reporting_summary["path"],
+        "latest_watchdog_report_excerpt": watchdog_report["excerpt"],
+        "latest_watchdog_report_heading": watchdog_report["heading"],
+        "latest_watchdog_report_path": watchdog_report["path"],
         "paperclip_api_ok": paperclip_api_ok,
         "paperclip_api_url": config.paperclip_api_url,
         "paperclip_errors": errors,
+        "recent_reports": reports,
+        "reporting_continuity": continuity,
         "recommended_next_action": recommended_next_action(
             paperclip_api_ok=paperclip_api_ok,
             company_id=company_id,
             active_runs_summary=active_runs_summary,
-            latest_report_path=report["path"],
+            latest_reporting_summary_path=reporting_summary["path"],
         ),
         "safety_flags": safety_flags(),
         "vector_index_summary": vector_index_summary(config),
@@ -354,26 +365,116 @@ def get_active_runs_summary(client: Any, company_id: str) -> dict[str, Any]:
     }
 
 
-def latest_report(project_root: Path) -> dict[str, Any]:
+def latest_watchdog_report(project_root: Path) -> dict[str, Any]:
     reports_dir = project_root / ".paperclip" / "reports"
     if not reports_dir.exists():
-        return {"exists": False, "excerpt": "", "path": None, "truncated": False}
+        return empty_report_summary()
 
     candidates = sorted(reports_dir.glob("*watchdog*.md"))
     if not candidates:
-        candidates = sorted(reports_dir.glob("*.md"))
-    if not candidates:
-        return {"exists": False, "excerpt": "", "path": None, "truncated": False}
+        return empty_report_summary()
 
-    selected = max(candidates, key=lambda path: (path.stat().st_mtime_ns, path.name))
-    text = selected.read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n")
-    excerpt = text[:REPORT_EXCERPT_CHARS]
+    return report_summary_for_path(max(candidates, key=report_sort_key))
+
+
+def latest_reporting_summary(project_root: Path) -> dict[str, Any]:
+    reports_dir = project_root / ".paperclip" / "reports"
+    if not reports_dir.exists():
+        return empty_report_summary()
+
+    candidates = sorted(reports_dir.glob("*.md"))
+    if not candidates:
+        return empty_report_summary()
+    return report_summary_for_path(max(candidates, key=report_sort_key))
+
+
+def recent_reports(project_root: Path, limit: int = RECENT_REPORT_LIMIT) -> list[dict[str, Any]]:
+    reports_dir = project_root / ".paperclip" / "reports"
+    if not reports_dir.exists():
+        return []
+    candidates = sorted(reports_dir.glob("*.md"), key=report_sort_key, reverse=True)
+    return [report_summary_for_path(path, include_excerpt=False) for path in candidates[:limit]]
+
+
+def empty_report_summary() -> dict[str, Any]:
     return {
-        "exists": True,
-        "excerpt": excerpt,
-        "path": str(selected),
-        "truncated": len(text) > REPORT_EXCERPT_CHARS,
+        "category": None,
+        "exists": False,
+        "excerpt": "",
+        "heading": None,
+        "modified_at": None,
+        "name": None,
+        "path": None,
+        "truncated": False,
     }
+
+
+def report_summary_for_path(path: Path, *, include_excerpt: bool = True) -> dict[str, Any]:
+    text = path.read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n")
+    excerpt = text[:REPORT_EXCERPT_CHARS] if include_excerpt else ""
+    report_id = report_digest(path, text)
+    return {
+        "category": report_category(path),
+        "exists": True,
+        "digest": report_id,
+        "excerpt": excerpt,
+        "heading": first_heading(text),
+        "modified_at": isoformat_utc(path.stat().st_mtime),
+        "name": path.name,
+        "path": str(path),
+        "truncated": len(text) > REPORT_EXCERPT_CHARS if include_excerpt else False,
+    }
+
+
+def reporting_continuity(reports: list[dict[str, Any]]) -> dict[str, Any]:
+    if not reports:
+        return {"continuity": "absent", "latest_digest": None, "previous_digest": None, "is_repeat": False}
+    latest_digest = str(reports[0].get("digest") or "")
+    previous_digest = str(reports[1].get("digest")) if len(reports) > 1 else None
+    return {
+        "continuity": "stable",
+        "latest_digest": latest_digest,
+        "is_repeat": latest_digest and latest_digest == (previous_digest or ""),
+        "previous_digest": previous_digest,
+    }
+
+
+def report_digest(path: Path, text: str) -> str:
+    import hashlib
+
+    body = text.encode("utf-8", errors="replace")
+    return hashlib.sha256(body).hexdigest()[:16]
+
+
+def report_category(path: Path) -> str:
+    name = path.name.lower()
+    if name == "operational_audit_latest.md" or name.startswith("operational_audit_"):
+        return "operational_audit"
+    if name == "watchdog_dispatch_report.md":
+        return "watchdog_dispatch"
+    if "watchdog" in name:
+        return "watchdog"
+    if name.startswith("tub"):
+        return "issue_report"
+    return "report"
+
+
+def first_heading(text: str) -> str | None:
+    for line in text.splitlines():
+        heading = line.strip()
+        if heading:
+            return heading
+    return None
+
+
+def report_sort_key(path: Path) -> tuple[int, str]:
+    return (path.stat().st_mtime_ns, path.name)
+
+
+def isoformat_utc(timestamp: float) -> str:
+    from datetime import datetime, timezone
+
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
 
 
 def watchdog_state_summary(project_root: Path) -> dict[str, Any]:
@@ -432,7 +533,7 @@ def recommended_next_action(
     paperclip_api_ok: bool,
     company_id: str | None,
     active_runs_summary: dict[str, Any],
-    latest_report_path: str | None,
+    latest_reporting_summary_path: str | None,
 ) -> dict[str, Any]:
     if not paperclip_api_ok:
         return {
@@ -456,10 +557,10 @@ def recommended_next_action(
             "requires_approval": False,
             "write_permitted": False,
         }
-    if not latest_report_path:
+    if not latest_reporting_summary_path:
         return {
-            "action": "review_status_without_watchdog_report",
-            "reason": "No watchdog report exists yet; use read-only status before proposing approvals.",
+            "action": "review_status_without_local_report",
+            "reason": "No local reporting summary exists yet; use read-only status before proposing approvals.",
             "requires_approval": False,
             "write_permitted": False,
         }

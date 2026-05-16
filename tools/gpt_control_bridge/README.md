@@ -11,7 +11,7 @@ The bridge exposes only GET endpoints and binds to loopback by default. It does 
 - `GET /v1/knowledge/automixer/stats`
 - `GET /v1/knowledge/automixer/search?q=<query>&limit=5`
 
-`/v1/context/automixer` returns Paperclip health, dashboard/agent/run summaries when available, `.paperclip/watchdog_state.json` summary, latest watchdog report path/excerpt, a recommended next action, and safety flags.
+`/v1/context/automixer` returns Paperclip health, dashboard/agent/run summaries when available, `.paperclip/watchdog_state.json` summary, a stable latest reporting summary, latest watchdog report path/excerpt, a short recent-reports list with report digests, a reporting continuity block for dedupe, a recommended next action, and safety flags.
 
 The knowledge endpoints expose the local ChromaDB project index in read-only
 mode for GPT usage. Search results include source path, category, metadata, and

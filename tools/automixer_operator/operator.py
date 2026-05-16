@@ -1090,13 +1090,35 @@ def render_state(summary: Any) -> list[str]:
 
 
 def render_latest_report(context: dict[str, Any]) -> list[str]:
+    reporting_path = context.get("latest_reporting_summary_path")
+    continuity = context.get("reporting_continuity")
+    continuity_digest = None
+    continuity_is_repeat = False
+    if isinstance(continuity, dict):
+        continuity_digest = continuity.get("latest_digest")
+        continuity_is_repeat = bool(continuity.get("is_repeat"))
+    lines = ["", "Latest reporting summary:"]
+    if reporting_path:
+        lines.append(f"- path: {reporting_path}")
+        lines.append(f"- category: {context.get('latest_reporting_summary', {}).get('category') if isinstance(context.get('latest_reporting_summary'), dict) else 'unknown'}")
+        heading = clean_missing(str(context.get("latest_reporting_summary_heading") or ""))
+        if heading:
+            lines.append(f"- heading: {heading}")
+        if continuity_digest:
+            lines.append(f"- digest: {continuity_digest}")
+        lines.append(f"- is_repeat: {continuity_is_repeat}")
+    else:
+        lines.append("- none")
+
     path = context.get("latest_watchdog_report_path")
-    lines = ["", "Latest watchdog report:"]
+    lines.extend(["", "Latest watchdog report:"])
     if not path:
         return lines + ["- none"]
     lines.append(f"- path: {path}")
-    excerpt = str(context.get("latest_watchdog_report_excerpt") or "").strip()
-    first_heading = next((line.strip() for line in excerpt.splitlines() if line.strip()), "")
+    first_heading = clean_missing(str(context.get("latest_watchdog_report_heading") or ""))
+    if not first_heading:
+        excerpt = str(context.get("latest_watchdog_report_excerpt") or "").strip()
+        first_heading = next((line.strip() for line in excerpt.splitlines() if line.strip()), "")
     if first_heading:
         lines.append(f"- heading: {first_heading}")
     return lines

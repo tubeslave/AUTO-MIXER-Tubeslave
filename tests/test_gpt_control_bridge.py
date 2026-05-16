@@ -74,8 +74,11 @@ def test_missing_reports_and_state_are_handled(tmp_path: Path) -> None:
     )
 
     assert context["paperclip_api_ok"] is True
+    assert context["latest_reporting_summary_path"] is None
+    assert context["latest_reporting_summary_excerpt"] == ""
     assert context["latest_watchdog_report_path"] is None
     assert context["latest_watchdog_report_excerpt"] == ""
+    assert context["recent_reports"] == []
     assert context["watchdog_state_summary"]["exists"] is False
     assert context["watchdog_state_summary"]["valid_json"] is False
     assert context["vector_index_summary"]["available"] is False
@@ -131,6 +134,52 @@ def test_latest_report_excerpt_loaded(tmp_path: Path) -> None:
     assert context["latest_watchdog_report_path"] == str(newer)
     assert "# Newer" in context["latest_watchdog_report_excerpt"]
     assert "latest watchdog report body" in context["latest_watchdog_report_excerpt"]
+    assert context["latest_reporting_summary_path"] == str(newer)
+    assert context["latest_reporting_summary_heading"] == "# Newer"
+
+
+def test_latest_reporting_summary_tracks_newest_non_watchdog_report(tmp_path: Path) -> None:
+    reports_dir = tmp_path / ".paperclip" / "reports"
+    reports_dir.mkdir(parents=True)
+    watchdog = reports_dir / "watchdog_dispatch_report.md"
+    issue_report = reports_dir / "tub163_reporting_loop.md"
+    watchdog.write_text("# Watchdog\npreview report\n", encoding="utf-8")
+    issue_report.write_text("# TUB-163\nstable reporting summary\n", encoding="utf-8")
+    os.utime(watchdog, (1000, 1000))
+    os.utime(issue_report, (2000, 2000))
+
+    context = bridge.build_context(
+        make_config(tmp_path),
+        client=FakePaperclipClient(make_routes()),
+    )
+
+    assert context["latest_watchdog_report_path"] == str(watchdog)
+    assert context["latest_reporting_summary_path"] == str(issue_report)
+    assert context["latest_reporting_summary"]["category"] == "issue_report"
+    assert context["recent_reports"][0]["path"] == str(issue_report)
+    assert len(context["recent_reports"]) >= 2
+    assert context["reporting_continuity"]["continuity"] == "stable"
+    assert context["reporting_continuity"]["latest_digest"] == context["recent_reports"][0]["digest"]
+    assert context["reporting_continuity"]["previous_digest"] == context["recent_reports"][1]["digest"]
+
+
+def test_reporting_continuity_marks_repeat_digest(tmp_path: Path) -> None:
+    reports_dir = tmp_path / ".paperclip" / "reports"
+    reports_dir.mkdir(parents=True)
+    report_one = reports_dir / "tub200_repeat.md"
+    report_two = reports_dir / "tub201_repeat.md"
+    report_one.write_text("# Same\nrepeat report\n", encoding="utf-8")
+    report_two.write_text("# Same\nrepeat report\n", encoding="utf-8")
+    os.utime(report_one, (1000, 1000))
+    os.utime(report_two, (2000, 2000))
+
+    context = bridge.build_context(
+        make_config(tmp_path),
+        client=FakePaperclipClient(make_routes()),
+    )
+
+    assert context["reporting_continuity"]["continuity"] == "stable"
+    assert context["reporting_continuity"]["is_repeat"] is True
 
 
 def test_watchdog_state_summary_loaded(tmp_path: Path) -> None:
@@ -220,7 +269,7 @@ def test_recommended_next_action_changes_when_active_runs_exist_vs_none(tmp_path
         ),
     )
 
-    assert no_runs["recommended_next_action"]["action"] == "review_status_without_watchdog_report"
+    assert no_runs["recommended_next_action"]["action"] == "review_status_without_local_report"
     assert with_runs["recommended_next_action"]["action"] == "observe_active_runs"
     assert with_runs["active_runs_summary"]["total"] == 1
 
