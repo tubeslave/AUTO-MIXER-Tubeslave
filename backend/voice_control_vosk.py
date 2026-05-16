@@ -1,6 +1,8 @@
 """
-Voice Control Module using Vosk
-Optimized for Russian voice commands with limited vocabulary
+Legacy lab-only Vosk backend.
+
+This module is not attached to `AutoMixerServer.start_voice_control` on the
+supervised pilot surface and remains quarantined from deployment use.
 """
 import asyncio
 import logging

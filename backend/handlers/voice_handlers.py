@@ -19,7 +19,8 @@ def register_handlers(server):
         await server.send_to_client(websocket, {
             "type": "voice_control_status",
             "active": False,
-            "message": "Starting voice control..."
+            "message": "Starting voice control...",
+            "runtime": server.get_voice_runtime_summary(),
         })
         logger.info("Sent initial acknowledgment to client")
 
@@ -38,7 +39,8 @@ def register_handlers(server):
             await server.send_to_client(websocket, {
                 "type": "voice_control_status",
                 "active": False,
-                "error": str(e)
+                "error": str(e),
+                "runtime": server.get_voice_runtime_summary(),
             })
             logger.info("Sent error response to client")
 
@@ -55,7 +57,8 @@ def register_handlers(server):
     async def handle_get_voice_control_status(websocket, data):
         await server.send_to_client(websocket, {
             "type": "voice_control_status",
-            "active": server.voice_control.is_listening if server.voice_control else False
+            "active": server.voice_control.is_listening if server.voice_control else False,
+            "runtime": server.get_voice_runtime_summary(),
         })
 
     return {

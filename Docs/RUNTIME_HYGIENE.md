@@ -8,6 +8,15 @@
 
 `backend/__init__.py` temporarily bootstraps the legacy sibling-import layout so repo-root imports work without `PYTHONPATH` overrides. This is an incremental compatibility layer, not a license to add more ad-hoc import hacks.
 
+## Supported pilot voice runtime
+
+- Supported entrypoint: `AutoMixerServer.start_voice_control`
+- Declared pilot primary backend: `VoiceControlSherpa` in `backend/voice_control_sherpa.py`
+- Declared pilot fallback backend: `VoiceControlV2` in `backend/voice_control_v2.py`
+- Quarantined non-pilot backends: `backend/voice_control.py`, `backend/voice_control_vosk.py`
+
+Voice commands remain constrained to the supervised manual write gate. On the current server path, only `fader` and `gain` commands can reach `_apply_manual_console_write`; snapshot and mute voice commands stay blocked.
+
 ## Frontend modules currently status-only
 
 The backend exposes read-only status endpoints for these tabs, but it does not expose live websocket control handlers yet. The frontend now treats them as disabled/status-only so it does not emit dead commands:

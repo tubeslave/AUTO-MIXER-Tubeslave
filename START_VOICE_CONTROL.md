@@ -38,6 +38,12 @@ npm start
 3. **Выберите канал** для записи голосовых команд
 4. **Нажмите "Start Voice Control"**
 
+Поддерживаемый pilot runtime сейчас такой:
+- primary: `VoiceControlSherpa`
+- fallback: `VoiceControlV2`
+
+`voice_control.py` и `voice_control_vosk.py` не считаются поддерживаемыми deployment runtime-путями.
+
 ### Что должно произойти:
 
 1. В консоли браузера (F12 → Console) появятся логи:
@@ -50,7 +56,7 @@ npm start
    RECEIVED start_voice_control MESSAGE
    ============================================================
    START_VOICE_CONTROL CALLED
-   Step 1: Initializing VoiceControl...
+   Step 1: Initializing VoiceControlSherpa (GigaAM)...
    Step 2: Starting voice control listening...
    Step 3: Broadcasting success message...
    ```

@@ -9,6 +9,7 @@ function VoiceControlTab({ globalMode }) {
   const [lastResponse, setLastResponse] = useState('');
   const [language, setLanguage] = useState('ru');
   const [modelSize, setModelSize] = useState('small');
+  const [voiceRuntime, setVoiceRuntime] = useState(null);
 
   useEffect(() => {
     const handle = (data) => {
@@ -17,6 +18,7 @@ function VoiceControlTab({ globalMode }) {
       if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
       if (data.command) setLastCommand(data.command);
       if (data.response) setLastResponse(data.response);
+      if (data.runtime) setVoiceRuntime(data.runtime);
     };
     const handleLoaded = (data) => {
       if (data.settings?.voiceControl) {
@@ -64,6 +66,13 @@ function VoiceControlTab({ globalMode }) {
           </select>
         </div>
         {statusMessage && <div className="module-status">{statusMessage}</div>}
+        {voiceRuntime && (
+          <div className="module-status">
+            Пилотный runtime: {voiceRuntime.selected_runtime.primary_backend}
+            {voiceRuntime.selected_runtime.fallback_backend ? `; fallback: ${voiceRuntime.selected_runtime.fallback_backend}` : ''}
+            . Параметр модели применяется только к Whisper fallback.
+          </div>
+        )}
 
         {lastCommand && (
           <div className="voice-last">

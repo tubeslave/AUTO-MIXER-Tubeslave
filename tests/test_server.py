@@ -156,6 +156,18 @@ class TestAutoMixerServerInit:
         assert server._is_shutting_down is False
         assert server._shutdown_event is None
 
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_voice_runtime_summary_declares_pilot_contract(self, mock_config, mock_bleed):
+        server = AutoMixerServer()
+        server.connection_mode = "wing"
+
+        summary = server.get_voice_runtime_summary()
+
+        assert summary["selected_runtime"]["entrypoint"] == "AutoMixerServer.start_voice_control"
+        assert summary["selected_runtime"]["live_write_path"] == "AutoMixerServer._apply_manual_console_write"
+        assert summary["selected_runtime"]["allowed_live_write_kinds"] == ["fader", "gain"]
+
 
 class TestDisconnectedAgentHandlers:
 

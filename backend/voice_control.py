@@ -1,7 +1,9 @@
 """
-Voice Control Module for Auto Mixer
-Uses Faster-Whisper for Speech-to-Text recognition
-With fuzzy matching for better command recognition
+Legacy lab-only Whisper backend.
+
+This module is retained for offline experiments and older tests, but
+`AutoMixerServer.start_voice_control` does not use it on the supervised pilot
+surface. The declared pilot runtime is Sherpa primary with Whisper V2 fallback.
 """
 import asyncio
 import logging

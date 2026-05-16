@@ -1,17 +1,21 @@
 # Голосовое управление пультом
 
-Модуль голосового управления использует библиотеку Faster-Whisper для распознавания речи и управления микшером через голосовые команды.
+Поддерживаемый pilot runtime для голосового управления:
+- primary: `VoiceControlSherpa` (`backend/voice_control_sherpa.py`)
+- fallback: `VoiceControlV2` (`backend/voice_control_v2.py`)
+
+`backend/voice_control.py` и `backend/voice_control_vosk.py` сохраняются только как legacy/lab-only backends и не считаются поддерживаемыми deployment runtime-путями.
 
 ## Установка
 
-Библиотека `faster-whisper` уже добавлена в `requirements.txt`. Для установки выполните:
+Для fallback runtime используется `faster-whisper`. Для установки выполните:
 
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-При первой загрузке модели Whisper автоматически скачает модель `small` (около 500MB).
+При использовании fallback runtime модель Whisper автоматически скачает выбранный размер (по умолчанию `small`).
 
 ## Использование
 
@@ -28,7 +32,7 @@ pip install -r requirements.txt
 ```
 
 Параметры:
-- `model_size`: размер модели Whisper (`tiny`, `base`, `small`, `medium`, `large`). По умолчанию `small`
+- `model_size`: размер модели Whisper fallback (`tiny`, `base`, `small`, `medium`, `large`). По умолчанию `small`
 - `language`: язык распознавания (`ru` для русского, `en` для английского, или `null` для автоопределения)
 
 ### Остановка голосового управления
@@ -107,7 +111,8 @@ pip install -r requirements.txt
 
 ## Технические детали
 
-- **Модель**: Faster-Whisper small (баланс между точностью и скоростью)
+- **Primary runtime**: Sherpa-ONNX / GigaAM
+- **Fallback runtime**: Faster-Whisper
 - **Частота дискретизации**: 16 kHz
 - **Буфер**: 3 секунды аудио для обработки
 - **VAD фильтр**: Включен для фильтрации тишины

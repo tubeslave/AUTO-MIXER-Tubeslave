@@ -26,7 +26,6 @@ from osc.enhanced_osc_client import EnhancedOSCClient
 from mixing_station_client import MixingStationClient, discover_mixing_station
 from audio_devices import get_audio_devices
 from dante_routing_config import get_routing_as_dict, get_module_signal_info
-from voice_control import VoiceControl
 from voice_control_v2 import VoiceControlV2
 try:
     from voice_control_sherpa import VoiceControlSherpa
@@ -51,6 +50,7 @@ from mixer_discovery import discover_mixers, discover_mixer_auto, DiscoveredMixe
 from handlers import register_all_handlers
 from wing_telemetry_recorder import WingTelemetryRecorder
 from gain_fader_runtime import build_gain_fader_runtime_summary
+from voice_runtime import build_voice_runtime_summary
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -112,8 +112,8 @@ class AutoMixerServer:
         
         self.connected_clients: Set[WebSocketServerProtocol] = set()
         
-        # Voice control
-        self.voice_control: Optional[VoiceControl] = None
+        # Voice runtime is attached lazily: Sherpa primary, Whisper V2 fallback.
+        self.voice_control: Optional[Any] = None
         
         # Gain staging controller (LUFS-based)
         self.gain_staging: Optional[LUFSGainStagingController] = None
@@ -2405,7 +2405,8 @@ class AutoMixerServer:
                 await self.broadcast({
                     "type": "voice_control_status",
                     "active": True,
-                    "message": "Voice control started successfully"
+                    "message": "Voice control started successfully",
+                    "runtime": self.get_voice_runtime_summary(),
                 })
                 logger.info("Step 3: ✅ Broadcast sent")
             except Exception as e:
@@ -2423,7 +2424,8 @@ class AutoMixerServer:
             await self.broadcast({
                 "type": "voice_control_status",
                 "active": False,
-                "error": str(e)
+                "error": str(e),
+                "runtime": self.get_voice_runtime_summary(),
             })
     
     def _setup_voice_aliases_from_wing(self):
@@ -2566,7 +2568,8 @@ class AutoMixerServer:
                 await self.broadcast({
                     "type": "voice_control_status",
                     "active": False,
-                    "message": "Voice control stopped"
+                    "message": "Voice control stopped",
+                    "runtime": self.get_voice_runtime_summary(),
                 })
                 logger.info("Voice control stopped")
         except Exception as e:
@@ -4635,7 +4638,15 @@ class AutoMixerServer:
             },
             "gain_fader_runtime": gain_fader_runtime,
         }
-    
+
+    def get_voice_runtime_summary(self) -> dict:
+        """Return the declared supported voice runtime for the current surface."""
+        return build_voice_runtime_summary(
+            connection_mode=self.connection_mode,
+            wing_boundary_active=self._is_wing_deployment_write_boundary_active(),
+            sherpa_available=VoiceControlSherpa is not None,
+        )
+
     async def create_snapshot(self, websocket, channels: list = None):
         """Create backup snapshot (for undo). Uses current mixer client."""
         if not self.mixer_client or not self.mixer_client.is_connected:
