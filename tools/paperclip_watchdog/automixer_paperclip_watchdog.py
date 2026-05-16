@@ -17,10 +17,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from tools import agent_specialization
-
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from tools import agent_specialization  # noqa: E402
+
 WATCHDOG_DIR = Path(__file__).resolve().parent
 
 DEFAULT_API_URL = "http://127.0.0.1:3100"
