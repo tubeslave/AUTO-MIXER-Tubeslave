@@ -13,6 +13,7 @@ class FakePaperclipAPI:
         self.created_payloads: list[dict] = []
         self.issue: dict = {"id": "issue-dispatch-1", "status": "todo"}
         self.active_runs: list[dict] = []
+        self.agents: list[dict] = []
         self.patch_calls: list[dict] = []
         self.wakeup_calls: list[dict] = []
         self.live_write_calls: list[dict] = []
@@ -35,6 +36,9 @@ class FakePaperclipAPI:
     def get_issue_active_runs(self, issue_id: str) -> list[dict]:
         _ = issue_id
         return list(self.active_runs)
+
+    def get_agents(self) -> list[dict]:
+        return list(self.agents)
 
     def patch_issue_assignment(self, issue_id: str, agent_id: str, status: str) -> dict:
         call = {
@@ -340,6 +344,36 @@ def test_dispatch_success_uses_patch_issue_assignment_only(tmp_path):
     ]
     assert api.wakeup_calls == []
     assert api.live_write_calls == []
+
+
+def test_dispatch_can_resolve_fixed_specialist_without_explicit_agent_id(tmp_path):
+    settings = make_dispatch_settings(
+        tmp_path,
+        allowlist_agent_ids=["c50c0ba1-9c94-4591-a9a4-37bcc7157cf6"],
+        agent_id=None,
+    )
+    api = FakePaperclipAPI()
+    api.issue = {
+        "id": "issue-dispatch-1",
+        "status": "todo",
+        "title": "Audit WING OSC telemetry safety",
+        "description": "Need dry-run console telemetry review before supervised writes.",
+    }
+    api.agents = [
+        {
+            "id": "c50c0ba1-9c94-4591-a9a4-37bcc7157cf6",
+            "name": "OSC Console Safety Engineer",
+            "status": "idle",
+            "adapterType": "codex_local",
+        }
+    ]
+
+    decision = watchdog.run_dispatch(settings, api=api, now=fixed_now())
+
+    assert decision.result == "dispatched"
+    assert decision.selected_agent_id == "c50c0ba1-9c94-4591-a9a4-37bcc7157cf6"
+    assert "OSC Console Safety Engineer selected" in decision.selected_agent_reason
+    assert api.patch_calls[0]["body"]["assigneeAgentId"] == "c50c0ba1-9c94-4591-a9a4-37bcc7157cf6"
 
 
 def test_dispatch_force_preview_never_patches_even_when_real_configured(tmp_path):

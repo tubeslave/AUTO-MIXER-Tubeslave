@@ -70,6 +70,8 @@ AUTOMIXER_WATCHDOG_DISPATCH_AGENT_ID=<agent-id>
 AUTOMIXER_WATCHDOG_DISPATCH_ALLOWLIST_AGENT_IDS=<agent-id>
 ```
 
+Если `AUTOMIXER_WATCHDOG_DISPATCH_AGENT_ID` не задан, watchdog пытается выбрать исполнителя по фиксированной модели специализаций из `tools/agent_specialization.py`, используя title/description issue и текущий Paperclip agent inventory. Это сохраняет постоянные роли и не дает `director`/management ролям дрейфовать в обычный execution dispatch.
+
 Если `AUTOMIXER_WATCHDOG_DISPATCH_ISSUE_ID` не задан, watchdog попробует взять последний `last_issue_id` из `.paperclip/watchdog_state.json`.
 
 ## Opt-in real dispatch

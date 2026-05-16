@@ -102,6 +102,17 @@ Before launching the dry-run preview, the operator tries to auto-select a safe P
 - agent must be idle/available/ready;
 - agent must use `codex_local`.
 
+Auto-selection uses the fixed specialization registry in `tools/agent_specialization.py`:
+
+- WING/OSC/supervised-write safety work routes to `OSC Console Safety Engineer`;
+- replay/validation/regression work routes to `Automixer QA Engineer`;
+- analyzer/LUFS/spectral work routes to `DSP Analyzer Engineer`;
+- operator dashboard/frontend work routes to `Control Center UX Engineer`;
+- research/literature work routes to `Live Sound Research Engineer`;
+- orchestration/architecture/refactor work routes to `Automixer Chief Architect`.
+
+Director/management roles stay out of default first-line execution routing, which prevents role drift during preview selection.
+
 If a target is found, its issue id, agent id, and task key are passed only to the dry-run watchdog subprocess.
 
 Report path:

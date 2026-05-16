@@ -25,6 +25,7 @@ if str(DEFAULT_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(DEFAULT_PROJECT_ROOT))
 
 from tools.project_vector_index import automixer_chromadb_index as vector_index  # noqa: E402
+from tools import agent_specialization  # noqa: E402
 
 ACTIVE_RUN_STATUSES = {"queued", "running", "active", "busy", "in_progress", "started", "working"}
 TERMINAL_RUN_STATUSES = {"done", "failed", "succeeded", "cancelled", "canceled", "finished"}
@@ -320,6 +321,7 @@ def get_agents_summary(client: Any, company_id: str) -> dict[str, Any]:
         "available": True,
         "by_status": count_by_status(agents),
         "items": [summarize_record(agent, agent_keys()) for agent in agents[:25]],
+        "specialization_health": agent_specialization.specialization_health_summary(agents),
         "total": len(agents),
     }
 

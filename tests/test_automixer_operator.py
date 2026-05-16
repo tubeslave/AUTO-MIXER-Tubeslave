@@ -495,6 +495,7 @@ def test_target_selection_picks_unassigned_todo_and_preferred_codex_agent(monkey
                         "id": "issue-safe",
                         "identifier": "TUB-291",
                         "title": "Safe target",
+                        "description": "Review WING telemetry and dry-run console safety before supervised write.",
                         "status": "todo",
                         "assigneeAgentId": None,
                         "activeRun": None,
@@ -532,6 +533,7 @@ def test_target_selection_picks_unassigned_todo_and_preferred_codex_agent(monkey
     assert target.ready is True
     assert automixer_operator.get_issue_id(target.issue or {}) == "issue-safe"
     assert automixer_operator.get_agent_id(target.agent or {}) == "agent-safety"
+    assert target.specialization_key == "console_safety"
     assert calls == [
         (
             "/api/companies/company-1/issues",
@@ -539,6 +541,58 @@ def test_target_selection_picks_unassigned_todo_and_preferred_codex_agent(monkey
         ),
         ("/api/companies/company-1/agents", None),
     ]
+
+
+def test_target_selection_routes_architecture_issue_to_architect(monkeypatch, tmp_path):
+    class FakeClient:
+        def __init__(self, base_url, timeout_seconds):
+            self.base_url = base_url
+            self.timeout_seconds = timeout_seconds
+
+        def get(self, path, params=None):
+            if path == "/api/companies/company-1/issues":
+                return [
+                    {
+                        "id": "issue-165",
+                        "identifier": "TUB-165",
+                        "title": "Implement fixed agent specialization model",
+                        "description": "Define orchestration boundaries and reduce routing drift.",
+                        "status": "todo",
+                    }
+                ]
+            if path == "/api/companies/company-1/agents":
+                return [
+                    {
+                        "id": "63750d40-cec7-43a2-a008-5b320d85aa75",
+                        "name": "Automixer Chief Architect",
+                        "status": "idle",
+                        "adapterType": "codex_local",
+                    },
+                    {
+                        "id": "c50c0ba1-9c94-4591-a9a4-37bcc7157cf6",
+                        "name": "OSC Console Safety Engineer",
+                        "status": "idle",
+                        "adapterType": "codex_local",
+                    },
+                ]
+            raise OSError(f"unexpected route: {path}")
+
+    monkeypatch.setattr(automixer_operator.bridge, "PaperclipClient", FakeClient)
+
+    target = automixer_operator.select_preview_target(
+        automixer_operator.build_config(config_env(tmp_path)),
+        {
+            "paperclip_api_ok": True,
+            "paperclip_api_url": "http://paperclip.test",
+            "company_id": "company-1",
+            "active_runs_summary": {"available": True, "total": 0},
+        },
+    )
+
+    assert target.ready is True
+    assert automixer_operator.get_issue_id(target.issue or {}) == "issue-165"
+    assert automixer_operator.get_agent_id(target.agent or {}) == "63750d40-cec7-43a2-a008-5b320d85aa75"
+    assert target.specialization_key == "architecture_owner"
 
 
 def test_target_selection_blocks_when_active_runs_exist(tmp_path):

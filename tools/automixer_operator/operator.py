@@ -28,6 +28,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.gpt_control_bridge import server as bridge  # noqa: E402
+from tools import agent_specialization  # noqa: E402
 from tools.automixer_operator import operational_audit  # noqa: E402
 
 
@@ -39,8 +40,6 @@ VECTOR_INDEXER_SCRIPT = Path("tools/project_vector_index/automixer_chromadb_inde
 REPORT_FIELD_RE = re.compile(r"^- ([A-Za-z0-9_]+):\s*(.*)$")
 TERMINAL_ISSUE_STATUSES = {"done", "completed", "closed", "resolved", "cancelled", "canceled"}
 PREVIEW_ISSUE_STATUSES = "backlog,todo,in_progress,in_review,blocked"
-PREFERRED_AGENT_IDS = ("c50c0ba1-9c94-4591-a9a4-37bcc7157cf6",)
-PREFERRED_AGENT_NAME_FRAGMENTS = ("osc console safety engineer", "console safety")
 SAFE_AGENT_ADAPTER_TYPE = "codex_local"
 SAFE_AGENT_STATUSES = {"idle", "available", "ready"}
 READ_ONLY_HTTP_METHODS = ("GET",)
@@ -96,6 +95,8 @@ class TargetSelection:
     agent: dict[str, Any] | None
     reason: str
     errors: list[str]
+    specialization_key: str | None = None
+    specialization_label: str | None = None
 
     @property
     def ready(self) -> bool:
@@ -578,10 +579,7 @@ def select_preview_target(config: OperatorConfig, context: dict[str, Any]) -> Ta
     errors = [error for error in (issues_error, agents_error) if error]
     issues = bridge.extract_items(issues_payload, ["issues", "data", "items", "results"])
     agents = bridge.extract_items(agents_payload, ["agents", "data", "items", "results"])
-    safe_issues = sorted(
-        [issue for issue in issues if is_safe_issue_candidate(issue)],
-        key=issue_preference_key,
-    )
+    safe_issues = sorted([issue for issue in issues if is_safe_issue_candidate(issue)], key=issue_preference_key)
     safe_agents = sorted(
         [agent for agent in agents if is_safe_agent_candidate(agent)],
         key=agent_preference_key,
@@ -598,13 +596,36 @@ def select_preview_target(config: OperatorConfig, context: dict[str, Any]) -> Ta
             reason = f"{reason} Read errors: {', '.join(errors)}"
         return TargetSelection(None, None, reason, errors)
 
-    issue = safe_issues[0]
-    agent = safe_agents[0]
+    best_issue: dict[str, Any] | None = None
+    best_selection: agent_specialization.SpecialistSelection | None = None
+    missing_roles: list[str] = []
+    for issue in safe_issues:
+        selection = agent_specialization.select_specialist_for_issue(issue, safe_agents)
+        if selection.agent:
+            best_issue = issue
+            best_selection = selection
+            break
+        missing_roles.append(selection.specialization.label)
+
+    if best_issue is None or best_selection is None:
+        reason = (
+            "No safe preview target found: matching specialist is not ready. "
+            f"Missing roles: {', '.join(sorted(set(missing_roles))) or 'unknown'}."
+        )
+        if errors:
+            reason = f"{reason} Read errors: {', '.join(errors)}"
+        return TargetSelection(None, None, reason, errors)
+
     return TargetSelection(
-        issue,
-        agent,
-        f"Selected {format_issue_label(issue)} for {format_agent_label(agent)}.",
+        best_issue,
+        best_selection.agent,
+        (
+            f"Selected {format_issue_label(best_issue)} for {format_agent_label(best_selection.agent)} "
+            f"via {best_selection.specialization.label}."
+        ),
         errors,
+        specialization_key=best_selection.specialization.key,
+        specialization_label=best_selection.specialization.label,
     )
 
 
@@ -641,7 +662,8 @@ def issue_preference_key(issue: dict[str, Any]) -> tuple[int, int, str, str]:
 def agent_preference_key(agent: dict[str, Any]) -> tuple[int, int, str, str]:
     agent_id = get_agent_id(agent) or ""
     name = agent_name(agent).lower()
-    preferred = agent_id in PREFERRED_AGENT_IDS or any(fragment in name for fragment in PREFERRED_AGENT_NAME_FRAGMENTS)
+    specialization = agent_specialization.specialization_for_agent(agent)
+    preferred = bool(specialization and specialization.execution_role)
     status = normalize_status(agent.get("status") or agent.get("state"))
     return (0 if preferred else 1, 0 if status == "idle" else 1, name, agent_id)
 
@@ -762,6 +784,8 @@ def render_target_selection(target: TargetSelection) -> str:
         lines.append(f"- agent: {format_agent_label(target.agent)}")
         lines.append(f"- agent_status: {normalize_status(target.agent.get('status') or target.agent.get('state')) or 'unknown'}")
         lines.append(f"- agent_adapter: {target.agent.get('adapterType') or target.agent.get('adapter_type') or 'unknown'}")
+    if target.specialization_label:
+        lines.append(f"- specialization: {target.specialization_label}")
     if target.errors:
         lines.append(f"- read_errors: {', '.join(target.errors)}")
     return "\n".join(lines)
@@ -972,6 +996,17 @@ def render_agents(summary: Any) -> list[str]:
         lines.append(f"- {format_record(item)}")
     if not items:
         lines.append("- items: none")
+    specialization_summary = summary.get("specialization_health")
+    if isinstance(specialization_summary, dict) and specialization_summary.get("available"):
+        counts = specialization_summary.get("counts") or {}
+        lines.append(f"- specialization_health: ready={counts.get('ready', 0)} busy={counts.get('busy', 0)} error={counts.get('error', 0)} unavailable={counts.get('unavailable', 0)}")
+        roles = specialization_summary.get("roles") if isinstance(specialization_summary.get("roles"), list) else []
+        for role in roles:
+            label = clean_missing(str(role.get("label") or ""))
+            health = clean_missing(str(role.get("health") or "unknown"))
+            agent_name_value = clean_missing(str(role.get("agent_name") or ""))
+            if label and role.get("execution_role"):
+                lines.append(f"- {label}: {health} ({agent_name_value or 'unresolved'})")
     return lines
 
 

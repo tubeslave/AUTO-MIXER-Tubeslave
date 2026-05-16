@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from tools import agent_specialization
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WATCHDOG_DIR = Path(__file__).resolve().parent
@@ -571,6 +573,13 @@ class PaperclipAPI:
             data={"assigneeAgentId": agent_id, "status": status},
         )
 
+    def get_agents(self) -> list[dict[str, Any]]:
+        payload = self.client.request_json(
+            "GET",
+            f"/api/companies/{urllib.parse.quote(self.company_id)}/agents",
+        )
+        return extract_list(payload, ["agents", "data", "items", "results"])
+
     def _required_get(
         self,
         path: str,
@@ -652,6 +661,9 @@ class MockPaperclipAPI:
         payload = {"assigneeAgentId": agent_id, "status": status}
         self.patch_calls.append({"issue_id": issue_id, "body": payload})
         return {"id": issue_id, **payload}
+
+    def get_agents(self) -> list[dict[str, Any]]:
+        return []
 
 
 def dict_env() -> dict[str, str]:
@@ -874,10 +886,9 @@ def run_dispatch(
     mode = "dry_run" if force_dry_run or policy.dry_run else "real"
     issue_id = settings.dispatch_issue_id or state.get("last_issue_id")
     task_key = settings.dispatch_task_key or state.get("last_task_key") or "manual_dispatch"
-    selected_agent_id, selected_agent_reason = select_dispatch_agent(settings)
-    idempotency_key = (
-        settings.dispatch_idempotency_key
-        or build_dispatch_idempotency_key(task_key, issue_id, selected_agent_id, policy.dispatch_method)
+    selected_agent_id = settings.dispatch_agent_id or None
+    selected_agent_reason = (
+        "explicit AUTOMIXER_WATCHDOG_DISPATCH_AGENT_ID" if settings.dispatch_agent_id else "not resolved yet"
     )
     intended_endpoint = f"/api/issues/{issue_id}" if issue_id else "/api/issues/<issue-id>"
     intended_body = {"assigneeAgentId": selected_agent_id, "status": policy.require_issue_status}
@@ -908,28 +919,9 @@ def run_dispatch(
         policy.forbid_wing_runtime_write,
     )
     add_dispatch_check(checks, "issue_id_present", bool(issue_id), issue_id or "")
-    add_dispatch_check(checks, "agent_id_selected", bool(selected_agent_id), selected_agent_id or "")
-    add_dispatch_check(
-        checks,
-        "agent_allowlisted",
-        bool(selected_agent_id) and selected_agent_id in policy.allowlist_agent_ids,
-        selected_agent_id or "",
-    )
-    add_dispatch_check(
-        checks,
-        "idempotency_key_present",
-        bool(idempotency_key) or not policy.require_idempotency_key,
-        idempotency_key or "",
-    )
-    add_dispatch_check(
-        checks,
-        "idempotency_ok",
-        not idempotency_key_used(state, idempotency_key),
-        idempotency_key or "",
-    )
-
     status: PaperclipStatus | None = None
     issue: dict[str, Any] = {}
+    agents: list[dict[str, Any]] = []
     active_runs: list[dict[str, Any]] = []
     actual_response: Any = None
     actual_error: str | None = None
@@ -976,6 +968,19 @@ def run_dispatch(
                     existing_assignee or "",
                 )
                 try:
+                    agents = api.get_agents()
+                except Exception as exc:
+                    actual_error = f"agent lookup failed: {sanitize_text(str(exc), secrets)}"
+                selected_agent_id, selected_agent_reason = select_dispatch_agent(
+                    settings,
+                    issue=issue,
+                    agents=agents,
+                )
+                intended_body = {
+                    "assigneeAgentId": selected_agent_id,
+                    "status": policy.require_issue_status,
+                }
+                try:
                     runs = api.get_issue_active_runs(issue_id)
                     active_runs = [run for run in runs if is_run_active(run)]
                     active_runs_ok = not active_runs or not policy.require_no_active_runs
@@ -1000,6 +1005,30 @@ def run_dispatch(
         add_dispatch_check(checks, "issue_status", False, "unknown")
         add_dispatch_check(checks, "issue_not_already_assigned", False, "unknown")
         add_dispatch_check(checks, "active_runs", False, "unknown")
+
+    idempotency_key = (
+        settings.dispatch_idempotency_key
+        or build_dispatch_idempotency_key(task_key, issue_id, selected_agent_id, policy.dispatch_method)
+    )
+    add_dispatch_check(checks, "agent_id_selected", bool(selected_agent_id), selected_agent_id or "")
+    add_dispatch_check(
+        checks,
+        "agent_allowlisted",
+        bool(selected_agent_id) and selected_agent_id in policy.allowlist_agent_ids,
+        selected_agent_id or "",
+    )
+    add_dispatch_check(
+        checks,
+        "idempotency_key_present",
+        bool(idempotency_key) or not policy.require_idempotency_key,
+        idempotency_key or "",
+    )
+    add_dispatch_check(
+        checks,
+        "idempotency_ok",
+        not idempotency_key_used(state, idempotency_key),
+        idempotency_key or "",
+    )
 
     dispatch_allowed = all(check["passed"] for check in checks.values())
     dispatch_executed = False
@@ -1065,9 +1094,24 @@ def run_dispatch(
     return decision
 
 
-def select_dispatch_agent(settings: Settings) -> tuple[str | None, str]:
+def select_dispatch_agent(
+    settings: Settings,
+    *,
+    issue: dict[str, Any] | None = None,
+    agents: list[dict[str, Any]] | None = None,
+) -> tuple[str | None, str]:
     if settings.dispatch_agent_id:
         return settings.dispatch_agent_id, "explicit AUTOMIXER_WATCHDOG_DISPATCH_AGENT_ID"
+    if issue and agents:
+        allowlist = set(settings.dispatch_policy.allowlist_agent_ids)
+        selection = agent_specialization.select_specialist_for_issue(
+            issue,
+            agents,
+            allowlist_agent_ids=allowlist if allowlist else None,
+        )
+        if selection.agent_id:
+            return selection.agent_id, selection.reason
+        return None, selection.reason
     allowlist = settings.dispatch_policy.allowlist_agent_ids
     if allowlist:
         return allowlist[0], "first agent in explicit allowlist"
