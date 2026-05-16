@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from tools.gpt_control_bridge import server as bridge
+from tools.automixer_operator import recovery_governor
 
 
 OPEN_ISSUE_STATUSES = {"backlog", "todo", "in_progress", "in_review", "blocked"}
@@ -52,6 +53,7 @@ class OperationalAuditResult:
     blocked_cycles: list[dict[str, Any]]
     unhealthy_agents: list[dict[str, Any]]
     duplicate_recovery_issues: list[dict[str, Any]]
+    recovery_governor: dict[str, Any]
     run_source: str
     read_only: bool = True
     report_paths: dict[str, str] = field(default_factory=dict)
@@ -64,6 +66,9 @@ class OperationalAuditResult:
             "blocked_cycles": len(self.blocked_cycles),
             "unhealthy_agents": len(self.unhealthy_agents),
             "duplicate_recovery_issues": len(self.duplicate_recovery_issues),
+            "recovery_governor_allow": int(self.recovery_governor.get("summary_counts", {}).get("allow", 0)),
+            "recovery_governor_suppress": int(self.recovery_governor.get("summary_counts", {}).get("suppress", 0)),
+            "recovery_governor_manual_review": int(self.recovery_governor.get("summary_counts", {}).get("manual_review", 0)),
         }
 
     def as_dict(self) -> dict[str, Any]:
@@ -85,6 +90,7 @@ class OperationalAuditResult:
             "blocked_cycles": self.blocked_cycles,
             "unhealthy_agents": self.unhealthy_agents,
             "duplicate_recovery_issues": self.duplicate_recovery_issues,
+            "recovery_governor": self.recovery_governor,
             "report_paths": self.report_paths,
         }
 
@@ -124,6 +130,12 @@ def create_operational_audit(
     blocked_chains, blocked_cycles = detect_blocked_dependency_chains(issues, issue_by_id)
     unhealthy_agents = detect_unhealthy_agents(agents, now, thresholds)
     duplicate_recovery_issues = detect_duplicate_recovery_issues(issues)
+    governed_recovery = recovery_governor.evaluate_recovery_governor(
+        issues,
+        stale_issues=stale_issues,
+        orphaned_issues=orphaned_issues,
+        now=now,
+    )
 
     result = OperationalAuditResult(
         generated_at=now.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -140,6 +152,7 @@ def create_operational_audit(
         blocked_cycles=blocked_cycles,
         unhealthy_agents=unhealthy_agents,
         duplicate_recovery_issues=duplicate_recovery_issues,
+        recovery_governor=governed_recovery,
         run_source=run_source,
     )
     result.report_paths = write_report_files(project_root, result, now)
@@ -465,6 +478,9 @@ def render_markdown(result: OperationalAuditResult) -> str:
         f"- blocked_cycles: {len(result.blocked_cycles)}",
         f"- unhealthy_agents: {len(result.unhealthy_agents)}",
         f"- duplicate_recovery_issues: {len(result.duplicate_recovery_issues)}",
+        f"- recovery_governor_allow: {result.recovery_governor.get('summary_counts', {}).get('allow', 0)}",
+        f"- recovery_governor_suppress: {result.recovery_governor.get('summary_counts', {}).get('suppress', 0)}",
+        f"- recovery_governor_manual_review: {result.recovery_governor.get('summary_counts', {}).get('manual_review', 0)}",
         "",
         "## Report Files",
         f"- markdown: {result.report_paths.get('markdown') or 'missing'}",
@@ -479,6 +495,7 @@ def render_markdown(result: OperationalAuditResult) -> str:
     lines.extend(render_chain_section("Blocked Dependency Cycles", result.blocked_cycles, max_items=10))
     lines.extend(render_agent_section("Unhealthy Agents", result.unhealthy_agents, max_items=15))
     lines.extend(render_duplicate_section("Duplicate Recovery Issues", result.duplicate_recovery_issues, max_items=15))
+    lines.extend(render_recovery_governor_section("Recovery Governor", result.recovery_governor, max_items=15))
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -535,6 +552,36 @@ def render_duplicate_section(title: str, items: list[dict[str, Any]], *, max_ite
         identifiers = ", ".join(item.get("issue_identifiers") or [])
         lines.append(f"- {item.get('kind')}: {identifiers}")
         lines.append(f"  reason: {item.get('reason')}")
+    lines.append("")
+    return lines
+
+
+def render_recovery_governor_section(title: str, report: dict[str, Any], *, max_items: int) -> list[str]:
+    lines = [f"## {title}"]
+    summary = report.get("summary_counts", {}) if isinstance(report, dict) else {}
+    thresholds = report.get("thresholds", {}) if isinstance(report, dict) else {}
+    targets = report.get("targets", []) if isinstance(report, dict) else []
+    lines.append(
+        "- "
+        + f"allow={summary.get('allow', 0)}, suppress={summary.get('suppress', 0)}, "
+        + f"manual_review={summary.get('manual_review', 0)}, "
+        + f"cooldown_hours={thresholds.get('cooldown_hours', 'unknown')}, "
+        + f"max_open_attempts_per_target={thresholds.get('max_open_attempts_per_target', 'unknown')}"
+    )
+    if not targets:
+        return lines + ["- none", ""]
+    for item in targets[:max_items]:
+        chain = " -> ".join(item.get("recursive_chain") or [])
+        lines.append(
+            "- "
+            + f"{item.get('target_identifier')} "
+            + f"(decision={item.get('decision')}, open_recovery_issues={item.get('open_recovery_issue_count')}, "
+            + f"cooldown_remaining_hours={item.get('cooldown_remaining_hours')})"
+        )
+        if chain:
+            lines.append(f"  chain: {chain}")
+        for reason in item.get("reasons") or []:
+            lines.append(f"  reason: {reason}")
     lines.append("")
     return lines
 

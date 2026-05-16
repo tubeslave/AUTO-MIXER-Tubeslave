@@ -130,8 +130,11 @@ def test_create_operational_audit_detects_required_conditions(tmp_path: Path):
     assert result.summary_counts()["blocked_cycles"] == 1
     assert result.summary_counts()["unhealthy_agents"] == 2
     assert result.summary_counts()["duplicate_recovery_issues"] == 1
+    assert result.summary_counts()["recovery_governor_allow"] >= 1
     assert "TUB-500" in result.blocked_chains[0]["path_identifiers"]
     assert result.duplicate_recovery_issues[0]["target_identifier"] == "TUB-700"
+    assert "summary_counts" in result.recovery_governor
+    assert "targets" in result.recovery_governor
     assert Path(result.report_paths["markdown"]).exists()
     assert Path(result.report_paths["json"]).exists()
     assert Path(result.report_paths["latest_markdown"]).exists()

@@ -366,6 +366,7 @@ def test_operational_audit_command_prints_report_paths(tmp_path, monkeypatch, ca
             blocked_cycles=[],
             unhealthy_agents=[],
             duplicate_recovery_issues=[],
+            recovery_governor={"summary_counts": {}, "targets": [], "thresholds": {}},
             run_source="live-runs",
             report_paths={
                 "markdown": str(tmp_path / ".paperclip" / "reports" / "operational_audit_test.md"),
