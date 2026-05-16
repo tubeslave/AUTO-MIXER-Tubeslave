@@ -80,6 +80,37 @@ def test_missing_reports_and_state_are_handled(tmp_path: Path) -> None:
     assert context["watchdog_state_summary"]["valid_json"] is False
 
 
+def test_company_resolution_prefers_tubeslave_automixer(tmp_path: Path) -> None:
+    routes = {
+        "/api/health": {"status": "ok"},
+        "/api/companies": [
+            {
+                "id": "company-empty",
+                "name": "Automixer Lab",
+                "issuePrefix": "AUT",
+                "issueCounter": 0,
+            },
+            {
+                "id": "company-tub",
+                "name": "Tubeslave Automixer",
+                "issuePrefix": "TUB",
+                "issueCounter": 352,
+            },
+        ],
+        "/api/companies/company-tub/dashboard": {"tasks": {"todo": 1}},
+        "/api/companies/company-tub/agents": [],
+        "/api/companies/company-tub/live-runs": [],
+    }
+
+    context = bridge.build_context(
+        make_config(tmp_path, company_id=None),
+        client=FakePaperclipClient(routes),
+    )
+
+    assert context["company_id"] == "company-tub"
+    assert context["company_id_source"] == "api:/api/companies"
+
+
 def test_latest_report_excerpt_loaded(tmp_path: Path) -> None:
     reports_dir = tmp_path / ".paperclip" / "reports"
     reports_dir.mkdir(parents=True)

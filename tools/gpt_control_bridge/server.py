@@ -178,9 +178,30 @@ def resolve_company_id(
     companies = extract_items(payload, ["companies", "data", "items", "results"])
     if not companies:
         return None, "missing"
-    companies = sorted(companies, key=lambda item: (str(item.get("name") or ""), str(item.get("id") or "")))
+    companies = sorted(companies, key=company_preference_key)
     company_id = companies[0].get("id") or companies[0].get("companyId")
     return (str(company_id), "api:/api/companies") if company_id else (None, "missing")
+
+
+def company_preference_key(company: dict[str, Any]) -> tuple[int, int, str, str]:
+    name = str(company.get("name") or "").strip().lower()
+    issue_prefix = str(company.get("issuePrefix") or company.get("issue_prefix") or "").strip().lower()
+    issue_counter = parse_nonnegative_int(company.get("issueCounter") or company.get("issue_counter"))
+    if issue_prefix == "tub" or "tubeslave automixer" in name:
+        priority = 0
+    elif issue_counter > 0:
+        priority = 1
+    else:
+        priority = 2
+    return (priority, -issue_counter, name, str(company.get("id") or company.get("companyId") or ""))
+
+
+def parse_nonnegative_int(value: Any) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return parsed if parsed >= 0 else 0
 
 
 def get_dashboard_summary(client: Any, company_id: str) -> dict[str, Any]:
