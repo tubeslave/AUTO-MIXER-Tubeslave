@@ -5,9 +5,9 @@ import SignalHint from './SignalHint';
 
 function CrossAdaptiveEQTab({ selectedChannels, availableChannels, selectedDevice, audioDevices, globalMode }) {
   const [active, setActive] = useState(false);
+  const [implemented, setImplemented] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
   const [eqAdjustments, setEqAdjustments] = useState({});
-  const [bandAnalysis, setBandAnalysis] = useState({});
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState({
     reductionStrength: 0.5, frequencyBands: 6, updateInterval: 500,
@@ -16,10 +16,10 @@ function CrossAdaptiveEQTab({ selectedChannels, availableChannels, selectedDevic
   useEffect(() => {
     const handle = (data) => {
       if (data.active !== undefined) setActive(data.active);
+      if (data.implemented !== undefined) setImplemented(data.implemented);
       if (data.message) setStatusMessage(data.message);
       if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
       if (data.eq_adjustments) setEqAdjustments(data.eq_adjustments);
-      if (data.band_analysis) setBandAnalysis(data.band_analysis);
     };
     websocketService.on('cross_adaptive_eq_status', handle);
     websocketService.getCrossAdaptiveEQStatus();
@@ -45,7 +45,7 @@ function CrossAdaptiveEQTab({ selectedChannels, availableChannels, selectedDevic
         <div className="module-actions">
           <button className={`btn-start ${active ? 'stop' : 'go'}`}
             onClick={handleToggle}
-            disabled={!selectedDevice || !channels.length}>
+            disabled={!implemented || !selectedDevice || !channels.length}>
             {active ? 'Стоп' : 'Старт'}
           </button>
         </div>
@@ -60,12 +60,12 @@ function CrossAdaptiveEQTab({ selectedChannels, availableChannels, selectedDevic
               <div className="setting-row">
                 <label>Сила коррекции</label>
                 <input type="range" min="0.1" max="1.0" step="0.1" value={settings.reductionStrength}
-                  onChange={e => setSettings(s => ({...s, reductionStrength: parseFloat(e.target.value)}))} disabled={active} />
+                  onChange={e => setSettings(s => ({...s, reductionStrength: parseFloat(e.target.value)}))} disabled={!implemented || active} />
                 <span className="val">{(settings.reductionStrength * 100).toFixed(0)}%</span>
               </div>
               <div className="setting-row">
                 <label>Полос EQ</label>
-                <select value={settings.frequencyBands} onChange={e => setSettings(s => ({...s, frequencyBands: parseInt(e.target.value)}))} disabled={active}>
+                <select value={settings.frequencyBands} onChange={e => setSettings(s => ({...s, frequencyBands: parseInt(e.target.value)}))} disabled={!implemented || active}>
                   <option value={4}>4</option><option value={6}>6</option><option value={8}>8</option>
                 </select>
               </div>

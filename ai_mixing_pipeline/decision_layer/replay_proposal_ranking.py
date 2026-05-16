@@ -66,6 +66,7 @@ class ReplayDecisionProposal:
     current_state: dict[str, Any]
     requested_state: dict[str, Any]
     confidence: float
+    source_payload: dict[str, Any] = field(default_factory=dict)
     safety: dict[str, Any] = field(default_factory=dict)
     auto_apply_blocked: bool = True
     replay_correlation_id: str | None = None
@@ -89,6 +90,7 @@ class ReplayDecisionProposal:
                     "target": self.target,
                     "current_state": self.current_state,
                     "requested_state": self.requested_state,
+                    "source_payload": self.source_payload,
                     "confidence": round(_coerce_float(self.confidence), 6),
                     "safety": self.safety,
                     "auto_apply_blocked": self.auto_apply_blocked,
@@ -106,6 +108,7 @@ class ReplayDecisionProposal:
             "target": self.target,
             "current_state": self.current_state,
             "requested_state": self.requested_state,
+            "source_payload": self.source_payload,
             "confidence": self.confidence,
             "safety": self.safety,
             "auto_apply_blocked": self.auto_apply_blocked,
@@ -126,6 +129,7 @@ class ReplayDecisionProposal:
             target=dict(payload.get("target") or {}),
             current_state=dict(payload.get("current_state") or {}),
             requested_state=dict(payload.get("requested_state") or {}),
+            source_payload=dict(payload.get("source_payload") or {}),
             confidence=_coerce_float(payload.get("confidence")),
             safety=dict(payload.get("safety") or {}),
             auto_apply_blocked=bool(payload.get("auto_apply_blocked", True)),
@@ -251,6 +255,7 @@ def _build_generic_proposals(
             target=target_builder(payload),
             current_state=current_state_builder(payload),
             requested_state=requested_state_builder(payload),
+            source_payload=_sanitize_replay_payload(payload),
             confidence=_coerce_float(payload.get("confidence"), 0.0),
             safety=dict(payload.get("safety") or {}),
             auto_apply_blocked=bool(payload.get("auto_apply_blocked", default_auto_apply_blocked)),
@@ -485,6 +490,7 @@ def build_replay_timeline_artifact(
             "family": proposal.family,
             "confidence": proposal.confidence,
             "replay_signature": proposal.replay_signature,
+            "source_payload": _sanitize_replay_payload(proposal.source_payload),
             "auto_apply_blocked": proposal.auto_apply_blocked,
             "transport_policy": proposal.transport_policy,
             "live_mixer_writes": proposal.live_mixer_writes,

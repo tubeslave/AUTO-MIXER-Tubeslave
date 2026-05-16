@@ -15,6 +15,7 @@ def register_handlers(server):
             server.auto_fader_controller.set_automation_frozen(True)
         if getattr(server, "auto_fader_v2_controller", None):
             server.auto_fader_v2_controller.set_automation_frozen(True)
+        server.set_manual_write_supervision(False, reason="emergency_stop")
         await server.send_to_client(websocket, {"type": "emergency_stop_applied"})
 
     async def handle_set_automation_frozen(websocket, data):
@@ -26,6 +27,47 @@ def register_handlers(server):
         if getattr(server, "auto_fader_v2_controller", None):
             server.auto_fader_v2_controller.set_automation_frozen(frozen)
         await server.send_to_client(websocket, {"type": "automation_frozen_set", "frozen": frozen})
+
+    async def handle_set_manual_write_supervision(websocket, data):
+        armed = bool(data.get("armed", False))
+        status = server.set_manual_write_supervision(armed, reason=data.get("reason", "manual_toggle"))
+        await server.send_to_client(websocket, status)
+
+    async def handle_get_manual_write_supervision(websocket, data):
+        await server.send_to_client(websocket, {"type": "manual_write_supervision", **server.get_manual_write_supervision_status()})
+
+    async def handle_start_manual_write_session(websocket, data):
+        status = server.start_manual_write_session(
+            session_label=data.get("session_label"),
+            reason=data.get("reason", "manual_session_start"),
+            reset=bool(data.get("reset", False)),
+        )
+        await server.send_to_client(websocket, status)
+
+    async def handle_get_manual_write_session(websocket, data):
+        await server.send_to_client(websocket, {
+            "type": "manual_write_session",
+            "status": "ok",
+            **server.get_manual_write_session_status(),
+        })
+
+    async def handle_rollback_last(websocket, data):
+        await server.rollback_manual_write_session(
+            websocket,
+            rollback_mode="rollback_last",
+            reason=data.get("reason"),
+            approved=bool(data.get("approved", False)),
+            approval_id=data.get("approval_id"),
+        )
+
+    async def handle_rollback_all(websocket, data):
+        await server.rollback_manual_write_session(
+            websocket,
+            rollback_mode="rollback_all",
+            reason=data.get("reason"),
+            approved=bool(data.get("approved", False)),
+            approval_id=data.get("approval_id"),
+        )
 
     async def handle_set_channel_frozen(websocket, data):
         ch = data.get("channel")
@@ -49,11 +91,21 @@ def register_handlers(server):
     async def handle_get_ready_for_live(websocket, data):
         await server.send_to_client(websocket, {"type": "ready_for_live", **server.get_ready_for_live_status()})
 
+    async def handle_get_supervised_pilot_status(websocket, data):
+        await server.send_to_client(websocket, server.get_supervised_pilot_status())
+
     return {
         "set_live_mode": handle_set_live_mode,
         "emergency_stop": handle_emergency_stop,
         "set_automation_frozen": handle_set_automation_frozen,
         "set_channel_frozen": handle_set_channel_frozen,
+        "set_manual_write_supervision": handle_set_manual_write_supervision,
+        "start_manual_write_session": handle_start_manual_write_session,
+        "get_manual_write_session": handle_get_manual_write_session,
+        "rollback_last": handle_rollback_last,
+        "rollback_all": handle_rollback_all,
         "get_freeze_status": handle_get_freeze_status,
         "get_ready_for_live": handle_get_ready_for_live,
+        "get_manual_write_supervision": handle_get_manual_write_supervision,
+        "get_supervised_pilot_status": handle_get_supervised_pilot_status,
     }

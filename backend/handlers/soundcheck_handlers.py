@@ -41,6 +41,10 @@ def register_handlers(server):
         mixer_port = data.get("mixer_port", 51328 if mixer_type == "dlive" else 2222)
         audio_device = data.get("audio_device", "soundgrid")
         num_channels = data.get("channels", 48)
+        auto_apply = bool(data.get("auto_apply", mixer_type != "wing"))
+
+        if mixer_type == "wing":
+            auto_apply = False
 
         async def on_state(state, msg):
             await server.broadcast({
@@ -62,7 +66,7 @@ def register_handlers(server):
             mixer_port=mixer_port,
             audio_device_name=audio_device,
             num_channels=num_channels,
-            auto_apply=True,
+            auto_apply=auto_apply,
         )
         server.auto_soundcheck_engine = engine
         engine.start_async()
@@ -72,6 +76,8 @@ def register_handlers(server):
             "status": "started",
             "mixer_type": mixer_type,
             "mixer_ip": mixer_ip,
+            "auto_apply": auto_apply,
+            "observation_only_forced": mixer_type == "wing",
         })
 
     async def handle_stop_auto_engine(websocket, data):

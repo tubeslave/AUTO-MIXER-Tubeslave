@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import websocketService from '../services/websocket';
 import './AutoEQTab.css';
 import SignalHint from './SignalHint';
@@ -117,6 +117,10 @@ function AutoEQTab({ selectedChannels, availableChannels, selectedDevice, audioD
     const onResetAll = (data) => {
       setStatusMessage(data.success ? (data.message || 'EQ сброшен') : `Ошибка: ${data.error}`);
     };
+    const onAutoEqStatus = (data) => {
+      if (data.active !== undefined) setIsActive(data.active);
+      if (data.message) setStatusMessage(data.message);
+    };
 
     websocketService.on('multi_channel_status', onStatus);
     websocketService.on('multi_channel_auto_eq_status', onStatus);
@@ -124,7 +128,7 @@ function AutoEQTab({ selectedChannels, availableChannels, selectedDevice, audioD
     websocketService.on('multi_channel_corrections', onCorrections);
     websocketService.on('multi_channel_apply_result', onApply);
     websocketService.on('reset_all_eq_result', onResetAll);
-    websocketService.on('auto_eq_status', (d) => { if (d.active !== undefined) setIsActive(d.active); if (d.message) setStatusMessage(d.message); });
+    websocketService.on('auto_eq_status', onAutoEqStatus);
 
     return () => {
       websocketService.off('multi_channel_status', onStatus);
@@ -133,6 +137,7 @@ function AutoEQTab({ selectedChannels, availableChannels, selectedDevice, audioD
       websocketService.off('multi_channel_corrections', onCorrections);
       websocketService.off('multi_channel_apply_result', onApply);
       websocketService.off('reset_all_eq_result', onResetAll);
+      websocketService.off('auto_eq_status', onAutoEqStatus);
     };
   }, [eqMode, channelCorrectionsReady]);
 

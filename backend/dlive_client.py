@@ -342,15 +342,17 @@ class DLiveClient(MixerClientBase):
 
     # ── Send raw bytes (thread-safe) ───────────────────────────
 
-    def _send_raw(self, data: bytes):
+    def _send_raw(self, data: bytes) -> bool:
         with self._lock:
             if not self.is_connected or not self._sock:
-                return
+                return False
             try:
                 self._sock.sendall(data)
+                return True
             except Exception as e:
                 logger.error(f"dLive send error: {e}")
                 self.is_connected = False
+                return False
 
     # ── Receiver loop ──────────────────────────────────────────
 
@@ -485,7 +487,8 @@ class DLiveClient(MixerClientBase):
     def send(self, address: str, *args):
         """Generic send — for dLive we accept raw bytes in args[0]."""
         if args and isinstance(args[0], (bytes, bytearray)):
-            self._send_raw(args[0])
+            return self._send_raw(args[0])
+        return False
 
     def subscribe(self, address: str, callback: Callable):
         self.callbacks.setdefault(address, []).append(callback)
@@ -502,7 +505,7 @@ class DLiveClient(MixerClientBase):
         midi_ch = self._midi_channel(channel_type)
         fader_val = db_to_fader_value(value_db)
         msg = build_nrpn(midi_ch, 0x00, channel - 1, fader_val)
-        self._send_raw(msg)
+        return self._send_raw(msg)
 
     def get_fader(self, channel: int) -> float:
         key = f"fader/{channel}"
@@ -518,7 +521,7 @@ class DLiveClient(MixerClientBase):
         note = channel - 1
         velocity = 0x7F if muted else 0x3F
         msg = build_note_on(midi_ch, note, velocity) + build_note_on(midi_ch, note, 0x00)
-        self._send_raw(msg)
+        return self._send_raw(msg)
 
     def get_mute(self, channel: int) -> bool:
         key = f"note/{self._midi_channel()}/{channel - 1}"
@@ -531,7 +534,98 @@ class DLiveClient(MixerClientBase):
         midi_ch = self._midi_channel("input")
         gain_val = db_to_gain_value(value_db)
         msg = build_pitchbend(midi_ch, gain_val)
-        self._send_raw(msg)
+        return self._send_raw(msg)
+
+    def get_live_apply_contract(self) -> Dict[str, Any]:
+        return {
+            "contract_version": self.LIVE_APPLY_CONTRACT_VERSION,
+            "mixer_family": "dlive",
+            "value_types": {
+                "fader": {
+                    "supported": False,
+                    "readback_supported": True,
+                    "mode": "blocked",
+                    "readback_source": "dlive_state_cache",
+                    "reason": "confirmed_readback_unsupported",
+                },
+                "gain": {
+                    "supported": False,
+                    "readback_supported": False,
+                    "mode": "blocked",
+                    "readback_source": None,
+                    "reason": "readback_unsupported",
+                },
+            },
+        }
+
+    def read_live_value(
+        self,
+        *,
+        channel: int,
+        value_type: str,
+        timeout_sec: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        if value_type == "fader":
+            key = f"fader/{int(channel)}"
+            if key not in self.state:
+                return {
+                    "status": "unavailable",
+                    "channel": int(channel),
+                    "value_type": str(value_type),
+                    "value": None,
+                    "readback_source": "dlive_state_cache",
+                    "reason": "readback_unavailable",
+                    "timeout_sec": timeout_sec,
+                }
+            return {
+                "status": "ok",
+                "channel": int(channel),
+                "value_type": str(value_type),
+                "value": self.get_fader(int(channel)),
+                "readback_source": "dlive_state_cache",
+                "reason": "ok",
+                "timeout_sec": timeout_sec,
+            }
+        return {
+            "status": "blocked",
+            "channel": int(channel),
+            "value_type": str(value_type),
+            "value": None,
+            "readback_source": None,
+            "reason": "readback_unsupported",
+            "timeout_sec": timeout_sec,
+        }
+
+    def apply_live_change(
+        self,
+        *,
+        channel: int,
+        value: float,
+        value_type: str,
+        source: str,
+        reason: str,
+        approved: bool,
+        approval_id: Optional[str] = None,
+        bypass_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        contract = self.get_live_apply_contract()["value_types"].get(str(value_type), {})
+        return {
+            "status": "blocked",
+            "channel": int(channel),
+            "value_type": str(value_type),
+            "requested_value": float(value),
+            "effective_value": float(value),
+            "old_value": None,
+            "readback_value": None,
+            "readback_source": contract.get("readback_source"),
+            "source": str(source),
+            "reason": contract.get("reason", "unsupported_value_type"),
+            "reason_text": str(reason or ""),
+            "approved": bool(approved),
+            "approval_id": approval_id,
+            "bypass_cooldown": bool(bypass_cooldown),
+            "contract_mode": "blocked",
+        }
 
     # ── Phantom 48V (SysEx) ────────────────────────────────────
 

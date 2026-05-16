@@ -5,12 +5,14 @@ import SignalHint from './SignalHint';
 
 function AutoReverbTab({ selectedChannels, availableChannels, selectedDevice, audioDevices, globalMode }) {
   const [active, setActive] = useState(false);
+  const [implemented, setImplemented] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
   const [channelData, setChannelData] = useState({});
 
   useEffect(() => {
     const handle = (data) => {
       if (data.active !== undefined) setActive(data.active);
+      if (data.implemented !== undefined) setImplemented(data.implemented);
       if (data.message) setStatusMessage(data.message);
       if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
       if (data.channel_data) setChannelData(data.channel_data);
@@ -39,11 +41,11 @@ function AutoReverbTab({ selectedChannels, availableChannels, selectedDevice, au
         <div className="module-actions">
           <button className={`btn-start ${active ? 'stop' : 'go'}`}
             onClick={active ? handleStop : handleStart}
-            disabled={!selectedDevice || !channels.length}>
+            disabled={!implemented || !selectedDevice || !channels.length}>
             {active ? 'Стоп' : 'Старт'}
           </button>
           <button className="btn-sm" onClick={handleApply}
-            disabled={!active || Object.keys(channelData).length === 0}>
+            disabled={!implemented || !active || Object.keys(channelData).length === 0}>
             Применить
           </button>
         </div>

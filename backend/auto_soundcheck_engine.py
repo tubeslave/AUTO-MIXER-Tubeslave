@@ -41,6 +41,7 @@ from signal_metrics import (
     SignalAnalyzer, ChannelMetrics, compare_channels,
     InterChannelMetrics, LevelMetrics, DynamicsMetrics, SpectralMetrics,
 )
+from replay_write_intent_adapter import ReplayWriteIntentAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -396,6 +397,9 @@ class AutoSoundcheckEngine:
 
         self._applied_channels: set = set()
         self._analyzers: Dict[int, SignalAnalyzer] = {}
+        self._replay_write_intent_adapter = ReplayWriteIntentAdapter(
+            source_system="auto_soundcheck_engine"
+        )
 
         mode = "auto-discover" if auto_discover and not mixer_ip else "manual"
         target = f"{mixer_type or '?'}@{mixer_ip or 'auto'}:{mixer_port or 'auto'}"
@@ -413,6 +417,69 @@ class AutoSoundcheckEngine:
                 self.on_state_change(new_state.value, message)
             except Exception:
                 pass
+
+    def get_replay_write_intents(self) -> List[Dict[str, Any]]:
+        """Return replay write-intent records captured for WING dry-run safety."""
+        return self._replay_write_intent_adapter.list_records()
+
+    def _build_replay_write_context(self) -> Dict[str, Any]:
+        context = {
+            "arrangement_id": getattr(self, "replay_arrangement_id", None),
+            "scene_id": getattr(self, "replay_scene_id", None),
+            "scene_label": getattr(self, "replay_scene_label", None),
+            "engine_state": self.state.value,
+        }
+        return {key: value for key, value in context.items() if value is not None}
+
+    def _emit_fader_write_intent(
+        self,
+        *,
+        channel: int,
+        current_db: float,
+        target_db: float,
+        readback_source: str,
+        info: Optional[ChannelInfo] = None,
+        extra_payload: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        payload = dict(extra_payload or {})
+        if info is not None:
+            payload.setdefault("channel_name", info.name)
+            payload.setdefault("instrument_preset", info.preset)
+        return self._replay_write_intent_adapter.emit_fader_intent(
+            mixer_client=self.mixer_client,
+            mixer_type=self.mixer_type,
+            channel=channel,
+            current_fader_db=current_db,
+            target_fader_db=target_db,
+            readback_source=readback_source,
+            context_metadata=self._build_replay_write_context(),
+            extra_payload=payload,
+        )
+
+    def _emit_gain_write_intent(
+        self,
+        *,
+        channel: int,
+        current_trim_db: float,
+        target_trim_db: float,
+        readback_source: str,
+        info: Optional[ChannelInfo] = None,
+        extra_payload: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        payload = dict(extra_payload or {})
+        if info is not None:
+            payload.setdefault("channel_name", info.name)
+            payload.setdefault("instrument_preset", info.preset)
+        return self._replay_write_intent_adapter.emit_gain_intent(
+            mixer_client=self.mixer_client,
+            mixer_type=self.mixer_type,
+            channel=channel,
+            current_trim_db=current_trim_db,
+            target_trim_db=target_trim_db,
+            readback_source=readback_source,
+            context_metadata=self._build_replay_write_context(),
+            extra_payload=payload,
+        )
 
     # ── 0. Auto-discover mixer ───────────────────────────────────
 
@@ -1223,10 +1290,27 @@ class AutoSoundcheckEngine:
             fader_db += balance_adj
 
         fader_db = max(-30.0, min(0.0, fader_db))
-        info.fader_db = fader_db
-
         try:
-            self.mixer_client.set_fader(ch, fader_db)
+            intent = self._emit_fader_write_intent(
+                channel=ch,
+                current_db=info.fader_db,
+                target_db=fader_db,
+                readback_source="channel_info_snapshot",
+                info=info,
+            )
+            if intent is not None and not intent["allow_live_write"]:
+                logger.info(
+                    "Ch %s '%s': WING fader write skipped; replay intent emitted (%s)",
+                    ch,
+                    info.name,
+                    intent["replay_correlation_id"],
+                )
+                return
+            result = self.mixer_client.set_fader(ch, fader_db)
+            if result is False:
+                logger.warning(f"Ch {ch}: fader write blocked or failed")
+                return
+            info.fader_db = fader_db
             total_adj = fader_db - base_fader
             if abs(total_adj) > 0.5:
                 logger.info(
@@ -1287,7 +1371,30 @@ class AutoSoundcheckEngine:
         correction = max(-SAFE_MAX_GAIN_DB, min(SAFE_MAX_GAIN_DB, correction))
 
         try:
-            self.mixer_client.set_gain(ch, correction)
+            intent = self._emit_gain_write_intent(
+                channel=ch,
+                current_trim_db=0.0,
+                target_trim_db=correction,
+                readback_source="analysis_snapshot",
+                info=info,
+                extra_payload={
+                    "measured_true_peak_dbtp": float(true_peak),
+                    "measured_rms_db": float(rms),
+                    "measured_crest_factor_db": float(crest),
+                },
+            )
+            if intent is not None and not intent["allow_live_write"]:
+                logger.info(
+                    "Ch %s '%s': WING gain write skipped; replay intent emitted (%s)",
+                    ch,
+                    info.name,
+                    intent["replay_correlation_id"],
+                )
+                return
+            result = self.mixer_client.set_gain(ch, correction)
+            if result is False:
+                logger.warning(f"Ch {ch}: input gain write blocked or failed")
+                return
             logger.info(
                 f"Ch {ch} '{info.name}': input gain {correction:+.1f}dB "
                 f"(TP={true_peak:.1f}dBTP, RMS={rms:.1f}, "
@@ -1508,7 +1615,7 @@ class AutoSoundcheckEngine:
             )
 
         try:
-            self.mixer_client.set_compressor(
+            result = self.mixer_client.set_compressor(
                 ch,
                 threshold_db=round(threshold, 1),
                 ratio=round(ratio, 1),
@@ -1517,6 +1624,9 @@ class AutoSoundcheckEngine:
                 makeup_db=0.0,
                 enabled=True,
             )
+            if result is False:
+                logger.warning(f"Ch {ch}: compressor write blocked or failed")
+                return
             info.compressor_applied = True
 
             changes = []
@@ -1698,7 +1808,25 @@ class AutoSoundcheckEngine:
                     return
                 current = info.fader_db
                 new_fader = max(-30.0, current - 3.0)
-                self.mixer_client.set_fader(ch, new_fader)
+                intent = self._emit_fader_write_intent(
+                    channel=ch,
+                    current_db=current,
+                    target_db=new_fader,
+                    readback_source="feedback_monitor_snapshot",
+                    info=info,
+                    extra_payload={"feedback_action": event.action},
+                )
+                if intent is not None and not intent["allow_live_write"]:
+                    logger.warning(
+                        "FEEDBACK: Ch %s fader reduction skipped; replay intent emitted (%s)",
+                        ch,
+                        intent["replay_correlation_id"],
+                    )
+                    return
+                result = self.mixer_client.set_fader(ch, new_fader)
+                if result is False:
+                    logger.warning(f"FEEDBACK: Ch {ch} fader reduction blocked or failed")
+                    return
                 info.fader_db = new_fader
                 logger.warning(f"FEEDBACK: Ch {ch} fader reduced to {new_fader:.1f}dB")
             except Exception:
@@ -1789,9 +1917,31 @@ class AutoSoundcheckEngine:
                 continue
             try:
                 if snap.fader_db > -90.0:
-                    self.mixer_client.set_fader(ch, snap.fader_db)
+                    intent = self._emit_fader_write_intent(
+                        channel=ch,
+                        current_db=info.fader_db,
+                        target_db=snap.fader_db,
+                        readback_source="restore_snapshot",
+                        info=info,
+                        extra_payload={"restore_original_settings": True},
+                    )
+                    if intent is not None and not intent["allow_live_write"]:
+                        logger.info(
+                            "Ch %s '%s': restore fader skipped; replay intent emitted (%s)",
+                            ch,
+                            info.name,
+                            intent["replay_correlation_id"],
+                        )
+                        continue
+                    result = self.mixer_client.set_fader(ch, snap.fader_db)
+                    if result is False:
+                        logger.warning(f"Ch {ch}: restore fader write blocked or failed")
+                        continue
                 if snap.muted:
-                    self.mixer_client.set_mute(ch, True)
+                    result = self.mixer_client.set_mute(ch, True)
+                    if result is False:
+                        logger.warning(f"Ch {ch}: restore mute write blocked or failed")
+                        continue
                 restored += 1
                 logger.info(f"Ch {ch} '{info.name}': restored fader={snap.fader_db:.1f}dB")
             except Exception as e:

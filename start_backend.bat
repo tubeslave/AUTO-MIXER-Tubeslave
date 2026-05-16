@@ -2,21 +2,21 @@
 echo === Auto Mixer Tubeslave - Starting Backend ===
 echo.
 
-cd backend
+cd /d %~dp0
 
-if not exist venv (
+if not exist backend\venv (
     echo Creating virtual environment...
-    python -m venv venv
+    python -m venv backend\venv
 )
 
 echo Activating virtual environment...
-call venv\Scripts\activate.bat
+call backend\venv\Scripts\activate.bat
 
 echo Installing dependencies...
-pip install -r requirements.txt
+pip install -r backend\requirements.txt
 
 echo.
 echo Starting WebSocket server...
-python server.py
+python -m backend.server
 
 pause

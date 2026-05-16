@@ -2716,6 +2716,7 @@ class MultiChannelAutoEQController:
         # Centralized bleed detection service
         self.bleed_service = bleed_service
         self.min_analysis_time = min_analysis_time
+        self.mode = "soundcheck"
         
         # Active channels: Dict[channel_id, channel_state]
         self.active_channels: Dict[int, Dict] = {}
@@ -2734,6 +2735,7 @@ class MultiChannelAutoEQController:
     def start_multi_channel(self, 
                            device_id: int,
                            channels_config: List[Dict],
+                           mode: str = "soundcheck",
                            on_spectrum_callback: Callable = None,
                            on_corrections_callback: Callable = None,
                            on_status_callback: Callable = None) -> bool:
@@ -2746,6 +2748,7 @@ class MultiChannelAutoEQController:
                 - channel: int (mixer channel number)
                 - profile: str (profile name)
                 - auto_apply: bool
+            mode: Analysis mode label from the websocket API ("soundcheck" or "live")
             on_spectrum_callback: Callback for spectrum updates (receives {channel, spectrum, ...})
             on_corrections_callback: Callback for correction updates (receives {channel, corrections})
             on_status_callback: Callback for status updates
@@ -2760,6 +2763,11 @@ class MultiChannelAutoEQController:
         self.on_spectrum_update = on_spectrum_callback
         self.on_corrections_calculated = on_corrections_callback
         self.on_status_update = on_status_callback
+        normalized_mode = str(mode or "soundcheck").strip().lower()
+        if normalized_mode not in {"soundcheck", "live"}:
+            logger.warning("Unknown multi-channel Auto-EQ mode '%s', using soundcheck", mode)
+            normalized_mode = "soundcheck"
+        self.mode = normalized_mode
         
         # Collect all channel IDs for spectral gate monitoring
         all_channel_ids = [config['channel'] for config in channels_config]
@@ -2803,7 +2811,8 @@ class MultiChannelAutoEQController:
                         'corrections': [],
                         'spectrum_buffer': deque(maxlen=int(self.min_analysis_time * 30)),
                         'analysis_start_time': time.time(),
-                        'device_id': device_id
+                        'device_id': device_id,
+                        'mode': self.mode
                     }
                     started_count += 1
                     logger.info(f"Successfully started analysis for channel {channel} with profile {profile_name}")
@@ -3092,7 +3101,8 @@ class MultiChannelAutoEQController:
                     'corrections': corrections,
                     'spectrum_buffer': deque(),
                     'analysis_start_time': None,
-                    'device_id': None
+                    'device_id': None,
+                    'mode': self.mode
                 }
         
         logger.info(f"Multi-channel Auto-EQ stopped. Saved corrections for {len(saved_corrections)} channels.")
@@ -3101,10 +3111,12 @@ class MultiChannelAutoEQController:
         """Get status for all channels."""
         return {
             'active': len(self.active_channels) > 0,
+            'mode': self.mode,
             'channels': {
                 ch: {
                     'profile': state['profile'].name if state['profile'] else None,
                     'auto_apply': state['auto_apply'],
+                    'mode': state.get('mode', self.mode),
                     'corrections_count': len(state['corrections'])
                 }
                 for ch, state in self.active_channels.items()

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import websocketService from './services/websocket';
 import VoiceControlTab from './components/VoiceControlTab';
@@ -15,6 +15,7 @@ import AutoReverbTab from './components/AutoReverbTab';
 import CrossAdaptiveEQTab from './components/CrossAdaptiveEQTab';
 import SystemMeasurementTab from './components/SystemMeasurementTab';
 import SettingsTab from './components/SettingsTab';
+import PilotDeploymentCockpit from './components/PilotDeploymentCockpit';
 
 // Color map for routing roles
 const ROLE_COLORS = {
@@ -64,13 +65,24 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [routingScheme, setRoutingScheme] = useState([]);
   const [routingChannelCount, setRoutingChannelCount] = useState(64);
+  const [pilotCockpit, setPilotCockpit] = useState(null);
+  const mixerIpRef = useRef(mixerIp);
 
   useEffect(() => {
-    websocketService.on('connection_status', (data) => {
+    mixerIpRef.current = mixerIp;
+  }, [mixerIp]);
+
+  useEffect(() => {
+    const refreshPilotCockpit = () => {
+      websocketService.getSupervisedPilotStatus();
+    };
+
+    const handleConnectionStatus = (data) => {
       setConnecting(false);
       setMixerConnected(data.connected);
       if (data.connected) {
-        setStatusMessage(`Wing: ${mixerIp}`);
+        setStatusMessage(`Wing: ${data.ip || mixerIpRef.current}`);
+        refreshPilotCockpit();
       } else {
         if (data.error) {
           setStatusMessage(`Ошибка: ${data.error}`);
@@ -78,9 +90,9 @@ function App() {
           setStatusMessage('Отключен');
         }
       }
-    });
+    };
 
-    websocketService.on('audio_devices', (data) => {
+    const handleAudioDevices = (data) => {
       setAudioDevices(data.devices || []);
       if (data.devices && data.devices.length > 0) {
         const danteDevice = data.devices.find(device =>
@@ -90,15 +102,15 @@ function App() {
         setSelectedDevice(deviceToSelect.id);
         setAvailableChannels(deviceToSelect.channels || []);
       }
-    });
+    };
 
-    websocketService.on('bypass_result', (data) => {
+    const handleBypassResult = (data) => {
       if (data.error) {
         setStatusMessage(`Bypass: ${data.error}`);
       } else if (data.success) {
         setStatusMessage(`Bypass OK: ${data.success_count}/40`);
       }
-    });
+    };
 
     const isDefaultChannelName = (name) => {
       if (!name || !name.trim()) return true;
@@ -113,7 +125,7 @@ function App() {
       return defaultPatterns.some(pattern => pattern.test(trimmedName));
     };
 
-    websocketService.on('mixer_channel_names', (data) => {
+    const handleMixerChannelNames = (data) => {
       if (data.error) {
         setStatusMessage(`Scan: ${data.error}`);
         return;
@@ -155,13 +167,14 @@ function App() {
           return updatedChannels;
         });
       }
-    });
+    };
 
-    websocketService.on('disconnected', () => {
+    const handleDisconnected = () => {
       setServerConnected(false);
       setMixerConnected(false);
+      setPilotCockpit(null);
       setStatusMessage('Переподключение...');
-    });
+    };
 
     const handleAllSettingsLoaded = (data) => {
       if (data.settings && data.settings.mixer) {
@@ -170,11 +183,36 @@ function App() {
         if (m.mixerPort) setMixerPort(m.mixerPort);
       }
     };
-    websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
 
-    websocketService.on('dante_routing', (data) => {
+    const handleDanteRouting = (data) => {
       if (data.routing_scheme) setRoutingScheme(data.routing_scheme);
-    });
+    };
+
+    const handleSupervisedPilotStatus = (data) => {
+      setPilotCockpit(data);
+    };
+
+    const handlePilotRefreshTrigger = () => {
+      refreshPilotCockpit();
+    };
+
+    websocketService.on('connection_status', handleConnectionStatus);
+    websocketService.on('audio_devices', handleAudioDevices);
+    websocketService.on('bypass_result', handleBypassResult);
+    websocketService.on('mixer_channel_names', handleMixerChannelNames);
+    websocketService.on('disconnected', handleDisconnected);
+    websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
+    websocketService.on('dante_routing', handleDanteRouting);
+    websocketService.on('supervised_pilot_status', handleSupervisedPilotStatus);
+    websocketService.on('manual_write_supervision', handlePilotRefreshTrigger);
+    websocketService.on('manual_write_session', handlePilotRefreshTrigger);
+    websocketService.on('manual_write_applied', handlePilotRefreshTrigger);
+    websocketService.on('manual_write_blocked', handlePilotRefreshTrigger);
+    websocketService.on('manual_write_error', handlePilotRefreshTrigger);
+    websocketService.on('manual_write_rollback_applied', handlePilotRefreshTrigger);
+    websocketService.on('manual_write_rollback_blocked', handlePilotRefreshTrigger);
+    websocketService.on('manual_write_rollback_error', handlePilotRefreshTrigger);
+    websocketService.on('emergency_stop_applied', handlePilotRefreshTrigger);
 
     websocketService.connect()
       .then(() => {
@@ -183,20 +221,38 @@ function App() {
         websocketService.send({ type: 'get_audio_devices' });
         websocketService.loadAllSettings();
         websocketService.getDanteRouting(64);
+        refreshPilotCockpit();
       })
       .catch(err => {
         setStatusMessage('Backend недоступен');
         console.error(err);
       });
 
+    const cockpitPollTimer = setInterval(() => {
+      if (websocketService.ws && websocketService.ws.readyState === WebSocket.OPEN) {
+        refreshPilotCockpit();
+      }
+    }, 5000);
+
     return () => {
-      websocketService.off('connection_status', () => {});
-      websocketService.off('audio_devices', () => {});
-      websocketService.off('bypass_result', () => {});
-      websocketService.off('mixer_channel_names', () => {});
-      websocketService.off('disconnected', () => {});
+      websocketService.off('connection_status', handleConnectionStatus);
+      websocketService.off('audio_devices', handleAudioDevices);
+      websocketService.off('bypass_result', handleBypassResult);
+      websocketService.off('mixer_channel_names', handleMixerChannelNames);
+      websocketService.off('disconnected', handleDisconnected);
       websocketService.off('all_settings_loaded', handleAllSettingsLoaded);
-      websocketService.off('dante_routing', () => {});
+      websocketService.off('dante_routing', handleDanteRouting);
+      websocketService.off('supervised_pilot_status', handleSupervisedPilotStatus);
+      websocketService.off('manual_write_supervision', handlePilotRefreshTrigger);
+      websocketService.off('manual_write_session', handlePilotRefreshTrigger);
+      websocketService.off('manual_write_applied', handlePilotRefreshTrigger);
+      websocketService.off('manual_write_blocked', handlePilotRefreshTrigger);
+      websocketService.off('manual_write_error', handlePilotRefreshTrigger);
+      websocketService.off('manual_write_rollback_applied', handlePilotRefreshTrigger);
+      websocketService.off('manual_write_rollback_blocked', handlePilotRefreshTrigger);
+      websocketService.off('manual_write_rollback_error', handlePilotRefreshTrigger);
+      websocketService.off('emergency_stop_applied', handlePilotRefreshTrigger);
+      clearInterval(cockpitPollTimer);
       websocketService.disconnect();
     };
   }, []);
@@ -381,6 +437,11 @@ function App() {
                   </select>
                 </div>
               </div>
+
+              <PilotDeploymentCockpit
+                status={pilotCockpit}
+                onRefresh={() => websocketService.getSupervisedPilotStatus()}
+              />
 
               {/* Routing Scheme Card */}
               <div className="connect-card">

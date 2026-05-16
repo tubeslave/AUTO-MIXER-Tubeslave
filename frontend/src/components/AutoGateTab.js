@@ -5,6 +5,7 @@ import SignalHint from './SignalHint';
 
 function AutoGateTab({ selectedChannels, availableChannels, selectedDevice, audioDevices, globalMode }) {
   const [running, setRunning] = useState(false);
+  const [implemented, setImplemented] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
   const [channelGateStatus, setChannelGateStatus] = useState({});
   const [showSettings, setShowSettings] = useState(false);
@@ -16,6 +17,7 @@ function AutoGateTab({ selectedChannels, availableChannels, selectedDevice, audi
   useEffect(() => {
     const handle = (data) => {
       if (data.running !== undefined) setRunning(data.running);
+      if (data.implemented !== undefined) setImplemented(data.implemented);
       if (data.message) setStatusMessage(data.message);
       if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
       if (data.channel_status) setChannelGateStatus(data.channel_status);
@@ -43,7 +45,7 @@ function AutoGateTab({ selectedChannels, availableChannels, selectedDevice, audi
         <div className="module-actions">
           <button className={`btn-start ${running ? 'stop' : 'go'}`}
             onClick={running ? handleStop : handleStart}
-            disabled={!selectedDevice || !channels.length}>
+            disabled={!implemented || !selectedDevice || !channels.length}>
             {running ? 'Стоп' : 'Старт'}
           </button>
         </div>
@@ -58,25 +60,25 @@ function AutoGateTab({ selectedChannels, availableChannels, selectedDevice, audi
               <div className="setting-row">
                 <label>Threshold</label>
                 <input type="range" min="-60" max="-20" value={settings.threshold}
-                  onChange={e => setSettings(s => ({...s, threshold: parseInt(e.target.value)}))} disabled={running} />
+                  onChange={e => setSettings(s => ({...s, threshold: parseInt(e.target.value)}))} disabled={!implemented || running} />
                 <span className="val">{settings.threshold} dB</span>
               </div>
               <div className="setting-row">
                 <label>Hold</label>
                 <input type="range" min="10" max="500" step="10" value={settings.holdMs}
-                  onChange={e => setSettings(s => ({...s, holdMs: parseInt(e.target.value)}))} disabled={running} />
+                  onChange={e => setSettings(s => ({...s, holdMs: parseInt(e.target.value)}))} disabled={!implemented || running} />
                 <span className="val">{settings.holdMs} ms</span>
               </div>
               <div className="setting-row">
                 <label>Release</label>
                 <input type="range" min="50" max="500" step="10" value={settings.releaseMs}
-                  onChange={e => setSettings(s => ({...s, releaseMs: parseInt(e.target.value)}))} disabled={running} />
+                  onChange={e => setSettings(s => ({...s, releaseMs: parseInt(e.target.value)}))} disabled={!implemented || running} />
                 <span className="val">{settings.releaseMs} ms</span>
               </div>
               <div className="setting-row">
                 <label>Range</label>
                 <input type="range" min="-80" max="-20" value={settings.rangeDb}
-                  onChange={e => setSettings(s => ({...s, rangeDb: parseInt(e.target.value)}))} disabled={running} />
+                  onChange={e => setSettings(s => ({...s, rangeDb: parseInt(e.target.value)}))} disabled={!implemented || running} />
                 <span className="val">{settings.rangeDb} dB</span>
               </div>
             </div>

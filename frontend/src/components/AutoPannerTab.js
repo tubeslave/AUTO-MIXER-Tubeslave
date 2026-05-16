@@ -5,14 +5,15 @@ import SignalHint from './SignalHint';
 
 function AutoPannerTab({ selectedChannels, availableChannels, selectedDevice, audioDevices, globalMode }) {
   const [running, setRunning] = useState(false);
+  const [implemented, setImplemented] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
   const [panPositions, setPanPositions] = useState({});
-  const [showSettings, setShowSettings] = useState(false);
   const [genre, setGenre] = useState('rock');
 
   useEffect(() => {
     const handle = (data) => {
       if (data.running !== undefined) setRunning(data.running);
+      if (data.implemented !== undefined) setImplemented(data.implemented);
       if (data.message) setStatusMessage(data.message);
       if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
       if (data.pan_positions) setPanPositions(data.pan_positions);
@@ -42,10 +43,10 @@ function AutoPannerTab({ selectedChannels, availableChannels, selectedDevice, au
         <div className="module-actions">
           <button className={`btn-start ${running ? 'stop' : 'go'}`}
             onClick={running ? handleStop : handleStart}
-            disabled={!selectedDevice || !channels.length}>
+            disabled={!implemented || !selectedDevice || !channels.length}>
             {running ? 'Стоп' : 'Старт'}
           </button>
-          <select value={genre} onChange={e => setGenre(e.target.value)} disabled={running}
+          <select value={genre} onChange={e => setGenre(e.target.value)} disabled={!implemented || running}
             className="genre-select">
             <option value="rock">Rock</option>
             <option value="jazz">Jazz</option>

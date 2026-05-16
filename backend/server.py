@@ -3,12 +3,14 @@ import atexit
 import json
 import logging
 import os
+import errno
 import re
 import signal
 import sys
 import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Set, Optional, Union, List, Dict, Any
 import websockets
 import numpy as np
@@ -47,6 +49,7 @@ from feedback_detector import FeedbackDetector
 from auto_soundcheck_engine import AutoSoundcheckEngine
 from mixer_discovery import discover_mixers, discover_mixer_auto, DiscoveredMixer
 from handlers import register_all_handlers
+from wing_telemetry_recorder import WingTelemetryRecorder
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -185,6 +188,23 @@ class AutoMixerServer:
         self._manual_write_session_history: List[Dict[str, Any]] = []
         self._manual_write_session_step_counter = 0
 
+        # Default safety mode for Wing test/observation runs
+        self._wing_observation_only = self._parse_env_bool(
+            os.getenv("AUTOMIXER_WING_OBSERVATION_MODE", "false")
+        )
+        self._wing_record_telemetry = self._parse_env_bool(
+            os.getenv("AUTOMIXER_WING_RECORD_TELEMETRY", "false")
+        )
+        self._wing_telemetry_dir = os.getenv(
+            "AUTOMIXER_WING_TELEMETRY_DIR",
+            "artifacts/wing_telemetry",
+        )
+        shadow_reports_root = Path(
+            os.getenv("AUTOMIXER_SHADOW_REPORTS_DIR", "artifacts")
+        )
+        if not shadow_reports_root.is_absolute():
+            shadow_reports_root = Path(__file__).resolve().parents[1] / shadow_reports_root
+        self._shadow_reports_root = shadow_reports_root
         self._wing_deployment_write_boundary_enabled = self._parse_env_bool(
             os.getenv("AUTOMIXER_WING_DEPLOYMENT_WRITE_BOUNDARY_ENABLED", "true")
         )
@@ -373,6 +393,31 @@ class AutoMixerServer:
             },
         )
         return step
+
+    def set_manual_write_supervision(self, armed: bool, *, reason: str = "") -> Dict[str, Any]:
+        self._manual_writes_armed = bool(armed)
+        if self._manual_writes_armed:
+            self._manual_write_panic_stopped = False
+        elif str(reason or "").strip().lower() == "emergency_stop":
+            self._manual_write_panic_stopped = True
+        wing_client = self._get_wing_write_client()
+        if wing_client and hasattr(wing_client, "configure_write_gate"):
+            wing_client.configure_write_gate(
+                enabled=self._manual_write_supervision_enabled,
+                allowed_kinds=("fader", "gain"),
+                cooldown_sec=self._manual_write_cooldown_sec,
+                requires_approval=True,
+            )
+            if self._manual_writes_armed:
+                wing_client.arm_write_gate(reason=str(reason or "manual_arm"))
+            elif self._manual_write_panic_stopped:
+                wing_client.emergency_stop_writes(reason=str(reason or "emergency_stop"))
+            else:
+                wing_client.disarm_write_gate(reason=str(reason or "manual_disarm"))
+        status = self.get_manual_write_supervision_status()
+        status.update({"type": "manual_write_supervision", "reason": str(reason or "requested")})
+        self._record_manual_write_telemetry("supervision", status)
+        return status
 
     def _record_manual_write_telemetry(self, event_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         event = {
@@ -572,6 +617,34 @@ class AutoMixerServer:
             return client
         return None
 
+    async def _block_console_write(
+        self,
+        websocket: Optional[WebSocketServerProtocol],
+        *,
+        source: str,
+        value_type: str,
+        reason: str,
+        channel: Optional[int] = None,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        payload = {
+            "status": "blocked",
+            "source": source,
+            "value_type": value_type,
+            "reason": reason,
+            "channel": channel,
+        }
+        if extra:
+            payload.update(extra)
+        self._record_manual_write_telemetry("blocked", payload)
+        if websocket is not None:
+            await self.send_to_client(websocket, {
+                "type": "manual_write_blocked",
+                "reason": reason,
+                "request": payload,
+            })
+        return payload
+
     async def _apply_manual_console_write(
         self,
         websocket: Optional[WebSocketServerProtocol],
@@ -599,30 +672,17 @@ class AutoMixerServer:
         if gate["allowed"]:
             self._record_manual_write_telemetry("attempted", gate)
             try:
-                wing_client = self._get_wing_write_client()
-                if wing_client and hasattr(wing_client, "supervised_set_channel_fader") and hasattr(wing_client, "supervised_set_channel_gain"):
-                    if value_type == "fader":
-                        write_result = wing_client.supervised_set_channel_fader(
-                            gate["channel"],
-                            gate["effective_value"],
-                            source=source,
-                            reason=gate["reason_text"],
-                            approved=gate["approved"],
-                            approval_id=gate.get("approval_id"),
-                            bypass_cooldown=gate.get("bypass_cooldown", False),
-                        )
-                    elif value_type == "gain":
-                        write_result = wing_client.supervised_set_channel_gain(
-                            gate["channel"],
-                            gate["effective_value"],
-                            source=source,
-                            reason=gate["reason_text"],
-                            approved=gate["approved"],
-                            approval_id=gate.get("approval_id"),
-                            bypass_cooldown=gate.get("bypass_cooldown", False),
-                        )
-                    else:
-                        write_result = {"status": "blocked", "reason": "unsupported_value_type"}
+                if self.mixer_client and hasattr(self.mixer_client, "apply_live_change"):
+                    write_result = self.mixer_client.apply_live_change(
+                        channel=gate["channel"],
+                        value=gate["effective_value"],
+                        value_type=value_type,
+                        source=source,
+                        reason=gate["reason_text"],
+                        approved=gate["approved"],
+                        approval_id=gate.get("approval_id"),
+                        bypass_cooldown=gate.get("bypass_cooldown", False),
+                    )
                 else:
                     if value_type == "fader":
                         if hasattr(self.mixer_client, "set_channel_fader"):
@@ -792,10 +852,451 @@ class AutoMixerServer:
             })
         return payload
 
+    def _latest_manual_write_event(self, *event_types: str) -> Optional[Dict[str, Any]]:
+        wanted = {event_type for event_type in event_types if event_type}
+        for event in reversed(self._manual_write_telemetry):
+            if not wanted or event.get("event_type") in wanted:
+                return event
+        return None
+
+    @staticmethod
+    def _load_json_if_exists(path: Path) -> Dict[str, Any]:
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError):
+            return {}
+
+    def _get_shadow_transport_status(self) -> Dict[str, Any]:
+        base_status = {
+            "available": False,
+            "state": "unavailable",
+            "report_dir": None,
+            "generated_at": None,
+            "dry_run_only": True,
+            "live_mixer_writes": False,
+            "ready": False,
+            "promotion_readiness_score": None,
+            "validation_highest_severity": None,
+            "selected_proposal_id": None,
+            "disagreement_count": 0,
+            "disagreement_rate": 0.0,
+            "disagreement_classes": {},
+            "confidence_trend": {},
+            "rollback_frequency": {},
+            "audit_coverage": {},
+            "promotion_readiness_gates": [],
+            "blocked_reasons": [],
+            "report_age_sec": None,
+        }
+        root = getattr(self, "_shadow_reports_root", None)
+        if not isinstance(root, Path) or not root.exists():
+            return base_status
+
+        try:
+            summary_paths = list(root.rglob("shadow_mode_summary.json"))
+        except OSError:
+            return base_status
+        if not summary_paths:
+            return base_status
+
+        summary_path = max(summary_paths, key=lambda candidate: candidate.stat().st_mtime)
+        report_dir = summary_path.parent
+        summary = self._load_json_if_exists(summary_path)
+        comparison = self._load_json_if_exists(report_dir / "shadow_mode_comparison.json")
+        readiness = self._load_json_if_exists(report_dir / "promotion_readiness_report.json")
+        rollback = self._load_json_if_exists(report_dir / "rollback_simulation_report.json")
+        trajectory = self._load_json_if_exists(report_dir / "confidence_trajectory.json")
+        aggregation = dict(readiness.get("aggregation") or {})
+
+        dry_run_only = bool(
+            readiness.get(
+                "dry_run_only",
+                (comparison.get("evidence") or {}).get("dry_run_only", True),
+            )
+        )
+        live_mixer_writes = bool(
+            readiness.get(
+                "live_mixer_writes",
+                (comparison.get("evidence") or {}).get("live_mixer_writes", False),
+            )
+        )
+        blocked_reasons = [str(reason) for reason in rollback.get("blocked_reasons", []) if reason]
+        highest_severity = str(readiness.get("validation_highest_severity") or "") or None
+        ready = bool(readiness.get("ready", False))
+
+        if live_mixer_writes or blocked_reasons or highest_severity == "error":
+            state = "blocked"
+        elif ready:
+            state = "shadow_ready"
+        else:
+            state = "shadow_dry_run"
+
+        return {
+            "available": True,
+            "state": state,
+            "report_dir": str(report_dir),
+            "generated_at": summary.get("generated_at"),
+            "dry_run_only": dry_run_only,
+            "live_mixer_writes": live_mixer_writes,
+            "ready": ready,
+            "promotion_readiness_score": readiness.get("promotion_readiness_score"),
+            "validation_highest_severity": highest_severity,
+            "selected_proposal_id": summary.get("selected_proposal_id") or comparison.get("selected_proposal_id"),
+            "disagreement_count": int(
+                summary.get(
+                    "disagreement_count",
+                    len(comparison.get("disagreements") or []),
+                )
+            ),
+            "disagreement_rate": aggregation.get(
+                "disagreement_rate",
+                ((comparison.get("disagreement_summary") or {}).get("disagreement_rate", 0.0)),
+            ),
+            "disagreement_classes": aggregation.get(
+                "disagreement_classes",
+                (comparison.get("disagreement_summary") or {}).get("classes", {}),
+            ),
+            "confidence_trend": aggregation.get(
+                "confidence_trend",
+                trajectory.get("trend_summary", {}),
+            ),
+            "rollback_frequency": aggregation.get("rollback_frequency", {}),
+            "audit_coverage": aggregation.get("audit_coverage", {}),
+            "promotion_readiness_gates": list(readiness.get("promotion_readiness_gates", [])),
+            "blocked_reasons": blocked_reasons,
+            "report_age_sec": max(0.0, time.time() - summary_path.stat().st_mtime),
+        }
+
+    def get_supervised_pilot_status(self) -> Dict[str, Any]:
+        supervision = self.get_manual_write_supervision_status()
+        session = self.get_manual_write_session_status()
+        ready_for_live = self.get_ready_for_live_status()
+        shadow_transport = self._get_shadow_transport_status()
+        wing_client = self._get_wing_write_client()
+        write_gate = dict(supervision.get("write_gate") or {})
+        emergency_stopped_state = getattr(
+            WingClient,
+            "WRITE_GATE_STATE_EMERGENCY_STOPPED",
+            "emergency_stopped",
+        )
+        latest_confirmed = self._latest_manual_write_event("applied", "rollback_applied")
+        latest_blocked = self._latest_manual_write_event(
+            "blocked",
+            "error",
+            "rollback_blocked",
+            "rollback_error",
+        )
+        latest_confirmed_payload = dict((latest_confirmed or {}).get("payload") or {})
+        latest_blocked_payload = dict((latest_blocked or {}).get("payload") or {})
+        last_blocked_is_current = bool(
+            latest_blocked
+            and (
+                not latest_confirmed
+                or float(latest_blocked.get("ts", 0.0)) >= float(latest_confirmed.get("ts", 0.0))
+            )
+        )
+
+        mixer_connected = bool(self.mixer_client and self.mixer_client.is_connected)
+        deployment_boundary_active = bool(
+            self.connection_mode != "wing" or self._is_wing_deployment_write_boundary_active()
+        )
+        readback_confirmed = bool(
+            latest_confirmed_payload
+            and latest_confirmed_payload.get("status") == "applied"
+            and latest_confirmed_payload.get("readback_value") is not None
+        )
+        dry_run_active = bool(
+            shadow_transport.get("dry_run_only")
+            and not shadow_transport.get("live_mixer_writes")
+            and not supervision.get("armed")
+        )
+        shadow_active = bool(shadow_transport.get("available"))
+        rollback_ready = bool(session.get("rollback_ready_count", 0))
+        blocked_active = bool(
+            supervision.get("panic_stopped")
+            or write_gate.get("state") == emergency_stopped_state
+            or shadow_transport.get("state") == "blocked"
+            or last_blocked_is_current
+            or not deployment_boundary_active
+        )
+
+        if blocked_active:
+            primary_state = "blocked"
+        elif rollback_ready:
+            primary_state = "rollback_ready"
+        elif readback_confirmed:
+            primary_state = "confirmed"
+        elif shadow_active:
+            primary_state = "shadow"
+        elif dry_run_active:
+            primary_state = "dry_run"
+        else:
+            primary_state = "idle"
+
+        state_flags = {
+            "dry_run": dry_run_active,
+            "shadow": shadow_active,
+            "blocked": blocked_active,
+            "confirmed": readback_confirmed,
+            "rollback_ready": rollback_ready,
+        }
+        states = [
+            {
+                "key": "dry_run",
+                "label": "Dry Run",
+                "active": state_flags["dry_run"],
+                "detail": "Write path stays disarmed while shadow transport remains dry-run only.",
+            },
+            {
+                "key": "shadow",
+                "label": "Shadow",
+                "active": state_flags["shadow"],
+                "detail": "Latest replay/shadow evidence is available for operator review.",
+            },
+            {
+                "key": "blocked",
+                "label": "Blocked",
+                "active": state_flags["blocked"],
+                "detail": "A safety gate, escalation, or shadow policy currently blocks pilot progression.",
+            },
+            {
+                "key": "confirmed",
+                "label": "Confirmed",
+                "active": state_flags["confirmed"],
+                "detail": "The latest supervised change completed with readback confirmation.",
+            },
+            {
+                "key": "rollback_ready",
+                "label": "Rollback Ready",
+                "active": state_flags["rollback_ready"],
+                "detail": "A supervised session holds at least one known-safe rollback point.",
+            },
+        ]
+
+        readiness_checks = [
+            {
+                "key": "mixer_connected",
+                "label": "Mixer connected",
+                "ok": mixer_connected,
+                "detail": "Backend has an active mixer connection.",
+            },
+            {
+                "key": "deployment_boundary",
+                "label": "Write boundary active",
+                "ok": deployment_boundary_active,
+                "detail": "WING deployment boundary limits writes to supervised manual fader/gain only.",
+            },
+            {
+                "key": "manual_supervision_enabled",
+                "label": "Manual supervision enabled",
+                "ok": bool(supervision.get("enabled")),
+                "detail": "Supervised write gate is enabled on the deployment path.",
+            },
+            {
+                "key": "shadow_dry_run_only",
+                "label": "Shadow transport dry-run only",
+                "ok": bool(
+                    shadow_transport.get("available")
+                    and shadow_transport.get("dry_run_only")
+                    and not shadow_transport.get("live_mixer_writes")
+                ),
+                "detail": "Latest shadow evidence proves replay transport stayed dry-run only.",
+            },
+            {
+                "key": "readback_confirmed",
+                "label": "Latest readback confirmed",
+                "ok": readback_confirmed,
+                "detail": "Most recent supervised write completed with readback confirmation.",
+            },
+        ]
+        pilot_ready = all(check["ok"] for check in readiness_checks[:4]) and not blocked_active
+
+        escalations: List[Dict[str, Any]] = []
+        if not mixer_connected:
+            escalations.append(
+                {
+                    "severity": "warning",
+                    "code": "mixer_disconnected",
+                    "message": "Mixer is disconnected; supervised pilot state is informational only.",
+                    "operator_action": "Reconnect the mixer before arming or reviewing write readiness.",
+                }
+            )
+        if not deployment_boundary_active:
+            escalations.append(
+                {
+                    "severity": "critical",
+                    "code": "deployment_boundary_inactive",
+                    "message": "WING deployment boundary is not active.",
+                    "operator_action": "Stop pilot activity until the supervised write boundary is restored.",
+                }
+            )
+        if supervision.get("panic_stopped"):
+            escalations.append(
+                {
+                    "severity": "critical",
+                    "code": "manual_write_panic_stopped",
+                    "message": "Manual write supervision is latched in emergency-stop mode.",
+                    "operator_action": "Investigate the stop reason before re-arming any supervised path.",
+                }
+            )
+        if write_gate.get("state") == emergency_stopped_state:
+            escalations.append(
+                {
+                    "severity": "critical",
+                    "code": "write_gate_emergency_stopped",
+                    "message": "WING write gate is emergency-stopped after a safety failure.",
+                    "operator_action": "Review the last readback failure and restore a known-safe console state.",
+                }
+            )
+        if shadow_transport.get("state") == "blocked":
+            escalations.append(
+                {
+                    "severity": "critical" if shadow_transport.get("live_mixer_writes") else "warning",
+                    "code": "shadow_transport_blocked",
+                    "message": "Latest shadow evidence is not promotion-ready.",
+                    "operator_action": "Review blocked reasons and validation findings before progressing the pilot.",
+                }
+            )
+        if not shadow_transport.get("available"):
+            escalations.append(
+                {
+                    "severity": "warning",
+                    "code": "shadow_transport_missing",
+                    "message": "No shadow-mode report was found under the configured artifacts root.",
+                    "operator_action": "Run or import a dry-run/shadow replay before treating the pilot as ready.",
+                }
+            )
+        if last_blocked_is_current:
+            escalations.append(
+                {
+                    "severity": "warning",
+                    "code": str(latest_blocked_payload.get("reason") or "manual_write_blocked"),
+                    "message": "Latest supervised write event was blocked.",
+                    "operator_action": "Resolve the blocked reason before retrying any console-side pilot step.",
+                }
+            )
+        if not ready_for_live["checks"].get("no_clipping_trusted", False):
+            escalations.append(
+                {
+                    "severity": "info",
+                    "code": "no_clipping_untrusted",
+                    "message": ready_for_live["checks"].get(
+                        "no_clipping_reason",
+                        "Measured clipping verification is not implemented yet.",
+                    ),
+                    "operator_action": "Keep this pilot in supervised mode until clipping verification exists.",
+                }
+            )
+
+        latest_confirmation = {
+            "event_type": (latest_confirmed or {}).get("event_type"),
+            "at": datetime.fromtimestamp(latest_confirmed["ts"], timezone.utc).isoformat()
+            if latest_confirmed
+            else None,
+            "channel": latest_confirmed_payload.get("channel"),
+            "value_type": latest_confirmed_payload.get("value_type"),
+            "effective_value": latest_confirmed_payload.get("effective_value"),
+            "readback_value": latest_confirmed_payload.get("readback_value"),
+            "approval_id": latest_confirmed_payload.get("approval_id"),
+            "reason": latest_confirmed_payload.get("reason"),
+        }
+        latest_block = {
+            "event_type": (latest_blocked or {}).get("event_type"),
+            "at": datetime.fromtimestamp(latest_blocked["ts"], timezone.utc).isoformat()
+            if latest_blocked
+            else None,
+            "reason": latest_blocked_payload.get("reason"),
+            "channel": latest_blocked_payload.get("channel"),
+            "value_type": latest_blocked_payload.get("value_type"),
+            "retry_after_sec": latest_blocked_payload.get("retry_after_sec"),
+        }
+
+        return {
+            "type": "supervised_pilot_status",
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "primary_state": primary_state,
+            "states": states,
+            "state_flags": state_flags,
+            "pilot_ready": pilot_ready,
+            "connection_mode": self.connection_mode,
+            "write_boundary": {
+                "deployment_boundary_active": deployment_boundary_active,
+                "mixer_connected": mixer_connected,
+                "observation_only": bool(getattr(wing_client, "observation_mode", False)) if wing_client else False,
+                "manual_supervision": supervision,
+                "write_gate": write_gate,
+            },
+            "shadow_transport": shadow_transport,
+            "manual_write_session": session,
+            "latest_confirmation": latest_confirmation,
+            "latest_block": latest_block,
+            "readiness": {
+                "pilot_ready": pilot_ready,
+                "checks": readiness_checks,
+                "ready_for_live": ready_for_live,
+            },
+            "escalations": escalations,
+        }
+
     @staticmethod
     def _parse_env_bool(value: str) -> bool:
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
+    def _get_wing_capture_client(self) -> Optional[Union[EnhancedOSCClient, WingClient]]:
+        client = self.mixer_client
+        if client and hasattr(client, "set_observation_mode") and hasattr(client, "subscribe"):
+            return client
+        return None
+
+    def _get_wing_telemetry_capture_status(self) -> Dict[str, Any]:
+        client = self._get_wing_capture_client()
+        if not client or not hasattr(client, "get_telemetry_capture_status"):
+            return {"active": False}
+        return client.get_telemetry_capture_status()
+
+    def _start_wing_telemetry_capture(
+        self,
+        *,
+        ip: Optional[str] = None,
+        send_port: Optional[int] = None,
+        receive_port: Optional[int] = None,
+        observation_only: bool = False,
+        session_label: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        client = self._get_wing_capture_client()
+        if not client or not hasattr(client, "set_telemetry_recorder"):
+            raise RuntimeError("WING telemetry capture requires a connected Wing client")
+
+        current = client.get_telemetry_capture_status()
+        if current.get("active"):
+            return current
+
+        resolved_ip = ip or getattr(client, "ip", "wing")
+        resolved_send_port = send_port or getattr(client, "port", None)
+        recorder = WingTelemetryRecorder(
+            base_dir=self._wing_telemetry_dir,
+            session_label=session_label or f"wing_{resolved_ip}",
+            metadata={
+                "mixer_type": "wing",
+                "ip": resolved_ip,
+                "send_port": resolved_send_port,
+                "receive_port": receive_port,
+                "observation_only": bool(observation_only),
+                "connection_mode": self.connection_mode,
+                "captured_by": "AutoMixerServer.connect_wing",
+            },
+        )
+        recorder.start()
+        client.set_telemetry_recorder(recorder)
+        return client.get_telemetry_capture_status()
+
+    def _stop_wing_telemetry_capture(self, reason: str = "") -> Dict[str, Any]:
+        client = self._get_wing_capture_client()
+        if not client or not hasattr(client, "stop_telemetry_capture"):
+            return {"active": False}
+        return client.stop_telemetry_capture(reason=reason)
     
     def cleanup_all_controllers(self):
         """Cleanup all active controllers - call before shutdown or on error."""
@@ -1083,7 +1584,15 @@ class AutoMixerServer:
             except:
                 pass
 
-    async def connect_wing(self, ip: str, send_port: int = 2223, receive_port: int = 2223):
+    async def connect_wing(
+        self,
+        ip: str,
+        send_port: int = 2223,
+        receive_port: int = 2223,
+        observation_only: Optional[bool] = None,
+        record_telemetry: Optional[bool] = None,
+        telemetry_session_label: Optional[str] = None,
+    ):
         """
         Connect directly to Wing mixer via OSC
         
@@ -1096,7 +1605,46 @@ class AutoMixerServer:
         
         try:
             self.mixer_client = EnhancedOSCClient(ip=ip, port=send_port)
+            self._manual_writes_armed = False
+            self._manual_write_panic_stopped = False
+            self._manual_write_last_ts = {}
+            self._manual_write_session_active = False
+            self._manual_write_session_id = None
+            self._manual_write_session_label = None
+            self._manual_write_session_started_at = None
+            self._manual_write_session_history = []
+            self._manual_write_session_step_counter = 0
+            if observation_only is None:
+                observation_only = self._wing_observation_only
+            else:
+                observation_only = bool(observation_only)
+            if record_telemetry is None:
+                record_telemetry = self._wing_record_telemetry
+            else:
+                record_telemetry = bool(record_telemetry)
+
             self.connection_mode = 'wing'
+
+            self.mixer_client.set_observation_mode(bool(observation_only), reason=f"session connect_wing ip={ip}")
+            if hasattr(self.mixer_client, "configure_write_gate"):
+                self.mixer_client.configure_write_gate(
+                    enabled=self._manual_write_supervision_enabled,
+                    allowed_kinds=("fader", "gain"),
+                    cooldown_sec=self._manual_write_cooldown_sec,
+                    requires_approval=True,
+                )
+                self.mixer_client.disarm_write_gate(reason="connect_wing_default_disarmed")
+
+            logger.info("Wing observation mode: %s", "enabled" if observation_only else "disabled")
+
+            if record_telemetry:
+                self._start_wing_telemetry_capture(
+                    ip=ip,
+                    send_port=send_port,
+                    receive_port=receive_port,
+                    observation_only=bool(observation_only),
+                    session_label=telemetry_session_label,
+                )
             
             # Store the event loop reference for thread-safe callback
             loop = asyncio.get_running_loop()
@@ -1139,10 +1687,13 @@ class AutoMixerServer:
                     "connected": True,
                     "mode": "wing",
                     "ip": ip,
+                    "observation_only": bool(observation_only),
+                    "telemetry_capture": self._get_wing_telemetry_capture_status(),
                     "state": self.mixer_client.get_state()
                 })
                 logger.info("Wing connected successfully (direct OSC)")
             else:
+                self._stop_wing_telemetry_capture(reason="connect_failed")
                 self.mixer_client = None
                 self.connection_mode = None
                 await self.broadcast({
@@ -1153,6 +1704,7 @@ class AutoMixerServer:
                 
         except Exception as e:
             logger.error(f"Error connecting to Wing: {e}")
+            self._stop_wing_telemetry_capture(reason="connect_exception")
             self.mixer_client = None
             self.connection_mode = None
             await self.broadcast({
@@ -1160,6 +1712,47 @@ class AutoMixerServer:
                 "connected": False,
                 "error": str(e)
             })
+
+    async def start_wing_telemetry_capture(
+        self,
+        websocket,
+        session_label: Optional[str] = None,
+    ):
+        """Start durable recording for the current WING session."""
+        if self.connection_mode != "wing" or not self.mixer_client:
+            await self.send_to_client(websocket, {
+                "type": "wing_telemetry_capture_status",
+                "error": "WING mixer not connected",
+                "telemetry_capture": {"active": False},
+            })
+            return
+
+        try:
+            status = self._start_wing_telemetry_capture(
+                ip=getattr(self.mixer_client, "ip", None),
+                send_port=getattr(self.mixer_client, "port", None),
+                observation_only=bool(getattr(self.mixer_client, "observation_mode", False)),
+                session_label=session_label,
+            )
+            await self.send_to_client(websocket, {
+                "type": "wing_telemetry_capture_status",
+                "telemetry_capture": status,
+            })
+        except Exception as e:
+            logger.error("Error starting WING telemetry capture: %s", e, exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "wing_telemetry_capture_status",
+                "error": str(e),
+                "telemetry_capture": {"active": False},
+            })
+
+    async def stop_wing_telemetry_capture(self, websocket, reason: str = "manual_stop"):
+        """Stop and flush the current WING telemetry recording."""
+        status = self._stop_wing_telemetry_capture(reason=reason)
+        await self.send_to_client(websocket, {
+            "type": "wing_telemetry_capture_status",
+            "telemetry_capture": status,
+        })
 
     async def connect_dlive(self, ip: str = "192.168.3.70", port: int = 51328,
                             tls: bool = False, midi_base_channel: int = 0):
@@ -1306,14 +1899,24 @@ class AutoMixerServer:
     async def disconnect_mixer(self):
         """Disconnect from current mixer (Wing or Mixing Station)"""
         if self.mixer_client:
+            telemetry_capture = {"active": False}
+            if self.connection_mode == "wing":
+                telemetry_capture = self._stop_wing_telemetry_capture(reason="disconnect_mixer")
             self.mixer_client.disconnect()
             self.mixer_client = None
             mode = self.connection_mode
             self.connection_mode = None
+            self._manual_write_session_active = False
+            self._manual_write_session_id = None
+            self._manual_write_session_label = None
+            self._manual_write_session_started_at = None
+            self._manual_write_session_history = []
+            self._manual_write_session_step_counter = 0
             
             await self.broadcast({
                 "type": "connection_status",
-                "connected": False
+                "connected": False,
+                "telemetry_capture": telemetry_capture,
             })
             logger.info(f"Disconnected from mixer (was: {mode})")
     
@@ -2094,6 +2697,105 @@ class AutoMixerServer:
                 "error": str(e),
                 "channel_names": {}
             })
+
+    async def probe_wing_level_telemetry(
+        self,
+        websocket,
+        channels: Optional[list[int]] = None,
+        timeout_sec: float = 2.0,
+        include_fallback: bool = True,
+    ):
+        """
+        Read-only probe for WING channel-level telemetry paths.
+
+        This does not send write commands and is safe in observation mode.
+        Returns observed values and candidate coverage to support firmware-specific
+        telemetry validation.
+        """
+        logger.info("Probing WING level telemetry paths...")
+
+        if not self.mixer_client or not self.mixer_client.is_connected:
+            await self.send_to_client(websocket, {
+                "type": "wing_level_telemetry",
+                "error": "Mixer not connected",
+                "observed": {},
+                "channels": channels or [],
+                "candidates": [],
+            })
+            return
+
+        if not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
+            await self.send_to_client(websocket, {
+                "type": "wing_level_telemetry",
+                "error": "Telemetry probe only supported for Wing",
+                "observed": {},
+                "channels": channels or [],
+                "candidates": [],
+            })
+            return
+
+        try:
+            channel_list = list(channels or range(1, 9))
+            channel_list = [int(ch) for ch in channel_list if int(ch) > 0]
+
+            if not channel_list:
+                channel_list = list(range(1, 9))
+
+            candidates = self.mixer_client.get_level_telemetry_probes()
+
+            telemetry = self.mixer_client.probe_channel_levels(
+                channels=channel_list,
+                timeout_sec=float(timeout_sec),
+                include_fallback=bool(include_fallback),
+            )
+
+            observed = telemetry.get("observed", {})
+            failure_modes = []
+            if not observed:
+                failure_modes.append("no_telemetry_response")
+            observed_addresses = set(observed.keys())
+            has_level_feedback = any(
+                token in address
+                for address in observed_addresses
+                for token in ["/main/", "/send/", "/lvl", "/meters/"]
+            )
+            has_fallback_only = bool(observed_addresses) and all(
+                address.startswith("/ch/")
+                and ("/fdr" in address or "/mute" in address or "/name" in address)
+                for address in observed_addresses
+            )
+            if not has_level_feedback and has_fallback_only:
+                failure_modes.append("no_non_meter_control_feedback")
+
+            await self.send_to_client(websocket, {
+                "type": "wing_level_telemetry",
+                "channels": channel_list,
+                "timeout_sec": float(timeout_sec),
+                "include_fallback": bool(include_fallback),
+                "candidate_patterns": candidates,
+                "addresses_queried": telemetry.get("addresses_queried", []),
+                "observed": observed,
+                "num_observed": telemetry.get("num_observed", 0),
+                "state_keys": telemetry.get("state_keys", 0),
+                "failure_modes": failure_modes,
+                "ready_for_observation": bool(observed),
+                "telemetry_capture": self._get_wing_telemetry_capture_status(),
+            })
+            logger.info(
+                "WING telemetry probe complete: %s observed, failure_modes=%s",
+                telemetry.get("num_observed", 0),
+                failure_modes,
+            )
+        except Exception as e:
+            logger.error("Error probing Wing level telemetry: %s", e, exc_info=True)
+            await self.send_to_client(websocket, {
+                "type": "wing_level_telemetry",
+                "error": str(e),
+                "observed": {},
+                "channels": channels or [],
+                "candidates": [],
+                "failure_modes": ["exception"],
+            })
     
     async def reset_trim(self, websocket, channels: list):
         """
@@ -2765,8 +3467,45 @@ class AutoMixerServer:
             mode: 'soundcheck' (analyze once, then stop) or 'live' (continuous)
         """
         channels_config = channels_config or []
-        logger.info(f"Starting Multi-Channel Auto-EQ: device={device_id}, channels={len(channels_config)}, mode={mode}")
-        logger.info(f"Channels config: {channels_config}")
+        normalized_mode = str(mode or "soundcheck").strip().lower()
+        if normalized_mode not in {"soundcheck", "live"}:
+            logger.warning("Unknown multi-channel Auto-EQ mode '%s', using soundcheck", mode)
+            normalized_mode = "soundcheck"
+
+        normalized_channels_config: List[Dict[str, Any]] = []
+        auto_apply_forced_off = False
+        confirm_defaults_applied = False
+        boundary_active = self._is_wing_deployment_write_boundary_active()
+        for config in channels_config:
+            normalized = dict(config or {})
+            requested_live_apply = bool(
+                normalized.get("live_apply", normalized.get("liveApply", normalized.get("auto_apply", False)))
+            )
+            requested_auto_apply = bool(normalized.get("auto_apply", requested_live_apply))
+            if boundary_active and requested_auto_apply:
+                requested_auto_apply = False
+                auto_apply_forced_off = True
+            if "apply_mode" not in normalized:
+                normalized["apply_mode"] = "auto" if requested_auto_apply else ("confirm" if requested_live_apply else "suggest")
+                if requested_live_apply:
+                    confirm_defaults_applied = True
+            if "requires_confirmation" not in normalized and "confirm_required" not in normalized:
+                normalized["requires_confirmation"] = bool(requested_live_apply and not requested_auto_apply)
+                if requested_live_apply:
+                    confirm_defaults_applied = True
+            else:
+                normalized["requires_confirmation"] = bool(
+                    normalized.get("requires_confirmation", normalized.get("confirm_required", False))
+                )
+            normalized["live_apply"] = requested_live_apply
+            normalized["auto_apply"] = requested_auto_apply
+            normalized["mode"] = normalized_mode
+            normalized_channels_config.append(normalized)
+
+        logger.info(
+            f"Starting Multi-Channel Auto-EQ: device={device_id}, channels={len(normalized_channels_config)}, mode={normalized_mode}"
+        )
+        logger.info(f"Channels config: {normalized_channels_config}")
         
         if not self.mixer_client or not self.mixer_client.is_connected:
             await self.send_to_client(websocket, {
@@ -2776,16 +3515,16 @@ class AutoMixerServer:
             })
             return
         
-        if device_id is None or not channels_config or len(channels_config) == 0:
+        if device_id is None or not normalized_channels_config or len(normalized_channels_config) == 0:
             await self.send_to_client(websocket, {
                 "type": "multi_channel_auto_eq_status",
                 "active": False,
-                "error": f"Missing required parameters: device_id={device_id}, channels_config length={len(channels_config)}"
+                "error": f"Missing required parameters: device_id={device_id}, channels_config length={len(normalized_channels_config)}"
             })
             return
         
         # Validate channels_config structure
-        for i, config in enumerate(channels_config):
+        for i, config in enumerate(normalized_channels_config):
             if 'channel' not in config:
                 await self.send_to_client(websocket, {
                     "type": "multi_channel_auto_eq_status",
@@ -2837,8 +3576,8 @@ class AutoMixerServer:
             # Start multi-channel analysis
             success = self.multi_channel_auto_eq_controller.start_multi_channel(
                 device_id=int(device_id),
-                channels_config=channels_config,
-                mode=mode,
+                channels_config=normalized_channels_config,
+                mode=normalized_mode,
                 on_spectrum_callback=on_spectrum_update,
                 on_corrections_callback=on_corrections_calculated,
                 on_status_callback=on_status_update
@@ -2848,8 +3587,11 @@ class AutoMixerServer:
                 await self.send_to_client(websocket, {
                     "type": "multi_channel_auto_eq_status",
                     "active": True,
-                    "channels_count": len(channels_config),
-                    "message": f"Multi-channel Auto-EQ started for {len(channels_config)} channels"
+                    "channels_count": len(normalized_channels_config),
+                    "mode": normalized_mode,
+                    "auto_apply_forced_off": auto_apply_forced_off,
+                    "confirm_defaults_applied": confirm_defaults_applied,
+                    "message": f"Multi-channel Auto-EQ started for {len(normalized_channels_config)} channels"
                 })
                 logger.info(f"Multi-channel Auto-EQ started successfully")
             else:
@@ -3466,14 +4208,18 @@ class AutoMixerServer:
         mixer_connected = bool(self.mixer_client and self.mixer_client.is_connected)
         gain_available = bool(self.gain_staging)
         fader_available = bool(self.auto_fader_controller)
-        ready = mixer_connected and gain_available and fader_available
+        no_clipping_measured = False
+        ready = mixer_connected and gain_available and fader_available and no_clipping_measured
         return {
             "ready": ready,
             "checks": {
                 "mixer_connected": mixer_connected,
                 "gain_staging_available": gain_available,
                 "auto_fader_available": fader_available,
-                "no_clipping": True,
+                "no_clipping": no_clipping_measured,
+                "no_clipping_trusted": False,
+                "no_clipping_reason": "Measured clipping verification is not implemented yet.",
+                "manual_write_supervision": self.get_manual_write_supervision_status(),
             },
         }
     
@@ -4509,6 +5255,7 @@ class AutoMixerServer:
             "type": "auto_gate_status",
             "request_id": request_id,
             "active": False,
+            "implemented": False,
             "message": "Auto Gate not implemented"
         })
     
@@ -4518,6 +5265,7 @@ class AutoMixerServer:
             "type": "auto_panner_status",
             "request_id": request_id,
             "active": False,
+            "implemented": False,
             "message": "Auto Panner not implemented"
         })
     
@@ -4527,6 +5275,7 @@ class AutoMixerServer:
             "type": "auto_reverb_status",
             "request_id": request_id,
             "active": False,
+            "implemented": False,
             "message": "Auto Reverb not implemented"
         })
     
@@ -4536,6 +5285,7 @@ class AutoMixerServer:
             "type": "auto_effects_status",
             "request_id": request_id,
             "active": False,
+            "implemented": False,
             "message": "Auto Effects not implemented"
         })
     
@@ -4545,6 +5295,7 @@ class AutoMixerServer:
             "type": "cross_adaptive_eq_status",
             "request_id": request_id,
             "active": False,
+            "implemented": False,
             "message": "Cross-Adaptive EQ not implemented"
         })
 
@@ -5010,45 +5761,77 @@ class AutoMixerServer:
             if cmd_type == "set_fader":
                 channel = command.get("channel")
                 value = command.get("value", 0.5)
-                self.mixer_client.set_channel_fader(channel, value)
-                await self.broadcast({
-                    "type": "voice_command_executed",
-                    "command": cmd_type,
-                    "channel": channel,
-                    "value": value
-                })
+                result = await self._apply_manual_console_write(
+                    websocket=None,
+                    channel=channel,
+                    value=value,
+                    value_type="fader",
+                    source="voice:set_fader",
+                    reason=command.get("reason", "voice command request"),
+                    approved=bool(command.get("approved", False)),
+                    approval_id=command.get("approval_id"),
+                )
+                if result["status"] == "applied":
+                    await self.broadcast({
+                        "type": "voice_command_executed",
+                        "command": cmd_type,
+                        "channel": channel,
+                        "value": result["effective_value"],
+                    })
+                else:
+                    await self.broadcast({
+                        "type": "voice_command_blocked",
+                        "command": cmd_type,
+                        "channel": channel,
+                        "reason": result.get("reason"),
+                    })
                 
             elif cmd_type == "set_gain":
                 channel = command.get("channel")
                 value = command.get("value", 0.0)
-                self.mixer_client.set_channel_gain(channel, value)
-                await self.broadcast({
-                    "type": "voice_command_executed",
-                    "command": cmd_type,
-                    "channel": channel,
-                    "value": value
-                })
-                
-            elif cmd_type == "load_snap":
-                snap_name = command.get("snap_name")
-                if isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    success = self.mixer_client.load_snap(snap_name)
+                result = await self._apply_manual_console_write(
+                    websocket=None,
+                    channel=channel,
+                    value=value,
+                    value_type="gain",
+                    source="voice:set_gain",
+                    reason=command.get("reason", "voice command request"),
+                    approved=bool(command.get("approved", False)),
+                    approval_id=command.get("approval_id"),
+                )
+                if result["status"] == "applied":
                     await self.broadcast({
                         "type": "voice_command_executed",
                         "command": cmd_type,
-                        "snap_name": snap_name,
-                        "success": success
+                        "channel": channel,
+                        "value": result["effective_value"],
                     })
+                else:
+                    await self.broadcast({
+                        "type": "voice_command_blocked",
+                        "command": cmd_type,
+                        "channel": channel,
+                        "reason": result.get("reason"),
+                    })
+
+            elif cmd_type == "load_snap":
+                snap_name = command.get("snap_name")
+                await self.broadcast({
+                    "type": "voice_command_blocked",
+                    "command": cmd_type,
+                    "snap_name": snap_name,
+                    "reason": "write_kind_not_allowed",
+                })
                     
             elif cmd_type == "mute_channel":
                 channel = command.get("channel")
                 muted = command.get("muted", True)
-                # Note: Add mute method to mixer_client if not exists
                 await self.broadcast({
-                    "type": "voice_command_executed",
+                    "type": "voice_command_blocked",
                     "command": cmd_type,
                     "channel": channel,
-                    "muted": muted
+                    "muted": muted,
+                    "reason": "write_kind_not_allowed",
                 })
                 
             elif cmd_type == "volume_up":
@@ -5067,25 +5850,49 @@ class AutoMixerServer:
                     if current_db is not None:
                         # Add dB directly (Wing uses dB values)
                         new_db = min(10.0, current_db + db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
-                        # Update tracked value
-                        self.last_fader_values[channel] = new_db
+                        result = await self._apply_manual_console_write(
+                            websocket=None,
+                            channel=channel,
+                            value=new_db,
+                            value_type="fader",
+                            source="voice:volume_up",
+                            reason=command.get("reason", f"voice volume_up {db_change}dB"),
+                            approved=bool(command.get("approved", False)),
+                            approval_id=command.get("approval_id"),
+                        )
                         logger.info(f"Increased channel {channel} fader: {current_db:.1f} dB -> {new_db:.1f} dB (+{db_change} dB)")
                     else:
                         # Fallback: use last known or default to 0
                         last_known = self.last_fader_values.get(channel, 0.0)
                         new_db = min(10.0, last_known + db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
-                        self.last_fader_values[channel] = new_db
+                        result = await self._apply_manual_console_write(
+                            websocket=None,
+                            channel=channel,
+                            value=new_db,
+                            value_type="fader",
+                            source="voice:volume_up",
+                            reason=command.get("reason", f"voice volume_up {db_change}dB"),
+                            approved=bool(command.get("approved", False)),
+                            approval_id=command.get("approval_id"),
+                        )
                         logger.info(f"Increased channel {channel} fader by {db_change} dB (to {new_db:.1f} dB, using tracked value)")
-                    
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "db_change": db_change,
-                        "new_db": new_db
-                    })
+                    new_db = result["effective_value"] if "effective_value" in result else None
+                    if result["status"] == "applied":
+                        self.last_fader_values[channel] = new_db
+                        await self.broadcast({
+                            "type": "voice_command_executed",
+                            "command": cmd_type,
+                            "channel": channel,
+                            "db_change": db_change,
+                            "new_db": new_db,
+                        })
+                    else:
+                        await self.broadcast({
+                            "type": "voice_command_blocked",
+                            "command": cmd_type,
+                            "channel": channel,
+                            "reason": result.get("reason"),
+                        })
                 else:
                     logger.warning(f"volume_up command ignored: channel is None")
                     
@@ -5105,109 +5912,108 @@ class AutoMixerServer:
                     if current_db is not None:
                         # Subtract dB directly (Wing uses dB values)
                         new_db = max(-144.0, current_db - db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
-                        # Update tracked value
-                        self.last_fader_values[channel] = new_db
+                        result = await self._apply_manual_console_write(
+                            websocket=None,
+                            channel=channel,
+                            value=new_db,
+                            value_type="fader",
+                            source="voice:volume_down",
+                            reason=command.get("reason", f"voice volume_down {db_change}dB"),
+                            approved=bool(command.get("approved", False)),
+                            approval_id=command.get("approval_id"),
+                        )
                         logger.info(f"Decreased channel {channel} fader: {current_db:.1f} dB -> {new_db:.1f} dB (-{db_change} dB)")
                     else:
                         # Fallback: use last known or default to 0
                         last_known = self.last_fader_values.get(channel, 0.0)
                         new_db = max(-144.0, last_known - db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
-                        self.last_fader_values[channel] = new_db
+                        result = await self._apply_manual_console_write(
+                            websocket=None,
+                            channel=channel,
+                            value=new_db,
+                            value_type="fader",
+                            source="voice:volume_down",
+                            reason=command.get("reason", f"voice volume_down {db_change}dB"),
+                            approved=bool(command.get("approved", False)),
+                            approval_id=command.get("approval_id"),
+                        )
                         logger.info(f"Decreased channel {channel} fader by {db_change} dB (to {new_db:.1f} dB, using tracked value)")
-                    
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "db_change": db_change,
-                        "new_db": new_db
-                    })
+                    new_db = result["effective_value"] if "effective_value" in result else None
+                    if result["status"] == "applied":
+                        self.last_fader_values[channel] = new_db
+                        await self.broadcast({
+                            "type": "voice_command_executed",
+                            "command": cmd_type,
+                            "channel": channel,
+                            "db_change": db_change,
+                            "new_db": new_db,
+                        })
+                    else:
+                        await self.broadcast({
+                            "type": "voice_command_blocked",
+                            "command": cmd_type,
+                            "channel": channel,
+                            "reason": result.get("reason"),
+                        })
                 else:
                     logger.warning(f"volume_down command ignored: channel is None")
             
             elif cmd_type == "eq_on":
                 channel = command.get("channel")
                 on = command.get("on", 1)
-                if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    self.mixer_client.set_eq_on(channel, on)
-                    logger.info(f"Set EQ {'on' if on else 'off'} for channel {channel}")
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "on": on
-                    })
+                await self.broadcast({
+                    "type": "voice_command_blocked",
+                    "command": cmd_type,
+                    "channel": channel,
+                    "on": on,
+                    "reason": "write_kind_not_allowed",
+                })
             
             elif cmd_type == "eq_band_up" or cmd_type == "eq_band_down":
                 channel = command.get("channel")
                 band = command.get("band")
                 db_change = command.get("db", 3)
-                if channel is not None and band and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    # Get current gain
-                    band_gain_key = f"{band}g" if band in ["1", "2", "3", "4"] else ("lg" if band == "low" else "hg")
-                    current_gain = self.mixer_client.get_eq_band_gain(channel, band_gain_key) or 0.0
-                    
-                    if cmd_type == "eq_band_up":
-                        new_gain = min(15.0, current_gain + db_change)
-                    else:
-                        new_gain = max(-15.0, current_gain - db_change)
-                    
-                    self.mixer_client.set_eq_band_gain(channel, band_gain_key, new_gain)
-                    logger.info(f"Set EQ band {band} for channel {channel}: {current_gain:.1f} dB -> {new_gain:.1f} dB")
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "band": band,
-                        "new_gain": new_gain
-                    })
+                await self.broadcast({
+                    "type": "voice_command_blocked",
+                    "command": cmd_type,
+                    "channel": channel,
+                    "band": band,
+                    "db_change": db_change,
+                    "reason": "write_kind_not_allowed",
+                })
             
             elif cmd_type == "compressor_on":
                 channel = command.get("channel")
                 on = command.get("on", 1)
-                if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    self.mixer_client.set_compressor_on(channel, on)
-                    logger.info(f"Set compressor {'on' if on else 'off'} for channel {channel}")
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "on": on
-                    })
+                await self.broadcast({
+                    "type": "voice_command_blocked",
+                    "command": cmd_type,
+                    "channel": channel,
+                    "on": on,
+                    "reason": "write_kind_not_allowed",
+                })
             
             elif cmd_type == "compressor_threshold":
                 channel = command.get("channel")
                 threshold = command.get("threshold")
-                if channel is not None and threshold is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    self.mixer_client.set_compressor_threshold(channel, threshold)
-                    logger.info(f"Set compressor threshold for channel {channel}: {threshold:.1f} dB")
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "threshold": threshold
-                    })
+                await self.broadcast({
+                    "type": "voice_command_blocked",
+                    "command": cmd_type,
+                    "channel": channel,
+                    "threshold": threshold,
+                    "reason": "write_kind_not_allowed",
+                })
             
             elif cmd_type == "compressor_gain_up" or cmd_type == "compressor_gain_down":
                 channel = command.get("channel")
                 db_change = command.get("db", 3)
-                if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    current_gain = self.mixer_client.get_compressor_gain(channel) or 0.0
-                    if cmd_type == "compressor_gain_up":
-                        new_gain = min(12.0, current_gain + db_change)
-                    else:
-                        new_gain = max(-6.0, current_gain - db_change)
-                    
-                    self.mixer_client.set_compressor_gain(channel, new_gain)
-                    logger.info(f"Set compressor gain for channel {channel}: {current_gain:.1f} dB -> {new_gain:.1f} dB")
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "channel": channel,
-                        "new_gain": new_gain
-                    })
+                await self.broadcast({
+                    "type": "voice_command_blocked",
+                    "command": cmd_type,
+                    "channel": channel,
+                    "db_change": db_change,
+                    "reason": "write_kind_not_allowed",
+                })
             
             logger.info("=" * 60)
             logger.info(f"✅ EXECUTED VOICE COMMAND: {cmd_type}")
@@ -5273,44 +6079,25 @@ class AutoMixerServer:
                 self.ws_port,
                 reuse_address=True  # Allow port reuse
             )
-            
-            logger.info(f"WebSocket server started on {self.ws_host}:{self.ws_port}")
-            
+        except OSError as e:
+            if e.errno in (errno.EADDRINUSE, 48, 98, 10048):
+                message = (
+                    f"Cannot start WebSocket server: port {self.ws_port} is already in use. "
+                    "Stop the existing process using this port before restarting the backend."
+                )
+                logger.error(message)
+                raise OSError(e.errno, message)
+            raise
+
+        logger.info(f"WebSocket server started on {self.ws_host}:{self.ws_port}")
+
+        try:
             # Wait for shutdown signal
             await self._shutdown_event.wait()
-            
+        finally:
             # Close the server
             server.close()
             await server.wait_closed()
-            
-        except OSError as e:
-            if e.errno == 48:  # Address already in use
-                logger.error(f"Port {self.ws_port} is already in use. Attempting to force cleanup...")
-                # Try to cleanup any existing processes
-                import subprocess
-                try:
-                    subprocess.run(
-                        f"lsof -ti:{self.ws_port} | xargs kill -9",
-                        shell=True,
-                        capture_output=True
-                    )
-                    await asyncio.sleep(1)
-                    # Retry
-                    server = await websockets.serve(
-                        self.handler,
-                        self.ws_host,
-                        self.ws_port,
-                        reuse_address=True
-                    )
-                    logger.info(f"WebSocket server started on {self.ws_host}:{self.ws_port} (after cleanup)")
-                    await self._shutdown_event.wait()
-                    server.close()
-                    await server.wait_closed()
-                except Exception as retry_error:
-                    logger.error(f"Failed to start server after cleanup: {retry_error}")
-                    raise
-            else:
-                raise
         
         logger.info("Server stopped")
 

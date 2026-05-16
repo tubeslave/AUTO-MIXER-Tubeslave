@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from ai_mixing_pipeline.decision_layer.replay_proposal_ranking import (
+    build_fader_proposals,
     build_gain_proposals,
+    build_replay_timeline_artifact,
     build_operator_assistance_proposals,
     build_replay_graph_checkpoint,
     compare_replay_graph_checkpoints,
@@ -112,3 +114,57 @@ def test_replay_graph_checkpoint_branch_compare_detects_decision_change():
     assert comparison["baseline_selected_proposal_id"] != comparison["candidate_selected_proposal_id"]
     assert comparison["proposal_ids_added"] == []
     assert comparison["proposal_ids_removed"] == []
+
+
+def test_replay_timeline_artifact_preserves_source_payload_for_inventory_restore():
+    gain = build_gain_proposals(
+        recommendations=[
+            {
+                "source": "auto_soundcheck_engine",
+                "mixer_channel": 7,
+                "current_trim_db": -1.0,
+                "recommended_target_trim_db": 1.2,
+                "confidence": 0.85,
+                "replay_correlation_id": "corr::gain::inventory",
+                "critic_scores": {"clarity": {"scores": {"overall": 0.4}, "confidence": 0.85}},
+                "arrangement_id": "intro_a",
+                "live_apply": True,
+            }
+        ]
+    )[0]
+    ranking = rank_replay_proposals([gain])
+
+    artifact = build_replay_timeline_artifact([gain], ranking, metadata={"scenario": "inventory_restore"})
+
+    assert artifact["events"][0]["source_payload"]["arrangement_id"] == "intro_a"
+    assert artifact["events"][0]["source_payload"]["recommended_target_trim_db"] == 1.2
+    assert artifact["events"][0]["source_payload"]["live_apply"] is True
+
+
+def test_replay_timeline_artifact_preserves_auto_fader_inventory_metadata():
+    fader = build_fader_proposals(
+        fader_updates=[
+            {
+                "source": "auto_fader_v2",
+                "mixer_channel": 11,
+                "current_fader_db": -6.0,
+                "recommended_target_fader_db": -3.5,
+                "confidence": 0.92,
+                "replay_correlation_id": "corr::fader::inventory",
+                "critic_scores": {"clarity": {"scores": {"overall": 0.6}, "confidence": 0.92}},
+                "arrangement_id": "chorus_b",
+                "live_apply": True,
+                "readback_source": "console_state",
+                "requires_confirmation": True,
+            }
+        ]
+    )[0]
+    ranking = rank_replay_proposals([fader])
+
+    artifact = build_replay_timeline_artifact([fader], ranking, metadata={"scenario": "auto_fader_inventory_restore"})
+
+    assert artifact["events"][0]["source_payload"]["arrangement_id"] == "chorus_b"
+    assert artifact["events"][0]["source_payload"]["recommended_target_fader_db"] == -3.5
+    assert artifact["events"][0]["source_payload"]["live_apply"] is True
+    assert artifact["events"][0]["source_payload"]["readback_source"] == "console_state"
+    assert artifact["events"][0]["source_payload"]["requires_confirmation"] is True

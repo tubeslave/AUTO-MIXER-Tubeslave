@@ -6,13 +6,31 @@ def register_handlers(server):
         channel = data.get("channel")
         value = data.get("value")
         if server.mixer_client:
-            server.mixer_client.set_channel_fader(channel, value)
+            await server._apply_manual_console_write(
+                websocket,
+                channel=channel,
+                value=value,
+                value_type="fader",
+                source="websocket:set_fader",
+                reason=data.get("reason"),
+                approved=bool(data.get("approved", False)),
+                approval_id=data.get("approval_id"),
+            )
 
     async def handle_set_gain(websocket, data):
         channel = data.get("channel")
         value = data.get("value")
         if server.mixer_client:
-            server.mixer_client.set_channel_gain(channel, value)
+            await server._apply_manual_console_write(
+                websocket,
+                channel=channel,
+                value=value,
+                value_type="gain",
+                source="websocket:set_gain",
+                reason=data.get("reason"),
+                approved=bool(data.get("approved", False)),
+                approval_id=data.get("approval_id"),
+            )
 
     async def handle_set_eq(websocket, data):
         channel = data.get("channel")
@@ -21,18 +39,26 @@ def register_handlers(server):
         gain = data.get("gain")
         q = data.get("q")
         if server.mixer_client:
-            server.mixer_client.set_eq_band(channel, band, freq, gain, q)
+            await server._block_console_write(
+                websocket,
+                source="websocket:set_eq",
+                value_type="eq",
+                reason="write_kind_not_allowed",
+                channel=channel,
+                extra={"band": band, "freq": freq, "gain": gain, "q": q},
+            )
 
     async def handle_set_compressor(websocket, data):
         channel = data.get("channel")
         params = data.get("params", {})
         if server.mixer_client:
-            server.mixer_client.set_compressor(
-                channel,
-                params.get("threshold", 0),
-                params.get("ratio", 1),
-                params.get("attack", 0),
-                params.get("release", 0)
+            await server._block_console_write(
+                websocket,
+                source="websocket:set_compressor",
+                value_type="compressor",
+                reason="write_kind_not_allowed",
+                channel=channel,
+                extra={"params": params},
             )
 
     async def handle_get_state(websocket, data):

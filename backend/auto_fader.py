@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 
 # Import LUFS components from existing module
 from lufs_gain_staging import LUFSMeter, TruePeakMeter, KWeightingFilter, AGCEnvelope
+from replay_write_intent_adapter import ReplayWriteIntentAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -915,6 +916,9 @@ class AutoFaderController:
         # Формат: {audio_ch: {'correction': float, 'integrated_lufs': float, 
         #           'target_lufs': float, 'locked': bool}}
         self.auto_balance_result: Dict[int, Any] = {}
+        self._replay_write_intent_adapter = ReplayWriteIntentAdapter(
+            source_system="auto_fader"
+        )
         
         self.auto_balance_pass = 0  # Номер текущего прохода (0 = не было, 1 = первый, 2 = второй)
         
@@ -941,6 +945,48 @@ class AutoFaderController:
             "frozen_channels": frozen_channels,
             "freeze_cooldown_seconds": self.freeze_cooldown_seconds,
         }
+
+    def get_replay_write_intents(self) -> List[Dict[str, Any]]:
+        """Return replay write-intent records captured for WING dry-run safety."""
+        return self._replay_write_intent_adapter.list_records()
+
+    def _build_replay_write_context(self) -> Dict[str, Any]:
+        replay_config = dict(self.config.get("replay_write_intent") or {})
+        context = {
+            "arrangement_id": replay_config.get("arrangement_id"),
+            "scene_id": replay_config.get("scene_id"),
+            "scene_label": replay_config.get("scene_label"),
+            "automation_mode": self.mode.value if isinstance(self.mode, BalanceMode) else str(self.mode),
+            "auto_balance_pass": int(self.auto_balance_pass),
+        }
+        return {key: value for key, value in context.items() if value is not None}
+
+    def _emit_fader_write_intent(
+        self,
+        *,
+        mixer_channel: int,
+        current_db: float,
+        target_db: float,
+        readback_source: str,
+        audio_channel: Optional[int] = None,
+        instrument_type: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        if not self.mixer_client:
+            return None
+        extra_payload = {
+            "audio_channel": int(audio_channel) if audio_channel is not None else None,
+            "instrument_type": instrument_type,
+        }
+        return self._replay_write_intent_adapter.emit_fader_intent(
+            mixer_client=self.mixer_client,
+            mixer_type=None,
+            channel=mixer_channel,
+            current_fader_db=current_db,
+            target_fader_db=target_db,
+            readback_source=readback_source,
+            context_metadata=self._build_replay_write_context(),
+            extra_payload=extra_payload,
+        )
     
     def start(self,
               device_id: int,
@@ -1532,9 +1578,32 @@ class AutoFaderController:
                         if mixer_ch in self.channel_freeze_until and self.channel_freeze_until[mixer_ch] > time.time():
                             continue
                         try:
+                            source_audio_ch = None
+                            source_state = None
+                            for candidate_audio_ch, candidate_state in self.channels.items():
+                                if candidate_state.mixer_channel == mixer_ch:
+                                    source_audio_ch = candidate_audio_ch
+                                    source_state = candidate_state
+                                    break
                             if iteration % 50 == 0:
                                 logger.info(f"Setting fader: mixer_ch={mixer_ch}, dB={new_fader_db:.2f}")
-                            
+
+                            intent = self._emit_fader_write_intent(
+                                mixer_channel=mixer_ch,
+                                current_db=source_state.current_fader if source_state else new_fader_db,
+                                target_db=new_fader_db,
+                                readback_source="controller_state",
+                                audio_channel=source_audio_ch,
+                                instrument_type=source_state.instrument_type if source_state else None,
+                            )
+                            if intent is not None and not intent["allow_live_write"]:
+                                if iteration % 50 == 0:
+                                    logger.info(
+                                        "WING real-time fader write skipped; replay intent emitted "
+                                        f"(channel={mixer_ch}, correlation={intent['replay_correlation_id']})"
+                                    )
+                                continue
+
                             self.mixer_client.set_channel_fader(mixer_ch, new_fader_db)
                             
                             # Обновляем состояние для всех каналов с этим mixer_channel
@@ -1874,6 +1943,9 @@ class AutoFaderController:
                     'integrated_lufs': float(ch_data['integrated']),
                     'target_lufs': float(ch_data['target_lufs']),
                     'locked': False,
+                    'current_fader': float(ch_data['current_fader']),
+                    'target_fader': float(new_fader),
+                    'pre_clip_target_fader': float(ch_data['ideal_fader'] - shift),
                     'bleed_ratio': float(ch_data.get('bleed_ratio', 0)),
                     'bleed_source': ch_data.get('bleed_source')
                 }
@@ -1922,6 +1994,7 @@ class AutoFaderController:
         
         applied_count = 0
         applied_details = {}
+        dry_run_blocked_details = {}
         
         for audio_ch, result in self.auto_balance_result.items():
             if audio_ch not in self.channels:
@@ -1935,30 +2008,34 @@ class AutoFaderController:
                 continue
             
             correction = result.get('correction', 0.0)
+            target_fader = result.get('target_fader')
+            stored_current_fader = result.get('current_fader')
             
             try:
                 # Получаем текущий фейдер из микшера (в dB)
                 current_db_value = self.mixer_client.get_channel_fader(state.mixer_channel)
+                readback_valid = current_db_value is not None and float(current_db_value) > -100
                 
-                if current_db_value is None:
-                    if state.current_fader != 0.0 and abs(state.current_fader) < 100:
+                if readback_valid:
+                    current_db = float(current_db_value)
+                else:
+                    if stored_current_fader is not None and abs(float(stored_current_fader)) < 100:
+                        current_db = float(stored_current_fader)
+                        logger.warning(
+                            f"Channel {state.mixer_channel}: Fader readback unavailable, using auto-balance snapshot {current_db:.1f} dB"
+                        )
+                    elif state.current_fader != 0.0 and abs(state.current_fader) < 100:
                         current_db = state.current_fader
                         logger.warning(f"Channel {state.mixer_channel}: Could not read fader, using saved value {current_db:.1f} dB")
                     else:
                         current_db = 0.0
                         logger.warning(f"Channel {state.mixer_channel}: Could not read fader, using default 0 dB")
-                else:
-                    current_db = float(current_db_value)
-                    if current_db < -100:
-                        if state.current_fader != 0.0 and abs(state.current_fader) < 100:
-                            current_db = state.current_fader
-                            logger.warning(f"Channel {state.mixer_channel}: Fader read as {current_db_value:.1f} dB (invalid), using saved value {current_db:.1f} dB")
-                        else:
-                            current_db = 0.0
-                            logger.warning(f"Channel {state.mixer_channel}: Fader read as {current_db_value:.1f} dB (invalid), using default 0 dB")
                 
-                new_db = current_db + correction
-                new_db = float(np.clip(new_db, -60.0, 10.0))
+                if not readback_valid and target_fader is not None:
+                    new_db = float(np.clip(float(target_fader), -60.0, 10.0))
+                else:
+                    new_db = current_db + correction
+                    new_db = float(np.clip(new_db, -60.0, 10.0))
                 
                 # Округляем до 0.05 dB
                 new_db = round(new_db * 20) / 20.0
@@ -1966,6 +2043,27 @@ class AutoFaderController:
                 if self.automation_frozen:
                     continue
                 if state.mixer_channel in self.channel_freeze_until and self.channel_freeze_until[state.mixer_channel] > time.time():
+                    continue
+                readback_source = "console_state" if readback_valid else "auto_balance_snapshot"
+                intent = self._emit_fader_write_intent(
+                    mixer_channel=state.mixer_channel,
+                    current_db=current_db,
+                    target_db=new_db,
+                    readback_source=readback_source,
+                    audio_channel=int(audio_ch),
+                    instrument_type=state.instrument_type,
+                )
+                if intent is not None and not intent["allow_live_write"]:
+                    dry_run_blocked_details[int(audio_ch)] = {
+                        'mixer_channel': int(state.mixer_channel),
+                        'previous_db': float(current_db),
+                        'requested_db': float(new_db),
+                        'replay_correlation_id': intent['replay_correlation_id'],
+                    }
+                    logger.info(
+                        "WING auto-balance write skipped; replay intent emitted "
+                        f"(channel={state.mixer_channel}, correlation={intent['replay_correlation_id']})"
+                    )
                     continue
                 self.mixer_client.set_channel_fader(state.mixer_channel, new_db)
                 
@@ -1994,7 +2092,8 @@ class AutoFaderController:
                 'applied_count': applied_count,
                 'total_count': len(self.auto_balance_result),
                 'pass_number': self.auto_balance_pass,
-                'details': applied_details
+                'details': applied_details,
+                'dry_run_blocked': dry_run_blocked_details,
             })
         
         # Очищаем результат после применения

@@ -16,6 +16,18 @@ def register_handlers(server):
         logger.info("=" * 60)
         await server.scan_mixer_channel_names(websocket)
 
+    async def handle_probe_wing_level_telemetry(websocket, data):
+        logger.info("=" * 60)
+        logger.info("RECEIVED probe_wing_level_telemetry MESSAGE")
+        logger.info(f"Data: {data}")
+        logger.info("=" * 60)
+        await server.probe_wing_level_telemetry(
+            websocket,
+            channels=data.get("channels"),
+            timeout_sec=data.get("timeout_sec", 2.0),
+            include_fallback=data.get("include_fallback", True),
+        )
+
     async def handle_reset_trim(websocket, data):
         await server.reset_trim(websocket, data.get("channels", []))
 
@@ -25,6 +37,7 @@ def register_handlers(server):
     return {
         "scan_channel_names": handle_scan_channel_names,
         "scan_mixer_channel_names": handle_scan_mixer_channel_names,
+        "probe_wing_level_telemetry": handle_probe_wing_level_telemetry,
         "reset_trim": handle_reset_trim,
         "bypass_mixer": handle_bypass_mixer,
     }

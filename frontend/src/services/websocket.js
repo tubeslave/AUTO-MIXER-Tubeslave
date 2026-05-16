@@ -7,6 +7,17 @@ class WebSocketService {
     this.reconnectTimer = null;
   }
 
+  notifyUnsupportedCommand(commandType, eventType, message) {
+    console.warn(`WebSocket command disabled: ${commandType}. ${message}`);
+    this.notifyListeners(eventType, {
+      type: eventType,
+      active: false,
+      implemented: false,
+      error: message,
+      unsupported_command: commandType
+    });
+  }
+
   connect() {
     return new Promise((resolve, reject) => {
       try {
@@ -280,6 +291,12 @@ console.error(`Error in listener for ${eventType}:`, error);
   getState() {
     this.send({
       type: 'get_state'
+    });
+  }
+
+  getSupervisedPilotStatus() {
+    this.send({
+      type: 'get_supervised_pilot_status'
     });
   }
 
@@ -717,98 +734,110 @@ console.error(`Error in listener for ${eventType}:`, error);
 
   // ========== Auto Panner ==========
   startAutoPanner(deviceId, channels, instrumentTypes, spectralCentroids, genre = 'rock') {
-    this.send({
-      type: 'start_auto_panner',
-      device_id: deviceId,
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids,
-      genre: genre
-    });
+    this.notifyUnsupportedCommand(
+      'start_auto_panner',
+      'auto_panner_status',
+      'Auto Panner backend control is not implemented yet.'
+    );
   }
   stopAutoPanner() {
-    this.send({ type: 'stop_auto_panner' });
+    this.notifyUnsupportedCommand(
+      'stop_auto_panner',
+      'auto_panner_status',
+      'Auto Panner backend control is not implemented yet.'
+    );
   }
   getAutoPannerStatus() {
     this.send({ type: 'get_auto_panner_status' });
   }
   calculateAutoPanning(channels, instrumentTypes, spectralCentroids) {
-    this.send({
-      type: 'calculate_auto_panning',
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids
-    });
+    this.notifyUnsupportedCommand(
+      'calculate_auto_panning',
+      'auto_panner_status',
+      'Auto Panner calculation is not implemented yet.'
+    );
   }
   applyAutoPanning() {
-    this.send({ type: 'apply_auto_panning' });
+    this.notifyUnsupportedCommand(
+      'apply_auto_panning',
+      'auto_panner_status',
+      'Auto Panner apply is not implemented yet.'
+    );
   }
 
   // ========== Auto Reverb ==========
   startAutoReverb(deviceId, channels, instrumentTypes, spectralCentroids, spectralFluxes) {
-    this.send({
-      type: 'start_auto_reverb',
-      device_id: deviceId,
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids,
-      spectral_fluxes: spectralFluxes
-    });
+    this.notifyUnsupportedCommand(
+      'start_auto_reverb',
+      'auto_reverb_status',
+      'Auto Reverb backend control is not implemented yet.'
+    );
   }
   stopAutoReverb() {
-    this.send({ type: 'stop_auto_reverb' });
+    this.notifyUnsupportedCommand(
+      'stop_auto_reverb',
+      'auto_reverb_status',
+      'Auto Reverb backend control is not implemented yet.'
+    );
   }
   getAutoReverbStatus() {
     this.send({ type: 'get_auto_reverb_status' });
   }
   calculateAutoReverb(channels, instrumentTypes, spectralCentroids, spectralFluxes) {
-    this.send({
-      type: 'calculate_auto_reverb',
-      channels: channels,
-      instrument_types: instrumentTypes,
-      spectral_centroids: spectralCentroids,
-      spectral_fluxes: spectralFluxes
-    });
+    this.notifyUnsupportedCommand(
+      'calculate_auto_reverb',
+      'auto_reverb_status',
+      'Auto Reverb calculation is not implemented yet.'
+    );
   }
   applyAutoReverb() {
-    this.send({ type: 'apply_auto_reverb' });
+    this.notifyUnsupportedCommand(
+      'apply_auto_reverb',
+      'auto_reverb_status',
+      'Auto Reverb apply is not implemented yet.'
+    );
   }
 
   // ========== Auto Gate ==========
   startAutoGate(deviceId, channels, channelConfigs, settings) {
-    this.send({
-      type: 'start_auto_gate',
-      device_id: deviceId,
-      channels: channels,
-      channel_configs: channelConfigs,
-      settings: settings
-    });
+    this.notifyUnsupportedCommand(
+      'start_auto_gate',
+      'auto_gate_status',
+      'Auto Gate backend control is not implemented yet.'
+    );
   }
   stopAutoGate() {
-    this.send({ type: 'stop_auto_gate' });
+    this.notifyUnsupportedCommand(
+      'stop_auto_gate',
+      'auto_gate_status',
+      'Auto Gate backend control is not implemented yet.'
+    );
   }
   getAutoGateStatus() {
     this.send({ type: 'get_auto_gate_status' });
   }
   configureGateChannel(channelId, config) {
-    this.send({
-      type: 'configure_gate_channel',
-      channel_id: channelId,
-      config: config
-    });
+    this.notifyUnsupportedCommand(
+      'configure_gate_channel',
+      'auto_gate_status',
+      'Auto Gate channel configuration is not implemented yet.'
+    );
   }
 
   // ========== Auto Effects ==========
   startAutoEffects(deviceId, channels, settings) {
-    this.send({
-      type: 'start_auto_effects',
-      device_id: deviceId,
-      channels: channels,
-      settings: settings
-    });
+    this.notifyUnsupportedCommand(
+      'start_auto_effects',
+      'auto_effects_status',
+      'Auto Effects backend control is not implemented yet.'
+    );
   }
   stopAutoEffects() {
-    this.send({ type: 'stop_auto_effects' });
+    this.notifyUnsupportedCommand(
+      'stop_auto_effects',
+      'auto_effects_status',
+      'Auto Effects backend control is not implemented yet.'
+    );
   }
   getAutoEffectsStatus() {
     this.send({ type: 'get_auto_effects_status' });
@@ -816,19 +845,24 @@ console.error(`Error in listener for ${eventType}:`, error);
 
   // ========== Cross-Adaptive EQ ==========
   startCrossAdaptiveEQ(deviceId, channels, settings) {
-    this.send({
-      type: 'start_cross_adaptive_eq',
-      device_id: deviceId,
-      channels: channels,
-      settings: settings
-    });
+    this.notifyUnsupportedCommand(
+      'start_cross_adaptive_eq',
+      'cross_adaptive_eq_status',
+      'Cross-Adaptive EQ backend control is not implemented yet.'
+    );
   }
   stopCrossAdaptiveEQ() {
-    this.send({ type: 'stop_cross_adaptive_eq' });
+    this.notifyUnsupportedCommand(
+      'stop_cross_adaptive_eq',
+      'cross_adaptive_eq_status',
+      'Cross-Adaptive EQ backend control is not implemented yet.'
+    );
   }
   getCrossAdaptiveEQStatus() {
     this.send({ type: 'get_cross_adaptive_eq_status' });
   }
 }
 
-export default new WebSocketService();
+const websocketService = new WebSocketService();
+
+export default websocketService;

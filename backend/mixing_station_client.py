@@ -19,11 +19,13 @@ import time
 import requests
 from typing import Callable, Dict, Any, Optional, List
 
+from mixer_client_base import MixerClientBase
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class MixingStationClient:
+class MixingStationClient(MixerClientBase):
     """
     Client for Mixing Station app API
     
@@ -34,6 +36,11 @@ class MixingStationClient:
     # Default ports to try for Mixing Station
     DEFAULT_OSC_PORT = 8000
     DEFAULT_REST_PORT = 8080
+    LIVE_APPLY_READBACK_TIMEOUT_SEC = 0.25
+    LIVE_APPLY_TOLERANCE = {
+        "fader": 0.25,
+        "gain": 0.25,
+    }
     
     def __init__(self, host: str = "127.0.0.1", osc_port: int = 8000, rest_port: int = 8080):
         """
@@ -211,6 +218,8 @@ class MixingStationClient:
                             return f'/ch/{ch_num}/mute'
                         elif parts[3] == 'pan':
                             return f'/ch/{ch_num}/pan'
+                elif parts[2] == 'preamp' and len(parts) > 3 and parts[3] == 'gain':
+                    return f'/ch/{ch_num}/gain'
             
             elif len(parts) >= 2 and parts[0] == 'main':
                 main_num = int(parts[1]) + 1
@@ -343,7 +352,7 @@ class MixingStationClient:
 
     def set_channel_fader(self, channel: int, value: float):
         """Set channel fader value"""
-        self.send(f"/ch/{channel}/fdr", value)
+        return self.send(f"/ch/{channel}/fdr", value)
 
     def get_channel_mute(self, channel: int) -> Optional[int]:
         """Get channel mute state"""
@@ -352,11 +361,16 @@ class MixingStationClient:
 
     def set_channel_mute(self, channel: int, value: int):
         """Set channel mute (0=unmuted, 1=muted)"""
-        self.send(f"/ch/{channel}/mute", value)
+        return self.send(f"/ch/{channel}/mute", value)
 
     def set_channel_gain(self, channel: int, value: float):
         """Set channel input gain"""
-        self.send(f"/ch/{channel}/gain", value)
+        return self.send(f"/ch/{channel}/gain", value)
+
+    def get_channel_gain(self, channel: int) -> Optional[float]:
+        """Get cached input gain value."""
+        address = f"/ch/{channel}/gain"
+        return self.state.get(address)
 
     def get_main_fader(self, main: int = 1) -> Optional[float]:
         """Get main fader value"""
@@ -365,7 +379,7 @@ class MixingStationClient:
 
     def set_main_fader(self, main: int, value: float):
         """Set main fader value"""
-        self.send(f"/main/{main}/fdr", value)
+        return self.send(f"/main/{main}/fdr", value)
 
     def get_dca_fader(self, dca: int) -> Optional[float]:
         """Get DCA fader value"""
@@ -374,7 +388,7 @@ class MixingStationClient:
 
     def set_dca_fader(self, dca: int, value: float):
         """Set DCA fader value"""
-        self.send(f"/dca/{dca}/fdr", value)
+        return self.send(f"/dca/{dca}/fdr", value)
 
     def set_eq_band(self, channel: int, band: int, freq: float = None, gain: float = None, q: float = None):
         """Set EQ band parameters"""
@@ -413,11 +427,241 @@ class MixingStationClient:
         """Get copy of current mixer state"""
         return self.state.copy()
 
-    def query(self, address: str) -> Optional[Any]:
+    def query(self, address: str, timeout_sec: float = 0.1) -> Optional[Any]:
         """Query a parameter and wait for response"""
         self.send(address)
-        time.sleep(0.1)
+        time.sleep(max(0.0, float(timeout_sec)))
         return self.state.get(address)
+
+    def get_live_apply_contract(self) -> Dict[str, Any]:
+        return {
+            "contract_version": self.LIVE_APPLY_CONTRACT_VERSION,
+            "mixer_family": "mixing_station",
+            "value_types": {
+                "fader": {
+                    "supported": True,
+                    "readback_supported": True,
+                    "mode": "query_confirmed",
+                    "readback_source": "mixing_station_query",
+                    "reason": "ok",
+                },
+                "gain": {
+                    "supported": True,
+                    "readback_supported": True,
+                    "mode": "query_confirmed",
+                    "readback_source": "mixing_station_query",
+                    "reason": "ok",
+                },
+            },
+        }
+
+    @staticmethod
+    def _live_values_match(expected: Any, actual: Any, tolerance: float) -> bool:
+        try:
+            return abs(float(expected) - float(actual)) <= tolerance
+        except (TypeError, ValueError):
+            return expected == actual
+
+    def _live_apply_address(self, channel: int, value_type: str) -> Optional[str]:
+        if value_type == "fader":
+            return f"/ch/{channel}/fdr"
+        if value_type == "gain":
+            return f"/ch/{channel}/gain"
+        return None
+
+    def read_live_value(
+        self,
+        *,
+        channel: int,
+        value_type: str,
+        timeout_sec: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        address = self._live_apply_address(int(channel), str(value_type))
+        if address is None:
+            return {
+                "status": "blocked",
+                "channel": int(channel),
+                "value_type": str(value_type),
+                "value": None,
+                "readback_source": None,
+                "reason": "unsupported_value_type",
+                "timeout_sec": timeout_sec,
+            }
+        value = self.query(
+            address,
+            timeout_sec=self.LIVE_APPLY_READBACK_TIMEOUT_SEC if timeout_sec is None else float(timeout_sec),
+        )
+        if value is None:
+            return {
+                "status": "unavailable",
+                "channel": int(channel),
+                "value_type": str(value_type),
+                "value": None,
+                "readback_source": "mixing_station_query",
+                "reason": "readback_unavailable",
+                "timeout_sec": timeout_sec,
+            }
+        return {
+            "status": "ok",
+            "channel": int(channel),
+            "value_type": str(value_type),
+            "value": value,
+            "readback_source": "mixing_station_query",
+            "reason": "ok",
+            "timeout_sec": timeout_sec,
+        }
+
+    def apply_live_change(
+        self,
+        *,
+        channel: int,
+        value: float,
+        value_type: str,
+        source: str,
+        reason: str,
+        approved: bool,
+        approval_id: Optional[str] = None,
+        bypass_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        contract = self.get_live_apply_contract()["value_types"].get(str(value_type), {})
+        if not contract.get("supported"):
+            return {
+                "status": "blocked",
+                "channel": int(channel),
+                "value_type": str(value_type),
+                "requested_value": value,
+                "effective_value": value,
+                "old_value": None,
+                "readback_value": None,
+                "readback_source": None,
+                "source": str(source),
+                "reason": contract.get("reason", "unsupported_value_type"),
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        before = self.read_live_value(channel=int(channel), value_type=str(value_type))
+        if before.get("status") != "ok":
+            return {
+                "status": "blocked",
+                "channel": int(channel),
+                "value_type": str(value_type),
+                "requested_value": float(value),
+                "effective_value": float(value),
+                "old_value": None,
+                "readback_value": None,
+                "readback_source": before.get("readback_source"),
+                "source": str(source),
+                "reason": "pre_read_unavailable",
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        if value_type == "fader":
+            sent = self.set_channel_fader(int(channel), float(value))
+        elif value_type == "gain":
+            sent = self.set_channel_gain(int(channel), float(value))
+        else:
+            sent = False
+        if not sent:
+            return {
+                "status": "error",
+                "channel": int(channel),
+                "value_type": str(value_type),
+                "requested_value": float(value),
+                "effective_value": float(value),
+                "old_value": before.get("value"),
+                "readback_value": None,
+                "readback_source": "mixing_station_query",
+                "source": str(source),
+                "reason": "transport_send_failed",
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        after = self.read_live_value(channel=int(channel), value_type=str(value_type))
+        if after.get("status") != "ok":
+            return {
+                "status": "error",
+                "channel": int(channel),
+                "value_type": str(value_type),
+                "requested_value": float(value),
+                "effective_value": float(value),
+                "old_value": before.get("value"),
+                "readback_value": None,
+                "readback_source": after.get("readback_source", "mixing_station_query"),
+                "source": str(source),
+                "reason": "readback_unavailable",
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        tolerance = self.LIVE_APPLY_TOLERANCE.get(str(value_type), 0.0)
+        if not self._live_values_match(float(value), after.get("value"), tolerance):
+            return {
+                "status": "error",
+                "channel": int(channel),
+                "value_type": str(value_type),
+                "requested_value": float(value),
+                "effective_value": float(value),
+                "old_value": before.get("value"),
+                "readback_value": after.get("value"),
+                "readback_source": after.get("readback_source"),
+                "source": str(source),
+                "reason": "readback_mismatch",
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        return {
+            "status": "applied",
+            "channel": int(channel),
+            "value_type": str(value_type),
+            "requested_value": float(value),
+            "effective_value": float(value),
+            "old_value": before.get("value"),
+            "readback_value": after.get("value"),
+            "readback_source": after.get("readback_source"),
+            "source": str(source),
+            "reason": "ok",
+            "reason_text": str(reason or ""),
+            "approved": bool(approved),
+            "approval_id": approval_id,
+            "bypass_cooldown": bool(bypass_cooldown),
+            "contract_mode": "query_confirmed",
+        }
+
+    # MixerClientBase bridge methods
+    def set_fader(self, channel: int, value_db: float):
+        return self.set_channel_fader(channel, value_db)
+
+    def get_fader(self, channel: int) -> float:
+        value = self.get_channel_fader(channel)
+        return float(value) if value is not None else -144.0
+
+    def set_mute(self, channel: int, muted: bool):
+        return self.set_channel_mute(channel, 1 if muted else 0)
+
+    def get_mute(self, channel: int) -> bool:
+        value = self.get_channel_mute(channel)
+        return bool(value) if value is not None else False
+
+    def set_gain(self, channel: int, value_db: float):
+        return self.set_channel_gain(channel, value_db)
+
+    def recall_scene(self, scene_number: int):
+        logger.warning("Mixing Station scene recall is not implemented in this adapter")
+        return False
 
 
 # Discovery function to find Mixing Station

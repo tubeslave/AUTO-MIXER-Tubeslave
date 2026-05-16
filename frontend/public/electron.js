@@ -46,11 +46,12 @@ function startBackend() {
   const backendPath = isDev
     ? path.join(__dirname, '../../backend/server.py')
     : path.join(process.resourcesPath, 'backend');
+  const repoRoot = path.join(__dirname, '../..');
 
   if (isDev) {
     const pythonExecutable = process.platform === 'win32' ? 'python' : 'python3';
-    backendProcess = spawn(pythonExecutable, [backendPath], {
-      cwd: path.join(__dirname, '../../backend')
+    backendProcess = spawn(pythonExecutable, ['-m', 'backend.server'], {
+      cwd: repoRoot
     });
   } else {
     backendProcess = spawn(backendPath, [], {

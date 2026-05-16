@@ -192,6 +192,222 @@ body {
   border-radius: 10px;
   padding: 16px 20px;
 }
+.pilot-cockpit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pilot-cockpit-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pilot-kicker {
+  font-size: 0.72em;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin-bottom: 4px;
+}
+.pilot-cockpit-header h3 {
+  font-size: 1.15em;
+  margin-bottom: 4px;
+}
+.pilot-meta {
+  font-size: 0.82em;
+  color: #8b949e;
+}
+.pilot-primary-badge {
+  margin-left: auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.78em;
+  font-weight: 700;
+  border: 1px solid #30363d;
+  background: #0d1117;
+}
+.pilot-primary-badge.state-dry_run,
+.pilot-state-pill.state-dry_run.active {
+  color: #00d4ff;
+  border-color: #00d4ff44;
+  background: #00d4ff14;
+}
+.pilot-primary-badge.state-shadow,
+.pilot-state-pill.state-shadow.active {
+  color: #d29922;
+  border-color: #d2992244;
+  background: #d2992214;
+}
+.pilot-primary-badge.state-blocked,
+.pilot-state-pill.state-blocked.active {
+  color: #f85149;
+  border-color: #f8514944;
+  background: #f8514914;
+}
+.pilot-primary-badge.state-confirmed,
+.pilot-state-pill.state-confirmed.active {
+  color: #3fb950;
+  border-color: #3fb95044;
+  background: #3fb95014;
+}
+.pilot-primary-badge.state-rollback_ready,
+.pilot-state-pill.state-rollback_ready.active {
+  color: #f0883e;
+  border-color: #f0883e44;
+  background: #f0883e14;
+}
+.pilot-state-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.pilot-state-pill {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  background: #0d1117;
+  padding: 10px 12px;
+  font-size: 0.84em;
+}
+.pilot-state-pill strong {
+  font-size: 0.78em;
+  letter-spacing: 0.08em;
+}
+.pilot-state-pill.inactive {
+  color: #8b949e;
+}
+.pilot-cockpit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.pilot-panel {
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 10px;
+  padding: 14px;
+}
+.pilot-panel h4 {
+  font-size: 0.9em;
+  margin-bottom: 12px;
+}
+.pilot-definition-list {
+  display: grid;
+  gap: 10px;
+}
+.pilot-definition-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.84em;
+}
+.pilot-definition-list dt {
+  color: #8b949e;
+}
+.pilot-definition-list dd {
+  text-align: right;
+}
+.pilot-status-ok {
+  color: #3fb950;
+}
+.pilot-status-warn {
+  color: #f0883e;
+}
+.pilot-limits,
+.pilot-badge-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.pilot-limits span,
+.pilot-inline-badge {
+  font-size: 0.78em;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #161b22;
+  border: 1px solid #30363d;
+}
+.pilot-inline-badge-warn {
+  color: #f0883e;
+  border-color: #f0883e44;
+}
+.pilot-detail-line {
+  margin-top: 10px;
+  font-size: 0.8em;
+  color: #8b949e;
+}
+.pilot-detail-warn {
+  color: #f0883e;
+}
+.pilot-check-list,
+.pilot-escalations {
+  display: grid;
+  gap: 10px;
+}
+.pilot-check-item,
+.pilot-escalation {
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #161b22;
+}
+.pilot-check-item strong,
+.pilot-escalation strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.pilot-check-item span {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.pilot-check-item.ok span {
+  color: #3fb950;
+}
+.pilot-check-item.warn span {
+  color: #f0883e;
+}
+.pilot-check-item p,
+.pilot-escalation p {
+  font-size: 0.82em;
+  color: #c9d1d9;
+}
+.pilot-escalation-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.pilot-escalation-top span {
+  font-size: 0.76em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.pilot-escalation.severity-info {
+  border-color: #00d4ff44;
+}
+.pilot-escalation.severity-warning {
+  border-color: #f0883e44;
+}
+.pilot-escalation.severity-critical {
+  border-color: #f8514944;
+}
+.pilot-escalation-action {
+  margin-top: 8px;
+  color: #8b949e;
+}
+.pilot-empty {
+  font-size: 0.86em;
+  color: #8b949e;
+}
 .connect-row {
   display: flex;
   gap: 12px;
@@ -624,4 +840,13 @@ body {
   .nav-label { display: none; }
   .logo { font-size: 0.9em; }
   .tab-content { padding: 12px; }
+  .pilot-primary-badge {
+    margin-left: 0;
+  }
+  .pilot-definition-list div {
+    flex-direction: column;
+  }
+  .pilot-definition-list dd {
+    text-align: left;
+  }
 }

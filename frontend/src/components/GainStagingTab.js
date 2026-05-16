@@ -104,15 +104,17 @@ function GainStagingTab({ selectedChannels, availableChannels, selectedDevice, a
   }, [selectedChannels]);
 
   useEffect(() => {
-    const s = {};
-    selectedChannels.forEach(id => {
-      if (channelSettings[id]) { s[id] = channelSettings[id]; }
-      else {
-        const ch = availableChannels.find(c => c.id === id);
-        s[id] = { preset: ch?.name ? recognizeSignalType(ch.name) : 'custom' };
-      }
+    setChannelSettings(prev => {
+      const s = {};
+      selectedChannels.forEach(id => {
+        if (prev[id]) { s[id] = prev[id]; }
+        else {
+          const ch = availableChannels.find(c => c.id === id);
+          s[id] = { preset: ch?.name ? recognizeSignalType(ch.name) : 'custom' };
+        }
+      });
+      return s;
     });
-    setChannelSettings(s);
   }, [selectedChannels, availableChannels]);
 
   const handleToggle = () => {

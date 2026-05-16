@@ -9,7 +9,26 @@ logger = logging.getLogger(__name__)
 
 def register_handlers(server):
     async def handle_connect_wing(websocket, data):
-        await server.connect_wing(data.get("ip"), data.get("send_port"), data.get("receive_port"))
+        await server.connect_wing(
+            data.get("ip"),
+            data.get("send_port"),
+            data.get("receive_port"),
+            observation_only=data.get("observation_only", None),
+            record_telemetry=data.get("record_telemetry", None),
+            telemetry_session_label=data.get("telemetry_session_label"),
+        )
+
+    async def handle_start_wing_telemetry_capture(websocket, data):
+        await server.start_wing_telemetry_capture(
+            websocket,
+            session_label=data.get("telemetry_session_label"),
+        )
+
+    async def handle_stop_wing_telemetry_capture(websocket, data):
+        await server.stop_wing_telemetry_capture(
+            websocket,
+            reason=data.get("reason", "manual_stop"),
+        )
 
     async def handle_connect_dlive(websocket, data):
         await server.connect_dlive(
@@ -121,6 +140,8 @@ def register_handlers(server):
 
     return {
         "connect_wing": handle_connect_wing,
+        "start_wing_telemetry_capture": handle_start_wing_telemetry_capture,
+        "stop_wing_telemetry_capture": handle_stop_wing_telemetry_capture,
         "connect_dlive": handle_connect_dlive,
         "connect_mixing_station": handle_connect_mixing_station,
         "discover_mixing_station": handle_discover_mixing_station,

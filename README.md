@@ -83,8 +83,7 @@ cp .env.example .env
 ### 1. Запуск Backend-сервера
 
 ```bash
-cd backend
-python server.py
+python -m backend.server
 ```
 
 Сервер запустится на `ws://localhost:8765`
@@ -164,6 +163,7 @@ python test_wing_connection.py
 - [Mixing Secrets for the Small Studio - Mike Senior](https://www.cambridge-mt.com/ms/mix-book/)
 - [Sound Systems: Design and Optimization - Bob McCarthy](https://bobmccarthy.com/)
 - [Docs/secrets-rotation.md](Docs/secrets-rotation.md) - порядок ротации секрета после инцидента с tracked `.env`
+- [Docs/RUNTIME_HYGIENE.md](Docs/RUNTIME_HYGIENE.md) - какие websocket-команды доступны, какие UI-модули пока status-only, и какие safety-команды backend-only
 
 ## Поддержка
 

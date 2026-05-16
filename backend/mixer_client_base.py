@@ -12,6 +12,8 @@ from typing import Any, Callable, Dict, Optional
 class MixerClientBase(ABC):
     """Abstract base class for all mixer clients."""
 
+    LIVE_APPLY_CONTRACT_VERSION = "live_apply_v1"
+
     @abstractmethod
     def connect(self, timeout: float = 5.0) -> bool:
         """Connect to the mixer. Returns True on success."""
@@ -101,6 +103,76 @@ class MixerClientBase(ABC):
     @abstractmethod
     def recall_scene(self, scene_number: int):
         ...
+
+    # ── Live Apply Contract ─────────────────────────────────────
+    def get_live_apply_contract(self) -> Dict[str, Any]:
+        """Describe the client's normalized live-apply/readback capabilities."""
+        return {
+            "contract_version": self.LIVE_APPLY_CONTRACT_VERSION,
+            "mixer_family": type(self).__name__,
+            "value_types": {
+                "fader": {
+                    "supported": False,
+                    "readback_supported": False,
+                    "mode": "blocked",
+                    "reason": "live_apply_unsupported",
+                },
+                "gain": {
+                    "supported": False,
+                    "readback_supported": False,
+                    "mode": "blocked",
+                    "reason": "live_apply_unsupported",
+                },
+            },
+        }
+
+    def read_live_value(
+        self,
+        *,
+        channel: int,
+        value_type: str,
+        timeout_sec: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Read a live value using the client's best available readback hook."""
+        return {
+            "status": "blocked",
+            "channel": int(channel),
+            "value_type": str(value_type),
+            "value": None,
+            "readback_source": None,
+            "reason": "readback_unsupported",
+            "timeout_sec": timeout_sec,
+        }
+
+    def apply_live_change(
+        self,
+        *,
+        channel: int,
+        value: float,
+        value_type: str,
+        source: str,
+        reason: str,
+        approved: bool,
+        approval_id: Optional[str] = None,
+        bypass_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        """Apply a live mutation using the client's normalized safety contract."""
+        return {
+            "status": "blocked",
+            "channel": int(channel),
+            "value_type": str(value_type),
+            "requested_value": value,
+            "effective_value": value,
+            "old_value": None,
+            "readback_value": None,
+            "readback_source": None,
+            "source": str(source),
+            "reason": "live_apply_unsupported",
+            "reason_text": str(reason or ""),
+            "approved": bool(approved),
+            "approval_id": approval_id,
+            "bypass_cooldown": bool(bypass_cooldown),
+        }
 
 
 def create_mixer_client(mixer_type: str, config: dict) -> MixerClientBase:

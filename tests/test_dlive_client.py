@@ -208,3 +208,43 @@ class TestMixerFactory:
     def test_case_insensitive(self):
         client = create_mixer_client("DLive", {})
         assert isinstance(client, DLiveClient)
+
+
+class TestDLiveLiveApplyContract:
+    def test_live_apply_contract_fails_closed_without_confirmed_readback(self):
+        client = DLiveClient()
+        contract = client.get_live_apply_contract()
+
+        assert contract["contract_version"] == "live_apply_v1"
+        assert contract["mixer_family"] == "dlive"
+        assert contract["value_types"]["fader"]["supported"] is False
+        assert contract["value_types"]["fader"]["readback_supported"] is True
+        assert contract["value_types"]["fader"]["reason"] == "confirmed_readback_unsupported"
+        assert contract["value_types"]["gain"]["readback_supported"] is False
+
+    def test_read_live_value_returns_cached_fader_state(self):
+        client = DLiveClient()
+        client.state["fader/3"] = FADER_0DB
+
+        result = client.read_live_value(channel=3, value_type="fader")
+
+        assert result["status"] == "ok"
+        assert result["channel"] == 3
+        assert abs(result["value"]) < 0.1
+        assert result["readback_source"] == "dlive_state_cache"
+
+    def test_apply_live_change_blocks_fader_without_confirmed_readback(self):
+        client = DLiveClient()
+
+        result = client.apply_live_change(
+            channel=3,
+            value=-5.0,
+            value_type="fader",
+            source="test",
+            reason="manual live apply",
+            approved=True,
+        )
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "confirmed_readback_unsupported"
+        assert result["readback_source"] == "dlive_state_cache"

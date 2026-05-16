@@ -140,6 +140,10 @@ class EnhancedOSCClient:
     def subscribe(self, address_pattern: str, callback: Callable):
         self._wing.subscribe(address_pattern, callback)
 
+    def set_observation_mode(self, enabled: bool, reason: str = ""):
+        """Enable/disable observation-only mode on the underlying Wing client."""
+        self._wing.set_observation_mode(enabled, reason=reason)
+
     def set_osc_throttle(self, enabled: bool = True, hz: float = 10.0):
         self._wing.set_osc_throttle(enabled, hz)
 
@@ -203,8 +207,16 @@ class EnhancedOSCClient:
         uptime = self._stats["connection_uptime_sec"]
         if self._connected_since:
             uptime += time.time() - self._connected_since
-        return {
+        stats = {
             **self._stats,
             "connection_state": self.connection_state.value,
             "current_uptime_sec": uptime,
         }
+        try:
+            wing_stats = self._wing.get_stats()
+            stats.update(wing_stats)
+        except Exception:
+            stats["observation_mode"] = getattr(self._wing, "observation_mode", False)
+            stats["observation_block_reason"] = getattr(self._wing, "_observation_block_reason", "")
+            stats["blocked_write_count"] = getattr(self._wing, "_blocked_write_count", 0)
+        return stats

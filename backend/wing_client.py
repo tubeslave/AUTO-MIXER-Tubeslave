@@ -18,13 +18,46 @@ logger = logging.getLogger(__name__)
 class WingClient(MixerClientBase):
     """OSC client for Behringer Wing mixer - uses correct Wing OSC address format"""
 
-
     WRITE_GATE_STATE_DISARMED = "disarmed"
     WRITE_GATE_STATE_ARMED = "armed"
     WRITE_GATE_STATE_EMERGENCY_STOPPED = "emergency_stopped"
 
     WRITE_KIND_FADER = "fader"
     WRITE_KIND_GAIN = "gain"
+    WRITE_KIND_MUTE = "mute"
+    WRITE_KIND_EQ = "eq"
+    WRITE_KIND_DYNAMICS = "dynamics"
+    WRITE_KIND_GATE = "gate"
+    WRITE_KIND_PHASE_DELAY = "phase_delay"
+    WRITE_KIND_SEND = "send"
+    WRITE_KIND_SNAPSHOT = "snapshot"
+    WRITE_KIND_ROUTING = "routing"
+    WRITE_KIND_OTHER = "other"
+
+    # Candidate meter/address probes observed on Wing firmware 3.0.5.
+    # If telemetry exists, replies are expected on one of these patterns.
+    LEVEL_TELEMETRY_PROBE_ADDRESSES = [
+        "/$meters/subscribe",
+        "/$meters/ch/{channel}/in",
+        "/ch/{channel}/in",
+        "/ch/{channel}/in/$in",
+        "/ch/{channel}/main/1/lvl",
+        "/ch/{channel}/main/2/lvl",
+        "/ch/{channel}/main/3/lvl",
+        "/ch/{channel}/main/4/lvl",
+        "/ch/{channel}/send/1/lvl",
+        "/ch/{channel}/send/2/lvl",
+        "/ch/{channel}/send/3/lvl",
+    ]
+
+    # Lightweight, read-only fallback used by compatibility scripts:
+    # this gives fader position, not audio level, but is still useful to verify
+    # callback traffic during observation mode.
+    LEVEL_FALLBACK_ADDRESSES = [
+        "/ch/{channel}/fdr",
+        "/ch/{channel}/mute",
+        "/ch/{channel}/name",
+    ]
     
     def __init__(self, ip: str = "192.168.1.102", port: int = 2223):
         """
@@ -51,6 +84,14 @@ class WingClient(MixerClientBase):
         self._osc_throttle_hz = 10.0  # Default: 10 Hz = 100ms minimum interval
         self._osc_last_send_time: Dict[str, float] = {}  # address -> last send time
 
+        # Safety: when observation mode is enabled, all write operations are blocked
+        # and only read/query commands are allowed.
+        self._observation_block_reason = ""
+        self._blocked_write_count = 0
+        self._observation_only = self._parse_env_bool(
+            os.getenv("AUTOMIXER_WING_OBSERVATION_MODE", "false")
+        )
+        self._telemetry_recorder = None
 
         # Central supervised-write gate for any state-changing WING command.
         self._write_gate_enabled = self._parse_env_bool(
@@ -93,11 +134,117 @@ class WingClient(MixerClientBase):
     def _parse_env_bool(value: str) -> bool:
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
+    def get_level_telemetry_probes(self) -> list[str]:
+        """Return ordered list of meter probe address patterns for discovery."""
+        return list(self.LEVEL_TELEMETRY_PROBE_ADDRESSES)
+
+    def probe_channel_levels(
+        self,
+        channels: tuple[int, ...] | list[int] | range,
+        timeout_sec: float = 2.0,
+        include_fallback: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Probe likely channel level telemetry addresses in read-only mode.
+
+        Returns a map of address -> observed value for addresses that returned data.
+        """
+        addresses = []
+        for channel in channels:
+            for pattern in self.LEVEL_TELEMETRY_PROBE_ADDRESSES:
+                addresses.append(pattern.format(channel=channel))
+            if include_fallback:
+                for pattern in self.LEVEL_FALLBACK_ADDRESSES:
+                    addresses.append(pattern.format(channel=channel))
+
+        # Send all read-only probe queries (no writes, so safe even if observation mode is on)
+        for address in addresses:
+            self.send(address)
+
+        time.sleep(max(0.0, timeout_sec))
+
+        observed = {}
+        for address in addresses:
+            if address not in self.state:
+                continue
+            value = self.state.get(address)
+            if value is None or value == "":
+                continue
+            observed[address] = value
+
+        return {
+            "addresses_queried": addresses,
+            "observed": observed,
+            "num_observed": len(observed),
+            "state_keys": len(self.state),
+        }
+
+    def set_observation_mode(self, enabled: bool, reason: str = ""):
+        """Enable/disable read-only observation mode.
+
+        Args:
+            enabled: If True, write commands are blocked.
+            reason: Optional reason for structured logging.
+        """
+        self._observation_only = bool(enabled)
+        self._observation_block_reason = reason or ""
+        logger.warning(
+            "WingClient observation mode changed",
+            extra={
+                "event": "osc_observation_mode",
+                "enabled": self._observation_only,
+                "reason": self._observation_block_reason,
+            },
+        )
+        self._record_telemetry_event(
+            "observation_mode_changed",
+            source="client_config",
+            enabled=self._observation_only,
+            reason=self._observation_block_reason,
+        )
+
+    @property
+    def observation_mode(self) -> bool:
+        return self._observation_only
+
+    def configure_write_gate(
+        self,
+        *,
+        enabled: Optional[bool] = None,
+        allowed_kinds: Optional[list[str] | tuple[str, ...] | set[str]] = None,
+        cooldown_sec: Optional[float] = None,
+        requires_approval: Optional[bool] = None,
+        readback_timeout_sec: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Update the supervised-write gate configuration."""
+        if enabled is not None:
+            self._write_gate_enabled = bool(enabled)
+        if allowed_kinds is not None:
+            self._write_gate_allowed_kinds = {str(kind) for kind in allowed_kinds if kind}
+        if cooldown_sec is not None:
+            self._write_gate_cooldown_sec = max(0.0, float(cooldown_sec))
+        if requires_approval is not None:
+            self._write_gate_requires_approval = bool(requires_approval)
+        if readback_timeout_sec is not None:
+            self._write_gate_readback_timeout_sec = max(0.0, float(readback_timeout_sec))
+        status = self.get_write_gate_status()
+        status["reason"] = "configure"
+        self._record_write_gate_event("configure", status)
+        return status
+
     def arm_write_gate(self, *, reason: str = "") -> Dict[str, Any]:
         self._write_gate_state = self.WRITE_GATE_STATE_ARMED
         self._write_gate_last_reason = str(reason or "")
         status = self.get_write_gate_status()
         status["reason"] = self._write_gate_last_reason or "arm"
+        self._record_write_gate_event("state_changed", status)
+        return status
+
+    def disarm_write_gate(self, *, reason: str = "") -> Dict[str, Any]:
+        self._write_gate_state = self.WRITE_GATE_STATE_DISARMED
+        self._write_gate_last_reason = str(reason or "")
+        status = self.get_write_gate_status()
+        status["reason"] = self._write_gate_last_reason or "disarm"
         self._record_write_gate_event("state_changed", status)
         return status
 
@@ -141,7 +288,46 @@ class WingClient(MixerClientBase):
             "wing_write_gate_event_type": event_type,
             **payload,
         })
+        self._record_telemetry_event(
+            "write_gate_event",
+            source="write_gate",
+            gate_event_type=event_type,
+            payload=payload,
+        )
         return event
+
+    def _classify_write_address(self, address: str) -> str:
+        if "/in/set/trim" in address:
+            return self.WRITE_KIND_GAIN
+        if address.startswith("/ch/") and address.endswith("/fdr"):
+            return self.WRITE_KIND_FADER
+        if "/mute" in address:
+            return self.WRITE_KIND_MUTE
+        if "/eq/" in address or address.endswith("/eq"):
+            return self.WRITE_KIND_EQ
+        if "/dyn/" in address:
+            return self.WRITE_KIND_DYNAMICS
+        if "/gate/" in address:
+            return self.WRITE_KIND_GATE
+        if "/send/" in address or "/main/" in address and address.endswith("/lvl"):
+            return self.WRITE_KIND_SEND
+        if "/dly" in address or "/inv" in address or "/bal" in address:
+            return self.WRITE_KIND_PHASE_DELAY
+        if "/snap/" in address or "/$ctl/lib/" in address:
+            return self.WRITE_KIND_SNAPSHOT
+        if "/io/out/" in address or "/conn/" in address:
+            return self.WRITE_KIND_ROUTING
+        return self.WRITE_KIND_OTHER
+
+    def _extract_channel_from_address(self, address: str) -> Optional[int]:
+        parts = [part for part in address.strip("/").split("/") if part]
+        for idx, part in enumerate(parts[:-1]):
+            if part in {"ch", "bus", "main", "dca"}:
+                try:
+                    return int(parts[idx + 1])
+                except (TypeError, ValueError):
+                    return None
+        return None
 
     def _numeric_values_match(self, expected: Any, actual: Any, tolerance: float) -> bool:
         try:
@@ -378,6 +564,171 @@ class WingClient(MixerClientBase):
             bypass_cooldown=bypass_cooldown,
         )
 
+    def _live_apply_address(self, channel: int, value_type: str) -> Optional[str]:
+        if value_type == self.WRITE_KIND_FADER:
+            return f"/ch/{channel}/fdr"
+        if value_type == self.WRITE_KIND_GAIN:
+            return f"/ch/{channel}/in/set/trim"
+        return None
+
+    def get_live_apply_contract(self) -> Dict[str, Any]:
+        return {
+            "contract_version": self.LIVE_APPLY_CONTRACT_VERSION,
+            "mixer_family": "wing",
+            "value_types": {
+                "fader": {
+                    "supported": True,
+                    "readback_supported": True,
+                    "mode": "supervised",
+                    "readback_source": "wing_osc_query",
+                    "reason": "ok",
+                },
+                "gain": {
+                    "supported": True,
+                    "readback_supported": True,
+                    "mode": "supervised",
+                    "readback_source": "wing_osc_query",
+                    "reason": "ok",
+                },
+            },
+        }
+
+    def read_live_value(
+        self,
+        *,
+        channel: int,
+        value_type: str,
+        timeout_sec: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        address = self._live_apply_address(int(channel), str(value_type))
+        if address is None:
+            return {
+                "status": "blocked",
+                "channel": int(channel),
+                "value_type": str(value_type),
+                "value": None,
+                "readback_source": None,
+                "reason": "unsupported_value_type",
+                "timeout_sec": timeout_sec,
+            }
+
+        value = self._wait_for_readback(
+            address,
+            self._write_gate_readback_timeout_sec if timeout_sec is None else float(timeout_sec),
+            fallback_to_previous=False,
+        )
+        if value is None:
+            return {
+                "status": "unavailable",
+                "channel": int(channel),
+                "value_type": str(value_type),
+                "value": None,
+                "readback_source": "wing_osc_query",
+                "reason": "readback_unavailable",
+                "timeout_sec": timeout_sec,
+            }
+        return {
+            "status": "ok",
+            "channel": int(channel),
+            "value_type": str(value_type),
+            "value": value,
+            "readback_source": "wing_osc_query",
+            "reason": "ok",
+            "timeout_sec": timeout_sec,
+        }
+
+    def apply_live_change(
+        self,
+        *,
+        channel: int,
+        value: float,
+        value_type: str,
+        source: str,
+        reason: str,
+        approved: bool,
+        approval_id: Optional[str] = None,
+        bypass_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        if value_type == self.WRITE_KIND_FADER:
+            result = self.supervised_set_channel_fader(
+                int(channel),
+                float(value),
+                source=source,
+                reason=reason,
+                approved=approved,
+                approval_id=approval_id,
+                bypass_cooldown=bypass_cooldown,
+            )
+        elif value_type == self.WRITE_KIND_GAIN:
+            result = self.supervised_set_channel_gain(
+                int(channel),
+                float(value),
+                source=source,
+                reason=reason,
+                approved=approved,
+                approval_id=approval_id,
+                bypass_cooldown=bypass_cooldown,
+            )
+        else:
+            return {
+                "status": "blocked",
+                "channel": int(channel),
+                "value_type": str(value_type),
+                "requested_value": value,
+                "effective_value": value,
+                "old_value": None,
+                "readback_value": None,
+                "readback_source": None,
+                "source": str(source),
+                "reason": "unsupported_value_type",
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+            }
+
+        normalized = dict(result)
+        normalized["channel"] = int(channel)
+        normalized["value_type"] = str(value_type)
+        normalized["requested_value"] = float(value)
+        normalized["readback_source"] = "wing_osc_query"
+        normalized["contract_mode"] = "supervised"
+        return normalized
+
+    def set_telemetry_recorder(self, recorder: Optional[Any]):
+        """Attach or detach a telemetry recorder."""
+        self._telemetry_recorder = recorder
+        if recorder:
+            self._record_telemetry_event(
+                "telemetry_capture_attached",
+                source="client_config",
+                observation_mode=self._observation_only,
+            )
+        return recorder
+
+    def stop_telemetry_capture(self, reason: str = "") -> Dict[str, Any]:
+        """Stop and detach the active telemetry recorder, if any."""
+        recorder = self._telemetry_recorder
+        if recorder is None:
+            return {"active": False}
+        self._record_telemetry_event(
+            "telemetry_capture_stopping",
+            source="client_config",
+            reason=reason,
+        )
+        status = recorder.stop(reason=reason)
+        self._telemetry_recorder = None
+        return status
+
+    def get_telemetry_capture_status(self) -> Dict[str, Any]:
+        """Return the current recorder status, if attached."""
+        recorder = self._telemetry_recorder
+        if recorder is None:
+            return {"active": False}
+        try:
+            return recorder.get_status()
+        except Exception:
+            return {"active": False}
 
     def connect(self, timeout: float = 5.0) -> bool:
         """
@@ -401,17 +752,36 @@ class WingClient(MixerClientBase):
             
             local_port = self.sock.getsockname()[1]
             logger.info(f"Bound to local port {local_port}")
+            self._record_telemetry_event(
+                "transport_bound",
+                source="connect",
+                local_port=local_port,
+                timeout_sec=timeout,
+            )
             
             # Step 1: Initiate connection by sending 'WING?' to port 2222
             # Per documentation: "Initiating a communication with WING starts with 
             # sending the 5 bytes [UDP] datagram 'WING?' to port 2222"
             logger.info(f"Initiating connection to Wing at {self.ip}...")
             self.sock.sendto(b'WING?', (self.ip, 2222))
+            self._record_telemetry_event(
+                "handshake_sent",
+                source="connect",
+                remote_ip=self.ip,
+                remote_port=2222,
+                payload="WING?",
+            )
             
             try:
                 data, addr = self.sock.recvfrom(4096)
                 wing_info = data.decode('utf-8', errors='ignore')
                 logger.info(f"Wing found: {wing_info}")
+                self._record_telemetry_event(
+                    "handshake_response",
+                    source="connect",
+                    remote_addr=addr,
+                    payload_text=wing_info,
+                )
             except socket.timeout:
                 logger.error(f"Connection timeout: Wing at {self.ip} did not respond to handshake")
                 self.sock.close()
@@ -443,6 +813,12 @@ class WingClient(MixerClientBase):
             
             # Scan initial state
             self._scan_console_state()
+            self._record_telemetry_event(
+                "transport_connected",
+                source="connect",
+                remote_ip=self.ip,
+                remote_port=self.port,
+            )
             
             logger.info(f"Connected to Wing at {self.ip}:{self.port}")
             return True
@@ -454,6 +830,12 @@ class WingClient(MixerClientBase):
 
     def disconnect(self):
         """Disconnect from Wing"""
+        self._record_telemetry_event(
+            "transport_disconnected",
+            source="disconnect",
+            remote_ip=self.ip,
+            remote_port=self.port,
+        )
         self._stop_receiver = True
         self.is_connected = False
         if self.sock:
@@ -514,6 +896,15 @@ class WingClient(MixerClientBase):
             self.state[address] = args[0]
         else:
             self.state[address] = args
+
+        self._record_telemetry_event(
+            "console_observed",
+            address=address,
+            values=args,
+            source="incoming_osc",
+            normalized_value=self.state.get(address),
+            observation_mode=self._observation_only,
+        )
         
         # Call registered callbacks
         if address in self.callbacks:
@@ -549,6 +940,65 @@ class WingClient(MixerClientBase):
             address: OSC address (e.g., '/ch/1/fdr')
             values: Optional values to send. If empty, this is a query.
         """
+        is_write = len(values) > 0
+        if is_write and self._observation_only:
+            self._blocked_write_count += 1
+            self._record_telemetry_event(
+                "blocked_write",
+                address=address,
+                values=values,
+                source="send",
+                reason=self._observation_block_reason,
+                observation_mode=True,
+                blocked_write_count=self._blocked_write_count,
+            )
+            logger.warning(
+                "OSC write blocked in observation mode (would apply)",
+                extra={
+                    "event": "osc_write_blocked",
+                    "address": address,
+                    "values": tuple(values),
+                    "reason": self._observation_block_reason,
+                    "would_apply": True,
+                    "count": self._blocked_write_count,
+                },
+            )
+            return False
+        if (
+            is_write
+            and self._write_gate_enabled
+            and self._supervised_write_depth <= 0
+        ):
+            self._blocked_write_count += 1
+            payload = {
+                "address": address,
+                "channel": self._extract_channel_from_address(address),
+                "write_kind": self._classify_write_address(address),
+                "reason": "direct_write_requires_supervision",
+                "source": "send",
+                "requested_value": values[0] if len(values) == 1 else list(values),
+                "write_gate_state": self._write_gate_state,
+            }
+            self._record_write_gate_event("blocked", payload)
+            self._record_telemetry_event(
+                "blocked_write",
+                address=address,
+                values=values,
+                source="send",
+                reason="direct_write_requires_supervision",
+                write_gate_state=self._write_gate_state,
+                blocked_write_count=self._blocked_write_count,
+            )
+            logger.warning(
+                "OSC write blocked by supervised write gate",
+                extra={
+                    "event": "osc_write_blocked",
+                    **payload,
+                    "count": self._blocked_write_count,
+                },
+            )
+            return False
+
         if not self.is_connected:
             logger.warning("Not connected to Wing")
             return False
@@ -579,6 +1029,13 @@ class WingClient(MixerClientBase):
             msg = builder.build()
             self.sock.sendto(msg.dgram, (self.ip, self.port))
             logger.debug(f"Sent: {address} {values}")
+            self._record_telemetry_event(
+                "write_sent" if values else "query_sent",
+                address=address,
+                values=values if values else None,
+                source="send",
+                observation_mode=self._observation_only,
+            )
             # Update local state cache when setting values (not queries)
             if values:
                 if len(values) == 1:
@@ -597,6 +1054,39 @@ class WingClient(MixerClientBase):
         except Exception as e:
             logger.error(f"Send failed: {e}")
             return False
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Return OSC send/observation statistics."""
+        return {
+            "observation_mode": self._observation_only,
+            "observation_block_reason": self._observation_block_reason,
+            "blocked_write_count": self._blocked_write_count,
+            "write_gate": self.get_write_gate_status(),
+            "telemetry_capture": self.get_telemetry_capture_status(),
+        }
+
+    def _record_telemetry_event(
+        self,
+        event_type: str,
+        *,
+        address: Optional[str] = None,
+        values: Any = None,
+        source: Optional[str] = None,
+        **extra: Any,
+    ):
+        recorder = self._telemetry_recorder
+        if recorder is None:
+            return
+        try:
+            recorder.record_event(
+                event_type,
+                address=address,
+                values=values,
+                source=source,
+                **extra,
+            )
+        except Exception as exc:
+            logger.error("Telemetry recorder failure: %s", exc)
 
     def subscribe(self, address_pattern: str, callback: Callable):
         """Subscribe to OSC address changes"""
@@ -766,7 +1256,7 @@ class WingClient(MixerClientBase):
             db_value = 10.0
         
         logger.info(f"Setting fader /ch/{channel}/fdr = {db_value:.2f} dB")
-        self.send(address, db_value)
+        return self.send(address, db_value)
 
     def get_channel_mute(self, channel: int) -> Optional[int]:
         """Get channel mute state"""
@@ -776,7 +1266,7 @@ class WingClient(MixerClientBase):
     def set_channel_mute(self, channel: int, value: int):
         """Set channel mute (0=unmuted, 1=muted)"""
         address = f"/ch/{channel}/mute"
-        self.send(address, value)
+        return self.send(address, value)
 
     def get_channel_gain(self, channel: int) -> Optional[float]:
         """Get channel input trim/gain"""
@@ -803,7 +1293,7 @@ class WingClient(MixerClientBase):
     
     def set_channel_phase_invert(self, channel: int, value: int):
         """Set channel phase invert (0=normal, 1=inverted)"""
-        self.send(f"/ch/{channel}/in/set/inv", value)
+        return self.send(f"/ch/{channel}/in/set/inv", value)
     
     def set_channel_delay(self, channel: int, value: float, mode: str = "MS"):
         """
@@ -815,9 +1305,12 @@ class WingClient(MixerClientBase):
             mode: Delay mode - "M" (meters 0..150), "FT" (feet 0.5..500), 
                   "MS" (milliseconds 0.5..500), "SMP" (samples 16..500)
         """
-        self.send(f"/ch/{channel}/in/set/dlymode", mode)
-        self.send(f"/ch/{channel}/in/set/dly", value)
-        self.send(f"/ch/{channel}/in/set/dlyon", 1)
+        results = [
+            self.send(f"/ch/{channel}/in/set/dlymode", mode),
+            self.send(f"/ch/{channel}/in/set/dly", value),
+            self.send(f"/ch/{channel}/in/set/dlyon", 1),
+        ]
+        return all(result is not False for result in results)
 
     def get_channel_pan(self, channel: int) -> Optional[float]:
         """Get channel pan"""
@@ -1128,7 +1621,10 @@ class WingClient(MixerClientBase):
     def set_compressor(self, channel: int, threshold: float = None, ratio: str = None,
                       knee: int = None, attack: float = None, hold: float = None,
                       release: float = None, gain: float = None, mix: float = None,
-                      det: str = None, env: str = None, auto: int = None):
+                      det: str = None, env: str = None, auto: int = None,
+                      threshold_db: float = None, attack_ms: float = None,
+                      release_ms: float = None, makeup_db: float = None,
+                      enabled: bool = None, **_ignored):
         """
         Set compressor/dynamics parameters
         
@@ -1148,40 +1644,47 @@ class WingClient(MixerClientBase):
             auto: Auto switch (0/1)
         """
         base = f"/ch/{channel}/dyn"
+        if threshold is None:
+            threshold = threshold_db
+        if attack is None:
+            attack = attack_ms
+        if release is None:
+            release = release_ms
+        if gain is None:
+            gain = makeup_db
+
         # Small delay between OSC commands to ensure mixer processes them
+        results = []
+        def send_param(address: str, value):
+            result = self.send(address, value)
+            results.append(result)
+            time.sleep(0.01)
+
+        if enabled is not None:
+            send_param(f"{base}/on", 1 if enabled else 0)
         if threshold is not None:
-            self.send(f"{base}/thr", threshold)
-            time.sleep(0.01)
+            send_param(f"{base}/thr", threshold)
         if ratio is not None:
-            self.send(f"{base}/ratio", ratio)
-            time.sleep(0.01)
+            send_param(f"{base}/ratio", ratio)
         if knee is not None:
-            self.send(f"{base}/knee", knee)
-            time.sleep(0.01)
+            send_param(f"{base}/knee", knee)
         if attack is not None:
-            self.send(f"{base}/att", attack)
-            time.sleep(0.01)
+            send_param(f"{base}/att", attack)
         if hold is not None:
-            self.send(f"{base}/hld", hold)
-            time.sleep(0.01)
+            send_param(f"{base}/hld", hold)
         if release is not None:
-            self.send(f"{base}/rel", release)
-            time.sleep(0.01)
+            send_param(f"{base}/rel", release)
         if gain is not None:
-            self.send(f"{base}/gain", gain)
-            time.sleep(0.01)
+            send_param(f"{base}/gain", gain)
         if mix is not None:
-            self.send(f"{base}/mix", mix)
-            time.sleep(0.01)
+            send_param(f"{base}/mix", mix)
         if det is not None:
-            self.send(f"{base}/det", det)
-            time.sleep(0.01)
+            send_param(f"{base}/det", det)
         if env is not None:
-            self.send(f"{base}/env", env)
-            time.sleep(0.01)
+            send_param(f"{base}/env", env)
         if auto is not None:
-            self.send(f"{base}/auto", auto)
-            time.sleep(0.01)
+            send_param(f"{base}/auto", auto)
+        return all(result is not False for result in results)
     
     def set_compressor_model(self, channel: int, model: str):
         """Set compressor model: COMP, EXP, B160, B560, D241, ECL33, 9000C, SBUS, 
@@ -1898,7 +2401,7 @@ class WingClient(MixerClientBase):
 
     # ── MixerClientBase ABC bridge methods ──────────────────────
     def set_fader(self, channel: int, value_db: float):
-        self.set_channel_fader(channel, value_db)
+        return self.set_channel_fader(channel, value_db)
 
     def get_fader(self, channel: int) -> float:
         address = f"/ch/{channel}/fdr"
@@ -1906,14 +2409,14 @@ class WingClient(MixerClientBase):
         return float(val) if val is not None else -144.0
 
     def set_mute(self, channel: int, muted: bool):
-        self.set_channel_mute(channel, 1 if muted else 0)
+        return self.set_channel_mute(channel, 1 if muted else 0)
 
     def get_mute(self, channel: int) -> bool:
         val = self.get_channel_mute(channel)
         return bool(val) if val is not None else False
 
     def set_gain(self, channel: int, value_db: float):
-        self.set_channel_gain(channel, value_db)
+        return self.set_channel_gain(channel, value_db)
 
     def recall_scene(self, scene_number: int):
         self.load_snap_by_index(scene_number)

@@ -296,6 +296,78 @@ class TestConnectionLifecycle:
 class TestSupervisedWriteGate:
     """Focused TUB-352 WING rollback/pre-read tests."""
 
+    def test_direct_fader_and_gain_setters_propagate_blocked_gate(self):
+        with patch.dict("sys.modules", _mock_pythonosc_modules()):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client.set_osc_throttle(enabled=False)
+
+            assert client.set_channel_fader(1, -20.0) is False
+            assert client.set_fader(1, -21.0) is False
+            assert client.set_channel_gain(1, -3.0) is False
+            assert client.set_gain(1, -4.0) is False
+
+            blocked_payloads = [
+                event["payload"]
+                for event in client._write_gate_events
+                if event["event_type"] == "blocked"
+            ]
+            assert {payload["write_kind"] for payload in blocked_payloads} == {"fader", "gain"}
+
+    def test_direct_write_gate_records_stable_inventory_fields_for_legacy_writes(self):
+        with patch.dict("sys.modules", _mock_pythonosc_modules()):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client.set_osc_throttle(enabled=False)
+
+            assert client.set_fader(7, -21.0) is False
+            assert client.set_gain(7, -4.0) is False
+
+            blocked_payloads = [
+                event["payload"]
+                for event in client._write_gate_events
+                if event["event_type"] == "blocked"
+            ]
+            by_kind = {payload["write_kind"]: payload for payload in blocked_payloads}
+
+            assert by_kind["fader"]["channel"] == 7
+            assert by_kind["fader"]["requested_value"] == -21.0
+            assert by_kind["fader"]["source"] == "send"
+            assert by_kind["fader"]["reason"] == "direct_write_requires_supervision"
+
+            assert by_kind["gain"]["channel"] == 7
+            assert by_kind["gain"]["requested_value"] == -4.0
+            assert by_kind["gain"]["source"] == "send"
+            assert by_kind["gain"]["reason"] == "direct_write_requires_supervision"
+
+    def test_generic_compressor_aliases_propagate_blocked_gate(self):
+        with patch.dict("sys.modules", _mock_pythonosc_modules()):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client.set_osc_throttle(enabled=False)
+
+            result = client.set_compressor(
+                1,
+                threshold_db=-18.0,
+                ratio=3.0,
+                attack_ms=5.0,
+                release_ms=80.0,
+                makeup_db=0.0,
+                enabled=True,
+            )
+
+            assert result is False
+            assert client._write_gate_events[-1]["payload"]["write_kind"] == "dynamics"
+
     def test_supervised_write_blocks_when_fresh_pre_read_is_unavailable(self, connected_supervised_wing_client):
         client = connected_supervised_wing_client
 
@@ -335,3 +407,35 @@ class TestSupervisedWriteGate:
         assert result["rollback"]["readback_value"] == 0.0
         assert client.sock.sendto.call_count == 2
         assert client.get_write_gate_status()["state"] == "emergency_stopped"
+
+    def test_live_apply_contract_reports_supervised_fader_and_gain(self, connected_supervised_wing_client):
+        contract = connected_supervised_wing_client.get_live_apply_contract()
+
+        assert contract["contract_version"] == "live_apply_v1"
+        assert contract["mixer_family"] == "wing"
+        assert contract["value_types"]["fader"]["supported"] is True
+        assert contract["value_types"]["gain"]["supported"] is True
+        assert contract["value_types"]["fader"]["mode"] == "supervised"
+        assert contract["value_types"]["gain"]["readback_source"] == "wing_osc_query"
+
+    def test_apply_live_change_delegates_to_supervised_write_path(self, connected_supervised_wing_client):
+        client = connected_supervised_wing_client
+
+        with patch.object(client, "_wait_for_readback", side_effect=[0.0, -6.0]):
+            result = client.apply_live_change(
+                channel=4,
+                value=-6.0,
+                value_type="fader",
+                source="test",
+                reason="approved fader change",
+                approved=True,
+                approval_id="approval-fader-live",
+            )
+
+        assert result["status"] == "applied"
+        assert result["channel"] == 4
+        assert result["value_type"] == "fader"
+        assert result["old_value"] == 0.0
+        assert result["readback_value"] == -6.0
+        assert result["readback_source"] == "wing_osc_query"
+        assert result["contract_mode"] == "supervised"

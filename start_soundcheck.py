@@ -11,12 +11,7 @@ to the first one found, detects the audio device, and starts auto-mixing.
     python3 start_soundcheck.py --ip 192.168.3.70  # direct connect
 """
 
-import os
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
-
-from auto_soundcheck_engine import main
+from backend.auto_soundcheck_engine import main
 
 if __name__ == "__main__":
     main()

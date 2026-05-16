@@ -5,12 +5,14 @@ import SignalHint from './SignalHint';
 
 function AutoEffectsTab({ selectedChannels, availableChannels, selectedDevice, audioDevices, globalMode }) {
   const [running, setRunning] = useState(false);
+  const [implemented, setImplemented] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
   const [channelEffects, setChannelEffects] = useState({});
 
   useEffect(() => {
     const handle = (data) => {
       if (data.running !== undefined) setRunning(data.running);
+      if (data.implemented !== undefined) setImplemented(data.implemented);
       if (data.message) setStatusMessage(data.message);
       if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
       if (data.channel_effects) setChannelEffects(data.channel_effects);
@@ -36,7 +38,7 @@ function AutoEffectsTab({ selectedChannels, availableChannels, selectedDevice, a
         <div className="module-actions">
           <button className={`btn-start ${running ? 'stop' : 'go'}`}
             onClick={running ? handleStop : handleStart}
-            disabled={!selectedDevice || !channels.length}>
+            disabled={!implemented || !selectedDevice || !channels.length}>
             {running ? 'Стоп' : 'Старт'}
           </button>
         </div>
