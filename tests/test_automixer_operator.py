@@ -335,6 +335,68 @@ def test_monitor_is_read_only(tmp_path, monkeypatch, capsys):
     assert all(path.startswith("/api/") for path, _params in calls)
 
 
+def test_operational_audit_command_prints_report_paths(tmp_path, monkeypatch, capsys):
+    captured = {}
+
+    def fake_load_context(config):
+        return {
+            "paperclip_api_ok": True,
+            "paperclip_api_url": "http://paperclip.test",
+            "company_id": "company-1",
+        }
+
+    def fake_create_operational_audit(**kwargs):
+        captured.update(kwargs)
+        return automixer_operator.operational_audit.OperationalAuditResult(
+            generated_at="2026-05-17T09:00:00Z",
+            company_id="company-1",
+            issue_total=10,
+            agent_total=3,
+            active_run_total=0,
+            issue_status_counts={"todo": 10},
+            agent_status_counts={"idle": 3},
+            thresholds=automixer_operator.operational_audit.AuditThresholds(
+                stale_hours=48.0,
+                orphan_hours=36.0,
+                heartbeat_stale_hours=12.0,
+            ),
+            stale_issues=[],
+            orphaned_issues=[],
+            blocked_chains=[],
+            blocked_cycles=[],
+            unhealthy_agents=[],
+            duplicate_recovery_issues=[],
+            run_source="live-runs",
+            report_paths={
+                "markdown": str(tmp_path / ".paperclip" / "reports" / "operational_audit_test.md"),
+                "json": str(tmp_path / ".paperclip" / "reports" / "operational_audit_test.json"),
+                "latest_markdown": str(tmp_path / ".paperclip" / "reports" / "operational_audit_latest.md"),
+                "latest_json": str(tmp_path / ".paperclip" / "reports" / "operational_audit_latest.json"),
+            },
+        )
+
+    monkeypatch.setattr(automixer_operator, "load_context", fake_load_context)
+    monkeypatch.setattr(
+        automixer_operator.operational_audit,
+        "create_operational_audit",
+        fake_create_operational_audit,
+    )
+
+    exit_code = automixer_operator.command_operational_audit(
+        make_config(tmp_path),
+        ["--stale-hours", "48", "--orphan-hours", "36", "--heartbeat-stale-hours", "12"],
+    )
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Automixer Operational Audit" in output
+    assert "report_markdown:" in output
+    assert captured["company_id"] == "company-1"
+    assert captured["thresholds"].stale_hours == 48.0
+    assert captured["thresholds"].orphan_hours == 36.0
+    assert captured["thresholds"].heartbeat_stale_hours == 12.0
+
+
 def test_safety_flags_always_block_wing_osc():
     env = automixer_operator.safety_preview_env()
 
@@ -588,6 +650,7 @@ def test_no_write_routes_or_actions_exist():
         "cycle",
         "approve-template",
         "monitor",
+        "operational-audit",
         "vector-index",
         "vector-search",
         "vector-add",

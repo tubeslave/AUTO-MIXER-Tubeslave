@@ -28,6 +28,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.gpt_control_bridge import server as bridge  # noqa: E402
+from tools.automixer_operator import operational_audit  # noqa: E402
 
 
 DEFAULT_BRIDGE_CONTEXT_URL = "http://127.0.0.1:8788/v1/context/automixer"
@@ -833,6 +834,55 @@ def command_monitor(config: OperatorConfig) -> int:
     return 0
 
 
+def command_operational_audit(config: OperatorConfig, extra_args: list[str]) -> int:
+    parser = argparse.ArgumentParser(
+        prog="operator.py operational-audit",
+        description="Generate a read-only daily operational audit report",
+    )
+    parser.add_argument("--stale-hours", type=float, default=operational_audit.DEFAULT_STALE_HOURS)
+    parser.add_argument("--orphan-hours", type=float, default=operational_audit.DEFAULT_ORPHAN_HOURS)
+    parser.add_argument(
+        "--heartbeat-stale-hours",
+        type=float,
+        default=operational_audit.DEFAULT_HEARTBEAT_STALE_HOURS,
+    )
+    args = parser.parse_args(extra_args)
+
+    context = load_context(config)
+    company_id = clean_missing(str(context.get("company_id") or "")) or clean_missing(
+        config.environ.get("PAPERCLIP_COMPANY_ID")
+    )
+    if context.get("paperclip_api_ok") is not True:
+        print("== Automixer Operational Audit ==")
+        print("error: Paperclip API is unavailable")
+        return 1
+    if not company_id:
+        print("== Automixer Operational Audit ==")
+        print("error: company_id is unavailable")
+        return 1
+
+    result = operational_audit.create_operational_audit(
+        project_root=config.project_root,
+        api_url=str(context.get("paperclip_api_url") or bridge.DEFAULT_PAPERCLIP_API_URL),
+        company_id=company_id,
+        timeout_seconds=parse_float(
+            config.environ.get("GPT_CONTROL_BRIDGE_PAPERCLIP_TIMEOUT_SECONDS"),
+            3.0,
+        ),
+        thresholds=operational_audit.AuditThresholds(
+            stale_hours=max(args.stale_hours, 0.0),
+            orphan_hours=max(args.orphan_hours, 0.0),
+            heartbeat_stale_hours=max(args.heartbeat_stale_hours, 0.0),
+        ),
+    )
+    print("== Automixer Operational Audit ==")
+    print(f"report_markdown: {result.report_paths.get('markdown') or 'missing'}")
+    print(f"report_json: {result.report_paths.get('json') or 'missing'}")
+    print("")
+    print(operational_audit.render_markdown(result), end="")
+    return 0
+
+
 def command_vector_indexer(config: OperatorConfig, operator_command: str, extra_args: list[str]) -> int:
     vector_command = VECTOR_OPERATOR_COMMANDS[operator_command]
     script = config.project_root / VECTOR_INDEXER_SCRIPT
@@ -1429,6 +1479,7 @@ def build_parser() -> argparse.ArgumentParser:
             "cycle",
             "approve-template",
             "monitor",
+            "operational-audit",
             "vector-index",
             "vector-search",
             "vector-add",
@@ -1469,6 +1520,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_approve_template(config)
     if args.command == "monitor":
         return command_monitor(config)
+    if args.command == "operational-audit":
+        return command_operational_audit(config, args.args)
     if args.command in VECTOR_OPERATOR_COMMANDS:
         return command_vector_indexer(config, args.command, args.args)
     parser.error(f"unknown command: {args.command}")

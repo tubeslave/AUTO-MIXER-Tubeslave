@@ -175,6 +175,40 @@ python3 tools/automixer_operator/operator.py monitor
 
 Reads active runs, the latest watchdog report, issue status, run status, and comments/report data where Paperclip exposes them. It does not change the issue, does not wake agents, and does not launch new work.
 
+## Operational Audit
+
+```bash
+python3 tools/automixer_operator/operator.py operational-audit
+```
+
+Generates a read-only daily operational audit from Paperclip GET routes only. The audit detects:
+
+- stale tasks;
+- orphaned tasks;
+- blocked dependency chains and cycles;
+- unhealthy agents;
+- duplicate recovery issues.
+
+It writes both timestamped and latest copies here:
+
+```text
+.paperclip/reports/operational_audit_<timestamp>.md
+.paperclip/reports/operational_audit_<timestamp>.json
+.paperclip/reports/operational_audit_latest.md
+.paperclip/reports/operational_audit_latest.json
+```
+
+Optional thresholds:
+
+```bash
+python3 tools/automixer_operator/operator.py operational-audit \
+  --stale-hours 24 \
+  --orphan-hours 24 \
+  --heartbeat-stale-hours 24
+```
+
+This command does not touch WING/OSC, does not dispatch agents, and does not mutate Paperclip issues.
+
 ## Project Vector Index
 
 The ChromaDB project index is a local read/write knowledge store under `.chromadb/`.
