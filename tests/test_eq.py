@@ -9,7 +9,7 @@ Covers:
 
 import numpy as np
 import pytest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from auto_eq import EQBand, SpectrumAnalyzer
 
@@ -167,3 +167,20 @@ class TestMultiChannelAutoEQController:
         assert started is True
         assert controller.mode == "soundcheck"
         assert controller.active_channels[2]["mode"] == "soundcheck"
+
+    def test_apply_channel_correction_uses_live_apply_adapter_when_present(self):
+        from auto_eq import EQBand, InstrumentProfiles, MultiChannelAutoEQController
+
+        mixer = MagicMock()
+        mixer.is_connected = True
+        controller = MultiChannelAutoEQController(mixer_client=mixer)
+        controller.live_apply_adapter = MagicMock(return_value=True)
+        controller.active_channels[1] = {
+            "profile": InstrumentProfiles.get_profile("custom"),
+            "corrections": [EQBand("peak", 1000.0, -3.0, 1.2)],
+            "mode": "soundcheck",
+        }
+
+        assert controller.apply_channel_correction(1) is True
+        mixer.set_eq_on.assert_not_called()
+        controller.live_apply_adapter.assert_called_once()

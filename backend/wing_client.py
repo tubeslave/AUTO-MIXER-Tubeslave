@@ -119,6 +119,12 @@ class WingClient(MixerClientBase):
             self.WRITE_KIND_GAIN: float(
                 os.getenv("AUTOMIXER_WING_WRITE_GATE_GAIN_TOLERANCE_DB", "0.25")
             ),
+            self.WRITE_KIND_EQ: float(
+                os.getenv("AUTOMIXER_WING_WRITE_GATE_EQ_TOLERANCE", "0.25")
+            ),
+            self.WRITE_KIND_PHASE_DELAY: float(
+                os.getenv("AUTOMIXER_WING_WRITE_GATE_PHASE_TOLERANCE", "0.25")
+            ),
         }
         self._write_gate_last_write_ts: Dict[tuple[int, str], float] = {}
         self._write_gate_events: list[Dict[str, Any]] = []
@@ -515,6 +521,202 @@ class WingClient(MixerClientBase):
         gate["status"] = "error"
         gate["reason"] = "readback_mismatch"
         self.emergency_stop_writes(reason=f"readback_mismatch:{address}")
+        self._record_write_gate_event("error", gate)
+        return gate
+
+    def _normalize_supervised_steps(
+        self,
+        *,
+        steps: list[Dict[str, Any]] | tuple[Dict[str, Any], ...],
+        write_kind: str,
+    ) -> list[Dict[str, Any]]:
+        normalized_steps: list[Dict[str, Any]] = []
+        default_tolerance = float(self._write_gate_tolerance.get(write_kind, 0.0))
+        for index, step in enumerate(steps or [], start=1):
+            address = str((step or {}).get("address") or "").strip()
+            if not address:
+                raise ValueError(f"step {index} missing address")
+            if "value" not in (step or {}):
+                raise ValueError(f"step {index} missing value")
+            tolerance = (step or {}).get("tolerance", default_tolerance)
+            normalized_steps.append(
+                {
+                    "index": index,
+                    "address": address,
+                    "value": step["value"],
+                    "tolerance": float(tolerance),
+                }
+            )
+        if not normalized_steps:
+            raise ValueError("at least one supervised step is required")
+        return normalized_steps
+
+    def _rollback_supervised_steps(
+        self,
+        *,
+        steps: list[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        rollback_steps: list[Dict[str, Any]] = []
+        restored_all = True
+        for step in reversed(steps):
+            rollback_step = {
+                "address": step["address"],
+                "old_value": step.get("old_value"),
+                "attempted": False,
+                "restored": False,
+                "readback_value": None,
+            }
+            if step.get("old_value") is None:
+                restored_all = False
+                rollback_steps.append(rollback_step)
+                continue
+            rollback_step["attempted"] = True
+            with self._supervised_write_context():
+                rollback_sent = self.send(step["address"], step["old_value"])
+            if rollback_sent:
+                rollback_readback = self._wait_for_readback(
+                    step["address"],
+                    self._write_gate_readback_timeout_sec,
+                    fallback_to_previous=False,
+                )
+                rollback_step["readback_value"] = rollback_readback
+                rollback_step["restored"] = self._numeric_values_match(
+                    step["old_value"],
+                    rollback_readback,
+                    float(step.get("tolerance", 0.0)),
+                )
+            if not rollback_step["restored"]:
+                restored_all = False
+            rollback_steps.append(rollback_step)
+        return {
+            "attempted": any(step["attempted"] for step in rollback_steps),
+            "restored": restored_all and bool(rollback_steps),
+            "steps": rollback_steps,
+        }
+
+    def apply_supervised_bundle(
+        self,
+        *,
+        channel: int,
+        write_kind: str,
+        steps: list[Dict[str, Any]] | tuple[Dict[str, Any], ...],
+        source: str,
+        reason: str,
+        approved: bool,
+        approval_id: Optional[str] = None,
+        bypass_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        normalized_channel = int(channel)
+        normalized_steps = self._normalize_supervised_steps(
+            steps=steps,
+            write_kind=str(write_kind),
+        )
+        requested_steps = [
+            {"address": step["address"], "value": step["value"]}
+            for step in normalized_steps
+        ]
+        gate = self._evaluate_supervised_write(
+            address=normalized_steps[0]["address"],
+            write_kind=str(write_kind),
+            channel=normalized_channel,
+            source=source,
+            reason=reason,
+            approved=approved,
+            requested_value=requested_steps,
+            bypass_cooldown=bypass_cooldown,
+        )
+        gate["approval_id"] = approval_id
+        gate["requested_steps"] = requested_steps
+        if not gate["allowed"]:
+            gate["status"] = "blocked"
+            self._record_write_gate_event("blocked", gate)
+            return gate
+
+        prepared_steps: list[Dict[str, Any]] = []
+        for step in normalized_steps:
+            old_value = self._wait_for_readback(
+                step["address"],
+                self._write_gate_readback_timeout_sec,
+                fallback_to_previous=False,
+            )
+            if old_value is None:
+                gate["status"] = "blocked"
+                gate["reason"] = "pre_read_unavailable"
+                gate["failed_step"] = {"address": step["address"], "value": step["value"]}
+                gate["prepared_steps"] = [
+                    {
+                        "address": prepared["address"],
+                        "old_value": prepared["old_value"],
+                    }
+                    for prepared in prepared_steps
+                ]
+                self._record_write_gate_event("blocked", gate)
+                return gate
+            prepared_steps.append(
+                {
+                    "address": step["address"],
+                    "value": step["value"],
+                    "tolerance": step["tolerance"],
+                    "old_value": old_value,
+                }
+            )
+
+        gate["old_value"] = [
+            {"address": step["address"], "value": step["old_value"]}
+            for step in prepared_steps
+        ]
+        self._record_write_gate_event("attempted", gate)
+        with self._supervised_write_context():
+            for step in prepared_steps:
+                sent = self.send(step["address"], step["value"])
+                if not sent:
+                    gate["status"] = "error"
+                    gate["reason"] = "transport_send_failed"
+                    gate["failed_step"] = {"address": step["address"], "value": step["value"]}
+                    gate["rollback"] = self._rollback_supervised_steps(steps=prepared_steps)
+                    self._record_write_gate_event("error", gate)
+                    return gate
+
+        readback_steps: list[Dict[str, Any]] = []
+        mismatched_step: Optional[Dict[str, Any]] = None
+        for step in prepared_steps:
+            readback_value = self._wait_for_readback(
+                step["address"],
+                self._write_gate_readback_timeout_sec,
+                fallback_to_previous=False,
+            )
+            matched = self._numeric_values_match(
+                step["value"],
+                readback_value,
+                float(step["tolerance"]),
+            )
+            readback_steps.append(
+                {
+                    "address": step["address"],
+                    "value": readback_value,
+                    "matched": matched,
+                }
+            )
+            if mismatched_step is None and not matched:
+                mismatched_step = {
+                    "address": step["address"],
+                    "requested_value": step["value"],
+                    "readback_value": readback_value,
+                }
+
+        gate["readback_value"] = readback_steps
+        if mismatched_step is None:
+            gate["status"] = "applied"
+            gate["effective_value"] = requested_steps
+            self._write_gate_last_write_ts[(normalized_channel, str(write_kind))] = time.time()
+            self._record_write_gate_event("applied", gate)
+            return gate
+
+        gate["status"] = "error"
+        gate["reason"] = "readback_mismatch"
+        gate["failed_step"] = mismatched_step
+        gate["rollback"] = self._rollback_supervised_steps(steps=prepared_steps)
+        self.emergency_stop_writes(reason=f"readback_mismatch:{mismatched_step['address']}")
         self._record_write_gate_event("error", gate)
         return gate
 

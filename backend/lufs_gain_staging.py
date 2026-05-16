@@ -1295,9 +1295,11 @@ class SafeGainCalibrator:
         self.learning_progress: float = 0.0
 
         self.suggestions: Dict[int, Dict[str, Any]] = {}
+        self.last_apply_summary: Dict[str, Any] = {}
 
         self.on_progress_update: Optional[Callable] = None
         self.on_suggestions_ready: Optional[Callable] = None
+        self.live_apply_adapter: Optional[Callable[..., Any]] = None
 
         logger.info(f"SafeGainCalibrator initialized: target={self.target_lufs} LUFS, "
                    f"peak_limit={self.max_peak_limit} dBTP, gate={self.noise_gate_threshold} dB")
@@ -1460,6 +1462,10 @@ class SafeGainCalibrator:
 
         return self.suggestions.copy()
 
+    def get_last_apply_summary(self) -> Dict[str, Any]:
+        """Return the last SafeGain apply summary."""
+        return dict(self.last_apply_summary)
+
     def apply_corrections(self, channel_ids: Optional[List[int]] = None) -> bool:
         """
         Применение рекомендованных коррекций к микшеру.
@@ -1483,6 +1489,10 @@ class SafeGainCalibrator:
         self.state = AnalysisState.APPLYING
 
         applied_count = 0
+        dry_run_count = 0
+        blocked_count = 0
+        error_count = 0
+        channel_results: List[Dict[str, Any]] = []
         for ch_id in channels_to_apply:
             if ch_id not in self.suggestions:
                 logger.warning(f"No suggestion for channel {ch_id}, skipping")
@@ -1498,18 +1508,93 @@ class SafeGainCalibrator:
                 new_trim = current_trim + gain
 
                 new_trim = np.clip(new_trim, -24.0, 24.0)
+                live_apply_adapter = getattr(self, "live_apply_adapter", None)
+                if callable(live_apply_adapter):
+                    apply_result = live_apply_adapter(
+                        audio_channel=ch_id,
+                        mixer_channel=mixer_ch,
+                        current_trim_db=float(current_trim),
+                        target_trim_db=float(new_trim),
+                        suggested_gain_db=float(gain),
+                        context={"suggestion": dict(suggestion)},
+                    )
+                    if isinstance(apply_result, dict):
+                        result = dict(apply_result)
+                    elif apply_result is True:
+                        result = {"status": "applied"}
+                    else:
+                        result = {
+                            "status": "blocked",
+                            "reason": "live_apply_adapter_rejected",
+                        }
+                else:
+                    self.mixer_client.set_channel_gain(mixer_ch, new_trim)
+                    result = {
+                        "status": "applied",
+                        "effective_value": float(new_trim),
+                    }
 
-                self.mixer_client.set_channel_gain(mixer_ch, new_trim)
-                logger.info(f"Channel {mixer_ch}: TRIM {current_trim:.1f} -> {new_trim:.1f} dB "
-                           f"(gain={gain:+.1f}dB)")
-                applied_count += 1
+                status = str(result.get("status", "unknown"))
+                if status == "applied":
+                    applied_count += 1
+                elif status == "dry_run":
+                    dry_run_count += 1
+                elif status == "blocked":
+                    blocked_count += 1
+                else:
+                    error_count += 1
+
+                channel_result = {
+                    "audio_channel": int(ch_id),
+                    "mixer_channel": int(mixer_ch),
+                    "current_trim_db": float(current_trim),
+                    "target_trim_db": float(new_trim),
+                    "suggested_gain_db": float(gain),
+                    "status": status,
+                    "apply_result": dict(result),
+                }
+                channel_results.append(channel_result)
+
+                logger.info(
+                    "Channel %s: TRIM %.1f -> %.1f dB (gain=%+.1fdB, status=%s)",
+                    mixer_ch,
+                    current_trim,
+                    new_trim,
+                    gain,
+                    status,
+                )
 
             except Exception as e:
                 logger.error(f"Failed to apply correction to channel {mixer_ch}: {e}")
+                error_count += 1
+                channel_results.append(
+                    {
+                        "audio_channel": int(ch_id),
+                        "mixer_channel": int(mixer_ch),
+                        "status": "error",
+                        "error": str(e),
+                    }
+                )
 
         self.state = AnalysisState.IDLE
 
-        logger.info(f"Corrections applied: {applied_count}/{len(channels_to_apply)} channels")
+        self.last_apply_summary = {
+            "requested_count": len(channels_to_apply),
+            "applied_count": applied_count,
+            "dry_run_count": dry_run_count,
+            "blocked_count": blocked_count,
+            "error_count": error_count,
+            "channel_results": channel_results,
+        }
+
+        logger.info(
+            "Corrections applied: %s applied, %s dry-run, %s blocked, %s errors (requested=%s)",
+            applied_count,
+            dry_run_count,
+            blocked_count,
+            error_count,
+            len(channels_to_apply),
+        )
 
         if self.on_progress_update:
             self.on_progress_update({

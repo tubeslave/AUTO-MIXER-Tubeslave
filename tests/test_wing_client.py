@@ -439,3 +439,27 @@ class TestSupervisedWriteGate:
         assert result["readback_value"] == -6.0
         assert result["readback_source"] == "wing_osc_query"
         assert result["contract_mode"] == "supervised"
+
+    def test_apply_supervised_bundle_handles_eq_steps_with_readback(self, connected_supervised_wing_client):
+        client = connected_supervised_wing_client
+        client.configure_write_gate(allowed_kinds=["fader", "gain", "eq"])
+
+        with patch.object(client, "_wait_for_readback", side_effect=[0.0, 0.0, 2.5, 1200.0]):
+            result = client.apply_supervised_bundle(
+                channel=3,
+                write_kind="eq",
+                steps=[
+                    {"address": "/ch/3/eq/lg", "value": 2.5},
+                    {"address": "/ch/3/eq/2f", "value": 1200.0},
+                ],
+                source="test",
+                reason="approved eq change",
+                approved=True,
+                approval_id="approval-eq-live",
+            )
+
+        assert result["status"] == "applied"
+        assert result["channel"] == 3
+        assert result["write_kind"] == "eq"
+        assert result["requested_steps"][0]["address"] == "/ch/3/eq/lg"
+        assert result["readback_value"][1]["value"] == 1200.0

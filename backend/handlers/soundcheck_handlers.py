@@ -11,7 +11,11 @@ def register_handlers(server):
             data.get("channels", []),
             data.get("channel_settings", {}),
             data.get("channel_mapping", {}),
-            data.get("timings", {})
+            data.get("timings", {}),
+            live_apply_enabled=bool(data.get("live_apply_enabled", data.get("live_apply", False))),
+            confirm_live_apply=bool(data.get("confirm_live_apply", False)),
+            live_apply_reason=data.get("live_apply_reason", "auto_soundcheck_cycle"),
+            live_apply_approval_id=data.get("live_apply_approval_id"),
         )
 
     async def handle_stop_auto_soundcheck(websocket, data):

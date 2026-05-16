@@ -109,3 +109,22 @@ def test_apply_auto_balance_emits_replay_intent_and_skips_live_wing_write():
     assert record["metadata"]["scene_id"] == "scene_7"
     assert payload["readback_source"] == "console_state"
     assert payload["requires_confirmation"] is True
+
+
+def test_apply_auto_balance_uses_live_apply_adapter_when_present():
+    controller, mixer = _make_controller(-6.0)
+    controller.live_apply_adapter = MagicMock(return_value=True)
+    controller.auto_balance_result = {
+        1: {
+            "correction": 2.0,
+            "integrated_lufs": -20.0,
+            "target_lufs": -18.0,
+            "locked": False,
+            "current_fader": -6.0,
+            "target_fader": -4.0,
+        }
+    }
+
+    assert controller.apply_auto_balance() is True
+    mixer.set_channel_fader.assert_not_called()
+    controller.live_apply_adapter.assert_called_once()

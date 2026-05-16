@@ -137,6 +137,7 @@ class AutoMixerServer:
         self.auto_soundcheck_running = False
         self.auto_soundcheck_task: Optional[asyncio.Task] = None
         self.auto_soundcheck_websocket: Optional[WebSocketServerProtocol] = None
+        self._active_soundcheck_live_policy: Optional[Dict[str, Any]] = None
         
         # Auto Compressor controller
         self.auto_compressor_controller: Optional[AutoCompressorController] = None
@@ -276,6 +277,382 @@ class AutoMixerServer:
         if websocket is not None:
             await self.send_to_client(websocket, payload)
         return True
+
+    def _resolve_soundcheck_live_apply_policy(
+        self,
+        *,
+        requested_live_apply: bool,
+        confirm_live_apply: bool,
+        reason: Optional[str] = None,
+        approval_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        boundary_active = self._is_wing_deployment_write_boundary_active()
+        if not boundary_active:
+            return {
+                "boundary_active": False,
+                "dry_run_only": False,
+                "live_apply_requested": True,
+                "confirm_live_apply": True,
+                "live_apply_allowed": True,
+                "reason_text": str(reason or "auto_soundcheck_cycle"),
+                "approval_id": approval_id,
+                "mode": "legacy_live_apply",
+            }
+        live_apply_allowed = bool(requested_live_apply and confirm_live_apply)
+        return {
+            "boundary_active": True,
+            "dry_run_only": not live_apply_allowed,
+            "live_apply_requested": bool(requested_live_apply),
+            "confirm_live_apply": bool(confirm_live_apply),
+            "live_apply_allowed": live_apply_allowed,
+            "reason_text": str(reason or "auto_soundcheck_cycle"),
+            "approval_id": approval_id,
+            "mode": "supervised_live_apply" if live_apply_allowed else "dry_run",
+        }
+
+    def _soundcheck_policy_allows_live_apply(
+        self,
+        policy: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        resolved = policy or self._active_soundcheck_live_policy
+        return bool(resolved and resolved.get("live_apply_allowed"))
+
+    def _apply_soundcheck_gain_or_fader_write_sync(
+        self,
+        *,
+        channel: int,
+        value: float,
+        value_type: str,
+        source: str,
+        write_policy: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        resolved = write_policy or self._active_soundcheck_live_policy
+        if self._is_wing_deployment_write_boundary_active():
+            if not self._soundcheck_policy_allows_live_apply(resolved):
+                logger.info(
+                    "Soundcheck %s dry-run only; skipped sync live write channel=%s value=%s source=%s",
+                    value_type,
+                    channel,
+                    value,
+                    source,
+                )
+                return {
+                    "status": "dry_run",
+                    "value_type": value_type,
+                    "channel": int(channel),
+                    "requested_value": float(value),
+                    "source": source,
+                }
+            if self.mixer_client and hasattr(self.mixer_client, "apply_live_change"):
+                return self.mixer_client.apply_live_change(
+                    channel=int(channel),
+                    value=float(value),
+                    value_type=value_type,
+                    source=source,
+                    reason=(resolved or {}).get("reason_text", "auto_soundcheck_cycle"),
+                    approved=True,
+                    approval_id=(resolved or {}).get("approval_id"),
+                )
+        if value_type == "fader":
+            self.mixer_client.set_channel_fader(int(channel), float(value))
+        else:
+            self.mixer_client.set_channel_gain(int(channel), float(value))
+        return {
+            "status": "applied",
+            "value_type": value_type,
+            "channel": int(channel),
+            "requested_value": float(value),
+            "effective_value": float(value),
+            "source": source,
+        }
+
+    def _build_safe_gain_live_apply_adapter(
+        self,
+        *,
+        write_policy: Optional[Dict[str, Any]] = None,
+    ):
+        def _adapter(
+            *,
+            audio_channel: int,
+            mixer_channel: int,
+            current_trim_db: float,
+            target_trim_db: float,
+            suggested_gain_db: float,
+            context: Optional[Dict[str, Any]] = None,
+        ) -> Dict[str, Any]:
+            del audio_channel, current_trim_db, suggested_gain_db, context
+            return self._apply_soundcheck_gain_or_fader_write_sync(
+                channel=int(mixer_channel),
+                value=float(target_trim_db),
+                value_type="gain",
+                source="auto_soundcheck:gain_staging:safe_gain",
+                write_policy=write_policy,
+            )
+
+        return _adapter
+
+    def _apply_soundcheck_supervised_bundle_sync(
+        self,
+        *,
+        channel: int,
+        write_kind: str,
+        steps: List[Dict[str, Any]],
+        source: str,
+        write_policy: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        resolved = write_policy or self._active_soundcheck_live_policy
+        if self._is_wing_deployment_write_boundary_active():
+            if not self._soundcheck_policy_allows_live_apply(resolved):
+                logger.info(
+                    "Soundcheck %s dry-run only; skipped sync live bundle channel=%s source=%s steps=%s",
+                    write_kind,
+                    channel,
+                    source,
+                    len(steps),
+                )
+                return {
+                    "status": "dry_run",
+                    "write_kind": write_kind,
+                    "channel": int(channel),
+                    "requested_steps": [dict(step) for step in steps],
+                    "source": source,
+                }
+            client = self._get_wing_write_client()
+            if client is None or not hasattr(client, "apply_supervised_bundle"):
+                return {
+                    "status": "blocked",
+                    "write_kind": write_kind,
+                    "channel": int(channel),
+                    "reason": "supervised_bundle_unavailable",
+                    "requested_steps": [dict(step) for step in steps],
+                    "source": source,
+                }
+            previous_allowed_kinds = None
+            if hasattr(client, "get_write_gate_status"):
+                previous_allowed_kinds = list(client.get_write_gate_status().get("allowed_kinds") or [])
+            if hasattr(client, "configure_write_gate"):
+                client.configure_write_gate(
+                    allowed_kinds=sorted(set(previous_allowed_kinds or []) | {str(write_kind)})
+                )
+            try:
+                return client.apply_supervised_bundle(
+                    channel=int(channel),
+                    write_kind=str(write_kind),
+                    steps=[dict(step) for step in steps],
+                    source=source,
+                    reason=(resolved or {}).get("reason_text", "auto_soundcheck_cycle"),
+                    approved=True,
+                    approval_id=(resolved or {}).get("approval_id"),
+                )
+            finally:
+                if previous_allowed_kinds is not None and hasattr(client, "configure_write_gate"):
+                    client.configure_write_gate(allowed_kinds=previous_allowed_kinds)
+
+        for step in steps:
+            self.mixer_client.send(step["address"], step["value"])
+        return {
+            "status": "applied",
+            "write_kind": write_kind,
+            "channel": int(channel),
+            "requested_steps": [dict(step) for step in steps],
+            "source": source,
+        }
+
+    async def _apply_soundcheck_gain_or_fader_write(
+        self,
+        *,
+        websocket: Optional[WebSocketServerProtocol],
+        channel: int,
+        value: float,
+        value_type: str,
+        source: str,
+        write_policy: Optional[Dict[str, Any]] = None,
+        record_session: bool = False,
+    ) -> Dict[str, Any]:
+        if websocket is None:
+            return self._apply_soundcheck_gain_or_fader_write_sync(
+                channel=channel,
+                value=value,
+                value_type=value_type,
+                source=source,
+                write_policy=write_policy,
+            )
+        resolved = write_policy or self._active_soundcheck_live_policy
+        if self._is_wing_deployment_write_boundary_active():
+            if not self._soundcheck_policy_allows_live_apply(resolved):
+                logger.info(
+                    "Soundcheck %s dry-run only; skipped live write channel=%s value=%s source=%s",
+                    value_type,
+                    channel,
+                    value,
+                    source,
+                )
+                return {
+                    "status": "dry_run",
+                    "value_type": value_type,
+                    "channel": int(channel),
+                    "requested_value": float(value),
+                    "source": source,
+                }
+            return await self._apply_manual_console_write(
+                websocket,
+                channel=int(channel),
+                value=float(value),
+                value_type=value_type,
+                source=source,
+                reason=(resolved or {}).get("reason_text", "auto_soundcheck_cycle"),
+                approved=True,
+                approval_id=(resolved or {}).get("approval_id"),
+                record_session=record_session,
+            )
+
+        if value_type == "fader":
+            self.mixer_client.set_channel_fader(int(channel), float(value))
+        else:
+            self.mixer_client.set_channel_gain(int(channel), float(value))
+        return {
+            "status": "applied",
+            "value_type": value_type,
+            "channel": int(channel),
+            "requested_value": float(value),
+            "effective_value": float(value),
+            "source": source,
+        }
+
+    async def _apply_soundcheck_supervised_bundle(
+        self,
+        *,
+        channel: int,
+        write_kind: str,
+        steps: List[Dict[str, Any]],
+        source: str,
+        write_policy: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        if self._active_soundcheck_live_policy is not None:
+            return self._apply_soundcheck_supervised_bundle_sync(
+                channel=channel,
+                write_kind=write_kind,
+                steps=steps,
+                source=source,
+                write_policy=write_policy,
+            )
+        resolved = write_policy or self._active_soundcheck_live_policy
+        if self._is_wing_deployment_write_boundary_active():
+            if not self._soundcheck_policy_allows_live_apply(resolved):
+                logger.info(
+                    "Soundcheck %s dry-run only; skipped live bundle channel=%s source=%s steps=%s",
+                    write_kind,
+                    channel,
+                    source,
+                    len(steps),
+                )
+                return {
+                    "status": "dry_run",
+                    "write_kind": write_kind,
+                    "channel": int(channel),
+                    "requested_steps": [dict(step) for step in steps],
+                    "source": source,
+                }
+            client = self._get_wing_write_client()
+            if client is None or not hasattr(client, "apply_supervised_bundle"):
+                return {
+                    "status": "blocked",
+                    "write_kind": write_kind,
+                    "channel": int(channel),
+                    "reason": "supervised_bundle_unavailable",
+                    "requested_steps": [dict(step) for step in steps],
+                    "source": source,
+                }
+            previous_allowed_kinds = None
+            if hasattr(client, "get_write_gate_status"):
+                previous_allowed_kinds = list(client.get_write_gate_status().get("allowed_kinds") or [])
+            if hasattr(client, "configure_write_gate"):
+                allowed_kinds = sorted(set(previous_allowed_kinds or []) | {str(write_kind)})
+                client.configure_write_gate(allowed_kinds=allowed_kinds)
+            try:
+                return client.apply_supervised_bundle(
+                    channel=int(channel),
+                    write_kind=str(write_kind),
+                    steps=[dict(step) for step in steps],
+                    source=source,
+                    reason=(resolved or {}).get("reason_text", "auto_soundcheck_cycle"),
+                    approved=True,
+                    approval_id=(resolved or {}).get("approval_id"),
+                )
+            finally:
+                if previous_allowed_kinds is not None and hasattr(client, "configure_write_gate"):
+                    client.configure_write_gate(allowed_kinds=previous_allowed_kinds)
+
+        for step in steps:
+            self.mixer_client.send(step["address"], step["value"])
+        return {
+            "status": "applied",
+            "write_kind": write_kind,
+            "channel": int(channel),
+            "requested_steps": [dict(step) for step in steps],
+            "source": source,
+        }
+
+    def _build_soundcheck_eq_reset_steps(self, channel: int) -> List[Dict[str, Any]]:
+        return [
+            {"address": f"/ch/{channel}/eq/on", "value": 1},
+            {"address": f"/ch/{channel}/eq/lg", "value": 0.0},
+            {"address": f"/ch/{channel}/eq/1g", "value": 0.0},
+            {"address": f"/ch/{channel}/eq/2g", "value": 0.0},
+            {"address": f"/ch/{channel}/eq/3g", "value": 0.0},
+            {"address": f"/ch/{channel}/eq/4g", "value": 0.0},
+            {"address": f"/ch/{channel}/eq/hg", "value": 0.0},
+        ]
+
+    def _build_soundcheck_eq_apply_steps(self, channel: int, mixer_bands: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+        steps: List[Dict[str, Any]] = [{"address": f"/ch/{channel}/eq/on", "value": 1}]
+        for band_name, params in mixer_bands.items():
+            if band_name == "low":
+                for key in ("lg", "lf", "lq"):
+                    if params.get(key) is not None:
+                        steps.append({"address": f"/ch/{channel}/eq/{key}", "value": params[key]})
+            elif band_name == "high":
+                for key in ("hg", "hf", "hq"):
+                    if params.get(key) is not None:
+                        steps.append({"address": f"/ch/{channel}/eq/{key}", "value": params[key]})
+            elif band_name.startswith("band"):
+                band_num = int(band_name[-1])
+                for suffix in ("f", "g", "q"):
+                    key = f"{band_num}{suffix}"
+                    if params.get(key) is not None:
+                        steps.append({"address": f"/ch/{channel}/eq/{key}", "value": params[key]})
+        return steps
+
+    def _build_soundcheck_phase_steps(
+        self,
+        *,
+        channel: int,
+        delay_ms: float,
+        phase_invert: int,
+        max_delay_ms: float,
+    ) -> List[Dict[str, Any]]:
+        steps: List[Dict[str, Any]] = []
+        if abs(delay_ms) >= 0.3:
+            delay_value = max(0.5, min(float(max_delay_ms), abs(float(delay_ms))))
+            steps.extend(
+                [
+                    {"address": f"/ch/{channel}/in/set/dlymode", "value": "MS"},
+                    {"address": f"/ch/{channel}/in/set/dly", "value": delay_value},
+                    {"address": f"/ch/{channel}/in/set/dlyon", "value": 1},
+                ]
+            )
+        else:
+            steps.append({"address": f"/ch/{channel}/in/set/dlyon", "value": 0})
+        steps.append({"address": f"/ch/{channel}/in/set/inv", "value": int(phase_invert)})
+        return steps
+
+    def _build_soundcheck_phase_reset_steps(self, channel: int) -> List[Dict[str, Any]]:
+        return [
+            {"address": f"/ch/{channel}/in/set/inv", "value": 0},
+            {"address": f"/ch/{channel}/in/set/dlyon", "value": 0},
+            {"address": f"/ch/{channel}/in/set/dlymode", "value": "MS"},
+            {"address": f"/ch/{channel}/in/set/dly", "value": 0.5},
+        ]
 
     def get_manual_write_supervision_status(self) -> Dict[str, Any]:
         status = {
@@ -2251,10 +2628,11 @@ class AutoMixerServer:
     
     async def start_realtime_correction(self, device_id: str = None, channels: list = None, 
                                         channel_settings: dict = None, channel_mapping: dict = None,
-                                        mode: str = "lufs", learning_duration_sec: float = None):
+                                        mode: str = "lufs", learning_duration_sec: float = None,
+                                        write_policy: Optional[Dict[str, Any]] = None):
         """Start Safe Gain Staging calibration (новый метод: анализ → одноразовое применение)."""
         logger.info("Starting Safe Gain Staging calibration (new method)...")
-        if await self._block_quarantined_wing_write_surface(
+        if self._active_soundcheck_live_policy is None and await self._block_quarantined_wing_write_surface(
             None,
             surface="start_realtime_correction",
             result_type="gain_staging_status",
@@ -2332,6 +2710,10 @@ class AutoMixerServer:
                 sample_rate=sample_rate,
                 config=self.config
             )
+            if write_policy is not None or self._active_soundcheck_live_policy is not None:
+                self.safe_gain_calibrator.live_apply_adapter = self._build_safe_gain_live_apply_adapter(
+                    write_policy=write_policy,
+                )
             
             # Логируем значение после создания калибратора
             logger.info(f"Calibrator learning_duration after init: {self.safe_gain_calibrator.learning_duration} seconds")
@@ -2360,7 +2742,7 @@ class AutoMixerServer:
                     "type": "gain_staging_status",
                     "status_type": "safe_gain_ready",
                     "suggestions": suggestions,
-                    "message": "Analysis complete. Applying corrections..."
+                    "message": "Analysis complete. Evaluating SafeGain trim actions..."
                 }
                 loop.call_soon_threadsafe(
                     lambda msg=message: asyncio.create_task(self.broadcast(msg))
@@ -2368,13 +2750,35 @@ class AutoMixerServer:
                 # Автоматически применяем коррекции после завершения анализа
                 if self.safe_gain_calibrator:
                     applied = self.safe_gain_calibrator.apply_corrections()
+                    apply_summary = self.safe_gain_calibrator.get_last_apply_summary()
                     if applied:
                         logger.info("Safe Gain corrections applied automatically")
                         loop.call_soon_threadsafe(
-                            lambda: asyncio.create_task(self.broadcast({
+                            lambda summary=apply_summary: asyncio.create_task(self.broadcast({
                                 "type": "gain_staging_status",
                                 "status_type": "safe_gain_applied",
-                                "message": "Corrections applied successfully"
+                                "message": "Corrections applied successfully",
+                                "apply_summary": summary,
+                            }))
+                        )
+                    elif apply_summary.get("dry_run_count", 0) > 0:
+                        logger.info("Safe Gain corrections stayed in dry-run preview")
+                        loop.call_soon_threadsafe(
+                            lambda summary=apply_summary: asyncio.create_task(self.broadcast({
+                                "type": "gain_staging_status",
+                                "status_type": "safe_gain_dry_run",
+                                "message": "Analysis complete. Dry-run policy prevented live trim writes.",
+                                "apply_summary": summary,
+                            }))
+                        )
+                    elif apply_summary.get("blocked_count", 0) > 0 or apply_summary.get("error_count", 0) > 0:
+                        logger.warning("Safe Gain corrections were blocked by the live-apply gate")
+                        loop.call_soon_threadsafe(
+                            lambda summary=apply_summary: asyncio.create_task(self.broadcast({
+                                "type": "gain_staging_status",
+                                "status_type": "safe_gain_apply_blocked",
+                                "message": "Analysis complete. SafeGain trim writes were blocked.",
+                                "apply_summary": summary,
                             }))
                         )
             
@@ -2803,7 +3207,7 @@ class AutoMixerServer:
                 "failure_modes": ["exception"],
             })
     
-    async def reset_trim(self, websocket, channels: list):
+    async def reset_trim(self, websocket, channels: list, write_policy: Optional[Dict[str, Any]] = None):
         """
         Reset TRIM to 0dB for selected channels.
         
@@ -2812,7 +3216,7 @@ class AutoMixerServer:
             channels: List of channel numbers to reset (mixer channels)
         """
         logger.info(f"Resetting TRIM to 0dB for channels: {channels}")
-        if await self._block_quarantined_wing_write_surface(
+        if write_policy is None and await self._block_quarantined_wing_write_surface(
             websocket,
             surface="reset_trim",
             result_type="reset_trim_result",
@@ -2851,65 +3255,31 @@ class AutoMixerServer:
             # Set TRIM to 0 dB for all channels
             for ch in channels:
                 try:
-                    # Set TRIM to 0 dB using direct OSC command for reliability
-                    if isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                        # Use direct OSC address for TRIM
-                        address = f"/ch/{ch}/in/set/trim"
-                        logger.info(f"Channel {ch}: Sending TRIM reset to {address} = 0.0 dB")
-                        result = self.mixer_client.send(address, 0.0)
-                        
-                        if result:
-                            success_count += 1
-                            results[ch] = {
-                                "success": True,
-                                "new_trim": 0.0
-                            }
-                            logger.info(f"Channel {ch}: TRIM reset command sent successfully")
-                            
-                            # Small delay to allow mixer to process
-                            await asyncio.sleep(0.1)
-                            
-                            # Query the trim value to verify and trigger state update
-                            logger.debug(f"Channel {ch}: Requesting TRIM value update from mixer")
-                            self.mixer_client.send(f"/ch/{ch}/in/set/trim")
-                        else:
-                            # Fallback to set_channel_gain method
-                            logger.warning(f"Channel {ch}: Direct OSC failed, trying set_channel_gain method")
-                            result = self.mixer_client.set_channel_gain(ch, 0.0)
-                            if result:
-                                success_count += 1
-                                results[ch] = {
-                                    "success": True,
-                                    "new_trim": 0.0
-                                }
-                            else:
-                                failed_channels.append(ch)
-                                results[ch] = {
-                                    "success": False,
-                                    "error": "Failed to send TRIM reset command"
-                                }
-                                logger.warning(f"Channel {ch}: Failed to send TRIM reset command")
+                    result = self._apply_soundcheck_gain_or_fader_write_sync(
+                        channel=int(ch),
+                        value=0.0,
+                        value_type="gain",
+                        source="auto_soundcheck:reset:trim",
+                        write_policy=write_policy,
+                    )
+                    if result.get("status") in {"applied", "dry_run"}:
+                        success_count += 1
+                        results[ch] = {
+                            "success": True,
+                            "new_trim": 0.0,
+                            "status": result.get("status"),
+                        }
                     else:
-                        # For other mixer clients, use standard method
-                        result = self.mixer_client.set_channel_gain(ch, 0.0)
-                        if result:
-                            success_count += 1
-                            results[ch] = {
-                                "success": True,
-                                "new_trim": 0.0
-                            }
-                            logger.info(f"Channel {ch}: TRIM reset command sent successfully")
-                        else:
-                            failed_channels.append(ch)
-                            results[ch] = {
-                                "success": False,
-                                "error": "Failed to send TRIM reset command"
-                            }
-                            logger.warning(f"Channel {ch}: Failed to send TRIM reset command")
-                    
+                        failed_channels.append(ch)
+                        results[ch] = {
+                            "success": False,
+                            "error": result.get("reason", result.get("status", "unknown")),
+                        }
+                        logger.warning(f"Channel {ch}: Failed to send TRIM reset command")
+
                     # Delay between commands to allow mixer to process
-                    await asyncio.sleep(0.1)  # Increased delay for better reliability
-                    
+                    await asyncio.sleep(0.1)
+
                 except Exception as e:
                     failed_channels.append(ch)
                     results[ch] = {
@@ -3384,11 +3754,11 @@ class AutoMixerServer:
             "error": "Mixer not connected"
         })
 
-    async def reset_all_eq(self, websocket, data: dict = None):
+    async def reset_all_eq(self, websocket, data: dict = None, write_policy: Optional[Dict[str, Any]] = None):
         """Reset EQ to flat for multiple channels."""
         if data is None:
             data = {}
-        if await self._block_quarantined_wing_write_surface(
+        if write_policy is None and await self._block_quarantined_wing_write_surface(
             websocket,
             surface="reset_all_eq",
             result_type="reset_all_eq_result",
@@ -3420,21 +3790,17 @@ class AutoMixerServer:
         try:
             for channel in channels:
                 try:
-                    # Ensure EQ is enabled
-                    if hasattr(self.mixer_client, 'set_eq_on'):
-                        self.mixer_client.set_eq_on(channel, 1)
-                        await asyncio.sleep(0.05)
-                    
-                    # Reset all EQ bands to 0 dB
-                    self.mixer_client.send(f"/ch/{channel}/eq/lg", 0.0)
-                    await asyncio.sleep(0.05)
-                    
-                    for band in [1, 2, 3, 4]:
-                        self.mixer_client.send(f"/ch/{channel}/eq/{band}g", 0.0)
-                        await asyncio.sleep(0.05)
-                    
-                    self.mixer_client.send(f"/ch/{channel}/eq/hg", 0.0)
-                    reset_count += 1
+                    result = self._apply_soundcheck_supervised_bundle_sync(
+                        channel=int(channel),
+                        write_kind=WingClient.WRITE_KIND_EQ,
+                        steps=self._build_soundcheck_eq_reset_steps(int(channel)),
+                        source="auto_soundcheck:reset:eq",
+                        write_policy=write_policy,
+                    )
+                    if result.get("status") in {"applied", "dry_run"}:
+                        reset_count += 1
+                    else:
+                        raise RuntimeError(result.get("reason", result.get("status", "eq_reset_failed")))
                     logger.debug(f"Reset All EQ: Successfully reset channel {channel}")
                     
                 except Exception as e:
@@ -3548,6 +3914,16 @@ class AutoMixerServer:
                 )
             else:
                 self.multi_channel_auto_eq_controller.mixer_client = self.mixer_client
+            self.multi_channel_auto_eq_controller.live_apply_adapter = (
+                lambda *, channel, corrections, mixer_bands, context=None: (
+                    self._apply_soundcheck_supervised_bundle_sync(
+                        channel=int(channel),
+                        write_kind=WingClient.WRITE_KIND_EQ,
+                        steps=self._build_soundcheck_eq_apply_steps(int(channel), dict(mixer_bands or {})),
+                        source="auto_soundcheck:auto_eq",
+                    ).get("status") in {"applied", "dry_run"}
+                )
+            )
             
             # Get event loop for thread-safe callbacks
             loop = asyncio.get_running_loop()
@@ -3700,9 +4076,9 @@ class AutoMixerServer:
                 "error": str(e)
             })
     
-    async def apply_all_corrections(self, websocket):
+    async def apply_all_corrections(self, websocket, write_policy: Optional[Dict[str, Any]] = None):
         """Apply corrections for all channels."""
-        if await self._block_quarantined_wing_write_surface(
+        if write_policy is None and await self._block_quarantined_wing_write_surface(
             websocket,
             surface="apply_all_corrections",
             result_type="multi_channel_apply_result",
@@ -3789,6 +4165,31 @@ class AutoMixerServer:
                 self.phase_alignment_controller.mixer_client = self.mixer_client
                 # Update settings for future analyzer instances
                 self.phase_alignment_controller.settings = settings
+            self.phase_alignment_controller.live_apply_adapter = (
+                lambda *, channel, delay_ms, phase_invert, coherence, max_delay_ms, context=None: (
+                    self._apply_soundcheck_supervised_bundle_sync(
+                        channel=int(channel),
+                        write_kind=WingClient.WRITE_KIND_PHASE_DELAY,
+                        steps=self._build_soundcheck_phase_steps(
+                            channel=int(channel),
+                            delay_ms=float(delay_ms),
+                            phase_invert=int(phase_invert),
+                            max_delay_ms=float(max_delay_ms),
+                        ),
+                        source="auto_soundcheck:phase_alignment",
+                    ).get("status") in {"applied", "dry_run"}
+                )
+            )
+            self.phase_alignment_controller.reset_live_apply_adapter = (
+                lambda *, channel, context=None: (
+                    self._apply_soundcheck_supervised_bundle_sync(
+                        channel=int(channel),
+                        write_kind=WingClient.WRITE_KIND_PHASE_DELAY,
+                        steps=self._build_soundcheck_phase_reset_steps(int(channel)),
+                        source="auto_soundcheck:reset:phase_delay",
+                    ).get("status") in {"applied", "dry_run"}
+                )
+            )
             
             # Get event loop for thread-safe callbacks
             loop = asyncio.get_running_loop()
@@ -3961,10 +4362,10 @@ class AutoMixerServer:
             # Применяем коррекции
             await self.apply_phase_corrections(websocket, measurements_serializable)
     
-    async def apply_phase_corrections(self, websocket, measurements: dict = None):
+    async def apply_phase_corrections(self, websocket, measurements: dict = None, write_policy: Optional[Dict[str, Any]] = None):
         """Apply phase/delay corrections to mixer."""
         logger.info(f"apply_phase_corrections called. Measurements type: {type(measurements)}, value: {measurements}")
-        if await self._block_quarantined_wing_write_surface(
+        if write_policy is None and await self._block_quarantined_wing_write_surface(
             websocket,
             surface="apply_phase_corrections",
             result_type="phase_alignment_apply_result",
@@ -3992,7 +4393,7 @@ class AutoMixerServer:
                 return
             # Применяем напрямую через mixer_client
             try:
-                success = await self._apply_phase_corrections_direct(measurements)
+                success = await self._apply_phase_corrections_direct(measurements, write_policy=write_policy)
                 await self.broadcast({
                     "type": "phase_alignment_apply_result",
                     "success": success,
@@ -4059,7 +4460,7 @@ class AutoMixerServer:
                 "error": f"Error: {str(e)}"
             })
     
-    async def _apply_phase_corrections_direct(self, measurements: dict):
+    async def _apply_phase_corrections_direct(self, measurements: dict, write_policy: Optional[Dict[str, Any]] = None):
         """Apply phase/delay corrections directly through mixer client."""
         import re
         applied_count = 0
@@ -4103,31 +4504,32 @@ class AutoMixerServer:
                 logger.info(f"Channel {ch}: Negligible delay ({delay_ms:.2f}ms) with good coherence - skipping delay")
                 delay_ms = 0.0
             
-            # Применение задержки только если она значительная
-            if abs(delay_ms) >= 0.3:
-                # Получаем max_delay_ms из контроллера если он есть
-                max_delay = 10.0  # Default 10ms - musically acceptable
-                if self.phase_alignment_controller:
-                    max_delay = getattr(self.phase_alignment_controller, 'max_delay_ms', 10.0)
-                delay_value = max(0.5, min(max_delay, abs(delay_ms)))
-                self.mixer_client.set_channel_delay(ch, delay_value, mode="MS")
-                logger.info(f"Channel {ch}: Applied delay {delay_value:.2f} ms (clamped to max {max_delay}ms)")
+            max_delay = 10.0
+            if self.phase_alignment_controller:
+                max_delay = getattr(self.phase_alignment_controller, 'max_delay_ms', 10.0)
+            result = self._apply_soundcheck_supervised_bundle_sync(
+                channel=int(ch),
+                write_kind=WingClient.WRITE_KIND_PHASE_DELAY,
+                steps=self._build_soundcheck_phase_steps(
+                    channel=int(ch),
+                    delay_ms=float(delay_ms),
+                    phase_invert=int(phase_invert),
+                    max_delay_ms=float(max_delay),
+                ),
+                source="auto_soundcheck:phase_alignment",
+                write_policy=write_policy,
+            )
+            if result.get("status") in {"applied", "dry_run"}:
+                applied_count += 1
             else:
-                self.mixer_client.send(f"/ch/{ch}/in/set/dlyon", 0)
-                logger.info(f"Channel {ch}: Delay disabled (too small or unnecessary)")
-            
-            # Применение инверсии фазы
-            self.mixer_client.set_channel_phase_invert(ch, phase_invert)
-            logger.info(f"Channel {ch}: Phase invert set to {phase_invert}")
-            
-            applied_count += 1
+                logger.warning(f"Channel {ch}: phase/delay apply blocked: {result}")
         
         logger.info(f"Applied corrections directly to {applied_count} channels")
         return applied_count > 0
     
-    async def reset_phase_delay(self, websocket, channels: List[int] = None):
+    async def reset_phase_delay(self, websocket, channels: List[int] = None, write_policy: Optional[Dict[str, Any]] = None):
         """Reset and disable all phase inversions and delays on specified channels."""
-        if await self._block_quarantined_wing_write_surface(
+        if write_policy is None and await self._block_quarantined_wing_write_surface(
             websocket,
             surface="reset_phase_delay",
             result_type="phase_alignment_reset_result",
@@ -4157,7 +4559,7 @@ class AutoMixerServer:
                 success = self.phase_alignment_controller.reset_all_phase_delay(channels)
             else:
                 # Иначе сбрасываем напрямую через mixer_client
-                success = await self._reset_phase_delay_direct(channels)
+                success = await self._reset_phase_delay_direct(channels, write_policy=write_policy)
             
             await self.broadcast({
                 "type": "phase_alignment_reset_result",
@@ -4173,23 +4575,23 @@ class AutoMixerServer:
                 "error": str(e)
             })
     
-    async def _reset_phase_delay_direct(self, channels: List[int]):
+    async def _reset_phase_delay_direct(self, channels: List[int], write_policy: Optional[Dict[str, Any]] = None):
         """Reset phase and delay directly through mixer client."""
         reset_count = 0
         
         for ch in channels:
             try:
-                # Сброс инверсии фазы (0 = нормальная фаза)
-                self.mixer_client.set_channel_phase_invert(ch, 0)
-                
-                # Отключение задержки
-                self.mixer_client.send(f"/ch/{ch}/in/set/dlyon", 0)
-                
-                # Сброс значения задержки на минимальное
-                self.mixer_client.send(f"/ch/{ch}/in/set/dlymode", "MS")
-                self.mixer_client.send(f"/ch/{ch}/in/set/dly", 0.5)  # Минимальное значение
-                
-                reset_count += 1
+                result = self._apply_soundcheck_supervised_bundle_sync(
+                    channel=int(ch),
+                    write_kind=WingClient.WRITE_KIND_PHASE_DELAY,
+                    steps=self._build_soundcheck_phase_reset_steps(int(ch)),
+                    source="auto_soundcheck:reset:phase_delay",
+                    write_policy=write_policy,
+                )
+                if result.get("status") in {"applied", "dry_run"}:
+                    reset_count += 1
+                else:
+                    raise RuntimeError(result.get("reason", result.get("status", "phase_reset_failed")))
                 logger.info(f"Channel {ch}: Reset phase and delay (direct)")
                 
             except Exception as e:
@@ -4342,6 +4744,17 @@ class AutoMixerServer:
                 sample_rate=48000,
                 config=self.config,
                 bleed_service=self.bleed_service
+            )
+            self.auto_fader_controller.live_apply_adapter = (
+                lambda *, audio_channel, mixer_channel, current_db, target_db, correction_db,
+                readback_valid, readback_source, instrument_type=None, context=None: (
+                    self._apply_soundcheck_gain_or_fader_write_sync(
+                        channel=int(mixer_channel),
+                        value=float(target_db),
+                        value_type="fader",
+                        source="auto_soundcheck:auto_balance",
+                    ).get("status") in {"applied", "dry_run"}
+                )
             )
             
             # Apply settings
@@ -4528,6 +4941,17 @@ class AutoMixerServer:
                 config=self.config,
                 bleed_service=self.bleed_service
             )
+            self.auto_fader_controller.live_apply_adapter = (
+                lambda *, audio_channel, mixer_channel, current_db, target_db, correction_db,
+                readback_valid, readback_source, instrument_type=None, context=None: (
+                    self._apply_soundcheck_gain_or_fader_write_sync(
+                        channel=int(mixer_channel),
+                        value=float(target_db),
+                        value_type="fader",
+                        source="auto_soundcheck:auto_balance",
+                    ).get("status") in {"applied", "dry_run"}
+                )
+            )
             
             # Set up callbacks
             loop = asyncio.get_running_loop()
@@ -4645,7 +5069,7 @@ class AutoMixerServer:
     async def apply_auto_balance(self, websocket):
         """Apply Auto Balance results to mixer."""
         logger.info("Applying Auto Balance")
-        if await self._block_quarantined_wing_write_surface(
+        if self._active_soundcheck_live_policy is None and await self._block_quarantined_wing_write_surface(
             websocket,
             surface="apply_auto_balance",
             result_type="auto_fader_status",
@@ -4892,7 +5316,7 @@ class AutoMixerServer:
 
     # ========== Auto Soundcheck Methods ==========
     
-    async def reset_all_functions_to_defaults(self, websocket, channels: List[int]):
+    async def reset_all_functions_to_defaults(self, websocket, channels: List[int], write_policy: Optional[Dict[str, Any]] = None):
         """Reset all functions to default state for selected channels."""
         logger.info(f"Resetting all functions to defaults for channels: {channels}")
         
@@ -4953,7 +5377,7 @@ class AutoMixerServer:
             # Reset TRIM to 0dB (with timeout and error handling)
             logger.info("Resetting TRIM to 0dB...")
             try:
-                await asyncio.wait_for(self.reset_trim(websocket, channels), timeout=15.0)
+                await asyncio.wait_for(self.reset_trim(websocket, channels, write_policy=write_policy), timeout=15.0)
                 logger.info("TRIM reset completed")
             except asyncio.TimeoutError:
                 logger.warning("TRIM reset timed out after 15s, continuing...")
@@ -4970,8 +5394,19 @@ class AutoMixerServer:
                     # Reset all 40 channels
                     for ch in range(1, 41):
                         try:
-                            self.mixer_client.set_channel_fader(ch, 0.0)
-                            reset_count += 1
+                            result = await self._apply_soundcheck_gain_or_fader_write(
+                                websocket=None,
+                                channel=ch,
+                                value=0.0,
+                                value_type="fader",
+                                source="auto_soundcheck:reset:fader",
+                                write_policy=write_policy,
+                                record_session=False,
+                            )
+                            if result.get("status") in {"applied", "dry_run"}:
+                                reset_count += 1
+                            else:
+                                errors.append(f"Channel {ch}: {result.get('reason', result.get('status', 'unknown'))}")
                             await asyncio.sleep(0.02)  # Small delay between channels
                         except Exception as e:
                             errors.append(f"Channel {ch}: {str(e)}")
@@ -4989,7 +5424,10 @@ class AutoMixerServer:
             # Reset EQ to flat (with timeout)
             logger.info("Resetting EQ to flat...")
             try:
-                await asyncio.wait_for(self.reset_all_eq(websocket, {"channels": channels}), timeout=15.0)
+                await asyncio.wait_for(
+                    self.reset_all_eq(websocket, {"channels": channels}, write_policy=write_policy),
+                    timeout=15.0,
+                )
                 logger.info("EQ reset completed")
             except asyncio.TimeoutError:
                 logger.warning("EQ reset timed out after 15s, continuing...")
@@ -5000,7 +5438,10 @@ class AutoMixerServer:
             # Reset phase/delay (with timeout)
             logger.info("Resetting phase/delay...")
             try:
-                await asyncio.wait_for(self.reset_phase_delay(websocket, channels), timeout=15.0)
+                await asyncio.wait_for(
+                    self.reset_phase_delay(websocket, channels, write_policy=write_policy),
+                    timeout=15.0,
+                )
                 logger.info("Phase/delay reset completed")
             except asyncio.TimeoutError:
                 logger.warning("Phase/delay reset timed out after 15s, continuing...")
@@ -5018,7 +5459,9 @@ class AutoMixerServer:
     
     async def start_auto_soundcheck(self, websocket, device_id: str = None, channels: list = None,
                                     channel_settings: dict = None, channel_mapping: dict = None,
-                                    timings: dict = None):
+                                    timings: dict = None, *, live_apply_enabled: bool = False,
+                                    confirm_live_apply: bool = False, live_apply_reason: str = "auto_soundcheck_cycle",
+                                    live_apply_approval_id: str = None):
         """Start automatic soundcheck cycle."""
         logger.info("=" * 60)
         logger.info("RECEIVED start_auto_soundcheck MESSAGE")
@@ -5026,14 +5469,12 @@ class AutoMixerServer:
         logger.info(f"channels: {channels}")
         logger.info(f"timings: {timings}")
         logger.info("=" * 60)
-        if await self._block_quarantined_wing_write_surface(
-            websocket,
-            surface="start_auto_soundcheck",
-            result_type="auto_soundcheck_status",
-            request={"device_id": device_id, "channels": channels or [], "timings": timings or {}},
-            extra={"is_running": False},
-        ):
-            return
+        soundcheck_write_policy = self._resolve_soundcheck_live_apply_policy(
+            requested_live_apply=bool(live_apply_enabled),
+            confirm_live_apply=bool(confirm_live_apply),
+            reason=live_apply_reason,
+            approval_id=live_apply_approval_id,
+        )
         
         if self.auto_soundcheck_running:
             logger.warning("Auto soundcheck is already running")
@@ -5096,9 +5537,17 @@ class AutoMixerServer:
         
         self.auto_soundcheck_running = True
         self.auto_soundcheck_websocket = websocket
+        self._active_soundcheck_live_policy = dict(soundcheck_write_policy)
         
         # Send initial status immediately before starting task
-        await self._send_soundcheck_status(websocket, None, 0, 0, "Soundcheck cycle starting...")
+        await self._send_soundcheck_status(
+            websocket,
+            None,
+            0,
+            0,
+            "Soundcheck cycle starting...",
+            live_apply_policy=soundcheck_write_policy,
+        )
         await asyncio.sleep(0.05)  # Small delay to ensure message is sent
         
         # Start the cycle in a background task
@@ -5106,18 +5555,26 @@ class AutoMixerServer:
         try:
             self.auto_soundcheck_task = asyncio.create_task(
                 self._run_auto_soundcheck_cycle(websocket, device_id, channels, channel_settings, 
-                                               channel_mapping, timings)
+                                               channel_mapping, timings, soundcheck_write_policy)
             )
             logger.info("Auto soundcheck cycle task created successfully")
             
             # Send status that cycle has started
-            await self._send_soundcheck_status(websocket, None, 5, 0, "Soundcheck cycle initialized, starting reset...")
+            await self._send_soundcheck_status(
+                websocket,
+                None,
+                5,
+                0,
+                "Soundcheck cycle initialized, starting reset...",
+                live_apply_policy=soundcheck_write_policy,
+            )
             
         except Exception as e:
             logger.error(f"Error creating auto soundcheck task: {e}", exc_info=True)
             import traceback
             logger.error(traceback.format_exc())
             self.auto_soundcheck_running = False
+            self._active_soundcheck_live_policy = None
             await self.send_to_client(websocket, {
                 "type": "auto_soundcheck_status",
                 "is_running": False,
@@ -5136,6 +5593,7 @@ class AutoMixerServer:
         
         logger.info("Stopping auto soundcheck cycle...")
         self.auto_soundcheck_running = False
+        self._active_soundcheck_live_policy = None
         
         # Cancel the task
         if self.auto_soundcheck_task:
@@ -5418,7 +5876,8 @@ class AutoMixerServer:
         await self.broadcast({"type": "auto_compressor_status", "manual_applied": ch})
     
     async def _run_auto_soundcheck_cycle(self, websocket, device_id: str, channels: list,
-                                         channel_settings: dict, channel_mapping: dict, timings: dict):
+                                         channel_settings: dict, channel_mapping: dict, timings: dict,
+                                         soundcheck_write_policy: Optional[Dict[str, Any]] = None):
         """Execute the full auto soundcheck cycle."""
         try:
             logger.info("=" * 60)
@@ -5447,7 +5906,7 @@ class AutoMixerServer:
                 await self._send_soundcheck_status(websocket, "reset", 50, 0, "Resetting TRIM, EQ, Phase...")
                 await asyncio.sleep(0.1)
                 
-                await self.reset_all_functions_to_defaults(websocket, channels)
+                await self.reset_all_functions_to_defaults(websocket, channels, write_policy=soundcheck_write_policy)
                 reset_completed = True
                 logger.info("Step 1 completed: Reset successful")
             except Exception as e:
@@ -5507,7 +5966,13 @@ class AutoMixerServer:
             logger.info(f"Before start_realtime_correction: mixer_client={self.mixer_client is not None}, mixer_connected={self.mixer_client.is_connected if self.mixer_client else False}")
             
             try:
-                await self.start_realtime_correction(device_id, channels, channel_settings, channel_mapping)
+                await self.start_realtime_correction(
+                    device_id,
+                    channels,
+                    channel_settings,
+                    channel_mapping,
+                    write_policy=soundcheck_write_policy,
+                )
                 logger.info("start_realtime_correction completed successfully")
                 logger.info(f"After start_realtime_correction: gain_staging={self.gain_staging is not None}, is_active={self.gain_staging.is_active if self.gain_staging else False}, is_audio_stream_active={self.gain_staging.is_audio_stream_active if self.gain_staging else False}")
             except Exception as e:
@@ -5652,7 +6117,7 @@ class AutoMixerServer:
             # Apply EQ corrections
             logger.info("Applying AUTO EQ corrections...")
             try:
-                await self.apply_all_corrections(websocket)
+                await self.apply_all_corrections(websocket, write_policy=soundcheck_write_policy)
                 logger.info("AUTO EQ corrections applied successfully")
             except Exception as e:
                 logger.error(f"Error applying AUTO EQ corrections: {e}", exc_info=True)
@@ -5700,7 +6165,15 @@ class AutoMixerServer:
             await asyncio.sleep(1)
             
             # Complete
-            await self._send_soundcheck_status(websocket, None, 100, 0, "Soundcheck cycle complete!", complete=True)
+            await self._send_soundcheck_status(
+                websocket,
+                None,
+                100,
+                0,
+                "Soundcheck cycle complete!",
+                complete=True,
+                live_apply_policy=soundcheck_write_policy,
+            )
             
         except asyncio.CancelledError:
             logger.info("Auto soundcheck cycle cancelled")
@@ -5713,6 +6186,7 @@ class AutoMixerServer:
         finally:
             logger.info("Auto soundcheck cycle finished, cleaning up...")
             self.auto_soundcheck_running = False
+            self._active_soundcheck_live_policy = None
             self.auto_soundcheck_task = None
             self.auto_soundcheck_websocket = None
     
@@ -5736,7 +6210,8 @@ class AutoMixerServer:
     
     async def _send_soundcheck_status(self, websocket, current_step: str = None, 
                                      step_progress: float = 0, step_time_remaining: float = 0,
-                                     message: str = "", error: str = None, complete: bool = False):
+                                     message: str = "", error: str = None, complete: bool = False,
+                                     live_apply_policy: Optional[Dict[str, Any]] = None):
         """Send auto soundcheck status update."""
         try:
             if websocket is None:
@@ -5753,6 +6228,8 @@ class AutoMixerServer:
                 "error": error,
                 "complete": complete
             }
+            if live_apply_policy is not None:
+                status_data["live_apply_policy"] = dict(live_apply_policy)
             
             logger.debug(f"Sending soundcheck status: step={current_step}, progress={step_progress:.1f}%, message={message}")
             await self.send_to_client(websocket, status_data)

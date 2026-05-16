@@ -2482,11 +2482,31 @@ class AutoEQController:
             return False
         
         try:
-            # Enable EQ
-            self.mixer_client.set_eq_on(self.current_channel, 1)
-            
             # Map corrections to mixer bands
             mixer_bands = self.corrector.map_to_mixer_bands(corrections)
+
+            live_apply_adapter = getattr(self, "live_apply_adapter", None)
+            if callable(live_apply_adapter):
+                handled = live_apply_adapter(
+                    channel=int(self.current_channel),
+                    corrections=list(corrections),
+                    mixer_bands=dict(mixer_bands),
+                    context={
+                        "controller": "single_channel_auto_eq",
+                        "profile": self.current_profile.name if self.current_profile else None,
+                    },
+                )
+                if handled is not None:
+                    if handled:
+                        self.applied_corrections_history.append(corrections.copy())
+                        if len(self.applied_corrections_history) > 10:
+                            self.applied_corrections_history.pop(0)
+                        logger.info(f"Applied EQ corrections to channel {self.current_channel} via live-apply adapter")
+                        self._notify_status('applied', f'EQ applied to channel {self.current_channel}')
+                    return bool(handled)
+
+            # Enable EQ
+            self.mixer_client.set_eq_on(self.current_channel, 1)
             
             # Apply each band
             for band_name, params in mixer_bands.items():
@@ -3008,22 +3028,41 @@ class MultiChannelAutoEQController:
         if channel not in self.active_channels:
             logger.warning(f"Channel {channel} not found in active channels")
             return False
+        channel_state = self.active_channels[channel]
+        profile = channel_state.get('profile')
         
         if not self.mixer_client or not self.mixer_client.is_connected:
             logger.warning("Mixer not connected")
             return False
         
-        corrections = self.active_channels[channel].get('corrections', [])
+        corrections = channel_state.get('corrections', [])
         if not corrections:
             logger.debug(f"No corrections to apply for channel {channel} (signal may be too quiet or already matches target)")
             return False
         
         try:
-            # Enable EQ
-            self.mixer_client.set_eq_on(channel, 1)
-            
             # Map corrections to mixer bands
             mixer_bands = self.corrector.map_to_mixer_bands(corrections)
+
+            live_apply_adapter = getattr(self, "live_apply_adapter", None)
+            if callable(live_apply_adapter):
+                handled = live_apply_adapter(
+                    channel=int(channel),
+                    corrections=list(corrections),
+                    mixer_bands=dict(mixer_bands),
+                    context={
+                        "controller": "multi_channel_auto_eq",
+                        "mode": channel_state.get("mode"),
+                        "profile": profile.name if profile else None,
+                    },
+                )
+                if handled is not None:
+                    if handled:
+                        logger.info(f"Applied EQ corrections to channel {channel} via live-apply adapter")
+                    return bool(handled)
+
+            # Enable EQ
+            self.mixer_client.set_eq_on(channel, 1)
             
             # Apply each band
             for band_name, params in mixer_bands.items():

@@ -2065,6 +2065,32 @@ class AutoFaderController:
                         f"(channel={state.mixer_channel}, correlation={intent['replay_correlation_id']})"
                     )
                     continue
+                live_apply_adapter = getattr(self, "live_apply_adapter", None)
+                if callable(live_apply_adapter):
+                    handled = live_apply_adapter(
+                        audio_channel=int(audio_ch),
+                        mixer_channel=int(state.mixer_channel),
+                        current_db=float(current_db),
+                        target_db=float(new_db),
+                        correction_db=float(correction),
+                        readback_valid=bool(readback_valid),
+                        readback_source=readback_source,
+                        instrument_type=state.instrument_type,
+                        context={
+                            'pass_number': int(self.auto_balance_pass),
+                        },
+                    )
+                    if handled is not None:
+                        if handled:
+                            state.current_fader = new_db
+                            applied_count += 1
+                            applied_details[int(audio_ch)] = {
+                                'mixer_channel': int(state.mixer_channel),
+                                'previous_db': float(current_db),
+                                'new_db': float(new_db),
+                                'applied_correction': float(correction)
+                            }
+                        continue
                 self.mixer_client.set_channel_fader(state.mixer_channel, new_db)
                 
                 state.current_fader = new_db

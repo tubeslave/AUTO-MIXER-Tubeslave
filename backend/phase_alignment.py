@@ -817,6 +817,24 @@ class PhaseAlignmentController:
                 'delay_ms': delay_ms,
                 'phase_invert': phase_invert
             }
+
+            live_apply_adapter = getattr(self, "live_apply_adapter", None)
+            if callable(live_apply_adapter):
+                handled = live_apply_adapter(
+                    channel=int(ch),
+                    delay_ms=float(delay_ms),
+                    phase_invert=int(phase_invert),
+                    coherence=float(coherence),
+                    max_delay_ms=float(getattr(self, 'max_delay_ms', 10.0)),
+                    context={
+                        "reference_channel": self.reference_channel,
+                        "measurements_key": pair_key,
+                    },
+                )
+                if handled is not None:
+                    if handled:
+                        applied_count += 1
+                    continue
             
             # Применение задержки только если она значительная
             if abs(delay_ms) >= 0.3:  # Минимальный порог 0.3ms (musically significant)
@@ -875,6 +893,21 @@ class PhaseAlignmentController:
         
         for ch in channels:
             try:
+                reset_adapter = getattr(self, "reset_live_apply_adapter", None)
+                if callable(reset_adapter):
+                    handled = reset_adapter(
+                        channel=int(ch),
+                        context={
+                            "reference_channel": self.reference_channel,
+                        },
+                    )
+                    if handled is not None:
+                        if handled:
+                            if ch in self.corrections:
+                                del self.corrections[ch]
+                            reset_count += 1
+                        continue
+
                 # Сброс инверсии фазы (0 = нормальная фаза)
                 self.mixer_client.set_channel_phase_invert(ch, 0)
                 

@@ -220,12 +220,14 @@ class DummyWingLike:
         self.supervised_set_channel_gain = MagicMock(side_effect=self._supervised_gain)
         self.load_snap = MagicMock(return_value=True)
         self.save_snap = MagicMock(return_value=True)
-        self.configure_write_gate = MagicMock()
+        self.configure_write_gate = MagicMock(side_effect=self._configure_gate)
         self._gate_state = "disarmed"
+        self._allowed_kinds = ["fader", "gain"]
         self.arm_write_gate = MagicMock(side_effect=self._arm_gate)
         self.disarm_write_gate = MagicMock(side_effect=self._disarm_gate)
         self.emergency_stop_writes = MagicMock(side_effect=self._emergency_stop_gate)
         self.get_write_gate_status = MagicMock(side_effect=self._get_gate_status)
+        self.apply_supervised_bundle = MagicMock(side_effect=self._apply_supervised_bundle)
         self.send = MagicMock()
         self.is_connected = True
         self.get_channel_fader = MagicMock(return_value=0.0)
@@ -269,7 +271,23 @@ class DummyWingLike:
         return {"state": self._gate_state}
 
     def _get_gate_status(self):
-        return {"state": self._gate_state}
+        return {"state": self._gate_state, "allowed_kinds": list(self._allowed_kinds)}
+
+    def _configure_gate(self, **kwargs):
+        allowed_kinds = kwargs.get("allowed_kinds")
+        if allowed_kinds is not None:
+            self._allowed_kinds = list(allowed_kinds)
+        return self._get_gate_status()
+
+    def _apply_supervised_bundle(self, channel, write_kind, steps, **kwargs):
+        return {
+            "status": "applied",
+            "channel": channel,
+            "write_kind": write_kind,
+            "requested_steps": list(steps),
+            "readback_value": list(steps),
+            **kwargs,
+        }
 
     def apply_live_change(self, **kwargs):
         value_type = kwargs["value_type"]
@@ -311,6 +329,35 @@ def dummy_wing_server(patch_wing_type_for_isinstance):
     server._manual_writes_armed = True
     server._manual_write_cooldown_sec = 0.0
     return server
+
+
+def test_build_safe_gain_live_apply_adapter_routes_trim_through_soundcheck_gate(dummy_wing_server):
+    server = dummy_wing_server
+    policy = {"live_apply_allowed": True, "reason_text": "operator_confirmed"}
+
+    with patch.object(
+        server,
+        "_apply_soundcheck_gain_or_fader_write_sync",
+        return_value={"status": "applied", "effective_value": 2.5},
+    ) as apply_sync:
+        adapter = server._build_safe_gain_live_apply_adapter(write_policy=policy)
+        result = adapter(
+            audio_channel=3,
+            mixer_channel=12,
+            current_trim_db=1.0,
+            target_trim_db=2.5,
+            suggested_gain_db=1.5,
+            context={"suggestion": {"suggested_gain_db": 1.5}},
+        )
+
+    assert result["status"] == "applied"
+    apply_sync.assert_called_once_with(
+        channel=12,
+        value=2.5,
+        value_type="gain",
+        source="auto_soundcheck:gain_staging:safe_gain",
+        write_policy=policy,
+    )
 
 
 @pytest.fixture
@@ -926,3 +973,68 @@ class TestWingDeploymentWriteBoundary:
         assert normalized["apply_mode"] == "confirm"
         assert normalized["requires_confirmation"] is True
         assert normalized["mode"] == "live"
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_start_auto_soundcheck_defaults_wing_cycle_to_dry_run_policy(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        with patch.object(server, "_run_auto_soundcheck_cycle", new=AsyncMock(return_value=None)) as run_cycle:
+            await server.start_auto_soundcheck(
+                websocket,
+                device_id="1",
+                channels=[1, 2],
+                channel_settings={},
+                channel_mapping={},
+                timings={"gain_staging": 1, "phase_alignment": 1, "auto_eq": 1, "auto_fader": 1},
+            )
+            await server.auto_soundcheck_task
+
+        policy = run_cycle.await_args.args[-1]
+        payload = self._decode_last_message(websocket)
+
+        assert policy["dry_run_only"] is True
+        assert policy["live_apply_allowed"] is False
+        assert payload["type"] == "auto_soundcheck_status"
+        assert payload["live_apply_policy"]["mode"] == "dry_run"
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_start_auto_soundcheck_accepts_confirmed_live_apply_policy(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        with patch.object(server, "_run_auto_soundcheck_cycle", new=AsyncMock(return_value=None)) as run_cycle:
+            await server.start_auto_soundcheck(
+                websocket,
+                device_id="1",
+                channels=[1, 2],
+                channel_settings={},
+                channel_mapping={},
+                timings={"gain_staging": 1, "phase_alignment": 1, "auto_eq": 1, "auto_fader": 1},
+                live_apply_enabled=True,
+                confirm_live_apply=True,
+                live_apply_reason="operator_confirmed",
+            )
+            await server.auto_soundcheck_task
+
+        policy = run_cycle.await_args.args[-1]
+
+        assert policy["dry_run_only"] is False
+        assert policy["live_apply_allowed"] is True
+        assert policy["reason_text"] == "operator_confirmed"
