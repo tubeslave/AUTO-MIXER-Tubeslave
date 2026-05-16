@@ -4,6 +4,10 @@
 
 Watchdog не подключается к WING RACK, не запускает audio capture и не меняет production-код Automixer. Он только читает Paperclip API и, после явного отключения dry-run, создает Paperclip issue.
 
+Политика ролей и обязательного `knowledge_context` для Director/GPT/Codex
+описана в `Docs/PAPERCLIP_DIRECTOR_WORKFLOW.md`. Watchdog не заменяет Director
+и не должен формулировать новые задачи вместо него.
+
 ## Настройка env
 
 Скопируй пример:

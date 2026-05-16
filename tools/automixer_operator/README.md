@@ -27,6 +27,13 @@ The detailed iPhone operating contract is in:
 tools/automixer_operator/IPHONE_CODEX_RUNBOOK.md
 ```
 
+Director-side issue formulation rules, including mandatory `knowledge_context`
+review and TUB task structure, are defined in:
+
+```text
+Docs/PAPERCLIP_DIRECTOR_WORKFLOW.md
+```
+
 ## Status
 
 ```bash
@@ -258,6 +265,9 @@ This operator intentionally has no executable command for:
 - commit/push;
 - issue status changes;
 - `POST`, `PATCH`, `DELETE`, or `PUT` routes.
+
+Any workflow that escalates beyond these read-only operator limits must use the
+mode and approval rules from `Docs/PAPERCLIP_DIRECTOR_WORKFLOW.md`.
 
 The only future-approved write remains the separate approval command printed by `approve-template` or `preview`, and it must be run manually by the operator.
 

@@ -17,6 +17,10 @@ The knowledge endpoints expose the local ChromaDB project index in read-only
 mode for GPT usage. Search results include source path, category, metadata, and
 short document chunks from the local Automixer vector index.
 
+Director-side task creation and reformulation must follow the checked-in
+workflow in `Docs/PAPERCLIP_DIRECTOR_WORKFLOW.md`, including mandatory
+`knowledge_context` review before drafting a TUB task.
+
 ## Environment
 
 ```bash
@@ -54,3 +58,5 @@ curl -s 'http://127.0.0.1:8788/v1/knowledge/automixer/search?q=WING%20rollback&l
 - write methods return `405`
 - non-loopback bind hosts are rejected
 - no secrets are required or stored by this bridge
+- live WING/OSC execution remains outside this bridge and still requires
+  separate explicit approval from Dmitry

@@ -14,6 +14,13 @@ bridge-start -> doctor -> status -> target -> next -> cycle -> report review -> 
 
 No step after `approve-template` is automatic.
 
+When Codex or Director creates or rewrites a TUB issue, it must first read the
+available `knowledge_context` and follow:
+
+```text
+Docs/PAPERCLIP_DIRECTOR_WORKFLOW.md
+```
+
 ## User Phrases
 
 When the user says:
