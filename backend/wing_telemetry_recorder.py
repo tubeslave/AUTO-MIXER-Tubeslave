@@ -35,11 +35,13 @@ class WingTelemetryRecorder:
         session_label: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         clock: Optional[callable] = None,
+        memory_store: Any = None,
     ):
         self._base_dir = Path(base_dir)
         self._session_label = session_label or "wing_session"
         self._metadata = dict(metadata or {})
         self._clock = clock or time.time
+        self._memory_store = memory_store
         self._lock = threading.Lock()
 
         session_stamp = time.strftime("%Y%m%d_%H%M%S", time.gmtime(self._clock()))
@@ -70,6 +72,7 @@ class WingTelemetryRecorder:
             self._write_metadata_locked()
 
         logger.info("Started WING telemetry capture: %s", self.session_dir)
+        self._record_memory_event("started")
         return self.get_status()
 
     def stop(self, reason: str = "") -> Dict[str, Any]:
@@ -85,6 +88,7 @@ class WingTelemetryRecorder:
             self._write_metadata_locked()
 
         logger.info("Stopped WING telemetry capture: %s", self.session_dir)
+        self._record_memory_event("stopped")
         return self.get_status()
 
     def record_event(
@@ -157,3 +161,15 @@ class WingTelemetryRecorder:
         }
         with self.metadata_path.open("w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, sort_keys=True)
+
+    def _record_memory_event(self, phase: str) -> None:
+        if self._memory_store is None:
+            return
+        try:
+            self._memory_store.record_telemetry_session(
+                phase=phase,
+                status=self.get_status(),
+                metadata=self._metadata,
+            )
+        except Exception as exc:
+            logger.warning("Operational memory telemetry record failed: %s", exc)

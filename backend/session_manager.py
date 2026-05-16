@@ -88,11 +88,12 @@ class SessionManager:
     - Auto-save on changes
     """
 
-    def __init__(self, sessions_dir: str = "sessions"):
+    def __init__(self, sessions_dir: str = "sessions", memory_store: Optional[Any] = None):
         self._sessions_dir = Path(sessions_dir)
         self._sessions_dir.mkdir(parents=True, exist_ok=True)
         self._current_session: Optional[Session] = None
         self._sessions: Dict[str, Session] = {}
+        self._memory_store = memory_store
 
     def create_session(self, name: str = "default", **config_kwargs) -> Session:
         """Create a new mixing session."""
@@ -104,6 +105,7 @@ class SessionManager:
         session.add_event("created")
         logger.info(f"Created session '{session_id}'")
         self._save_session(session)
+        self._record_memory_event("created", session)
         return session
 
     def get_current_session(self) -> Optional[Session]:
@@ -120,6 +122,7 @@ class SessionManager:
             session.active = True
             session.add_event("activated")
             logger.info(f"Activated session '{session_id}'")
+            self._record_memory_event("activated", session)
         return session
 
     def update_config(self, **kwargs) -> Optional[SessionConfig]:
@@ -132,6 +135,7 @@ class SessionManager:
                 setattr(config, key, value)
         self._current_session.add_event("config_updated", kwargs)
         self._save_session(self._current_session)
+        self._record_memory_event("config_updated", self._current_session, extra=kwargs)
         return config
 
     def end_session(self, session_id: str = None):
@@ -146,6 +150,7 @@ class SessionManager:
             if session == self._current_session:
                 self._current_session = None
             logger.info(f"Ended session '{session.id}'")
+            self._record_memory_event("ended", session)
 
     def list_sessions(self) -> List[Dict]:
         """List all sessions."""
@@ -195,3 +200,19 @@ class SessionManager:
             except Exception as e:
                 logger.warning(f"Failed to load session {filepath}: {e}")
         logger.info(f"Loaded {len(self._sessions)} sessions")
+
+    def _record_memory_event(self, action: str, session: Session, extra: Optional[Dict[str, Any]] = None):
+        if self._memory_store is None:
+            return
+        try:
+            self._memory_store.record_session_event(
+                action=action,
+                session_id=session.id,
+                session_name=session.config.name,
+                config=session.config.to_dict(),
+                active=session.active,
+                event_count=len(session.events),
+                extra=extra or {},
+            )
+        except Exception as exc:
+            logger.warning("Operational memory session record failed: %s", exc)

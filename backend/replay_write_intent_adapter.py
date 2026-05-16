@@ -23,10 +23,11 @@ def _compact(payload: dict[str, Any]) -> dict[str, Any]:
 class ReplayWriteIntentAdapter:
     """Emit replay-safe intent artifacts before legacy automation can touch WING."""
 
-    def __init__(self, *, source_system: str):
+    def __init__(self, *, source_system: str, memory_store: Any | None = None):
         self.source_system = str(source_system or "unknown")
         self._records: list[dict[str, Any]] = []
         self._sequence = count(1)
+        self._memory_store = memory_store
 
     def list_records(self) -> list[dict[str, Any]]:
         return [dict(record) for record in self._records]
@@ -303,6 +304,8 @@ class ReplayWriteIntentAdapter:
             }
         )
         self._records.append(record)
+        if self._memory_store is not None:
+            self._memory_store.record_write_intent(record)
         return record
 
     def _next_correlation_id(self, write_kind: str, target: int | str) -> str:
