@@ -13,11 +13,12 @@ Use Codex from ChatGPT on iPhone as the execution console, but keep Paperclip in
 3. Ask Codex to run `status`.
 4. Ask Codex to run `target` if you want to see the selected safe Paperclip issue/agent.
 5. Ask Codex to run `next` to see the safe next step.
-6. Ask Codex to run `cycle` when you want the full safe dry-run flow in one command.
-7. Review `.paperclip/reports/watchdog_dispatch_report.md`.
-8. Ask Codex to run `approve-template` only after the preview report is acceptable.
-9. Manually approve any real dispatch command before it is run.
-10. Ask Codex to run `monitor` after an approved dispatch.
+6. Ask Codex to run `blocked` when the queue has blocked tasks and no safe todo target.
+7. Ask Codex to run `cycle` when you want the full safe dry-run flow in one command.
+8. Review `.paperclip/reports/watchdog_dispatch_report.md`.
+9. Ask Codex to run `approve-template` only after the preview report is acceptable.
+10. Manually approve any real dispatch command before it is run.
+11. Ask Codex to run `monitor` after an approved dispatch.
 
 Codex must not skip Paperclip or call WING/OSC/live runtime paths from this operator.
 
@@ -166,6 +167,24 @@ Prints the safe next operator action:
 - show approval template if the latest dry-run preview is ready;
 - create/select a new Paperclip todo issue if the current report is blocked;
 - otherwise run `cycle`.
+
+## Blocked Queue
+
+```bash
+python3 tools/automixer_operator/operator.py blocked
+```
+
+Reads Paperclip blocked issues through GET requests only and prints:
+
+- blocked issue identifier/title;
+- current assignee;
+- blocker attention state;
+- unresolved blocker count;
+- sample blocker identifier when Paperclip exposes one.
+
+This command exists for triage when `status` reports `todo=0`,
+`in_progress=0`, and many blocked tasks. It does not change issue status, does
+not wake agents, and does not dispatch.
 
 ## Approval Template
 

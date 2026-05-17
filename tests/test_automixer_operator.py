@@ -377,6 +377,64 @@ def test_monitor_is_read_only(tmp_path, monkeypatch, capsys):
     assert all(path.startswith("/api/") for path, _params in calls)
 
 
+def test_blocked_command_lists_blocked_issues_read_only(tmp_path, monkeypatch, capsys):
+    calls = []
+
+    class FakeClient:
+        def __init__(self, base_url, timeout_seconds):
+            self.base_url = base_url
+            self.timeout_seconds = timeout_seconds
+
+        def get(self, path, params=None):
+            calls.append((path, params))
+            if path == "/api/companies/company-1/issues":
+                return [
+                    {
+                        "id": "issue-2",
+                        "identifier": "TUB-2",
+                        "title": "Normal blocked issue",
+                        "status": "blocked",
+                        "blockerAttention": {"state": "none", "unresolvedBlockerCount": 0},
+                    },
+                    {
+                        "id": "issue-1",
+                        "identifier": "TUB-1",
+                        "title": "Needs attention",
+                        "status": "blocked",
+                        "assigneeAgentId": "agent-1",
+                        "blockerAttention": {
+                            "state": "needs_attention",
+                            "unresolvedBlockerCount": 2,
+                            "sampleBlockerIdentifier": "TUB-0",
+                        },
+                    },
+                ]
+            raise OSError(f"unexpected route: {path}")
+
+    def fake_context(config):
+        return {
+            "_operator_context_source": "test",
+            "paperclip_api_ok": True,
+            "paperclip_api_url": "http://paperclip.test",
+            "company_id": "company-1",
+        }
+
+    monkeypatch.setattr(automixer_operator, "load_context", fake_context)
+    monkeypatch.setattr(automixer_operator.bridge, "PaperclipClient", FakeClient)
+
+    exit_code = automixer_operator.command_blocked(make_config(tmp_path))
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Automixer Blocked Queue" in output
+    assert "write actions: disabled" in output
+    assert "TUB-1" in output
+    assert "sample_blocker: TUB-0" in output
+    assert calls == [
+        ("/api/companies/company-1/issues", {"status": "blocked", "limit": 20}),
+    ]
+
+
 def test_operational_audit_command_prints_report_paths(tmp_path, monkeypatch, capsys):
     captured = {}
 
@@ -747,6 +805,7 @@ def test_no_write_routes_or_actions_exist():
         "cycle",
         "approve-template",
         "monitor",
+        "blocked",
         "operational-audit",
         "vector-index",
         "vector-search",

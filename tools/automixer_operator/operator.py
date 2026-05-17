@@ -858,6 +858,42 @@ def command_monitor(config: OperatorConfig) -> int:
     return 0
 
 
+def command_blocked(config: OperatorConfig) -> int:
+    context = load_context(config)
+    issues, error = load_blocked_issues(config, context)
+    print(render_blocked_queue(context, issues, error))
+    return 0 if error is None else 1
+
+
+def load_blocked_issues(
+    config: OperatorConfig,
+    context: dict[str, Any],
+    *,
+    limit: int = 20,
+) -> tuple[list[dict[str, Any]], str | None]:
+    if context.get("paperclip_api_ok") is not True:
+        return [], "Paperclip API is unavailable"
+    company_id = clean_missing(str(context.get("company_id") or ""))
+    if not company_id:
+        return [], "company_id is unavailable"
+    client = bridge.PaperclipClient(
+        str(context.get("paperclip_api_url") or bridge.DEFAULT_PAPERCLIP_API_URL),
+        parse_float(
+            config.environ.get("GPT_CONTROL_BRIDGE_PAPERCLIP_TIMEOUT_SECONDS"),
+            3.0,
+        ),
+    )
+    payload, error = bridge.safe_get(
+        client,
+        f"/api/companies/{bridge.quote(company_id)}/issues",
+        params={"status": "blocked", "limit": limit},
+    )
+    if error:
+        return [], error
+    issues = bridge.extract_items(payload, ["issues", "data", "items", "results"])
+    return sorted(issues, key=blocked_issue_sort_key), None
+
+
 def command_operational_audit(config: OperatorConfig, extra_args: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="operator.py operational-audit",
@@ -1252,6 +1288,60 @@ def render_monitor(
     return "\n".join(lines)
 
 
+def render_blocked_queue(
+    context: dict[str, Any],
+    issues: list[dict[str, Any]],
+    error: str | None,
+) -> str:
+    lines = [
+        "== Automixer Blocked Queue ==",
+        f"context_source: {context.get('_operator_context_source', 'unknown')}",
+        "write actions: disabled",
+        f"paperclip_api_ok: {context.get('paperclip_api_ok')}",
+    ]
+    if error:
+        lines.append(f"error: {error}")
+        return "\n".join(lines)
+    lines.append(f"shown: {len(issues)}")
+    if not issues:
+        lines.append("items: none")
+        return "\n".join(lines)
+    lines.extend(["", "Blocked issues:"])
+    for issue in issues:
+        lines.extend(render_blocked_issue(issue))
+    return "\n".join(lines)
+
+
+def render_blocked_issue(issue: dict[str, Any]) -> list[str]:
+    attention = issue.get("blockerAttention") if isinstance(issue.get("blockerAttention"), dict) else {}
+    blocked_by = issue.get("blockedBy") if isinstance(issue.get("blockedBy"), list) else []
+    unresolved = attention.get("unresolvedBlockerCount")
+    sample = (
+        attention.get("sampleBlockerIdentifier")
+        or attention.get("sampleStalledBlockerIdentifier")
+        or "none"
+    )
+    return [
+        f"- {format_issue_label(issue)}",
+        f"  status: {normalize_status(issue.get('status') or issue.get('state')) or 'unknown'}",
+        f"  assignee: {get_issue_assignee(issue) or 'none'}",
+        f"  blocker_attention: {attention.get('state') or 'unknown'}",
+        f"  unresolved_blockers: {unresolved if unresolved is not None else len(blocked_by)}",
+        f"  sample_blocker: {sample}",
+    ]
+
+
+def blocked_issue_sort_key(issue: dict[str, Any]) -> tuple[int, int, str]:
+    attention = issue.get("blockerAttention") if isinstance(issue.get("blockerAttention"), dict) else {}
+    needs_attention = 0 if attention.get("state") == "needs_attention" else 1
+    try:
+        priority = int(issue.get("priorityRank") or issue.get("priority") or 99)
+    except (TypeError, ValueError):
+        priority = 99
+    identifier = issue_identifier(issue) or get_issue_id(issue) or ""
+    return needs_attention, priority, identifier
+
+
 def final_result(details: MonitorDetails) -> str:
     if details.issue:
         status = normalize_status(details.issue.get("status") or details.issue.get("state"))
@@ -1585,6 +1675,7 @@ def build_parser() -> argparse.ArgumentParser:
             "cycle",
             "approve-template",
             "monitor",
+            "blocked",
             "operational-audit",
             "vector-index",
             "vector-search",
@@ -1626,6 +1717,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_approve_template(config)
     if args.command == "monitor":
         return command_monitor(config)
+    if args.command == "blocked":
+        return command_blocked(config)
     if args.command == "operational-audit":
         return command_operational_audit(config, args.args)
     if args.command in VECTOR_OPERATOR_COMMANDS:
