@@ -1,5 +1,25 @@
 /* Auto Soundcheck — minimal */
 .auto-soundcheck-tab { width: 100%; }
+.quarantine-banner {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #d2992244;
+  background: linear-gradient(180deg, #d2992214 0%, #161b22 100%);
+}
+.quarantine-title {
+  margin-bottom: 6px;
+  color: #f0b84b;
+  font-size: 0.9em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.quarantine-copy {
+  color: #c9d1d9;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
 .progress-section { margin: 12px 0; }
 .progress-bar {
   height: 6px; background: #21262d; border-radius: 3px; overflow: hidden; margin-bottom: 8px;

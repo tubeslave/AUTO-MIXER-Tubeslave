@@ -12,7 +12,14 @@ const CYCLE_STEPS = [
   { id: 'fader', label: 'Fader' },
 ];
 
-function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice, audioDevices, globalMode }) {
+function AutoSoundcheckTab({
+  selectedChannels,
+  availableChannels,
+  selectedDevice,
+  audioDevices,
+  globalMode,
+  wingSafetyQuarantine,
+}) {
   const [running, setRunning] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [currentStep, setCurrentStep] = useState('');
@@ -41,6 +48,10 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
   }, []);
 
   const handleStart = () => {
+    if (wingSafetyQuarantine) {
+      setStatusMessage('Auto Soundcheck для WING временно заблокирован; используйте пробный анализ и pilot cockpit.');
+      return;
+    }
     if (!selectedDevice || !selectedChannels?.length) { setStatusMessage('Выберите устройство и каналы'); return; }
     const mapping = {}; selectedChannels.forEach(ch => { mapping[ch] = ch; });
     const chSettings = {}; selectedChannels.forEach(ch => { chSettings[ch] = { preset: 'custom' }; });
@@ -56,11 +67,20 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
     <div className="auto-soundcheck-tab">
       <SignalHint moduleKey="auto_soundcheck" />
       <div className="module-card">
+        {wingSafetyQuarantine && (
+          <div className="quarantine-banner">
+            <div className="quarantine-title">WING: контур на паузе</div>
+            <div className="quarantine-copy">
+              Auto Soundcheck для WING пока оставлен вне pilot-запуска, пока правила supervised-управления не расширены.
+              Используйте пробный анализ, выбор каналов и cockpit-проверку перед любым live-действием.
+            </div>
+          </div>
+        )}
         <div className="module-actions">
           <button className={`btn-start ${running ? 'stop' : 'go'}`}
             onClick={running ? handleStop : handleStart}
-            disabled={!selectedDevice || !channels.length}>
-            {running ? 'Стоп' : 'Запустить Soundcheck'}
+            disabled={!running && (wingSafetyQuarantine || !selectedDevice || !channels.length)}>
+            {running ? 'Стоп' : wingSafetyQuarantine ? 'WING: пробный режим' : 'Запустить Soundcheck'}
           </button>
         </div>
         {statusMessage && <div className="module-status">{statusMessage}</div>}

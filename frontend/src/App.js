@@ -49,12 +49,15 @@ const NAV_ITEMS = [
   { id: 'settings', icon: '⚙', label: 'Settings' },
 ];
 
+const WING_QUARANTINED_TABS = new Set(['autoFader', 'autoSoundcheck']);
+
 function App() {
   const [serverConnected, setServerConnected] = useState(false);
   const [mixerConnected, setMixerConnected] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [mixerIp, setMixerIp] = useState('192.168.1.102');
   const [mixerPort, setMixerPort] = useState(2223);
+  const [mixerType, setMixerType] = useState('wing');
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedDevice, setSelectedDevice] = useState('');
   const [availableChannels, setAvailableChannels] = useState([]);
@@ -179,6 +182,7 @@ function App() {
     const handleAllSettingsLoaded = (data) => {
       if (data.settings && data.settings.mixer) {
         const m = data.settings.mixer;
+        if (m.mixerType) setMixerType(m.mixerType);
         if (m.mixerIp) setMixerIp(m.mixerIp);
         if (m.mixerPort) setMixerPort(m.mixerPort);
       }
@@ -312,7 +316,17 @@ function App() {
     selectedDevice,
     audioDevices,
     globalMode,
+    mixerType,
+    wingSafetyQuarantine: mixerType === 'wing',
   };
+
+  const navItems = NAV_ITEMS.map(item => (
+    mixerType === 'wing' && WING_QUARANTINED_TABS.has(item.id)
+      ? { ...item, quarantined: true }
+      : item
+  ));
+
+  const activeNavItem = navItems.find(n => n.id === activeTab);
 
   return (
     <div className="App">
@@ -354,15 +368,20 @@ function App() {
         </div>
 
         <div className="nav-items">
-          {NAV_ITEMS.map(item => (
+          {navItems.map(item => (
             <button
               key={item.id}
-              className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+              className={`nav-item ${activeTab === item.id ? 'active' : ''} ${item.quarantined ? 'quarantined' : ''}`}
               onClick={() => setActiveTab(item.id)}
-              title={item.label}
+              title={item.quarantined ? `${item.label} • WING на паузе` : item.label}
             >
               <span className="nav-icon">{item.icon}</span>
-              {!sidebarCollapsed && <span className="nav-label">{item.label}</span>}
+              {!sidebarCollapsed && (
+                <>
+                  <span className="nav-label">{item.label}</span>
+                  {item.quarantined && <span className="nav-pill">WING ПАУЗА</span>}
+                </>
+              )}
             </button>
           ))}
         </div>
@@ -373,8 +392,8 @@ function App() {
         {/* Top bar with mode indicator */}
         <div className="topbar">
           <span className="topbar-title">
-            {NAV_ITEMS.find(n => n.id === activeTab)?.icon}{' '}
-            {NAV_ITEMS.find(n => n.id === activeTab)?.label}
+            {activeNavItem?.icon}{' '}
+            {activeNavItem?.label}
           </span>
           <div className={`mode-badge ${globalMode}`}>
             {globalMode === 'soundcheck' ? '🎯 Soundcheck' : '🔴 Live'}
@@ -541,6 +560,7 @@ function App() {
               mixerIp={mixerIp}
               mixerPort={mixerPort}
               onMixerSettingsChange={(key, value) => {
+                if (key === 'mixerType') setMixerType(value);
                 if (key === 'mixerIp') setMixerIp(value);
                 if (key === 'mixerPort') setMixerPort(value);
               }}

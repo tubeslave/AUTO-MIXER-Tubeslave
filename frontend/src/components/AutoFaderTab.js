@@ -10,7 +10,14 @@ const FADER_MODES = [
   { id: 'full_auto', label: 'Auto' },
 ];
 
-function AutoFaderTab({ selectedChannels, availableChannels, selectedDevice, audioDevices, globalMode }) {
+function AutoFaderTab({
+  selectedChannels,
+  availableChannels,
+  selectedDevice,
+  audioDevices,
+  globalMode,
+  wingSafetyQuarantine,
+}) {
   const [running, setRunning] = useState(false);
   const [mode, setMode] = useState('off');
   const [statusMessage, setStatusMessage] = useState('');
@@ -43,6 +50,10 @@ function AutoFaderTab({ selectedChannels, availableChannels, selectedDevice, aud
   }, []);
 
   const handleStart = () => {
+    if (wingSafetyQuarantine) {
+      setStatusMessage('Auto Fader для WING временно заблокирован; используйте ручной supervised-путь fader/gain.');
+      return;
+    }
     if (!selectedDevice || !selectedChannels?.length) { setStatusMessage('Выберите устройство и каналы'); return; }
     const mapping = {}; selectedChannels.forEach(ch => { mapping[ch] = ch; });
     const chSettings = {}; selectedChannels.forEach(ch => { chSettings[ch] = { preset: 'custom' }; });
@@ -51,6 +62,10 @@ function AutoFaderTab({ selectedChannels, availableChannels, selectedDevice, aud
   const handleStop = () => websocketService.stopRealtimeFader();
 
   const handleModeChange = (m) => {
+    if (wingSafetyQuarantine) {
+      setStatusMessage('Режимы Auto Fader для WING поставлены на паузу.');
+      return;
+    }
     setMode(m);
     websocketService.send({ type: 'set_auto_fader_mode', mode: m });
   };
@@ -62,16 +77,26 @@ function AutoFaderTab({ selectedChannels, availableChannels, selectedDevice, aud
     <div className="auto-fader-tab">
       <SignalHint moduleKey="auto_fader" />
       <div className="module-card">
+        {wingSafetyQuarantine && (
+          <div className="quarantine-banner">
+            <div className="quarantine-title">WING: контур на паузе</div>
+            <div className="quarantine-copy">
+              Auto Fader виден для контекста оператора, но автоматическое управление фейдерами WING сейчас заблокировано.
+              Используется только ручной supervised-путь для fader/gain и пробные отчёты без live-записи.
+            </div>
+          </div>
+        )}
         <div className="module-actions">
           <button className={`btn-start ${running ? 'stop' : 'go'}`}
             onClick={running ? handleStop : handleStart}
-            disabled={!selectedDevice || !channels.length}>
-            {running ? 'Стоп' : 'Старт'}
+            disabled={!running && (wingSafetyQuarantine || !selectedDevice || !channels.length)}>
+            {running ? 'Стоп' : wingSafetyQuarantine ? 'WING: ручной режим' : 'Старт'}
           </button>
           <div className="mode-pills">
             {FADER_MODES.map(m => (
               <button key={m.id} className={`pill ${mode === m.id ? 'active' : ''}`}
-                onClick={() => handleModeChange(m.id)}>
+                onClick={() => handleModeChange(m.id)}
+                disabled={wingSafetyQuarantine}>
                 {m.label}
               </button>
             ))}

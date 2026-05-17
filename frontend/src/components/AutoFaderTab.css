@@ -1,5 +1,25 @@
 /* Auto Fader — minimal */
 .auto-fader-tab { width: 100%; }
+.quarantine-banner {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #d2992244;
+  background: linear-gradient(180deg, #d2992214 0%, #161b22 100%);
+}
+.quarantine-title {
+  margin-bottom: 6px;
+  color: #f0b84b;
+  font-size: 0.9em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.quarantine-copy {
+  color: #c9d1d9;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
 .mode-pills { display: flex; gap: 4px; }
 .pill {
   padding: 4px 10px; border: 1px solid #30363d; border-radius: 12px;
@@ -8,3 +28,7 @@
 }
 .pill:hover { border-color: #484f58; color: #c9d1d9; }
 .pill.active { background: #00d4ff22; border-color: #00d4ff; color: #00d4ff; }
+.pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

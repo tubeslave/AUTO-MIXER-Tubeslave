@@ -129,6 +129,9 @@ body {
   transition: all 0.15s;
   white-space: nowrap;
 }
+.nav-item.quarantined {
+  color: #d29922;
+}
 .nav-item:hover {
   background: #1c2128;
   color: #c9d1d9;
@@ -140,6 +143,17 @@ body {
 }
 .nav-icon { font-size: 1.1em; width: 24px; text-align: center; flex-shrink: 0; }
 .nav-label { font-weight: 500; }
+.nav-pill {
+  margin-left: auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #d29922;
+  background: #d2992214;
+  border: 1px solid #d2992244;
+}
 
 /* ========== MAIN CONTENT ========== */
 .main-content {
