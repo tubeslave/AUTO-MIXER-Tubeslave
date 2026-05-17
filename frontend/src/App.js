@@ -16,6 +16,13 @@ import CrossAdaptiveEQTab from './components/CrossAdaptiveEQTab';
 import SystemMeasurementTab from './components/SystemMeasurementTab';
 import SettingsTab from './components/SettingsTab';
 import PilotDeploymentCockpit from './components/PilotDeploymentCockpit';
+import {
+  AgentsConsoleView,
+  ChannelListView,
+  ConnectionsView,
+  DashboardView,
+  TransportBar,
+} from './components/ControlCenterViews';
 
 // Color map for routing roles
 const ROLE_COLORS = {
@@ -32,21 +39,24 @@ const ROLE_COLORS = {
 };
 
 const NAV_ITEMS = [
-  { id: 'mixer', icon: '🔌', label: 'Connect' },
-  { id: 'gainStaging', icon: '📊', label: 'Gain' },
-  { id: 'phaseAlignment', icon: '⟳', label: 'Phase' },
-  { id: 'autoEQ', icon: '〰', label: 'EQ' },
-  { id: 'autoCompressor', icon: '⬇', label: 'Comp' },
-  { id: 'autoGate', icon: '🚪', label: 'Gate' },
-  { id: 'autoFader', icon: '🎚', label: 'Fader' },
-  { id: 'autoPanner', icon: '🎧', label: 'Pan' },
-  { id: 'autoReverb', icon: '🌊', label: 'Reverb' },
-  { id: 'autoEffects', icon: '✨', label: 'FX' },
-  { id: 'crossAdaptiveEQ', icon: '🔀', label: 'X-EQ' },
-  { id: 'autoSoundcheck', icon: '🎯', label: 'Soundcheck' },
-  { id: 'systemMeasurement', icon: '📐', label: 'Measure' },
-  { id: 'voice', icon: '🎙', label: 'Voice' },
-  { id: 'settings', icon: '⚙', label: 'Settings' },
+  { section: 'Обзор', id: 'dashboard', icon: '▣', label: 'Dashboard' },
+  { section: 'Каналы', id: 'channelList', icon: '☰', label: 'Channel List' },
+  { section: 'Каналы', id: 'gainStaging', icon: '▥', label: 'Gain' },
+  { section: 'Каналы', id: 'phaseAlignment', icon: '⟳', label: 'Phase' },
+  { section: 'AI агенты', id: 'agentsConsole', icon: 'AI', label: 'Agents Console' },
+  { section: 'AI агенты', id: 'autoEQ', icon: '≈', label: 'EQ' },
+  { section: 'AI агенты', id: 'autoCompressor', icon: '⇣', label: 'Comp' },
+  { section: 'AI агенты', id: 'autoGate', icon: '▤', label: 'Gate' },
+  { section: 'AI агенты', id: 'autoFader', icon: '▥', label: 'Fader' },
+  { section: 'AI агенты', id: 'autoPanner', icon: '◇', label: 'Pan' },
+  { section: 'AI агенты', id: 'autoReverb', icon: '≈', label: 'Reverb' },
+  { section: 'AI агенты', id: 'autoEffects', icon: '✦', label: 'FX' },
+  { section: 'AI агенты', id: 'crossAdaptiveEQ', icon: '⇄', label: 'X-EQ' },
+  { section: 'Обучение', id: 'autoSoundcheck', icon: '◎', label: 'Soundcheck' },
+  { section: 'Обучение', id: 'systemMeasurement', icon: '⌁', label: 'Measure' },
+  { section: 'Обучение', id: 'voice', icon: '◉', label: 'Voice' },
+  { section: 'Система', id: 'connections', icon: '⌘', label: 'Connections' },
+  { section: 'Система', id: 'settings', icon: '⚙', label: 'Settings' },
 ];
 
 const WING_QUARANTINED_TABS = new Set(['autoFader', 'autoSoundcheck']);
@@ -69,7 +79,7 @@ function App() {
   const [availableChannels, setAvailableChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [connecting, setConnecting] = useState(false);
-  const [activeTab, setActiveTab] = useState('mixer');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [globalMode] = useState('soundcheck');
   const [operatorModeStatus, setOperatorModeStatus] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -368,7 +378,7 @@ function App() {
       {/* Sidebar */}
       <nav className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
-          <h1 className="logo">{sidebarCollapsed ? 'AM' : 'AutoMixer'}</h1>
+          <h1 className="logo">{sidebarCollapsed ? 'AM' : <><span>AutoMixer</span><small>Tubeslave</small></>}</h1>
           <button className="btn-collapse" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
             {sidebarCollapsed ? '▶' : '◀'}
           </button>
@@ -399,22 +409,28 @@ function App() {
         </div>
 
         <div className="nav-items">
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              className={`nav-item ${activeTab === item.id ? 'active' : ''} ${item.quarantined ? 'quarantined' : ''}`}
-              onClick={() => setActiveTab(item.id)}
-              title={item.quarantined ? `${item.label} • WING на паузе` : item.label}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              {!sidebarCollapsed && (
-                <>
-                  <span className="nav-label">{item.label}</span>
-                  {item.quarantined && <span className="nav-pill">WING ПАУЗА</span>}
-                </>
-              )}
-            </button>
-          ))}
+          {navItems.map((item, index) => {
+            const previous = navItems[index - 1];
+            const showSection = !sidebarCollapsed && item.section !== previous?.section;
+            return (
+              <React.Fragment key={item.id}>
+                {showSection && <div className="nav-section-label">{item.section}</div>}
+                <button
+                  className={`nav-item ${activeTab === item.id ? 'active' : ''} ${item.quarantined ? 'quarantined' : ''}`}
+                  onClick={() => setActiveTab(item.id)}
+                  title={item.quarantined ? `${item.label} • WING на паузе` : item.label}
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  {!sidebarCollapsed && (
+                    <>
+                      <span className="nav-label">{item.label}</span>
+                      {item.quarantined && <span className="nav-pill">WING ПАУЗА</span>}
+                    </>
+                  )}
+                </button>
+              </React.Fragment>
+            );
+          })}
         </div>
       </nav>
 
@@ -445,6 +461,22 @@ function App() {
 
         {/* Tab Content */}
         <div className="tab-content">
+          {activeTab === 'dashboard' && <DashboardView />}
+          {activeTab === 'agentsConsole' && <AgentsConsoleView />}
+          {activeTab === 'channelList' && <ChannelListView />}
+          {activeTab === 'connections' && (
+            <ConnectionsView
+              serverConnected={serverConnected}
+              mixerConnected={mixerConnected}
+              statusMessage={statusMessage}
+              mixerIp={mixerIp}
+              mixerPort={mixerPort}
+              setMixerIp={setMixerIp}
+              setMixerPort={setMixerPort}
+              handleConnect={handleConnect}
+              connecting={connecting}
+            />
+          )}
           {activeTab === 'mixer' && (
             <div className="connect-page">
               <div className="connect-card">
@@ -610,6 +642,7 @@ function App() {
             />
           )}
         </div>
+        <TransportBar />
       </main>
     </div>
   );
