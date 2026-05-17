@@ -689,6 +689,75 @@ def test_agent_health_reports_unhealthy_agent_without_exposing_token(tmp_path, m
     ]
 
 
+def test_agent_health_uses_live_agent_state_over_stale_audit(tmp_path, monkeypatch, capsys):
+    reports_dir = tmp_path / ".paperclip" / "reports"
+    reports_dir.mkdir(parents=True)
+    (reports_dir / "operational_audit_latest.json").write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-05-17T09:00:00Z",
+                "unhealthy_agents": [
+                    {
+                        "id": "agent-codex",
+                        "name": "Codex",
+                        "status": "error",
+                        "reason": "agent status is error",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls = []
+
+    class FakeClient:
+        def __init__(self, base_url, timeout_seconds):
+            self.base_url = base_url
+            self.timeout_seconds = timeout_seconds
+
+        def get(self, path, params=None):
+            calls.append((path, params))
+            if path == "/api/companies/company-1/agents":
+                return [
+                    {
+                        "id": "agent-codex",
+                        "name": "Codex",
+                        "status": "idle",
+                        "adapterType": "openclaw_gateway",
+                        "lastHeartbeatAt": "2099-01-01T00:00:00Z",
+                    }
+                ]
+            if path == "/api/companies/company-1/issues":
+                return []
+            raise OSError(f"unexpected route: {path}")
+
+    def fake_context(config):
+        return {
+            "_operator_context_source": "test",
+            "paperclip_api_ok": True,
+            "paperclip_api_url": "http://paperclip.test",
+            "company_id": "company-1",
+        }
+
+    monkeypatch.setattr(automixer_operator, "load_context", fake_context)
+    monkeypatch.setattr(automixer_operator.bridge, "PaperclipClient", FakeClient)
+
+    exit_code = automixer_operator.command_agent_health(make_config(tmp_path))
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "audit_source: live_paperclip" in output
+    assert "unhealthy_agents: 0" in output
+    assert "agent: Codex" not in output
+    assert calls == [
+        ("/api/companies/company-1/agents", None),
+        (
+            "/api/companies/company-1/issues",
+            {"status": automixer_operator.PREVIEW_ISSUE_STATUSES, "limit": 500},
+        ),
+    ]
+
+
 def test_local_gateway_probe_refuses_external_url(monkeypatch):
     def forbidden_urlopen(*args, **kwargs):
         raise AssertionError("external probe should not open a connection")

@@ -19,6 +19,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -1078,8 +1079,17 @@ def load_agent_health_details(config: OperatorConfig, context: dict[str, Any]) -
 
     agents = bridge.extract_items(agents_payload, ["agents", "data", "items", "results"])
     issues = bridge.extract_items(issues_payload, ["issues", "data", "items", "results"])
-    audit = latest_operational_audit(config.project_root) or {}
-    unhealthy_audit_items = audit.get("unhealthy_agents") if isinstance(audit.get("unhealthy_agents"), list) else []
+    now = datetime.now(timezone.utc)
+    unhealthy_audit_items = operational_audit.detect_unhealthy_agents(
+        agents,
+        now,
+        operational_audit.AuditThresholds(),
+    )
+    audit = {
+        "generated_at": now.isoformat().replace("+00:00", "Z"),
+        "source": "live_paperclip",
+        "unhealthy_agents": unhealthy_audit_items,
+    }
     unhealthy_ids = {
         clean_missing(str(item.get("id") or ""))
         for item in unhealthy_audit_items
@@ -1138,6 +1148,7 @@ def load_agent_health_details(config: OperatorConfig, context: dict[str, Any]) -
         )
     return {
         "error": None,
+        "audit_source": audit.get("source") if isinstance(audit, dict) else None,
         "audit_generated_at": audit.get("generated_at") if isinstance(audit, dict) else None,
         "unhealthy_agent_count": len(details),
         "agents": details,
@@ -1228,6 +1239,7 @@ def render_agent_health(context: dict[str, Any], details: dict[str, Any]) -> str
     if details.get("error"):
         lines.append(f"error: {details['error']}")
         return "\n".join(lines)
+    lines.append(f"audit_source: {details.get('audit_source') or 'unknown'}")
     lines.append(f"audit_generated_at: {details.get('audit_generated_at') or 'unknown'}")
     lines.append(f"unhealthy_agents: {details.get('unhealthy_agent_count', 0)}")
     agents = details.get("agents") if isinstance(details.get("agents"), list) else []
