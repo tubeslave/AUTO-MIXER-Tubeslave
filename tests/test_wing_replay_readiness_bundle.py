@@ -70,7 +70,7 @@ def _write_telemetry_session(base_dir, name, *, observation_only=True, events=No
     return session_dir
 
 
-def _write_supervised_summary(base_dir, telemetry_dir):
+def _write_supervised_summary(base_dir, telemetry_dir, *, no_clipping=None):
     path = base_dir / "supervised_summary.json"
     _write_json(
         path,
@@ -95,6 +95,7 @@ def _write_supervised_summary(base_dir, telemetry_dir):
                 "events_path": str(telemetry_dir / "events.jsonl"),
                 "metadata_path": str(telemetry_dir / "metadata.json"),
             },
+            "no_clipping": no_clipping,
         },
     )
     return path
@@ -137,6 +138,11 @@ def test_bundle_marks_ready_when_shadow_and_telemetry_are_safe(tmp_path):
     assert payload["telemetry"]["blocked_write_total"] == 1
     assert payload["supervised"]["telemetry_artifacts_present"] is True
     assert payload["shadow"]["promotion_readiness_score"] == 91
+    assert payload["no_clipping"]["measured"] is False
+    assert payload["no_clipping"]["clear"] is False
+    assert "No measured no-clipping evidence" in payload["no_clipping"]["reason"]
+    assert payload["evidence"]["no_clipping_measured"] is False
+    assert payload["evidence"]["no_clipping_clear"] is False
 
 
 def test_bundle_fails_closed_when_observation_only_telemetry_contains_write_sent(tmp_path):
@@ -163,3 +169,46 @@ def test_bundle_fails_closed_when_observation_only_telemetry_contains_write_sent
     assert "observation_only_telemetry_contains_write_sent" in payload["blockers"]
     assert payload["telemetry"]["dangerous_write_detected"] is True
     assert payload["telemetry"]["dangerous_write_sessions"][0]["write_sent_count"] == 1
+
+
+def test_bundle_surfaces_explicit_no_clipping_evidence_from_supervised_summary(tmp_path):
+    report_dir = _write_shadow_report_dir(tmp_path)
+    live_session = _write_telemetry_session(
+        tmp_path,
+        "live",
+        events=[
+            {"seq": 1, "timestamp": 1.0, "event_type": "console_observed", "address": "/$meters/ch/1/in", "values": [0.25]},
+        ],
+    )
+    supervised_summary = _write_supervised_summary(
+        tmp_path,
+        live_session,
+        no_clipping={
+            "measured": True,
+            "clear": True,
+            "reason": "Peak telemetry stayed below the approved threshold.",
+            "threshold_dbtp": -3.0,
+            "max_true_peak_dbtp": -8.4,
+            "sample_count": 24,
+        },
+    )
+
+    result = build_wing_replay_readiness_bundle(
+        output_dir=tmp_path / "bundle",
+        shadow_report_dir=report_dir,
+        live_telemetry_session=live_session,
+        supervised_summary_path=supervised_summary,
+    )
+
+    payload = json.loads(result["json"].read_text(encoding="utf-8"))
+    markdown = result["markdown"].read_text(encoding="utf-8")
+
+    assert payload["no_clipping"]["measured"] is True
+    assert payload["no_clipping"]["clear"] is True
+    assert payload["no_clipping"]["source"] == "supervised_summary.no_clipping"
+    assert payload["no_clipping"]["threshold_dbtp"] == -3.0
+    assert payload["no_clipping"]["max_true_peak_dbtp"] == -8.4
+    assert payload["evidence"]["no_clipping_measured"] is True
+    assert payload["evidence"]["no_clipping_clear"] is True
+    assert "## No-Clipping Evidence" in markdown
+    assert "- measured: True" in markdown

@@ -18,6 +18,7 @@
 - Fails closed if observation-only telemetry contains any `write_sent` event.
 - Fails closed if the supervised summary is missing telemetry artifact paths.
 - Preserves the exact blocker list in the bundle output for review.
+- Emits an explicit `no_clipping` evidence section even when measured proof is missing, so downstream trust gates can distinguish `missing`, `measured+clear`, and `measured+not_clear`.
 
 ## Regression proof added
 
@@ -25,6 +26,7 @@
 - Coverage:
   - safe path: shadow-ready bundle + observation-only telemetry with blocked writes only
   - unsafe path: observation-only telemetry containing `write_sent` must force `ready=false`
+  - explicit no-clipping evidence path: supervised summary evidence is copied into the bundle and markdown output
 
 ## Targeted verification
 

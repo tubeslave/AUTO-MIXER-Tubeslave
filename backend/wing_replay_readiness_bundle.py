@@ -42,6 +42,107 @@ def _pick_truthy(*values: Any) -> Any:
     return None
 
 
+def _normalize_no_clipping_candidate(
+    candidate: Mapping[str, Any] | None,
+    *,
+    source: str,
+) -> dict[str, Any] | None:
+    if not isinstance(candidate, Mapping):
+        return None
+
+    measured = bool(
+        candidate.get("measured")
+        or candidate.get("available")
+        or candidate.get("verified")
+    )
+    clear = bool(
+        candidate.get("clear")
+        or candidate.get("passed")
+        or candidate.get("ok")
+    )
+    normalized = {
+        "measured": measured,
+        "clear": clear,
+        "source": source,
+    }
+
+    for key in (
+        "reason",
+        "summary",
+        "threshold_dbtp",
+        "max_true_peak_dbtp",
+        "max_meter_value",
+        "sample_count",
+        "channel_count",
+        "channels",
+        "evidence_path",
+    ):
+        value = candidate.get(key)
+        if value not in (None, "", [], {}):
+            normalized[key] = value
+    return normalized
+
+
+def _build_no_clipping_status(
+    *,
+    supervised_summary: Mapping[str, Any] | None,
+    live_telemetry_summary: Mapping[str, Any],
+    replay_telemetry_summary: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+
+    if isinstance(supervised_summary, Mapping):
+        checks = supervised_summary.get("checks")
+        if isinstance(checks, Mapping):
+            for key in ("no_clipping_evidence", "no_clipping"):
+                normalized = _normalize_no_clipping_candidate(
+                    checks.get(key),
+                    source=f"supervised_summary.checks.{key}",
+                )
+                if normalized:
+                    candidates.append(normalized)
+        results = supervised_summary.get("results")
+        if isinstance(results, Mapping):
+            normalized = _normalize_no_clipping_candidate(
+                results.get("no_clipping"),
+                source="supervised_summary.results.no_clipping",
+            )
+            if normalized:
+                candidates.append(normalized)
+        normalized = _normalize_no_clipping_candidate(
+            supervised_summary.get("no_clipping"),
+            source="supervised_summary.no_clipping",
+        )
+        if normalized:
+            candidates.append(normalized)
+
+    telemetry_sources = [
+        ("live_telemetry.metadata.no_clipping", live_telemetry_summary.get("metadata", {}).get("no_clipping")),
+        (
+            "replay_telemetry.metadata.no_clipping",
+            (replay_telemetry_summary or {}).get("metadata", {}).get("no_clipping"),
+        ),
+    ]
+    for source, candidate in telemetry_sources:
+        normalized = _normalize_no_clipping_candidate(candidate, source=source)
+        if normalized:
+            candidates.append(normalized)
+
+    if candidates:
+        selected = dict(next((item for item in candidates if item.get("measured")), candidates[0]))
+        selected["candidates"] = candidates
+        selected.setdefault("reason", "Measured no-clipping evidence was loaded into the readiness bundle.")
+        return selected
+
+    return {
+        "measured": False,
+        "clear": False,
+        "source": None,
+        "reason": "No measured no-clipping evidence was found in the supervised summary or telemetry metadata.",
+        "candidates": [],
+    }
+
+
 def _build_shadow_status(shadow_report_dir: str | Path) -> dict[str, Any]:
     root = Path(shadow_report_dir)
     summary = _load_json(root / "shadow_mode_summary.json")
@@ -106,6 +207,7 @@ def _build_supervised_status(supervised_summary_path: str | Path | None) -> dict
         "manual_write_session": dict(summary.get("manual_write_session") or {}),
         "result_reasons": blocked_reasons,
         "emergency_stop_seen": bool((results.get("emergency_stop") or {}).get("type") == "emergency_stop_applied"),
+        "raw_summary": summary,
     }
 
 
@@ -133,6 +235,11 @@ def _build_telemetry_status(
     ]
 
     blocked_write_total = sum(int(summary.get("blocked_write_count", 0)) for summary in observation_paths)
+    no_clipping = _build_no_clipping_status(
+        supervised_summary=None,
+        live_telemetry_summary=live_summary,
+        replay_telemetry_summary=replay_summary,
+    )
     return {
         "live": live_summary,
         "replay": replay_summary,
@@ -141,6 +248,7 @@ def _build_telemetry_status(
         "dangerous_write_detected": bool(dangerous_write_sessions),
         "blocked_write_total": blocked_write_total,
         "fallback_only_detected": any(summary.get("fallback_only_observation", False) for summary in observation_paths),
+        "no_clipping": no_clipping,
     }
 
 
@@ -162,6 +270,13 @@ def build_wing_replay_readiness_bundle(
         replay_session_path=replay_telemetry_session,
     )
     supervised = _build_supervised_status(supervised_summary_path)
+    no_clipping = _build_no_clipping_status(
+        supervised_summary=supervised.get("raw_summary") if supervised.get("available") else None,
+        live_telemetry_summary=telemetry["live"],
+        replay_telemetry_summary=telemetry["replay"],
+    )
+    telemetry["no_clipping"] = no_clipping
+    supervised.pop("raw_summary", None)
 
     blockers: list[str] = []
     if shadow.get("live_mixer_writes"):
@@ -198,6 +313,7 @@ def build_wing_replay_readiness_bundle(
         "shadow": shadow,
         "telemetry": telemetry,
         "supervised": supervised,
+        "no_clipping": no_clipping,
         "evidence": {
             "selected_proposal_id": shadow.get("selected_proposal_id"),
             "promotion_readiness_score": shadow.get("promotion_readiness_score"),
@@ -210,6 +326,9 @@ def build_wing_replay_readiness_bundle(
                 (supervised.get("telemetry_capture_stop") or {}).get("events_path"),
                 (supervised.get("connection_status") or {}).get("telemetry_capture", {}).get("events_path"),
             ),
+            "no_clipping": no_clipping,
+            "no_clipping_measured": bool(no_clipping.get("measured")),
+            "no_clipping_clear": bool(no_clipping.get("clear")),
         },
     }
 
@@ -227,6 +346,7 @@ def _build_markdown(summary: dict[str, Any]) -> str:
     shadow = dict(summary.get("shadow") or {})
     telemetry = dict(summary.get("telemetry") or {})
     supervised = dict(summary.get("supervised") or {})
+    no_clipping = dict(summary.get("no_clipping") or {})
     lines = [
         "# WING Replay Readiness Bundle",
         "",
@@ -237,6 +357,8 @@ def _build_markdown(summary: dict[str, Any]) -> str:
         f"- dangerous_write_detected: {telemetry.get('dangerous_write_detected')}",
         f"- telemetry_blocked_write_total: {telemetry.get('blocked_write_total')}",
         f"- supervised_session_label: {supervised.get('session_label')}",
+        f"- no_clipping_measured: {no_clipping.get('measured')}",
+        f"- no_clipping_clear: {no_clipping.get('clear')}",
         "",
         "## Blockers",
     ]
@@ -253,6 +375,12 @@ def _build_markdown(summary: dict[str, Any]) -> str:
             f"- live_telemetry_session: {summary.get('sources', {}).get('live_telemetry_session')}",
             f"- replay_telemetry_session: {summary.get('sources', {}).get('replay_telemetry_session')}",
             f"- supervised_summary_path: {summary.get('sources', {}).get('supervised_summary_path')}",
+            "",
+            "## No-Clipping Evidence",
+            f"- measured: {no_clipping.get('measured')}",
+            f"- clear: {no_clipping.get('clear')}",
+            f"- source: {no_clipping.get('source')}",
+            f"- reason: {no_clipping.get('reason')}",
         ]
     )
     return "\n".join(lines) + "\n"
