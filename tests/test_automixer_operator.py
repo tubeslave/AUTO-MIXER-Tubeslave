@@ -303,6 +303,33 @@ def test_work_queue_uses_issue_fallback_counts():
     assert "- in_progress: 1" in lines
 
 
+def test_agents_summary_highlights_error_agents():
+    lines = automixer_operator.render_agents(
+        {
+            "available": True,
+            "total": 2,
+            "by_status": {"idle": 1, "error": 1},
+            "items": [
+                {
+                    "id": "agent-error",
+                    "name": "Codex",
+                    "status": "error",
+                    "adapterType": "openclaw_gateway",
+                },
+                {
+                    "id": "agent-idle",
+                    "name": "OSC Console Safety Engineer",
+                    "status": "idle",
+                    "adapterType": "codex_local",
+                },
+            ],
+        }
+    )
+
+    assert "- attention: 1 agent(s) need review" in lines
+    assert "- attention_agent: Codex (agent-error), status=error, adapter=openclaw_gateway" in lines
+
+
 def test_recommended_action_triages_blocked_only_queue():
     action = automixer_operator.operator_recommended_action(
         {

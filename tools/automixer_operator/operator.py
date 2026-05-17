@@ -1042,6 +1042,13 @@ def render_agents(summary: Any) -> list[str]:
     if by_status:
         lines.append(f"- by_status: {format_counts(by_status)}")
     items = summary.get("items") if isinstance(summary.get("items"), list) else []
+    attention_items = agent_attention_items(items)
+    if attention_items:
+        lines.append(f"- attention: {len(attention_items)} agent(s) need review")
+        for item in attention_items[:5]:
+            status = normalize_status(item.get("status") or item.get("state")) or "unknown"
+            adapter = item.get("adapterType") or item.get("adapter_type") or "unknown"
+            lines.append(f"- attention_agent: {format_agent_label(item)}, status={status}, adapter={adapter}")
     for item in items[:10]:
         lines.append(f"- {format_record(item)}")
     if not items:
@@ -1058,6 +1065,16 @@ def render_agents(summary: Any) -> list[str]:
             if label and role.get("execution_role"):
                 lines.append(f"- {label}: {health} ({agent_name_value or 'unresolved'})")
     return lines
+
+
+def agent_attention_items(items: list[Any]) -> list[dict[str, Any]]:
+    attention_statuses = {"error", "failed", "offline", "unavailable"}
+    return [
+        item
+        for item in items
+        if isinstance(item, dict)
+        and normalize_status(item.get("status") or item.get("state")) in attention_statuses
+    ]
 
 
 def load_issue_status_counts(
