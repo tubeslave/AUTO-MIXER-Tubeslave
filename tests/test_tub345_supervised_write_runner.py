@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from tub345_supervised_write_runner import (
+    build_no_clipping_evidence,
     build_run_summary,
     extract_request,
     make_artifact_path,
@@ -102,12 +103,52 @@ def test_numeric_values_match_handles_tolerance_and_bad_values():
     assert numeric_values_match("same", "same") is True
 
 
+def test_build_no_clipping_evidence_marks_missing_measurement_explicitly():
+    args = argparse.Namespace(
+        no_clipping_threshold_dbtp=-3.0,
+        max_true_peak_dbtp=None,
+        no_clipping_sample_count=None,
+    )
+    payload = build_no_clipping_evidence(args)
+    assert payload["measured"] is False
+    assert payload["clear"] is False
+    assert payload["threshold_dbtp"] == -3.0
+
+
+def test_build_no_clipping_evidence_marks_clear_measurement():
+    args = argparse.Namespace(
+        no_clipping_threshold_dbtp=-3.0,
+        max_true_peak_dbtp=-8.4,
+        no_clipping_sample_count=24,
+    )
+    payload = build_no_clipping_evidence(args)
+    assert payload["measured"] is True
+    assert payload["clear"] is True
+    assert payload["max_true_peak_dbtp"] == -8.4
+    assert payload["sample_count"] == 24
+
+
+def test_build_no_clipping_evidence_marks_peak_over_threshold_as_not_clear():
+    args = argparse.Namespace(
+        no_clipping_threshold_dbtp=-3.0,
+        max_true_peak_dbtp=-1.2,
+        no_clipping_sample_count=24,
+    )
+    payload = build_no_clipping_evidence(args)
+    assert payload["measured"] is True
+    assert payload["clear"] is False
+    assert payload["max_true_peak_dbtp"] == -1.2
+
+
 def test_build_run_summary_includes_key_live_test_results():
     args = argparse.Namespace(
         channel=9,
         fader_target_db=-30.0,
         gain_target_db=1.5,
         cooldown_fader_target_db=-30.5,
+        no_clipping_threshold_dbtp=-3.0,
+        max_true_peak_dbtp=-8.4,
+        no_clipping_sample_count=24,
     )
     summary = build_run_summary(
         args=args,
@@ -187,4 +228,7 @@ def test_build_run_summary_includes_key_live_test_results():
     assert summary["results"]["blocked_after_stop"]["reason"] == "manual_path_not_armed"
     assert summary["results"]["blocked_after_emergency_mid"]["reason"] == "manual_path_not_armed"
     assert summary["telemetry_capture_stop"]["events_path"] == "/tmp/events.jsonl"
+    assert summary["no_clipping"]["measured"] is True
+    assert summary["no_clipping"]["clear"] is True
+    assert summary["checks"]["no_clipping_evidence"]["max_true_peak_dbtp"] == -8.4
     assert len(summary["sequence_steps"]) == 3

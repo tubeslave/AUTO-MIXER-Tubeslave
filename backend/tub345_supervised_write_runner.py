@@ -77,6 +77,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Required flag. Without it, the script exits before sending any live write-capable request.",
     )
+    parser.add_argument(
+        "--no-clipping-threshold-dbtp",
+        type=float,
+        default=-3.0,
+        help="Threshold used for measured no-clipping evidence in the saved summary (default: -3.0 dBTP).",
+    )
+    parser.add_argument(
+        "--max-true-peak-dbtp",
+        type=float,
+        help="Measured maximum true-peak observed during the supervised live test. If provided, no-clipping evidence is saved.",
+    )
+    parser.add_argument(
+        "--no-clipping-sample-count",
+        type=int,
+        help="Optional number of meter/telemetry samples behind the measured max true peak.",
+    )
     return parser
 
 
@@ -161,6 +177,38 @@ def summarize_sequence_step(payload: dict[str, Any], *, label: str) -> dict[str,
     }
 
 
+def build_no_clipping_evidence(args: argparse.Namespace) -> dict[str, Any]:
+    max_true_peak = getattr(args, "max_true_peak_dbtp", None)
+    threshold = float(getattr(args, "no_clipping_threshold_dbtp", -3.0))
+    sample_count = getattr(args, "no_clipping_sample_count", None)
+
+    if max_true_peak is None:
+        return {
+            "measured": False,
+            "clear": False,
+            "reason": (
+                "No measured no-clipping evidence was provided to the supervised runner. "
+                "Pass --max-true-peak-dbtp after checking the live meter/telemetry result."
+            ),
+            "threshold_dbtp": threshold,
+            "sample_count": sample_count,
+        }
+
+    clear = float(max_true_peak) <= threshold
+    return {
+        "measured": True,
+        "clear": clear,
+        "reason": (
+            "Measured maximum true peak stayed within the approved threshold."
+            if clear
+            else "Measured maximum true peak exceeded the approved threshold."
+        ),
+        "threshold_dbtp": threshold,
+        "max_true_peak_dbtp": float(max_true_peak),
+        "sample_count": sample_count,
+    }
+
+
 def build_run_summary(
     *,
     args: argparse.Namespace,
@@ -189,6 +237,7 @@ def build_run_summary(
     telemetry_stop: dict[str, Any],
     transcript_path: Path,
 ) -> dict[str, Any]:
+    no_clipping_evidence = build_no_clipping_evidence(args)
     return {
         "issue": "TUB-350",
         "runner": "TUB-350",
@@ -238,6 +287,10 @@ def build_run_summary(
             "blocked_after_stop": summarize_manual_result(blocked_after_stop),
             "blocked_after_emergency_mid": summarize_manual_result(blocked_after_emergency_mid or {}),
         },
+        "checks": {
+            "no_clipping_evidence": no_clipping_evidence,
+        },
+        "no_clipping": no_clipping_evidence,
         "telemetry_capture_stop": telemetry_stop.get("telemetry_capture", {}),
         "local_transcript_path": str(transcript_path),
     }
