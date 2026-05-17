@@ -24,19 +24,30 @@
 
 ### Обработка ошибок
 ```python
-# Правильно: конкретные исключения, логирование
+# Правильно для WING: только через supervised manual-write path
 try:
-    await self.wing_client.set_fader(channel, value_db)
+    result = await self._apply_manual_console_write(
+        websocket,
+        channel=channel,
+        value=value_db,
+        value_type="fader",
+        source="websocket:set_fader",
+        reason="operator-approved manual write",
+        approved=True,
+        approval_id=approval_id,
+    )
+    if result["status"] != "applied":
+        logger.warning("Manual WING write blocked", channel=channel, result=result)
 except ConnectionError:
     logger.error("Wing connection lost", channel=channel)
     await self._reconnect()
 except ValueError as e:
     logger.warning("Invalid fader value", channel=channel, value=value_db, error=str(e))
 
-# Неправильно: голый except, подавление ошибок
+# Неправильно: прямой write в обход supervised gate и подавление ошибок
 try:
-    self.wing_client.set_fader(channel, value_db)
-except:
+    legacy_mixer.write_raw_value(channel, value_db)
+except Exception:
     pass
 ```
 

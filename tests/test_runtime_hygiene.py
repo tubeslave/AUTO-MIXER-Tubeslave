@@ -34,6 +34,13 @@ def test_frontend_websocket_commands_have_backend_handlers():
     assert frontend_types - backend_types == set()
 
 
+def test_conventions_do_not_recommend_direct_wing_fader_writes():
+    conventions = (REPO_ROOT / "docs/CONVENTIONS.md").read_text()
+    correct_example = conventions.split("# Неправильно", 1)[0]
+    assert "wing_client.set_fader" not in correct_example
+    assert "_apply_manual_console_write" in correct_example
+
+
 @pytest.mark.asyncio
 async def test_unimplemented_status_endpoints_advertise_disabled_backend_controls():
     server_module = importlib.import_module("backend.server")
