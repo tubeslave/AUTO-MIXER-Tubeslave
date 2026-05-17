@@ -91,6 +91,7 @@ class OperationalAuditResult:
             "unhealthy_agents": self.unhealthy_agents,
             "duplicate_recovery_issues": self.duplicate_recovery_issues,
             "recovery_governor": self.recovery_governor,
+            "priority_actions": build_priority_actions(self),
             "report_paths": self.report_paths,
         }
 
@@ -482,13 +483,18 @@ def render_markdown(result: OperationalAuditResult) -> str:
         f"- recovery_governor_suppress: {result.recovery_governor.get('summary_counts', {}).get('suppress', 0)}",
         f"- recovery_governor_manual_review: {result.recovery_governor.get('summary_counts', {}).get('manual_review', 0)}",
         "",
+    ]
+    lines.extend(render_priority_actions_section("Priority Actions", build_priority_actions(result), max_items=8))
+    lines.extend(
+        [
         "## Report Files",
         f"- markdown: {result.report_paths.get('markdown') or 'missing'}",
         f"- json: {result.report_paths.get('json') or 'missing'}",
         f"- latest_markdown: {result.report_paths.get('latest_markdown') or 'missing'}",
         f"- latest_json: {result.report_paths.get('latest_json') or 'missing'}",
         "",
-    ]
+        ]
+    )
     lines.extend(render_issue_section("Stale Issues", result.stale_issues, max_items=15))
     lines.extend(render_issue_section("Orphaned Issues", result.orphaned_issues, max_items=15))
     lines.extend(render_chain_section("Blocked Dependency Chains", result.blocked_chains, max_items=10))
@@ -497,6 +503,161 @@ def render_markdown(result: OperationalAuditResult) -> str:
     lines.extend(render_duplicate_section("Duplicate Recovery Issues", result.duplicate_recovery_issues, max_items=15))
     lines.extend(render_recovery_governor_section("Recovery Governor", result.recovery_governor, max_items=15))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def build_priority_actions(result: OperationalAuditResult) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+    blocked_count = int(result.issue_status_counts.get("blocked", 0))
+    todo_count = int(result.issue_status_counts.get("todo", 0))
+    in_progress_count = int(result.issue_status_counts.get("in_progress", 0))
+    recovery_counts = result.recovery_governor.get("summary_counts", {}) if isinstance(result.recovery_governor, dict) else {}
+
+    if result.unhealthy_agents:
+        first = result.unhealthy_agents[0]
+        actions.append(
+            priority_action(
+                "repair_unhealthy_agents",
+                "critical",
+                (
+                    f"{len(result.unhealthy_agents)} agent(s) are unhealthy; "
+                    "blocked or assigned work may not progress until they are reviewed."
+                ),
+                first.get("name"),
+                first.get("reason"),
+                "operator_read_only_review",
+            )
+        )
+
+    if todo_count == 0 and in_progress_count == 0 and blocked_count > 0:
+        actions.append(
+            priority_action(
+                "triage_blocked_queue",
+                "critical",
+                f"{blocked_count} issue(s) are blocked while no todo or in-progress work is available.",
+                "blocked_queue",
+                "automation has no safe preview target",
+                "review blockers before creating or dispatching new work",
+            )
+        )
+
+    if result.orphaned_issues:
+        first = result.orphaned_issues[0]
+        actions.append(
+            priority_action(
+                "review_orphaned_assignments",
+                "high",
+                f"{len(result.orphaned_issues)} open issue(s) are unassigned, assigned to a missing agent, or assigned to an unhealthy agent.",
+                first.get("identifier"),
+                first.get("reason"),
+                "manual Paperclip review",
+            )
+        )
+
+    if result.blocked_cycles:
+        first = result.blocked_cycles[0]
+        actions.append(
+            priority_action(
+                "break_blocked_dependency_cycles",
+                "high",
+                f"{len(result.blocked_cycles)} blocked dependency cycle(s) were found.",
+                " -> ".join(first.get("path_identifiers") or []),
+                first.get("reason"),
+                "manual dependency review",
+            )
+        )
+
+    if result.blocked_chains:
+        first = result.blocked_chains[0]
+        actions.append(
+            priority_action(
+                "resolve_deep_blocked_chains",
+                "medium",
+                f"{len(result.blocked_chains)} blocked dependency chain(s) need review.",
+                " -> ".join(first.get("path_identifiers") or []),
+                first.get("terminal_reason") or first.get("reason"),
+                "manual dependency review",
+            )
+        )
+
+    if result.duplicate_recovery_issues:
+        first = result.duplicate_recovery_issues[0]
+        actions.append(
+            priority_action(
+                "dedupe_recovery_issues",
+                "medium",
+                f"{len(result.duplicate_recovery_issues)} duplicate recovery issue group(s) were found.",
+                first.get("target_identifier") or ", ".join(first.get("issue_identifiers") or []),
+                first.get("reason"),
+                "manual recovery review",
+            )
+        )
+
+    manual_review = int(recovery_counts.get("manual_review", 0) or 0)
+    suppressed = int(recovery_counts.get("suppress", 0) or 0)
+    if manual_review or suppressed:
+        actions.append(
+            priority_action(
+                "review_recovery_governor_blocks",
+                "medium",
+                f"Recovery governor has {manual_review} manual-review and {suppressed} suppressed target(s).",
+                "recovery_governor",
+                "recursive or duplicate recovery paths need operator review",
+                "operator_read_only_review",
+            )
+        )
+
+    if not actions:
+        actions.append(
+            priority_action(
+                "continue_safe_dry_run_flow",
+                "low",
+                "No audit blockers were found; continue normal status -> preview -> approval-template flow.",
+                "operator_cycle",
+                "audit clear",
+                "python3 tools/automixer_operator/operator.py cycle",
+            )
+        )
+
+    return actions
+
+
+def priority_action(
+    key: str,
+    severity: str,
+    reason: str,
+    target: Any,
+    evidence: Any,
+    next_step: str,
+) -> dict[str, Any]:
+    return {
+        "key": key,
+        "severity": severity,
+        "reason": reason,
+        "target": target or "none",
+        "evidence": evidence or "none",
+        "next_step": next_step,
+        "write_permitted": False,
+    }
+
+
+def render_priority_actions_section(
+    title: str,
+    actions: list[dict[str, Any]],
+    *,
+    max_items: int,
+) -> list[str]:
+    lines = [f"## {title}"]
+    if not actions:
+        return lines + ["- none", ""]
+    for item in actions[:max_items]:
+        lines.append(f"- {item.get('severity')}: {item.get('key')}")
+        lines.append(f"  reason: {item.get('reason')}")
+        lines.append(f"  target: {item.get('target')}")
+        lines.append(f"  evidence: {item.get('evidence')}")
+        lines.append(f"  next_step: {item.get('next_step')}")
+        lines.append(f"  write_permitted: {item.get('write_permitted')}")
+    lines.append("")
+    return lines
 
 
 def render_issue_section(title: str, items: list[dict[str, Any]], *, max_items: int) -> list[str]:

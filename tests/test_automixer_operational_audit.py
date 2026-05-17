@@ -135,10 +135,22 @@ def test_create_operational_audit_detects_required_conditions(tmp_path: Path):
     assert result.duplicate_recovery_issues[0]["target_identifier"] == "TUB-700"
     assert "summary_counts" in result.recovery_governor
     assert "targets" in result.recovery_governor
+    priority_actions = operational_audit.build_priority_actions(result)
+    priority_keys = [item["key"] for item in priority_actions]
+    assert priority_keys[:3] == [
+        "repair_unhealthy_agents",
+        "review_orphaned_assignments",
+        "break_blocked_dependency_cycles",
+    ]
+    assert all(item["write_permitted"] is False for item in priority_actions)
+    assert result.as_dict()["priority_actions"] == priority_actions
     assert Path(result.report_paths["markdown"]).exists()
     assert Path(result.report_paths["json"]).exists()
     assert Path(result.report_paths["latest_markdown"]).exists()
-    assert "Daily Operational Audit" in Path(result.report_paths["markdown"]).read_text(encoding="utf-8")
+    markdown = Path(result.report_paths["markdown"]).read_text(encoding="utf-8")
+    assert "Daily Operational Audit" in markdown
+    assert "## Priority Actions" in markdown
+    assert "repair_unhealthy_agents" in markdown
     assert client.calls == [
         (
             "/api/companies/company-1/issues",
