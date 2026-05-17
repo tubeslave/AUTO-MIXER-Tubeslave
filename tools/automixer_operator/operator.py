@@ -440,7 +440,7 @@ def priority_command(action: dict[str, Any]) -> str:
     if key == "triage_blocked_queue":
         return "python3 tools/automixer_operator/operator.py blocked"
     if key == "repair_unhealthy_agents":
-        return "python3 tools/automixer_operator/operator.py status"
+        return "python3 tools/automixer_operator/operator.py agent-health"
     return "python3 tools/automixer_operator/operator.py operational-audit"
 
 
@@ -914,6 +914,191 @@ def command_blocked(config: OperatorConfig) -> int:
     issues, error = load_blocked_issues(config, context)
     print(render_blocked_queue(context, issues, error))
     return 0 if error is None else 1
+
+
+def command_agent_health(config: OperatorConfig) -> int:
+    context = load_context(config)
+    details = load_agent_health_details(config, context)
+    print(render_agent_health(context, details))
+    return 0 if details.get("error") is None else 1
+
+
+def load_agent_health_details(config: OperatorConfig, context: dict[str, Any]) -> dict[str, Any]:
+    if context.get("paperclip_api_ok") is not True:
+        return {"error": "Paperclip API is unavailable"}
+    company_id = clean_missing(str(context.get("company_id") or ""))
+    if not company_id:
+        return {"error": "company_id is unavailable"}
+
+    client = bridge.PaperclipClient(
+        str(context.get("paperclip_api_url") or bridge.DEFAULT_PAPERCLIP_API_URL),
+        parse_float(
+            config.environ.get("GPT_CONTROL_BRIDGE_PAPERCLIP_TIMEOUT_SECONDS"),
+            3.0,
+        ),
+    )
+    agents_payload, agents_error = bridge.safe_get(
+        client,
+        f"/api/companies/{bridge.quote(company_id)}/agents",
+    )
+    issues_payload, issues_error = bridge.safe_get(
+        client,
+        f"/api/companies/{bridge.quote(company_id)}/issues",
+        params={"status": PREVIEW_ISSUE_STATUSES, "limit": 500},
+    )
+    if agents_error or issues_error:
+        return {"error": "; ".join(error for error in (agents_error, issues_error) if error)}
+
+    agents = bridge.extract_items(agents_payload, ["agents", "data", "items", "results"])
+    issues = bridge.extract_items(issues_payload, ["issues", "data", "items", "results"])
+    audit = latest_operational_audit(config.project_root) or {}
+    unhealthy_audit_items = audit.get("unhealthy_agents") if isinstance(audit.get("unhealthy_agents"), list) else []
+    unhealthy_ids = {
+        clean_missing(str(item.get("id") or ""))
+        for item in unhealthy_audit_items
+        if isinstance(item, dict)
+    }
+    unhealthy_names = {
+        clean_missing(str(item.get("name") or ""))
+        for item in unhealthy_audit_items
+        if isinstance(item, dict)
+    }
+    unhealthy_ids.discard(None)
+    unhealthy_names.discard(None)
+
+    selected_agents = [
+        agent
+        for agent in agents
+        if is_agent_unhealthy_by_audit_or_status(agent, unhealthy_ids, unhealthy_names)
+    ]
+    selected_agents = sorted(selected_agents, key=lambda agent: (agent_name(agent).lower(), get_agent_id(agent) or ""))
+    details = []
+    for agent in selected_agents:
+        agent_id = get_agent_id(agent)
+        assigned_issues = [
+            issue
+            for issue in issues
+            if get_issue_assignee(issue) == agent_id
+        ]
+        detail_payload, detail_error = ({}, None)
+        if agent_id:
+            detail_payload, detail_error = bridge.safe_get(client, f"/api/agents/{bridge.quote(agent_id)}")
+        details.append(
+            {
+                "agent": bridge.summarize_record(agent, ["id", "name", "title", "role", "status", "adapterType", "lastHeartbeatAt", "updatedAt"]),
+                "audit": find_unhealthy_audit_item(agent, unhealthy_audit_items),
+                "assigned_issue_count": len(assigned_issues),
+                "assigned_issues": [bridge.summarize_record(issue, ["id", "identifier", "title", "status", "priority", "lastActivityAt", "updatedAt"]) for issue in assigned_issues[:10]],
+                "detail_error": detail_error,
+                "safe_adapter_config": safe_agent_adapter_config(detail_payload if isinstance(detail_payload, dict) else {}),
+            }
+        )
+    return {
+        "error": None,
+        "audit_generated_at": audit.get("generated_at") if isinstance(audit, dict) else None,
+        "unhealthy_agent_count": len(details),
+        "agents": details,
+    }
+
+
+def is_agent_unhealthy_by_audit_or_status(
+    agent: dict[str, Any],
+    unhealthy_ids: set[str | None],
+    unhealthy_names: set[str | None],
+) -> bool:
+    agent_id = get_agent_id(agent)
+    name = agent_name(agent)
+    if agent_id and agent_id in unhealthy_ids:
+        return True
+    if name and name in unhealthy_names:
+        return True
+    return bool(agent_attention_items([agent]))
+
+
+def find_unhealthy_audit_item(
+    agent: dict[str, Any],
+    unhealthy_audit_items: list[Any],
+) -> dict[str, Any]:
+    agent_id = get_agent_id(agent)
+    name = agent_name(agent)
+    for item in unhealthy_audit_items:
+        if not isinstance(item, dict):
+            continue
+        if agent_id and clean_missing(str(item.get("id") or "")) == agent_id:
+            return item
+        if name and clean_missing(str(item.get("name") or "")) == name:
+            return item
+    return {}
+
+
+def safe_agent_adapter_config(agent_detail: dict[str, Any]) -> dict[str, Any]:
+    config = agent_detail.get("adapterConfig") if isinstance(agent_detail.get("adapterConfig"), dict) else {}
+    headers = config.get("headers") if isinstance(config.get("headers"), dict) else {}
+    token = clean_missing(str(headers.get("x-openclaw-token") or headers.get("x-openclaw-auth") or ""))
+    device_key = clean_missing(str(config.get("devicePrivateKeyPem") or ""))
+    return {
+        "url": clean_missing(str(config.get("url") or "")) or "missing",
+        "sessionKeyStrategy": clean_missing(str(config.get("sessionKeyStrategy") or "")) or "unknown",
+        "disableDeviceAuth": bool(config.get("disableDeviceAuth", False)),
+        "token_configured": bool(token),
+        "token_length": len(token or ""),
+        "device_key_configured": bool(device_key),
+    }
+
+
+def render_agent_health(context: dict[str, Any], details: dict[str, Any]) -> str:
+    lines = [
+        "== Automixer Agent Health ==",
+        f"context_source: {context.get('_operator_context_source', 'unknown')}",
+        "write actions: disabled",
+        f"paperclip_api_ok: {context.get('paperclip_api_ok')}",
+    ]
+    if details.get("error"):
+        lines.append(f"error: {details['error']}")
+        return "\n".join(lines)
+    lines.append(f"audit_generated_at: {details.get('audit_generated_at') or 'unknown'}")
+    lines.append(f"unhealthy_agents: {details.get('unhealthy_agent_count', 0)}")
+    agents = details.get("agents") if isinstance(details.get("agents"), list) else []
+    if not agents:
+        lines.append("items: none")
+        return "\n".join(lines)
+    for item in agents:
+        agent = item.get("agent") if isinstance(item.get("agent"), dict) else {}
+        audit = item.get("audit") if isinstance(item.get("audit"), dict) else {}
+        config = item.get("safe_adapter_config") if isinstance(item.get("safe_adapter_config"), dict) else {}
+        lines.extend(
+            [
+                "",
+                f"- agent: {agent.get('name') or agent.get('title') or 'unnamed'} ({agent.get('id') or 'missing-id'})",
+                f"  status: {agent.get('status') or 'unknown'}",
+                f"  adapter: {agent.get('adapterType') or 'unknown'}",
+                f"  reason: {audit.get('reason') or 'status needs review'}",
+                f"  heartbeat_age_hours: {audit.get('heartbeat_age_hours') if audit.get('heartbeat_age_hours') is not None else 'unknown'}",
+                f"  assigned_open_issues: {item.get('assigned_issue_count', 0)}",
+            ]
+        )
+        if item.get("detail_error"):
+            lines.append(f"  detail_error: {item['detail_error']}")
+        if config:
+            lines.extend(
+                [
+                    f"  adapter_url: {config.get('url')}",
+                    f"  session_key_strategy: {config.get('sessionKeyStrategy')}",
+                    f"  token_configured: {config.get('token_configured')}",
+                    f"  token_length: {config.get('token_length')}",
+                    f"  device_key_configured: {config.get('device_key_configured')}",
+                    f"  disable_device_auth: {config.get('disableDeviceAuth')}",
+                ]
+            )
+        assigned = item.get("assigned_issues") if isinstance(item.get("assigned_issues"), list) else []
+        for issue in assigned[:5]:
+            lines.append(
+                "  assigned_issue: "
+                + f"{issue.get('identifier') or issue.get('id')}, "
+                + f"status={issue.get('status') or 'unknown'}, "
+                + f"title={issue.get('title') or 'untitled'}"
+            )
+    return "\n".join(lines)
 
 
 def load_blocked_issues(
@@ -1787,6 +1972,7 @@ def build_parser() -> argparse.ArgumentParser:
             "approve-template",
             "monitor",
             "blocked",
+            "agent-health",
             "operational-audit",
             "vector-index",
             "vector-search",
@@ -1830,6 +2016,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_monitor(config)
     if args.command == "blocked":
         return command_blocked(config)
+    if args.command == "agent-health":
+        return command_agent_health(config)
     if args.command == "operational-audit":
         return command_operational_audit(config, args.args)
     if args.command in VECTOR_OPERATOR_COMMANDS:

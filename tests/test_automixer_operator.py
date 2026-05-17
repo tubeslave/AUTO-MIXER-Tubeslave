@@ -295,7 +295,7 @@ def test_next_prefers_latest_audit_priority_when_queue_is_blocked():
     assert action == "repair_unhealthy_agents"
     assert "critical priority" in reason
     assert "Codex" in reason
-    assert command.endswith("operator.py status")
+    assert command.endswith("operator.py agent-health")
 
 
 def test_next_recommends_cycle_when_blocked_report_but_target_ready(tmp_path):
@@ -561,6 +561,101 @@ def test_blocked_command_lists_blocked_issues_read_only(tmp_path, monkeypatch, c
     assert "sample_blocker: TUB-0" in output
     assert calls == [
         ("/api/companies/company-1/issues", {"status": "blocked", "limit": 20}),
+    ]
+
+
+def test_agent_health_reports_unhealthy_agent_without_exposing_token(tmp_path, monkeypatch, capsys):
+    reports_dir = tmp_path / ".paperclip" / "reports"
+    reports_dir.mkdir(parents=True)
+    (reports_dir / "operational_audit_latest.json").write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-05-17T09:00:00Z",
+                "unhealthy_agents": [
+                    {
+                        "id": "agent-error",
+                        "name": "Codex",
+                        "status": "error",
+                        "adapter_type": "openclaw_gateway",
+                        "heartbeat_age_hours": 10.9,
+                        "reason": "agent status is error",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls = []
+
+    class FakeClient:
+        def __init__(self, base_url, timeout_seconds):
+            self.base_url = base_url
+            self.timeout_seconds = timeout_seconds
+
+        def get(self, path, params=None):
+            calls.append((path, params))
+            if path == "/api/companies/company-1/agents":
+                return [
+                    {
+                        "id": "agent-error",
+                        "name": "Codex",
+                        "status": "error",
+                        "adapterType": "openclaw_gateway",
+                    }
+                ]
+            if path == "/api/companies/company-1/issues":
+                return [
+                    {
+                        "id": "issue-111",
+                        "identifier": "TUB-111",
+                        "title": "Check next test readiness",
+                        "status": "blocked",
+                        "assigneeAgentId": "agent-error",
+                    }
+                ]
+            if path == "/api/agents/agent-error":
+                return {
+                    "id": "agent-error",
+                    "adapterConfig": {
+                        "url": "wss://gateway.example.com/",
+                        "sessionKeyStrategy": "issue",
+                        "headers": {"x-openclaw-token": "secret-token-value"},
+                        "devicePrivateKeyPem": "secret-device-key",
+                    },
+                }
+            raise OSError(f"unexpected route: {path}")
+
+    def fake_context(config):
+        return {
+            "_operator_context_source": "test",
+            "paperclip_api_ok": True,
+            "paperclip_api_url": "http://paperclip.test",
+            "company_id": "company-1",
+        }
+
+    monkeypatch.setattr(automixer_operator, "load_context", fake_context)
+    monkeypatch.setattr(automixer_operator.bridge, "PaperclipClient", FakeClient)
+
+    exit_code = automixer_operator.command_agent_health(make_config(tmp_path))
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Automixer Agent Health" in output
+    assert "write actions: disabled" in output
+    assert "agent: Codex (agent-error)" in output
+    assert "adapter_url: wss://gateway.example.com/" in output
+    assert "token_configured: True" in output
+    assert "token_length: 18" in output
+    assert "secret-token-value" not in output
+    assert "secret-device-key" not in output
+    assert "assigned_issue: TUB-111" in output
+    assert calls == [
+        ("/api/companies/company-1/agents", None),
+        (
+            "/api/companies/company-1/issues",
+            {"status": automixer_operator.PREVIEW_ISSUE_STATUSES, "limit": 500},
+        ),
+        ("/api/agents/agent-error", None),
     ]
 
 
@@ -935,6 +1030,7 @@ def test_no_write_routes_or_actions_exist():
         "approve-template",
         "monitor",
         "blocked",
+        "agent-health",
         "operational-audit",
         "vector-index",
         "vector-search",

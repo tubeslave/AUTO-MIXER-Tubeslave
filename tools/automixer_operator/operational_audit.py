@@ -524,7 +524,7 @@ def build_priority_actions(result: OperationalAuditResult) -> list[dict[str, Any
                 ),
                 first.get("name"),
                 first.get("reason"),
-                "operator_read_only_review",
+                "python3 tools/automixer_operator/operator.py agent-health",
             )
         )
 
