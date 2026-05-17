@@ -137,11 +137,14 @@ def test_create_operational_audit_detects_required_conditions(tmp_path: Path):
     assert "targets" in result.recovery_governor
     priority_actions = operational_audit.build_priority_actions(result)
     priority_keys = [item["key"] for item in priority_actions]
-    assert priority_keys[:3] == [
+    assert priority_keys[:4] == [
         "repair_unhealthy_agents",
+        "repair_stale_agent_heartbeats",
         "review_orphaned_assignments",
         "break_blocked_dependency_cycles",
     ]
+    assert priority_actions[0]["severity"] == "critical"
+    assert priority_actions[1]["severity"] == "high"
     assert all(item["write_permitted"] is False for item in priority_actions)
     assert result.as_dict()["priority_actions"] == priority_actions
     assert Path(result.report_paths["markdown"]).exists()
@@ -159,6 +162,45 @@ def test_create_operational_audit_detects_required_conditions(tmp_path: Path):
         ("/api/companies/company-1/agents", None),
         ("/api/companies/company-1/live-runs", {"limit": 200, "minCount": 0}),
     ]
+
+
+def test_stale_only_agents_do_not_outrank_empty_blocked_queue_triage(tmp_path: Path):
+    now = datetime(2026, 5, 17, 9, 0, tzinfo=timezone.utc)
+    client = FakeClient(
+        {
+            "/api/companies/company-1/issues": [
+                issue(
+                    "blocked-1",
+                    "TUB-700",
+                    "Blocked without runnable todo",
+                    "blocked",
+                    last_activity="2026-05-16T00:00:00Z",
+                    assignee="agent-stale",
+                    priority="high",
+                ),
+            ],
+            "/api/companies/company-1/agents": [
+                agent("agent-stale", "Stale Agent", "idle", "2026-05-15T00:00:00Z"),
+            ],
+            "/api/companies/company-1/live-runs": [],
+        }
+    )
+
+    result = operational_audit.create_operational_audit(
+        project_root=tmp_path,
+        api_url="http://paperclip.test",
+        company_id="company-1",
+        now=now,
+        client=client,
+    )
+
+    priority_actions = operational_audit.build_priority_actions(result)
+    assert [item["key"] for item in priority_actions[:2]] == [
+        "triage_blocked_queue",
+        "repair_stale_agent_heartbeats",
+    ]
+    assert priority_actions[0]["severity"] == "critical"
+    assert priority_actions[1]["severity"] == "high"
 
 
 def issue(

@@ -512,14 +512,17 @@ def build_priority_actions(result: OperationalAuditResult) -> list[dict[str, Any
     in_progress_count = int(result.issue_status_counts.get("in_progress", 0))
     recovery_counts = result.recovery_governor.get("summary_counts", {}) if isinstance(result.recovery_governor, dict) else {}
 
-    if result.unhealthy_agents:
-        first = result.unhealthy_agents[0]
+    error_agents = [agent for agent in result.unhealthy_agents if str(agent.get("status") or "").lower() == "error"]
+    stale_agents = [agent for agent in result.unhealthy_agents if str(agent.get("status") or "").lower() != "error"]
+
+    if error_agents:
+        first = error_agents[0]
         actions.append(
             priority_action(
                 "repair_unhealthy_agents",
                 "critical",
                 (
-                    f"{len(result.unhealthy_agents)} agent(s) are unhealthy; "
+                    f"{len(error_agents)} agent(s) are in error; "
                     "blocked or assigned work may not progress until they are reviewed."
                 ),
                 first.get("name"),
@@ -537,6 +540,22 @@ def build_priority_actions(result: OperationalAuditResult) -> list[dict[str, Any
                 "blocked_queue",
                 "automation has no safe preview target",
                 "review blockers before creating or dispatching new work",
+            )
+        )
+
+    if stale_agents:
+        first = stale_agents[0]
+        actions.append(
+            priority_action(
+                "repair_stale_agent_heartbeats",
+                "high",
+                (
+                    f"{len(stale_agents)} idle agent(s) have stale heartbeats; "
+                    "review worker availability, but do not block safer queue triage on this alone."
+                ),
+                first.get("name"),
+                first.get("reason"),
+                "python3 tools/automixer_operator/operator.py agent-health",
             )
         )
 

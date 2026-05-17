@@ -566,7 +566,7 @@ def priority_command(action: dict[str, Any]) -> str:
     key = str(action.get("key") or "")
     if key == "triage_blocked_queue":
         return "python3 tools/automixer_operator/operator.py blocked"
-    if key == "repair_unhealthy_agents":
+    if key in {"repair_unhealthy_agents", "repair_stale_agent_heartbeats"}:
         return "python3 tools/automixer_operator/operator.py agent-health"
     return "python3 tools/automixer_operator/operator.py operational-audit"
 
