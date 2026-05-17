@@ -6256,9 +6256,9 @@ class AutoMixerServer:
         
         try:
             cmd_type = command.get("type")
+            channel = command.get("channel")
             
             if cmd_type == "set_fader":
-                channel = command.get("channel")
                 value = command.get("value", 0.5)
                 result = await self._apply_manual_console_write(
                     websocket=None,
@@ -6284,9 +6284,8 @@ class AutoMixerServer:
                         "channel": channel,
                         "reason": result.get("reason"),
                     })
-                
+
             elif cmd_type == "set_gain":
-                channel = command.get("channel")
                 value = command.get("value", 0.0)
                 result = await self._apply_manual_console_write(
                     websocket=None,
@@ -6323,7 +6322,6 @@ class AutoMixerServer:
                 })
                     
             elif cmd_type == "mute_channel":
-                channel = command.get("channel")
                 muted = command.get("muted", True)
                 await self.broadcast({
                     "type": "voice_command_blocked",
@@ -6334,7 +6332,6 @@ class AutoMixerServer:
                 })
                 
             elif cmd_type == "volume_up":
-                channel = command.get("channel")
                 db_change = command.get("db", 3)  # Get dB value directly (default 3 dB)
                 if channel is not None:
                     # Try to get current value from tracked values first, then from mixer
@@ -6396,7 +6393,6 @@ class AutoMixerServer:
                     logger.warning(f"volume_up command ignored: channel is None")
                     
             elif cmd_type == "volume_down":
-                channel = command.get("channel")
                 db_change = command.get("db", 3)  # Get dB value directly (default 3 dB)
                 if channel is not None:
                     # Try to get current value from tracked values first, then from mixer
@@ -6458,7 +6454,6 @@ class AutoMixerServer:
                     logger.warning(f"volume_down command ignored: channel is None")
             
             elif cmd_type == "eq_on":
-                channel = command.get("channel")
                 on = command.get("on", 1)
                 await self.broadcast({
                     "type": "voice_command_blocked",
@@ -6469,7 +6464,6 @@ class AutoMixerServer:
                 })
             
             elif cmd_type == "eq_band_up" or cmd_type == "eq_band_down":
-                channel = command.get("channel")
                 band = command.get("band")
                 db_change = command.get("db", 3)
                 await self.broadcast({
@@ -6482,7 +6476,6 @@ class AutoMixerServer:
                 })
             
             elif cmd_type == "compressor_on":
-                channel = command.get("channel")
                 on = command.get("on", 1)
                 await self.broadcast({
                     "type": "voice_command_blocked",
@@ -6493,7 +6486,6 @@ class AutoMixerServer:
                 })
             
             elif cmd_type == "compressor_threshold":
-                channel = command.get("channel")
                 threshold = command.get("threshold")
                 await self.broadcast({
                     "type": "voice_command_blocked",
@@ -6504,7 +6496,6 @@ class AutoMixerServer:
                 })
             
             elif cmd_type == "compressor_gain_up" or cmd_type == "compressor_gain_down":
-                channel = command.get("channel")
                 db_change = command.get("db", 3)
                 await self.broadcast({
                     "type": "voice_command_blocked",

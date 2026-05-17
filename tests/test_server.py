@@ -7,6 +7,7 @@ All tests work without hardware or network (all external connections mocked).
 
 import json
 import sys
+import time
 import numpy as np
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -847,6 +848,136 @@ class TestManualWriteRollbackSession:
             approved=True,
             approval_id="approval-generic-1",
             bypass_cooldown=False,
+        )
+
+
+class TestVoiceCommandManualWriteSafety:
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_voice_fader_blocks_without_approval(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command(
+            {"type": "set_fader", "channel": 1, "value": -12.0, "reason": "voice check"}
+        )
+
+        server.mixer_client.supervised_set_channel_fader.assert_not_called()
+        server.broadcast.assert_awaited_once_with(
+            {
+                "type": "voice_command_blocked",
+                "command": "set_fader",
+                "channel": 1,
+                "reason": "approval_required",
+            }
+        )
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_voice_gain_uses_supervised_manual_write_gate_when_approved(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command(
+            {
+                "type": "set_gain",
+                "channel": 2,
+                "value": 1.5,
+                "reason": "voice approved gain",
+                "approved": True,
+                "approval_id": "voice-gain-1",
+            }
+        )
+
+        server.mixer_client.supervised_set_channel_gain.assert_called_once_with(
+            2,
+            1.5,
+            source="voice:set_gain",
+            reason="voice approved gain",
+            approved=True,
+            approval_id="voice-gain-1",
+            bypass_cooldown=False,
+        )
+        server.broadcast.assert_awaited_once_with(
+            {
+                "type": "voice_command_executed",
+                "command": "set_gain",
+                "channel": 2,
+                "value": 1.5,
+            }
+        )
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_voice_fader_respects_manual_write_cooldown(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.broadcast = AsyncMock()
+        server._manual_write_cooldown_sec = 30.0
+        server._manual_write_last_ts[(1, "fader")] = time.time()
+
+        await server._execute_voice_command(
+            {
+                "type": "set_fader",
+                "channel": 1,
+                "value": -9.0,
+                "reason": "voice cooldown check",
+                "approved": True,
+                "approval_id": "voice-fader-1",
+            }
+        )
+
+        server.mixer_client.supervised_set_channel_fader.assert_not_called()
+        server.broadcast.assert_awaited_once()
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_blocked"
+        assert payload["command"] == "set_fader"
+        assert payload["channel"] == 1
+        assert payload["reason"] == "cooldown"
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_voice_load_snap_stays_blocked_and_does_not_call_live_mixer(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command(
+            {"type": "load_snap", "snap_name": "concert_a", "reason": "voice snapshot request"}
+        )
+
+        server.mixer_client.load_snap.assert_not_called()
+        assert server.broadcast.await_count == 1
+        server.broadcast.assert_awaited_once_with(
+            {
+                "type": "voice_command_blocked",
+                "command": "load_snap",
+                "snap_name": "concert_a",
+                "reason": "write_kind_not_allowed",
+            }
         )
 
 
