@@ -436,12 +436,35 @@ function App() {
 
       {/* Main Content */}
       <main className="main-content">
-        {/* Top bar with mode indicator */}
+        {/* Top bar with session and safety indicators */}
         <div className="topbar">
-          <span className="topbar-title">
-            {activeNavItem?.icon}{' '}
-            {activeNavItem?.label}
-          </span>
+          <div className="topbar-session">
+            <span>Session</span>
+            <strong>2026-05-17 · {activeNavItem?.label}</strong>
+            <small>Live in Club · Soundcheck</small>
+          </div>
+          <div className="topbar-status-grid">
+            <div className="topbar-status-cell">
+              <span>Status</span>
+              <strong className={serverConnected ? 'status-green' : 'status-red'}>
+                {serverConnected ? 'Live' : 'Offline'}
+              </strong>
+            </div>
+            <div className="topbar-status-cell">
+              <span>Mode</span>
+              <strong className={`mode-text-${operatorMode}`}>{operatorModeLabel}</strong>
+            </div>
+            <div className="topbar-status-cell">
+              <span>Safe</span>
+              <strong className={operatorModeCanApply ? 'status-yellow' : 'status-green'}>
+                {operatorModeCanApply ? 'Armed' : 'On'}
+              </strong>
+            </div>
+            <div className="topbar-status-cell">
+              <span>Connected to</span>
+              <strong>{mixerConnected ? 'WING RACK' : 'Safe Offline'}</strong>
+            </div>
+          </div>
           <div className="topbar-mode">
             <div className={`mode-badge operator-mode-badge mode-${operatorMode}`}>
               Режим: {operatorModeLabel}
@@ -456,6 +479,12 @@ function App() {
                 <span className="policy-blocked" key={reason}>{reason}</span>
               ))}
             </div>
+          </div>
+          <div className="topbar-user">
+            <button title="Аудио">▥</button>
+            <button title="Снимок">□</button>
+            <button title="Настройки">⚙</button>
+            <div><strong>Director</strong><span>Automixer</span></div>
           </div>
         </div>
 
