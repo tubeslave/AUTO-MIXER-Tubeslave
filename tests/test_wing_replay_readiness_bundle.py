@@ -7,9 +7,31 @@ def _write_json(path, payload):
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
-def _write_shadow_report_dir(base_dir, *, ready=True, live_mixer_writes=False, dry_run_only=True):
+def _write_shadow_report_dir(
+    base_dir,
+    *,
+    ready=True,
+    live_mixer_writes=False,
+    dry_run_only=True,
+    include_safety_evidence=True,
+):
     report_dir = base_dir / "shadow"
     report_dir.mkdir()
+    comparison_evidence = {}
+    readiness_safety = {}
+    if include_safety_evidence:
+        comparison_evidence.update(
+            {
+                "dry_run_only": dry_run_only,
+                "live_mixer_writes": live_mixer_writes,
+            }
+        )
+        readiness_safety.update(
+            {
+                "dry_run_only": dry_run_only,
+                "live_mixer_writes": live_mixer_writes,
+            }
+        )
     _write_json(
         report_dir / "shadow_mode_summary.json",
         {
@@ -24,18 +46,13 @@ def _write_shadow_report_dir(base_dir, *, ready=True, live_mixer_writes=False, d
             "selected_proposal_id": "proposal::selected",
             "disagreements": [],
             "disagreement_summary": {"disagreement_rate": 0.0},
-            "evidence": {
-                "dry_run_only": dry_run_only,
-                "live_mixer_writes": live_mixer_writes,
-            },
+            "evidence": comparison_evidence,
         },
     )
     _write_json(
         report_dir / "promotion_readiness_report.json",
         {
             "ready": ready,
-            "dry_run_only": dry_run_only,
-            "live_mixer_writes": live_mixer_writes,
             "promotion_readiness_score": 91,
             "validation_highest_severity": "info",
             "promotion_readiness_gates": [{"key": "dry_run_only", "ok": dry_run_only}],
@@ -45,6 +62,7 @@ def _write_shadow_report_dir(base_dir, *, ready=True, live_mixer_writes=False, d
                 "rollback_frequency": {"blocked_event_count": 0},
                 "confidence_trend": {"direction": "ai_above_operator"},
             },
+            **readiness_safety,
         },
     )
     _write_json(report_dir / "rollback_simulation_report.json", {"blocked_reasons": []})
@@ -169,6 +187,34 @@ def test_bundle_fails_closed_when_observation_only_telemetry_contains_write_sent
     assert "observation_only_telemetry_contains_write_sent" in payload["blockers"]
     assert payload["telemetry"]["dangerous_write_detected"] is True
     assert payload["telemetry"]["dangerous_write_sessions"][0]["write_sent_count"] == 1
+
+
+def test_bundle_fails_closed_when_shadow_safety_evidence_is_missing(tmp_path):
+    report_dir = _write_shadow_report_dir(tmp_path, include_safety_evidence=False)
+    live_session = _write_telemetry_session(
+        tmp_path,
+        "live",
+        events=[
+            {"seq": 1, "timestamp": 1.0, "event_type": "query_sent", "address": "/ch/1/fdr"},
+            {"seq": 2, "timestamp": 2.0, "event_type": "console_observed", "address": "/ch/1/fdr", "values": [0.5]},
+        ],
+    )
+    supervised_summary = _write_supervised_summary(tmp_path, live_session)
+
+    result = build_wing_replay_readiness_bundle(
+        output_dir=tmp_path / "bundle",
+        shadow_report_dir=report_dir,
+        live_telemetry_session=live_session,
+        supervised_summary_path=supervised_summary,
+    )
+
+    payload = json.loads(result["json"].read_text(encoding="utf-8"))
+
+    assert payload["ready"] is False
+    assert payload["shadow"]["dry_run_only"] is False
+    assert payload["shadow"]["live_mixer_writes"] is True
+    assert "shadow_report_not_dry_run_only" in payload["blockers"]
+    assert "shadow_report_live_mixer_writes" in payload["blockers"]
 
 
 def test_bundle_surfaces_explicit_no_clipping_evidence_from_supervised_summary(tmp_path):

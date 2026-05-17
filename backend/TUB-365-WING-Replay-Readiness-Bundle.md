@@ -15,6 +15,8 @@
 
 - Fails closed if a shadow report is not dry-run only.
 - Fails closed if a shadow report indicates live mixer writes.
+- Fails closed if shadow safety evidence is missing from both the comparison
+  report and the promotion-readiness report.
 - Fails closed if observation-only telemetry contains any `write_sent` event.
 - Fails closed if the supervised summary is missing telemetry artifact paths.
 - Preserves the exact blocker list in the bundle output for review.
@@ -26,6 +28,7 @@
 - Coverage:
   - safe path: shadow-ready bundle + observation-only telemetry with blocked writes only
   - unsafe path: observation-only telemetry containing `write_sent` must force `ready=false`
+  - unsafe path: missing shadow safety evidence must force `ready=false`
   - explicit no-clipping evidence path: supervised summary evidence is copied into the bundle and markdown output
 
 ## Targeted verification

@@ -42,6 +42,13 @@ def _pick_truthy(*values: Any) -> Any:
     return None
 
 
+def _pick_bool_with_default(*values: Any, default: bool) -> bool:
+    for value in values:
+        if value is not None:
+            return bool(value)
+    return default
+
+
 def _normalize_no_clipping_candidate(
     candidate: Mapping[str, Any] | None,
     *,
@@ -151,6 +158,7 @@ def _build_shadow_status(shadow_report_dir: str | Path) -> dict[str, Any]:
     rollback = _load_optional_json(root / "rollback_simulation_report.json")
     trajectory = _load_optional_json(root / "confidence_trajectory.json")
     aggregation = dict(readiness.get("aggregation") or {})
+    comparison_evidence = dict(comparison.get("evidence") or {})
     blocked_gates = [
         str(gate.get("key"))
         for gate in readiness.get("promotion_readiness_gates", [])
@@ -164,9 +172,15 @@ def _build_shadow_status(shadow_report_dir: str | Path) -> dict[str, Any]:
         "ready": bool(readiness.get("ready", False)),
         "promotion_readiness_score": readiness.get("promotion_readiness_score"),
         "validation_highest_severity": readiness.get("validation_highest_severity"),
-        "dry_run_only": bool(readiness.get("dry_run_only", comparison.get("evidence", {}).get("dry_run_only", True))),
-        "live_mixer_writes": bool(
-            readiness.get("live_mixer_writes", comparison.get("evidence", {}).get("live_mixer_writes", False))
+        "dry_run_only": _pick_bool_with_default(
+            readiness.get("dry_run_only"),
+            comparison_evidence.get("dry_run_only"),
+            default=False,
+        ),
+        "live_mixer_writes": _pick_bool_with_default(
+            readiness.get("live_mixer_writes"),
+            comparison_evidence.get("live_mixer_writes"),
+            default=True,
         ),
         "disagreement_count": len(comparison.get("disagreements") or []),
         "disagreement_rate": aggregation.get(
