@@ -1010,6 +1010,7 @@ def render_status(config: OperatorConfig, context: dict[str, Any]) -> str:
     lines.extend(render_agents(context.get("agents_summary")))
     direct_counts, direct_counts_error = load_issue_status_counts(config, context)
     lines.extend(render_queue_counts(context.get("dashboard_summary"), direct_counts, direct_counts_error))
+    lines.extend(render_latest_operational_audit(config.project_root))
     lines.extend(render_state(context.get("watchdog_state_summary")))
     lines.extend(render_latest_report(context))
     lines.extend(["", render_recommended_action(context, direct_counts)])
@@ -1131,6 +1132,48 @@ def render_queue_counts(
         lines.append(f"- {status}: {value}")
     if direct_counts_error:
         lines.append(f"- issues_fallback_warning: {direct_counts_error}")
+    return lines
+
+
+def latest_operational_audit(project_root: Path) -> dict[str, Any] | None:
+    path = project_root / ".paperclip" / "reports" / "operational_audit_latest.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def render_latest_operational_audit(project_root: Path) -> list[str]:
+    lines = ["", "Latest operational audit:"]
+    audit = latest_operational_audit(project_root)
+    path = project_root / ".paperclip" / "reports" / "operational_audit_latest.json"
+    if not audit:
+        return lines + ["- none"]
+    lines.append(f"- path: {path}")
+    lines.append(f"- generated_at: {audit.get('generated_at') or 'unknown'}")
+    issue_counts = audit.get("issue_status_counts") if isinstance(audit.get("issue_status_counts"), dict) else {}
+    agent_counts = audit.get("agent_status_counts") if isinstance(audit.get("agent_status_counts"), dict) else {}
+    if issue_counts:
+        lines.append(f"- issue_status_counts: {format_counts(issue_counts)}")
+    if agent_counts:
+        lines.append(f"- agent_status_counts: {format_counts(agent_counts)}")
+    priority_actions = audit.get("priority_actions") if isinstance(audit.get("priority_actions"), list) else []
+    if not priority_actions:
+        lines.append("- priority_actions: none")
+        return lines
+    lines.append(f"- priority_actions: {len(priority_actions)}")
+    for item in priority_actions[:5]:
+        if not isinstance(item, dict):
+            continue
+        lines.append(
+            "- priority_action: "
+            + f"{item.get('severity') or 'unknown'}:{item.get('key') or 'unknown'}, "
+            + f"target={item.get('target') or 'none'}, "
+            + f"write_permitted={item.get('write_permitted')}"
+        )
     return lines
 
 

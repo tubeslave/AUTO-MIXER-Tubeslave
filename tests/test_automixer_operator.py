@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -301,6 +302,46 @@ def test_work_queue_uses_issue_fallback_counts():
     assert "- blocked: 2" in lines
     assert "- todo: 3" in lines
     assert "- in_progress: 1" in lines
+
+
+def test_status_shows_latest_operational_audit_priorities(tmp_path):
+    reports_dir = tmp_path / ".paperclip" / "reports"
+    reports_dir.mkdir(parents=True)
+    (reports_dir / "operational_audit_latest.json").write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-05-17T09:00:00Z",
+                "issue_status_counts": {"blocked": 85, "todo": 0},
+                "agent_status_counts": {"error": 1, "idle": 8},
+                "priority_actions": [
+                    {
+                        "key": "repair_unhealthy_agents",
+                        "severity": "critical",
+                        "target": "Codex",
+                        "write_permitted": False,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    output = automixer_operator.render_status(
+        make_config(tmp_path),
+        {
+            "_operator_context_source": "test",
+            "paperclip_api_url": "http://paperclip.test",
+            "paperclip_api_ok": False,
+            "company_id": "company-1",
+            "active_runs_summary": {"available": True, "total": 0, "items": []},
+            "agents_summary": {"available": True, "total": 0, "items": []},
+            "dashboard_summary": {"available": False, "reason": "test"},
+        },
+    )
+
+    assert "Latest operational audit:" in output
+    assert "- priority_actions: 1" in output
+    assert "- priority_action: critical:repair_unhealthy_agents, target=Codex, write_permitted=False" in output
 
 
 def test_agents_summary_highlights_error_agents():
