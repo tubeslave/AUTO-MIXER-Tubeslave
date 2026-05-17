@@ -35,6 +35,7 @@ from tools.automixer_operator import operational_audit  # noqa: E402
 DEFAULT_BRIDGE_CONTEXT_URL = "http://127.0.0.1:8788/v1/context/automixer"
 DEFAULT_BRIDGE_TIMEOUT_SECONDS = 1.0
 DEFAULT_OPENCLAW_LOCAL_HEALTH_URL = "http://127.0.0.1:18679/"
+OPENCLAW_LOCAL_PORTS = (18679, 18681, 18682)
 BRIDGE_TMUX_SESSION = "automixer_gpt_control_bridge"
 WATCHDOG_SCRIPT = Path("tools/paperclip_watchdog/automixer_paperclip_watchdog.py")
 VECTOR_INDEXER_SCRIPT = Path("tools/project_vector_index/automixer_chromadb_index.py")
@@ -191,6 +192,42 @@ def probe_openclaw_local_gateway(config: OperatorConfig) -> dict[str, Any]:
             1.0,
         ),
     )
+
+
+def load_openclaw_local_listeners() -> dict[str, Any]:
+    command = ["lsof", "-nP"]
+    for port in OPENCLAW_LOCAL_PORTS:
+        command.append(f"-iTCP:{port}")
+    command.append("-sTCP:LISTEN")
+    try:
+        result = subprocess.run(
+            command,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"error": f"{type(exc).__name__}: {exc}", "items": []}
+    if result.returncode not in (0, 1):
+        return {"error": (result.stderr or result.stdout or "lsof failed").strip(), "items": []}
+    return {"error": None, "items": parse_lsof_listeners(result.stdout)}
+
+
+def parse_lsof_listeners(raw: str) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    for line in raw.splitlines()[1:]:
+        parts = line.split(None, 8)
+        if len(parts) < 9:
+            continue
+        items.append(
+            {
+                "command": parts[0].replace("\\x20", " "),
+                "pid": parts[1],
+                "name": parts[8],
+            }
+        )
+    return items
 
 
 def probe_local_http_url(url: str, timeout_seconds: float) -> dict[str, Any]:
@@ -1081,6 +1118,11 @@ def load_agent_health_details(config: OperatorConfig, context: dict[str, Any]) -
             if str(agent.get("adapterType") or agent.get("adapter_type") or "") == "openclaw_gateway"
             else None
         )
+        local_gateway_listeners = (
+            load_openclaw_local_listeners()
+            if str(agent.get("adapterType") or agent.get("adapter_type") or "") == "openclaw_gateway"
+            else None
+        )
         details.append(
             {
                 "agent": agent_summary,
@@ -1090,6 +1132,7 @@ def load_agent_health_details(config: OperatorConfig, context: dict[str, Any]) -
                 "detail_error": detail_error,
                 "safe_adapter_config": adapter_config,
                 "local_gateway_probe": local_gateway_probe,
+                "local_gateway_listeners": local_gateway_listeners,
                 "repair_hint": agent_repair_hint(agent_summary, audit_item, adapter_config, local_gateway_probe),
             }
         )
@@ -1235,6 +1278,19 @@ def render_agent_health(context: dict[str, Any], details: dict[str, Any]) -> str
             )
             if probe.get("error"):
                 lines.append(f"  local_gateway_error: {probe.get('error')}")
+        listeners = item.get("local_gateway_listeners") if isinstance(item.get("local_gateway_listeners"), dict) else {}
+        if listeners:
+            lines.append(f"  local_gateway_listener_count: {len(listeners.get('items') or [])}")
+            if listeners.get("error"):
+                lines.append(f"  local_gateway_listener_error: {listeners.get('error')}")
+            for listener in (listeners.get("items") or [])[:5]:
+                if isinstance(listener, dict):
+                    lines.append(
+                        "  local_gateway_listener: "
+                        + f"pid={listener.get('pid')}, "
+                        + f"command={listener.get('command')}, "
+                        + f"name={listener.get('name')}"
+                    )
         assigned = item.get("assigned_issues") if isinstance(item.get("assigned_issues"), list) else []
         for issue in assigned[:5]:
             lines.append(

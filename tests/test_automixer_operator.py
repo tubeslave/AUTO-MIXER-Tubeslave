@@ -650,6 +650,14 @@ def test_agent_health_reports_unhealthy_agent_without_exposing_token(tmp_path, m
             "error": None,
         },
     )
+    monkeypatch.setattr(
+        automixer_operator,
+        "load_openclaw_local_listeners",
+        lambda: {
+            "error": None,
+            "items": [{"pid": "123", "command": "Kimi H", "name": "127.0.0.1:18679"}],
+        },
+    )
 
     exit_code = automixer_operator.command_agent_health(make_config(tmp_path))
 
@@ -668,6 +676,8 @@ def test_agent_health_reports_unhealthy_agent_without_exposing_token(tmp_path, m
     assert "local_gateway_probe_url: http://127.0.0.1:18679/" in output
     assert "local_gateway_reachable: True" in output
     assert "local_gateway_openclaw_detected: True" in output
+    assert "local_gateway_listener_count: 1" in output
+    assert "local_gateway_listener: pid=123, command=Kimi H, name=127.0.0.1:18679" in output
     assert "assigned_issue: TUB-111" in output
     assert calls == [
         ("/api/companies/company-1/agents", None),
@@ -692,6 +702,19 @@ def test_local_gateway_probe_refuses_external_url(monkeypatch):
     assert result["ok"] is False
     assert result["url"] == "https://gateway.example.com/"
     assert "secret" not in result["url"]
+
+
+def test_parse_lsof_listeners_sanitizes_command_name():
+    raw = "\n".join(
+        [
+            "COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME",
+            "Kimi\\x20H 123 user 18u IPv4 dev 0t0 TCP 127.0.0.1:18679 (LISTEN)",
+        ]
+    )
+
+    assert automixer_operator.parse_lsof_listeners(raw) == [
+        {"command": "Kimi H", "pid": "123", "name": "127.0.0.1:18679 (LISTEN)"}
+    ]
 
 
 def test_operational_audit_command_prints_report_paths(tmp_path, monkeypatch, capsys):
