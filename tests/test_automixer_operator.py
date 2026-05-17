@@ -279,6 +279,48 @@ def test_work_queue_uses_issue_fallback_counts():
     assert "- in_progress: 1" in lines
 
 
+def test_recommended_action_triages_blocked_only_queue():
+    action = automixer_operator.operator_recommended_action(
+        {
+            "paperclip_api_ok": True,
+            "active_runs_summary": {"available": True, "total": 0},
+            "dashboard_summary": {"available": True, "summary": {"tasks": {"blocked": 7}}},
+            "recommended_next_action": {
+                "action": "review_latest_report",
+                "reason": "generic bridge fallback",
+                "requires_approval": False,
+                "write_permitted": False,
+            },
+        },
+        {"blocked": 7, "todo": 0, "in_progress": 0},
+    )
+
+    assert action is not None
+    assert action["action"] == "triage_blocked_queue_or_create_safe_local_task"
+    assert "7 blocked issues" in action["reason"]
+    assert action["write_permitted"] is False
+
+
+def test_recommended_action_keeps_base_when_todo_exists():
+    action = automixer_operator.operator_recommended_action(
+        {
+            "paperclip_api_ok": True,
+            "active_runs_summary": {"available": True, "total": 0},
+            "dashboard_summary": {"available": True, "summary": {"tasks": {"blocked": 7}}},
+            "recommended_next_action": {
+                "action": "review_latest_report",
+                "reason": "generic bridge fallback",
+                "requires_approval": False,
+                "write_permitted": False,
+            },
+        },
+        {"blocked": 7, "todo": 1, "in_progress": 0},
+    )
+
+    assert action is not None
+    assert action["action"] == "review_latest_report"
+
+
 def test_approve_template_only_prints_command(tmp_path, monkeypatch, capsys):
     write_dry_run_report(tmp_path)
 

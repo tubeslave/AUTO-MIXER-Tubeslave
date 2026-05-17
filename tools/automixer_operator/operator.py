@@ -962,7 +962,7 @@ def render_status(config: OperatorConfig, context: dict[str, Any]) -> str:
     lines.extend(render_queue_counts(context.get("dashboard_summary"), direct_counts, direct_counts_error))
     lines.extend(render_state(context.get("watchdog_state_summary")))
     lines.extend(render_latest_report(context))
-    lines.extend(["", render_recommended_action(context)])
+    lines.extend(["", render_recommended_action(context, direct_counts)])
     return "\n".join(lines)
 
 
@@ -1067,6 +1067,22 @@ def render_queue_counts(
     return lines
 
 
+def queue_count(
+    context: dict[str, Any],
+    status: str,
+    direct_counts: dict[str, int] | None = None,
+) -> int | None:
+    summary = context.get("dashboard_summary")
+    if isinstance(summary, dict) and summary.get("available"):
+        counts = find_status_counts(summary.get("summary"))
+        value = counts.get(status)
+        if isinstance(value, int):
+            return value
+    if direct_counts is not None:
+        return direct_counts.get(status, 0)
+    return None
+
+
 def render_state(summary: Any) -> list[str]:
     lines = ["", "Watchdog state:"]
     if not isinstance(summary, dict) or not summary.get("exists"):
@@ -1124,8 +1140,41 @@ def render_latest_report(context: dict[str, Any]) -> list[str]:
     return lines
 
 
-def render_recommended_action(context: dict[str, Any]) -> str:
+def operator_recommended_action(
+    context: dict[str, Any],
+    direct_counts: dict[str, int] | None = None,
+) -> dict[str, Any] | None:
     action = context.get("recommended_next_action")
+    base_action = action if isinstance(action, dict) else None
+    if context.get("paperclip_api_ok") is True:
+        active = context.get("active_runs_summary")
+        active_total = 0
+        if isinstance(active, dict) and active.get("available"):
+            try:
+                active_total = int(active.get("total") or 0)
+            except (TypeError, ValueError):
+                active_total = 0
+        todo = queue_count(context, "todo", direct_counts)
+        in_progress = queue_count(context, "in_progress", direct_counts)
+        blocked = queue_count(context, "blocked", direct_counts)
+        if active_total == 0 and todo == 0 and in_progress == 0 and (blocked or 0) > 0:
+            return {
+                "action": "triage_blocked_queue_or_create_safe_local_task",
+                "reason": (
+                    f"Paperclip has {blocked} blocked issues and no todo/in_progress work; "
+                    "triage blockers or create a narrow safe local task before previewing dispatch."
+                ),
+                "requires_approval": False,
+                "write_permitted": False,
+            }
+    return base_action
+
+
+def render_recommended_action(
+    context: dict[str, Any],
+    direct_counts: dict[str, int] | None = None,
+) -> str:
+    action = operator_recommended_action(context, direct_counts)
     if not isinstance(action, dict):
         return "Recommended next action:\n- action: unavailable"
     return "\n".join(
