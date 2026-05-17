@@ -12,6 +12,8 @@ Safety boundary:
 - They must not write to a mixer.
 - They must preserve evidence proving `dry_run_only=true` and
   `live_mixer_writes=false`.
+- Safety evidence is fail-closed: manifest flags and every proposal row are
+  checked together before a report can be considered promotion-ready.
 
 ## Output files
 
@@ -45,6 +47,18 @@ Top-level fields:
 - `disagreements`
 - `disagreement_summary`
 - `evidence`
+
+The comparison `evidence` block includes:
+- `manifest_dry_run_only`
+- `manifest_live_mixer_writes`
+- `proposal_live_mixer_write_count`
+- `proposal_non_dry_run_count`
+- aggregated `dry_run_only`
+- aggregated `live_mixer_writes`
+
+The aggregated fields are conservative. If any proposal row contains
+`live_mixer_writes=true` or a transport policy other than `dry_run_only`, the
+report is marked not dry-run-only and not promotion-ready.
 
 Each row in `operator_rows`, `ai_rows`, `ai_would_do_this`, and
 `operator_action_capture` preserves dry-run evidence already present in replay

@@ -239,6 +239,27 @@ def _annotate_confidence_trajectory(rows: list[dict[str, Any]]) -> dict[str, Any
     return payload
 
 
+def _build_dry_run_evidence(manifest: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any]:
+    proposal_live_write_count = sum(1 for row in rows if bool(row.get("live_mixer_writes")))
+    proposal_non_dry_run_count = sum(
+        1 for row in rows if str(row.get("transport_policy") or "") != "dry_run_only"
+    )
+    manifest_dry_run_only = bool(manifest.get("dry_run_only", True))
+    manifest_live_mixer_writes = bool(manifest.get("live_mixer_writes", False))
+    return {
+        "dry_run_only": (
+            manifest_dry_run_only
+            and proposal_live_write_count == 0
+            and proposal_non_dry_run_count == 0
+        ),
+        "live_mixer_writes": manifest_live_mixer_writes or proposal_live_write_count > 0,
+        "manifest_dry_run_only": manifest_dry_run_only,
+        "manifest_live_mixer_writes": manifest_live_mixer_writes,
+        "proposal_live_mixer_write_count": proposal_live_write_count,
+        "proposal_non_dry_run_count": proposal_non_dry_run_count,
+    }
+
+
 def _build_rollback_payload(manifest: dict[str, Any], executor: dict[str, Any]) -> dict[str, Any]:
     graph = dict(manifest.get("graph_checkpoint") or {})
     proposals = {proposal["proposal_id"]: proposal for proposal in graph.get("proposals", [])}
@@ -367,12 +388,12 @@ def _build_audit_coverage(
         },
         {
             "key": "dry_run_evidence",
-            "ok": bool(evidence.get("dry_run_only", True)),
+            "ok": bool(evidence.get("dry_run_only", False)),
             "detail": "Dry-run evidence remains asserted in the comparison report.",
         },
         {
             "key": "no_live_mixer_writes",
-            "ok": not bool(evidence.get("live_mixer_writes", False)),
+            "ok": not bool(evidence.get("live_mixer_writes", True)),
             "detail": "Evidence shows live mixer writes stayed disabled.",
         },
     ]
@@ -391,7 +412,7 @@ def _build_audit_coverage(
 
 def _build_promotion_readiness_gates(
     *,
-    manifest: dict[str, Any],
+    evidence: dict[str, Any],
     score: int,
     error_count: int,
     disagreement_summary: dict[str, Any],
@@ -401,15 +422,15 @@ def _build_promotion_readiness_gates(
     return [
         {
             "key": "dry_run_only",
-            "ok": bool(manifest.get("dry_run_only", True)),
+            "ok": bool(evidence.get("dry_run_only", False)),
             "blocking": True,
-            "detail": "Replay manifest remains dry-run only.",
+            "detail": "Replay manifest and every proposal remain dry-run only.",
         },
         {
             "key": "no_live_mixer_writes",
-            "ok": not bool(manifest.get("live_mixer_writes", False)),
+            "ok": not bool(evidence.get("live_mixer_writes", True)),
             "blocking": True,
-            "detail": "Replay evidence shows no live mixer writes.",
+            "detail": "Replay manifest and proposal rows show no live mixer writes.",
         },
         {
             "key": "validation_errors_clear",
@@ -458,13 +479,14 @@ def _build_promotion_readiness(
     warning_count = sum(1 for item in findings if item.get("severity") == "warning")
     info_count = sum(1 for item in findings if item.get("severity") == "info")
     disagreement_summary = dict(comparison.get("disagreement_summary") or {})
+    evidence = dict(comparison.get("evidence") or {})
     rollback_frequency = _build_rollback_frequency(rollback)
     audit_coverage = _build_audit_coverage(manifest, comparison, validation_report)
     disagreement_penalty = 15 if comparison.get("disagreements") else 0
     blocked_penalty = 10 if rollback.get("blocked_reasons") else 0
     score = max(0, 100 - error_count * 25 - warning_count * 10 - disagreement_penalty - blocked_penalty)
     gates = _build_promotion_readiness_gates(
-        manifest=manifest,
+        evidence=evidence,
         score=score,
         error_count=error_count,
         disagreement_summary=disagreement_summary,
@@ -476,8 +498,8 @@ def _build_promotion_readiness(
         "schema_version": REPLAY_SHADOW_REPORT_SCHEMA_VERSION,
         "ready": ready,
         "promotion_readiness_score": score,
-        "dry_run_only": bool(manifest.get("dry_run_only", True)),
-        "live_mixer_writes": bool(manifest.get("live_mixer_writes", False)),
+        "dry_run_only": bool(evidence.get("dry_run_only", False)),
+        "live_mixer_writes": bool(evidence.get("live_mixer_writes", True)),
         "validation_highest_severity": validation_report.get("highest_severity"),
         "validation_counts": {
             "error": error_count,
@@ -592,6 +614,7 @@ def write_shadow_mode_reports(
         top_operator=top_operator,
         top_ai=top_ai,
     )
+    dry_run_evidence = _build_dry_run_evidence(manifest, rows)
 
     comparison = {
         "schema_version": REPLAY_SHADOW_REPORT_SCHEMA_VERSION,
@@ -617,8 +640,7 @@ def write_shadow_mode_reports(
             "timeline_signature": timeline.get("timeline_signature"),
             "manifest_signature": manifest.get("manifest_signature"),
             "replay_correlation_ids": list(manifest.get("replay_correlation_ids", [])),
-            "dry_run_only": bool(manifest.get("dry_run_only", True)),
-            "live_mixer_writes": bool(manifest.get("live_mixer_writes", False)),
+            **dry_run_evidence,
         },
     }
     trajectory = _annotate_confidence_trajectory(rows)

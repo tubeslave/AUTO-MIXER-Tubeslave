@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 
 from ai_mixing_pipeline.reports import write_shadow_mode_reports as package_write_shadow_mode_reports
@@ -46,6 +47,10 @@ def test_shadow_mode_reports_follow_fixture_schema_and_preserve_dry_run_evidence
         assert comparison["disagreement_summary"]["classes"]["by_taxonomy"] == expected["disagreement_taxonomy_counts"]
         assert comparison["evidence"]["dry_run_only"] is True
         assert comparison["evidence"]["live_mixer_writes"] is False
+        assert comparison["evidence"]["manifest_dry_run_only"] is True
+        assert comparison["evidence"]["manifest_live_mixer_writes"] is False
+        assert comparison["evidence"]["proposal_live_mixer_write_count"] == 0
+        assert comparison["evidence"]["proposal_non_dry_run_count"] == 0
         assert comparison["evidence"]["replay_correlation_ids"] == case["manifest"]["replay_correlation_ids"]
 
         if expected["operator_source_payload"] is None:
@@ -86,6 +91,39 @@ def test_shadow_mode_reports_follow_fixture_schema_and_preserve_dry_run_evidence
         assert summary["disagreement_rate"] == expected["disagreement_rate"]
         assert summary["audit_coverage_rate"] == 1.0
         assert summary["files"]["comparison"] == "shadow_mode_comparison.json"
+
+
+def test_shadow_mode_reports_fail_closed_when_proposal_contains_live_write_evidence(tmp_path):
+    case = copy.deepcopy(build_shadow_report_fixture_cases()[0])
+    first_proposal = case["manifest"]["graph_checkpoint"]["proposals"][0]
+    first_proposal["live_mixer_writes"] = True
+    first_proposal["transport_policy"] = "live_write"
+
+    write_shadow_mode_reports(
+        tmp_path,
+        case["manifest"],
+        executor=case["executor"],
+        validation_report=case["validation"],
+        generated_at=case["generated_at"],
+    )
+
+    comparison = json.loads((tmp_path / "shadow_mode_comparison.json").read_text(encoding="utf-8"))
+    readiness = json.loads((tmp_path / "promotion_readiness_report.json").read_text(encoding="utf-8"))
+    gates = {gate["key"]: gate for gate in readiness["promotion_readiness_gates"]}
+
+    assert comparison["evidence"]["manifest_dry_run_only"] is True
+    assert comparison["evidence"]["manifest_live_mixer_writes"] is False
+    assert comparison["evidence"]["proposal_live_mixer_write_count"] == 1
+    assert comparison["evidence"]["proposal_non_dry_run_count"] == 1
+    assert comparison["evidence"]["dry_run_only"] is False
+    assert comparison["evidence"]["live_mixer_writes"] is True
+
+    assert readiness["ready"] is False
+    assert readiness["dry_run_only"] is False
+    assert readiness["live_mixer_writes"] is True
+    assert gates["dry_run_only"]["ok"] is False
+    assert gates["no_live_mixer_writes"]["ok"] is False
+    assert readiness["aggregation"]["audit_coverage"]["complete"] is False
 
 
 def test_reports_package_exports_shadow_report_writer() -> None:
