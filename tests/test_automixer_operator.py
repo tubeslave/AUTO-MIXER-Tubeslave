@@ -635,6 +635,19 @@ def test_agent_health_reports_unhealthy_agent_without_exposing_token(tmp_path, m
 
     monkeypatch.setattr(automixer_operator, "load_context", fake_context)
     monkeypatch.setattr(automixer_operator.bridge, "PaperclipClient", FakeClient)
+    monkeypatch.setattr(
+        automixer_operator,
+        "probe_openclaw_local_gateway",
+        lambda config: {
+            "url": "http://127.0.0.1:18679/",
+            "allowed_local_only": True,
+            "reachable": True,
+            "ok": True,
+            "status_code": 200,
+            "openclaw_ui_detected": True,
+            "error": None,
+        },
+    )
 
     exit_code = automixer_operator.command_agent_health(make_config(tmp_path))
 
@@ -648,6 +661,10 @@ def test_agent_health_reports_unhealthy_agent_without_exposing_token(tmp_path, m
     assert "token_length: 18" in output
     assert "secret-token-value" not in output
     assert "secret-device-key" not in output
+    assert "external_gateway_probe: disabled" in output
+    assert "local_gateway_probe_url: http://127.0.0.1:18679/" in output
+    assert "local_gateway_reachable: True" in output
+    assert "local_gateway_openclaw_detected: True" in output
     assert "assigned_issue: TUB-111" in output
     assert calls == [
         ("/api/companies/company-1/agents", None),
@@ -657,6 +674,21 @@ def test_agent_health_reports_unhealthy_agent_without_exposing_token(tmp_path, m
         ),
         ("/api/agents/agent-error", None),
     ]
+
+
+def test_local_gateway_probe_refuses_external_url(monkeypatch):
+    def forbidden_urlopen(*args, **kwargs):
+        raise AssertionError("external probe should not open a connection")
+
+    monkeypatch.setattr(automixer_operator.urllib.request, "urlopen", forbidden_urlopen)
+
+    result = automixer_operator.probe_local_http_url("https://gateway.example.com/?token=secret", 0.01)
+
+    assert result["allowed_local_only"] is False
+    assert result["reachable"] is False
+    assert result["ok"] is False
+    assert result["url"] == "https://gateway.example.com/"
+    assert "secret" not in result["url"]
 
 
 def test_operational_audit_command_prints_report_paths(tmp_path, monkeypatch, capsys):

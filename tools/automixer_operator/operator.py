@@ -34,6 +34,7 @@ from tools.automixer_operator import operational_audit  # noqa: E402
 
 DEFAULT_BRIDGE_CONTEXT_URL = "http://127.0.0.1:8788/v1/context/automixer"
 DEFAULT_BRIDGE_TIMEOUT_SECONDS = 1.0
+DEFAULT_OPENCLAW_LOCAL_HEALTH_URL = "http://127.0.0.1:18679/"
 BRIDGE_TMUX_SESSION = "automixer_gpt_control_bridge"
 WATCHDOG_SCRIPT = Path("tools/paperclip_watchdog/automixer_paperclip_watchdog.py")
 VECTOR_INDEXER_SCRIPT = Path("tools/project_vector_index/automixer_chromadb_index.py")
@@ -44,6 +45,7 @@ SAFE_AGENT_ADAPTER_TYPE = "codex_local"
 SAFE_AGENT_STATUSES = {"idle", "available", "ready"}
 READ_ONLY_HTTP_METHODS = ("GET",)
 EXECUTABLE_WRITE_COMMANDS: tuple[str, ...] = ()
+LOCAL_PROBE_ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1"}
 VECTOR_OPERATOR_COMMANDS = {
     "vector-index": "index",
     "vector-search": "search",
@@ -176,6 +178,94 @@ def fetch_bridge_health(config: OperatorConfig) -> tuple[dict[str, Any] | None, 
     if isinstance(payload, dict):
         return payload, None
     return None, "bridge health response is not an object"
+
+
+def probe_openclaw_local_gateway(config: OperatorConfig) -> dict[str, Any]:
+    return probe_local_http_url(
+        config.environ.get(
+            "AUTOMIXER_OPERATOR_OPENCLAW_LOCAL_HEALTH_URL",
+            DEFAULT_OPENCLAW_LOCAL_HEALTH_URL,
+        ),
+        parse_float(
+            config.environ.get("AUTOMIXER_OPERATOR_LOCAL_PROBE_TIMEOUT_SECONDS"),
+            1.0,
+        ),
+    )
+
+
+def probe_local_http_url(url: str, timeout_seconds: float) -> dict[str, Any]:
+    display_url = local_probe_display_url(url)
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.hostname or ""
+    if parsed.scheme != "http" or host not in LOCAL_PROBE_ALLOWED_HOSTS:
+        return {
+            "url": display_url,
+            "allowed_local_only": False,
+            "reachable": False,
+            "ok": False,
+            "status_code": None,
+            "openclaw_ui_detected": False,
+            "error": "blocked: local probes only allow http loopback URLs",
+        }
+
+    try:
+        request = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            status_code = int(getattr(response, "status", response.getcode()))
+            raw = response.read(1024).decode("utf-8", errors="replace")
+        return {
+            "url": display_url,
+            "allowed_local_only": True,
+            "reachable": True,
+            "ok": 200 <= status_code < 400,
+            "status_code": status_code,
+            "openclaw_ui_detected": "openclaw" in raw.lower(),
+            "error": None,
+        }
+    except urllib.error.HTTPError as exc:
+        raw = exc.read(1024).decode("utf-8", errors="replace")
+        return {
+            "url": display_url,
+            "allowed_local_only": True,
+            "reachable": True,
+            "ok": 200 <= int(exc.code) < 400,
+            "status_code": int(exc.code),
+            "openclaw_ui_detected": "openclaw" in raw.lower(),
+            "error": f"HTTPError: {exc.code}",
+        }
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        return {
+            "url": display_url,
+            "allowed_local_only": True,
+            "reachable": False,
+            "ok": False,
+            "status_code": None,
+            "openclaw_ui_detected": False,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+
+def local_probe_display_url(url: str) -> str:
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.hostname or ""
+    if not host:
+        return "invalid-url"
+    if ":" in host and not host.startswith("["):
+        netloc = f"[{host}]"
+    else:
+        netloc = host
+    if parsed.port:
+        netloc = f"{netloc}:{parsed.port}"
+    return urllib.parse.urlunparse(
+        (
+            parsed.scheme or "http",
+            netloc,
+            parsed.path or "/",
+            "",
+            "",
+            "",
+        )
+    )
 
 
 def bridge_health_url(context_url: str) -> str:
@@ -991,6 +1081,9 @@ def load_agent_health_details(config: OperatorConfig, context: dict[str, Any]) -
                 "assigned_issues": [bridge.summarize_record(issue, ["id", "identifier", "title", "status", "priority", "lastActivityAt", "updatedAt"]) for issue in assigned_issues[:10]],
                 "detail_error": detail_error,
                 "safe_adapter_config": safe_agent_adapter_config(detail_payload if isinstance(detail_payload, dict) else {}),
+                "local_gateway_probe": probe_openclaw_local_gateway(config)
+                if str(agent.get("adapterType") or agent.get("adapter_type") or "") == "openclaw_gateway"
+                else None,
             }
         )
     return {
@@ -1090,6 +1183,21 @@ def render_agent_health(context: dict[str, Any], details: dict[str, Any]) -> str
                     f"  disable_device_auth: {config.get('disableDeviceAuth')}",
                 ]
             )
+        probe = item.get("local_gateway_probe") if isinstance(item.get("local_gateway_probe"), dict) else {}
+        if probe:
+            lines.extend(
+                [
+                    "  external_gateway_probe: disabled",
+                    f"  local_gateway_probe_url: {probe.get('url')}",
+                    f"  local_gateway_probe_allowed: {probe.get('allowed_local_only')}",
+                    f"  local_gateway_reachable: {probe.get('reachable')}",
+                    f"  local_gateway_ok: {probe.get('ok')}",
+                    f"  local_gateway_status_code: {probe.get('status_code')}",
+                    f"  local_gateway_openclaw_detected: {probe.get('openclaw_ui_detected')}",
+                ]
+            )
+            if probe.get("error"):
+                lines.append(f"  local_gateway_error: {probe.get('error')}")
         assigned = item.get("assigned_issues") if isinstance(item.get("assigned_issues"), list) else []
         for issue in assigned[:5]:
             lines.append(
