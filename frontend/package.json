@@ -25,9 +25,11 @@
     "eject": "react-scripts eject",
     "electron": "electron .",
     "electron:dev": "concurrently \"BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:build": "npm run build && electron-builder",
-    "electron:build:mac": "npm run build && electron-builder --mac",
-    "dist": "npm run build && electron-builder --mac --publish never"
+    "build:backend": "cd .. && ./build_backend.sh",
+    "dist:frontend": "npm run build && electron-builder --mac --publish never",
+    "electron:build": "npm run build:backend && npm run build && electron-builder",
+    "electron:build:mac": "npm run build:backend && npm run build && electron-builder --mac",
+    "dist": "npm run build:backend && npm run dist:frontend"
   },
   "eslintConfig": {
     "extends": [
@@ -52,6 +54,7 @@
     "files": [
       "build/**/*",
       "public/electron.js",
+      "public/preload.js",
       "public/icon.png"
     ],
     "extraResources": [

@@ -53,8 +53,6 @@ jobs:
           python -m py_compile backend/processing_graph.py
 
       - name: Run tests
-        run: |
-          cd /home/user/workspace/AUTO-MIXER-Tubeslave-affabb77
-          python -m pytest tests/ -x --tb=short -q
+        run: python -m pytest tests/ -x --tb=short -q
         env:
           PYTHONPATH: backend
