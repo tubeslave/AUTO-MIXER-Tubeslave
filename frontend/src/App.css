@@ -76,13 +76,13 @@ body {
 
 /* Mode Toggle in Sidebar */
 .mode-toggle {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2px;
   padding: 10px 8px;
   border-bottom: 1px solid #21262d;
 }
 .mode-btn {
-  flex: 1;
   padding: 6px 4px;
   border: 1px solid #30363d;
   border-radius: 6px;
@@ -101,12 +101,10 @@ body {
   color: #0d1117;
   border-color: transparent;
 }
-.mode-toggle .mode-btn.active:first-child {
-  background: #f0883e;
-}
-.mode-toggle .mode-btn.active:last-child {
-  background: #f85149;
-}
+.mode-btn.mode-analyze.active { background: #00d4ff; }
+.mode-btn.mode-assist.active { background: #a371f7; color: #f8f8ff; }
+.mode-btn.mode-supervised.active { background: #3fb950; }
+.mode-btn.mode-auto.active { background: #f85149; color: #fff; }
 
 /* Navigation */
 .nav-items {
@@ -178,6 +176,13 @@ body {
   font-weight: 600;
   color: #e6e6e6;
 }
+.topbar-mode {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
 .mode-badge {
   padding: 4px 12px;
   border-radius: 12px;
@@ -186,6 +191,41 @@ body {
 }
 .mode-badge.soundcheck { background: #f0883e22; color: #f0883e; border: 1px solid #f0883e44; }
 .mode-badge.live { background: #f8514922; color: #f85149; border: 1px solid #f8514944; }
+.mode-badge.mode-analyze { background: #00d4ff22; color: #00d4ff; border: 1px solid #00d4ff44; }
+.mode-badge.mode-assist { background: #a371f722; color: #c9a8ff; border: 1px solid #a371f744; }
+.mode-badge.mode-supervised { background: #3fb95022; color: #3fb950; border: 1px solid #3fb95044; }
+.mode-badge.mode-auto { background: #f8514922; color: #f85149; border: 1px solid #f8514944; }
+.operator-mode-policy {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: min(620px, 62vw);
+  font-size: 0.72em;
+  color: #8b949e;
+}
+.operator-mode-policy span {
+  border: 1px solid #30363d;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #0d1117;
+  white-space: nowrap;
+}
+.operator-mode-policy .policy-safe {
+  color: #00d4ff;
+  border-color: #00d4ff44;
+  background: #00d4ff14;
+}
+.operator-mode-policy .policy-apply {
+  color: #3fb950;
+  border-color: #3fb95044;
+  background: #3fb95014;
+}
+.operator-mode-policy .policy-blocked {
+  color: #f85149;
+  border-color: #f8514944;
+  background: #f8514914;
+}
 
 .tab-content {
   flex: 1;
@@ -270,6 +310,26 @@ body {
   color: #f0883e;
   border-color: #f0883e44;
   background: #f0883e14;
+}
+.pilot-state-pill.state-analyze.active {
+  color: #00d4ff;
+  border-color: #00d4ff44;
+  background: #00d4ff14;
+}
+.pilot-state-pill.state-assist.active {
+  color: #c9a8ff;
+  border-color: #a371f744;
+  background: #a371f714;
+}
+.pilot-state-pill.state-supervised.active {
+  color: #3fb950;
+  border-color: #3fb95044;
+  background: #3fb95014;
+}
+.pilot-state-pill.state-auto.active {
+  color: #f85149;
+  border-color: #f8514944;
+  background: #f8514914;
 }
 .pilot-state-strip {
   display: grid;

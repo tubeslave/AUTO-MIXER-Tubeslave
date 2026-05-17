@@ -120,6 +120,7 @@ class TestAutoMixerServerInit:
         assert server.connection_mode is None
         assert server.connected_clients == set()
         assert server.live_mode is False
+        assert server.operator_mode == "assist"
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
@@ -168,6 +169,97 @@ class TestAutoMixerServerInit:
         assert summary["selected_runtime"]["entrypoint"] == "AutoMixerServer.start_voice_control"
         assert summary["selected_runtime"]["live_write_path"] == "AutoMixerServer._apply_manual_console_write"
         assert summary["selected_runtime"]["allowed_live_write_kinds"] == ["fader", "gain"]
+
+
+class TestOperatorModePolicy:
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_operator_mode_status_exposes_product_capabilities(self, mock_config, mock_bleed):
+        server = AutoMixerServer()
+
+        status = server.get_operator_mode_status()
+
+        assert status["type"] == "operator_mode_status"
+        assert status["mode"] == "assist"
+        assert status["capabilities"]["can_analyze"] is True
+        assert status["capabilities"]["can_create_proposals"] is True
+        assert status["capabilities"]["can_apply_to_console"] is False
+        assert [mode["key"] for mode in status["available_modes"]] == [
+            "analyze",
+            "assist",
+            "supervised",
+            "auto",
+        ]
+
+    def test_non_supervised_operator_mode_disarms_wing_manual_gate(self, dummy_wing_server):
+        server = dummy_wing_server
+        assert server._manual_writes_armed is True
+
+        status = server.set_operator_mode("assist", reason="unit")
+
+        assert status["mode"] == "assist"
+        assert status["previous_mode"] == "supervised"
+        assert server._manual_writes_armed is False
+        server.mixer_client.disarm_write_gate.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_operator_mode_blocks_approved_wing_write_outside_supervised_mode(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "assist"
+
+        result = await server._apply_manual_console_write(
+            None,
+            channel=1,
+            value=-6.0,
+            value_type="fader",
+            source="manual:test",
+            reason="operator approved",
+            approved=True,
+            approval_id="approval-1",
+        )
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "operator_mode_blocks_live_write"
+        assert result["operator_mode"]["mode"] == "assist"
+        server.mixer_client.supervised_set_channel_fader.assert_not_called()
+
+    def test_assist_mode_keeps_confirmed_soundcheck_live_apply_as_dry_run(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "assist"
+
+        policy = server._resolve_soundcheck_live_apply_policy(
+            requested_live_apply=True,
+            confirm_live_apply=True,
+            reason="operator confirmed",
+            approval_id="approval-soundcheck",
+        )
+
+        assert policy["mode"] == "dry_run"
+        assert policy["dry_run_only"] is True
+        assert policy["live_apply_allowed"] is False
+        assert policy["operator_mode"]["mode"] == "assist"
+        assert "operator_mode_blocks_live_apply" in policy["blocked_reasons"]
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_operator_mode_handlers_round_trip_status(self, mock_bleed, mock_config):
+        server = AutoMixerServer()
+        websocket = AsyncMock()
+        server.send_to_client = AsyncMock()
+
+        await server._dispatch["set_operator_mode"](
+            websocket,
+            {"mode": "supervised", "reason": "unit"},
+        )
+        await server._dispatch["get_operator_mode"](websocket, {})
+
+        first_payload = server.send_to_client.await_args_list[0].args[1]
+        second_payload = server.send_to_client.await_args_list[1].args[1]
+        assert first_payload["mode"] == "supervised"
+        assert first_payload["capabilities"]["can_apply_to_console"] is True
+        assert second_payload["mode"] == "supervised"
 
 
 class TestDisconnectedAgentHandlers:
@@ -339,6 +431,7 @@ def dummy_wing_server(patch_wing_type_for_isinstance):
     server = AutoMixerServer(ws_host="localhost", ws_port=8765)
     server.connection_mode = "wing"
     server.mixer_client = DummyWingLike()
+    server.operator_mode = "supervised"
     server._manual_write_supervision_enabled = True
     server._manual_writes_armed = True
     server._manual_write_cooldown_sec = 0.0
@@ -539,6 +632,7 @@ def test_soundcheck_supervised_bundle_sync_uses_supervised_live_apply_and_restor
 def real_wing_server():
     server = AutoMixerServer(ws_host="localhost", ws_port=8765)
     server.connection_mode = "wing"
+    server.operator_mode = "supervised"
     client = server_module.WingClient(ip="127.0.0.1", port=2223)
     client.is_connected = True
     client.sock = MagicMock()

@@ -8,6 +8,16 @@ def register_handlers(server):
             server.gain_staging.apply_preset("live" if server.live_mode else "soundcheck")
         await server.send_to_client(websocket, {"type": "live_mode_set", "live_mode": server.live_mode})
 
+    async def handle_set_operator_mode(websocket, data):
+        status = server.set_operator_mode(
+            data.get("mode", data.get("operator_mode")),
+            reason=data.get("reason", "operator_mode_change"),
+        )
+        await server.send_to_client(websocket, status)
+
+    async def handle_get_operator_mode(websocket, data):
+        await server.send_to_client(websocket, server.get_operator_mode_status())
+
     async def handle_emergency_stop(websocket, data):
         if server.gain_staging:
             server.gain_staging.automation_frozen = True
@@ -96,6 +106,8 @@ def register_handlers(server):
 
     return {
         "set_live_mode": handle_set_live_mode,
+        "set_operator_mode": handle_set_operator_mode,
+        "get_operator_mode": handle_get_operator_mode,
         "emergency_stop": handle_emergency_stop,
         "set_automation_frozen": handle_set_automation_frozen,
         "set_channel_frozen": handle_set_channel_frozen,

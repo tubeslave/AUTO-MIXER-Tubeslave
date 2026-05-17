@@ -50,6 +50,12 @@ from mixer_discovery import discover_mixers, discover_mixer_auto, DiscoveredMixe
 from handlers import register_all_handlers
 from wing_telemetry_recorder import WingTelemetryRecorder
 from gain_fader_runtime import build_gain_fader_runtime_summary
+from operator_mode_policy import (
+    DEFAULT_OPERATOR_MODE,
+    MODE_SUPERVISED,
+    build_operator_mode_status,
+    normalize_operator_mode,
+)
 from voice_runtime import build_voice_runtime_summary
 
 logging.basicConfig(level=logging.INFO)
@@ -156,6 +162,12 @@ class AutoMixerServer:
         
         # Live concert mode: stricter limits, emergency stop
         self.live_mode = False
+        self.operator_mode = normalize_operator_mode(
+            os.getenv("AUTOMIXER_OPERATOR_MODE", DEFAULT_OPERATOR_MODE)
+        )
+        self._auto_mode_unlocked = self._parse_env_bool(
+            os.getenv("AUTOMIXER_AUTO_MODE_UNLOCKED", "false")
+        )
 
         # Supervised manual/voice write safety (WING first-live hard gate)
         self._manual_write_supervision_enabled = self._parse_env_bool(
@@ -242,6 +254,38 @@ class AutoMixerServer:
             and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient))
         )
 
+    def get_operator_mode_status(self) -> Dict[str, Any]:
+        return {
+            "type": "operator_mode_status",
+            **build_operator_mode_status(
+                mode=self.operator_mode,
+                connection_mode=self.connection_mode,
+                wing_boundary_active=self._is_wing_deployment_write_boundary_active(),
+                auto_mode_unlocked=self._auto_mode_unlocked,
+            ),
+        }
+
+    def set_operator_mode(self, mode: str, *, reason: str = "") -> Dict[str, Any]:
+        previous_mode = self.operator_mode
+        self.operator_mode = normalize_operator_mode(mode)
+
+        if self.operator_mode != MODE_SUPERVISED and self._manual_writes_armed:
+            self.set_manual_write_supervision(
+                False,
+                reason=f"operator_mode:{self.operator_mode}",
+            )
+
+        status = self.get_operator_mode_status()
+        status.update(
+            {
+                "previous_mode": previous_mode,
+                "requested_mode": str(mode or ""),
+                "reason": str(reason or "operator_mode_change"),
+            }
+        )
+        self._record_manual_write_telemetry("operator_mode_changed", status)
+        return status
+
     async def _block_quarantined_wing_write_surface(
         self,
         websocket: Optional[WebSocketServerProtocol],
@@ -293,6 +337,7 @@ class AutoMixerServer:
         approval_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         boundary_active = self._is_wing_deployment_write_boundary_active()
+        operator_mode = self.get_operator_mode_status()
         if not boundary_active:
             return {
                 "boundary_active": False,
@@ -303,8 +348,14 @@ class AutoMixerServer:
                 "reason_text": str(reason or "auto_soundcheck_cycle"),
                 "approval_id": approval_id,
                 "mode": "legacy_live_apply",
+                "operator_mode": operator_mode,
             }
-        live_apply_allowed = bool(requested_live_apply and confirm_live_apply)
+        mode_allows_apply = bool(operator_mode["capabilities"]["can_apply_to_console"])
+        live_apply_allowed = bool(requested_live_apply and confirm_live_apply and mode_allows_apply)
+        blocked_reasons = []
+        if requested_live_apply and confirm_live_apply and not mode_allows_apply:
+            blocked_reasons.append("operator_mode_blocks_live_apply")
+        blocked_reasons.extend(operator_mode.get("blocked_reasons") or [])
         return {
             "boundary_active": True,
             "dry_run_only": not live_apply_allowed,
@@ -314,6 +365,8 @@ class AutoMixerServer:
             "reason_text": str(reason or "auto_soundcheck_cycle"),
             "approval_id": approval_id,
             "mode": "supervised_live_apply" if live_apply_allowed else "dry_run",
+            "operator_mode": operator_mode,
+            "blocked_reasons": blocked_reasons,
         }
 
     def _soundcheck_policy_allows_live_apply(
@@ -844,6 +897,23 @@ class AutoMixerServer:
                 "bypass_cooldown": bool(bypass_cooldown),
             }
 
+        operator_mode = self.get_operator_mode_status()
+        if not operator_mode["capabilities"]["can_apply_to_console"]:
+            return {
+                "allowed": False,
+                "reason": "operator_mode_blocks_live_write",
+                "source": source,
+                "value_type": value_type,
+                "channel": channel,
+                "requested_value": requested_value,
+                "effective_value": requested_value,
+                "reason_text": str(reason or ""),
+                "approved": bool(approved),
+                "approval_id": approval_id,
+                "bypass_cooldown": bool(bypass_cooldown),
+                "operator_mode": operator_mode,
+            }
+
         if not self._manual_write_supervision_enabled:
             return {
                 "allowed": True,
@@ -856,6 +926,7 @@ class AutoMixerServer:
                 "approved": bool(approved),
                 "approval_id": approval_id,
                 "bypass_cooldown": bool(bypass_cooldown),
+                "operator_mode": operator_mode,
             }
 
         if self._manual_write_panic_stopped or not self._manual_writes_armed:
@@ -1470,6 +1541,7 @@ class AutoMixerServer:
         supervision = self.get_manual_write_supervision_status()
         session = self.get_manual_write_session_status()
         ready_for_live = self.get_ready_for_live_status()
+        operator_mode = self.get_operator_mode_status()
         shadow_transport = self._get_shadow_transport_status()
         wing_client = self._get_wing_write_client()
         write_gate = dict(supervision.get("write_gate") or {})
@@ -1596,6 +1668,12 @@ class AutoMixerServer:
                 "detail": "Supervised write gate is enabled on the deployment path.",
             },
             {
+                "key": "operator_mode_supervised",
+                "label": "Operator mode allows supervised apply",
+                "ok": bool(operator_mode["capabilities"]["can_apply_to_console"]),
+                "detail": "Current product mode permits only approved fader/gain writes.",
+            },
+            {
                 "key": "shadow_dry_run_only",
                 "label": "Shadow transport dry-run only",
                 "ok": bool(
@@ -1612,7 +1690,7 @@ class AutoMixerServer:
                 "detail": "Most recent supervised write completed with readback confirmation.",
             },
         ]
-        pilot_ready = all(check["ok"] for check in readiness_checks[:4]) and not blocked_active
+        pilot_ready = all(check["ok"] for check in readiness_checks[:5]) and not blocked_active
 
         escalations: List[Dict[str, Any]] = []
         if not mixer_connected:
@@ -1669,6 +1747,15 @@ class AutoMixerServer:
                     "operator_action": "Run or import a dry-run/shadow replay before treating the pilot as ready.",
                 }
             )
+        if not operator_mode["capabilities"]["can_apply_to_console"]:
+            escalations.append(
+                {
+                    "severity": "info",
+                    "code": "operator_mode_blocks_live_write",
+                    "message": f"Operator mode is {operator_mode['label']}; live writes stay disabled.",
+                    "operator_action": "Switch to Supervised mode before an approved console write.",
+                }
+            )
         if last_blocked_is_current:
             escalations.append(
                 {
@@ -1722,6 +1809,7 @@ class AutoMixerServer:
             "state_flags": state_flags,
             "pilot_ready": pilot_ready,
             "connection_mode": self.connection_mode,
+            "operator_mode": operator_mode,
             "write_boundary": {
                 "deployment_boundary_active": deployment_boundary_active,
                 "mixer_connected": mixer_connected,

@@ -300,6 +300,20 @@ console.error(`Error in listener for ${eventType}:`, error);
     });
   }
 
+  getOperatorMode() {
+    this.send({
+      type: 'get_operator_mode'
+    });
+  }
+
+  setOperatorMode(mode, reason = 'frontend_mode_control') {
+    this.send({
+      type: 'set_operator_mode',
+      mode,
+      reason
+    });
+  }
+
   // Voice control commands
   startVoiceControl(modelSize = 'small', language = 'ru', deviceId = null, channel = 0) {
     const message = {

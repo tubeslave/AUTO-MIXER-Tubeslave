@@ -54,6 +54,7 @@ export default function PilotDeploymentCockpit({ status, onRefresh }) {
   const readiness = status.readiness || {};
   const checks = readiness.checks || [];
   const escalations = status.escalations || [];
+  const operatorMode = status.operator_mode || {};
 
   return (
     <div className="connect-card pilot-cockpit-card">
@@ -72,6 +73,13 @@ export default function PilotDeploymentCockpit({ status, onRefresh }) {
       </div>
 
       <div className="pilot-state-strip">
+        <div
+          className={`pilot-state-pill active state-${operatorMode.mode || 'idle'}`}
+          title={operatorMode.summary}
+        >
+          <span>Mode: {formatValue(operatorMode.label)}</span>
+          <strong>{formatValue(operatorMode.live_write_policy)}</strong>
+        </div>
         {(status.states || []).map((item) => (
           <div
             key={item.key}

@@ -50,6 +50,12 @@ const NAV_ITEMS = [
 ];
 
 const WING_QUARANTINED_TABS = new Set(['autoFader', 'autoSoundcheck']);
+const OPERATOR_MODES = [
+  { key: 'analyze', label: 'Analyze', short: 'ANL' },
+  { key: 'assist', label: 'Assist', short: 'AST' },
+  { key: 'supervised', label: 'Supervised', short: 'SUP' },
+  { key: 'auto', label: 'Auto', short: 'AUT' },
+];
 
 function App() {
   const [serverConnected, setServerConnected] = useState(false);
@@ -64,7 +70,8 @@ function App() {
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [connecting, setConnecting] = useState(false);
   const [activeTab, setActiveTab] = useState('mixer');
-  const [globalMode, setGlobalMode] = useState('soundcheck');
+  const [globalMode] = useState('soundcheck');
+  const [operatorModeStatus, setOperatorModeStatus] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [routingScheme, setRoutingScheme] = useState([]);
   const [routingChannelCount, setRoutingChannelCount] = useState(64);
@@ -194,6 +201,12 @@ function App() {
 
     const handleSupervisedPilotStatus = (data) => {
       setPilotCockpit(data);
+      if (data.operator_mode) setOperatorModeStatus(data.operator_mode);
+    };
+
+    const handleOperatorModeStatus = (data) => {
+      setOperatorModeStatus(data);
+      if (data.label) setStatusMessage(`Mode: ${data.label}`);
     };
 
     const handlePilotRefreshTrigger = () => {
@@ -208,6 +221,7 @@ function App() {
     websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
     websocketService.on('dante_routing', handleDanteRouting);
     websocketService.on('supervised_pilot_status', handleSupervisedPilotStatus);
+    websocketService.on('operator_mode_status', handleOperatorModeStatus);
     websocketService.on('manual_write_supervision', handlePilotRefreshTrigger);
     websocketService.on('manual_write_session', handlePilotRefreshTrigger);
     websocketService.on('manual_write_applied', handlePilotRefreshTrigger);
@@ -225,6 +239,7 @@ function App() {
         websocketService.send({ type: 'get_audio_devices' });
         websocketService.loadAllSettings();
         websocketService.getDanteRouting(64);
+        websocketService.getOperatorMode();
         refreshPilotCockpit();
       })
       .catch(err => {
@@ -247,6 +262,7 @@ function App() {
       websocketService.off('all_settings_loaded', handleAllSettingsLoaded);
       websocketService.off('dante_routing', handleDanteRouting);
       websocketService.off('supervised_pilot_status', handleSupervisedPilotStatus);
+      websocketService.off('operator_mode_status', handleOperatorModeStatus);
       websocketService.off('manual_write_supervision', handlePilotRefreshTrigger);
       websocketService.off('manual_write_session', handlePilotRefreshTrigger);
       websocketService.off('manual_write_applied', handlePilotRefreshTrigger);
@@ -310,12 +326,24 @@ function App() {
     }
   };
 
+  const handleOperatorModeChange = (mode) => {
+    setOperatorModeStatus(prev => ({
+      ...(prev || {}),
+      mode,
+      label: OPERATOR_MODES.find(item => item.key === mode)?.label || mode,
+    }));
+    websocketService.setOperatorMode(mode);
+    websocketService.getSupervisedPilotStatus();
+  };
+
   const sharedProps = {
     selectedChannels,
     availableChannels,
     selectedDevice,
     audioDevices,
     globalMode,
+    operatorMode: operatorModeStatus?.mode || 'assist',
+    operatorModeStatus,
     mixerType,
     wingSafetyQuarantine: mixerType === 'wing',
   };
@@ -327,6 +355,13 @@ function App() {
   ));
 
   const activeNavItem = navItems.find(n => n.id === activeTab);
+  const operatorMode = operatorModeStatus?.mode || 'assist';
+  const operatorModeLabel = operatorModeStatus?.label || OPERATOR_MODES.find(item => item.key === operatorMode)?.label || 'Assist';
+  const operatorModeCapabilities = operatorModeStatus?.capabilities || {};
+  const operatorModeCanApply = operatorModeCapabilities.can_apply_to_console === true;
+  const operatorModeRequiresApproval = operatorModeCapabilities.requires_approval === true;
+  const operatorModePolicy = operatorModeStatus?.live_write_policy || 'suggestions_only';
+  const operatorModeBlockedReasons = operatorModeStatus?.blocked_reasons || [];
 
   return (
     <div className="App">
@@ -349,22 +384,18 @@ function App() {
           )}
         </div>
 
-        {/* Global Mode Toggle */}
-        <div className="mode-toggle">
-          <button
-            className={`mode-btn ${globalMode === 'soundcheck' ? 'active' : ''}`}
-            onClick={() => setGlobalMode('soundcheck')}
-            title="Soundcheck: анализ → применить"
-          >
-            {sidebarCollapsed ? 'SC' : 'Soundcheck'}
-          </button>
-          <button
-            className={`mode-btn ${globalMode === 'live' ? 'active' : ''}`}
-            onClick={() => setGlobalMode('live')}
-            title="Live: непрерывная коррекция"
-          >
-            {sidebarCollapsed ? 'LV' : 'Live'}
-          </button>
+        {/* Operator Mode Toggle */}
+        <div className="mode-toggle operator-mode-toggle">
+          {OPERATOR_MODES.map(mode => (
+            <button
+              key={mode.key}
+              className={`mode-btn mode-${mode.key} ${operatorMode === mode.key ? 'active' : ''}`}
+              onClick={() => handleOperatorModeChange(mode.key)}
+              title={operatorModeStatus?.available_modes?.find(item => item.key === mode.key)?.summary || mode.label}
+            >
+              {sidebarCollapsed ? mode.short : mode.label}
+            </button>
+          ))}
         </div>
 
         <div className="nav-items">
@@ -395,8 +426,20 @@ function App() {
             {activeNavItem?.icon}{' '}
             {activeNavItem?.label}
           </span>
-          <div className={`mode-badge ${globalMode}`}>
-            {globalMode === 'soundcheck' ? '🎯 Soundcheck' : '🔴 Live'}
+          <div className="topbar-mode">
+            <div className={`mode-badge operator-mode-badge mode-${operatorMode}`}>
+              Режим: {operatorModeLabel}
+            </div>
+            <div className="operator-mode-policy">
+              <span className={operatorModeCanApply ? 'policy-apply' : 'policy-safe'}>
+                {operatorModeCanApply ? 'запись разрешается только по правилу режима' : 'запись в пульт закрыта'}
+              </span>
+              <span>{operatorModeRequiresApproval ? 'нужно подтверждение' : 'без автоматического применения'}</span>
+              <span>{operatorModePolicy}</span>
+              {operatorModeBlockedReasons.slice(0, 2).map(reason => (
+                <span className="policy-blocked" key={reason}>{reason}</span>
+              ))}
+            </div>
           </div>
         </div>
 
