@@ -236,6 +236,30 @@ def test_next_recommends_cycle_without_ready_report():
     assert command.endswith("operator.py cycle")
 
 
+def test_next_recommends_blocked_queue_when_no_todo_target():
+    target = automixer_operator.TargetSelection(
+        None,
+        None,
+        "No safe preview target found: missing unassigned todo issue.",
+        [],
+    )
+
+    action, reason, command = automixer_operator.next_operator_step(
+        {
+            "paperclip_api_ok": True,
+            "active_runs_summary": {"available": True, "total": 0},
+            "dashboard_summary": {"available": True, "summary": {"tasks": {"blocked": 4}}},
+        },
+        None,
+        target,
+        {"blocked": 4, "todo": 0, "in_progress": 0},
+    )
+
+    assert action == "blocked"
+    assert "4 blocked issues" in reason
+    assert command.endswith("operator.py blocked")
+
+
 def test_next_recommends_cycle_when_blocked_report_but_target_ready(tmp_path):
     report_path = write_dry_run_report(tmp_path)
     report_path.write_text(

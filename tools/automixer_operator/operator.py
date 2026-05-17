@@ -317,7 +317,8 @@ def command_next(config: OperatorConfig) -> int:
     context = load_context(config)
     report = latest_dry_run_report(config.project_root)
     target = select_preview_target(config, context)
-    action, reason, command = next_operator_step(context, report, target)
+    direct_counts, _direct_counts_error = load_issue_status_counts(config, context)
+    action, reason, command = next_operator_step(context, report, target, direct_counts)
     lines = [
         "== Automixer Operator Next ==",
         f"action: {action}",
@@ -334,6 +335,7 @@ def next_operator_step(
     context: dict[str, Any],
     report: DispatchReport | None,
     target: TargetSelection | None = None,
+    direct_counts: dict[str, int] | None = None,
 ) -> tuple[str, str, str]:
     if context.get("paperclip_api_ok") is not True:
         return (
@@ -358,6 +360,18 @@ def next_operator_step(
         )
 
     if target is not None and not target.ready:
+        blocked = queue_count(context, "blocked", direct_counts)
+        todo = queue_count(context, "todo", direct_counts)
+        in_progress = queue_count(context, "in_progress", direct_counts)
+        if todo == 0 and in_progress == 0 and (blocked or 0) > 0:
+            return (
+                "blocked",
+                (
+                    f"Paperclip has {blocked} blocked issues and no safe todo target; "
+                    "inspect blockers before creating or dispatching new work."
+                ),
+                "python3 tools/automixer_operator/operator.py blocked",
+            )
         return (
             "create_or_select_new_todo_issue",
             target.reason,
