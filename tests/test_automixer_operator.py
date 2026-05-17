@@ -559,6 +559,8 @@ def test_blocked_command_lists_blocked_issues_read_only(tmp_path, monkeypatch, c
     assert "write actions: disabled" in output
     assert "TUB-1" in output
     assert "sample_blocker: TUB-0" in output
+    assert "triage_hint: Resolve or review blocker TUB-0 before moving this issue." in output
+    assert "triage_hint: No assignee is recorded; choose an owner only after the blocker state is clear." in output
     assert calls == [
         ("/api/companies/company-1/issues", {"status": "blocked", "limit": 20}),
     ]

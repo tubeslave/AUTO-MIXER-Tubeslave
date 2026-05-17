@@ -1769,7 +1769,38 @@ def render_blocked_issue(issue: dict[str, Any]) -> list[str]:
         f"  blocker_attention: {attention.get('state') or 'unknown'}",
         f"  unresolved_blockers: {unresolved if unresolved is not None else len(blocked_by)}",
         f"  sample_blocker: {sample}",
+        f"  triage_hint: {blocked_issue_triage_hint(issue)}",
     ]
+
+
+def blocked_issue_triage_hint(issue: dict[str, Any]) -> str:
+    attention = issue.get("blockerAttention") if isinstance(issue.get("blockerAttention"), dict) else {}
+    blocked_by = issue.get("blockedBy") if isinstance(issue.get("blockedBy"), list) else []
+    unresolved = attention.get("unresolvedBlockerCount")
+    if unresolved is None:
+        unresolved_count = len(blocked_by)
+    else:
+        try:
+            unresolved_count = int(unresolved)
+        except (TypeError, ValueError):
+            unresolved_count = 0
+    sample = (
+        attention.get("sampleBlockerIdentifier")
+        or attention.get("sampleStalledBlockerIdentifier")
+        or None
+    )
+    state = str(attention.get("state") or "").lower()
+    if unresolved_count > 0:
+        if sample:
+            return f"Resolve or review blocker {sample} before moving this issue."
+        return "Resolve recorded blockers before moving this issue."
+    if state == "needs_attention":
+        return "No unresolved blockers are recorded; manually review whether this issue can leave blocked."
+    if state == "covered":
+        return "Blocker coverage exists; monitor blockers and do not dispatch this issue yet."
+    if not get_issue_assignee(issue):
+        return "No assignee is recorded; choose an owner only after the blocker state is clear."
+    return "Read-only review; keep blocked until the blocker state is clear."
 
 
 def blocked_issue_sort_key(issue: dict[str, Any]) -> tuple[int, int, str]:
