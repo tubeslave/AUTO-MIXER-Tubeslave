@@ -59,7 +59,8 @@ class MixingAgent:
                  mixer_client=None,
                  mode: AgentMode = AgentMode.SUGGEST,
                  cycle_interval: float = 0.5,
-                 kb_first: bool = False):
+                 kb_first: bool = False,
+                 allow_wing_auto_writes: bool = False):
         self.kb_first = kb_first
 
         if knowledge_base is None:
@@ -82,6 +83,7 @@ class MixingAgent:
         self.mixer = mixer_client
         self.state = AgentState(mode=mode)
         self.cycle_interval = cycle_interval
+        self.allow_wing_auto_writes = allow_wing_auto_writes
         self._confidence_threshold = 0.6
         self._max_actions_per_cycle = 5
         self._action_history: List[AgentAction] = []
@@ -232,6 +234,14 @@ class MixingAgent:
         Uses method names available on both WingClient and DLiveClient
         (DLiveClient provides compatibility aliases).
         """
+        if self._blocks_direct_wing_writes():
+            for action in actions:
+                self._record_blocked_action(
+                    action,
+                    "legacy_mixing_agent_wing_auto_write_blocked",
+                )
+            return
+
         for action in actions:
             try:
                 applied = False
@@ -240,55 +250,50 @@ class MixingAgent:
                         amount = action.parameters.get('amount_db', -3)
                         current = self._safe_get_fader(action.channel)
                         target = max(-100.0, current + amount)
-                        self._safe_set_fader(action.channel, target)
-                        applied = True
+                        applied = self._safe_set_fader(action.channel, target)
                     elif action.action_type == 'adjust_gain':
                         adj = action.parameters.get('adjustment_db', 0)
                         current = self._safe_get_fader(action.channel)
                         target = max(-100.0, min(10.0, current + adj))
-                        self._safe_set_fader(action.channel, target)
-                        applied = True
+                        applied = self._safe_set_fader(action.channel, target)
                     elif action.action_type == 'mute_channel':
-                        self.mixer.set_mute(action.channel, True)
-                        applied = True
+                        applied = self._call_mixer_write('set_mute', action.channel, True)
                     elif action.action_type == 'unmute_channel':
-                        self.mixer.set_mute(action.channel, False)
-                        applied = True
+                        applied = self._call_mixer_write('set_mute', action.channel, False)
                     elif action.action_type == 'apply_hpf':
                         freq = action.parameters.get('frequency', 80)
                         if hasattr(self.mixer, 'set_channel_hpf'):
-                            self.mixer.set_channel_hpf(action.channel, freq)
+                            applied = self._call_mixer_write('set_channel_hpf', action.channel, freq)
                         elif hasattr(self.mixer, 'set_hpf'):
-                            self.mixer.set_hpf(action.channel, freq)
-                        applied = True
+                            applied = self._call_mixer_write('set_hpf', action.channel, freq)
                     elif action.action_type == 'adjust_compressor':
                         if hasattr(self.mixer, 'set_channel_compressor'):
-                            self.mixer.set_channel_compressor(
+                            applied = self._call_mixer_write(
+                                'set_channel_compressor',
                                 action.channel,
                                 threshold=action.parameters.get('threshold_db', -18),
                                 ratio=action.parameters.get('ratio', 3.0),
                                 attack=action.parameters.get('attack_ms', 10),
                                 release=action.parameters.get('release_ms', 100),
                             )
-                        applied = True
                     elif action.action_type == 'adjust_deesser':
                         if hasattr(self.mixer, 'set_channel_deesser'):
-                            self.mixer.set_channel_deesser(
+                            applied = self._call_mixer_write(
+                                'set_channel_deesser',
                                 action.channel,
                                 frequency=action.parameters.get('frequency', 6500),
                                 threshold=action.parameters.get('threshold_db', -20),
                                 ratio=action.parameters.get('ratio', 4.0),
                             )
-                        applied = True
                     elif action.action_type == 'set_eq':
                         band = action.parameters.get('band', 1)
-                        self.mixer.set_eq_band(
+                        applied = self._call_mixer_write(
+                            'set_eq_band',
                             action.channel, band,
                             freq=action.parameters.get('freq', 1000.0),
                             gain=action.parameters.get('gain', 0.0),
                             q=action.parameters.get('q', 1.0),
                         )
-                        applied = True
 
                 if applied:
                     self._action_history.append(action)
@@ -308,13 +313,42 @@ class MixingAgent:
                 logger.error(error_msg)
                 self.state.errors.append(error_msg)
 
-    def _safe_set_fader(self, channel: int, value_db: float):
+    def _safe_set_fader(self, channel: int, value_db: float) -> bool:
         """Set fader using whichever method the mixer client provides."""
         value_db = max(-100.0, min(0.0, value_db))
         if hasattr(self.mixer, 'set_channel_fader_db'):
-            self.mixer.set_channel_fader_db(channel, value_db)
+            return self._call_mixer_write('set_channel_fader_db', channel, value_db)
         elif hasattr(self.mixer, 'set_fader'):
-            self.mixer.set_fader(channel, value_db)
+            return self._call_mixer_write('set_fader', channel, value_db)
+        return False
+
+    def _call_mixer_write(self, method_name: str, *args, **kwargs) -> bool:
+        """Call a mixer write method and treat explicit False as blocked/failed."""
+        if not self.mixer or not hasattr(self.mixer, method_name):
+            return False
+        result = getattr(self.mixer, method_name)(*args, **kwargs)
+        return result is not False
+
+    def _blocks_direct_wing_writes(self) -> bool:
+        """Prevent the legacy AI agent from bypassing the supervised WING path."""
+        if self.allow_wing_auto_writes:
+            return False
+        if not self.mixer:
+            return False
+        mixer_type = (
+            f"{self.mixer.__class__.__module__}.{self.mixer.__class__.__name__}".lower()
+        )
+        if "wing" in mixer_type:
+            return True
+        return (
+            hasattr(self.mixer, 'get_write_gate_status')
+            and hasattr(self.mixer, 'supervised_set_channel_fader')
+        )
+
+    def _record_blocked_action(self, action: AgentAction, reason: str) -> None:
+        error_msg = f"Blocked action: {action.action_type} ch{action.channel}: {reason}"
+        logger.warning(error_msg)
+        self.state.errors.append(error_msg)
 
     def _safe_get_fader(self, channel: int) -> float:
         """Get fader value using whichever method the mixer client provides."""

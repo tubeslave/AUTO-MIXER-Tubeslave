@@ -1,8 +1,10 @@
 """Tests for ai.agent module."""
-import pytest
+import asyncio
 import os
 import sys
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
@@ -174,3 +176,76 @@ class TestMixingAgent:
         agent.state.is_running = True
         agent.stop()
         assert agent.state.is_running is False
+
+    def test_auto_mode_blocks_legacy_wing_like_direct_writes(self):
+        class WingLikeMixer:
+            def __init__(self):
+                self.calls = []
+
+            def get_write_gate_status(self):
+                return {"state": "disarmed"}
+
+            def supervised_set_channel_fader(self, *args, **kwargs):
+                self.calls.append(("supervised_set_channel_fader", args, kwargs))
+
+            def get_fader(self, channel):
+                return -12.0
+
+            def set_fader(self, channel, value_db):
+                self.calls.append(("set_fader", channel, value_db))
+                return True
+
+            def set_mute(self, channel, muted):
+                self.calls.append(("set_mute", channel, muted))
+                return True
+
+        mixer = WingLikeMixer()
+        agent = MixingAgent(
+            knowledge_base=MagicMock(),
+            rule_engine=MagicMock(),
+            llm_client=MagicMock(),
+            mixer_client=mixer,
+            mode=AgentMode.AUTO,
+        )
+
+        asyncio.run(agent._act([
+            AgentAction(action_type='reduce_gain', channel=1, parameters={'amount_db': -3}),
+            AgentAction(action_type='mute_channel', channel=1, parameters={}),
+        ]))
+
+        assert mixer.calls == []
+        assert agent.state.applied_actions == []
+        assert len(agent.state.errors) == 2
+        assert all(
+            "legacy_mixing_agent_wing_auto_write_blocked" in err
+            for err in agent.state.errors
+        )
+
+    def test_blocked_mixer_write_is_not_recorded_as_applied(self):
+        class BlockingMixer:
+            def __init__(self):
+                self.calls = []
+
+            def get_fader(self, channel):
+                return -12.0
+
+            def set_fader(self, channel, value_db):
+                self.calls.append(("set_fader", channel, value_db))
+                return False
+
+        mixer = BlockingMixer()
+        agent = MixingAgent(
+            knowledge_base=MagicMock(),
+            rule_engine=MagicMock(),
+            llm_client=MagicMock(),
+            mixer_client=mixer,
+            mode=AgentMode.AUTO,
+        )
+
+        asyncio.run(agent._act([
+            AgentAction(action_type='adjust_gain', channel=1, parameters={'adjustment_db': -3}),
+        ]))
+
+        assert mixer.calls == [("set_fader", 1, -15.0)]
+        assert agent.state.applied_actions == []
+        assert agent.get_action_history() == []
