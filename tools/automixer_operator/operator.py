@@ -650,8 +650,9 @@ def command_preview(config: OperatorConfig) -> int:
         print(indent(result.stderr.rstrip()))
 
     context = load_context(config)
+    direct_counts, _direct_counts_error = load_issue_status_counts(config, context)
     print("")
-    print(render_recommended_action(context))
+    print(render_recommended_action(context, direct_counts))
 
     report = latest_dry_run_report(config.project_root)
     if report is None:
@@ -690,7 +691,8 @@ def command_cycle(config: OperatorConfig) -> int:
     print("")
     print("[3/5] refreshed recommendation")
     after_context = load_context(config)
-    print(indent(render_recommended_action(after_context)))
+    after_direct_counts, _after_direct_counts_error = load_issue_status_counts(config, after_context)
+    print(indent(render_recommended_action(after_context, after_direct_counts)))
 
     print("")
     print("[4/5] latest dry-run report")
