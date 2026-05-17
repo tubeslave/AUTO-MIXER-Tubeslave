@@ -648,6 +648,51 @@ def write_shadow_report_bundle(
     return report_dir
 
 
+def write_wing_replay_readiness_bundle(
+    root: Path,
+    *,
+    ready: bool = True,
+    blockers: list[str] | None = None,
+    dangerous_write_detected: bool = False,
+    shadow_dry_run_only: bool = True,
+    shadow_live_mixer_writes: bool = False,
+    no_clipping_measured: bool = False,
+    no_clipping_clear: bool = False,
+) -> Path:
+    report_dir = root / "readiness_case"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    bundle_path = report_dir / "wing_replay_readiness_bundle.json"
+    bundle_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "wing_replay_readiness_bundle/v1",
+                "generated_at": "2026-05-17T10:30:00+00:00",
+                "ready": ready,
+                "blockers": blockers or [],
+                "shadow": {
+                    "selected_proposal_id": "proposal::selected",
+                    "ready": ready,
+                    "dry_run_only": shadow_dry_run_only,
+                    "live_mixer_writes": shadow_live_mixer_writes,
+                },
+                "telemetry": {
+                    "dangerous_write_detected": dangerous_write_detected,
+                },
+                "evidence": {
+                    "selected_proposal_id": "proposal::selected",
+                    "dangerous_write_detected": dangerous_write_detected,
+                    "no_clipping": {
+                        "measured": no_clipping_measured,
+                        "clear": no_clipping_clear,
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return bundle_path
+
+
 class TestManualWriteRollbackSession:
 
     @pytest.mark.asyncio
@@ -1217,6 +1262,147 @@ class TestSupervisedPilotCockpit:
         assert payload["type"] == "supervised_pilot_status"
         assert payload["shadow_transport"]["available"] is True
         assert payload["gain_fader_runtime"]["selected_runtime"]["id"] == "wing_supervised_soundcheck"
+
+
+class TestReadyForLiveNoClippingTrust:
+
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    def test_ready_for_live_fails_closed_without_replay_bundle(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        tmp_path,
+    ):
+        server = AutoMixerServer()
+        server.connection_mode = "wing"
+        server.mixer_client = MagicMock(is_connected=True)
+        server.gain_staging = object()
+        server.auto_fader_controller = object()
+        server._wing_replay_readiness_root = tmp_path
+
+        status = server.get_ready_for_live_status()
+
+        assert status["ready"] is False
+        assert status["checks"]["no_clipping"] is False
+        assert status["checks"]["no_clipping_trusted"] is False
+        assert "No WING replay readiness bundle was found" in status["checks"]["no_clipping_reason"]
+        assert status["checks"]["no_clipping_evidence"]["available"] is False
+
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    def test_ready_for_live_keeps_clean_bundle_untrusted_without_measured_no_clipping(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        tmp_path,
+    ):
+        server = AutoMixerServer()
+        server.connection_mode = "wing"
+        server.mixer_client = MagicMock(is_connected=True)
+        server.gain_staging = object()
+        server.auto_fader_controller = object()
+        server._wing_replay_readiness_root = tmp_path
+        bundle_path = write_wing_replay_readiness_bundle(tmp_path)
+
+        status = server.get_ready_for_live_status()
+
+        assert status["ready"] is False
+        assert status["checks"]["no_clipping"] is False
+        assert status["checks"]["no_clipping_trusted"] is False
+        assert "Measured no-clipping verification is not present" in status["checks"]["no_clipping_reason"]
+        assert status["checks"]["no_clipping_evidence"]["report_path"] == str(bundle_path)
+        assert status["checks"]["no_clipping_evidence"]["available"] is True
+        assert status["checks"]["no_clipping_evidence"]["ready"] is True
+        assert status["checks"]["no_clipping_evidence"]["no_clipping_measured"] is False
+
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    def test_ready_for_live_trusts_clean_replay_bundle_with_measured_no_clipping(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        tmp_path,
+    ):
+        server = AutoMixerServer()
+        server.connection_mode = "wing"
+        server.mixer_client = MagicMock(is_connected=True)
+        server.gain_staging = object()
+        server.auto_fader_controller = object()
+        server._wing_replay_readiness_root = tmp_path
+        bundle_path = write_wing_replay_readiness_bundle(
+            tmp_path,
+            no_clipping_measured=True,
+            no_clipping_clear=True,
+        )
+
+        status = server.get_ready_for_live_status()
+
+        assert status["ready"] is True
+        assert status["checks"]["no_clipping"] is True
+        assert status["checks"]["no_clipping_trusted"] is True
+        assert status["checks"]["no_clipping_reason"] == (
+            "Trusted from WING replay readiness bundle with measured no-clipping evidence."
+        )
+        assert status["checks"]["no_clipping_evidence"]["report_path"] == str(bundle_path)
+        assert status["checks"]["no_clipping_evidence"]["no_clipping_measured"] is True
+        assert status["checks"]["no_clipping_evidence"]["no_clipping_clear"] is True
+
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    def test_ready_for_live_keeps_no_clipping_untrusted_when_bundle_is_blocked(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        tmp_path,
+    ):
+        server = AutoMixerServer()
+        server.connection_mode = "wing"
+        server.mixer_client = MagicMock(is_connected=True)
+        server.gain_staging = object()
+        server.auto_fader_controller = object()
+        server._wing_replay_readiness_root = tmp_path
+        write_wing_replay_readiness_bundle(
+            tmp_path,
+            ready=False,
+            blockers=["observation_only_telemetry_contains_write_sent"],
+            dangerous_write_detected=True,
+        )
+
+        status = server.get_ready_for_live_status()
+
+        assert status["ready"] is False
+        assert status["checks"]["no_clipping"] is False
+        assert status["checks"]["no_clipping_trusted"] is False
+        assert "observation_only_telemetry_contains_write_sent" in status["checks"]["no_clipping_reason"]
+        assert status["checks"]["no_clipping_evidence"]["dangerous_write_detected"] is True
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_get_ready_for_live_handler_exposes_no_clipping_trust_boundary(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        tmp_path,
+    ):
+        server = AutoMixerServer()
+        server.connection_mode = "wing"
+        server.mixer_client = MagicMock(is_connected=True)
+        server.gain_staging = object()
+        server.auto_fader_controller = object()
+        server._wing_replay_readiness_root = tmp_path
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server._dispatch["get_ready_for_live"](websocket, {})
+
+        payload = json.loads(websocket.send.await_args.args[0])
+        assert payload["type"] == "ready_for_live"
+        assert payload["ready"] is False
+        assert payload["checks"]["no_clipping"] is False
+        assert payload["checks"]["no_clipping_trusted"] is False
+        assert payload["checks"]["no_clipping_evidence"]["available"] is False
 
 
 class DummyAutoEQController:

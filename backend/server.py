@@ -207,6 +207,12 @@ class AutoMixerServer:
         if not shadow_reports_root.is_absolute():
             shadow_reports_root = Path(__file__).resolve().parents[1] / shadow_reports_root
         self._shadow_reports_root = shadow_reports_root
+        replay_readiness_root = Path(
+            os.getenv("AUTOMIXER_WING_REPLAY_READINESS_DIR", "artifacts")
+        )
+        if not replay_readiness_root.is_absolute():
+            replay_readiness_root = Path(__file__).resolve().parents[1] / replay_readiness_root
+        self._wing_replay_readiness_root = replay_readiness_root
         self._wing_deployment_write_boundary_enabled = self._parse_env_bool(
             os.getenv("AUTOMIXER_WING_DEPLOYMENT_WRITE_BOUNDARY_ENABLED", "true")
         )
@@ -1345,6 +1351,113 @@ class AutoMixerServer:
             "promotion_readiness_gates": list(readiness.get("promotion_readiness_gates", [])),
             "blocked_reasons": blocked_reasons,
             "report_age_sec": max(0.0, time.time() - summary_path.stat().st_mtime),
+        }
+
+    def _get_no_clipping_trust_status(self) -> Dict[str, Any]:
+        base_status = {
+            "available": False,
+            "trusted": False,
+            "ready": False,
+            "reason": "No WING replay readiness bundle was found under the configured artifacts root.",
+            "report_path": None,
+            "generated_at": None,
+            "blockers": [],
+            "dangerous_write_detected": False,
+            "selected_proposal_id": None,
+            "no_clipping_measured": False,
+            "no_clipping_clear": False,
+            "report_age_sec": None,
+        }
+        root = getattr(self, "_wing_replay_readiness_root", None)
+        if not isinstance(root, Path) or not root.exists():
+            return base_status
+
+        try:
+            bundle_paths = list(root.rglob("wing_replay_readiness_bundle.json"))
+        except OSError:
+            return base_status
+        if not bundle_paths:
+            return base_status
+
+        bundle_path = max(bundle_paths, key=lambda candidate: candidate.stat().st_mtime)
+        bundle = self._load_json_if_exists(bundle_path)
+        if not bundle:
+            base_status.update(
+                {
+                    "available": True,
+                    "reason": "Latest WING replay readiness bundle could not be parsed.",
+                    "report_path": str(bundle_path),
+                    "report_age_sec": max(0.0, time.time() - bundle_path.stat().st_mtime),
+                }
+            )
+            return base_status
+
+        shadow = dict(bundle.get("shadow") or {})
+        telemetry = dict(bundle.get("telemetry") or {})
+        evidence = dict(bundle.get("evidence") or {})
+        no_clipping_evidence = dict(bundle.get("no_clipping") or evidence.get("no_clipping") or {})
+        blockers = [str(item) for item in bundle.get("blockers", []) if item]
+        dangerous_write_detected = bool(evidence.get("dangerous_write_detected"))
+        ready = bool(bundle.get("ready", False))
+        safety_ready = (
+            ready
+            and not blockers
+            and bool(shadow.get("dry_run_only", True))
+            and not bool(shadow.get("live_mixer_writes", False))
+            and not dangerous_write_detected
+            and not bool(telemetry.get("dangerous_write_detected"))
+        )
+        no_clipping_measured = bool(
+            no_clipping_evidence.get("measured")
+            or evidence.get("no_clipping_measured")
+        )
+        no_clipping_clear = bool(
+            no_clipping_evidence.get("clear")
+            or evidence.get("no_clipping_clear")
+            or evidence.get("no_clipping") is True
+        )
+        trusted = (
+            safety_ready
+            and no_clipping_measured
+            and no_clipping_clear
+        )
+        if trusted:
+            reason = "Trusted from WING replay readiness bundle with measured no-clipping evidence."
+        elif blockers:
+            reason = "WING replay readiness bundle is blocked: " + ", ".join(blockers)
+        elif dangerous_write_detected or bool(telemetry.get("dangerous_write_detected")):
+            reason = "Observation-only telemetry contains write_sent events."
+        elif not ready:
+            reason = "Latest WING replay readiness bundle is not marked ready."
+        elif not bool(shadow.get("dry_run_only", True)):
+            reason = "Latest WING replay readiness bundle is not dry-run only."
+        elif bool(shadow.get("live_mixer_writes", False)):
+            reason = "Latest WING replay readiness bundle reports live mixer writes."
+        elif not no_clipping_measured:
+            reason = "Measured no-clipping verification is not present in the latest WING replay readiness bundle."
+        elif not no_clipping_clear:
+            reason = "Measured no-clipping verification did not pass in the latest WING replay readiness bundle."
+        else:
+            reason = "Latest WING replay readiness bundle did not satisfy the no-clipping trust gate."
+
+        return {
+            "available": True,
+            "trusted": trusted,
+            "ready": ready,
+            "reason": reason,
+            "report_path": str(bundle_path),
+            "generated_at": bundle.get("generated_at"),
+            "blockers": blockers,
+            "dangerous_write_detected": (
+                dangerous_write_detected or bool(telemetry.get("dangerous_write_detected"))
+            ),
+            "no_clipping_measured": no_clipping_measured,
+            "no_clipping_clear": no_clipping_clear,
+            "selected_proposal_id": (
+                evidence.get("selected_proposal_id")
+                or shadow.get("selected_proposal_id")
+            ),
+            "report_age_sec": max(0.0, time.time() - bundle_path.stat().st_mtime),
         }
 
     def get_supervised_pilot_status(self) -> Dict[str, Any]:
@@ -4619,7 +4732,8 @@ class AutoMixerServer:
         mixer_connected = bool(self.mixer_client and self.mixer_client.is_connected)
         gain_available = bool(self.gain_staging)
         fader_available = bool(self.auto_fader_controller)
-        no_clipping_measured = False
+        no_clipping_status = self._get_no_clipping_trust_status()
+        no_clipping_measured = bool(no_clipping_status.get("trusted"))
         ready = mixer_connected and gain_available and fader_available and no_clipping_measured
         gain_fader_runtime = build_gain_fader_runtime_summary(
             connection_mode=self.connection_mode,
@@ -4632,8 +4746,9 @@ class AutoMixerServer:
                 "gain_staging_available": gain_available,
                 "auto_fader_available": fader_available,
                 "no_clipping": no_clipping_measured,
-                "no_clipping_trusted": False,
-                "no_clipping_reason": "Measured clipping verification is not implemented yet.",
+                "no_clipping_trusted": bool(no_clipping_status.get("trusted")),
+                "no_clipping_reason": str(no_clipping_status.get("reason")),
+                "no_clipping_evidence": no_clipping_status,
                 "manual_write_supervision": self.get_manual_write_supervision_status(),
             },
             "gain_fader_runtime": gain_fader_runtime,
