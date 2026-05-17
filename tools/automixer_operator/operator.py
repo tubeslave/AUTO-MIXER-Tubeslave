@@ -499,7 +499,7 @@ def next_operator_step(
         todo = queue_count(context, "todo", direct_counts)
         in_progress = queue_count(context, "in_progress", direct_counts)
         if todo == 0 and in_progress == 0 and (blocked or 0) > 0:
-            priority = first_priority_action(audit)
+            priority = first_priority_action(audit, context)
             if priority:
                 priority_reason = str(priority.get("reason") or "review audit").rstrip(".")
                 return (
@@ -554,13 +554,64 @@ def next_operator_step(
     )
 
 
-def first_priority_action(audit: dict[str, Any] | None) -> dict[str, Any] | None:
+def first_priority_action(
+    audit: dict[str, Any] | None,
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     if not isinstance(audit, dict):
         return None
     actions = audit.get("priority_actions")
     if not isinstance(actions, list):
         return None
-    return next((item for item in actions if isinstance(item, dict)), None)
+    return next(
+        (
+            item
+            for item in actions
+            if isinstance(item, dict)
+            and not priority_action_is_stale_for_live_context(item, context)
+        ),
+        None,
+    )
+
+
+def priority_action_is_stale_for_live_context(
+    action: dict[str, Any],
+    context: dict[str, Any] | None,
+) -> bool:
+    if str(action.get("key") or "") != "repair_unhealthy_agents":
+        return False
+    has_error_agents = live_context_has_error_agents(context)
+    return has_error_agents is False
+
+
+def live_context_has_error_agents(context: dict[str, Any] | None) -> bool | None:
+    if not isinstance(context, dict):
+        return None
+    summary = context.get("agents_summary")
+    if not isinstance(summary, dict):
+        return None
+    attention_statuses = {"error", "failed", "offline", "unavailable"}
+    items = summary.get("items")
+    if isinstance(items, list):
+        return any(
+            isinstance(item, dict)
+            and normalize_status(item.get("status") or item.get("state")) in attention_statuses
+            for item in items
+        )
+    by_status = summary.get("by_status")
+    if isinstance(by_status, dict):
+        return any(
+            normalize_status(status) in attention_statuses and safe_positive_count(count)
+            for status, count in by_status.items()
+        )
+    return None
+
+
+def safe_positive_count(value: Any) -> bool:
+    try:
+        return int(value or 0) > 0
+    except (TypeError, ValueError):
+        return False
 
 
 def priority_command(action: dict[str, Any]) -> str:

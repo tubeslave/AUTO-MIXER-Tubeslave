@@ -298,6 +298,51 @@ def test_next_prefers_latest_audit_priority_when_queue_is_blocked():
     assert command.endswith("operator.py agent-health")
 
 
+def test_next_skips_stale_unhealthy_priority_when_live_context_is_clear():
+    target = automixer_operator.TargetSelection(
+        None,
+        None,
+        "No safe preview target found: missing unassigned todo issue.",
+        [],
+    )
+
+    action, reason, command = automixer_operator.next_operator_step(
+        {
+            "paperclip_api_ok": True,
+            "active_runs_summary": {"available": True, "total": 0},
+            "agents_summary": {"available": True, "by_status": {"idle": 9}},
+            "dashboard_summary": {"available": True, "summary": {"tasks": {"blocked": 85}}},
+        },
+        None,
+        target,
+        {"blocked": 85, "todo": 0, "in_progress": 0},
+        {
+            "priority_actions": [
+                {
+                    "key": "repair_unhealthy_agents",
+                    "severity": "critical",
+                    "reason": "1 agent is unhealthy.",
+                    "target": "Codex",
+                    "evidence": "agent status is error",
+                    "write_permitted": False,
+                },
+                {
+                    "key": "triage_blocked_queue",
+                    "severity": "critical",
+                    "reason": "85 issue(s) are blocked while no todo or in-progress work is available.",
+                    "target": "blocked_queue",
+                    "evidence": "automation has no safe preview target",
+                    "write_permitted": False,
+                },
+            ]
+        },
+    )
+
+    assert action == "triage_blocked_queue"
+    assert "blocked_queue" in reason
+    assert command.endswith("operator.py blocked")
+
+
 def test_next_recommends_cycle_when_blocked_report_but_target_ready(tmp_path):
     report_path = write_dry_run_report(tmp_path)
     report_path.write_text(
