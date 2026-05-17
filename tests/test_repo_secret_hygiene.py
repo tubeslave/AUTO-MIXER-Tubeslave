@@ -38,6 +38,23 @@ def test_root_env_files_are_ignored_but_example_is_trackable() -> None:
     assert example.returncode == 1, example.stdout or example.stderr
 
 
+def test_tool_local_env_and_secret_files_are_ignored_but_examples_are_trackable() -> None:
+    ignored = git_check_ignore(
+        "tools/paperclip_watchdog/.env",
+        "tools/paperclip_watchdog/.env.local",
+        "tools/paperclip_watchdog/.secret",
+        "config/user_config.json",
+    )
+    assert ignored.returncode == 0, ignored.stderr
+    assert "tools/paperclip_watchdog/.env" in ignored.stdout
+    assert "tools/paperclip_watchdog/.env.local" in ignored.stdout
+    assert "tools/paperclip_watchdog/.secret" in ignored.stdout
+    assert "config/user_config.json" in ignored.stdout
+
+    example = git_check_ignore_plain("tools/paperclip_watchdog/.env.example")
+    assert example.returncode == 1, example.stdout or example.stderr
+
+
 def test_runtime_artifact_outputs_are_ignored() -> None:
     ignored = git_check_ignore(
         ".paperclip/watchdog_state.json",
