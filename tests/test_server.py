@@ -243,6 +243,7 @@ class DummyWingLike:
         self.send = MagicMock()
         self.is_connected = True
         self.get_channel_fader = MagicMock(return_value=0.0)
+        self.get_all_channel_names = MagicMock(return_value={1: "Kick", 2: "Snare"})
         self._fader_value = -5.0
         self._gain_value = 0.0
 
@@ -370,6 +371,167 @@ def test_build_safe_gain_live_apply_adapter_routes_trim_through_soundcheck_gate(
         source="auto_soundcheck:gain_staging:safe_gain",
         write_policy=policy,
     )
+
+
+def test_soundcheck_gain_write_sync_stays_dry_run_without_confirmed_live_policy(dummy_wing_server):
+    server = dummy_wing_server
+
+    result = server._apply_soundcheck_gain_or_fader_write_sync(
+        channel=5,
+        value=-3.5,
+        value_type="gain",
+        source="auto_soundcheck:gain_staging:safe_gain",
+        write_policy={
+            "boundary_active": True,
+            "dry_run_only": True,
+            "live_apply_allowed": False,
+            "reason_text": "dry_run_default",
+        },
+    )
+
+    assert result == {
+        "status": "dry_run",
+        "value_type": "gain",
+        "channel": 5,
+        "requested_value": -3.5,
+        "source": "auto_soundcheck:gain_staging:safe_gain",
+    }
+    server.mixer_client.supervised_set_channel_gain.assert_not_called()
+    server.mixer_client.set_channel_gain.assert_not_called()
+
+
+def test_soundcheck_gain_write_sync_uses_supervised_live_apply_when_confirmed(dummy_wing_server):
+    server = dummy_wing_server
+
+    result = server._apply_soundcheck_gain_or_fader_write_sync(
+        channel=5,
+        value=-3.5,
+        value_type="gain",
+        source="auto_soundcheck:gain_staging:safe_gain",
+        write_policy={
+            "boundary_active": True,
+            "dry_run_only": False,
+            "live_apply_allowed": True,
+            "reason_text": "operator_confirmed",
+            "approval_id": "approval-soundcheck-1",
+        },
+    )
+
+    assert result["status"] == "applied"
+    assert result["channel"] == 5
+    assert result["effective_value"] == -3.5
+    server.mixer_client.supervised_set_channel_gain.assert_called_once_with(
+        5,
+        -3.5,
+        source="auto_soundcheck:gain_staging:safe_gain",
+        reason="operator_confirmed",
+        approved=True,
+        approval_id="approval-soundcheck-1",
+        bypass_cooldown=False,
+    )
+    server.mixer_client.set_channel_gain.assert_not_called()
+
+
+def test_soundcheck_fader_write_sync_uses_supervised_live_apply_when_confirmed(dummy_wing_server):
+    server = dummy_wing_server
+
+    result = server._apply_soundcheck_gain_or_fader_write_sync(
+        channel=6,
+        value=-8.0,
+        value_type="fader",
+        source="auto_soundcheck:auto_balance",
+        write_policy={
+            "boundary_active": True,
+            "dry_run_only": False,
+            "live_apply_allowed": True,
+            "reason_text": "operator_confirmed",
+            "approval_id": "approval-soundcheck-fader-1",
+        },
+    )
+
+    assert result["status"] == "applied"
+    assert result["channel"] == 6
+    assert result["effective_value"] == -8.0
+    server.mixer_client.supervised_set_channel_fader.assert_called_once_with(
+        6,
+        -8.0,
+        source="auto_soundcheck:auto_balance",
+        reason="operator_confirmed",
+        approved=True,
+        approval_id="approval-soundcheck-fader-1",
+        bypass_cooldown=False,
+    )
+    server.mixer_client.set_channel_fader.assert_not_called()
+
+
+def test_soundcheck_supervised_bundle_sync_stays_dry_run_without_confirmed_live_policy(dummy_wing_server):
+    server = dummy_wing_server
+    steps = [
+        {"address": "/ch/7/eq/1g", "value": 2.5},
+        {"address": "/ch/7/eq/1f", "value": 1600.0},
+    ]
+
+    result = server._apply_soundcheck_supervised_bundle_sync(
+        channel=7,
+        write_kind="eq",
+        steps=steps,
+        source="auto_soundcheck:auto_eq",
+        write_policy={
+            "boundary_active": True,
+            "dry_run_only": True,
+            "live_apply_allowed": False,
+            "reason_text": "dry_run_default",
+        },
+    )
+
+    assert result == {
+        "status": "dry_run",
+        "write_kind": "eq",
+        "channel": 7,
+        "requested_steps": steps,
+        "source": "auto_soundcheck:auto_eq",
+    }
+    server.mixer_client.apply_supervised_bundle.assert_not_called()
+    server.mixer_client.send.assert_not_called()
+
+
+def test_soundcheck_supervised_bundle_sync_uses_supervised_live_apply_and_restores_gate(dummy_wing_server):
+    server = dummy_wing_server
+    initial_allowed_kinds = server.mixer_client.get_write_gate_status()["allowed_kinds"]
+    steps = [
+        {"address": "/ch/7/eq/1g", "value": 2.5},
+        {"address": "/ch/7/eq/1f", "value": 1600.0},
+    ]
+
+    result = server._apply_soundcheck_supervised_bundle_sync(
+        channel=7,
+        write_kind="eq",
+        steps=steps,
+        source="auto_soundcheck:auto_eq",
+        write_policy={
+            "boundary_active": True,
+            "dry_run_only": False,
+            "live_apply_allowed": True,
+            "reason_text": "operator_confirmed",
+            "approval_id": "approval-soundcheck-eq-1",
+        },
+    )
+
+    assert result["status"] == "applied"
+    assert result["write_kind"] == "eq"
+    server.mixer_client.apply_supervised_bundle.assert_called_once_with(
+        channel=7,
+        write_kind="eq",
+        steps=steps,
+        source="auto_soundcheck:auto_eq",
+        reason="operator_confirmed",
+        approved=True,
+        approval_id="approval-soundcheck-eq-1",
+    )
+    configure_calls = server.mixer_client.configure_write_gate.call_args_list
+    assert configure_calls[0].kwargs["allowed_kinds"] == ["eq", "fader", "gain"]
+    assert configure_calls[-1].kwargs["allowed_kinds"] == initial_allowed_kinds
+    assert server.mixer_client.get_write_gate_status()["allowed_kinds"] == initial_allowed_kinds
 
 
 @pytest.fixture
@@ -1050,3 +1212,127 @@ class TestWingDeploymentWriteBoundary:
         assert policy["dry_run_only"] is False
         assert policy["live_apply_allowed"] is True
         assert policy["reason_text"] == "operator_confirmed"
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_auto_soundcheck_full_cycle_keeps_default_wing_run_dry(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        active_policies_seen = []
+
+        async def capture_apply_auto_balance(_websocket):
+            active_policies_seen.append(dict(server._active_soundcheck_live_policy or {}))
+
+        with (
+            patch.object(server_module.asyncio, "sleep", new=AsyncMock(return_value=None)),
+            patch.object(server, "reset_all_functions_to_defaults", new=AsyncMock(return_value=None)) as reset_defaults,
+            patch.object(server, "start_realtime_correction", new=AsyncMock(return_value=None)) as start_gain,
+            patch.object(server, "stop_realtime_correction", new=AsyncMock(return_value=None)),
+            patch.object(server, "start_phase_alignment", new=AsyncMock(return_value=None)),
+            patch.object(server, "stop_phase_alignment", new=AsyncMock(return_value=None)),
+            patch.object(server, "start_multi_channel_auto_eq", new=AsyncMock(return_value=None)),
+            patch.object(server, "stop_multi_channel_auto_eq", new=AsyncMock(return_value=None)),
+            patch.object(server, "apply_all_corrections", new=AsyncMock(return_value=None)) as apply_eq,
+            patch.object(server, "start_auto_balance", new=AsyncMock(return_value=None)),
+            patch.object(server, "apply_auto_balance", new=AsyncMock(side_effect=capture_apply_auto_balance)),
+            patch.object(server, "_wait_with_progress", new=AsyncMock(return_value=None)),
+        ):
+            await server.start_auto_soundcheck(
+                websocket,
+                device_id="1",
+                channels=[1, 2],
+                channel_settings={},
+                channel_mapping={},
+                timings={"gain_staging": 0, "phase_alignment": 0, "auto_eq": 0, "auto_fader": 0},
+            )
+            await server.auto_soundcheck_task
+
+        reset_policy = reset_defaults.await_args.kwargs["write_policy"]
+        gain_policy = start_gain.await_args.kwargs["write_policy"]
+        eq_policy = apply_eq.await_args.kwargs["write_policy"]
+        payloads = [json.loads(call.args[0]) for call in websocket.send.await_args_list]
+        complete_payload = next(payload for payload in payloads if payload.get("complete") is True)
+
+        assert reset_policy["mode"] == "dry_run"
+        assert reset_policy["dry_run_only"] is True
+        assert reset_policy["live_apply_allowed"] is False
+        assert gain_policy == reset_policy
+        assert eq_policy == reset_policy
+        assert active_policies_seen[-1] == reset_policy
+        assert complete_payload["live_apply_policy"] == reset_policy
+        assert server._active_soundcheck_live_policy is None
+        server.mixer_client.set_channel_gain.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+        server.mixer_client.supervised_set_channel_gain.assert_not_called()
+        server.mixer_client.supervised_set_channel_fader.assert_not_called()
+        server.mixer_client.apply_supervised_bundle.assert_not_called()
+        server.mixer_client.send.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_auto_soundcheck_full_cycle_carries_confirmed_live_apply_policy(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        active_policies_seen = []
+
+        async def capture_apply_auto_balance(_websocket):
+            active_policies_seen.append(dict(server._active_soundcheck_live_policy or {}))
+
+        with (
+            patch.object(server_module.asyncio, "sleep", new=AsyncMock(return_value=None)),
+            patch.object(server, "reset_all_functions_to_defaults", new=AsyncMock(return_value=None)) as reset_defaults,
+            patch.object(server, "start_realtime_correction", new=AsyncMock(return_value=None)) as start_gain,
+            patch.object(server, "stop_realtime_correction", new=AsyncMock(return_value=None)),
+            patch.object(server, "start_phase_alignment", new=AsyncMock(return_value=None)),
+            patch.object(server, "stop_phase_alignment", new=AsyncMock(return_value=None)),
+            patch.object(server, "start_multi_channel_auto_eq", new=AsyncMock(return_value=None)),
+            patch.object(server, "stop_multi_channel_auto_eq", new=AsyncMock(return_value=None)),
+            patch.object(server, "apply_all_corrections", new=AsyncMock(return_value=None)) as apply_eq,
+            patch.object(server, "start_auto_balance", new=AsyncMock(return_value=None)),
+            patch.object(server, "apply_auto_balance", new=AsyncMock(side_effect=capture_apply_auto_balance)),
+            patch.object(server, "_wait_with_progress", new=AsyncMock(return_value=None)),
+        ):
+            await server.start_auto_soundcheck(
+                websocket,
+                device_id="1",
+                channels=[1, 2],
+                channel_settings={},
+                channel_mapping={},
+                timings={"gain_staging": 0, "phase_alignment": 0, "auto_eq": 0, "auto_fader": 0},
+                live_apply_enabled=True,
+                confirm_live_apply=True,
+                live_apply_reason="operator_confirmed",
+                live_apply_approval_id="approval-soundcheck-full-cycle",
+            )
+            await server.auto_soundcheck_task
+
+        reset_policy = reset_defaults.await_args.kwargs["write_policy"]
+        gain_policy = start_gain.await_args.kwargs["write_policy"]
+        eq_policy = apply_eq.await_args.kwargs["write_policy"]
+        payloads = [json.loads(call.args[0]) for call in websocket.send.await_args_list]
+        complete_payload = next(payload for payload in payloads if payload.get("complete") is True)
+
+        assert reset_policy["mode"] == "supervised_live_apply"
+        assert reset_policy["dry_run_only"] is False
+        assert reset_policy["live_apply_allowed"] is True
+        assert reset_policy["reason_text"] == "operator_confirmed"
+        assert reset_policy["approval_id"] == "approval-soundcheck-full-cycle"
+        assert gain_policy == reset_policy
+        assert eq_policy == reset_policy
+        assert active_policies_seen[-1] == reset_policy
+        assert complete_payload["live_apply_policy"] == reset_policy
+        assert server._active_soundcheck_live_policy is None
