@@ -880,6 +880,139 @@ class TestVoiceCommandManualWriteSafety:
         )
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("command_type", "starting_db", "delta_db", "expected_db"),
+        [
+            ("volume_up", -4.0, 2.5, -1.5),
+            ("volume_down", -4.0, 2.5, -6.5),
+        ],
+    )
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_voice_volume_commands_use_supervised_manual_write_gate_when_approved(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+        command_type,
+        starting_db,
+        delta_db,
+        expected_db,
+    ):
+        server = dummy_wing_server
+        server.broadcast = AsyncMock()
+        server.last_fader_values[3] = starting_db
+        reason = f"voice approved {command_type}"
+        approval_id = f"{command_type}-approval-1"
+
+        await server._execute_voice_command(
+            {
+                "type": command_type,
+                "channel": 3,
+                "db": delta_db,
+                "reason": reason,
+                "approved": True,
+                "approval_id": approval_id,
+            }
+        )
+
+        server.mixer_client.supervised_set_channel_fader.assert_called_once_with(
+            3,
+            expected_db,
+            source=f"voice:{command_type}",
+            reason=reason,
+            approved=True,
+            approval_id=approval_id,
+            bypass_cooldown=False,
+        )
+        server.mixer_client.set_channel_fader.assert_not_called()
+        assert server.last_fader_values[3] == expected_db
+        server.broadcast.assert_awaited_once_with(
+            {
+                "type": "voice_command_executed",
+                "command": command_type,
+                "channel": 3,
+                "db_change": delta_db,
+                "new_db": expected_db,
+            }
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("command_type", ["volume_up", "volume_down"])
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_voice_volume_commands_block_without_approval_and_do_not_write_directly(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+        command_type,
+    ):
+        server = dummy_wing_server
+        server.broadcast = AsyncMock()
+        server.last_fader_values[4] = -6.0
+
+        await server._execute_voice_command(
+            {
+                "type": command_type,
+                "channel": 4,
+                "db": 3.0,
+                "reason": f"voice blocked {command_type}",
+            }
+        )
+
+        server.mixer_client.supervised_set_channel_fader.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+        assert server.last_fader_values[4] == -6.0
+        server.broadcast.assert_awaited_once_with(
+            {
+                "type": "voice_command_blocked",
+                "command": command_type,
+                "channel": 4,
+                "reason": "approval_required",
+            }
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("command_type", ["volume_up", "volume_down"])
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_voice_volume_commands_block_when_manual_path_disarmed(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+        command_type,
+    ):
+        server = dummy_wing_server
+        server.broadcast = AsyncMock()
+        server._manual_writes_armed = False
+        server.last_fader_values[5] = -9.0
+
+        await server._execute_voice_command(
+            {
+                "type": command_type,
+                "channel": 5,
+                "db": 1.5,
+                "reason": f"voice disarmed {command_type}",
+                "approved": True,
+                "approval_id": f"{command_type}-armed-check",
+            }
+        )
+
+        server.mixer_client.supervised_set_channel_fader.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+        assert server.last_fader_values[5] == -9.0
+        server.broadcast.assert_awaited_once_with(
+            {
+                "type": "voice_command_blocked",
+                "command": command_type,
+                "channel": 5,
+                "reason": "manual_path_not_armed",
+            }
+        )
+
+    @pytest.mark.asyncio
     @patch.object(AutoMixerServer, "_load_config", return_value={})
     @patch("server.BleedService")
     async def test_voice_gain_uses_supervised_manual_write_gate_when_approved(
