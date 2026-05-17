@@ -261,6 +261,43 @@ def test_next_recommends_blocked_queue_when_no_todo_target():
     assert command.endswith("operator.py blocked")
 
 
+def test_next_prefers_latest_audit_priority_when_queue_is_blocked():
+    target = automixer_operator.TargetSelection(
+        None,
+        None,
+        "No safe preview target found: missing unassigned todo issue.",
+        [],
+    )
+
+    action, reason, command = automixer_operator.next_operator_step(
+        {
+            "paperclip_api_ok": True,
+            "active_runs_summary": {"available": True, "total": 0},
+            "dashboard_summary": {"available": True, "summary": {"tasks": {"blocked": 85}}},
+        },
+        None,
+        target,
+        {"blocked": 85, "todo": 0, "in_progress": 0},
+        {
+            "priority_actions": [
+                {
+                    "key": "repair_unhealthy_agents",
+                    "severity": "critical",
+                    "reason": "3 agent(s) are unhealthy.",
+                    "target": "Codex",
+                    "evidence": "agent status is error",
+                    "write_permitted": False,
+                }
+            ]
+        },
+    )
+
+    assert action == "repair_unhealthy_agents"
+    assert "critical priority" in reason
+    assert "Codex" in reason
+    assert command.endswith("operator.py status")
+
+
 def test_next_recommends_cycle_when_blocked_report_but_target_ready(tmp_path):
     report_path = write_dry_run_report(tmp_path)
     report_path.write_text(

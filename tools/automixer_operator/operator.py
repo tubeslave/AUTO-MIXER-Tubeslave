@@ -318,7 +318,13 @@ def command_next(config: OperatorConfig) -> int:
     report = latest_dry_run_report(config.project_root)
     target = select_preview_target(config, context)
     direct_counts, _direct_counts_error = load_issue_status_counts(config, context)
-    action, reason, command = next_operator_step(context, report, target, direct_counts)
+    action, reason, command = next_operator_step(
+        context,
+        report,
+        target,
+        direct_counts,
+        latest_operational_audit(config.project_root),
+    )
     lines = [
         "== Automixer Operator Next ==",
         f"action: {action}",
@@ -336,6 +342,7 @@ def next_operator_step(
     report: DispatchReport | None,
     target: TargetSelection | None = None,
     direct_counts: dict[str, int] | None = None,
+    audit: dict[str, Any] | None = None,
 ) -> tuple[str, str, str]:
     if context.get("paperclip_api_ok") is not True:
         return (
@@ -364,6 +371,18 @@ def next_operator_step(
         todo = queue_count(context, "todo", direct_counts)
         in_progress = queue_count(context, "in_progress", direct_counts)
         if todo == 0 and in_progress == 0 and (blocked or 0) > 0:
+            priority = first_priority_action(audit)
+            if priority:
+                priority_reason = str(priority.get("reason") or "review audit").rstrip(".")
+                return (
+                    str(priority.get("key") or "review_operational_audit"),
+                    (
+                        f"{priority.get('severity') or 'unknown'} priority: {priority_reason}. "
+                        f"Target: {priority.get('target') or 'none'}. "
+                        f"Evidence: {priority.get('evidence') or 'none'}."
+                    ),
+                    priority_command(priority),
+                )
             return (
                 "blocked",
                 (
@@ -405,6 +424,24 @@ def next_operator_step(
         "No active run and no ready approval template; run a full dry-run cycle.",
         "python3 tools/automixer_operator/operator.py cycle",
     )
+
+
+def first_priority_action(audit: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(audit, dict):
+        return None
+    actions = audit.get("priority_actions")
+    if not isinstance(actions, list):
+        return None
+    return next((item for item in actions if isinstance(item, dict)), None)
+
+
+def priority_command(action: dict[str, Any]) -> str:
+    key = str(action.get("key") or "")
+    if key == "triage_blocked_queue":
+        return "python3 tools/automixer_operator/operator.py blocked"
+    if key == "repair_unhealthy_agents":
+        return "python3 tools/automixer_operator/operator.py status"
+    return "python3 tools/automixer_operator/operator.py operational-audit"
 
 
 def command_target(config: OperatorConfig) -> int:
