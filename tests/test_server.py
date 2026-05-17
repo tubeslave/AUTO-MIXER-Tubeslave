@@ -557,12 +557,28 @@ def write_shadow_report_bundle(
     ready: bool = True,
     dry_run_only: bool = True,
     live_mixer_writes: bool = False,
+    include_safety_evidence: bool = True,
     blocked_reasons: list[str] | None = None,
     disagreement_count: int = 0,
     highest_severity: str = "warning",
 ) -> Path:
     report_dir = root / "shadow_case"
     report_dir.mkdir(parents=True, exist_ok=True)
+    comparison_evidence = {}
+    readiness_safety = {}
+    if include_safety_evidence:
+        comparison_evidence.update(
+            {
+                "dry_run_only": dry_run_only,
+                "live_mixer_writes": live_mixer_writes,
+            }
+        )
+        readiness_safety.update(
+            {
+                "dry_run_only": dry_run_only,
+                "live_mixer_writes": live_mixer_writes,
+            }
+        )
     (report_dir / "shadow_mode_summary.json").write_text(
         json.dumps(
             {
@@ -587,10 +603,7 @@ def write_shadow_report_bundle(
             {
                 "selected_proposal_id": "corr::operator::unit",
                 "disagreements": [{} for _ in range(disagreement_count)],
-                "evidence": {
-                    "dry_run_only": dry_run_only,
-                    "live_mixer_writes": live_mixer_writes,
-                },
+                "evidence": comparison_evidence,
             }
         ),
         encoding="utf-8",
@@ -600,8 +613,6 @@ def write_shadow_report_bundle(
             {
                 "ready": ready,
                 "promotion_readiness_score": 88 if ready else 40,
-                "dry_run_only": dry_run_only,
-                "live_mixer_writes": live_mixer_writes,
                 "validation_highest_severity": highest_severity,
                 "aggregation": {
                     "disagreement_rate": 1.0 if disagreement_count else 0.0,
@@ -633,6 +644,7 @@ def write_shadow_report_bundle(
                     {"key": "dry_run_only", "ok": dry_run_only, "blocking": True},
                     {"key": "no_live_mixer_writes", "ok": not live_mixer_writes, "blocking": True},
                 ],
+                **readiness_safety,
             }
         ),
         encoding="utf-8",
@@ -1205,6 +1217,32 @@ class TestSupervisedPilotCockpit:
         assert status["shadow_transport"]["disagreement_rate"] == 0.0
         assert status["shadow_transport"]["audit_coverage"]["coverage_rate"] == 1.0
         assert status["shadow_transport"]["confidence_trend"]["direction"] == "ai_above_operator"
+
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    def test_supervised_pilot_status_blocks_shadow_when_safety_evidence_is_missing(
+        self,
+        mock_bleed_service,
+        mock_load_config,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        server._shadow_reports_root = tmp_path
+        write_shadow_report_bundle(
+            tmp_path,
+            ready=True,
+            include_safety_evidence=False,
+            highest_severity="warning",
+        )
+
+        status = server.get_supervised_pilot_status()
+
+        assert status["primary_state"] == "blocked"
+        assert status["shadow_transport"]["state"] == "blocked"
+        assert status["shadow_transport"]["dry_run_only"] is False
+        assert status["shadow_transport"]["live_mixer_writes"] is True
+        assert status["pilot_ready"] is False
 
     @patch.object(AutoMixerServer, "_load_config", return_value={})
     @patch("server.BleedService")

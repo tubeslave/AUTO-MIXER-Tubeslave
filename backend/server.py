@@ -1294,23 +1294,29 @@ class AutoMixerServer:
         trajectory = self._load_json_if_exists(report_dir / "confidence_trajectory.json")
         aggregation = dict(readiness.get("aggregation") or {})
 
-        dry_run_only = bool(
-            readiness.get(
-                "dry_run_only",
-                (comparison.get("evidence") or {}).get("dry_run_only", True),
-            )
+        comparison_evidence = dict(comparison.get("evidence") or {})
+
+        def _shadow_safety_bool(primary: Any, fallback: Any, *, default: bool) -> bool:
+            for value in (primary, fallback):
+                if value is not None:
+                    return bool(value)
+            return default
+
+        dry_run_only = _shadow_safety_bool(
+            readiness.get("dry_run_only"),
+            comparison_evidence.get("dry_run_only"),
+            default=False,
         )
-        live_mixer_writes = bool(
-            readiness.get(
-                "live_mixer_writes",
-                (comparison.get("evidence") or {}).get("live_mixer_writes", False),
-            )
+        live_mixer_writes = _shadow_safety_bool(
+            readiness.get("live_mixer_writes"),
+            comparison_evidence.get("live_mixer_writes"),
+            default=True,
         )
         blocked_reasons = [str(reason) for reason in rollback.get("blocked_reasons", []) if reason]
         highest_severity = str(readiness.get("validation_highest_severity") or "") or None
         ready = bool(readiness.get("ready", False))
 
-        if live_mixer_writes or blocked_reasons or highest_severity == "error":
+        if live_mixer_writes or not dry_run_only or blocked_reasons or highest_severity == "error":
             state = "blocked"
         elif ready:
             state = "shadow_ready"
