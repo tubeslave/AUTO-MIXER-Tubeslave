@@ -661,6 +661,7 @@ def test_agent_health_reports_unhealthy_agent_without_exposing_token(tmp_path, m
     assert "token_length: 18" in output
     assert "secret-token-value" not in output
     assert "secret-device-key" not in output
+    assert "repair_hint: Local OpenClaw gateway is healthy" in output
     assert "external_gateway_probe: disabled" in output
     assert "local_gateway_probe_url: http://127.0.0.1:18679/" in output
     assert "local_gateway_reachable: True" in output

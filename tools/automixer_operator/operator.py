@@ -1073,17 +1073,24 @@ def load_agent_health_details(config: OperatorConfig, context: dict[str, Any]) -
         detail_payload, detail_error = ({}, None)
         if agent_id:
             detail_payload, detail_error = bridge.safe_get(client, f"/api/agents/{bridge.quote(agent_id)}")
+        agent_summary = bridge.summarize_record(agent, ["id", "name", "title", "role", "status", "adapterType", "lastHeartbeatAt", "updatedAt"])
+        audit_item = find_unhealthy_audit_item(agent, unhealthy_audit_items)
+        adapter_config = safe_agent_adapter_config(detail_payload if isinstance(detail_payload, dict) else {})
+        local_gateway_probe = (
+            probe_openclaw_local_gateway(config)
+            if str(agent.get("adapterType") or agent.get("adapter_type") or "") == "openclaw_gateway"
+            else None
+        )
         details.append(
             {
-                "agent": bridge.summarize_record(agent, ["id", "name", "title", "role", "status", "adapterType", "lastHeartbeatAt", "updatedAt"]),
-                "audit": find_unhealthy_audit_item(agent, unhealthy_audit_items),
+                "agent": agent_summary,
+                "audit": audit_item,
                 "assigned_issue_count": len(assigned_issues),
                 "assigned_issues": [bridge.summarize_record(issue, ["id", "identifier", "title", "status", "priority", "lastActivityAt", "updatedAt"]) for issue in assigned_issues[:10]],
                 "detail_error": detail_error,
-                "safe_adapter_config": safe_agent_adapter_config(detail_payload if isinstance(detail_payload, dict) else {}),
-                "local_gateway_probe": probe_openclaw_local_gateway(config)
-                if str(agent.get("adapterType") or agent.get("adapter_type") or "") == "openclaw_gateway"
-                else None,
+                "safe_adapter_config": adapter_config,
+                "local_gateway_probe": local_gateway_probe,
+                "repair_hint": agent_repair_hint(agent_summary, audit_item, adapter_config, local_gateway_probe),
             }
         )
     return {
@@ -1139,6 +1146,35 @@ def safe_agent_adapter_config(agent_detail: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def agent_repair_hint(
+    agent: dict[str, Any],
+    audit: dict[str, Any],
+    adapter_config: dict[str, Any],
+    local_gateway_probe: dict[str, Any] | None,
+) -> str:
+    status = str(agent.get("status") or "").lower()
+    adapter = str(agent.get("adapterType") or "").lower()
+    if adapter == "openclaw_gateway":
+        if adapter_config.get("token_configured") is not True or adapter_config.get("device_key_configured") is not True:
+            return "OpenClaw adapter config is incomplete; review Paperclip agent credentials manually before dispatch."
+        if isinstance(local_gateway_probe, dict) and local_gateway_probe.get("allowed_local_only") is not True:
+            return "Local gateway probe is blocked by safety rules; use a loopback URL only."
+        if isinstance(local_gateway_probe, dict) and local_gateway_probe.get("reachable") is not True:
+            return "Local OpenClaw gateway is not reachable; start or reconnect the local gateway, then rerun agent-health."
+        if (
+            status == "error"
+            and isinstance(local_gateway_probe, dict)
+            and local_gateway_probe.get("ok") is True
+            and local_gateway_probe.get("openclaw_ui_detected") is True
+        ):
+            return "Local OpenClaw gateway is healthy, but Paperclip still marks the agent as error; refresh the Paperclip/OpenClaw agent state manually before dispatch."
+        if status == "error":
+            return "Paperclip reports this OpenClaw agent as error; inspect local gateway logs and Paperclip run history before dispatch."
+    if audit.get("heartbeat_age_hours") is not None:
+        return "Agent heartbeat is stale; start the local worker or reassign its blocked work manually."
+    return "Review this agent manually before assigning more Automixer work."
+
+
 def render_agent_health(context: dict[str, Any], details: dict[str, Any]) -> str:
     lines = [
         "== Automixer Agent Health ==",
@@ -1168,6 +1204,7 @@ def render_agent_health(context: dict[str, Any], details: dict[str, Any]) -> str
                 f"  reason: {audit.get('reason') or 'status needs review'}",
                 f"  heartbeat_age_hours: {audit.get('heartbeat_age_hours') if audit.get('heartbeat_age_hours') is not None else 'unknown'}",
                 f"  assigned_open_issues: {item.get('assigned_issue_count', 0)}",
+                f"  repair_hint: {item.get('repair_hint') or 'review manually'}",
             ]
         )
         if item.get("detail_error"):
