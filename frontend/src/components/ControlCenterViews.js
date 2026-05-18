@@ -39,6 +39,56 @@ const decisions = [
   ['10:20', 'Gtr 1: -2 dB at 3.2 kHz', 'APPLIED'],
 ];
 
+function formatMetric(value, fallback = 'N/A', suffix = '') {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return fallback;
+  return `${Number(value).toFixed(1)}${suffix}`;
+}
+
+function normalizeChannel(channel) {
+  const level = channel.level_db ?? channel.level ?? channel.meter?.rms_db ?? -60;
+  const peak = channel.peak_db ?? channel.meter?.peak_db ?? null;
+  const dynamic = channel.dynamic_range_db ?? channel.dynamic ?? (
+    peak !== null && level !== null ? Math.max(0, Number(peak) - Number(level)) : 0
+  );
+  return {
+    id: channel.id ?? channel.number,
+    name: channel.name || `Ch ${channel.number || channel.id}`,
+    role: channel.role || channel.routing_role || 'Channel',
+    group: channel.group || 'CHANNELS',
+    level: Number.isFinite(Number(level)) ? Number(level) : -60,
+    peak,
+    lufs: channel.lufs ?? channel.meter?.lufs ?? null,
+    dynamic: Number.isFinite(Number(dynamic)) ? Number(dynamic) : 0,
+    confidence: channel.ai_recognition?.confidence ?? channel.confidence ?? 0,
+    status: channel.status || 'unknown',
+    source: channel.source || `In ${String(channel.id ?? channel.number).padStart(2, '0')}`,
+  };
+}
+
+function channelsFromInventory(inventory) {
+  if (inventory?.channels?.length) {
+    return inventory.channels.map(normalizeChannel);
+  }
+  return mixChannels;
+}
+
+function decisionsFromQueue(queue) {
+  const pending = queue?.pending_actions || [];
+  const history = queue?.history || [];
+  const rows = [...pending, ...history].slice(0, 5).map((item, index) => [
+    item.created_at ? String(item.created_at).slice(11, 16) : `--:${String(index).padStart(2, '0')}`,
+    item.title || item.message || item.action || 'Decision',
+    String(item.status || 'PENDING').toUpperCase(),
+  ]);
+  return rows.length ? rows : decisions;
+}
+
+function statusClass(status) {
+  if (['ACTIVE', 'OK', 'ONLINE', 'RUNNING'].includes(String(status).toUpperCase())) return 'state-green';
+  if (['OFFLINE', 'UNAVAILABLE', 'BLOCKED'].includes(String(status).toUpperCase())) return 'state-red';
+  return 'state-yellow';
+}
+
 function MiniSparkline({ tone = 'green' }) {
   return (
     <div className={`mini-spark mini-spark-${tone}`}>
@@ -99,25 +149,35 @@ function SpectrumChart({ compact = false }) {
   );
 }
 
-function DirectorPanel() {
+function DirectorPanel({ decisionQueue, operatorModeStatus, proposalActions }) {
+  const rows = decisionsFromQueue(decisionQueue);
+  const queueAvailable = decisionQueue?.proposal_queue_available !== false;
+  const agentRuntimeAvailable = decisionQueue?.agent_runtime_available === true;
+  const canApply = operatorModeStatus?.capabilities?.can_apply_to_console === true;
+  const modeLabel = operatorModeStatus?.label || 'Assist';
+  const currentGoal = queueAvailable
+    ? 'Обеспечить читаемость вокала и сбалансированный микс в рамках текущей политики режима.'
+    : 'Очередь предложений недоступна; экран показывает read-only состояние backend без фиктивных применений.';
   return (
     <aside className="director-panel">
       <section className="director-card director-profile">
         <div className="director-avatar">AI</div>
         <div>
           <h3>Директор Automixer</h3>
-          <p>Главный управляющий агент</p>
-          <span className="online-dot">Online</span>
+          <p>Mode: {modeLabel}</p>
+          <span className={queueAvailable ? 'online-dot' : 'state-yellow'}>
+            {agentRuntimeAvailable ? 'Agent online' : queueAvailable ? 'Queue online' : 'Queue unavailable'}
+          </span>
         </div>
       </section>
       <section className="director-card">
         <h4>Текущая цель</h4>
-        <p>Обеспечить читаемость вокала и сбалансированный микс без live-записей вне разрешённого режима.</p>
+        <p>{currentGoal}</p>
         <button className="ghost-action">Детали цели</button>
       </section>
       <section className="director-card">
         <h4>Последние решения</h4>
-        {decisions.map(([time, text, state]) => (
+        {rows.map(([time, text, state]) => (
           <div className="decision-row" key={`${time}-${text}`}>
             <span>{time}</span>
             <p>{text}</p>
@@ -127,32 +187,43 @@ function DirectorPanel() {
       </section>
       <section className="director-card">
         <h4>Предложения агента</h4>
-        <div className="proposal-row">
-          <p>Lead Vocal: добавить воздуха +1.5 dB @ 12 kHz</p>
-          <div><button>Принять</button><button>Отклонить</button></div>
-        </div>
-        <div className="proposal-row">
-          <p>Kick: убрать мутность -2 dB @ 250 Hz</p>
-          <div><button>Принять</button><button>Отклонить</button></div>
-        </div>
+        {(decisionQueue?.pending_actions || []).slice(0, 2).map((item) => (
+          <div className="proposal-row" key={item.id || item.title}>
+            <p>{item.title}</p>
+            <div>
+              <button onClick={() => proposalActions?.onAccept?.(item.id)}>Принять</button>
+              {canApply && item.can_apply && (
+                <button onClick={() => proposalActions?.onApply?.(item.id)}>Применить</button>
+              )}
+              <button onClick={() => proposalActions?.onDismiss?.(item.id)}>Отклонить</button>
+            </div>
+          </div>
+        ))}
+        {(!decisionQueue?.pending_actions || decisionQueue.pending_actions.length === 0) && (
+          <div className="proposal-row">
+            <p>{decisionQueue?.reason || 'Нет предложений в очереди'}</p>
+          </div>
+        )}
       </section>
     </aside>
   );
 }
 
 function ChannelStrip({ channel, selected }) {
+  const meterHeight = Math.max(8, Math.min(92, 80 + channel.level));
+  const faderPosition = Math.max(8, Math.min(84, 62 + channel.level));
   return (
     <div className={`console-strip ${selected ? 'selected' : ''}`}>
       <div className="strip-head">
         <strong>{channel.name}</strong>
         <span>{channel.role}</span>
       </div>
-      <b className="strip-db">{channel.level.toFixed(1)} dB</b>
+      <b className="strip-db">{formatMetric(channel.level, 'N/A', ' dB')}</b>
       <MiniSparkline tone={channel.group === 'VOCALS' ? 'purple' : 'green'} />
       <div className="strip-tools"><span>GATE</span><span>COMP</span></div>
       <div className="strip-fader">
-        <div className="strip-meter"><span style={{ height: `${Math.max(12, Math.min(92, 80 + channel.level))}%` }} /></div>
-        <div className="fader-rail"><i style={{ bottom: `${Math.max(8, Math.min(84, 62 + channel.level))}%` }} /></div>
+        <div className="strip-meter"><span style={{ height: `${meterHeight}%` }} /></div>
+        <div className="fader-rail"><i style={{ bottom: `${faderPosition}%` }} /></div>
       </div>
       <div className="strip-buttons"><button>M</button><button>S</button></div>
       <footer>{String(channel.id).padStart(2, '0')}</footer>
@@ -169,34 +240,43 @@ function MetricCard({ title, children }) {
   );
 }
 
-export function DashboardView() {
+export function DashboardView({ snapshot, channelInventory, decisionQueue, operatorModeStatus, proposalActions, operatorAnalysisReport }) {
+  const channels = channelsFromInventory(channelInventory);
+  const master = snapshot?.master_bus || {};
+  const channelSummary = snapshot?.channel_summary || channelInventory?.summary || {};
+  const decisionSummary = snapshot?.decision_summary || decisionQueue?.summary || {};
+  const aiConfidence = decisionQueue?.agent_runtime_available === true ? 87 : 0;
   return (
     <div className="console-page console-page-dashboard">
       <div className="console-main">
         <div className="metrics-grid">
           <MetricCard title="Master Bus">
             <div className="master-values">
-              <div className="big-metric">-14.2 <span>LUFS</span></div>
-              <div className="big-metric small">-1.1 <span>dBTP</span></div>
+              <div className="big-metric">{formatMetric(master.integrated_lufs, 'N/A')} <span>LUFS</span></div>
+              <div className="big-metric small">{formatMetric(master.true_peak_db, 'N/A')} <span>dBTP</span></div>
             </div>
             <div className="master-labels"><span>Integrated</span><span>True Peak</span></div>
-            <MeterBar value={-14.2} />
+            <MeterBar value={master.integrated_lufs ?? -60} />
           </MetricCard>
           <MetricCard title="Spectrum">
             <SpectrumChart />
             <div className="spectrum-axis"><span>20</span><span>100</span><span>1k</span><span>10k</span></div>
           </MetricCard>
           <MetricCard title="Loudness">
-            <div className="metric-list"><span>Short Term</span><strong>-13.8 LUFS</strong></div>
-            <div className="metric-list"><span>Momentary</span><strong>-12.1 LUFS</strong></div>
-            <div className="metric-list"><span>LRA</span><strong>6.7 LU</strong></div>
+            <div className="metric-list"><span>Short Term</span><strong>{formatMetric(master.short_term_lufs, 'N/A', ' LUFS')}</strong></div>
+            <div className="metric-list"><span>Momentary</span><strong>{formatMetric(master.momentary_lufs, 'N/A', ' LUFS')}</strong></div>
+            <div className="metric-list"><span>LRA</span><strong>{formatMetric(master.lra_lu, 'N/A', ' LU')}</strong></div>
           </MetricCard>
           <MetricCard title="Mix Balance">
             <div className="balance-donut" />
-            <div className="balance-legend"><span>Drums 28%</span><span>Vocals 26%</span><span>Bass 12%</span></div>
+            <div className="balance-legend">
+              <span>Total {channelSummary.total_channels ?? channels.length}</span>
+              <span>Active {channelSummary.active_channels ?? 0}</span>
+              <span>Named {channelSummary.named_channels ?? 0}</span>
+            </div>
           </MetricCard>
           <MetricCard title="AI Confidence">
-            <DonutScore value={87} label="High" />
+            <DonutScore value={aiConfidence} label={decisionQueue?.agent_runtime_available === true ? 'High' : 'Offline'} />
             <SpectrumChart compact />
           </MetricCard>
         </div>
@@ -206,8 +286,8 @@ export function DashboardView() {
           <div className="console-view-tools"><small>View</small><button>▤</button><button>▦</button><button>▥</button><button>⚙</button></div>
         </div>
         <div className="console-strips">
-          {mixChannels.slice(0, 14).map((channel) => (
-            <ChannelStrip channel={channel} selected={channel.name === 'Lead Vocal'} key={channel.id} />
+          {channels.slice(0, 14).map((channel) => (
+            <ChannelStrip channel={channel} selected={channel.name === 'Lead Vocal' || channel.group === 'VOCALS'} key={channel.id} />
           ))}
         </div>
 
@@ -217,37 +297,54 @@ export function DashboardView() {
           <MetricCard title="Spectral Balance"><div className="bar-chart">{[40, 78, 66, 58, 82, 39, 73].map((h, i) => <i key={i} style={{ height: `${h}%` }} />)}</div></MetricCard>
           <MetricCard title="Dynamics Overview"><div className="h-bars">{['Drums', 'Bass', 'Guitars', 'Vocals'].map((name, i) => <p key={name}><span>{name}</span><i style={{ width: `${82 - i * 12}%` }} /></p>)}</div></MetricCard>
           <MetricCard title="Loudness History"><SpectrumChart compact /></MetricCard>
-          <MetricCard title="AI Suggestions"><MiniSparkline tone="dots" /></MetricCard>
+          <MetricCard title="AI Suggestions"><div className="big-metric">{decisionSummary.pending_count ?? 0}</div><p>{operatorAnalysisReport?.status || 'pending'}</p></MetricCard>
         </div>
       </div>
-      <DirectorPanel />
+      <DirectorPanel decisionQueue={decisionQueue} operatorModeStatus={operatorModeStatus} proposalActions={proposalActions} />
     </div>
   );
 }
 
-export function AgentsConsoleView() {
+export function AgentsConsoleView({ decisionQueue, operatorModeStatus, proposalActions, operatorAnalysisReport }) {
+  const agentAvailable = decisionQueue?.agent_runtime_available === true;
+  const summary = decisionQueue?.summary || {};
+  const canApply = operatorModeStatus?.capabilities?.can_apply_to_console === true;
+  const agentRows = agentAvailable ? agents : [
+    {
+      name: 'Mixing Agent Runtime',
+      role: 'Очередь предложений и история решений',
+      status: 'UNAVAILABLE',
+      task: decisionQueue?.reason || 'mixing_agent_runtime_not_initialized',
+      confidence: 0,
+      tone: 'yellow',
+    },
+  ];
   return (
     <div className="console-page">
       <div className="console-main">
         <div className="page-heading">
-          <div><h2>Консоль агентов</h2><p>Управление AI-агентами Automixer</p></div>
-          <button className="primary-action">+ Создать агента</button>
+          <div><h2>Консоль агентов</h2><p>Mode: {operatorModeStatus?.label || 'Assist'} · {agentAvailable ? 'runtime connected' : 'runtime unavailable'} · Analysis: {operatorAnalysisReport?.status || 'idle'}</p></div>
+          <div className="page-actions">
+            <button className="ghost-action" onClick={() => proposalActions?.onImportSafeGain?.()}>SafeGain</button>
+            <button className="ghost-action" onClick={() => proposalActions?.onImportSoundcheck?.()}>Soundcheck</button>
+            <button className="primary-action" onClick={() => proposalActions?.onAnalyze?.()}>Анализ</button>
+          </div>
         </div>
         <div className="agent-summary-grid">
-          <MetricCard title="Активные агенты"><div className="big-metric">8</div><p>Все системы работают</p></MetricCard>
-          <MetricCard title="Решения сегодня"><div className="big-metric">142</div><p>28% от вчера</p></MetricCard>
-          <MetricCard title="AI Confidence"><div className="big-metric">87%</div><p>High</p></MetricCard>
-          <MetricCard title="Предложений"><div className="big-metric">23</div><p>Требуют проверки</p></MetricCard>
-          <MetricCard title="Применено"><div className="big-metric">12</div><p>За последние 30 мин</p></MetricCard>
+          <MetricCard title="Активные агенты"><div className="big-metric">{agentAvailable ? agentRows.length : 0}</div><p>{agentAvailable ? 'Runtime работает' : 'Не подключён'}</p></MetricCard>
+          <MetricCard title="История решений"><div className="big-metric">{summary.history_count ?? 0}</div><p>backend queue</p></MetricCard>
+          <MetricCard title="AI Confidence"><div className="big-metric">{agentAvailable ? '87%' : '0%'}</div><p>{agentAvailable ? 'High' : 'Offline'}</p></MetricCard>
+          <MetricCard title="Предложений"><div className="big-metric">{summary.pending_count ?? 0}</div><p>Требуют проверки</p></MetricCard>
+          <MetricCard title="Применено"><div className="big-metric">{summary.applied_count ?? 0}</div><p>История агента</p></MetricCard>
         </div>
         <div className="console-tabs"><span className="active">Агенты</span><span>Коммуникации</span><span>Очередь задач</span><span>Память</span><span>Производительность</span><span>Настройки</span></div>
         <div className="agent-table">
           <header><span>Агент</span><span>Роль</span><span>Статус</span><span>Текущая задача</span><span>Уверенность</span><span>Активность</span><span>Действия</span></header>
-          {agents.map((agent) => (
+          {agentRows.map((agent) => (
             <div className="agent-row" key={agent.name}>
               <strong>{agent.name}<small>v1.2.{agent.confidence % 10}</small></strong>
               <p>{agent.role}</p>
-              <span className="state-green">{agent.status}</span>
+              <span className={statusClass(agent.status)}>{agent.status}</span>
               <p>{agent.task}</p>
               <div className="confidence-cell"><DonutScore value={agent.confidence} label="" /><span>{agent.confidence >= 85 ? 'High' : 'Medium'}</span></div>
               <MiniSparkline tone={agent.tone} />
@@ -258,83 +355,93 @@ export function AgentsConsoleView() {
       </div>
       <aside className="director-panel">
         <section className="director-card communications-map"><h4>Связи агентов</h4><div className="network-map"><span /><span /><span /><span /><span /></div></section>
-        <section className="director-card"><h4>Очередь задач</h4>{['Оценить баланс барабанов', 'Lead Vocal: проверить компрессию', 'Bass: анализ низких частот', 'Гитара 1: проверить резонансы'].map((task, i) => <div className="task-row" key={task}><b>{i < 2 ? 'High' : 'Medium'}</b><p>{task}</p><span>10:{24 + i}</span></div>)}</section>
-        <section className="director-card"><h4>Сообщения агентов</h4>{['Decision Agent -> Safety Agent', 'Safety Agent -> Decision Agent', 'Mix Critic Agent -> All Agents'].map((item) => <p className="message-line" key={item}>{item}</p>)}</section>
+        <section className="director-card"><h4>Очередь задач</h4>{(decisionQueue?.pending_actions || []).slice(0, 4).map((task, i) => <div className="task-row task-row-actions" key={task.id || task.title}><b>{task.severity || 'Medium'}</b><p>{task.title}</p><span>{i + 1}</span><div><button onClick={() => proposalActions?.onAccept?.(task.id)}>✓</button>{canApply && task.can_apply && <button onClick={() => proposalActions?.onApply?.(task.id)}>▶</button>}<button onClick={() => proposalActions?.onDismiss?.(task.id)}>×</button></div></div>)}{(!decisionQueue?.pending_actions || decisionQueue.pending_actions.length === 0) && <p className="message-line">{decisionQueue?.reason || 'Очередь пуста'}</p>}</section>
+        <section className="director-card"><h4>Сообщения агентов</h4>{decisionsFromQueue(decisionQueue).slice(0, 3).map((item) => <p className="message-line" key={item.join('-')}>{item[1]} · {item[2]}</p>)}</section>
       </aside>
     </div>
   );
 }
 
-export function ChannelListView() {
+export function ChannelListView({ inventory }) {
+  const channels = channelsFromInventory(inventory);
+  const summary = inventory?.summary || {};
+  const selectedChannel = channels.find(channel => channel.group === 'VOCALS') || channels[0] || normalizeChannel({});
   return (
     <div className="console-page">
       <div className="console-main">
         <div className="page-heading"><div><h2>Список каналов</h2><p>Все каналы и их текущее состояние</p></div><input className="search-input" placeholder="Поиск канала..." /></div>
         <div className="agent-summary-grid compact">
-          <MetricCard title="Всего каналов"><div className="big-metric">48</div></MetricCard>
-          <MetricCard title="Активные"><div className="big-metric">36</div></MetricCard>
-          <MetricCard title="Muted"><div className="big-metric warn">6</div></MetricCard>
-          <MetricCard title="Inactive"><div className="big-metric purple">6</div></MetricCard>
-          <MetricCard title="Coverage"><div className="big-metric blue">98%</div></MetricCard>
+          <MetricCard title="Всего каналов"><div className="big-metric">{summary.total_channels ?? channels.length}</div></MetricCard>
+          <MetricCard title="Активные"><div className="big-metric">{summary.active_channels ?? 0}</div></MetricCard>
+          <MetricCard title="Muted"><div className="big-metric warn">{summary.muted_channels ?? 'N/A'}</div></MetricCard>
+          <MetricCard title="Inactive"><div className="big-metric purple">{summary.inactive_channels ?? 'N/A'}</div></MetricCard>
+          <MetricCard title="Coverage"><div className="big-metric blue">{formatMetric(summary.coverage_percent, '0.0%', '%')}</div></MetricCard>
         </div>
         <div className="channel-table">
           <header><span>#</span><span>Канал</span><span>Тип</span><span>Источник</span><span>Уровень</span><span>LUFS</span><span>Динамика</span><span>Статус</span><span>AI</span><span>Группа</span></header>
-          {mixChannels.map((channel) => (
+          {channels.map((channel) => (
             <div className="channel-row" key={channel.id}>
               <span>{channel.id}</span>
               <strong>{channel.name}</strong>
               <span>{channel.role}</span>
-              <span>In {String(channel.id).padStart(2, '0')}</span>
+              <span>{channel.source}</span>
               <MeterBar value={channel.level} />
-              <span>{channel.lufs}</span>
-              <span>{channel.dynamic} dB</span>
-              <span className="state-green">ACTIVE</span>
-              <span className="ai-recognition">{channel.role} ({channel.confidence}%)</span>
+              <span>{formatMetric(channel.lufs)}</span>
+              <span>{formatMetric(channel.dynamic, 'N/A', ' dB')}</span>
+              <span className={statusClass(channel.status)}>{String(channel.status).toUpperCase()}</span>
+              <span className="ai-recognition">{channel.role}{channel.confidence ? ` (${channel.confidence}%)` : ''}</span>
               <span className="group-tag">{channel.group}</span>
             </div>
           ))}
         </div>
       </div>
       <aside className="director-panel channel-detail">
-        <section className="director-card"><div className="channel-avatar">MIC</div><h3>Lead Vocal</h3><p>In 12 · ACTIVE</p><DonutScore value={99} label="AI" /></section>
-        <section className="director-card"><h4>Level Meter</h4><MeterBar value={-9.3} /><p>Input Level -9.3 dBFS</p><p>LUFS Short -10.2</p><p>True Peak -1.1 dBTP</p></section>
+        <section className="director-card"><div className="channel-avatar">MIC</div><h3>{selectedChannel.name}</h3><p>{selectedChannel.source} · {String(selectedChannel.status).toUpperCase()}</p><DonutScore value={selectedChannel.confidence || 0} label="AI" /></section>
+        <section className="director-card"><h4>Level Meter</h4><MeterBar value={selectedChannel.level} /><p>Input Level {formatMetric(selectedChannel.level, 'N/A', ' dBFS')}</p><p>LUFS Short {formatMetric(selectedChannel.lufs)}</p><p>True Peak {formatMetric(selectedChannel.peak, 'N/A', ' dBTP')}</p></section>
       </aside>
     </div>
   );
 }
 
-export function ConnectionsView({ serverConnected, mixerConnected }) {
+export function ConnectionsView({ serverConnected, mixerConnected, topology }) {
+  const connection = topology?.connection || {};
+  const audioCapture = topology?.audio_capture || {};
+  const nodes = topology?.nodes || [];
+  const connectedDevices = topology?.connected_devices || [];
+  const mixerState = connection.connected ?? mixerConnected;
+  const coreNode = nodes.find(node => node.id === 'automixer_core');
+  const audioNode = nodes.find(node => node.id === 'audio_capture');
   return (
     <div className="console-page">
       <div className="console-main">
         <div className="console-tabs connection-tabs"><span className="active">System Connection</span><span>Audio Routing</span><span>OSC / MIDI</span><span>Devices</span><span>Network</span><span>Backup & Sync</span></div>
         <div className="topology-board">
           <section className="topology-column"><h4>Клиенты</h4>{['Director Control', 'Engineer Tablet', 'Stage Monitor iPad', 'FOH Laptop'].map((name) => <div className="node-card" key={name}><span>▣</span><div><strong>{name}</strong><p>Online</p></div></div>)}</section>
-          <section className="topology-column core"><h4>Automixer Core</h4><div className="node-card large"><span>AM</span><div><strong>Automixer Engine</strong><p>v0.8.7 · running</p></div></div><div className="node-card"><span>AI</span><div><strong>AI Processing</strong><p>8 agents active</p></div></div></section>
-          <section className="topology-column"><h4>Audio Interface</h4><div className="node-card large"><span>W</span><div><strong>WING RACK</strong><p>{mixerConnected ? 'Connected' : 'Disconnected'}</p><p>48 kHz · 0.8 ms</p></div></div></section>
+          <section className="topology-column core"><h4>Automixer Core</h4><div className="node-card large"><span>AM</span><div><strong>Automixer Engine</strong><p>{coreNode?.detail || 'running'}</p></div></div><div className="node-card"><span>AI</span><div><strong>Decision Queue</strong><p>{nodes.find(node => node.id === 'decision_queue')?.detail || 'runtime pending'}</p></div></div></section>
+          <section className="topology-column"><h4>Audio Interface</h4><div className="node-card large"><span>W</span><div><strong>{connection.client_type || 'WING RACK'}</strong><p>{mixerState ? 'Connected' : 'Disconnected'}</p><p>{audioCapture.sample_rate ? `${audioCapture.sample_rate / 1000} kHz` : '48 kHz'} · {audioNode?.detail || '0 channel(s)'}</p></div></div></section>
         </div>
         <div className="connection-bottom-grid">
           <section className="director-card">
             <h4>Network Interfaces</h4>
-            <div className="status-tile"><b>Ethernet 1</b><p>192.168.1.50 · 1 Gbps · Up</p></div>
+            <div className="status-tile"><b>Control</b><p>{connection.ip || 'No mixer IP'} · {connection.connection_mode || 'offline'}</p></div>
             <div className="status-tile"><b>Ethernet 2</b><p>192.168.2.50 · Standby</p></div>
           </section>
           <section className="director-card">
             <h4>System Latency</h4>
-            <div className="status-tile"><b>0.8 ms</b><p>Audio round trip</p></div>
+            <div className="status-tile"><b>{audioCapture.running ? 'Running' : 'Offline'}</b><p>Audio capture</p></div>
             <SpectrumChart compact />
           </section>
           <section className="director-card">
             <h4>Sync Status</h4>
-            <div className="status-tile"><b>Locked</b><p>48 kHz · word clock</p></div>
-            <div className="status-tile"><b>0.8 ms</b><p>Latency compensation</p></div>
+            <div className="status-tile"><b>{audioCapture.sample_rate ? 'Known' : 'Unknown'}</b><p>{audioCapture.sample_rate || 'No sample rate'} Hz</p></div>
+            <div className="status-tile"><b>{audioCapture.num_channels || 0}</b><p>Audio channels</p></div>
           </section>
         </div>
       </div>
       <aside className="director-panel">
-        <section className="director-card"><h4>Connection Status</h4><div className="connection-status-grid"><div className="status-tile"><b>{serverConnected ? 'Good' : 'Offline'}</b><p>Overall Status</p></div><div className="status-tile"><b>Good</b><p>Audio Connection</p></div><div className="status-tile"><b>{mixerConnected ? 'Good' : 'Safe Offline'}</b><p>Control Connection</p></div><div className="status-tile"><b>Good</b><p>Network Status</p></div></div></section>
-        <section className="director-card"><h4>Connected Devices</h4>{['WING RACK · 192.168.1.10', 'Stage Box 1 · 192.168.1.11', 'Stage Box 2 · 192.168.1.12', 'Powerplay P16 · 192.168.1.13'].map((line) => <p className="message-line" key={line}>{line} · Online</p>)}</section>
-        <section className="director-card"><h4>Connection Log</h4>{['Connected to WING RACK', 'OSC connection established', 'Audio stream started', 'All systems ready'].map((line, i) => <p className="message-line" key={line}>10:2{i} · {line}</p>)}</section>
+        <section className="director-card"><h4>Connection Status</h4><div className="connection-status-grid"><div className="status-tile"><b>{serverConnected ? 'Good' : 'Offline'}</b><p>Overall Status</p></div><div className="status-tile"><b>{audioCapture.running ? 'Good' : 'Offline'}</b><p>Audio Connection</p></div><div className="status-tile"><b>{mixerState ? 'Good' : 'Safe Offline'}</b><p>Control Connection</p></div><div className="status-tile"><b>{topology ? 'Known' : 'Pending'}</b><p>Topology</p></div></div></section>
+        <section className="director-card"><h4>Connected Devices</h4>{connectedDevices.length > 0 ? connectedDevices.map((device) => <p className="message-line" key={`${device.kind}-${device.name}`}>{device.name} · {device.ip || device.channels || ''} · {device.status}</p>) : <p className="message-line">Нет подключённых устройств runtime</p>}</section>
+        <section className="director-card"><h4>Connection Log</h4>{(topology?.links || []).map((link) => <p className="message-line" key={`${link.from}-${link.to}`}>{link.kind} · {link.status}</p>)}{!topology?.links?.length && <p className="message-line">Ожидаю topology snapshot</p>}</section>
       </aside>
     </div>
   );

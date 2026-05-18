@@ -56,6 +56,14 @@ from operator_mode_policy import (
     build_operator_mode_status,
     normalize_operator_mode,
 )
+from operator_proposal_queue import OperatorProposalQueue
+from operator_recommendation_bridge import (
+    SAFE_GAIN_SOURCE,
+    SOUNDCHECK_SOURCE,
+    build_safe_gain_operator_proposals,
+    build_soundcheck_operator_proposals,
+    import_operator_proposals,
+)
 from voice_runtime import build_voice_runtime_summary
 
 logging.basicConfig(level=logging.INFO)
@@ -168,6 +176,7 @@ class AutoMixerServer:
         self._auto_mode_unlocked = self._parse_env_bool(
             os.getenv("AUTOMIXER_AUTO_MODE_UNLOCKED", "false")
         )
+        self.operator_proposal_queue = OperatorProposalQueue()
 
         # Supervised manual/voice write safety (WING first-live hard gate)
         self._manual_write_supervision_enabled = self._parse_env_bool(
@@ -285,6 +294,94 @@ class AutoMixerServer:
         )
         self._record_manual_write_telemetry("operator_mode_changed", status)
         return status
+
+    def import_safe_gain_suggestions_to_operator_queue(
+        self,
+        suggestions: Optional[Dict[Any, Any]] = None,
+        *,
+        source: str = SAFE_GAIN_SOURCE,
+    ) -> Dict[str, Any]:
+        if suggestions is None and self.safe_gain_calibrator:
+            try:
+                suggestions = self.safe_gain_calibrator.get_suggestions()
+            except Exception as exc:
+                return {
+                    "type": "operator_proposals_imported",
+                    "status": "unavailable",
+                    "success": False,
+                    "source": source,
+                    "reason": "safe_gain_suggestions_unavailable",
+                    "error": str(exc),
+                    "operator_mode": self.get_operator_mode_status(),
+                    "imported_count": 0,
+                    "created_count": 0,
+                    "existing_count": 0,
+                    "blocked_count": 0,
+                    "results": [],
+                }
+
+        channel_mapping = (
+            getattr(self.safe_gain_calibrator, "channel_mapping", None)
+            if self.safe_gain_calibrator
+            else None
+        )
+        proposals = build_safe_gain_operator_proposals(
+            suggestions or {},
+            channel_mapping=channel_mapping,
+            mixer_client=self.mixer_client,
+            source=source,
+        )
+        summary = import_operator_proposals(
+            self.operator_proposal_queue,
+            proposals,
+            self.get_operator_mode_status(),
+            source=source,
+        )
+        if not suggestions:
+            summary["reason"] = "no_safe_gain_suggestions"
+        elif not proposals:
+            summary["reason"] = "no_actionable_safe_gain_suggestions"
+        return summary
+
+    def import_soundcheck_recommendations_to_operator_queue(
+        self,
+        bundle: Optional[Dict[str, Any]] = None,
+        *,
+        source: str = SOUNDCHECK_SOURCE,
+    ) -> Dict[str, Any]:
+        if bundle is None:
+            engine = getattr(self, "auto_soundcheck_engine", None)
+            if engine and hasattr(engine, "get_soundcheck_recommendation_bundle"):
+                try:
+                    bundle = engine.get_soundcheck_recommendation_bundle()
+                except Exception as exc:
+                    return {
+                        "type": "operator_proposals_imported",
+                        "status": "unavailable",
+                        "success": False,
+                        "source": source,
+                        "reason": "soundcheck_recommendation_bundle_unavailable",
+                        "error": str(exc),
+                        "operator_mode": self.get_operator_mode_status(),
+                        "imported_count": 0,
+                        "created_count": 0,
+                        "existing_count": 0,
+                        "blocked_count": 0,
+                        "results": [],
+                    }
+
+        proposals = build_soundcheck_operator_proposals(bundle or {}, source=source)
+        summary = import_operator_proposals(
+            self.operator_proposal_queue,
+            proposals,
+            self.get_operator_mode_status(),
+            source=source,
+        )
+        if not bundle:
+            summary["reason"] = "no_soundcheck_recommendation_bundle"
+        elif not proposals:
+            summary["reason"] = "no_soundcheck_recommendations"
+        return summary
 
     async def _block_quarantined_wing_write_surface(
         self,
@@ -2948,16 +3045,41 @@ class AutoMixerServer:
                 )
             
             def on_suggestions_ready(suggestions: dict):
+                proposal_import = self.import_safe_gain_suggestions_to_operator_queue(
+                    suggestions,
+                    source=SAFE_GAIN_SOURCE,
+                )
                 message = {
                     "type": "gain_staging_status",
                     "status_type": "safe_gain_ready",
                     "suggestions": suggestions,
+                    "operator_proposal_import": proposal_import,
                     "message": "Analysis complete. Evaluating SafeGain trim actions..."
                 }
                 loop.call_soon_threadsafe(
                     lambda msg=message: asyncio.create_task(self.broadcast(msg))
                 )
-                # Автоматически применяем коррекции после завершения анализа
+                loop.call_soon_threadsafe(
+                    lambda summary=proposal_import: asyncio.create_task(self.broadcast(summary))
+                )
+                operator_mode = self.get_operator_mode_status()
+                resolved_policy = write_policy or self._active_soundcheck_live_policy or {}
+                auto_apply_allowed = bool(resolved_policy.get("live_apply_allowed")) or bool(
+                    operator_mode["capabilities"].get("can_autonomous_apply")
+                )
+                if not auto_apply_allowed:
+                    loop.call_soon_threadsafe(
+                        lambda summary=proposal_import, mode=operator_mode: asyncio.create_task(self.broadcast({
+                            "type": "gain_staging_status",
+                            "status_type": "safe_gain_proposals_queued",
+                            "message": "SafeGain analysis queued proposals. Current operator mode blocks automatic apply.",
+                            "operator_mode": mode,
+                            "operator_proposal_import": summary,
+                        }))
+                    )
+                    return
+
+                # Automatic apply remains available only for explicit live policies or unlocked autonomous mode.
                 if self.safe_gain_calibrator:
                     applied = self.safe_gain_calibrator.apply_corrections()
                     apply_summary = self.safe_gain_calibrator.get_last_apply_summary()

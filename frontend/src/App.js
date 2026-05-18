@@ -83,6 +83,11 @@ function App() {
   const [routingScheme, setRoutingScheme] = useState([]);
   const [routingChannelCount, setRoutingChannelCount] = useState(64);
   const [pilotCockpit, setPilotCockpit] = useState(null);
+  const [dashboardSnapshot, setDashboardSnapshot] = useState(null);
+  const [channelInventory, setChannelInventory] = useState(null);
+  const [decisionQueue, setDecisionQueue] = useState(null);
+  const [connectionTopology, setConnectionTopology] = useState(null);
+  const [operatorAnalysisReport, setOperatorAnalysisReport] = useState(null);
   const mixerIpRef = useRef(mixerIp);
 
   useEffect(() => {
@@ -92,6 +97,13 @@ function App() {
   useEffect(() => {
     const refreshPilotCockpit = () => {
       websocketService.getSupervisedPilotStatus();
+    };
+
+    const refreshProductState = () => {
+      websocketService.getDashboardSnapshot();
+      websocketService.getChannelInventory(24);
+      websocketService.getDecisionQueue(50);
+      websocketService.getConnectionTopology();
     };
 
     const handleConnectionStatus = (data) => {
@@ -216,8 +228,41 @@ function App() {
       if (data.label) setStatusMessage(`Mode: ${data.label}`);
     };
 
+    const handleDashboardSnapshot = (data) => {
+      setDashboardSnapshot(data);
+      if (data.operator_mode) setOperatorModeStatus(data.operator_mode);
+    };
+
+    const handleChannelInventory = (data) => {
+      setChannelInventory(data);
+    };
+
+    const handleDecisionQueue = (data) => {
+      setDecisionQueue(data);
+      if (data.operator_mode) setOperatorModeStatus(data.operator_mode);
+    };
+
+    const handleConnectionTopology = (data) => {
+      setConnectionTopology(data);
+      if (data.connection?.connected !== undefined) {
+        setMixerConnected(Boolean(data.connection.connected));
+      }
+    };
+
+    const handleOperatorAnalysisReport = (data) => {
+      setOperatorAnalysisReport(data);
+      setStatusMessage(`Analysis: ${data.status || 'ok'} · ${data.created_count || 0} proposals`);
+      refreshProductState();
+    };
+
+    const handleOperatorProposalsImported = (data) => {
+      setStatusMessage(`Import: ${data.created_count || 0} new · ${data.existing_count || 0} existing`);
+      refreshProductState();
+    };
+
     const handlePilotRefreshTrigger = () => {
       refreshPilotCockpit();
+      refreshProductState();
     };
 
     websocketService.on('connection_status', handleConnectionStatus);
@@ -229,6 +274,17 @@ function App() {
     websocketService.on('dante_routing', handleDanteRouting);
     websocketService.on('supervised_pilot_status', handleSupervisedPilotStatus);
     websocketService.on('operator_mode_status', handleOperatorModeStatus);
+    websocketService.on('dashboard_snapshot', handleDashboardSnapshot);
+    websocketService.on('channel_inventory', handleChannelInventory);
+    websocketService.on('decision_queue', handleDecisionQueue);
+    websocketService.on('connection_topology', handleConnectionTopology);
+    websocketService.on('operator_analysis_report', handleOperatorAnalysisReport);
+    websocketService.on('operator_proposals_imported', handleOperatorProposalsImported);
+    websocketService.on('operator_proposal_created', handlePilotRefreshTrigger);
+    websocketService.on('operator_proposal_accepted', handlePilotRefreshTrigger);
+    websocketService.on('operator_proposal_dismissed', handlePilotRefreshTrigger);
+    websocketService.on('operator_proposal_apply_result', handlePilotRefreshTrigger);
+    websocketService.on('operator_proposal_apply_blocked', handlePilotRefreshTrigger);
     websocketService.on('manual_write_supervision', handlePilotRefreshTrigger);
     websocketService.on('manual_write_session', handlePilotRefreshTrigger);
     websocketService.on('manual_write_applied', handlePilotRefreshTrigger);
@@ -248,6 +304,7 @@ function App() {
         websocketService.getDanteRouting(64);
         websocketService.getOperatorMode();
         refreshPilotCockpit();
+        refreshProductState();
       })
       .catch(err => {
         setStatusMessage('Backend недоступен');
@@ -257,6 +314,7 @@ function App() {
     const cockpitPollTimer = setInterval(() => {
       if (websocketService.ws && websocketService.ws.readyState === WebSocket.OPEN) {
         refreshPilotCockpit();
+        refreshProductState();
       }
     }, 5000);
 
@@ -270,6 +328,17 @@ function App() {
       websocketService.off('dante_routing', handleDanteRouting);
       websocketService.off('supervised_pilot_status', handleSupervisedPilotStatus);
       websocketService.off('operator_mode_status', handleOperatorModeStatus);
+      websocketService.off('dashboard_snapshot', handleDashboardSnapshot);
+      websocketService.off('channel_inventory', handleChannelInventory);
+      websocketService.off('decision_queue', handleDecisionQueue);
+      websocketService.off('connection_topology', handleConnectionTopology);
+      websocketService.off('operator_analysis_report', handleOperatorAnalysisReport);
+      websocketService.off('operator_proposals_imported', handleOperatorProposalsImported);
+      websocketService.off('operator_proposal_created', handlePilotRefreshTrigger);
+      websocketService.off('operator_proposal_accepted', handlePilotRefreshTrigger);
+      websocketService.off('operator_proposal_dismissed', handlePilotRefreshTrigger);
+      websocketService.off('operator_proposal_apply_result', handlePilotRefreshTrigger);
+      websocketService.off('operator_proposal_apply_blocked', handlePilotRefreshTrigger);
       websocketService.off('manual_write_supervision', handlePilotRefreshTrigger);
       websocketService.off('manual_write_session', handlePilotRefreshTrigger);
       websocketService.off('manual_write_applied', handlePilotRefreshTrigger);
@@ -363,6 +432,17 @@ function App() {
   const operatorModeLabel = operatorModeStatus?.label || OPERATOR_MODES.find(item => item.key === operatorMode)?.label || 'Assist';
   const operatorModeCapabilities = operatorModeStatus?.capabilities || {};
   const operatorModeCanApply = operatorModeCapabilities.can_apply_to_console === true;
+  const proposalActions = {
+    onAccept: (proposalId) => websocketService.acceptOperatorProposal(proposalId),
+    onDismiss: (proposalId) => websocketService.dismissOperatorProposal(proposalId),
+    onAnalyze: () => websocketService.runOperatorAnalysis(24, true),
+    onImportSafeGain: () => websocketService.importSafeGainSuggestions(),
+    onImportSoundcheck: () => websocketService.importSoundcheckRecommendations(),
+    onApply: (proposalId) => {
+      if (!window.confirm('Применить это предложение через supervised gate?')) return;
+      websocketService.applyOperatorProposal(proposalId, true);
+    },
+  };
 
   const selectTab = (tabId) => {
     setActiveTab(tabId);
@@ -455,13 +535,34 @@ function App() {
 
         {/* Tab Content */}
         <div className="tab-content">
-          {activeTab === 'dashboard' && <DashboardView />}
-          {activeTab === 'agentsConsole' && <AgentsConsoleView />}
-          {activeTab === 'channelList' && <ChannelListView />}
+          {activeTab === 'dashboard' && (
+            <DashboardView
+              snapshot={dashboardSnapshot}
+              channelInventory={channelInventory}
+              decisionQueue={decisionQueue}
+              operatorModeStatus={operatorModeStatus}
+              proposalActions={proposalActions}
+              operatorAnalysisReport={operatorAnalysisReport}
+            />
+          )}
+          {activeTab === 'agentsConsole' && (
+            <AgentsConsoleView
+              decisionQueue={decisionQueue}
+              operatorModeStatus={operatorModeStatus}
+              proposalActions={proposalActions}
+              operatorAnalysisReport={operatorAnalysisReport}
+            />
+          )}
+          {activeTab === 'channelList' && (
+            <ChannelListView
+              inventory={channelInventory}
+            />
+          )}
           {activeTab === 'connections' && (
             <ConnectionsView
               serverConnected={serverConnected}
               mixerConnected={mixerConnected}
+              topology={connectionTopology}
               statusMessage={statusMessage}
               mixerIp={mixerIp}
               mixerPort={mixerPort}
