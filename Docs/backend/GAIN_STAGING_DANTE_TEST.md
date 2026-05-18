@@ -290,5 +290,5 @@ logging.basicConfig(level=logging.DEBUG)
 ## Дополнительная информация
 
 - Документация по Gain Staging: `backend/gain_staging.py`
-- Документация по Dante routing: `backend/DANTE_ROUTING_README.md`
+- Документация по Dante routing: `Docs/backend/DANTE_ROUTING_README.md`
 - Конфигурация: `config/default_config.json`

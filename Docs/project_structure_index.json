@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-05-18",
+  "status": "canonical_structure_baseline",
+  "primary_documents": [
+    {
+      "path": "Docs/INDEX.md",
+      "role": "documentation_entrypoint",
+      "status": "canonical"
+    },
+    {
+      "path": "Docs/PROJECT_IMPLEMENTATION_PLAN.md",
+      "role": "implementation_plan",
+      "status": "canonical"
+    },
+    {
+      "path": "Docs/PROJECT_STRUCTURE_MAP.md",
+      "role": "domain_structure_map",
+      "status": "canonical"
+    },
+    {
+      "path": "Docs/PROJECT_CLEANUP_BACKLOG.md",
+      "role": "cleanup_backlog",
+      "status": "canonical"
+    },
+    {
+      "path": "Docs/HEALTH_BASELINE_20260518.md",
+      "role": "post_cleanup_health_baseline",
+      "status": "canonical"
+    },
+    {
+      "path": "Docs/STRUCTURING_COMPLETION_20260518.md",
+      "role": "structuring_completion_report",
+      "status": "canonical"
+    },
+    {
+      "path": "Docs/CONVENTIONS.md",
+      "role": "code_and_dsp_conventions",
+      "status": "canonical"
+    },
+    {
+      "path": "Docs/ARCHITECTURE.md",
+      "role": "existing_architecture_overview",
+      "status": "needs_refresh"
+    }
+  ],
+  "status_labels": [
+    "canonical",
+    "optional",
+    "lab",
+    "legacy",
+    "quarantine",
+    "generated"
+  ],
+  "domains": [
+    {
+      "id": "live_runtime_wing_safety",
+      "name": "Live Runtime And WING Safety",
+      "status": "canonical",
+      "paths": [
+        "backend/wing_client.py",
+        "backend/server.py",
+        "backend/handlers",
+        "backend/auto_soundcheck_engine.py",
+        "backend/replay_write_intent_adapter.py",
+        "backend/wing_telemetry_recorder.py",
+        "backend/wing_telemetry_compare.py",
+        "backend/tub345_supervised_write_runner.py"
+      ],
+      "boundary": "Default read-only or dry-run. Real WING writes require supervised approval, readback, rollback, cooldown, and emergency-stop proof."
+    },
+    {
+      "id": "backend_product_layer",
+      "name": "Backend Product Layer",
+      "status": "canonical",
+      "paths": [
+        "backend/operator_product_state.py",
+        "backend/operator_proposal_queue.py",
+        "backend/operator_recommendation_bridge.py",
+        "backend/operator_analysis.py",
+        "backend/operator_mode_policy.py",
+        "backend/handlers/product_state_handlers.py"
+      ],
+      "boundary": "Automation outputs become operator proposals first, not autonomous live actions."
+    },
+    {
+      "id": "frontend_control_center",
+      "name": "Frontend Operator Control Center",
+      "status": "canonical",
+      "paths": [
+        "frontend/src/App.js",
+        "frontend/src/components/ControlCenterViews.js",
+        "frontend/src/components/ControlCenterViews.css",
+        "frontend/src/services/websocket.js"
+      ],
+      "boundary": "UI must show status, proposals, safety state, and blockers. Unsupported live controls must be status-only."
+    },
+    {
+      "id": "offline_mixing",
+      "name": "Offline Mixing And Render Pipelines",
+      "status": "canonical_for_offline",
+      "paths": [
+        "automixer/production_mix_v1",
+        "mix_agent",
+        "ai_mixing_pipeline",
+        "production_mix_v1_out",
+        "mixes",
+        "offline_test_input"
+      ],
+      "boundary": "Offline render logic must not automatically apply to live console runtime."
+    },
+    {
+      "id": "decision_safety_architecture",
+      "name": "Analyzer Decision Safety Architecture",
+      "status": "canonical_architecture_spine",
+      "paths": [
+        "automixer/analyzer",
+        "automixer/knowledge",
+        "automixer/critics",
+        "automixer/decision",
+        "automixer/safety",
+        "automixer/executor",
+        "automixer/experiments"
+      ],
+      "boundary": "Analyzer, Knowledge, Critics, Decision, Safety, Executor, and Logs stay separate."
+    },
+    {
+      "id": "backend_dsp_automation",
+      "name": "Backend DSP And Automation Modules",
+      "status": "mixed",
+      "paths": [
+        "backend/auto_eq.py",
+        "backend/cross_adaptive_eq.py",
+        "backend/auto_compressor.py",
+        "backend/auto_fader.py",
+        "backend/auto_fader_v2",
+        "backend/gain_fader_runtime.py",
+        "backend/lufs_gain_staging.py",
+        "backend/phase_alignment.py",
+        "backend/auto_gate_caig.py",
+        "backend/auto_panner.py",
+        "backend/auto_reverb.py",
+        "backend/auto_effects.py"
+      ],
+      "boundary": "Each module needs an explicit analysis/proposal/safety/live-write contract before joining the MVP path."
+    },
+    {
+      "id": "voice_input",
+      "name": "Voice Input",
+      "status": "optional_lab",
+      "paths": [
+        "backend/voice_runtime.py",
+        "backend/voice_control.py",
+        "backend/voice_control_v2.py",
+        "backend/voice_control_vosk.py",
+        "backend/voice_control_sherpa.py",
+        "backend/models/sherpa-onnx-nemo-ctc-giga-am-russian-2024-10-24"
+      ],
+      "boundary": "Voice can create proposals or requests. It must not bypass Product Layer and safety policy."
+    },
+    {
+      "id": "ml_research_external",
+      "name": "ML Research And External Sources",
+      "status": "lab",
+      "paths": [
+        "backend/ml",
+        "backend/perceptual",
+        "backend/evaluation",
+        "external",
+        "models/training_datasets"
+      ],
+      "boundary": "Research code may inform decisions but must not enter live runtime without a small contract and tests."
+    },
+    {
+      "id": "agent_coordination",
+      "name": "Agent Paperclip GPT Telegram Coordination",
+      "status": "support",
+      "paths": [
+        "tools/automixer_operator",
+        "tools/gpt_control_bridge",
+        "tools/paperclip_watchdog",
+        "tools/project_vector_index",
+        "plugins/telegram",
+        ".paperclip/reports"
+      ],
+      "boundary": "Coordination surfaces are read-only or dry-run by default and do not grant runtime approval."
+    },
+    {
+      "id": "documentation_and_archives",
+      "name": "Documentation Reports Manuals And Archives",
+      "status": "canonical_docs",
+      "paths": [
+        "Docs/INDEX.md",
+        "Docs/backend",
+        "Docs/reports/tub",
+        "Docs/manuals/wing",
+        "Docs/archive"
+      ],
+      "boundary": "Project knowledge lives in Docs. Runtime folders should not store reports, manuals, or generated historical snapshots."
+    },
+    {
+      "id": "generated_outputs",
+      "name": "Generated Caches Builds And Runtime Outputs",
+      "status": "generated",
+      "paths": [
+        "__pycache__",
+        ".pytest_cache",
+        "frontend/node_modules",
+        "frontend/build",
+        "frontend/dist",
+        "backend/venv",
+        "backend/build",
+        "backend/dist",
+        "logs",
+        "runtime",
+        "artifacts"
+      ],
+      "boundary": "Preview cleanup before deletion and preserve evidence artifacts."
+    }
+  ],
+  "completed_product_layer_slice": [
+    "backend/handlers/__init__.py",
+    "backend/server.py",
+    "backend/handlers/product_state_handlers.py",
+    "backend/operator_analysis.py",
+    "backend/operator_product_state.py",
+    "backend/operator_proposal_queue.py",
+    "backend/operator_recommendation_bridge.py",
+    "frontend/src/App.js",
+    "frontend/src/components/ControlCenterViews.css",
+    "frontend/src/components/ControlCenterViews.js",
+    "frontend/src/services/websocket.js",
+    "tests/test_operator_product_state.py",
+    "Docs/PROJECT_IMPLEMENTATION_PLAN.md"
+  ],
+  "next_structural_target": {
+    "id": "manual_probe_migration",
+    "steps": [
+      "move one manual probe family at a time into backend/lab_only",
+      "add compatibility wrappers only where old operator commands must remain stable",
+      "convert valuable probes into tests under tests",
+      "prove no live write path was widened"
+    ]
+  }
+}
