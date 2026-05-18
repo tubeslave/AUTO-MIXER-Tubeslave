@@ -18,6 +18,10 @@ Current health-baseline pointer:
 
 `/Docs/HEALTH_BASELINE_20260518.md`
 
+Current documentation index:
+
+`/Docs/INDEX.md`
+
 Hard boundary: this plan does not grant live write approval. WING/OSC writes
 remain blocked unless an operator explicitly approves a supervised run with
 readback, rollback, cooldown, and emergency-stop proof.
@@ -32,6 +36,8 @@ Last updated: 2026-05-18
   modernization task, not with blind `npm audit fix --force`.
 - Product Layer proposal workflow is implemented and covered by focused tests
   plus server integration tests.
+- Documentation structure is consolidated under `Docs/INDEX.md`; backend
+  reports, TUB reports, manuals, and archives have explicit homes.
 - Generated dependency/build folders are ignored and can be recreated locally.
 - Branch synchronization is still unresolved: local `main` was
   `ahead 66, behind 26` before the health-baseline report.

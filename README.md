@@ -42,24 +42,22 @@ OSC_DISABLED=true PYTHONPATH=. python -m mix_agent.stem_training_loop \
 
 ```
 AUTO MIXER Tubeslave/
-├── backend/              # Python-бэкенд с OSC-клиентом
-│   ├── wing_client.py    # Класс для управления Wing через OSC
-│   ├── wing_addresses.py # Справочник OSC-адресов Wing
-│   ├── server.py         # WebSocket-сервер для связи с фронтендом
-│   └── requirements.txt  # Зависимости Python
-├── frontend/             # React-фронтенд
-│   ├── public/
-│   ├── src/
-│   │   ├── components/   # Компоненты GUI
-│   │   ├── services/     # WebSocket-сервис
-│   │   └── App.js
+├── backend/              # Python runtime, WING client, DSP modules, Product Layer
+├── frontend/             # React operator Control Center
 ├── mix_agent/            # Offline analysis/apply/research facade
-├── tests/                # Automated tests
-├── config/               # Конфигурационные файлы
-│   └── default_config.json
-├── presets/              # Сохраненные пресеты микса
-└── Docs/                 # Документация
+├── automixer/            # Offline/architecture spine and production_mix_v1
+├── ai_mixing_pipeline/   # Legacy/offline analysis and critic pipeline
+├── tools/                # Local automation, Paperclip/GPT/vector tooling
+├── tests/                # Canonical automated tests
+└── Docs/                 # Canonical documentation and reports
+    ├── INDEX.md          # Start here
+    ├── backend/          # Backend docs and manual-probe inventory
+    ├── reports/tub/      # Historical TUB reports and runbooks
+    ├── manuals/wing/     # WING manuals and protocol PDFs
+    └── archive/          # Old notes and generated legacy snapshots
 ```
+
+Главная карта проекта: [`Docs/INDEX.md`](Docs/INDEX.md).
 
 ## Возможности (Этап 1)
 
@@ -460,7 +458,9 @@ training:
 
 ## Тестирование OSC-связи
 
-Используйте тестовый скрипт для проверки подключения:
+Ручные backend-проверки сохранены для совместимости и описаны в
+[`Docs/backend/MANUAL_PROBES.md`](Docs/backend/MANUAL_PROBES.md). Для проверки
+OSC-связи можно использовать старый ручной скрипт:
 
 ```bash
 cd backend
@@ -486,6 +486,10 @@ python test_wing_connection.py
 - [Behringer Wing OSC Implementation](https://wiki.munichmakerlab.de/wiki/Behringer_Wing)
 - [Mixing Secrets for the Small Studio - Mike Senior](https://www.cambridge-mt.com/ms/mix-book/)
 - [Sound Systems: Design and Optimization - Bob McCarthy](https://bobmccarthy.com/)
+- [Docs/secrets-rotation.md](Docs/secrets-rotation.md) - порядок ротации секрета после инцидента с tracked `.env`
+- [Docs/RUNTIME_HYGIENE.md](Docs/RUNTIME_HYGIENE.md) - какие websocket-команды доступны, какие UI-модули пока status-only, и какие safety-команды backend-only
+- [Docs/PROJECT_IMPLEMENTATION_PLAN.md](Docs/PROJECT_IMPLEMENTATION_PLAN.md) - план MVP, safety-границы и расписание работ
+- [Docs/PROJECT_STRUCTURE_MAP.md](Docs/PROJECT_STRUCTURE_MAP.md) - доменная карта проекта и правила структурирования
 
 ## Поддержка
 

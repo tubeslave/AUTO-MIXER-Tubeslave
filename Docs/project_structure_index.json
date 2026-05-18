@@ -4,6 +4,11 @@
   "status": "canonical_structure_baseline",
   "primary_documents": [
     {
+      "path": "Docs/INDEX.md",
+      "role": "documentation_entrypoint",
+      "status": "canonical"
+    },
+    {
       "path": "Docs/PROJECT_IMPLEMENTATION_PLAN.md",
       "role": "implementation_plan",
       "status": "canonical"
@@ -16,6 +21,16 @@
     {
       "path": "Docs/PROJECT_CLEANUP_BACKLOG.md",
       "role": "cleanup_backlog",
+      "status": "canonical"
+    },
+    {
+      "path": "Docs/HEALTH_BASELINE_20260518.md",
+      "role": "post_cleanup_health_baseline",
+      "status": "canonical"
+    },
+    {
+      "path": "Docs/STRUCTURING_COMPLETION_20260518.md",
+      "role": "structuring_completion_report",
       "status": "canonical"
     },
     {
@@ -105,7 +120,6 @@
         "automixer/decision",
         "automixer/safety",
         "automixer/executor",
-        "automixer/logs",
         "automixer/experiments"
       ],
       "boundary": "Analyzer, Knowledge, Critics, Decision, Safety, Executor, and Logs stay separate."
@@ -172,6 +186,19 @@
       "boundary": "Coordination surfaces are read-only or dry-run by default and do not grant runtime approval."
     },
     {
+      "id": "documentation_and_archives",
+      "name": "Documentation Reports Manuals And Archives",
+      "status": "canonical_docs",
+      "paths": [
+        "Docs/INDEX.md",
+        "Docs/backend",
+        "Docs/reports/tub",
+        "Docs/manuals/wing",
+        "Docs/archive"
+      ],
+      "boundary": "Project knowledge lives in Docs. Runtime folders should not store reports, manuals, or generated historical snapshots."
+    },
+    {
       "id": "generated_outputs",
       "name": "Generated Caches Builds And Runtime Outputs",
       "status": "generated",
@@ -191,7 +218,7 @@
       "boundary": "Preview cleanup before deletion and preserve evidence artifacts."
     }
   ],
-  "current_dirty_product_layer_slice": [
+  "completed_product_layer_slice": [
     "backend/handlers/__init__.py",
     "backend/server.py",
     "backend/handlers/product_state_handlers.py",
@@ -207,13 +234,12 @@
     "Docs/PROJECT_IMPLEMENTATION_PLAN.md"
   ],
   "next_structural_target": {
-    "id": "product_layer_slice_review",
+    "id": "manual_probe_migration",
     "steps": [
-      "review current dirty Product Layer slice",
-      "run focused operator product state tests",
-      "run frontend build",
-      "confirm no new live write path was introduced",
-      "publish short Product Layer status report"
+      "move one manual probe family at a time into backend/lab_only",
+      "add compatibility wrappers only where old operator commands must remain stable",
+      "convert valuable probes into tests under tests",
+      "prove no live write path was widened"
     ]
   }
 }
