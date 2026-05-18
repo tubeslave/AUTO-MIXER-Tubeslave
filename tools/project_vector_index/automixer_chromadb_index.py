@@ -37,8 +37,8 @@ DEFAULT_INCLUDE_GLOBS = (
     "README.md",
     "CLAUDE.md",
     "BUILD.md",
-    "TEST_RESULTS.md",
     "Docs/**/*.md",
+    "Docs/reports/tub/TUB-*.md",
     "backend/TUB-*.md",
     "backend/ai/knowledge/**/*.md",
     "tools/**/*.md",
@@ -425,6 +425,8 @@ def source_category(rel_path: Path) -> str:
     parts = rel_path.parts
     if parts[:2] == (".paperclip", "reports"):
         return "paperclip_report"
+    if parts[:3] == ("Docs", "reports", "tub") and rel_path.name.startswith("TUB-"):
+        return "tub_report"
     if parts and parts[0] == "Docs":
         return "docs"
     if parts[:3] == ("backend", "ai", "knowledge"):

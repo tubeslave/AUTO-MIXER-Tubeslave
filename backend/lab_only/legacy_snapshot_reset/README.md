@@ -10,6 +10,6 @@ Use them only for explicit lab workflows from the repo root, for example:
 
 The approved WING deployment path remains the supervised backend/runtime flow described in:
 
-- `backend/TUB-327-Legacy-Runtime-Quarantine-Matrix.md`
-- `backend/TUB-364-Analyzer-Control-Runtime-Consolidation.md`
+- `Docs/reports/tub/TUB-327-Legacy-Runtime-Quarantine-Matrix.md`
+- `Docs/reports/tub/TUB-364-Analyzer-Control-Runtime-Consolidation.md`
 - `Docs/RUNTIME_HYGIENE.md`

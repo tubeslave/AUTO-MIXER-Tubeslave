@@ -115,6 +115,18 @@ def test_build_source_chunks_adds_metadata_and_embeddings(tmp_path: Path) -> Non
     assert any(value != 0 for value in record.embedding)
 
 
+def test_docs_tub_reports_keep_tub_report_category(tmp_path: Path) -> None:
+    source = tmp_path / "Docs" / "reports" / "tub" / "TUB-343-WING-Write-Gate-Report.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("Supervised write gate report.", encoding="utf-8")
+
+    records = indexer.build_source_chunks(tmp_path, [source], indexed_at="2026-05-18T00:00:00+00:00")
+
+    assert len(records) == 1
+    assert records[0].metadata["source_path"] == "Docs/reports/tub/TUB-343-WING-Write-Gate-Report.md"
+    assert records[0].metadata["category"] == "tub_report"
+
+
 def test_manual_chunks_can_be_serialized() -> None:
     records = indexer.build_manual_chunks(
         "Store this note in ChromaDB.",

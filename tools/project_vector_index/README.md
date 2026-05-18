@@ -10,10 +10,10 @@ runtime paths.
 python3 tools/project_vector_index/automixer_chromadb_index.py index
 ```
 
-Default sources include project docs, `backend/TUB-*.md`, runtime AI knowledge,
-safe automation READMEs, selected config files, and selected backend/replay code.
-Local `.env`, secrets, `config/user_config.json`, logs, `external/`,
-`node_modules/`, and generated artifacts are excluded.
+Default sources include project docs, `Docs/reports/tub/TUB-*.md`, runtime AI
+knowledge, safe automation READMEs, selected config files, and selected
+backend/replay code. Local `.env`, secrets, `config/user_config.json`, logs,
+`external/`, `node_modules/`, and generated artifacts are excluded.
 
 Optional local Paperclip reports can be included explicitly:
 

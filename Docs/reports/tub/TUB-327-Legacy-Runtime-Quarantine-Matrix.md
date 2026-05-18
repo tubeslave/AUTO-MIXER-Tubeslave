@@ -15,7 +15,7 @@ The approved WING deployment path remains:
 
 Source evidence:
 - `Docs/RUNTIME_HYGIENE.md`
-- `backend/TUB-364-Analyzer-Control-Runtime-Consolidation.md`
+- `Docs/reports/tub/TUB-364-Analyzer-Control-Runtime-Consolidation.md`
 - `backend/gain_fader_runtime.py`
 - `tests/test_runtime_hygiene.py`
 - `tests/test_gain_fader_runtime.py`
@@ -70,7 +70,7 @@ Anything else should be clearly classified as one of:
 - `backend/lab_only/legacy_snapshot_reset/scan_and_load_snap.py`
 - `backend/lab_only/legacy_snapshot_reset/reset_all_channels.py`
 - `backend/lab_only/legacy_snapshot_reset/reset_modules_trim_faders.py`
-- `server.py.bak`
+- `backend/lab_only/legacy_backups/server.py.bak`
 
 These direct-write scripts are now parked behind the lab-only namespace because they look executable and authoritative, but they are not the approved supervised pilot runtime.
 
@@ -87,7 +87,7 @@ These direct-write scripts are now parked behind the lab-only namespace because 
 - `backend/server.py` still contains the broader `start_auto_soundcheck` cycle, which calls `reset_all_functions_to_defaults`, `start_realtime_correction`, `apply_all_corrections`, `start_auto_balance`, and `apply_auto_balance`.
 - `frontend/src/components/AutoSoundcheckTab.js` still exposes that cycle as a startable operator tab.
 - `frontend/src/components/AutoFaderTab.js` still exposes `start_realtime_fader`.
-- `backend/gain_fader_runtime.py` and `backend/TUB-364-Analyzer-Control-Runtime-Consolidation.md` classify `AutoFaderController`, `LUFSGainStagingController`, and `SafeGainCalibrator` as legacy or quarantined on the WING deployment surface.
+- `backend/gain_fader_runtime.py` and `Docs/reports/tub/TUB-364-Analyzer-Control-Runtime-Consolidation.md` classify `AutoFaderController`, `LUFSGainStagingController`, and `SafeGainCalibrator` as legacy or quarantined on the WING deployment surface.
 
 ### Snapshot and reset surfaces
 

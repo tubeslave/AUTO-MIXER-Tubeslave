@@ -212,7 +212,7 @@ This workflow should be read together with:
 - `tools/automixer_operator/IPHONE_CODEX_RUNBOOK.md`
 - `tools/paperclip_watchdog/README.md`
 - `.paperclip/reports/tub351_watchdog_dispatch_architecture.md`
-- `backend/TUB-343-WING-Write-Gate-Report.md`
+- `Docs/reports/tub/TUB-343-WING-Write-Gate-Report.md`
 
 ## Safe Example
 

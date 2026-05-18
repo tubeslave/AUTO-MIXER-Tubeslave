@@ -9,10 +9,10 @@ must be sorted. It does not approve live WING/OSC writes.
 
 ## Current Baseline
 
-- Branch state at inventory time: `main...origin/main [ahead 62, behind 26]`.
-- Working tree is dirty and already contains Product Layer changes.
-- Approximate source/document file count after excluding caches, build outputs,
-  `node_modules`, backend venv, and pyc files: 711.
+- Current health baseline: `Docs/HEALTH_BASELINE_20260518.md`.
+- Current documentation entrypoint: `Docs/INDEX.md`.
+- Product Layer changes have been reviewed, tested, and committed.
+- Documentation and report files have been moved out of runtime folders.
 - Existing implementation plan: `Docs/PROJECT_IMPLEMENTATION_PLAN.md`.
 - Primary safety rule: live console behavior is read-only or dry-run by default.
   Real writes require explicit supervised approval, readback, rollback,
@@ -173,7 +173,7 @@ Purpose: operator command input, not an autonomous control authority.
 | `backend/voice_runtime.py` | `optional` | Runtime summary and voice status. |
 | `backend/voice_control*.py` | `lab` / `optional` | Multiple recognition experiments. |
 | `backend/models/sherpa-*` | `lab` | Local voice model asset. |
-| `backend/VOICE_CONTROL_README.md` | `legacy` | Useful notes; needs consolidation. |
+| `Docs/backend/VOICE_CONTROL_README.md` | `legacy` | Useful notes; consolidated under backend docs. |
 
 Rule: voice commands may create proposals or operator requests. They must not
 bypass Product Layer and safety policy.
@@ -210,7 +210,23 @@ systems by default.
 Rule: coordination tools do not grant runtime approval. They may report status,
 create dry-run plans, and publish evidence.
 
-### 10. Generated, Cache, And Build Areas
+### 10. Documentation And Archives
+
+Purpose: keep project knowledge searchable without mixing reports into runtime
+code folders.
+
+| Path | Status | Role |
+| --- | --- | --- |
+| `Docs/INDEX.md` | `canonical` | Main documentation entrypoint. |
+| `Docs/backend/` | `canonical` docs | Backend setup, routing, voice, Dante, safe gain, and manual-probe docs. |
+| `Docs/reports/tub/` | `legacy` / `report` | Historical TUB reports, runbooks, and readiness records. |
+| `Docs/manuals/wing/` | `reference` | WING manuals and protocol PDFs. |
+| `Docs/archive/` | `archive` | Old root notes and tracked generated legacy snapshots. |
+
+Rule: new reports go under `Docs/reports/` or `.paperclip/reports/`; new
+backend behavior goes under `backend/`.
+
+### 11. Generated, Cache, And Build Areas
 
 These paths are not product source:
 
@@ -229,9 +245,9 @@ These paths are not product source:
 Rule: cleanup must start with preview commands and preserve evidence artifacts
 for live/safety work.
 
-## Current Dirty Product-Layer Slice
+## Completed Product-Layer Slice
 
-At inventory time, the working tree already contained this relevant slice:
+The Product Layer implementation slice has been reviewed, tested, and committed:
 
 - `backend/handlers/__init__.py`
 - `backend/server.py`
@@ -247,8 +263,7 @@ At inventory time, the working tree already contained this relevant slice:
 - `tests/test_operator_product_state.py`
 - `Docs/PROJECT_IMPLEMENTATION_PLAN.md`
 
-Treat this as the current Product Layer implementation slice until reviewed.
-Do not mix unrelated cleanup into that slice.
+Do not mix unrelated cleanup into Product Layer behavior without focused tests.
 
 ## Working Rules For Future Agents
 
@@ -267,11 +282,9 @@ Do not mix unrelated cleanup into that slice.
 
 ## Next Structural Target
 
-The next concrete engineering target is to review the current Product Layer
-slice and prove that:
+The next concrete structural target is manual-probe migration:
 
-- backend Product State imports cleanly;
-- proposal queue has tests;
-- WebSocket handler registration is explicit;
-- frontend build still passes;
-- no new live write path was introduced.
+- move one probe family at a time into `backend/lab_only/`;
+- add compatibility wrappers only when old commands must remain usable;
+- convert valuable probes into tests under `tests/`;
+- prove no live write path was widened.

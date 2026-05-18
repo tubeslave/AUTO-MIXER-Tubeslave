@@ -14,7 +14,7 @@ Important boundary:
   readiness, not to verified live-console telemetry behavior.
 
 Related existing note:
-- `backend/TUB-335-WING-Telemetry-Notes.md`
+- `Docs/reports/tub/TUB-335-WING-Telemetry-Notes.md`
 
 ## Current shadow-mode path
 
