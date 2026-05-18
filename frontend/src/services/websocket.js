@@ -189,6 +189,106 @@ class WebSocketService extends BaseWebSocketTransport {
     });
   }
 
+  getSupervisedPilotStatus() {
+    this.send({
+      type: 'get_supervised_pilot_status'
+    });
+  }
+
+  getOperatorMode() {
+    this.send({
+      type: 'get_operator_mode'
+    });
+  }
+
+  setOperatorMode(mode, reason = 'frontend_mode_control') {
+    this.send({
+      type: 'set_operator_mode',
+      mode,
+      reason
+    });
+  }
+
+  getDashboardSnapshot() {
+    this.send({
+      type: 'get_dashboard_snapshot'
+    });
+  }
+
+  getChannelInventory(totalChannels = 24) {
+    this.send({
+      type: 'get_channel_inventory',
+      total_channels: totalChannels
+    });
+  }
+
+  getDecisionQueue(limit = 50) {
+    this.send({
+      type: 'get_decision_queue',
+      limit
+    });
+  }
+
+  getConnectionTopology() {
+    this.send({
+      type: 'get_connection_topology'
+    });
+  }
+
+  runOperatorAnalysis(totalChannels = 24, createProposals = true) {
+    this.send({
+      type: 'run_operator_analysis',
+      total_channels: totalChannels,
+      create_proposals: createProposals
+    });
+  }
+
+  importSafeGainSuggestions() {
+    this.send({
+      type: 'import_safe_gain_suggestions'
+    });
+  }
+
+  importSoundcheckRecommendations(bundle = null) {
+    const message = {
+      type: 'import_soundcheck_recommendations'
+    };
+    if (bundle) message.bundle = bundle;
+    this.send(message);
+  }
+
+  createOperatorProposal(proposal) {
+    this.send({
+      type: 'create_operator_proposal',
+      proposal
+    });
+  }
+
+  acceptOperatorProposal(proposalId) {
+    this.send({
+      type: 'accept_operator_proposal',
+      proposal_id: proposalId
+    });
+  }
+
+  dismissOperatorProposal(proposalId, reason = 'frontend_dismiss') {
+    this.send({
+      type: 'dismiss_operator_proposal',
+      proposal_id: proposalId,
+      reason
+    });
+  }
+
+  applyOperatorProposal(proposalId, approved = false, reason = 'frontend_supervised_apply') {
+    this.send({
+      type: 'apply_operator_proposal',
+      proposal_id: proposalId,
+      approved,
+      reason,
+      approval_id: `frontend-${proposalId}`
+    });
+  }
+
   // Voice control commands
   startVoiceControl(modelSize = 'small', language = 'ru', deviceId = null, channel = 0) {
     const message = {
