@@ -49,6 +49,15 @@ frontend/dist/
 /logs/
 /backend/logs/
 
+# Local ChromaDB/vector indexes
+.chromadb/
+.paperclip/
+
+# Runtime/live-session outputs
+artifacts/tub345_supervised_live/
+artifacts/wing_telemetry*/
+production_mix_v1_out/
+
 # OS
 Thumbs.db
 .DS_Store
@@ -87,4 +96,4 @@ frontend/node_modules/
 backend/venv/
 .claude/
 GitHub/
-sessions/test_*.json
+sessions/*.json
