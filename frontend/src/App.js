@@ -39,33 +39,30 @@ const ROLE_COLORS = {
 };
 
 const NAV_ITEMS = [
-  { section: 'Обзор', id: 'dashboard', icon: '▣', label: 'Dashboard' },
-  { section: 'Каналы', id: 'channelList', icon: '☰', label: 'Channel List' },
-  { section: 'Каналы', id: 'gainStaging', icon: '▥', label: 'Gain' },
-  { section: 'Каналы', id: 'phaseAlignment', icon: '⟳', label: 'Phase' },
-  { section: 'AI агенты', id: 'agentsConsole', icon: 'AI', label: 'Agents Console' },
-  { section: 'AI агенты', id: 'autoEQ', icon: '≈', label: 'EQ' },
-  { section: 'AI агенты', id: 'autoCompressor', icon: '⇣', label: 'Comp' },
-  { section: 'AI агенты', id: 'autoGate', icon: '▤', label: 'Gate' },
-  { section: 'AI агенты', id: 'autoFader', icon: '▥', label: 'Fader' },
-  { section: 'AI агенты', id: 'autoPanner', icon: '◇', label: 'Pan' },
-  { section: 'AI агенты', id: 'autoReverb', icon: '≈', label: 'Reverb' },
-  { section: 'AI агенты', id: 'autoEffects', icon: '✦', label: 'FX' },
-  { section: 'AI агенты', id: 'crossAdaptiveEQ', icon: '⇄', label: 'X-EQ' },
-  { section: 'Обучение', id: 'autoSoundcheck', icon: '◎', label: 'Soundcheck' },
-  { section: 'Обучение', id: 'systemMeasurement', icon: '⌁', label: 'Measure' },
-  { section: 'Обучение', id: 'voice', icon: '◉', label: 'Voice' },
-  { section: 'Система', id: 'connections', icon: '⌘', label: 'Connections' },
-  { section: 'Система', id: 'settings', icon: '⚙', label: 'Settings' },
+  { section: 'Overview', id: 'dashboard', icon: '▣', label: 'Dashboard' },
+  { section: 'Channels', id: 'channelList', icon: '☰', label: 'Channel List' },
+  { section: 'Channels', id: 'gainStaging', icon: '⌘', label: 'Groups / Buses' },
+  { section: 'AI Agents', id: 'agentsConsole', icon: '△', label: 'Agents Console' },
+  { section: 'AI Agents', id: 'autoEQ', icon: '▤', label: 'Decision Log' },
+  { section: 'Learning', id: 'autoSoundcheck', icon: '◌', label: 'Training Sessions' },
+  { section: 'Learning', id: 'systemMeasurement', icon: '□', label: 'Rules Library' },
+  { section: 'System', id: 'connections', icon: '▣', label: 'Connections' },
+  { section: 'System', id: 'settings', icon: '⚙', label: 'Settings' },
+  { section: 'System', id: 'voice', icon: '▤', label: 'Logs' },
 ];
 
-const WING_QUARANTINED_TABS = new Set(['autoFader', 'autoSoundcheck']);
+const WING_QUARANTINED_TABS = new Set();
 const OPERATOR_MODES = [
   { key: 'analyze', label: 'Analyze', short: 'ANL' },
   { key: 'assist', label: 'Assist', short: 'AST' },
   { key: 'supervised', label: 'Supervised', short: 'SUP' },
   { key: 'auto', label: 'Auto', short: 'AUT' },
 ];
+
+function getInitialControlCenterTab() {
+  const hashTab = window.location.hash.replace(/^#\/?/, '');
+  return NAV_ITEMS.some(item => item.id === hashTab) ? hashTab : 'dashboard';
+}
 
 function App() {
   const [serverConnected, setServerConnected] = useState(false);
@@ -79,7 +76,7 @@ function App() {
   const [availableChannels, setAvailableChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [connecting, setConnecting] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(getInitialControlCenterTab);
   const [globalMode] = useState('soundcheck');
   const [operatorModeStatus, setOperatorModeStatus] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -287,6 +284,14 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleHashChange = () => {
+      setActiveTab(getInitialControlCenterTab());
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const handleDeviceChange = (deviceId) => {
     setSelectedDevice(deviceId);
     const device = audioDevices.find(d => d.id === deviceId);
@@ -336,16 +341,6 @@ function App() {
     }
   };
 
-  const handleOperatorModeChange = (mode) => {
-    setOperatorModeStatus(prev => ({
-      ...(prev || {}),
-      mode,
-      label: OPERATOR_MODES.find(item => item.key === mode)?.label || mode,
-    }));
-    websocketService.setOperatorMode(mode);
-    websocketService.getSupervisedPilotStatus();
-  };
-
   const sharedProps = {
     selectedChannels,
     availableChannels,
@@ -364,14 +359,15 @@ function App() {
       : item
   ));
 
-  const activeNavItem = navItems.find(n => n.id === activeTab);
   const operatorMode = operatorModeStatus?.mode || 'assist';
   const operatorModeLabel = operatorModeStatus?.label || OPERATOR_MODES.find(item => item.key === operatorMode)?.label || 'Assist';
   const operatorModeCapabilities = operatorModeStatus?.capabilities || {};
   const operatorModeCanApply = operatorModeCapabilities.can_apply_to_console === true;
-  const operatorModeRequiresApproval = operatorModeCapabilities.requires_approval === true;
-  const operatorModePolicy = operatorModeStatus?.live_write_policy || 'suggestions_only';
-  const operatorModeBlockedReasons = operatorModeStatus?.blocked_reasons || [];
+
+  const selectTab = (tabId) => {
+    setActiveTab(tabId);
+    window.history.replaceState(null, '', `#/${tabId}`);
+  };
 
   return (
     <div className="App">
@@ -384,30 +380,6 @@ function App() {
           </button>
         </div>
 
-        <div className="sidebar-status">
-          <div className={`status-dot ${serverConnected ? 'on' : 'off'}`} title={serverConnected ? 'Backend Online' : 'Backend Offline'} />
-          <div className={`status-dot ${mixerConnected ? 'on' : 'off'}`} title={mixerConnected ? 'Mixer OK' : 'Mixer Off'} />
-          {!sidebarCollapsed && (
-            <span className="status-text-small">
-              {serverConnected ? (mixerConnected ? 'Всё ОК' : 'Mixer ✕') : 'Offline'}
-            </span>
-          )}
-        </div>
-
-        {/* Operator Mode Toggle */}
-        <div className="mode-toggle operator-mode-toggle">
-          {OPERATOR_MODES.map(mode => (
-            <button
-              key={mode.key}
-              className={`mode-btn mode-${mode.key} ${operatorMode === mode.key ? 'active' : ''}`}
-              onClick={() => handleOperatorModeChange(mode.key)}
-              title={operatorModeStatus?.available_modes?.find(item => item.key === mode.key)?.summary || mode.label}
-            >
-              {sidebarCollapsed ? mode.short : mode.label}
-            </button>
-          ))}
-        </div>
-
         <div className="nav-items">
           {navItems.map((item, index) => {
             const previous = navItems[index - 1];
@@ -417,7 +389,7 @@ function App() {
                 {showSection && <div className="nav-section-label">{item.section}</div>}
                 <button
                   className={`nav-item ${activeTab === item.id ? 'active' : ''} ${item.quarantined ? 'quarantined' : ''}`}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => selectTab(item.id)}
                   title={item.quarantined ? `${item.label} • WING на паузе` : item.label}
                 >
                   <span className="nav-icon">{item.icon}</span>
@@ -432,6 +404,14 @@ function App() {
             );
           })}
         </div>
+        {!sidebarCollapsed && (
+          <div className="sidebar-health">
+            <strong>System Health</strong>
+            <span className="state-green">✓ All systems normal</span>
+            <p>CPU: 18% · RAM: 32%</p>
+            <p>DISK: 512 GB free</p>
+          </div>
+        )}
       </nav>
 
       {/* Main Content */}
@@ -440,7 +420,7 @@ function App() {
         <div className="topbar">
           <div className="topbar-session">
             <span>Session</span>
-            <strong>2026-05-17 · {activeNavItem?.label}</strong>
+            <strong>2025-05-25 · Live in Club · Soundcheck</strong>
             <small>Live in Club · Soundcheck</small>
           </div>
           <div className="topbar-status-grid">
@@ -463,21 +443,6 @@ function App() {
             <div className="topbar-status-cell">
               <span>Connected to</span>
               <strong>{mixerConnected ? 'WING RACK' : 'Safe Offline'}</strong>
-            </div>
-          </div>
-          <div className="topbar-mode">
-            <div className={`mode-badge operator-mode-badge mode-${operatorMode}`}>
-              Режим: {operatorModeLabel}
-            </div>
-            <div className="operator-mode-policy">
-              <span className={operatorModeCanApply ? 'policy-apply' : 'policy-safe'}>
-                {operatorModeCanApply ? 'запись разрешается только по правилу режима' : 'запись в пульт закрыта'}
-              </span>
-              <span>{operatorModeRequiresApproval ? 'нужно подтверждение' : 'без автоматического применения'}</span>
-              <span>{operatorModePolicy}</span>
-              {operatorModeBlockedReasons.slice(0, 2).map(reason => (
-                <span className="policy-blocked" key={reason}>{reason}</span>
-              ))}
             </div>
           </div>
           <div className="topbar-user">

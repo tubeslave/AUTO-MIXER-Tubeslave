@@ -76,6 +76,29 @@ function DonutScore({ value, label }) {
   );
 }
 
+function SpectrumChart({ compact = false }) {
+  return (
+    <div className={`spectrum-chart ${compact ? 'compact' : ''}`}>
+      <svg viewBox="0 0 220 82" role="img" aria-label="Spectrum">
+        <defs>
+          <linearGradient id="spectrumFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#a371f7" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#1f6feb" stopOpacity="0.04" />
+          </linearGradient>
+          <linearGradient id="spectrumLine" x1="0" x2="1">
+            <stop offset="0%" stopColor="#58a6ff" />
+            <stop offset="55%" stopColor="#a371f7" />
+            <stop offset="100%" stopColor="#58a6ff" />
+          </linearGradient>
+        </defs>
+        <path d="M0 70 L0 50 L10 55 L20 32 L30 49 L40 25 L50 43 L60 28 L70 39 L80 24 L90 34 L100 20 L110 30 L120 26 L130 18 L140 34 L150 24 L160 38 L170 30 L180 45 L190 36 L200 50 L210 44 L220 62 L220 70 Z" fill="url(#spectrumFill)" />
+        <polyline points="0,50 10,55 20,32 30,49 40,25 50,43 60,28 70,39 80,24 90,34 100,20 110,30 120,26 130,18 140,34 150,24 160,38 170,30 180,45 190,36 200,50 210,44 220,62" fill="none" stroke="url(#spectrumLine)" strokeWidth="2" />
+        <polyline points="0,58 14,42 27,53 42,36 56,50 70,31 84,45 98,33 112,40 126,27 140,38 154,32 168,46 182,39 196,54 210,48 220,66" fill="none" stroke="#f778ba" strokeOpacity="0.72" strokeWidth="1.3" />
+      </svg>
+    </div>
+  );
+}
+
 function DirectorPanel() {
   return (
     <aside className="director-panel">
@@ -124,6 +147,7 @@ function ChannelStrip({ channel, selected }) {
         <strong>{channel.name}</strong>
         <span>{channel.role}</span>
       </div>
+      <b className="strip-db">{channel.level.toFixed(1)} dB</b>
       <MiniSparkline tone={channel.group === 'VOCALS' ? 'purple' : 'green'} />
       <div className="strip-tools"><span>GATE</span><span>COMP</span></div>
       <div className="strip-fader">
@@ -151,11 +175,15 @@ export function DashboardView() {
       <div className="console-main">
         <div className="metrics-grid">
           <MetricCard title="Master Bus">
-            <div className="big-metric">-14.2 <span>LUFS</span></div>
+            <div className="master-values">
+              <div className="big-metric">-14.2 <span>LUFS</span></div>
+              <div className="big-metric small">-1.1 <span>dBTP</span></div>
+            </div>
+            <div className="master-labels"><span>Integrated</span><span>True Peak</span></div>
             <MeterBar value={-14.2} />
           </MetricCard>
           <MetricCard title="Spectrum">
-            <MiniSparkline tone="blue" />
+            <SpectrumChart />
             <div className="spectrum-axis"><span>20</span><span>100</span><span>1k</span><span>10k</span></div>
           </MetricCard>
           <MetricCard title="Loudness">
@@ -169,10 +197,14 @@ export function DashboardView() {
           </MetricCard>
           <MetricCard title="AI Confidence">
             <DonutScore value={87} label="High" />
+            <SpectrumChart compact />
           </MetricCard>
         </div>
 
-        <div className="console-tabs"><span className="active">Каналы</span><span>Обзор</span><span>EQ Match</span><span>Динамика</span><span>Посылы</span><span>Main Bus</span></div>
+        <div className="console-tabs">
+          <span className="active">Channels</span><span>Overview</span><span>EQ Match</span><span>Dynamics</span><span>Sends</span><span>Main Bus</span>
+          <div className="console-view-tools"><small>View</small><button>▤</button><button>▦</button><button>▥</button><button>⚙</button></div>
+        </div>
         <div className="console-strips">
           {mixChannels.slice(0, 14).map((channel) => (
             <ChannelStrip channel={channel} selected={channel.name === 'Lead Vocal'} key={channel.id} />
@@ -184,6 +216,7 @@ export function DashboardView() {
           <MetricCard title="Correlation"><div className="correlation-value">+0.28</div><MeterBar value={-12} /></MetricCard>
           <MetricCard title="Spectral Balance"><div className="bar-chart">{[40, 78, 66, 58, 82, 39, 73].map((h, i) => <i key={i} style={{ height: `${h}%` }} />)}</div></MetricCard>
           <MetricCard title="Dynamics Overview"><div className="h-bars">{['Drums', 'Bass', 'Guitars', 'Vocals'].map((name, i) => <p key={name}><span>{name}</span><i style={{ width: `${82 - i * 12}%` }} /></p>)}</div></MetricCard>
+          <MetricCard title="Loudness History"><SpectrumChart compact /></MetricCard>
           <MetricCard title="AI Suggestions"><MiniSparkline tone="dots" /></MetricCard>
         </div>
       </div>
@@ -270,7 +303,7 @@ export function ChannelListView() {
   );
 }
 
-export function ConnectionsView({ serverConnected, mixerConnected, statusMessage, mixerIp, mixerPort, setMixerIp, setMixerPort, handleConnect, connecting }) {
+export function ConnectionsView({ serverConnected, mixerConnected }) {
   return (
     <div className="console-page">
       <div className="console-main">
@@ -280,16 +313,28 @@ export function ConnectionsView({ serverConnected, mixerConnected, statusMessage
           <section className="topology-column core"><h4>Automixer Core</h4><div className="node-card large"><span>AM</span><div><strong>Automixer Engine</strong><p>v0.8.7 · running</p></div></div><div className="node-card"><span>AI</span><div><strong>AI Processing</strong><p>8 agents active</p></div></div></section>
           <section className="topology-column"><h4>Audio Interface</h4><div className="node-card large"><span>W</span><div><strong>WING RACK</strong><p>{mixerConnected ? 'Connected' : 'Disconnected'}</p><p>48 kHz · 0.8 ms</p></div></div></section>
         </div>
-        <div className="connection-controls">
-          <label>WING IP<input value={mixerIp} onChange={(e) => setMixerIp(e.target.value)} /></label>
-          <label>OSC Port<input type="number" value={mixerPort} onChange={(e) => setMixerPort(parseInt(e.target.value, 10))} /></label>
-          <button className={`btn-connect ${mixerConnected ? 'connected' : ''}`} disabled={!serverConnected || connecting} onClick={handleConnect}>{connecting ? '...' : mixerConnected ? 'Отключить' : 'Подключить'}</button>
-          {statusMessage && <p>{statusMessage}</p>}
+        <div className="connection-bottom-grid">
+          <section className="director-card">
+            <h4>Network Interfaces</h4>
+            <div className="status-tile"><b>Ethernet 1</b><p>192.168.1.50 · 1 Gbps · Up</p></div>
+            <div className="status-tile"><b>Ethernet 2</b><p>192.168.2.50 · Standby</p></div>
+          </section>
+          <section className="director-card">
+            <h4>System Latency</h4>
+            <div className="status-tile"><b>0.8 ms</b><p>Audio round trip</p></div>
+            <SpectrumChart compact />
+          </section>
+          <section className="director-card">
+            <h4>Sync Status</h4>
+            <div className="status-tile"><b>Locked</b><p>48 kHz · word clock</p></div>
+            <div className="status-tile"><b>0.8 ms</b><p>Latency compensation</p></div>
+          </section>
         </div>
       </div>
       <aside className="director-panel">
-        <section className="director-card"><h4>Connection Status</h4><div className="status-tile"><b>{serverConnected ? 'Good' : 'Offline'}</b><p>Backend</p></div><div className="status-tile"><b>{mixerConnected ? 'Good' : 'Safe Offline'}</b><p>WING Rack</p></div></section>
-        <section className="director-card"><h4>Connection Log</h4>{['Backend ready', 'OSC connection disabled until approval', 'Audio route waiting', 'All safe gates active'].map((line, i) => <p className="message-line" key={line}>10:2{i} · {line}</p>)}</section>
+        <section className="director-card"><h4>Connection Status</h4><div className="connection-status-grid"><div className="status-tile"><b>{serverConnected ? 'Good' : 'Offline'}</b><p>Overall Status</p></div><div className="status-tile"><b>Good</b><p>Audio Connection</p></div><div className="status-tile"><b>{mixerConnected ? 'Good' : 'Safe Offline'}</b><p>Control Connection</p></div><div className="status-tile"><b>Good</b><p>Network Status</p></div></div></section>
+        <section className="director-card"><h4>Connected Devices</h4>{['WING RACK · 192.168.1.10', 'Stage Box 1 · 192.168.1.11', 'Stage Box 2 · 192.168.1.12', 'Powerplay P16 · 192.168.1.13'].map((line) => <p className="message-line" key={line}>{line} · Online</p>)}</section>
+        <section className="director-card"><h4>Connection Log</h4>{['Connected to WING RACK', 'OSC connection established', 'Audio stream started', 'All systems ready'].map((line, i) => <p className="message-line" key={line}>10:2{i} · {line}</p>)}</section>
       </aside>
     </div>
   );
