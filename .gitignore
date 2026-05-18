@@ -46,7 +46,8 @@ frontend/dist/
 
 # Logs
 *.log
-logs/
+/logs/
+/backend/logs/
 
 # OS
 Thumbs.db
