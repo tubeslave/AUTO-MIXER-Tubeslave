@@ -1035,6 +1035,128 @@ body {
 ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 
+/* High-resolution 16:9 cockpit target, for example 1920x1080. */
+@media (min-width: 1600px) and (min-aspect-ratio: 16 / 10) {
+  .sidebar {
+    width: 192px;
+    min-width: 192px;
+  }
+
+  .sidebar.collapsed {
+    width: 90px;
+    min-width: 90px;
+  }
+
+  .sidebar-header {
+    min-height: 72px;
+    padding: 14px 15px;
+  }
+
+  .logo {
+    font-size: 1.23em;
+  }
+
+  .logo small {
+    font-size: 0.75rem;
+  }
+
+  .btn-collapse {
+    font-size: 1rem;
+  }
+
+  .nav-items {
+    padding: 14px 0 6px;
+  }
+
+  .nav-section-label {
+    padding: 18px 15px 8px;
+    font-size: 0.81rem;
+  }
+
+  .nav-item {
+    gap: 11px;
+    min-height: 40px;
+    padding: 9px 15px;
+    font-size: 0.99em;
+  }
+
+  .nav-icon {
+    width: 26px;
+    font-size: 1.1em;
+  }
+
+  .sidebar-health {
+    gap: 6px;
+    margin: 0 12px 14px;
+    padding: 15px 12px;
+    font-size: 0.84rem;
+  }
+
+  .sidebar-health strong {
+    font-size: 0.84rem;
+  }
+
+  .topbar {
+    gap: 15px;
+    height: 72px;
+    min-height: 72px;
+    padding: 9px 15px;
+  }
+
+  .topbar-session {
+    min-width: 352px;
+  }
+
+  .topbar-session span,
+  .topbar-status-cell span {
+    font-size: 0.75rem;
+  }
+
+  .topbar-session strong {
+    font-size: 1.02rem;
+  }
+
+  .topbar-session small {
+    font-size: 0.87rem;
+  }
+
+  .topbar-status-grid {
+    grid-template-columns: repeat(4, minmax(129px, 1fr));
+    gap: 6px;
+    max-width: 840px;
+  }
+
+  .topbar-status-cell {
+    gap: 3px;
+    padding: 0 15px;
+  }
+
+  .topbar-status-cell strong {
+    font-size: 0.96rem;
+  }
+
+  .topbar-user {
+    gap: 9px;
+  }
+
+  .topbar-user button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .topbar-user strong {
+    font-size: 0.96rem;
+  }
+
+  .topbar-user span {
+    font-size: 0.78rem;
+  }
+
+  .tab-content {
+    padding: 12px;
+  }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .sidebar { width: 60px; min-width: 60px; }

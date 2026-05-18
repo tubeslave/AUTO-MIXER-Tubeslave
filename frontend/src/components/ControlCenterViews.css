@@ -889,6 +889,412 @@
   grid-column: 1 / -1;
 }
 
+/* High-resolution 16:9 cockpit target, for example 1920x1080. */
+@media (min-width: 1600px) and (min-aspect-ratio: 16 / 10) {
+  .console-page {
+    grid-template-columns: minmax(0, 1fr) 372px;
+    gap: 12px;
+  }
+
+  .metrics-grid {
+    height: 219px;
+    flex-basis: 219px;
+  }
+
+  .lower-metrics-grid {
+    height: 156px;
+    flex-basis: 156px;
+    margin-top: 12px;
+  }
+
+  .agent-summary-grid {
+    flex-basis: 123px;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .metric-card {
+    padding: 14px 15px;
+    border-radius: 8px;
+  }
+
+  .metric-card h3,
+  .director-card h4,
+  .topology-column h4 {
+    margin-bottom: 15px;
+    font-size: 0.93rem;
+  }
+
+  .big-metric {
+    font-size: 2.18rem;
+  }
+
+  .big-metric.small {
+    font-size: 1.58rem;
+  }
+
+  .big-metric span,
+  .metric-card p,
+  .metric-list span,
+  .transport-bar span {
+    font-size: 0.93rem;
+  }
+
+  .master-values {
+    gap: 15px;
+  }
+
+  .master-labels {
+    margin: 3px 0 18px;
+    font-size: 0.84rem;
+  }
+
+  .meter-track {
+    height: 10px;
+  }
+
+  .mini-spark {
+    gap: 5px;
+    height: 57px;
+    padding-top: 9px;
+  }
+
+  .mini-spark-dots i {
+    width: 11px;
+    height: 11px !important;
+    flex-basis: 11px;
+  }
+
+  .spectrum-chart {
+    height: 114px;
+  }
+
+  .spectrum-chart.compact {
+    height: 42px;
+    margin-top: 8px;
+  }
+
+  .spectrum-axis,
+  .balance-legend {
+    font-size: 0.84rem;
+  }
+
+  .balance-donut {
+    width: 102px;
+    height: 102px;
+  }
+
+  .balance-donut::after {
+    inset: 26px;
+  }
+
+  .donut-score {
+    width: 96px;
+    height: 96px;
+  }
+
+  .donut-score::after {
+    inset: 12px;
+  }
+
+  .donut-score strong {
+    font-size: 1.5rem;
+  }
+
+  .donut-score span {
+    font-size: 0.98rem;
+  }
+
+  .console-tabs {
+    min-height: 54px;
+    flex-basis: 54px;
+    margin: 12px 0;
+    padding: 0 11px;
+  }
+
+  .console-tabs span {
+    padding: 15px 12px;
+    font-size: 0.87rem;
+  }
+
+  .console-view-tools {
+    gap: 8px;
+  }
+
+  .console-view-tools small {
+    font-size: 0.82rem;
+  }
+
+  .console-view-tools button {
+    width: 30px;
+    height: 30px;
+    font-size: 0.87rem;
+  }
+
+  .console-strips {
+    grid-template-columns: repeat(14, minmax(78px, 1fr));
+    gap: 6px;
+    height: 432px;
+    flex-basis: 432px;
+  }
+
+  .console-strip {
+    padding: 9px 8px;
+  }
+
+  .strip-head strong {
+    font-size: 0.93rem;
+  }
+
+  .strip-head span,
+  .console-strip footer,
+  .strip-db {
+    font-size: 0.81rem;
+  }
+
+  .strip-db {
+    margin-top: 8px;
+  }
+
+  .strip-tools {
+    margin: 8px 0;
+    font-size: 0.75rem;
+  }
+
+  .strip-fader {
+    grid-template-columns: 21px 1fr;
+    gap: 11px;
+    height: 156px;
+  }
+
+  .fader-rail {
+    width: 21px;
+  }
+
+  .fader-rail i {
+    width: 36px;
+    height: 16px;
+  }
+
+  .strip-buttons {
+    margin-top: 10px;
+  }
+
+  .strip-buttons button,
+  .row-actions button,
+  .proposal-row button,
+  .connection-controls button,
+  .primary-action,
+  .ghost-action {
+    padding: 8px 12px;
+    font-size: 0.87rem;
+  }
+
+  .phase-scope {
+    width: 108px;
+    height: 108px;
+  }
+
+  .correlation-value {
+    margin: 16px 0;
+    font-size: 1.5rem;
+  }
+
+  .bar-chart {
+    height: 96px;
+  }
+
+  .h-bars p {
+    grid-template-columns: 63px 1fr;
+    gap: 9px;
+    margin: 8px 0;
+    font-size: 0.84rem;
+  }
+
+  .director-panel {
+    gap: 12px;
+  }
+
+  .director-card {
+    padding: 15px;
+  }
+
+  .director-profile {
+    grid-template-columns: 75px 1fr;
+    gap: 15px;
+  }
+
+  .director-avatar,
+  .channel-avatar {
+    width: 69px;
+    height: 69px;
+  }
+
+  .director-card p,
+  .message-line {
+    font-size: 0.93rem;
+  }
+
+  .decision-row,
+  .task-row,
+  .proposal-row {
+    gap: 6px;
+    padding: 10px 0;
+  }
+
+  .decision-row {
+    grid-template-columns: 51px 1fr 69px;
+  }
+
+  .decision-row span,
+  .task-row span {
+    font-size: 0.87rem;
+  }
+
+  .decision-row strong {
+    font-size: 0.81rem;
+  }
+
+  .page-heading {
+    margin: 3px 0 12px;
+  }
+
+  .page-heading h2 {
+    font-size: 1.5rem;
+  }
+
+  .page-heading p {
+    font-size: 1.17rem;
+  }
+
+  .agent-table header,
+  .agent-row {
+    gap: 12px;
+    padding: 10px 15px;
+  }
+
+  .channel-table header,
+  .channel-row {
+    gap: 12px;
+    height: 41px;
+    padding: 0 15px;
+  }
+
+  .agent-table header,
+  .channel-table header {
+    font-size: 0.84rem;
+  }
+
+  .agent-row strong,
+  .channel-row strong {
+    font-size: 1.02rem;
+  }
+
+  .agent-row p,
+  .channel-row span {
+    font-size: 0.93rem;
+  }
+
+  .agent-row .mini-spark {
+    height: 46px;
+    padding-top: 5px;
+  }
+
+  .confidence-cell .donut-score {
+    width: 45px;
+    height: 45px;
+  }
+
+  .confidence-cell .donut-score strong {
+    font-size: 0.75rem;
+  }
+
+  .search-input,
+  .connection-controls input {
+    padding: 12px 15px;
+    font-size: 1.05rem;
+  }
+
+  .topology-board {
+    gap: 30px;
+    height: 573px;
+    padding: 36px 39px;
+  }
+
+  .topology-column {
+    gap: 18px;
+  }
+
+  .node-card {
+    grid-template-columns: 57px 1fr;
+    gap: 15px;
+    padding: 18px;
+  }
+
+  .node-card.large {
+    min-height: 144px;
+  }
+
+  .node-card span {
+    width: 51px;
+    height: 51px;
+  }
+
+  .node-card strong {
+    font-size: 1.23rem;
+  }
+
+  .node-card p {
+    font-size: 1.08rem;
+  }
+
+  .connection-bottom-grid {
+    gap: 12px;
+    margin-top: 12px;
+    height: 153px;
+    flex-basis: 153px;
+  }
+
+  .status-tile {
+    gap: 5px;
+    padding: 11px 15px;
+  }
+
+  .connection-bottom-grid .status-tile {
+    padding: 8px 15px;
+  }
+
+  .connection-bottom-grid .director-card h4 {
+    margin-bottom: 8px;
+  }
+
+  .transport-bar {
+    grid-template-columns: 108px 114px 1.2fr 1.25fr 0.95fr 0.95fr 1.25fr;
+    gap: 9px;
+    height: 96px;
+    min-height: 96px;
+    padding: 10px 15px;
+  }
+
+  .transport-bar > div {
+    gap: 5px;
+    padding-left: 12px;
+  }
+
+  .transport-bar strong {
+    font-size: 1.08rem;
+  }
+
+  .transport-bar button {
+    padding: 6px 12px;
+    font-size: 0.9rem;
+  }
+
+  .play-button {
+    height: 54px;
+  }
+}
+
 @media (max-width: 1180px) {
   .console-page {
     grid-template-columns: 1fr;
