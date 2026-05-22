@@ -188,6 +188,58 @@ class TestStateManagement:
             assert client.state["/ch/1/$name"] == "Vocals"
 
 
+class TestChannelNameScanning:
+    """Tests for read-only WING channel name discovery."""
+
+    def test_initial_scan_queries_linked_source_names(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            sent = []
+            client.send = lambda address, *values: sent.append(address) or True
+
+            with patch("wing_client.time.sleep", lambda _seconds: None), patch("wing_client.threading.Thread"):
+                client._scan_console_state()
+
+            assert "/ch/1/$name" in sent
+            assert "/ch/1/name" in sent
+            assert "/ch/8/$name" in sent
+            assert sent.index("/ch/1/$name") < sent.index("/ch/1/name")
+
+    def test_full_scan_queries_linked_source_names(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            sent = []
+            client.send = lambda address, *values: sent.append(address) or True
+            client._scan_channel_inserts = MagicMock()
+            client.get_all_channels_with_inserts = MagicMock(return_value={})
+
+            with patch("wing_client.time.sleep", lambda _seconds: None):
+                client._scan_all_channels_with_inserts()
+
+            assert "/ch/16/$name" in sent
+            assert "/ch/16/name" in sent
+            assert "/ch/40/$name" in sent
+            assert client._scan_channel_inserts.call_count == 40
+
+
 class TestRoutingState:
     """Tests for WING channel/BUS/DCA routing snapshots."""
 
@@ -364,8 +416,28 @@ class TestConnectionLifecycle:
             client.sock = MagicMock()
             client._osc_throttle_enabled = False  # Disable throttle
 
-            client.send("/ch/1/fdr", 0.75)
+            result = client.send("/ch/1/fdr", 0.75)
+            assert result is True
             assert client.state.get("/ch/1/fdr") == 0.75
+
+    def test_set_channel_fader_returns_send_result(self):
+        """set_channel_fader should expose send() success/failure to callers."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client._osc_throttle_enabled = False
+
+            assert client.set_channel_fader(1, -6.0) is True
+            assert client.state.get("/ch/1/fdr") == -6.0
 
 
 class TestAutoSoundcheckBridge:

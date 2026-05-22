@@ -90,6 +90,15 @@ export class BaseWebSocketTransport {
         this.ws = socket;
 
         socket.onopen = () => {
+          if (this.ws !== socket || !this.shouldReconnect) {
+            socket.close();
+            if (!settled) {
+              this.connectPromise = null;
+              settled = true;
+              reject(new Error('WebSocket connection cancelled'));
+            }
+            return;
+          }
           console.log('WebSocket connected');
           if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
@@ -111,6 +120,14 @@ export class BaseWebSocketTransport {
         };
 
         socket.onerror = (error) => {
+          if (this.ws !== socket || !this.shouldReconnect) {
+            if (!settled) {
+              this.connectPromise = null;
+              settled = true;
+              reject(error);
+            }
+            return;
+          }
           console.error('WebSocket error:', error);
           if (!settled) {
             this.connectPromise = null;
@@ -163,8 +180,11 @@ export class BaseWebSocketTransport {
     if (this.ws) {
       const socket = this.ws;
       this.ws = null;
-      socket.close();
       this.connectPromise = null;
+      if (socket.readyState === this.WebSocketImpl.CONNECTING) {
+        return;
+      }
+      socket.close();
       this.notifyListeners('disconnected', {});
     }
   }

@@ -3,7 +3,7 @@
 import asyncio
 import os
 import sys
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -23,6 +23,7 @@ class DummyServer:
         self.auto_soundcheck_engine = None
         self.sent_messages = []
         self.broadcast_messages = []
+        self.imported_soundcheck_bundles = []
         self.send_to_client = AsyncMock(side_effect=self._capture_send)
         self.broadcast = AsyncMock(side_effect=self._capture_broadcast)
         self.start_auto_soundcheck = AsyncMock()
@@ -32,6 +33,19 @@ class DummyServer:
 
     async def _capture_broadcast(self, payload):
         self.broadcast_messages.append(payload)
+
+    def import_soundcheck_recommendations_to_operator_queue(self, bundle=None):
+        self.imported_soundcheck_bundles.append(bundle)
+        return {
+            "type": "operator_proposals_imported",
+            "status": "ok",
+            "source": "soundcheck_recommendation_bundle",
+            "created_count": len((bundle or {}).get("proposals", [])) if isinstance(bundle, dict) else 0,
+            "existing_count": 0,
+            "blocked_count": 0,
+            "imported_count": len((bundle or {}).get("proposals", [])) if isinstance(bundle, dict) else 0,
+            "results": [],
+        }
 
 
 @pytest.mark.asyncio
@@ -136,3 +150,52 @@ async def test_start_auto_engine_uses_config_and_wires_callbacks(monkeypatch):
 
     assert {"type": "auto_engine_state", "state": "running", "message": "Engine started"} in server.broadcast_messages
     assert {"type": "auto_engine_channel", "channel": 3, "data": {"preset": "kick"}} in server.broadcast_messages
+
+
+@pytest.mark.asyncio
+async def test_auto_engine_imports_soundcheck_recommendations_on_running_state(monkeypatch):
+    server = DummyServer()
+    handlers = register_handlers(server)
+    bundle = {
+        "schema_version": "soundcheck_recommendation_bundle/v1",
+        "proposals": [
+            {
+                "proposal_id": "unit-fader",
+                "action_type": "set_fader_db",
+                "target": {"mixer_channel": 2},
+                "current_state": {"fader_db": -10.0},
+                "requested_state": {"fader_db": -8.5},
+            }
+        ],
+    }
+
+    class FakeEngine:
+        def __init__(self, **kwargs):
+            self.on_state_change = kwargs["on_state_change"]
+            self.state = type("State", (), {"value": "idle"})()
+            self.started = False
+            self.get_soundcheck_recommendation_bundle = MagicMock(return_value=bundle)
+
+        def start_async(self):
+            self.started = True
+
+    monkeypatch.setattr("handlers.soundcheck_handlers.AutoSoundcheckEngine", FakeEngine)
+
+    await handlers["start_auto_engine"]("ws", {})
+    server.auto_soundcheck_engine.on_state_change("running", "Auto-soundcheck complete, monitoring...")
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert server.imported_soundcheck_bundles == [bundle]
+    assert {
+        "type": "operator_proposals_imported",
+        "status": "ok",
+        "source": "soundcheck_recommendation_bundle",
+        "created_count": 1,
+        "existing_count": 0,
+        "blocked_count": 0,
+        "imported_count": 1,
+        "results": [],
+        "trigger": "auto_soundcheck_state",
+        "trigger_state": "running",
+    } in server.broadcast_messages

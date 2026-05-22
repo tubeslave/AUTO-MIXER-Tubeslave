@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { BaseWebSocketTransport, inferWebSocketUrl } from '../websocketCore.mjs';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const srcRoot = path.resolve(__dirname, '../..');
 
 class FakeWebSocket {
   static CONNECTING = 0;
@@ -29,6 +35,12 @@ class FakeWebSocket {
     this.readyState = FakeWebSocket.CLOSED;
     if (this.onclose) {
       this.onclose();
+    }
+  }
+
+  fail(error = new Error('fake socket error')) {
+    if (this.onerror) {
+      this.onerror(error);
     }
   }
 
@@ -132,6 +144,39 @@ test('stale close does not clear an active replacement socket', async () => {
   assert.equal(transport.ws, activeSocket);
 });
 
+test('stale connecting socket error after disconnect is not logged', async () => {
+  const transport = createTransport();
+  const originalError = console.error;
+  const consoleErrors = [];
+  console.error = (...args) => consoleErrors.push(args);
+
+  try {
+    const connectPromise = transport.connect();
+    const socket = FakeWebSocket.instances[0];
+    transport.disconnect();
+    assert.equal(socket.readyState, FakeWebSocket.CONNECTING);
+    socket.fail();
+
+    await assert.rejects(connectPromise);
+    assert.deepEqual(consoleErrors, []);
+  } finally {
+    console.error = originalError;
+  }
+});
+
+test('stale connecting socket open after disconnect closes without taking ownership', async () => {
+  const transport = createTransport();
+
+  const connectPromise = transport.connect();
+  const socket = FakeWebSocket.instances[0];
+  transport.disconnect();
+  socket.open();
+
+  await assert.rejects(connectPromise);
+  assert.equal(socket.readyState, FakeWebSocket.CLOSED);
+  assert.equal(transport.ws, null);
+});
+
 test('send() serializes messages when socket is open', async () => {
   const transport = createTransport();
   const connectPromise = transport.connect();
@@ -165,4 +210,31 @@ test('setUrl normalizes and persists manual websocket host', () => {
 
   assert.equal(transport.getUrl(), 'ws://192.168.1.30:8765');
   assert.equal(store.get('automixer_ws_url'), 'ws://192.168.1.30:8765');
+});
+
+test('main cockpit source does not call direct live write websocket methods', () => {
+  const cockpitSources = [
+    path.join(srcRoot, 'AutomixerPrototype.tsx'),
+    path.join(srcRoot, 'App.js'),
+    path.join(srcRoot, 'services/useOperatorBackend.ts')
+  ];
+  const forbiddenCalls = [
+    '.setFader(',
+    '.setGain(',
+    '.setEQ(',
+    '.setCompressor(',
+    '.routeOutput(',
+    '.loadSnap(',
+    '.saveSnap('
+  ];
+
+  for (const sourcePath of cockpitSources) {
+    const source = fs.readFileSync(sourcePath, 'utf8');
+    for (const call of forbiddenCalls) {
+      assert.equal(source.includes(call), false, `${path.basename(sourcePath)} must not call ${call}`);
+    }
+  }
+
+  const operatorBackend = fs.readFileSync(path.join(srcRoot, 'services/useOperatorBackend.ts'), 'utf8');
+  assert.match(operatorBackend, /applyOperatorProposal\(/);
 });

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const fs = require('fs');
 
 let mainWindow;
 let backendProcess;
@@ -45,7 +46,7 @@ function createWindow() {
 function startBackend() {
   const backendPath = isDev
     ? path.join(__dirname, '../../backend/server.py')
-    : path.join(process.resourcesPath, 'backend');
+    : path.join(process.resourcesPath, 'backend', 'server');
 
   if (isDev) {
     const pythonExecutable = process.platform === 'win32' ? 'python' : 'python3';
@@ -53,8 +54,16 @@ function startBackend() {
       cwd: path.join(__dirname, '../../backend')
     });
   } else {
+    if (!fs.existsSync(backendPath)) {
+      console.error(`Backend executable not found: ${backendPath}`);
+      return;
+    }
     backendProcess = spawn(backendPath, [], {
-      cwd: process.resourcesPath
+      cwd: process.resourcesPath,
+      env: {
+        ...process.env,
+        AUTOMIXER_REPO_ROOT: process.resourcesPath
+      }
     });
   }
 

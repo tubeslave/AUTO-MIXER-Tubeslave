@@ -187,6 +187,8 @@ class EnhancedOSCClient:
                 break
             logger.info(f"Reconnect attempt {attempt}...")
             time.sleep(self._reconnect_interval)
+            if self._stop_reconnect:
+                break
             try:
                 self._wing.disconnect()
                 ok = self._wing.connect(timeout=5.0)

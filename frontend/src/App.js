@@ -12,6 +12,13 @@ import AutoCompressorTab from './components/AutoCompressorTab';
 import SettingsTab from './components/SettingsTab';
 import AIAgentTab from './components/AIAgentTab';
 import IPhoneControlSurface from './components/IPhoneControlSurface';
+import {
+  AgentsConsoleView,
+  ChannelListView,
+  ConnectionsView,
+  DashboardView,
+  TransportBar,
+} from './components/ControlCenterViews';
 
 // Color map for routing roles
 const ROLE_COLORS = {
@@ -28,6 +35,10 @@ const ROLE_COLORS = {
 };
 
 const NAV_ITEMS = [
+  { id: 'dashboard', icon: '▦', label: 'Dashboard' },
+  { id: 'agentsConsole', icon: 'AI', label: 'Agents' },
+  { id: 'channelList', icon: '▤', label: 'Channels' },
+  { id: 'connections', icon: '⌁', label: 'System' },
   { id: 'remote', icon: '▣', label: 'Remote' },
   { id: 'mixer', icon: '🔌', label: 'Connect' },
   { id: 'gainStaging', icon: '📊', label: 'Gain' },
@@ -42,6 +53,8 @@ const NAV_ITEMS = [
   { id: 'settings', icon: '⚙', label: 'Settings' },
 ];
 
+const CONTROL_CENTER_TABS = new Set(['dashboard', 'agentsConsole', 'channelList', 'connections']);
+
 function App() {
   const [serverConnected, setServerConnected] = useState(false);
   const [mixerConnected, setMixerConnected] = useState(false);
@@ -55,19 +68,46 @@ function App() {
   const [connecting, setConnecting] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined' && window.innerWidth <= 700) return 'remote';
-    return 'mixer';
+    return 'dashboard';
   });
   const [globalMode, setGlobalMode] = useState('soundcheck');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [routingScheme, setRoutingScheme] = useState([]);
   const [routingChannelCount, setRoutingChannelCount] = useState(64);
+  const [dashboardSnapshot, setDashboardSnapshot] = useState(null);
+  const [channelInventory, setChannelInventory] = useState(null);
+  const [decisionQueue, setDecisionQueue] = useState(null);
+  const [operatorModeStatus, setOperatorModeStatus] = useState(null);
+  const [operatorAgentRoster, setOperatorAgentRoster] = useState(null);
+  const [connectionTopology, setConnectionTopology] = useState(null);
+  const [operatorAnalysisReport, setOperatorAnalysisReport] = useState(null);
   const mixerIpRef = useRef(mixerIp);
+  const isControlCenterTab = CONTROL_CENTER_TABS.has(activeTab);
+  const operatorMode = operatorModeStatus?.mode || 'assist';
+  const operatorModeOptions = operatorModeStatus?.available_modes || [
+    { key: 'analyze', label: 'Analyze' },
+    { key: 'assist', label: 'Assist' },
+    { key: 'supervised', label: 'Supervised' },
+    { key: 'auto', label: 'Auto' },
+  ];
 
   useEffect(() => {
     mixerIpRef.current = mixerIp;
   }, [mixerIp]);
 
+  const requestProductState = () => {
+    websocketService.getOperatorMode();
+    websocketService.getDashboardSnapshot();
+    websocketService.getChannelInventory(24);
+    websocketService.getDecisionQueue(50);
+    websocketService.getOperatorAgentRoster();
+    websocketService.getConnectionTopology();
+  };
+
   useEffect(() => {
+    let productRefreshTimer = null;
+    let isActive = true;
+
     const handleConnectionStatus = (data) => {
       setConnecting(false);
       setMixerConnected(data.connected);
@@ -189,6 +229,55 @@ function App() {
       }
     };
 
+    const refreshProductStateAfterMutation = () => {
+      websocketService.getDashboardSnapshot();
+      websocketService.getDecisionQueue(50);
+      websocketService.getOperatorAgentRoster();
+      websocketService.getConnectionTopology();
+    };
+
+    const handleDashboardSnapshot = (data) => {
+      setDashboardSnapshot(data);
+      if (data.operator_mode) setOperatorModeStatus(data.operator_mode);
+    };
+
+    const handleChannelInventory = (data) => {
+      setChannelInventory(data);
+    };
+
+    const handleDecisionQueue = (data) => {
+      setDecisionQueue(data);
+      if (data.operator_mode) setOperatorModeStatus(data.operator_mode);
+    };
+
+    const handleConnectionTopology = (data) => {
+      setConnectionTopology(data);
+      if (data.operator_mode) setOperatorModeStatus(data.operator_mode);
+    };
+
+    const handleOperatorModeStatus = (data) => {
+      setOperatorModeStatus(data);
+      refreshProductStateAfterMutation();
+    };
+
+    const handleOperatorAgentRoster = (data) => {
+      setOperatorAgentRoster(data);
+      if (data.operator_mode) setOperatorModeStatus(data.operator_mode);
+    };
+
+    const handleOperatorAnalysisReport = (data) => {
+      setOperatorAnalysisReport(data);
+      setStatusMessage(`Analysis: ${data.status || 'ok'} · ${data.created_count || 0} proposal(s)`);
+      refreshProductStateAfterMutation();
+    };
+
+    const handleProposalMutation = (data) => {
+      const status = data.status || data.result?.status || 'updated';
+      const reason = data.reason || data.apply_result?.reason || data.source || '';
+      setStatusMessage(`Proposal: ${status}${reason ? ` · ${reason}` : ''}`);
+      refreshProductStateAfterMutation();
+    };
+
     websocketService.on('connection_status', handleConnectionStatus);
     websocketService.on('audio_devices', handleAudioDevices);
     websocketService.on('bypass_result', handleBypassResult);
@@ -197,21 +286,46 @@ function App() {
     websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
     websocketService.on('dante_routing', handleDanteRouting);
     websocketService.on('audio_device_selected', handleAudioDeviceSelected);
+    websocketService.on('dashboard_snapshot', handleDashboardSnapshot);
+    websocketService.on('channel_inventory', handleChannelInventory);
+    websocketService.on('decision_queue', handleDecisionQueue);
+    websocketService.on('connection_topology', handleConnectionTopology);
+    websocketService.on('operator_mode_status', handleOperatorModeStatus);
+    websocketService.on('operator_agent_roster', handleOperatorAgentRoster);
+    websocketService.on('operator_analysis_report', handleOperatorAnalysisReport);
+    websocketService.on('operator_proposal_created', handleProposalMutation);
+    websocketService.on('operator_proposal_accepted', handleProposalMutation);
+    websocketService.on('operator_proposal_dismissed', handleProposalMutation);
+    websocketService.on('operator_proposal_apply_result', handleProposalMutation);
+    websocketService.on('operator_proposal_apply_blocked', handleProposalMutation);
+    websocketService.on('operator_proposals_imported', handleProposalMutation);
 
     websocketService.connect()
       .then(() => {
+        if (!isActive) return;
         setServerConnected(true);
         setStatusMessage('Backend OK');
         websocketService.send({ type: 'get_audio_devices' });
         websocketService.loadAllSettings();
         websocketService.getDanteRouting(64);
+        requestProductState();
+        productRefreshTimer = setInterval(() => {
+          websocketService.getDashboardSnapshot();
+          websocketService.getChannelInventory(24);
+          websocketService.getDecisionQueue(50);
+          websocketService.getOperatorAgentRoster();
+          websocketService.getConnectionTopology();
+        }, 5000);
       })
       .catch(err => {
+        if (!isActive) return;
         setStatusMessage('Backend недоступен');
         console.error(err);
       });
 
     return () => {
+      isActive = false;
+      if (productRefreshTimer) clearInterval(productRefreshTimer);
       websocketService.off('connection_status', handleConnectionStatus);
       websocketService.off('audio_devices', handleAudioDevices);
       websocketService.off('bypass_result', handleBypassResult);
@@ -220,6 +334,19 @@ function App() {
       websocketService.off('all_settings_loaded', handleAllSettingsLoaded);
       websocketService.off('dante_routing', handleDanteRouting);
       websocketService.off('audio_device_selected', handleAudioDeviceSelected);
+      websocketService.off('dashboard_snapshot', handleDashboardSnapshot);
+      websocketService.off('channel_inventory', handleChannelInventory);
+      websocketService.off('decision_queue', handleDecisionQueue);
+      websocketService.off('connection_topology', handleConnectionTopology);
+      websocketService.off('operator_mode_status', handleOperatorModeStatus);
+      websocketService.off('operator_agent_roster', handleOperatorAgentRoster);
+      websocketService.off('operator_analysis_report', handleOperatorAnalysisReport);
+      websocketService.off('operator_proposal_created', handleProposalMutation);
+      websocketService.off('operator_proposal_accepted', handleProposalMutation);
+      websocketService.off('operator_proposal_dismissed', handleProposalMutation);
+      websocketService.off('operator_proposal_apply_result', handleProposalMutation);
+      websocketService.off('operator_proposal_apply_blocked', handleProposalMutation);
+      websocketService.off('operator_proposals_imported', handleProposalMutation);
       websocketService.disconnect();
     };
   }, []);
@@ -275,12 +402,27 @@ function App() {
     }
   };
 
+  const handleOperatorModeChange = (mode) => {
+    websocketService.setOperatorMode(mode, 'frontend_operator_mode_dropdown');
+  };
+
+  const proposalActions = {
+    onAnalyze: () => websocketService.runOperatorAnalysis(24, true),
+    onImportSafeGain: () => websocketService.importSafeGainSuggestions(),
+    onImportSoundcheck: () => websocketService.importSoundcheckRecommendations(),
+    onAccept: (proposalId) => websocketService.acceptOperatorProposal(proposalId),
+    onDismiss: (proposalId) => websocketService.dismissOperatorProposal(proposalId),
+    onApply: (proposalId) => websocketService.applyOperatorProposal(proposalId, true, 'frontend_operator_approved_apply'),
+  };
+
   const sharedProps = {
     selectedChannels,
     availableChannels,
     selectedDevice,
     audioDevices,
     globalMode,
+    operatorMode,
+    operatorModeStatus,
   };
 
   return (
@@ -345,13 +487,72 @@ function App() {
             {NAV_ITEMS.find(n => n.id === activeTab)?.icon}{' '}
             {NAV_ITEMS.find(n => n.id === activeTab)?.label}
           </span>
-          <div className={`mode-badge ${globalMode}`}>
-            {globalMode === 'soundcheck' ? '🎯 Soundcheck' : '🔴 Live'}
+          <div className="topbar-controls">
+            <label className="operator-mode-control">
+              <span>Mode</span>
+              <select
+                value={operatorMode}
+                onChange={(event) => handleOperatorModeChange(event.target.value)}
+                disabled={!serverConnected}
+              >
+                {operatorModeOptions.map((mode) => (
+                  <option key={mode.key} value={mode.key}>{mode.label}</option>
+                ))}
+              </select>
+            </label>
+            <div className={`mode-badge operator-${operatorMode}`}>
+              {operatorModeStatus?.label || 'Assist'} · {operatorModeStatus?.live_write_policy || 'suggestions_only'}
+            </div>
           </div>
         </div>
 
         {/* Tab Content */}
-        <div className="tab-content">
+        <div className={`tab-content ${isControlCenterTab ? 'product-console' : ''}`}>
+          {activeTab === 'dashboard' && (
+            <div className="console-stage">
+              <DashboardView
+                snapshot={dashboardSnapshot}
+                channelInventory={channelInventory}
+                decisionQueue={decisionQueue}
+                operatorModeStatus={operatorModeStatus}
+                proposalActions={proposalActions}
+                operatorAnalysisReport={operatorAnalysisReport}
+              />
+              <TransportBar />
+            </div>
+          )}
+
+          {activeTab === 'agentsConsole' && (
+            <div className="console-stage">
+              <AgentsConsoleView
+                decisionQueue={decisionQueue}
+                operatorModeStatus={operatorModeStatus}
+                proposalActions={proposalActions}
+                operatorAnalysisReport={operatorAnalysisReport}
+                agentRoster={operatorAgentRoster}
+              />
+              <TransportBar />
+            </div>
+          )}
+
+          {activeTab === 'channelList' && (
+            <div className="console-stage">
+              <ChannelListView inventory={channelInventory} />
+              <TransportBar />
+            </div>
+          )}
+
+          {activeTab === 'connections' && (
+            <div className="console-stage">
+              <ConnectionsView
+                serverConnected={serverConnected}
+                mixerConnected={mixerConnected}
+                topology={connectionTopology}
+              />
+              <TransportBar />
+            </div>
+          )}
+
           {activeTab === 'remote' && (
             <IPhoneControlSurface
               serverConnected={serverConnected}

@@ -1,0 +1,118 @@
+import {
+  agents,
+  buses,
+  channels,
+  communications,
+  devices,
+  logs,
+  memories,
+  overviewMetrics,
+  performance as mockPerformance,
+  rules as mockRules,
+  trainingSessions as mockTrainingSessions,
+  tasks
+} from '../mock/automixerData';
+import type { OperatorViewData } from '../services/useOperatorBackend';
+import type { DashboardRuntime, DirectorRuntime, RouteId, UiActions, UiState, ViewModel } from '../types';
+import { AgentsConsole, Communications } from './AgentViews';
+import { ChannelList, Groups } from './ChannelViews';
+import { Dashboard } from './DashboardView';
+import { Memory, RulesLibrary, Training } from './KnowledgeViews';
+import { Performance } from './PerformanceView';
+import { Settings } from './SettingsView';
+import { AudioRouting, Devices, Logs, OscMidi, SystemConnection } from './SystemViews';
+import { TaskQueue } from './TaskQueueView';
+
+const fallbackDashboardRuntime: DashboardRuntime = {
+  integratedLufs: -14.2,
+  truePeakDb: -1.1,
+  shortTermLufs: -13.8,
+  momentaryLufs: -12.1,
+  lraLu: 6.7,
+  aiConfidencePercent: 87,
+  activeChannels: 36,
+  totalChannels: 48,
+  pendingDecisions: 23,
+  appliedDecisions: 12,
+  blockedDecisions: 3,
+  sourceLabel: 'Mock'
+};
+
+const fallbackDirectorRuntime: DirectorRuntime = {
+  currentGoal: 'Maintain vocal intelligibility and balanced live mix while keeping all writes supervised.',
+  readyLabel: 'Mock ready',
+  readyTone: 'blue',
+  audioLabel: 'Mock meters',
+  audioTone: 'blue',
+  proposalQueueLabel: 'Mock queue',
+  proposalQueueTone: 'blue',
+  liveWritePolicy: 'mock_frontend_only',
+  manualGateLabel: 'UI only',
+  manualGateTone: 'blue',
+  resetRequired: false,
+  hardwareProofItems: [
+    { label: 'Fader proof', value: 'Mock only', tone: 'blue' },
+    { label: 'Readback', value: 'Mock only', tone: 'blue' },
+    { label: 'Rollback', value: 'Mock only', tone: 'blue' },
+    { label: 'Final readiness', value: 'Prototype', tone: 'blue' }
+  ],
+  blockedReasons: [],
+  statusItems: [
+    { label: 'Mixer connected', value: 'Mock', tone: 'blue' },
+    { label: 'Gain staging', value: 'Mock', tone: 'blue' },
+    { label: 'Auto fader', value: 'Mock', tone: 'blue' },
+    { label: 'No clipping', value: 'Assumed', tone: 'green' }
+  ],
+  sourceLabel: 'Mock'
+};
+
+function fallbackViewData(): OperatorViewData {
+  return {
+    channels,
+    buses,
+    agents,
+    tasks,
+    overviewMetrics,
+    devices,
+    logs,
+    communications,
+    memories,
+    trainingSessions: mockTrainingSessions,
+    rules: mockRules,
+    topologyNodes: [],
+    topologyLinks: [],
+    routingSegments: [],
+    dashboardRuntime: fallbackDashboardRuntime,
+    directorRuntime: fallbackDirectorRuntime,
+    performanceRecords: mockPerformance,
+    readModelSources: {
+      groups: 'mock',
+      memory: 'mock',
+      training: 'mock',
+      rules: 'mock',
+      communications: 'mock'
+    }
+  };
+}
+
+export function buildView(route: RouteId, ui: UiState, actions: UiActions, data: OperatorViewData = fallbackViewData()): ViewModel {
+  switch (route) {
+    case 'dashboard': return Dashboard(ui, actions, data);
+    case 'agents': return AgentsConsole(ui, actions, data);
+    case 'communications': return Communications(ui, actions, data);
+    case 'task-queue': return TaskQueue(ui, actions, data);
+    case 'memory': return Memory(ui, actions, data);
+    case 'performance': return Performance(ui, actions, data);
+    case 'settings': return Settings(ui, actions, data);
+    case 'channels': return ChannelList(ui, actions, data);
+    case 'groups': return Groups(ui, actions, data);
+    case 'system': return SystemConnection(ui, actions, data);
+    case 'routing': return AudioRouting(ui, actions, data);
+    case 'osc-midi': return OscMidi(ui, actions, data);
+    case 'devices': return Devices(ui, actions, data);
+    case 'logs': return Logs(ui, actions, data);
+    case 'training': return Training(ui, actions, data);
+    case 'rules': return RulesLibrary(ui, actions, data);
+    default: return Dashboard(ui, actions, data);
+  }
+}

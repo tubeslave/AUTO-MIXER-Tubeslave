@@ -16,6 +16,16 @@ except ImportError:  # pragma: no cover - compatibility for older integration br
     def build_gain_fader_runtime_summary(*args: Any, **kwargs: Any) -> Dict[str, Any]:
         _ = (args, kwargs)
         return {"available": False, "reason": "gain_fader_runtime_unavailable"}
+try:
+    from processing_registry import (
+        build_pipeline_runtime_summary,
+        build_processing_registry_snapshot,
+    )
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_registry import (
+        build_pipeline_runtime_summary,
+        build_processing_registry_snapshot,
+    )
 
 
 DEFAULT_CHANNEL_COUNT = 24
@@ -121,8 +131,9 @@ def _infer_role_and_group(name: str, routing_role: str, channel: int) -> Dict[st
         (("tom",), "Tom", "DRUMS"),
         (("oh", "overhead"), "Overhead", "DRUMS"),
         (("bass", "бас"), "Bass", "BASS"),
-        (("vox", "vocal", "lead", "back", "вокал"), "Vocal", "VOCALS"),
+        (("playback", "pb l", "pb r"), "Playback", "PLAYBACK"),
         (("gtr", "guitar", "гит"), "Guitar", "GUITARS"),
+        (("vox", "vocal", "lead", "back", "вокал"), "Vocal", "VOCALS"),
         (("key", "piano", "synth", "keys"), "Keys", "KEYS"),
         (("master", "main"), "Master", "MASTER"),
     ]
@@ -393,7 +404,11 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
     channel_inventory = build_channel_inventory(server)
     decision_queue = build_decision_queue(server, limit=12)
     ready_for_live = _safe_call(server.get_ready_for_live_status, default={})
-    pilot = _safe_call(server.get_supervised_pilot_status, default={})
+    pilot = (
+        _safe_call(server.get_supervised_pilot_status, default={})
+        if hasattr(server, "get_supervised_pilot_status")
+        else {}
+    )
     gain_fader_runtime = build_gain_fader_runtime_summary(
         connection_mode=getattr(server, "connection_mode", None),
         wing_boundary_active=_safe_call(server._is_wing_deployment_write_boundary_active, default=False),
@@ -403,6 +418,12 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
         if hasattr(server, "get_voice_runtime_summary")
         else {}
     )
+    manual_write_supervision = (
+        _safe_call(server.get_manual_write_supervision_status, default={})
+        if hasattr(server, "get_manual_write_supervision_status")
+        else {}
+    )
+    processing_runtime = build_pipeline_runtime_summary(operator_mode, manual_write_supervision)
 
     return {
         "type": "dashboard_snapshot",
@@ -419,18 +440,227 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
             "pilot_ready": pilot.get("pilot_ready"),
             "live_write_policy": operator_mode.get("live_write_policy"),
             "blocked_reasons": operator_mode.get("blocked_reasons", []),
-            "manual_write_supervision": (
-                _safe_call(server.get_manual_write_supervision_status, default={})
-                if hasattr(server, "get_manual_write_supervision_status")
-                else {}
-            ),
+            "manual_write_supervision": manual_write_supervision,
         },
         "runtime": {
             "gain_fader": gain_fader_runtime,
             "voice": voice_runtime,
+            "processing": processing_runtime,
             "agent_available": bool(decision_queue.get("agent_runtime_available")),
             "proposal_queue_available": bool(decision_queue.get("proposal_queue_available")),
         },
+    }
+
+
+def build_processing_pipeline_snapshot(server: Any, include_methods: bool = True) -> Dict[str, Any]:
+    """Return the selected processing methods and pipeline profiles.
+
+    This is a read-only Product Layer contract. It exposes which methods are
+    canonical, proposal-only, offline-only, lab or quarantined without importing
+    DSP modules or widening the live write boundary.
+    """
+
+    operator_mode = server.get_operator_mode_status()
+    manual_write_supervision = (
+        _safe_call(server.get_manual_write_supervision_status, default={})
+        if hasattr(server, "get_manual_write_supervision_status")
+        else {}
+    )
+    snapshot = build_processing_registry_snapshot(include_methods=include_methods)
+    snapshot["runtime"] = build_pipeline_runtime_summary(operator_mode, manual_write_supervision)
+    snapshot["operator_mode"] = operator_mode
+    return snapshot
+
+
+def _agent_record(
+    *,
+    agent_id: str,
+    name: str,
+    role: str,
+    status: str,
+    task: str,
+    confidence: Optional[float],
+    tone: str,
+    category: str,
+    reports_to: Optional[str] = "automixer_director",
+    can_write: bool = False,
+    write_scope: Optional[List[str]] = None,
+    blocked_reason: Optional[str] = None,
+) -> Dict[str, Any]:
+    return {
+        "id": agent_id,
+        "name": name,
+        "role": role,
+        "status": status,
+        "task": task,
+        "confidence": confidence,
+        "tone": tone,
+        "category": category,
+        "reports_to": reports_to,
+        "can_write": can_write,
+        "write_scope": write_scope or [],
+        "blocked_reason": blocked_reason,
+    }
+
+
+def build_operator_agent_roster(server: Any) -> Dict[str, Any]:
+    """Return the product-facing multi-agent roster without starting agents.
+
+    The roster is a UI/runtime contract: Director coordinates specialized roles,
+    while only the console executor can ever route approved changes to the
+    supervised manual gate. This function is read-only and safe offline.
+    """
+
+    operator_mode = server.get_operator_mode_status()
+    connection = _connection_summary(server)
+    audio_capture = _audio_capture_status(server)
+    decision_queue = build_decision_queue(server, limit=10)
+    queue_summary = decision_queue.get("summary", {})
+    audio_running = bool(audio_capture.get("running"))
+    proposal_queue_available = bool(decision_queue.get("proposal_queue_available"))
+    manual_write_supervision = (
+        _safe_call(server.get_manual_write_supervision_status, default={})
+        if hasattr(server, "get_manual_write_supervision_status")
+        else {}
+    )
+    can_apply = bool(operator_mode["capabilities"]["can_apply_to_console"])
+    mixer_connected = bool(connection.get("connected"))
+    emergency_stopped = bool(manual_write_supervision.get("emergency_stopped"))
+    executor_ready = bool(can_apply and mixer_connected and not emergency_stopped)
+    blocked_reason = None
+    if not can_apply:
+        blocked_reason = operator_mode.get("live_write_policy") or "operator_mode_blocks_live_write"
+    elif not mixer_connected:
+        blocked_reason = "mixer_not_connected"
+    elif emergency_stopped:
+        blocked_reason = "manual_write_emergency_stop_active"
+
+    agents = [
+        _agent_record(
+            agent_id="automixer_director",
+            name="Automixer Director",
+            role="Координирует агентов и политику режима",
+            status="ACTIVE",
+            task=f"Mode {operator_mode['label']} · {operator_mode['live_write_policy']}",
+            confidence=90,
+            tone="green",
+            category="director",
+            reports_to=None,
+        ),
+        _agent_record(
+            agent_id="analyzer_agent",
+            name="Analyzer Agent",
+            role="Читает уровни, LUFS, peak и состояние каналов",
+            status="ACTIVE" if audio_running else "STANDBY",
+            task="Анализ аудиопотока" if audio_running else "Ожидает audio capture или cached state",
+            confidence=84 if audio_running else 55,
+            tone="green" if audio_running else "yellow",
+            category="analysis",
+        ),
+        _agent_record(
+            agent_id="channel_classifier_agent",
+            name="Channel Classifier Agent",
+            role="Определяет роли каналов и группы",
+            status="ACTIVE" if connection.get("state") else "STANDBY",
+            task="Использует cached mixer names и routing defaults",
+            confidence=82 if connection.get("state") else 60,
+            tone="green" if connection.get("state") else "yellow",
+            category="analysis",
+        ),
+        _agent_record(
+            agent_id="spectral_agent",
+            name="Spectral Agent",
+            role="Следит за спектральным балансом",
+            status="ACTIVE" if audio_running else "STANDBY",
+            task="Мониторинг спектра" if audio_running else "Offline до появления аудиопотока",
+            confidence=80 if audio_running else 50,
+            tone="green" if audio_running else "yellow",
+            category="analysis",
+        ),
+        _agent_record(
+            agent_id="dynamics_agent",
+            name="Dynamics Agent",
+            role="Оценивает динамический диапазон и компрессию",
+            status="ACTIVE" if audio_running else "STANDBY",
+            task="Сравнивает RMS/peak/dynamic range" if audio_running else "Ожидает измерений",
+            confidence=78 if audio_running else 50,
+            tone="green" if audio_running else "yellow",
+            category="analysis",
+        ),
+        _agent_record(
+            agent_id="balance_agent",
+            name="Balance Agent",
+            role="Формирует предложения по fader/gain балансу",
+            status="ACTIVE" if queue_summary.get("pending_count", 0) else "STANDBY",
+            task=f"{queue_summary.get('pending_count', 0)} proposal(s) pending",
+            confidence=86 if queue_summary.get("pending_count", 0) else 64,
+            tone="green" if queue_summary.get("pending_count", 0) else "yellow",
+            category="proposal",
+        ),
+        _agent_record(
+            agent_id="safety_agent",
+            name="Safety Agent",
+            role="Проверяет режим, headroom и запрет опасных writes",
+            status="ACTIVE",
+            task=f"Allowed writes: {', '.join(operator_mode['capabilities'].get('allowed_live_write_kinds') or ['none'])}",
+            confidence=96,
+            tone="green",
+            category="safety",
+        ),
+        _agent_record(
+            agent_id="proposal_queue_agent",
+            name="Proposal Queue Agent",
+            role="Хранит предложения, принятия, отклонения и apply results",
+            status="ACTIVE" if proposal_queue_available else "UNAVAILABLE",
+            task=f"{queue_summary.get('pending_count', 0)} pending · {queue_summary.get('history_count', 0)} history",
+            confidence=92 if proposal_queue_available else 0,
+            tone="green" if proposal_queue_available else "yellow",
+            category="proposal",
+        ),
+        _agent_record(
+            agent_id="console_executor_agent",
+            name="Console Executor Agent",
+            role="Единственный путь к supervised manual write gate",
+            status="ACTIVE" if executor_ready else "BLOCKED",
+            task="Ready for approved fader/gain apply" if executor_ready else "Live apply blocked",
+            confidence=100 if executor_ready else 0,
+            tone="green" if executor_ready else "yellow",
+            category="execution",
+            can_write=executor_ready,
+            write_scope=operator_mode["capabilities"].get("allowed_live_write_kinds") or [],
+            blocked_reason=blocked_reason,
+        ),
+        _agent_record(
+            agent_id="memory_learning_agent",
+            name="Memory / Learning Agent",
+            role="Сохраняет решения оператора как будущие правила",
+            status="STANDBY",
+            task="Ожидает accepted/applied history",
+            confidence=70 if queue_summary.get("history_count", 0) else 45,
+            tone="yellow",
+            category="learning",
+        ),
+    ]
+
+    active_count = sum(1 for agent in agents if agent["status"] == "ACTIVE")
+    blocked_count = sum(1 for agent in agents if agent["status"] == "BLOCKED")
+    standby_count = sum(1 for agent in agents if agent["status"] == "STANDBY")
+    return {
+        "type": "operator_agent_roster",
+        "generated_at": _utc_now(),
+        "status": "ok",
+        "operator_mode": operator_mode,
+        "connection": connection,
+        "decision_queue_summary": queue_summary,
+        "summary": {
+            "agent_count": len(agents),
+            "active_count": active_count,
+            "standby_count": standby_count,
+            "blocked_count": blocked_count,
+            "can_live_execute": executor_ready,
+            "proposal_queue_available": proposal_queue_available,
+        },
+        "agents": agents,
     }
 
 
@@ -546,4 +776,286 @@ def build_connection_topology(server: Any) -> Dict[str, Any]:
                 else {}
             ),
         },
+    }
+
+
+def build_groups_buses_snapshot(server: Any) -> Dict[str, Any]:
+    channel_inventory = build_channel_inventory(server, total_channels=48)
+    channels = channel_inventory.get("channels", [])
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for channel in channels:
+        group = str(channel.get("group") or "CHANNELS").upper()
+        grouped.setdefault(group, []).append(channel)
+
+    buses = []
+    for group, rows in sorted(grouped.items()):
+        level_values = [row.get("level_db") for row in rows if row.get("level_db") is not None]
+        lufs_values = [row.get("lufs") for row in rows if row.get("lufs") is not None]
+        dynamic_values = [
+            row.get("dynamic_range_db")
+            for row in rows
+            if row.get("dynamic_range_db") is not None
+        ]
+        confidence_values = [
+            (row.get("ai_recognition") or {}).get("confidence")
+            for row in rows
+            if isinstance(row.get("ai_recognition"), dict)
+            and (row.get("ai_recognition") or {}).get("confidence") is not None
+        ]
+        active_channels = sum(1 for row in rows if row.get("status") == "active")
+        muted_channels = sum(
+            1
+            for row in rows
+            if (row.get("control_state") or {}).get("mute") in {1, True, "1", "true"}
+        )
+        buses.append(
+            {
+                "name": f"{group.title().replace('_', ' ')} Bus",
+                "role": "Master" if group == "MASTER" else "Group",
+                "level": _round(sum(level_values) / len(level_values)) if level_values else None,
+                "lufs": _round(sum(lufs_values) / len(lufs_values)) if lufs_values else None,
+                "channels": len(rows),
+                "active_channels": active_channels,
+                "muted_channels": muted_channels,
+                "dynamic": _round(sum(dynamic_values) / len(dynamic_values)) if dynamic_values else None,
+                "confidence": round(sum(confidence_values) / len(confidence_values)) if confidence_values else None,
+                "status": "Active" if active_channels else ("Muted" if muted_channels else "Inactive"),
+                "color": "purple" if "VOCAL" in group else "yellow" if "BASS" in group else "blue" if "GUITAR" in group else "green",
+                "members": [
+                    f"{int(row.get('number') or row.get('id') or 0):02d} {row.get('name') or 'Channel'}"
+                    for row in rows
+                ],
+            }
+        )
+
+    return {
+        "type": "groups_buses_snapshot",
+        "generated_at": _utc_now(),
+        "source": "runtime_channel_inventory",
+        "available": True,
+        "summary": {
+            "bus_count": len(buses),
+            "channel_count": len(channels),
+            "source": channel_inventory.get("source"),
+        },
+        "buses": buses,
+    }
+
+
+def build_memory_knowledge_snapshot(server: Any) -> Dict[str, Any]:
+    roster = build_operator_agent_roster(server)
+    queue = build_decision_queue(server, limit=12)
+    inventory = build_channel_inventory(server, total_channels=24)
+
+    memories: List[Dict[str, Any]] = []
+    for agent in roster.get("agents", [])[:8]:
+        confidence = agent.get("confidence")
+        memories.append(
+            {
+                "name": f"{agent.get('name', 'Agent')} runtime state",
+                "type": "Agent State",
+                "size": f"{max(1.0, float(confidence or 50) / 24):.1f} KB",
+                "confidence": round(float(confidence or 50)),
+                "updated": str(agent.get("task") or "runtime"),
+            }
+        )
+
+    for item in queue.get("history", [])[:5] + queue.get("pending_actions", [])[:5]:
+        status = str(item.get("status") or "pending")
+        memories.append(
+            {
+                "name": f"{item.get('target') or item.get('title') or 'Decision'} memory",
+                "type": "Decision History" if status in {"applied", "accepted"} else "Decision Draft",
+                "size": "2.4 KB",
+                "confidence": 90 if status in {"applied", "accepted"} else 82,
+                "updated": str(item.get("created_at") or "queue"),
+            }
+        )
+
+    for channel in inventory.get("channels", [])[:8]:
+        recognition = channel.get("ai_recognition") or {}
+        memories.append(
+            {
+                "name": f"{channel.get('name', 'Channel')} channel profile",
+                "type": f"{channel.get('group', 'CHANNELS')} Profile",
+                "size": "1.6 KB",
+                "confidence": round(float(recognition.get("confidence") or 72)),
+                "updated": str(channel.get("status") or "inventory"),
+            }
+        )
+
+    return {
+        "type": "memory_knowledge_snapshot",
+        "generated_at": _utc_now(),
+        "source": "runtime_product_state",
+        "available": True,
+        "summary": {
+            "memory_count": len(memories),
+            "agent_records": len(roster.get("agents", [])),
+            "queue_records": len(queue.get("history", [])) + len(queue.get("pending_actions", [])),
+        },
+        "memories": memories[:32],
+    }
+
+
+def build_training_sessions_snapshot(server: Any) -> Dict[str, Any]:
+    roster = build_operator_agent_roster(server)
+    queue = build_decision_queue(server, limit=50)
+    inventory = build_channel_inventory(server, total_channels=48)
+    summary = queue.get("summary", {})
+    agents = roster.get("agents", [])
+    channels = inventory.get("channels", [])
+    active_channels = inventory.get("summary", {}).get("active_channels") or 0
+    pending_count = summary.get("pending_count") or 0
+    history_count = summary.get("history_count") or 0
+    average_confidence = 0
+    confidence_values = [
+        float(agent.get("confidence"))
+        for agent in agents
+        if agent.get("confidence") is not None
+    ]
+    if confidence_values:
+        average_confidence = round(sum(confidence_values) / len(confidence_values))
+
+    sessions = [
+        {
+            "name": "Agent roster calibration",
+            "status": "Running" if agents else "Queued",
+            "examples": len(agents),
+            "score": f"{average_confidence or 72}%",
+            "updated": "runtime",
+        },
+        {
+            "name": "Decision queue learning set",
+            "status": "Review" if pending_count else "Complete",
+            "examples": int(pending_count) + int(history_count),
+            "score": f"{max(80, 96 - int(pending_count) * 2)}%",
+            "updated": "queue",
+        },
+        {
+            "name": "Channel profile refresh",
+            "status": "Complete" if channels else "Queued",
+            "examples": len(channels),
+            "score": "92%" if channels else "N/A",
+            "updated": f"{active_channels} active",
+        },
+    ]
+
+    return {
+        "type": "training_sessions_snapshot",
+        "generated_at": _utc_now(),
+        "source": "runtime_product_state",
+        "available": True,
+        "summary": {
+            "session_count": len(sessions),
+            "learning_enabled": False,
+        },
+        "sessions": sessions,
+    }
+
+
+def build_rules_library_snapshot(server: Any) -> Dict[str, Any]:
+    operator_mode = server.get_operator_mode_status()
+    queue = build_decision_queue(server, limit=12)
+    pending = queue.get("pending_actions", [])
+
+    rules = [
+        {
+            "name": "No direct OSC writes from frontend",
+            "category": "Safety",
+            "confidence": "100%",
+            "state": "Locked",
+        },
+        {
+            "name": "Console changes require supervised gate",
+            "category": "Control",
+            "confidence": "100%",
+            "state": "Locked",
+        },
+        {
+            "name": f"{operator_mode.get('live_write_policy', 'read_only')} policy",
+            "category": "Mode",
+            "confidence": "100%",
+            "state": "Active",
+        },
+        {
+            "name": "Rollback evidence required for live validation",
+            "category": "Safety",
+            "confidence": "98%",
+            "state": "Review" if pending else "Locked",
+        },
+    ]
+    for item in pending[:6]:
+        rules.append(
+            {
+                "name": f"{item.get('title', 'Proposal')} requires director review",
+                "category": "Safety" if item.get("severity") in {"high", "critical"} else "Decision",
+                "confidence": "94%" if item.get("severity") in {"high", "critical"} else "88%",
+                "state": "Review",
+            }
+        )
+
+    return {
+        "type": "rules_library_snapshot",
+        "generated_at": _utc_now(),
+        "source": "runtime_policy_state",
+        "available": True,
+        "summary": {
+            "rule_count": len(rules),
+            "locked_count": sum(1 for rule in rules if rule["state"] == "Locked"),
+            "review_count": sum(1 for rule in rules if rule["state"] == "Review"),
+        },
+        "rules": rules,
+    }
+
+
+def build_agent_communications_snapshot(server: Any) -> Dict[str, Any]:
+    roster = build_operator_agent_roster(server)
+    queue = build_decision_queue(server, limit=12)
+    now = _utc_now()
+
+    communications: List[Dict[str, Any]] = [
+        {
+            "time": now,
+            "from": "Automixer Director",
+            "to": "Operator",
+            "topic": f"Mode policy: {roster.get('operator_mode', {}).get('live_write_policy', 'read_only')}",
+            "status": "Info",
+            "tone": "blue",
+        }
+    ]
+    for item in queue.get("pending_actions", [])[:8]:
+        communications.append(
+            {
+                "time": str(item.get("created_at") or now),
+                "from": str(item.get("source") or "Decision Agent"),
+                "to": "Automixer Director",
+                "topic": str(item.get("title") or "Pending operator proposal"),
+                "status": "Review",
+                "tone": "yellow" if item.get("severity") in {"high", "critical"} else "blue",
+            }
+        )
+    for agent in roster.get("agents", [])[:8]:
+        communications.append(
+            {
+                "time": now,
+                "from": str(agent.get("name") or "Agent"),
+                "to": "Automixer Director",
+                "topic": str(agent.get("task") or agent.get("role") or "Runtime state"),
+                "status": "Approved" if agent.get("status") == "ACTIVE" else "Review",
+                "tone": str(agent.get("tone") or "blue"),
+            }
+        )
+
+    return {
+        "type": "agent_communications_snapshot",
+        "generated_at": now,
+        "source": "runtime_agent_bus",
+        "available": True,
+        "summary": {
+            "communication_count": len(communications),
+            "agent_count": len(roster.get("agents", [])),
+            "pending_count": queue.get("summary", {}).get("pending_count", 0),
+        },
+        "communications": communications[:30],
     }

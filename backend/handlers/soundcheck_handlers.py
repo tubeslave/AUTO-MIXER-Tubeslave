@@ -123,6 +123,24 @@ def register_handlers(server):
             }
             _schedule(loop, server.send_to_client(websocket, payload), "auto soundcheck observation send")
 
+        recommendation_import = {"done": False}
+
+        async def _import_soundcheck_recommendations(trigger_state):
+            if recommendation_import["done"]:
+                return
+            recommendation_import["done"] = True
+            if not hasattr(server, "import_soundcheck_recommendations_to_operator_queue"):
+                return
+            bundle = None
+            if hasattr(engine, "get_soundcheck_recommendation_bundle"):
+                bundle = engine.get_soundcheck_recommendation_bundle()
+            summary = server.import_soundcheck_recommendations_to_operator_queue(bundle)
+            summary.update({
+                "trigger": "auto_soundcheck_state",
+                "trigger_state": trigger_state,
+            })
+            await server.broadcast(summary)
+
         engine = AutoSoundcheckEngine(
             mixer_type=mixer_type,
             mixer_ip=mixer_ip,
@@ -139,6 +157,19 @@ def register_handlers(server):
         server.auto_soundcheck_engine = engine
         server.auto_soundcheck_running = True
         server.auto_soundcheck_observe_only = observe_only
+
+        original_on_state = on_state
+
+        def on_state_with_recommendation_import(state, msg):
+            original_on_state(state, msg)
+            if state in {"running", "stopped"}:
+                _schedule(
+                    loop,
+                    _import_soundcheck_recommendations(state),
+                    "auto soundcheck recommendation import",
+                )
+
+        engine.on_state_change = on_state_with_recommendation_import
         engine.start_async()
 
         await server.send_to_client(websocket, {

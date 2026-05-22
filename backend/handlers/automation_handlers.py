@@ -9,13 +9,41 @@ def register_handlers(server):
         await server.send_to_client(websocket, {"type": "live_mode_set", "live_mode": server.live_mode})
 
     async def handle_emergency_stop(websocket, data):
+        server._manual_write_emergency_stopped = True
         if server.gain_staging:
             server.gain_staging.automation_frozen = True
         if server.auto_fader_controller:
             server.auto_fader_controller.set_automation_frozen(True)
         if getattr(server, "auto_fader_v2_controller", None):
             server.auto_fader_v2_controller.set_automation_frozen(True)
-        await server.send_to_client(websocket, {"type": "emergency_stop_applied"})
+        payload = {
+            "type": "emergency_stop_applied",
+            "status": "stopped",
+            "success": True,
+            "manual_write_supervision": server.get_manual_write_supervision_status(),
+            "ready_for_live": server.get_ready_for_live_status(),
+        }
+        artifact_path = server._record_manual_write_event("manual_write_emergency_stop", payload)
+        if artifact_path:
+            payload["artifact_path"] = artifact_path
+        await server.send_to_client(websocket, payload)
+
+    async def handle_get_manual_write_supervision(websocket, data):
+        await server.send_to_client(
+            websocket,
+            {
+                "type": "manual_write_supervision_status",
+                **server.get_manual_write_supervision_status(),
+            },
+        )
+
+    async def handle_reset_manual_write_emergency_stop(websocket, data):
+        result = server.reset_manual_write_emergency_stop(
+            approved=bool(data.get("approved", False)),
+            approval_id=data.get("approval_id"),
+            reason=data.get("reason") or "operator_requested_emergency_reset",
+        )
+        await server.send_to_client(websocket, result)
 
     async def handle_set_automation_frozen(websocket, data):
         frozen = bool(data.get("frozen", False))
@@ -52,6 +80,8 @@ def register_handlers(server):
     return {
         "set_live_mode": handle_set_live_mode,
         "emergency_stop": handle_emergency_stop,
+        "get_manual_write_supervision": handle_get_manual_write_supervision,
+        "reset_manual_write_emergency_stop": handle_reset_manual_write_emergency_stop,
         "set_automation_frozen": handle_set_automation_frozen,
         "set_channel_frozen": handle_set_channel_frozen,
         "get_freeze_status": handle_get_freeze_status,

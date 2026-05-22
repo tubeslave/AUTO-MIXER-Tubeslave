@@ -84,6 +84,7 @@ Purpose: convert analyzer output into operator-visible state and proposals.
 | `backend/operator_recommendation_bridge.py` | `canonical` | Imports safe recommendations into the operator workflow. |
 | `backend/operator_analysis.py` | `canonical` | Product-level analysis summary and readiness blockers. |
 | `backend/operator_mode_policy.py` | `canonical` | Observe / Assist / Supervised mode policy. |
+| `backend/processing_registry.py` | `canonical` | Read-only method and pipeline-profile registry. |
 | `backend/handlers/product_state_handlers.py` | `canonical` | WebSocket surface for Product Layer state. |
 
 Rule: automation modules should feed proposals first. They should not quietly

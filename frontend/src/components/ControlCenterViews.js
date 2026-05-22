@@ -31,14 +31,6 @@ const agents = [
   { name: 'Memory Agent', role: 'Синхронизирует память', status: 'ACTIVE', task: 'База знаний обновлена', confidence: 90, tone: 'green' },
 ];
 
-const decisions = [
-  ['10:24', 'Lead Vocal: -1.5 dB fader', 'APPLIED'],
-  ['10:23', 'Snare Top: HPF 120 Hz', 'APPLIED'],
-  ['10:22', 'Bass DI: +2 dB 80 Hz', 'APPLIED'],
-  ['10:21', 'Overheads: Align phase', 'APPLIED'],
-  ['10:20', 'Gtr 1: -2 dB at 3.2 kHz', 'APPLIED'],
-];
-
 function formatMetric(value, fallback = 'N/A', suffix = '') {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return fallback;
   return `${Number(value).toFixed(1)}${suffix}`;
@@ -80,13 +72,99 @@ function decisionsFromQueue(queue) {
     item.title || item.message || item.action || 'Decision',
     String(item.status || 'PENDING').toUpperCase(),
   ]);
-  return rows.length ? rows : decisions;
+  return rows;
 }
 
 function statusClass(status) {
-  if (['ACTIVE', 'OK', 'ONLINE', 'RUNNING'].includes(String(status).toUpperCase())) return 'state-green';
+  if (['ACTIVE', 'OK', 'ONLINE', 'RUNNING', 'READY'].includes(String(status).toUpperCase())) return 'state-green';
   if (['OFFLINE', 'UNAVAILABLE', 'BLOCKED'].includes(String(status).toUpperCase())) return 'state-red';
   return 'state-yellow';
+}
+
+function formatChangeValue(value, valueType = '') {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return 'N/A';
+  const suffix = ['fader', 'gain', 'trim'].includes(String(valueType).toLowerCase()) ? ' dB' : '';
+  return `${Number(value).toFixed(1)}${suffix}`;
+}
+
+function describeRequestedChange(change) {
+  const valueType = String(change?.value_type || 'change').toUpperCase();
+  const channel = change?.channel !== undefined && change?.channel !== null ? `Ch ${change.channel}` : 'Target';
+  const current = change?.current_value !== undefined ? `${formatChangeValue(change.current_value, change.value_type)} -> ` : '';
+  const delta = change?.delta_db !== undefined ? ` (${formatChangeValue(change.delta_db, 'fader')})` : '';
+  return `${channel} ${valueType}: ${current}${formatChangeValue(change?.value, change?.value_type)}${delta}`;
+}
+
+function proposalApplyState(item, operatorCanApply) {
+  if (!item?.can_apply) return { tone: 'state-yellow', text: 'Только анализ' };
+  if (!operatorCanApply) return { tone: 'state-yellow', text: 'Применение заблокировано режимом' };
+  return { tone: 'state-green', text: 'Можно применить через supervised' };
+}
+
+function ProposalChangeList({ item }) {
+  const changes = item?.requested_changes || (item?.requested_change ? [item.requested_change] : []);
+  if (!changes.length) return null;
+  return (
+    <ul className="proposal-changes">
+      {changes.slice(0, 3).map((change, index) => (
+        <li key={`${change.channel || 'target'}-${change.value_type || 'change'}-${index}`}>
+          {describeRequestedChange(change)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ProposalActions({ item, operatorCanApply, proposalActions, compact = false }) {
+  const applyState = proposalApplyState(item, operatorCanApply);
+  const canRunApply = Boolean(operatorCanApply && item?.can_apply);
+  return (
+    <div className={compact ? 'proposal-actions compact' : 'proposal-actions'}>
+      <button onClick={() => proposalActions?.onAccept?.(item.id)} disabled={!item?.id} title="Принять">
+        {compact ? '✓' : 'Принять'}
+      </button>
+      <button
+        onClick={() => proposalActions?.onApply?.(item.id)}
+        disabled={!canRunApply || !item?.id}
+        title={applyState.text}
+      >
+        {compact ? '▶' : 'Применить'}
+      </button>
+      <button onClick={() => proposalActions?.onDismiss?.(item.id)} disabled={!item?.id} title="Отклонить">
+        {compact ? '×' : 'Отклонить'}
+      </button>
+    </div>
+  );
+}
+
+function ProposalRow({ item, operatorCanApply, proposalActions }) {
+  const applyState = proposalApplyState(item, operatorCanApply);
+  const linkedCount = item?.linked_change_count || item?.requested_changes?.length || 0;
+  return (
+    <div className="proposal-row" key={item.id || item.title}>
+      <p>{item.title}</p>
+      <div className="proposal-meta">
+        <span className={applyState.tone}>{applyState.text}</span>
+        {linkedCount > 1 && <span>Linked x{linkedCount}</span>}
+      </div>
+      <ProposalChangeList item={item} />
+      <ProposalActions item={item} operatorCanApply={operatorCanApply} proposalActions={proposalActions} />
+    </div>
+  );
+}
+
+function normalizeAgentRecord(agent) {
+  const confidence = Number(agent.confidence);
+  return {
+    id: agent.id || agent.name,
+    name: agent.name || 'Agent',
+    role: agent.role || agent.description || 'Runtime role',
+    status: String(agent.status || 'STANDBY').toUpperCase(),
+    task: agent.task || agent.blocked_reason || 'Ожидает данных',
+    confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(100, confidence)) : 0,
+    tone: agent.tone || (String(agent.status || '').toUpperCase() === 'ACTIVE' ? 'green' : 'yellow'),
+    blockedReason: agent.blocked_reason,
+  };
 }
 
 function MiniSparkline({ tone = 'green' }) {
@@ -177,27 +255,25 @@ function DirectorPanel({ decisionQueue, operatorModeStatus, proposalActions }) {
       </section>
       <section className="director-card">
         <h4>Последние решения</h4>
-        {rows.map(([time, text, state]) => (
+        {rows.length > 0 ? rows.map(([time, text, state]) => (
           <div className="decision-row" key={`${time}-${text}`}>
             <span>{time}</span>
             <p>{text}</p>
             <strong>{state}</strong>
           </div>
-        ))}
+        )) : (
+          <p className="message-line">Нет применённых решений в backend history</p>
+        )}
       </section>
       <section className="director-card">
         <h4>Предложения агента</h4>
         {(decisionQueue?.pending_actions || []).slice(0, 2).map((item) => (
-          <div className="proposal-row" key={item.id || item.title}>
-            <p>{item.title}</p>
-            <div>
-              <button onClick={() => proposalActions?.onAccept?.(item.id)}>Принять</button>
-              {canApply && item.can_apply && (
-                <button onClick={() => proposalActions?.onApply?.(item.id)}>Применить</button>
-              )}
-              <button onClick={() => proposalActions?.onDismiss?.(item.id)}>Отклонить</button>
-            </div>
-          </div>
+          <ProposalRow
+            item={item}
+            operatorCanApply={canApply}
+            proposalActions={proposalActions}
+            key={item.id || item.title}
+          />
         ))}
         {(!decisionQueue?.pending_actions || decisionQueue.pending_actions.length === 0) && (
           <div className="proposal-row">
@@ -305,12 +381,15 @@ export function DashboardView({ snapshot, channelInventory, decisionQueue, opera
   );
 }
 
-export function AgentsConsoleView({ decisionQueue, operatorModeStatus, proposalActions, operatorAnalysisReport }) {
-  const agentAvailable = decisionQueue?.agent_runtime_available === true;
+export function AgentsConsoleView({ decisionQueue, operatorModeStatus, proposalActions, operatorAnalysisReport, agentRoster }) {
+  const rosterRows = agentRoster?.agents?.length ? agentRoster.agents.map(normalizeAgentRecord) : [];
+  const agentAvailable = decisionQueue?.agent_runtime_available === true || rosterRows.length > 0;
   const summary = decisionQueue?.summary || {};
+  const rosterSummary = agentRoster?.summary || {};
   const canApply = operatorModeStatus?.capabilities?.can_apply_to_console === true;
-  const agentRows = agentAvailable ? agents : [
+  const agentRows = rosterRows.length ? rosterRows : agentAvailable ? agents.map(normalizeAgentRecord) : [
     {
+      id: 'mixing_agent_runtime',
       name: 'Mixing Agent Runtime',
       role: 'Очередь предложений и история решений',
       status: 'UNAVAILABLE',
@@ -319,11 +398,15 @@ export function AgentsConsoleView({ decisionQueue, operatorModeStatus, proposalA
       tone: 'yellow',
     },
   ];
+  const confidenceValues = agentRows.map(agent => Number(agent.confidence)).filter(value => value > 0);
+  const averageConfidence = confidenceValues.length
+    ? Math.round(confidenceValues.reduce((total, value) => total + value, 0) / confidenceValues.length)
+    : 0;
   return (
     <div className="console-page">
       <div className="console-main">
         <div className="page-heading">
-          <div><h2>Консоль агентов</h2><p>Mode: {operatorModeStatus?.label || 'Assist'} · {agentAvailable ? 'runtime connected' : 'runtime unavailable'} · Analysis: {operatorAnalysisReport?.status || 'idle'}</p></div>
+          <div><h2>Консоль агентов</h2><p>Mode: {operatorModeStatus?.label || 'Assist'} · {rosterRows.length ? 'backend roster' : agentAvailable ? 'runtime connected' : 'runtime unavailable'} · Analysis: {operatorAnalysisReport?.status || 'idle'}</p></div>
           <div className="page-actions">
             <button className="ghost-action" onClick={() => proposalActions?.onImportSafeGain?.()}>SafeGain</button>
             <button className="ghost-action" onClick={() => proposalActions?.onImportSoundcheck?.()}>Soundcheck</button>
@@ -331,9 +414,9 @@ export function AgentsConsoleView({ decisionQueue, operatorModeStatus, proposalA
           </div>
         </div>
         <div className="agent-summary-grid">
-          <MetricCard title="Активные агенты"><div className="big-metric">{agentAvailable ? agentRows.length : 0}</div><p>{agentAvailable ? 'Runtime работает' : 'Не подключён'}</p></MetricCard>
+          <MetricCard title="Активные агенты"><div className="big-metric">{rosterSummary.active_count ?? agentRows.filter(agent => agent.status === 'ACTIVE').length}</div><p>{rosterSummary.agent_count ?? agentRows.length} roles</p></MetricCard>
           <MetricCard title="История решений"><div className="big-metric">{summary.history_count ?? 0}</div><p>backend queue</p></MetricCard>
-          <MetricCard title="AI Confidence"><div className="big-metric">{agentAvailable ? '87%' : '0%'}</div><p>{agentAvailable ? 'High' : 'Offline'}</p></MetricCard>
+          <MetricCard title="AI Confidence"><div className="big-metric">{averageConfidence}%</div><p>{agentAvailable ? 'Runtime contract' : 'Offline'}</p></MetricCard>
           <MetricCard title="Предложений"><div className="big-metric">{summary.pending_count ?? 0}</div><p>Требуют проверки</p></MetricCard>
           <MetricCard title="Применено"><div className="big-metric">{summary.applied_count ?? 0}</div><p>История агента</p></MetricCard>
         </div>
@@ -341,12 +424,12 @@ export function AgentsConsoleView({ decisionQueue, operatorModeStatus, proposalA
         <div className="agent-table">
           <header><span>Агент</span><span>Роль</span><span>Статус</span><span>Текущая задача</span><span>Уверенность</span><span>Активность</span><span>Действия</span></header>
           {agentRows.map((agent) => (
-            <div className="agent-row" key={agent.name}>
+            <div className="agent-row" key={agent.id || agent.name}>
               <strong>{agent.name}<small>v1.2.{agent.confidence % 10}</small></strong>
               <p>{agent.role}</p>
               <span className={statusClass(agent.status)}>{agent.status}</span>
-              <p>{agent.task}</p>
-              <div className="confidence-cell"><DonutScore value={agent.confidence} label="" /><span>{agent.confidence >= 85 ? 'High' : 'Medium'}</span></div>
+              <p>{agent.blockedReason || agent.task}</p>
+              <div className="confidence-cell"><DonutScore value={agent.confidence} label="" /><span>{agent.confidence >= 85 ? 'High' : agent.confidence > 0 ? 'Medium' : 'N/A'}</span></div>
               <MiniSparkline tone={agent.tone} />
               <div className="row-actions"><button>◉</button><button>↗</button><button>⋮</button></div>
             </div>
@@ -355,8 +438,8 @@ export function AgentsConsoleView({ decisionQueue, operatorModeStatus, proposalA
       </div>
       <aside className="director-panel">
         <section className="director-card communications-map"><h4>Связи агентов</h4><div className="network-map"><span /><span /><span /><span /><span /></div></section>
-        <section className="director-card"><h4>Очередь задач</h4>{(decisionQueue?.pending_actions || []).slice(0, 4).map((task, i) => <div className="task-row task-row-actions" key={task.id || task.title}><b>{task.severity || 'Medium'}</b><p>{task.title}</p><span>{i + 1}</span><div><button onClick={() => proposalActions?.onAccept?.(task.id)}>✓</button>{canApply && task.can_apply && <button onClick={() => proposalActions?.onApply?.(task.id)}>▶</button>}<button onClick={() => proposalActions?.onDismiss?.(task.id)}>×</button></div></div>)}{(!decisionQueue?.pending_actions || decisionQueue.pending_actions.length === 0) && <p className="message-line">{decisionQueue?.reason || 'Очередь пуста'}</p>}</section>
-        <section className="director-card"><h4>Сообщения агентов</h4>{decisionsFromQueue(decisionQueue).slice(0, 3).map((item) => <p className="message-line" key={item.join('-')}>{item[1]} · {item[2]}</p>)}</section>
+        <section className="director-card"><h4>Очередь задач</h4>{(decisionQueue?.pending_actions || []).slice(0, 4).map((task, i) => <div className="task-row task-row-actions" key={task.id || task.title}><b>{task.severity || 'Medium'}</b><p>{task.title}<small>{proposalApplyState(task, canApply).text}</small></p><span>{i + 1}</span><ProposalActions item={task} operatorCanApply={canApply} proposalActions={proposalActions} compact /></div>)}{(!decisionQueue?.pending_actions || decisionQueue.pending_actions.length === 0) && <p className="message-line">{decisionQueue?.reason || 'Очередь пуста'}</p>}</section>
+        <section className="director-card"><h4>Сообщения агентов</h4>{decisionsFromQueue(decisionQueue).slice(0, 3).map((item) => <p className="message-line" key={item.join('-')}>{item[1]} · {item[2]}</p>)}{decisionsFromQueue(decisionQueue).length === 0 && <p className="message-line">История backend пока пуста</p>}</section>
       </aside>
     </div>
   );

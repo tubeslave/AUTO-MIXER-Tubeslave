@@ -5,7 +5,30 @@ from osc.enhanced_osc_client import EnhancedOSCClient
 
 
 def register_handlers(server):
+    async def block_quarantined_write(websocket, surface, result_type, request):
+        blocker = getattr(server, "_block_quarantined_wing_write_surface", None)
+        if blocker is None:
+            return False
+        return await blocker(
+            websocket,
+            surface=surface,
+            result_type=result_type,
+            request=request,
+        )
+
     async def handle_route_output(websocket, data):
+        if await block_quarantined_write(
+            websocket,
+            "route_output",
+            "route_output_result",
+            {
+                "output_group": data.get("output_group"),
+                "output_number": data.get("output_number"),
+                "source_group": data.get("source_group"),
+                "source_channel": data.get("source_channel"),
+            },
+        ):
+            return
         if server.mixer_client and isinstance(server.mixer_client, (WingClient, EnhancedOSCClient)):
             output_group = data.get("output_group")
             output_number = data.get("output_number")
@@ -26,6 +49,19 @@ def register_handlers(server):
                 })
 
     async def handle_route_multiple_outputs(websocket, data):
+        if await block_quarantined_write(
+            websocket,
+            "route_multiple_outputs",
+            "route_multiple_outputs_result",
+            {
+                "output_group": data.get("output_group"),
+                "start_output": data.get("start_output"),
+                "num_outputs": data.get("num_outputs"),
+                "source_group": data.get("source_group"),
+                "start_source_channel": data.get("start_source_channel"),
+            },
+        ):
+            return
         if server.mixer_client and isinstance(server.mixer_client, (WingClient, EnhancedOSCClient)):
             output_group = data.get("output_group")
             start_output = data.get("start_output")
@@ -61,6 +97,17 @@ def register_handlers(server):
                 })
 
     async def handle_set_channel_input(websocket, data):
+        if await block_quarantined_write(
+            websocket,
+            "set_channel_input",
+            "set_channel_input_result",
+            {
+                "channel": data.get("channel"),
+                "source_group": data.get("source_group"),
+                "source_channel": data.get("source_channel"),
+            },
+        ):
+            return
         if server.mixer_client and isinstance(server.mixer_client, (WingClient, EnhancedOSCClient)):
             channel = data.get("channel")
             source_group = data.get("source_group")
@@ -77,6 +124,17 @@ def register_handlers(server):
                 })
 
     async def handle_set_channel_alt_input(websocket, data):
+        if await block_quarantined_write(
+            websocket,
+            "set_channel_alt_input",
+            "set_channel_alt_input_result",
+            {
+                "channel": data.get("channel"),
+                "source_group": data.get("source_group"),
+                "source_channel": data.get("source_channel"),
+            },
+        ):
+            return
         if server.mixer_client and isinstance(server.mixer_client, (WingClient, EnhancedOSCClient)):
             channel = data.get("channel")
             source_group = data.get("source_group")

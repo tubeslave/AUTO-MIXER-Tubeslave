@@ -549,9 +549,59 @@
   font-size: 0.54rem;
 }
 
-.proposal-row div {
+.proposal-actions {
   display: flex;
   gap: 6px;
+}
+
+.proposal-actions.compact {
+  gap: 4px;
+}
+
+.proposal-row button:disabled,
+.task-row-actions button:disabled {
+  color: #59636f;
+  border-color: #1d2733;
+  background: #0d131b;
+  cursor: not-allowed;
+}
+
+.proposal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.proposal-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 6px;
+  border: 1px solid #263241;
+  border-radius: 999px;
+  background: #0d131b;
+  color: #8b949e;
+  font-size: 0.52rem;
+}
+
+.proposal-meta span.state-green { color: #3fb950; }
+.proposal-meta span.state-yellow { color: #d29922; }
+.proposal-meta span.state-red { color: #f85149; }
+
+.proposal-changes {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.proposal-changes li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c9d1d9;
+  font-size: 0.56rem;
 }
 
 .task-row-actions {
@@ -562,6 +612,13 @@
 .task-row-actions div {
   display: flex;
   gap: 4px;
+}
+
+.task-row-actions p small {
+  display: block;
+  margin-top: 2px;
+  color: #6e7681;
+  font-size: 0.52rem;
 }
 
 .task-row-actions button {

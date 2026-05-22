@@ -195,6 +195,21 @@ class WebSocketService extends BaseWebSocketTransport {
     });
   }
 
+  getManualWriteSupervision() {
+    this.send({
+      type: 'get_manual_write_supervision'
+    });
+  }
+
+  resetManualWriteEmergencyStop(approved = false, approvalId = '', reason = 'frontend_operator_reset') {
+    this.send({
+      type: 'reset_manual_write_emergency_stop',
+      approved,
+      approval_id: approvalId,
+      reason
+    });
+  }
+
   getOperatorMode() {
     this.send({
       type: 'get_operator_mode'
@@ -229,9 +244,60 @@ class WebSocketService extends BaseWebSocketTransport {
     });
   }
 
+  getOperatorAgentRoster() {
+    this.send({
+      type: 'get_operator_agent_roster'
+    });
+  }
+
   getConnectionTopology() {
     this.send({
       type: 'get_connection_topology'
+    });
+  }
+
+  getGroupsBusesSnapshot() {
+    this.send({
+      type: 'get_groups_buses_snapshot'
+    });
+  }
+
+  getMemoryKnowledgeSnapshot() {
+    this.send({
+      type: 'get_memory_knowledge_snapshot'
+    });
+  }
+
+  getTrainingSessionsSnapshot() {
+    this.send({
+      type: 'get_training_sessions_snapshot'
+    });
+  }
+
+  getRulesLibrarySnapshot() {
+    this.send({
+      type: 'get_rules_library_snapshot'
+    });
+  }
+
+  getAgentCommunicationsSnapshot() {
+    this.send({
+      type: 'get_agent_communications_snapshot'
+    });
+  }
+
+  getProcessingPipelineSnapshot(includeMethods = false) {
+    this.send({
+      type: 'get_processing_pipeline_snapshot',
+      include_methods: includeMethods
+    });
+  }
+
+  getMainPipelinePreview(totalChannels = 48, includeMethods = false) {
+    this.send({
+      type: 'get_main_pipeline_preview',
+      total_channels: totalChannels,
+      include_methods: includeMethods
     });
   }
 
@@ -384,6 +450,19 @@ class WebSocketService extends BaseWebSocketTransport {
 
   getAudioCaptureStatus() {
     this.send({ type: 'get_audio_capture_status' });
+  }
+
+  startAudioCapturePreview(deviceId = null, numChannels = 48, sampleRate = 48000) {
+    this.send({
+      type: 'start_audio_capture_preview',
+      device_id: deviceId,
+      num_channels: numChannels,
+      sample_rate: sampleRate
+    });
+  }
+
+  stopAudioCapturePreview() {
+    this.send({ type: 'stop_audio_capture_preview' });
   }
 
   getChannelMeters() {

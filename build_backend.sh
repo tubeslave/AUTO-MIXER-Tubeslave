@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 echo "Building Python backend with PyInstaller..."
 
 cd backend
@@ -15,9 +17,10 @@ source venv/bin/activate
 echo "Installing dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
+pip install "pyinstaller>=6.0.0"
 
 echo "Building executable with PyInstaller..."
-venv/bin/pyinstaller --clean server.spec
+python -m PyInstaller --clean server.spec
 
 if [ -f "dist/server" ]; then
     echo "✓ Backend built successfully: backend/dist/server"

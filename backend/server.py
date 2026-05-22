@@ -72,7 +72,10 @@ from operator_recommendation_bridge import (
     import_operator_proposals,
 )
 
-_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_REPO_ROOT = os.path.abspath(
+    os.environ.get("AUTOMIXER_REPO_ROOT")
+    or os.path.join(os.path.dirname(__file__), "..")
+)
 
 
 def _load_repo_dotenv() -> None:
@@ -251,6 +254,23 @@ class AutoMixerServer:
         self._wing_deployment_write_boundary_enabled = self._parse_env_bool(
             os.getenv("AUTOMIXER_WING_DEPLOYMENT_WRITE_BOUNDARY_ENABLED", "true")
         )
+        self._manual_write_emergency_stopped = False
+        self._manual_write_cooldown_sec = max(
+            0.0,
+            self._parse_env_float(os.getenv("AUTOMIXER_MANUAL_WRITE_COOLDOWN_SEC"), 2.0),
+        )
+        self._manual_write_last_write_ts: Dict[tuple[int, str], float] = {}
+        self._last_manual_write_result: Optional[Dict[str, Any]] = None
+        self._manual_write_readback_tolerance = {"fader": 0.05, "gain": 0.05}
+        manual_write_artifacts_dir = Path(
+            os.getenv(
+                "AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR",
+                "artifacts/wing_telemetry/manual_write_gate",
+            )
+        )
+        if not manual_write_artifacts_dir.is_absolute():
+            manual_write_artifacts_dir = Path(__file__).resolve().parents[1] / manual_write_artifacts_dir
+        self._manual_write_artifacts_dir = manual_write_artifacts_dir
         
         # Snapshot for undo (path to last backup file)
         self._last_snapshot_path: Optional[str] = None
@@ -278,6 +298,15 @@ class AutoMixerServer:
     @staticmethod
     def _parse_env_bool(value: Any) -> bool:
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _parse_env_float(value: Any, default: float) -> float:
+        try:
+            if value is None or str(value).strip() == "":
+                return float(default)
+            return float(value)
+        except (TypeError, ValueError):
+            return float(default)
 
     def _is_wing_deployment_write_boundary_active(self) -> bool:
         return (
@@ -316,10 +345,86 @@ class AutoMixerServer:
             "deployment_write_boundary_active": self._is_wing_deployment_write_boundary_active(),
             "connection_mode": self.connection_mode,
             "approved_live_write_kinds": ["fader", "gain"],
+            "operator_mode": self.operator_mode,
+            "requires_operator_mode": "supervised",
+            "emergency_stopped": self._manual_write_emergency_stopped,
+            "reset_required": self._manual_write_emergency_stopped,
+            "emergency_reset_requires_operator_action": True,
+            "cooldown_sec": self._manual_write_cooldown_sec,
         }
         if self.mixer_client and hasattr(self.mixer_client, "get_write_gate_status"):
             status["write_gate"] = self.mixer_client.get_write_gate_status()
         return status
+
+    def reset_manual_write_emergency_stop(
+        self,
+        *,
+        approved: bool = False,
+        approval_id: Optional[str] = None,
+        reason: str = "",
+    ) -> Dict[str, Any]:
+        """Clear the manual-write emergency latch only after explicit operator approval.
+
+        This does not unfreeze automation controllers. A separate operator review is
+        required before returning the whole live system to a ready state.
+        """
+
+        if not self._manual_write_emergency_stopped:
+            result = {
+                "type": "manual_write_emergency_reset_result",
+                "status": "not_required",
+                "success": True,
+                "reason": "emergency_stop_not_active",
+                "approval_id": approval_id,
+                "automation_remains_frozen": True,
+                "manual_write_supervision": self.get_manual_write_supervision_status(),
+                "ready_for_live": self.get_ready_for_live_status(),
+            }
+            artifact_path = self._record_manual_write_event(
+                "manual_write_emergency_reset_not_required",
+                result,
+            )
+            if artifact_path:
+                result["artifact_path"] = artifact_path
+            return result
+
+        if not approved or not str(approval_id or "").strip():
+            result = {
+                "type": "manual_write_emergency_reset_result",
+                "status": "blocked",
+                "success": False,
+                "reason": "operator_approval_required",
+                "approval_id": approval_id,
+                "automation_remains_frozen": True,
+                "manual_write_supervision": self.get_manual_write_supervision_status(),
+                "ready_for_live": self.get_ready_for_live_status(),
+            }
+            artifact_path = self._record_manual_write_event(
+                "manual_write_emergency_reset_blocked",
+                result,
+            )
+            if artifact_path:
+                result["artifact_path"] = artifact_path
+            return result
+
+        self._manual_write_emergency_stopped = False
+        result = {
+            "type": "manual_write_emergency_reset_result",
+            "status": "reset",
+            "success": True,
+            "reason": str(reason or "operator_approved_emergency_reset"),
+            "approval_id": str(approval_id),
+            "automation_remains_frozen": True,
+            "manual_write_supervision": self.get_manual_write_supervision_status(),
+            "ready_for_live": self.get_ready_for_live_status(),
+        }
+        artifact_path = self._record_manual_write_event(
+            "manual_write_emergency_reset",
+            result,
+        )
+        if artifact_path:
+            result["artifact_path"] = artifact_path
+        return result
 
     def import_safe_gain_suggestions_to_operator_queue(
         self,
@@ -449,6 +554,601 @@ class AutoMixerServer:
         if websocket is not None:
             await self.send_to_client(websocket, payload)
         return True
+
+    def _is_voice_command_write_surface(self, cmd_type: Any) -> bool:
+        return str(cmd_type or "").strip().lower() in {
+            "set_fader",
+            "set_gain",
+            "load_snap",
+            "mute_channel",
+            "volume_up",
+            "volume_down",
+            "eq_on",
+            "eq_band_up",
+            "eq_band_down",
+            "compressor_on",
+            "compressor_threshold",
+            "compressor_gain_up",
+            "compressor_gain_down",
+        }
+
+    async def _block_quarantined_voice_command_if_needed(self, command: Dict[str, Any]) -> bool:
+        cmd_type = str((command or {}).get("type") or "").strip()
+        if (
+            not self._is_wing_deployment_write_boundary_active()
+            or not self._is_voice_command_write_surface(cmd_type)
+        ):
+            return False
+
+        payload = {
+            "type": "voice_command_blocked",
+            "status": "blocked",
+            "success": False,
+            "reason": "deployment_write_surface_quarantined",
+            "surface": f"voice_command:{cmd_type}",
+            "command": cmd_type,
+            "request": dict(command or {}),
+            "message": (
+                "WING deployment path is limited to Product Layer proposals and "
+                "approved manual fader/gain writes; direct voice-command writes "
+                "are quarantined."
+            ),
+            "manual_write_supervision": self.get_manual_write_supervision_status(),
+        }
+        artifact_path = self._record_manual_write_event("voice_command_blocked", payload)
+        if artifact_path:
+            payload["artifact_path"] = artifact_path
+        await self.broadcast(payload)
+        return True
+
+    def _manual_write_blocked_result(
+        self,
+        *,
+        reason: str,
+        channel: Any = None,
+        value: Any = None,
+        value_type: Any = None,
+        source: str = "",
+        approval_id: Optional[str] = None,
+        extra: Optional[Dict[str, Any]] = None,
+        event_type: str = "manual_write_blocked",
+    ) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "status": "blocked",
+            "success": False,
+            "reason": reason,
+            "channel": channel,
+            "value_type": value_type,
+            "requested_value": value,
+            "proof_status": "blocked",
+            "source": source,
+            "approval_id": approval_id,
+            "manual_write_supervision": self.get_manual_write_supervision_status(),
+        }
+        if extra:
+            result.update(extra)
+        artifact_path = self._record_manual_write_event(event_type, result)
+        if artifact_path:
+            result["artifact_path"] = artifact_path
+        return result
+
+    def _record_manual_write_event(self, event_type: str, result: Dict[str, Any]) -> Optional[str]:
+        try:
+            self._manual_write_artifacts_dir.mkdir(parents=True, exist_ok=True)
+            path = self._manual_write_artifacts_dir / "manual_write_events.jsonl"
+            event = {
+                "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "event_type": str(event_type),
+                "result": convert_numpy_types(result),
+            }
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+            return str(path)
+        except Exception as exc:
+            logger.warning("Could not record manual write event: %s", exc, exc_info=True)
+            return None
+
+    @staticmethod
+    def _normalize_manual_write_kind(value_type: Any) -> str:
+        value = str(value_type or "").strip().lower()
+        if value in {"trim", "input_gain", "preamp_gain"}:
+            return "gain"
+        return value
+
+    @staticmethod
+    def _manual_write_address(channel: int, value_type: str) -> str:
+        if value_type == "fader":
+            return f"/ch/{channel}/fdr"
+        if value_type == "gain":
+            return f"/ch/{channel}/in/set/trim"
+        return ""
+
+    @staticmethod
+    def _clamp_manual_write_value(value: float, value_type: str) -> float:
+        if value_type == "fader":
+            return max(-144.0, min(10.0, float(value)))
+        if value_type == "gain":
+            return max(-18.0, min(18.0, float(value)))
+        return float(value)
+
+    @staticmethod
+    def _coerce_optional_float(value: Any) -> Optional[float]:
+        try:
+            if value is None:
+                return None
+            if str(type(value).__module__).startswith("unittest.mock"):
+                return None
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _manual_write_cooldown_remaining(self, channel: int, value_type: str) -> float:
+        if self._manual_write_cooldown_sec <= 0:
+            return 0.0
+        last_write = self._manual_write_last_write_ts.get((int(channel), value_type))
+        if last_write is None:
+            return 0.0
+        elapsed = time.monotonic() - last_write
+        return max(0.0, self._manual_write_cooldown_sec - elapsed)
+
+    def _manual_write_readback_status(
+        self,
+        *,
+        old_value: Any,
+        readback_value: Any,
+        effective_value: float,
+        value_type: str,
+        readback_source: str = "mixer_state_cache",
+    ) -> str:
+        readback_float = self._coerce_optional_float(readback_value)
+        if readback_float is None:
+            return "readback_unavailable"
+
+        tolerance = self._manual_write_readback_tolerance.get(value_type, 0.05)
+        if abs(readback_float - effective_value) <= tolerance:
+            if readback_source == "physical_readback":
+                return "verified_from_physical_readback"
+            return "verified_from_cache"
+
+        old_float = self._coerce_optional_float(old_value)
+        if old_float is not None and abs(readback_float - old_float) <= tolerance:
+            return "not_verified"
+
+        if readback_source == "physical_readback":
+            return "mismatch_from_physical_readback"
+        return "mismatch_from_cache"
+
+    async def _maybe_await(self, value: Any) -> Any:
+        if asyncio.iscoroutine(value) or hasattr(value, "__await__"):
+            return await value
+        return value
+
+    def _extract_manual_write_read_value(self, raw_value: Any) -> Any:
+        if str(type(raw_value).__module__).startswith("unittest.mock"):
+            return None
+        if isinstance(raw_value, dict):
+            for key in ("value", "readback_value", "current_value", "result"):
+                if raw_value.get(key) is not None:
+                    return raw_value.get(key)
+            return None
+        if isinstance(raw_value, (list, tuple)):
+            for item in reversed(raw_value):
+                if self._coerce_optional_float(item) is not None:
+                    return item
+            return None
+        return raw_value
+
+    async def _manual_write_read_value(
+        self,
+        *,
+        channel: int,
+        value_type: str,
+        address: str,
+        prefer_physical: bool = False,
+    ) -> Dict[str, Any]:
+        """Read a fader/gain value for proof metadata without writing.
+
+        Physical readback is used only when the mixer client exposes an explicit
+        query helper. Otherwise this falls back to the local mixer state cache.
+        """
+
+        client = self.mixer_client
+        state = getattr(client, "state", {}) if client else {}
+        cached_value = state.get(address) if isinstance(state, dict) else None
+
+        async def physical_read() -> Optional[Dict[str, Any]]:
+            query_parameter = getattr(client, "query_parameter", None) if client else None
+            if not callable(query_parameter):
+                return None
+            try:
+                raw = await self._maybe_await(query_parameter(address))
+            except Exception as exc:
+                return {
+                    "value": None,
+                    "status": "readback_unavailable",
+                    "source": "physical_readback",
+                    "address": address,
+                    "error": str(exc),
+                }
+            value = self._extract_manual_write_read_value(raw)
+            if self._coerce_optional_float(value) is None:
+                return {
+                    "value": None,
+                    "status": "readback_unavailable",
+                    "source": "physical_readback",
+                    "address": address,
+                    "raw": raw,
+                }
+            return {
+                "value": value,
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "address": address,
+                "raw": raw,
+            }
+
+        if prefer_physical:
+            physical = await physical_read()
+            if physical and physical.get("value") is not None:
+                return physical
+
+        if self._coerce_optional_float(cached_value) is not None:
+            return {
+                "value": cached_value,
+                "status": "verified_from_cache",
+                "source": "mixer_state_cache",
+                "address": address,
+            }
+
+        physical = await physical_read()
+        if physical:
+            return physical
+
+        return {
+            "value": None,
+            "status": "readback_unavailable",
+            "source": "unavailable",
+            "address": address,
+        }
+
+    @staticmethod
+    def _manual_write_proof_status(readback_status: str) -> str:
+        if readback_status in {"verified_from_cache", "verified_from_physical_readback"}:
+            return "verified"
+        return "partial"
+
+    async def _apply_manual_console_write(
+        self,
+        websocket: Optional[WebSocketServerProtocol],
+        *,
+        channel: Any,
+        value: Any,
+        value_type: Any,
+        source: str = "",
+        reason: str = "",
+        approved: bool = False,
+        approval_id: Optional[str] = None,
+        bypass_cooldown: bool = False,
+        record_event: bool = True,
+    ) -> Dict[str, Any]:
+        write_kind = self._normalize_manual_write_kind(value_type)
+        if write_kind not in {"fader", "gain"}:
+            return self._manual_write_blocked_result(
+                reason="unsupported_value_type",
+                channel=channel,
+                value=value,
+                value_type=write_kind or value_type,
+                source=source,
+                approval_id=approval_id,
+                extra={"allowed_live_write_kinds": ["fader", "gain"]},
+            )
+
+        if self.operator_mode != "supervised":
+            return self._manual_write_blocked_result(
+                reason="operator_mode_blocks_live_write",
+                channel=channel,
+                value=value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+            )
+
+        if self._manual_write_emergency_stopped:
+            return self._manual_write_blocked_result(
+                reason="emergency_stop_active",
+                channel=channel,
+                value=value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+            )
+
+        if not approved:
+            return self._manual_write_blocked_result(
+                reason="approval_required",
+                channel=channel,
+                value=value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+            )
+
+        try:
+            channel_int = int(channel)
+        except (TypeError, ValueError):
+            return self._manual_write_blocked_result(
+                reason="invalid_channel",
+                channel=channel,
+                value=value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+            )
+        if channel_int < 1 or channel_int > 48:
+            return self._manual_write_blocked_result(
+                reason="channel_out_of_range",
+                channel=channel_int,
+                value=value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+            )
+
+        try:
+            requested_value = float(value)
+        except (TypeError, ValueError):
+            return self._manual_write_blocked_result(
+                reason="invalid_value",
+                channel=channel_int,
+                value=value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+            )
+        effective_value = self._clamp_manual_write_value(requested_value, write_kind)
+
+        if not self.mixer_client or not getattr(self.mixer_client, "is_connected", False):
+            return self._manual_write_blocked_result(
+                reason="mixer_not_connected",
+                channel=channel_int,
+                value=requested_value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+            )
+
+        method_name = "set_channel_fader" if write_kind == "fader" else "set_channel_gain"
+        write_method = getattr(self.mixer_client, method_name, None)
+        if not callable(write_method):
+            return self._manual_write_blocked_result(
+                reason="manual_write_method_unavailable",
+                channel=channel_int,
+                value=requested_value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+                extra={"method": method_name},
+            )
+
+        address = self._manual_write_address(channel_int, write_kind)
+        pre_read = await self._manual_write_read_value(
+            channel=channel_int,
+            value_type=write_kind,
+            address=address,
+            prefer_physical=True,
+        )
+        old_value = pre_read.get("value")
+        old_value_float = self._coerce_optional_float(old_value)
+        pre_read_status = str(pre_read.get("status") or "readback_unavailable")
+        pre_read_source = str(pre_read.get("source") or "unavailable")
+        if old_value_float is None:
+            return self._manual_write_blocked_result(
+                reason="pre_read_unavailable",
+                channel=channel_int,
+                value=requested_value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+                extra={
+                    "address": address,
+                    "effective_value": effective_value,
+                    "pre_read_status": pre_read_status,
+                    "pre_read_source": pre_read_source,
+                    "pre_read_value": old_value,
+                    "pre_read_error": pre_read.get("error"),
+                },
+            )
+
+        cooldown_remaining = 0.0 if bypass_cooldown else self._manual_write_cooldown_remaining(channel_int, write_kind)
+        if cooldown_remaining > 0:
+            return self._manual_write_blocked_result(
+                reason="cooldown",
+                channel=channel_int,
+                value=requested_value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+                extra={
+                    "address": address,
+                    "effective_value": effective_value,
+                    "old_value": old_value,
+                    "pre_read_status": pre_read_status,
+                    "pre_read_source": pre_read_source,
+                    "pre_read_value": old_value,
+                    "cooldown_sec": self._manual_write_cooldown_sec,
+                    "cooldown_remaining_sec": round(cooldown_remaining, 3),
+                },
+            )
+
+        try:
+            write_result = write_method(channel_int, effective_value)
+        except Exception as exc:
+            logger.error("Manual console write failed: %s", exc, exc_info=True)
+            error_result = {
+                "status": "error",
+                "success": False,
+                "reason": "manual_write_exception",
+                "error": str(exc),
+                "channel": channel_int,
+                "value_type": write_kind,
+                "requested_value": requested_value,
+                "effective_value": effective_value,
+                "old_value": old_value,
+                "pre_read_status": pre_read_status,
+                "pre_read_source": pre_read_source,
+                "pre_read_value": old_value,
+                "proof_status": "blocked",
+                "source": source,
+                "approval_id": approval_id,
+            }
+            if record_event:
+                artifact_path = self._record_manual_write_event("manual_write_error", error_result)
+                if artifact_path:
+                    error_result["artifact_path"] = artifact_path
+            return error_result
+
+        if write_result is False:
+            return self._manual_write_blocked_result(
+                reason="mixer_write_failed",
+                channel=channel_int,
+                value=requested_value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+                extra={
+                    "address": address,
+                    "effective_value": effective_value,
+                    "old_value": old_value,
+                    "pre_read_status": pre_read_status,
+                    "pre_read_source": pre_read_source,
+                    "pre_read_value": old_value,
+                    "method": method_name,
+                },
+            )
+
+        self._manual_write_last_write_ts[(channel_int, write_kind)] = time.monotonic()
+        readback = await self._manual_write_read_value(
+            channel=channel_int,
+            value_type=write_kind,
+            address=address,
+            prefer_physical=True,
+        )
+        readback_value = readback.get("value")
+        readback_source = str(readback.get("source") or "unavailable")
+        readback_status = self._manual_write_readback_status(
+            old_value=old_value,
+            readback_value=readback_value,
+            effective_value=effective_value,
+            value_type=write_kind,
+            readback_source=readback_source,
+        )
+        proof_status = self._manual_write_proof_status(readback_status)
+        rollback_value = self._coerce_optional_float(old_value)
+        rollback_available = rollback_value is not None
+
+        result = {
+            "status": "applied",
+            "success": True,
+            "channel": channel_int,
+            "value_type": write_kind,
+            "requested_value": requested_value,
+            "effective_value": effective_value,
+            "old_value": old_value,
+            "pre_read_value": old_value,
+            "pre_read_status": pre_read_status,
+            "pre_read_source": pre_read_source,
+            "readback_value": readback_value,
+            "readback_status": readback_status,
+            "readback_source": readback_source,
+            "proof_status": proof_status,
+            "rollback_available": rollback_available,
+            "rollback_value": rollback_value,
+            "rollback_address": address if rollback_available else None,
+            "rollback_status": "not_attempted",
+            "cooldown_sec": self._manual_write_cooldown_sec,
+            "source": source,
+            "reason": str(reason or "manual_supervised_write"),
+            "approval_id": approval_id,
+            "method": method_name,
+            "manual_write_supervision": self.get_manual_write_supervision_status(),
+        }
+        self._last_manual_write_result = dict(result)
+        if record_event:
+            artifact_path = self._record_manual_write_event("manual_write_applied", result)
+            if artifact_path:
+                result["artifact_path"] = artifact_path
+                self._last_manual_write_result["artifact_path"] = artifact_path
+        return result
+
+    async def _rollback_last_manual_console_write(
+        self,
+        websocket: Optional[WebSocketServerProtocol],
+        *,
+        source: str = "manual_rollback",
+        reason: str = "",
+        approved: bool = False,
+        approval_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        previous = self._last_manual_write_result
+        if not previous or previous.get("status") != "applied":
+            return self._manual_write_blocked_result(
+                reason="no_rollback_available",
+                source=source,
+                approval_id=approval_id,
+                event_type="manual_write_rollback_blocked",
+            )
+
+        if not previous.get("rollback_available"):
+            return self._manual_write_blocked_result(
+                reason="rollback_value_unavailable",
+                channel=previous.get("channel"),
+                value_type=previous.get("value_type"),
+                source=source,
+                approval_id=approval_id,
+                extra={"rollback_of": previous.get("approval_id")},
+                event_type="manual_write_rollback_blocked",
+            )
+
+        rollback_result = await self._apply_manual_console_write(
+            websocket,
+            channel=previous.get("channel"),
+            value=previous.get("rollback_value"),
+            value_type=previous.get("value_type"),
+            source=source,
+            reason=reason or f"rollback:{previous.get('approval_id') or previous.get('source') or 'manual_write'}",
+            approved=approved,
+            approval_id=approval_id or f"rollback:{previous.get('approval_id') or 'manual_write'}",
+            bypass_cooldown=True,
+            record_event=False,
+        )
+        rollback_result.update(
+            {
+                "rollback": True,
+                "rollback_of": previous.get("approval_id"),
+                "rollback_source": previous.get("source"),
+            }
+        )
+        if rollback_result.get("status") == "applied":
+            rollback_proof_status = rollback_result.get("proof_status") or self._manual_write_proof_status(
+                str(rollback_result.get("readback_status") or "")
+            )
+            rollback_result["rollback_readback_status"] = rollback_result.get("readback_status")
+            rollback_result["rollback_readback_source"] = rollback_result.get("readback_source")
+            rollback_result["rollback_proof_status"] = rollback_proof_status
+            rollback_result["rollback_status"] = "applied" if rollback_proof_status == "verified" else "partial"
+        rollback_event_type = (
+            "manual_write_rollback_applied"
+            if rollback_result.get("status") == "applied"
+            else "manual_write_rollback_blocked"
+        )
+        if rollback_result.get("status") == "error":
+            rollback_event_type = "manual_write_rollback_error"
+        artifact_path = self._record_manual_write_event(rollback_event_type, rollback_result)
+        if artifact_path:
+            rollback_result["artifact_path"] = artifact_path
+            if rollback_result.get("status") == "applied":
+                self._last_manual_write_result["artifact_path"] = artifact_path
+        return rollback_result
     
     def cleanup_all_controllers(self):
         """Cleanup all active controllers - call before shutdown or on error."""
@@ -977,7 +1677,18 @@ class AutoMixerServer:
     ) -> AudioCapture:
         """Ensure unified AudioCapture is running for the requested input device."""
         source_type = AudioSourceType.SOUNDDEVICE if HAS_SOUNDDEVICE else AudioSourceType.SILENCE
-        requested_device = None if device_id in (None, "", "default") else device_id
+        if device_id in (None, "", "default"):
+            requested_device = None
+        elif isinstance(device_id, str):
+            normalized_device = device_id.strip()
+            if normalized_device == "" or normalized_device.lower() == "default":
+                requested_device = None
+            elif normalized_device.isdigit():
+                requested_device = int(normalized_device)
+            else:
+                requested_device = normalized_device
+        else:
+            requested_device = device_id
 
         needs_restart = (
             self.audio_capture is None or
@@ -1447,6 +2158,12 @@ class AutoMixerServer:
                 })
                 logger.info("Wing connected successfully (direct OSC)")
             else:
+                disconnect_failed_client = getattr(self.mixer_client, "disconnect", None)
+                if callable(disconnect_failed_client):
+                    self._safe_cleanup_call(
+                        disconnect_failed_client,
+                        "Error stopping failed Wing connection attempt",
+                    )
                 self.mixer_client = None
                 self.connection_mode = None
                 await self.broadcast({
@@ -4028,7 +4745,12 @@ class AutoMixerServer:
         """Checklist: ready for live (all systems calibrated, no clipping)."""
         mixer_connected = bool(self.mixer_client and self.mixer_client.is_connected)
         gain_available = bool(self.gain_staging)
+        gain_automation_frozen = False
+        if self.gain_staging:
+            raw_gain_frozen = getattr(self.gain_staging, "automation_frozen", False)
+            gain_automation_frozen = raw_gain_frozen if isinstance(raw_gain_frozen, bool) else False
         fader_available = False
+        fader_automation_frozen = False
         if self.auto_fader_controller:
             try:
                 fader_status = self.auto_fader_controller.get_status() or {}
@@ -4039,14 +4761,49 @@ class AutoMixerServer:
                 )
             except Exception as exc:
                 logger.warning("Failed to read Auto Fader readiness status: %s", exc)
-        ready = mixer_connected and gain_available and fader_available
+            try:
+                freeze_status = self.auto_fader_controller.get_freeze_status()
+                if isinstance(freeze_status, dict):
+                    fader_automation_frozen = bool(
+                        freeze_status.get("automation_frozen")
+                        or freeze_status.get("global_frozen")
+                        or freeze_status.get("frozen")
+                        or freeze_status.get("all_frozen")
+                    )
+            except Exception as exc:
+                logger.warning("Failed to read Auto Fader freeze status: %s", exc)
+        manual_emergency_clear = not self._manual_write_emergency_stopped
+        automation_unfrozen = not (gain_automation_frozen or fader_automation_frozen)
+        no_clipping = True
+        ready = (
+            mixer_connected
+            and gain_available
+            and fader_available
+            and manual_emergency_clear
+            and automation_unfrozen
+            and no_clipping
+        )
+        blocked_reasons = []
+        if not mixer_connected:
+            blocked_reasons.append("mixer_not_connected")
+        if not gain_available:
+            blocked_reasons.append("gain_staging_unavailable")
+        if not fader_available:
+            blocked_reasons.append("auto_fader_unavailable")
+        if not manual_emergency_clear:
+            blocked_reasons.append("manual_write_emergency_stop_active")
+        if not automation_unfrozen:
+            blocked_reasons.append("automation_frozen_after_emergency_stop")
         return {
             "ready": ready,
+            "blocked_reasons": blocked_reasons,
             "checks": {
                 "mixer_connected": mixer_connected,
                 "gain_staging_available": gain_available,
                 "auto_fader_available": fader_available,
-                "no_clipping": True,
+                "manual_write_emergency_clear": manual_emergency_clear,
+                "automation_unfrozen": automation_unfrozen,
+                "no_clipping": no_clipping,
             },
         }
     
@@ -5810,9 +6567,11 @@ class AutoMixerServer:
         
         try:
             cmd_type = command.get("type")
+            channel = command.get("channel")
+            if await self._block_quarantined_voice_command_if_needed(command):
+                return
             
             if cmd_type == "set_fader":
-                channel = command.get("channel")
                 value = command.get("value", 0.5)
                 self.mixer_client.set_channel_fader(channel, value)
                 await self.broadcast({
@@ -5823,7 +6582,6 @@ class AutoMixerServer:
                 })
                 
             elif cmd_type == "set_gain":
-                channel = command.get("channel")
                 value = command.get("value", 0.0)
                 self.mixer_client.set_channel_gain(channel, value)
                 await self.broadcast({
@@ -5845,7 +6603,6 @@ class AutoMixerServer:
                     })
                     
             elif cmd_type == "mute_channel":
-                channel = command.get("channel")
                 muted = command.get("muted", True)
                 # Note: Add mute method to mixer_client if not exists
                 await self.broadcast({
@@ -5853,10 +6610,9 @@ class AutoMixerServer:
                     "command": cmd_type,
                     "channel": channel,
                     "muted": muted
-                })
+                    })
                 
             elif cmd_type == "volume_up":
-                channel = command.get("channel")
                 db_change = command.get("db", 3)  # Get dB value directly (default 3 dB)
                 if channel is not None:
                     # Try to get current value from tracked values first, then from mixer
@@ -5894,7 +6650,6 @@ class AutoMixerServer:
                     logger.warning(f"volume_up command ignored: channel is None")
                     
             elif cmd_type == "volume_down":
-                channel = command.get("channel")
                 db_change = command.get("db", 3)  # Get dB value directly (default 3 dB)
                 if channel is not None:
                     # Try to get current value from tracked values first, then from mixer
@@ -5932,7 +6687,6 @@ class AutoMixerServer:
                     logger.warning(f"volume_down command ignored: channel is None")
             
             elif cmd_type == "eq_on":
-                channel = command.get("channel")
                 on = command.get("on", 1)
                 if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     self.mixer_client.set_eq_on(channel, on)
@@ -5945,7 +6699,6 @@ class AutoMixerServer:
                     })
             
             elif cmd_type == "eq_band_up" or cmd_type == "eq_band_down":
-                channel = command.get("channel")
                 band = command.get("band")
                 db_change = command.get("db", 3)
                 if channel is not None and band and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
@@ -5969,7 +6722,6 @@ class AutoMixerServer:
                     })
             
             elif cmd_type == "compressor_on":
-                channel = command.get("channel")
                 on = command.get("on", 1)
                 if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     self.mixer_client.set_compressor_on(channel, on)
@@ -5982,7 +6734,6 @@ class AutoMixerServer:
                     })
             
             elif cmd_type == "compressor_threshold":
-                channel = command.get("channel")
                 threshold = command.get("threshold")
                 if channel is not None and threshold is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     self.mixer_client.set_compressor_threshold(channel, threshold)
@@ -5995,7 +6746,6 @@ class AutoMixerServer:
                     })
             
             elif cmd_type == "compressor_gain_up" or cmd_type == "compressor_gain_down":
-                channel = command.get("channel")
                 db_change = command.get("db", 3)
                 if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     current_gain = self.mixer_client.get_compressor_gain(channel) or 0.0

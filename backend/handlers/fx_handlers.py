@@ -2,6 +2,17 @@
 
 
 def register_handlers(server):
+    async def block_quarantined_write(websocket, surface, result_type, request):
+        blocker = getattr(server, "_block_quarantined_wing_write_surface", None)
+        if blocker is None:
+            return False
+        return await blocker(
+            websocket,
+            surface=surface,
+            result_type=result_type,
+            request=request,
+        )
+
     async def handle_get_fx_overview(websocket, data):
         if not server.mixer_client:
             return
@@ -30,6 +41,18 @@ def register_handlers(server):
         })
 
     async def handle_set_insert(websocket, data):
+        if await block_quarantined_write(
+            websocket,
+            "set_insert",
+            "insert_updated",
+            {
+                "target_type": data.get("target_type", "channel"),
+                "target": data.get("target"),
+                "position": data.get("position", "pre"),
+                "slot": data.get("slot", "NONE"),
+            },
+        ):
+            return
         if not server.mixer_client or not hasattr(server.mixer_client, "set_insert"):
             return
         server.mixer_client.set_insert(
@@ -55,6 +78,13 @@ def register_handlers(server):
         })
 
     async def handle_set_fx_model(websocket, data):
+        if await block_quarantined_write(
+            websocket,
+            "set_fx_model",
+            "fx_slot_updated",
+            {"slot": data.get("slot"), "model": data.get("model")},
+        ):
+            return
         if not server.mixer_client or not hasattr(server.mixer_client, "set_fx_model"):
             return
         slot = data.get("slot")
@@ -66,6 +96,13 @@ def register_handlers(server):
         })
 
     async def handle_set_fx_on(websocket, data):
+        if await block_quarantined_write(
+            websocket,
+            "set_fx_on",
+            "fx_slot_updated",
+            {"slot": data.get("slot"), "on": data.get("on")},
+        ):
+            return
         if not server.mixer_client or not hasattr(server.mixer_client, "set_fx_on"):
             return
         slot = data.get("slot")
@@ -77,6 +114,13 @@ def register_handlers(server):
         })
 
     async def handle_set_fx_mix(websocket, data):
+        if await block_quarantined_write(
+            websocket,
+            "set_fx_mix",
+            "fx_slot_updated",
+            {"slot": data.get("slot"), "mix": data.get("mix")},
+        ):
+            return
         if not server.mixer_client or not hasattr(server.mixer_client, "set_fx_mix"):
             return
         slot = data.get("slot")
@@ -88,6 +132,17 @@ def register_handlers(server):
         })
 
     async def handle_set_fx_parameter(websocket, data):
+        if await block_quarantined_write(
+            websocket,
+            "set_fx_parameter",
+            "fx_parameter_updated",
+            {
+                "slot": data.get("slot"),
+                "parameter": data.get("parameter"),
+                "value": data.get("value"),
+            },
+        ):
+            return
         if not server.mixer_client or not hasattr(server.mixer_client, "set_fx_parameter"):
             return
         slot = data.get("slot")

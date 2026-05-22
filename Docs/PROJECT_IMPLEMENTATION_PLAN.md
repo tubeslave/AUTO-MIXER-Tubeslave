@@ -28,21 +28,85 @@ readback, rollback, cooldown, and emergency-stop proof.
 
 ## Current Execution Status
 
-Last updated: 2026-05-18
+Last updated: 2026-05-22
 
 - Phase 0 local health baseline is complete. Backend tests and frontend build
   are green after cleanup.
+- Phase 1 has started. First supervised-write slice is implemented in
+  `Docs/PHASE1_SUPERVISED_WRITE_PROGRESS_20260519.md`: WING websocket
+  `set_fader`/`set_gain` now route through server manual gate when deployment
+  boundary is active, generic `set_eq`/`set_compressor` fail closed, and
+  emergency stop blocks later manual writes. The manual gate now also enforces
+  per-target cooldown, reports cache readback plus rollback metadata, and can
+  execute `rollback_last_manual_write` through the same gate. Manual gate
+  events are preserved as local JSONL evidence under `artifacts/wing_telemetry/`.
+- Phase 5 was partially proven earlier than the original schedule, but only in
+  a narrow supervised scenario: one WING channel fader proposal was applied
+  through `apply_operator_proposal`, read back, rolled back, read back again,
+  and emergency stop blocked a later apply. This is documented in
+  `Docs/reports/AUTOMIXER_HANDOFF_WING_VALIDATION_20260520.md`.
+- This status is **supervised hardware-proven for one fader proposal path**.
+  It is not autonomous/live-ready and does not approve EQ, phase, delay,
+  routing, snapshots, scenes, training/rule writes, or automatic console apply.
+- Backend emergency-stop state is now explicit in the manual-write supervision
+  contract. Reset requires an explicit operator-approved
+  `reset_manual_write_emergency_stop` action, writes an audit event, and does
+  not silently unfreeze automation. `ready_for_live` remains false while
+  emergency stop or post-emergency automation freeze is active.
+- Processing method selection is now implemented as a read-only registry:
+  `backend/processing_registry.py`, `get_processing_pipeline_snapshot`, and
+  `Docs/PROCESSING_METHODS_INVENTORY.md`. The registry marks
+  `main_live_assist` as the canonical pipeline and keeps live execution limited
+  to supervised `fader`/`gain`.
+- Slice 2 preview is implemented as a read-only `main_live_assist` surface:
+  `get_main_pipeline_preview`, `backend/processing_proposal_adapters.py`, and
+  `backend/processing_pipeline_preview.py`. It returns proposal candidates and
+  registry blockers without queue mutation or live mixer writes.
+- Phase 1 write-surface inventory is now tracked in
+  `Docs/reports/AUTOMIXER_PHASE1_WRITE_PATH_INVENTORY_20260520.md`. Routing
+  and FX write handlers are quarantined under the WING deployment boundary, like
+  EQ/compressor/snapshot/reset write surfaces. The same fail-closed rule now
+  covers direct voice-command write surfaces, so voice control cannot bypass
+  Product Layer proposals or the supervised manual gate.
+- Product Layer analysis can now create display-safe supervised proposals for
+  safe fader-down balance changes and severe peak/clipping gain-trim-down cases,
+  with current value, proposed value, safety evidence, rollback value, and
+  readback requirement metadata.
 - Frontend dependency audit is red and must be handled as a separate
   modernization task, not with blind `npm audit fix --force`.
 - Product Layer proposal workflow is implemented and covered by focused tests
   plus server integration tests.
+- Frontend cockpit now shows Product Layer DTO/read-model state, mode gating,
+  supervised proposal UI, emergency reset-required state, and hardware
+  proof/evidence indicators without direct OSC/live-write controls.
 - Documentation structure is consolidated under `Docs/INDEX.md`; backend
   reports, TUB reports, manuals, and archives have explicit homes.
 - Generated dependency/build folders are ignored and can be recreated locally.
 - Branch synchronization is still unresolved: local `main` was
   `ahead 66, behind 26` before the health-baseline report.
-- Live-console readiness is unchanged. No physical WING proof was performed as
-  part of the cleanup/baseline work.
+- Live-console readiness is still not fully proven. The next live step is a
+  separate gain proof, only after safe-state reset, physical old-value pre-read,
+  apply readback, rollback readback, blocked proof, and artifact preservation.
+- Slice 3 proof-readiness is implemented in
+  `Docs/reports/AUTOMIXER_SLICE3_PROOF_READINESS_HANDOFF_20260520.md`. The
+  manual gate now distinguishes cache evidence from physical readback evidence,
+  blocks writes when pre-read is unavailable, marks unverified apply/rollback
+  as partial, and includes a fake-only dry-run gain proof runner. This still
+  does not approve physical `gain` proof or any new live write surface.
+- Current non-live handoff checks are green in the unrestricted local
+  environment: full backend suite `1126 passed, 1 skipped`, frontend e2e
+  `8 passed`, frontend unit `13 passed`, package smoke passed. The physical
+  `gain` proof remains a separate live-validation step documented in
+  `Docs/reports/AUTOMIXER_GAIN_PROOF_PREFLIGHT_20260521.md`.
+- Release-candidate staging order and package evidence are recorded in
+  `Docs/reports/AUTOMIXER_RC_STAGING_HANDOFF_20260521.md`. The worktree must
+  still be staged by logical slice; no bulk release-candidate commit is
+  approved.
+- The 2026-05-22 no-WING execution slice is recorded in
+  `Docs/reports/AUTOMIXER_OFFLINE_NO_WING_EXECUTION_20260522.md`: focused
+  safety tests, fake gain proof, full backend/frontend checks, and package
+  smoke passed. This does not change live readiness wording or approve physical
+  `gain` proof.
 
 ## 1. Goals And Objectives
 

@@ -40,6 +40,10 @@ def _is_applyable_change(change: Optional[Dict[str, Any]]) -> bool:
     return bool(change.get("value_type")) and change.get("channel") is not None and change.get("value") is not None
 
 
+def _are_applyable_changes(changes: List[Dict[str, Any]]) -> bool:
+    return bool(changes) and all(_is_applyable_change(change) for change in changes)
+
+
 @dataclass
 class OperatorProposal:
     id: str
@@ -54,12 +58,13 @@ class OperatorProposal:
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
     requested_change: Optional[Dict[str, Any]] = None
+    requested_changes: List[Dict[str, Any]] = field(default_factory=list)
     mode_at_creation: Optional[str] = None
     raw: Dict[str, Any] = field(default_factory=dict)
     result: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        can_apply = _is_applyable_change(self.requested_change)
+        can_apply = _are_applyable_changes(self.requested_changes) if self.requested_changes else _is_applyable_change(self.requested_change)
         return {
             "id": self.id,
             "title": self.title,
@@ -73,6 +78,8 @@ class OperatorProposal:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "requested_change": dict(self.requested_change) if self.requested_change else None,
+            "requested_changes": [dict(change) for change in self.requested_changes] if self.requested_changes else None,
+            "linked_change_count": len(self.requested_changes),
             "mode_at_creation": self.mode_at_creation,
             "can_apply": can_apply,
             "requires_approval": can_apply,
@@ -104,12 +111,41 @@ class OperatorProposalQueue:
 
         if not value_type or channel_int is None or value_float is None:
             return None
-        return {
+        normalized = {
             "value_type": value_type,
             "channel": channel_int,
             "value": value_float,
             "raw": dict(raw_change) if raw_change else {},
         }
+        current_value = _coerce_float(raw_change.get("current_value"))
+        if current_value is not None:
+            normalized["current_value"] = current_value
+        delta_db = _coerce_float(raw_change.get("delta_db"))
+        if delta_db is not None:
+            normalized["delta_db"] = delta_db
+        for key in ("old_value", "proposed_value", "rollback_value"):
+            optional_value = _coerce_float(raw_change.get(key))
+            if optional_value is not None:
+                normalized[key] = optional_value
+        if "readback_required" in raw_change:
+            normalized["readback_required"] = bool(raw_change.get("readback_required"))
+        safety_evidence = raw_change.get("safety_evidence")
+        if isinstance(safety_evidence, list):
+            normalized["safety_evidence"] = [dict(item) for item in safety_evidence if isinstance(item, dict)]
+        return normalized
+
+    def _normalize_requested_changes(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+        raw_changes = payload.get("requested_changes")
+        if not isinstance(raw_changes, list):
+            return []
+        normalized = []
+        for raw_change in raw_changes:
+            if not isinstance(raw_change, dict):
+                continue
+            change = self._normalize_requested_change({"requested_change": raw_change})
+            if change:
+                normalized.append(change)
+        return normalized
 
     def create(self, payload: Dict[str, Any], operator_mode: Dict[str, Any]) -> Dict[str, Any]:
         if not operator_mode["capabilities"]["can_create_proposals"]:
@@ -123,9 +159,12 @@ class OperatorProposalQueue:
             }
 
         requested_change = self._normalize_requested_change(payload)
+        requested_changes = self._normalize_requested_changes(payload)
         target = payload.get("target")
         if target is None and requested_change and requested_change.get("channel"):
             target = requested_change["channel"]
+        elif target is None and requested_changes:
+            target = [change["channel"] for change in requested_changes]
         title = (
             payload.get("title")
             or payload.get("description")
@@ -148,12 +187,17 @@ class OperatorProposalQueue:
             id=proposal_id,
             title=str(title),
             target=target,
-            kind=str(payload.get("kind") or (requested_change or {}).get("value_type") or "analysis"),
+            kind=str(
+                payload.get("kind")
+                or (requested_change or {}).get("value_type")
+                or (f"linked_{requested_changes[0]['value_type']}" if requested_changes else "analysis")
+            ),
             severity=str(payload.get("severity") or payload.get("priority") or "medium"),
             confidence=_coerce_float(payload.get("confidence")),
             source=str(payload.get("source") or "operator_proposal_queue"),
             reason=str(payload.get("reason") or payload.get("rationale") or ""),
             requested_change=requested_change,
+            requested_changes=requested_changes,
             mode_at_creation=operator_mode.get("mode"),
             raw=dict(payload),
         )

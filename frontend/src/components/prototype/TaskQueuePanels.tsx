@@ -1,0 +1,375 @@
+import {
+  ActionCluster,
+  DataTable,
+  MetricCard,
+  Panel,
+  StatusBadge
+} from './AutomixerComponents';
+import { applyPlanForTask, safetyEvidenceForTask } from '../../mock/automixerData';
+import { textClassForTone, toneForMode, toneForPriority, toneFromState } from '../../utils/prototypeTone';
+import type {
+  ApplyPlanStep,
+  DecisionPolicy,
+  Metric,
+  ProposalPreview,
+  SafetyEvidenceItem,
+  Task,
+  Tone,
+  UiActions,
+  UiState
+} from '../../types';
+
+export type TaskRow = Task & {
+  proposal: ProposalPreview;
+};
+
+function taskQueueMetrics(taskRows: TaskRow[]): Metric[] {
+  return [
+    { label: 'Total Queue', value: String(taskRows.length), sub: 'operator proposals', tone: 'blue' },
+    { label: 'High Risk', value: String(taskRows.filter(task => task.priority === 'High').length), sub: 'needs review', tone: 'red' },
+    { label: 'Pending', value: String(taskRows.filter(task => task.status === 'Pending').length), sub: 'operator wait', tone: 'yellow' },
+    { label: 'Applied', value: String(taskRows.filter(task => task.status === 'Applied').length), sub: 'mock state', tone: 'green' },
+    { label: 'Rejected', value: String(taskRows.filter(task => task.status === 'Rejected').length), sub: 'mock state', tone: 'red' }
+  ];
+}
+
+function focusTaskDetail(actions: UiActions, task: TaskRow) {
+  actions.selectTask(task.id);
+  actions.focusAction({
+    action: 'Detail',
+    target: task.title,
+    detail: `Review task ${task.id} from ${task.agent}. This only changes the local inspector context.`,
+    tone: toneForPriority(task.priority),
+    timestamp: '10:24:15'
+  });
+}
+
+function requestTaskApply(task: TaskRow, ui: UiState, actions: UiActions) {
+  if (ui.mode === 'Supervised') {
+    actions.openSupervisedProposal(task.id);
+    return;
+  }
+
+  actions.setTaskStatus(task.id, 'Applied');
+}
+
+export function TaskDetailsPanel({
+  task,
+  ui,
+  actions,
+  policy
+}: {
+  task: TaskRow;
+  ui: UiState;
+  actions: UiActions;
+  policy: DecisionPolicy;
+}) {
+  const proposal = task.proposal;
+
+  return (
+    <Panel title="Task Details">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <StatusBadge tone={toneForPriority(task.priority)}>{task.priority}</StatusBadge>
+        <span className="font-mono text-[10px] text-muted">{task.id}</span>
+      </div>
+      <h3 className="text-base font-bold">{task.title}</h3>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+        <StatusBadge tone={toneFromState(task.status)}>{task.status}</StatusBadge>
+        <StatusBadge tone={toneForMode(ui.mode)}>{ui.mode}</StatusBadge>
+        <span className="rounded-[4px] border border-line bg-row px-1.5 py-0.5 text-muted">{task.agent}</span>
+        <span className="font-mono text-muted">{task.time}</span>
+      </div>
+      <div className="mt-3 rounded-[6px] border border-line bg-row p-2">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="am-label">Proposal Preview</div>
+          <StatusBadge tone={proposal.tone}>{proposal.risk}</StatusBadge>
+        </div>
+        <div className="grid grid-cols-[76px_1fr] gap-y-1.5 text-[10px]">
+          <span className="text-muted">Target</span><span className="truncate text-text">{task.target ?? 'Session'}</span>
+          <span className="text-muted">Parameter</span><span className="truncate text-text">{proposal.parameter}</span>
+          <span className="text-muted">Delta</span><span className="truncate font-bold text-audio">{proposal.delta}</span>
+          <span className="text-muted">Proof</span><span className="truncate text-text">{proposal.proof}</span>
+          <span className="text-muted">Rollback</span><span className="truncate text-text">{proposal.rollback}</span>
+        </div>
+      </div>
+      <div className="mt-3">
+        <div className="am-label mb-2">Decision Chain</div>
+        <div className="space-y-1.5">
+          {policy.chain.map((step, index) => (
+            <div className="grid grid-cols-[16px_1fr_68px] items-center gap-2 text-[10px]" key={`${step.node}-${step.state}`}>
+              <span className="grid h-4 w-4 place-items-center rounded-full border border-line bg-panel2 font-mono text-[8px] text-muted">{index + 1}</span>
+              <span className="truncate text-muted">{step.node}</span>
+              <StatusBadge tone={step.tone}>{step.state}</StatusBadge>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-[10px] leading-4 text-muted">{policy.hint}</p>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button className="am-button text-online" onClick={() => requestTaskApply(task, ui, actions)} type="button">{policy.actionLabel}</button>
+        <button className="am-button text-danger" onClick={() => actions.setTaskStatus(task.id, 'Rejected')} type="button">Reject</button>
+      </div>
+    </Panel>
+  );
+}
+
+function ApplyPlanPanel({ plan }: { plan: ApplyPlanStep[] }) {
+  return (
+    <Panel title="Apply Plan">
+      <div className="grid grid-cols-5 gap-1">
+        {plan.map(step => (
+          <div className="rounded-[5px] border border-line bg-row px-1.5 py-1" key={`${step.label}-${step.value}`}>
+            <div className="truncate text-[8px] uppercase tracking-[0.04em] text-dim">{step.label}</div>
+            <div className={`mt-1 truncate text-[9px] font-bold ${textClassForTone(step.tone)}`}>{step.value}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-line">
+        <div className="h-full w-3/5 rounded-full bg-gradient-to-r from-audio via-warn to-online" />
+      </div>
+    </Panel>
+  );
+}
+
+function SafetyEvidencePanel({ evidence }: { evidence: SafetyEvidenceItem[] }) {
+  return (
+    <Panel title="Safety Evidence">
+      <div className="grid grid-cols-3 gap-1">
+        {evidence.map(row => (
+          <div className="rounded-[5px] border border-line bg-row px-1.5 py-1" key={`${row.label}-${row.value}`}>
+            <div className="truncate text-[8px] uppercase tracking-[0.08em] text-dim">{row.label}</div>
+            <div className={`truncate text-[9px] font-bold ${textClassForTone(row.tone)}`}>{row.value}</div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function OperatorDecisionPanel({ ui, policy }: { ui: UiState; policy: DecisionPolicy }) {
+  return (
+    <Panel title="Operator Decision">
+      <div className="space-y-2">
+        {[
+          { label: 'Current mode', value: ui.mode, tone: toneForMode(ui.mode) },
+          { label: 'Apply result', value: policy.apply, tone: toneForMode(ui.mode) },
+          { label: 'Write path', value: ui.backend.applyPath, tone: ui.backend.canApplyToConsole ? 'yellow' as const : 'red' as const },
+          { label: 'Backend', value: ui.backend.statusLabel, tone: ui.backend.statusTone }
+        ].map(row => (
+          <div className="flex items-center justify-between border-b border-line pb-2 text-[10px]" key={`${row.label}-${row.value}`}>
+            <span className="text-muted">{row.label}</span>
+            <StatusBadge tone={row.tone}>{row.value}</StatusBadge>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function SupervisedApplyModal({
+  task,
+  ui,
+  evidence,
+  applyPlan,
+  onClose,
+  onConfirm
+}: {
+  task: TaskRow;
+  ui: UiState;
+  evidence: SafetyEvidenceItem[];
+  applyPlan: ApplyPlanStep[];
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const proposal = task.proposal;
+  const canRequestBackendGate = ui.mode === 'Supervised' && ui.backend.canApplyToConsole && Boolean(task.canApply ?? true);
+  const approvalLabel = ui.mode !== 'Supervised'
+    ? 'Blocked by mode'
+    : canRequestBackendGate
+      ? 'Backend supervised gate'
+      : 'Local prototype approval only';
+  const approvalTone: Tone = ui.mode !== 'Supervised' ? 'red' : canRequestBackendGate ? 'yellow' : 'blue';
+  const applyRequest = canRequestBackendGate ? 'Ready to request' : ui.mode === 'Supervised' ? 'UI-only simulation' : 'Blocked';
+  const backendResult = ui.backend.proposalApplyResult;
+  const resultMatches = Boolean(
+    backendResult
+    && (!backendResult.proposalId || backendResult.proposalId === task.proposalId || backendResult.proposalId === task.id)
+  );
+  const applyRequestLabel = resultMatches ? backendResult?.applyRequest ?? applyRequest : applyRequest;
+  const readbackLabel = resultMatches ? backendResult?.readbackStatus ?? 'Required after backend apply' : 'Required after backend apply';
+  const rollbackLabel = resultMatches ? backendResult?.rollbackStatus ?? 'Snapshot required' : 'Snapshot required';
+  const backendResultTone = resultMatches ? backendResult?.tone ?? approvalTone : approvalTone;
+
+  return (
+    <div className="absolute inset-0 z-40 grid place-items-center bg-[#05080d]/80 p-5 backdrop-blur-sm" role="dialog" aria-label="Supervised Apply Proposal">
+      <div className="w-full max-w-[760px] rounded-[8px] border border-warn/45 bg-[#0d151e] p-4 shadow-[0_18px_60px_rgba(0,0,0,.55)]">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <div className="am-label text-warn">Supervised Apply Proposal</div>
+            <h2 className="mt-1 text-xl font-black text-text">{task.title}</h2>
+            <p className="mt-1 text-[11px] text-muted">{task.id} · {task.agent} · no direct OSC/live write transport from frontend</p>
+          </div>
+          <StatusBadge tone={approvalTone}>{approvalLabel}</StatusBadge>
+        </div>
+        <div className="grid grid-cols-[1.05fr_0.95fr] gap-3">
+          <div className="space-y-3">
+            <div className="rounded-[7px] border border-line bg-row p-3">
+              <div className="am-label mb-2">Proposal Target</div>
+              <div className="grid grid-cols-[92px_1fr] gap-y-2 text-[11px]">
+                <span className="text-muted">Target</span><b className="truncate text-text">{task.target ?? task.title}</b>
+                <span className="text-muted">Parameter</span><b className="truncate text-text">{proposal.parameter}</b>
+                <span className="text-muted">Old value</span><b className="truncate text-muted">Current console snapshot</b>
+                <span className="text-muted">New value</span><b className="truncate text-audio">{proposal.delta}</b>
+                <span className="text-muted">Rollback</span><b className="truncate text-text">{proposal.rollback}</b>
+              </div>
+            </div>
+            <div className="rounded-[7px] border border-line bg-row p-3">
+              <div className="am-label mb-2">Safety Evidence</div>
+              <div className="grid grid-cols-3 gap-2">
+                {evidence.map(row => (
+                  <div className="rounded-[5px] border border-line bg-panel2 px-2 py-1" key={`${row.label}-${row.value}`}>
+                    <div className="truncate text-[8px] uppercase tracking-[0.08em] text-dim">{row.label}</div>
+                    <div className={`truncate text-[10px] font-bold ${textClassForTone(row.tone)}`}>{row.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div className="rounded-[7px] border border-line bg-row p-3">
+              <div className="am-label mb-2">Apply Gate</div>
+              <div className="space-y-2">
+                {[
+                  { label: 'Required approval', value: approvalLabel, tone: approvalTone },
+                  { label: 'Apply request', value: applyRequestLabel, tone: backendResultTone },
+                  { label: 'Readback status', value: readbackLabel, tone: resultMatches && readbackLabel.includes('verified') ? 'green' as const : 'yellow' as const },
+                  { label: 'Rollback status', value: rollbackLabel, tone: resultMatches && rollbackLabel.includes('available') ? 'green' as const : resultMatches && rollbackLabel.includes('failed') ? 'red' as const : 'yellow' as const },
+                  { label: 'Final readiness', value: ui.backend.statusLabel, tone: ui.backend.statusTone },
+                  { label: 'Direct writes', value: 'Disabled', tone: 'red' as const }
+                ].map(row => (
+                  <div className="flex items-center justify-between border-b border-line pb-2 text-[10px]" key={row.label}>
+                    <span className="text-muted">{row.label}</span>
+                    <StatusBadge tone={row.tone}>{row.value}</StatusBadge>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-[7px] border border-line bg-row p-3">
+              <div className="am-label mb-2">Gate Sequence</div>
+              <div className="grid grid-cols-5 gap-1">
+                {applyPlan.map(step => (
+                  <div className="rounded-[5px] border border-line bg-panel2 px-1.5 py-1" key={`${step.label}-${step.value}`}>
+                    <div className="truncate text-[8px] uppercase tracking-[0.04em] text-dim">{step.label}</div>
+                    <div className={`mt-1 truncate text-[9px] font-bold ${textClassForTone(step.tone)}`}>{step.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {resultMatches && (
+              <div className="rounded-[7px] border border-line bg-row p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="am-label">Backend Result</div>
+                  <StatusBadge tone={backendResultTone}>{backendResult?.status}</StatusBadge>
+                </div>
+                <p className="text-[10px] leading-4 text-muted">
+                  {backendResult?.reason || 'Backend gate response received.'} · {backendResult?.updatedAt}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button className="am-button" onClick={onClose} type="button">Cancel</button>
+          <button className="am-button border-warn/40 bg-warn/10 text-warn" onClick={onConfirm} type="button">
+            Request Supervised Apply
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function TaskQueueWorkspace({
+  taskRows,
+  selectedTask,
+  ui,
+  actions,
+  policy,
+  evidence,
+  applyPlan
+}: {
+  taskRows: TaskRow[];
+  selectedTask: TaskRow;
+  ui: UiState;
+  actions: UiActions;
+  policy: DecisionPolicy;
+  evidence: SafetyEvidenceItem[];
+  applyPlan: ApplyPlanStep[];
+}) {
+  const modalTask = ui.supervisedProposalTaskId
+    ? taskRows.find(task => task.id === ui.supervisedProposalTaskId)
+    : undefined;
+  const modalEvidence = modalTask ? safetyEvidenceForTask(modalTask, ui.mode) : evidence;
+  const modalApplyPlan = modalTask ? applyPlanForTask(modalTask, ui.mode) : applyPlan;
+
+  return (
+    <div className="relative grid h-full grid-rows-[76px_1fr_108px] gap-2">
+      <div className="grid grid-cols-5 gap-2">
+        {taskQueueMetrics(taskRows).map(metric => <MetricCard metric={metric} key={metric.label} />)}
+      </div>
+      <DataTable
+        rows={taskRows}
+        selectedRow={selectedTask}
+        onSelect={task => actions.selectTask(task.id)}
+        rowKey={task => task.id}
+        searchable
+        searchPlaceholder="Search task, target, agent..."
+        filters={[
+          { label: 'All', predicate: () => true },
+          { label: 'High', predicate: task => task.priority === 'High' },
+          { label: 'Pending', predicate: task => task.status === 'Pending' },
+          { label: 'Applied', predicate: task => task.status === 'Applied' }
+        ]}
+        getSearchText={task => `${task.title} ${task.agent} ${task.target} ${task.status} ${task.priority}`}
+        columns={[
+          { key: 'priority', label: 'Priority', width: '0.75fr', render: task => <StatusBadge tone={toneForPriority(task.priority)}>{task.priority}</StatusBadge> },
+          { key: 'title', label: 'Task', width: '1.55fr' },
+          { key: 'agent', label: 'Created By', width: '1.15fr' },
+          { key: 'target', label: 'Target / Move', width: '1fr', render: task => <span className="truncate"><span className="text-text">{task.target}</span><span className="ml-2 font-mono text-audio">{task.proposal.delta}</span></span> },
+          { key: 'status', label: 'Status', width: '0.9fr', render: task => <StatusBadge tone={toneFromState(task.status)}>{task.status}</StatusBadge> },
+          { key: 'time', label: 'Last', width: '0.55fr' },
+          {
+            key: 'actions',
+            label: 'Actions',
+            width: '90px',
+            render: task => (
+              <ActionCluster
+                actions={['Detail', 'Apply', 'Reject']}
+                onAction={action => {
+                  if (action === 'Apply') requestTaskApply(task, ui, actions);
+                  else if (action === 'Reject') actions.setTaskStatus(task.id, 'Rejected');
+                  else focusTaskDetail(actions, task);
+                }}
+              />
+            )
+          }
+        ]}
+      />
+      <div className="grid grid-cols-[1.2fr_1fr_1fr] gap-2">
+        <ApplyPlanPanel plan={applyPlan} />
+        <SafetyEvidencePanel evidence={evidence} />
+        <OperatorDecisionPanel ui={ui} policy={policy} />
+      </div>
+      {modalTask && (
+        <SupervisedApplyModal
+          applyPlan={modalApplyPlan}
+          evidence={modalEvidence}
+          onClose={actions.closeSupervisedProposal}
+          onConfirm={() => actions.confirmSupervisedApply(modalTask.id)}
+          task={modalTask}
+          ui={ui}
+        />
+      )}
+    </div>
+  );
+}

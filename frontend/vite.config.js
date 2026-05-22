@@ -15,10 +15,6 @@ const jsAsJsx = () => ({
 export default defineConfig({
   base: './',
   plugins: [jsAsJsx(), react()],
-  esbuild: {
-    loader: 'jsx',
-    include: /src\/.*\.[jt]sx?$/,
-  },
   optimizeDeps: {
     esbuildOptions: {
       loader: {

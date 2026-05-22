@@ -1,0 +1,910 @@
+import { expect, test } from '@playwright/test';
+
+const routes = [
+  ['dashboard', '1. Overview'],
+  ['agents', '2. Agents Console'],
+  ['communications', '3. Communications'],
+  ['task-queue', '4. Task Queue'],
+  ['memory', '5. Memory / Knowledge Base'],
+  ['performance', '6. Performance'],
+  ['settings', '7. Settings'],
+  ['channels', '8. Channel List'],
+  ['groups', '9. Groups / Buses'],
+  ['system', '10. System Connection'],
+  ['routing', '11. Audio Routing'],
+  ['osc-midi', '12. OSC / MIDI'],
+  ['devices', '13. Devices'],
+  ['logs', '14. Logs'],
+  ['training', '15. Training Sessions'],
+  ['rules', '16. Rules Library']
+] as const;
+
+test.describe('Automixer frontend prototype', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('automixer_backend_autoconnect', 'off');
+    });
+  });
+
+  test('renders every reference route without framework errors', async ({ page }) => {
+    const consoleErrors: string[] = [];
+    page.on('console', message => {
+      if (message.type() === 'error') consoleErrors.push(message.text());
+    });
+    page.on('pageerror', error => consoleErrors.push(error.message));
+
+    for (const [route, title] of routes) {
+      await page.goto(`/#/${route}`);
+      await expect(page.getByText(title)).toBeVisible();
+      await expect(page.locator('body')).toContainText('Automixer');
+    }
+
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test('keeps operator actions local and does not emit unsafe writes', async ({ page }) => {
+    const unsafeRequests: string[] = [];
+    page.on('request', request => {
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())) {
+        unsafeRequests.push(`${request.method()} ${request.url()}`);
+      }
+    });
+
+    await page.goto('/#/task-queue');
+    await expect(page.getByText('4. Task Queue')).toBeVisible();
+    await expect(page.getByText('Decision Chain')).toBeVisible();
+    await expect(page.getByText('Proposal Preview')).toBeVisible();
+    await expect(page.getByText('Safety Evidence')).toBeVisible();
+    await expect(page.getByText('Apply Plan')).toBeVisible();
+    await page.getByLabel('Automation mode').selectOption('Supervised');
+    await expect(page.getByText('Mode changed to Supervised. Mock fallback only.')).toBeVisible();
+
+    const leadVocalRow = page.locator('.am-table-row').filter({ hasText: 'Reduce Lead Vocal presence' });
+    await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
+
+    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Current console snapshot');
+    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Snapshot required');
+    await page.getByRole('button', { name: 'Request Supervised Apply' }).click();
+    await expect(page.getByText('T-101 marked Applied. No mixer write sent.')).toBeVisible();
+    await expect(leadVocalRow).toContainText('Applied');
+
+    await page.goto('/#/channels');
+    const kickInRow = page.locator('.am-table-row').filter({ hasText: 'Kick In' });
+    await kickInRow.getByRole('button', { name: 'Inspect' }).click();
+
+    const actionFocus = page.locator('section').filter({ hasText: 'Action Focus' }).filter({ hasText: 'Kick In' });
+    await expect(actionFocus).toBeVisible();
+    await expect(actionFocus.getByText('Write Path')).toBeVisible();
+    await expect(actionFocus.getByText('Guarded')).toBeVisible();
+    expect(unsafeRequests).toEqual([]);
+  });
+
+  test('mode policy gates task apply actions locally', async ({ page }) => {
+    await page.goto('/#/task-queue');
+    await expect(page.getByText('4. Task Queue')).toBeVisible();
+    await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Assist');
+
+    const leadVocalRow = page.locator('.am-table-row').filter({ hasText: 'Reduce Lead Vocal presence' });
+
+    await page.getByLabel('Automation mode').selectOption('Analyze');
+    await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Analyze');
+    await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
+    const blockedFocus = page.locator('section').filter({ hasText: 'Action Focus' }).filter({ hasText: 'Apply Blocked' });
+    await expect(blockedFocus).toContainText('Analyze mode is read-only');
+    await expect(leadVocalRow).toContainText('Pending');
+
+    await page.getByLabel('Automation mode').selectOption('Assist');
+    await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Assist');
+    await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.getByText('Assist mode does not apply changes')).toBeVisible();
+    await expect(leadVocalRow).toContainText('Review');
+
+    await page.getByLabel('Automation mode').selectOption('Auto');
+    await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Auto');
+    await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.getByText('Auto mode simulated the apply locally')).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toHaveCount(0);
+  });
+
+  test('mode selector changes prototype state only', async ({ page }) => {
+    await page.goto('/#/dashboard');
+    await page.getByLabel('Automation mode').selectOption('Supervised');
+
+    await expect(page.getByText('Mode changed to Supervised. Mock fallback only.')).toBeVisible();
+    await expect(page.getByLabel('Automation mode')).toHaveValue('Supervised');
+  });
+
+  test('renders compact operator view on mobile width', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/#/dashboard');
+
+    await expect(page.getByText('Compact Operator')).toBeVisible();
+    await expect(page.getByText('Selected Channel')).toBeVisible();
+    await expect(page.getByLabel('Compact mode')).toBeVisible();
+  });
+
+  test('selected rows update read-only detail panels', async ({ page }) => {
+    await page.goto('/#/communications');
+    await page.locator('.am-table-row').filter({ hasText: 'Review Snare transient' }).click();
+    await expect(page.locator('section').filter({ hasText: 'Selected Message' })).toContainText('Review Snare transient');
+
+    await page.goto('/#/memory');
+    await page.locator('.am-table-row').filter({ hasText: 'Bass DI compression memory' }).click();
+    await expect(page.locator('section').filter({ hasText: 'Memory Inspector' })).toContainText('Bass DI compression memory');
+    await expect(page.locator('section').filter({ hasText: 'Memory Inspector' })).toContainText('Dynamics');
+
+    await page.goto('/#/groups');
+    await page.locator('.am-table-row').filter({ hasText: 'Bass Bus' }).click();
+    await expect(page.locator('section').filter({ hasText: 'Bus Details' })).toContainText('Bass Bus');
+
+    await page.goto('/#/training');
+    await page.locator('.am-table-row').filter({ hasText: 'Rock drums transient map' }).click();
+    const trainingDetail = page.locator('section').filter({ hasText: 'Training Queue' }).filter({ hasText: 'Auto learn' });
+    await expect(trainingDetail).toContainText('Rock drums transient map');
+    await expect(trainingDetail).toContainText('84 examples');
+
+    await page.goto('/#/rules');
+    await page.locator('.am-table-row').filter({ hasText: 'No boost without headroom' }).click();
+    await expect(page.locator('section').filter({ hasText: 'Rule Inspector' })).toContainText('No boost without headroom');
+    await expect(page.locator('section').filter({ hasText: 'Rule Inspector' })).toContainText('Locked');
+
+    await page.goto('/#/performance');
+    await page.locator('.am-table-row').filter({ hasText: 'Learning Agent' }).click();
+    await expect(page.locator('section').filter({ hasText: 'Performance Inspector' })).toContainText('Learning Agent');
+    await expect(page.locator('section').filter({ hasText: 'Performance Inspector' })).toContainText('Watch');
+
+    await page.goto('/#/settings');
+    await page.getByRole('button', { name: 'Write Policy' }).first().click();
+    await expect(page.locator('section').filter({ hasText: 'Settings Inspector' })).toContainText('Write Policy');
+    await expect(page.locator('section').filter({ hasText: 'Settings Inspector' })).toContainText('Direct OSC');
+
+    await page.goto('/#/system');
+    await page.getByRole('button', { name: /WING Rack/ }).click();
+    await expect(page.locator('section').filter({ hasText: 'Connection Status' })).toContainText('WING Rack');
+
+    await page.goto('/#/routing');
+    await page.getByRole('button', { name: /Bass Bus/ }).click();
+    await expect(page.locator('section').filter({ hasText: 'Routing Segment' })).toContainText('Bass Bus');
+
+    await page.goto('/#/osc-midi');
+    await page.locator('.am-table-row').filter({ hasText: 'OSC connection established' }).click();
+    await expect(page.locator('section').filter({ hasText: 'OSC / MIDI Message' }).first()).toContainText('OSC connection established');
+
+    await page.goto('/#/devices');
+    await page.locator('.am-table-row').filter({ hasText: 'Stage Box 1' }).click();
+    await expect(page.locator('section').filter({ hasText: 'Selected Device' })).toContainText('Stage Box 1');
+
+    await page.goto('/#/logs');
+    await page.locator('.am-table-row').filter({ hasText: 'Redundant link not available' }).click();
+    await expect(page.locator('section').filter({ hasText: 'Log Details' })).toContainText('Redundant link not available');
+  });
+});
+
+test.describe('Automixer backend Product Layer adapter', () => {
+  test('shows partial backend state when only some Product Layer payloads arrive', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('automixer_backend_autoconnect', 'on');
+      const payloads: Record<string, unknown> = {
+        get_operator_mode: {
+          type: 'operator_mode_status',
+          mode: 'assist',
+          label: 'Assist',
+          live_write_policy: 'read_only_partial_fixture',
+          apply_path: 'none',
+          capabilities: {
+            can_create_proposals: true,
+            can_apply_to_console: false,
+            requires_approval: true,
+            allowed_live_write_kinds: []
+          }
+        },
+        get_dashboard_snapshot: {
+          type: 'dashboard_snapshot',
+          generated_at: '2026-05-19T20:40:00Z',
+          operator_mode: {
+            mode: 'assist',
+            label: 'Assist',
+            live_write_policy: 'read_only_partial_fixture',
+            apply_path: 'none',
+            capabilities: {
+              can_create_proposals: true,
+              can_apply_to_console: false,
+              requires_approval: true,
+              allowed_live_write_kinds: []
+            }
+          },
+          connection: {
+            connected: false,
+            connection_mode: 'wing',
+            client_type: 'EnhancedOSCClient',
+            ip: '10.10.10.20'
+          },
+          master_bus: {
+            available: true,
+            integrated_lufs: -20.1,
+            short_term_lufs: -19.8,
+            momentary_lufs: -19.1,
+            true_peak_db: -3.4,
+            lra_lu: 4.8
+          },
+          channel_summary: {
+            total_channels: 48,
+            active_channels: 0
+          },
+          decision_summary: {
+            pending_count: 0,
+            history_count: 0,
+            applied_count: 0,
+            blocked_count: 0
+          },
+          safety: {
+            live_write_policy: 'read_only_partial_fixture',
+            ready_for_live: {
+              ready: false,
+              checks: {
+                mixer_connected: false,
+                gain_staging_available: false,
+                auto_fader_available: false,
+                no_clipping: true
+              }
+            },
+            manual_write_supervision: {
+              emergency_stopped: false,
+              requires_operator_mode: 'supervised'
+            },
+            blocked_reasons: ['Partial Product Layer fixture']
+          }
+        }
+      };
+
+      class PartialWebSocket {
+        static CONNECTING = 0;
+        static OPEN = 1;
+        static CLOSING = 2;
+        static CLOSED = 3;
+        readyState = PartialWebSocket.CONNECTING;
+        onopen: null | (() => void) = null;
+        onmessage: null | ((event: { data: string }) => void) = null;
+        onerror: null | ((event: unknown) => void) = null;
+        onclose: null | (() => void) = null;
+
+        constructor() {
+          setTimeout(() => {
+            this.readyState = PartialWebSocket.OPEN;
+            this.onopen?.();
+          }, 0);
+        }
+
+        send(raw: string) {
+          const message = JSON.parse(raw);
+          const response = payloads[message.type];
+          if (response) {
+            setTimeout(() => this.onmessage?.({ data: JSON.stringify(response) }), 0);
+          }
+        }
+
+        close() {
+          this.readyState = PartialWebSocket.CLOSED;
+          this.onclose?.();
+        }
+      }
+
+      Object.defineProperty(window, 'WebSocket', {
+        configurable: true,
+        value: PartialWebSocket
+      });
+    });
+
+    await page.goto('/#/settings');
+    await expect(page.locator('section').filter({ hasText: 'Settings Inspector' })).toContainText('Product Layer partial');
+    await expect(page.locator('body')).toContainText('read_only_partial_fixture');
+    await expect(page.locator('body')).toContainText('No apply');
+  });
+
+  test('renders backend payloads through the prototype UI without unsafe writes', async ({ page }) => {
+    const sentTypes: string[] = [];
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('automixer_backend_autoconnect', 'on');
+      const payloads: Record<string, unknown> = {
+        get_operator_mode: {
+          type: 'operator_mode_status',
+          mode: 'supervised',
+          label: 'Supervised',
+          live_write_policy: 'supervised_approval_required',
+          apply_path: 'supervised_manual_gate',
+          capabilities: {
+            can_create_proposals: true,
+            can_apply_to_console: true,
+            requires_approval: true,
+            allowed_live_write_kinds: ['fader', 'gain']
+          }
+        },
+        get_dashboard_snapshot: {
+          type: 'dashboard_snapshot',
+          generated_at: '2026-05-19T20:30:00Z',
+          operator_mode: {
+            mode: 'supervised',
+            label: 'Supervised',
+            live_write_policy: 'supervised_approval_required',
+            apply_path: 'supervised_manual_gate',
+            capabilities: {
+              can_create_proposals: true,
+              can_apply_to_console: true,
+              requires_approval: true,
+              allowed_live_write_kinds: ['fader', 'gain']
+            }
+          },
+          connection: {
+            connected: true,
+            connection_mode: 'wing',
+            client_type: 'EnhancedOSCClient',
+            ip: '10.10.10.20'
+          },
+          master_bus: {
+            available: true,
+            integrated_lufs: -18.2,
+            short_term_lufs: -17.8,
+            momentary_lufs: -16.9,
+            true_peak_db: -2.4,
+            lra_lu: 5.1
+          },
+          audio_capture: {
+            running: true,
+            num_channels: 48,
+            sample_rate: 48000
+          },
+          channel_summary: {
+            total_channels: 2,
+            active_channels: 1
+          },
+          decision_summary: {
+            pending_count: 1,
+            history_count: 2,
+            applied_count: 1,
+            blocked_count: 0
+          },
+          safety: {
+            live_write_policy: 'supervised_approval_required',
+            ready_for_live: {
+              ready: true,
+              checks: {
+                mixer_connected: true,
+                gain_staging_available: true,
+                auto_fader_available: true,
+                no_clipping: true
+              }
+            },
+            manual_write_supervision: {
+              emergency_stopped: false,
+              requires_operator_mode: 'supervised'
+            },
+            blocked_reasons: []
+          },
+          runtime: {
+            agent_available: true,
+            proposal_queue_available: true
+          }
+        },
+        get_channel_inventory: {
+          type: 'channel_inventory',
+          available: true,
+          connection: {
+            connected: true,
+            connection_mode: 'wing',
+            client_type: 'EnhancedOSCClient',
+            ip: '10.10.10.20'
+          },
+          channels: [
+            {
+              id: 1,
+              number: 1,
+              name: 'Backend Kick',
+              source: 'In 01',
+              role: 'Kick',
+              group: 'DRUMS',
+              status: 'active',
+              level_db: -13.4,
+              lufs: -16.1,
+              dynamic_range_db: 7.2,
+              control_state: { fader_db: -4.5 },
+              ai_recognition: { label: 'Kick', confidence: 98 }
+            },
+            {
+              id: 2,
+              number: 2,
+              name: 'Backend Lead Vox',
+              source: 'In 02',
+              role: 'Vocal',
+              group: 'VOCALS',
+              status: 'idle',
+              level_db: -44,
+              lufs: -50,
+              dynamic_range_db: 3.1,
+              control_state: { fader_db: -8 },
+              ai_recognition: { label: 'Lead Vocal', confidence: 91 }
+            }
+          ]
+        },
+        get_decision_queue: {
+          type: 'decision_queue',
+          status: 'ok',
+          available: true,
+          operator_mode: {
+            mode: 'supervised',
+            label: 'Supervised',
+            live_write_policy: 'supervised_approval_required',
+            apply_path: 'supervised_manual_gate',
+            capabilities: {
+              can_create_proposals: true,
+              can_apply_to_console: true,
+              requires_approval: true,
+              allowed_live_write_kinds: ['fader', 'gain']
+            }
+          },
+          summary: {
+            pending_count: 1,
+            history_count: 2,
+            applied_count: 1,
+            blocked_count: 0
+          },
+          pending_actions: [
+            {
+              id: 'proposal-backend-1',
+              title: 'Backend proposal fader move',
+              target: 'Backend Lead Vox',
+              kind: 'fader',
+              severity: 'high',
+              status: 'pending',
+              source: 'Backend Decision Agent',
+              created_at: '2026-05-19T20:29:00Z',
+              requested_change: {
+                value_type: 'fader',
+                channel: 2,
+                value: -9.5
+              },
+              can_apply: true
+            }
+          ],
+          history: []
+        },
+        get_operator_agent_roster: {
+          type: 'operator_agent_roster',
+          status: 'ok',
+          summary: {
+            agent_count: 2,
+            active_count: 1,
+            blocked_count: 0,
+            can_live_execute: true
+          },
+          agents: [
+            {
+              id: 'automixer_director',
+              name: 'Backend Director',
+              role: 'Coordinates backend agents',
+              status: 'ACTIVE',
+              task: 'Supervised backend mode',
+              confidence: 96,
+              tone: 'green',
+              category: 'director'
+            },
+            {
+              id: 'console_executor_agent',
+              name: 'Backend Executor',
+              role: 'Supervised apply gate',
+              status: 'ACTIVE',
+              task: 'Ready for approved fader/gain apply',
+              confidence: 100,
+              tone: 'green',
+              category: 'execution',
+              can_write: true,
+              write_scope: ['fader', 'gain']
+            }
+          ]
+        },
+        get_connection_topology: {
+          type: 'connection_topology',
+          connection: {
+            connected: true,
+            connection_mode: 'wing',
+            client_type: 'EnhancedOSCClient',
+            ip: '10.10.10.20'
+          },
+          connected_devices: [
+            {
+              name: 'Backend WING',
+              ip: '10.10.10.20',
+              kind: 'wing',
+              sample_rate: '48 kHz',
+              detail: 'Backend fixture console',
+              status: 'online'
+            }
+          ],
+          nodes: [
+            {
+              id: 'director_control',
+              label: 'Backend Director Surface',
+              kind: 'client',
+              status: 'online',
+              detail: 'fake websocket client'
+            },
+            {
+              id: 'automixer_core',
+              label: 'Backend Core Node',
+              kind: 'core',
+              status: 'running',
+              detail: 'mode=supervised'
+            },
+            {
+              id: 'mixer',
+              label: 'Backend Mixer Node',
+              kind: 'mixer',
+              status: 'online',
+              detail: 'wing'
+            }
+          ],
+          links: [
+            {
+              from: 'director_control',
+              to: 'automixer_core',
+              kind: 'websocket',
+              status: 'online'
+            },
+            {
+              from: 'automixer_core',
+              to: 'mixer',
+              kind: 'osc_control',
+              status: 'online'
+            }
+          ],
+          routing_scheme: [
+            {
+              start: 1,
+              end: 2,
+              role: 'backend_fixture',
+              tap_point: 'Backend Tap Point',
+              label_short: 'Backend Routing Segment',
+              label_full: 'Backend fixture routing segment',
+              wing_routing_hint: 'Backend WING routing hint',
+              stereo: true,
+              required: true,
+              used_by: ['Backend Test Module']
+            }
+          ]
+        },
+        get_groups_buses_snapshot: {
+          type: 'groups_buses_snapshot',
+          generated_at: '2026-05-19T20:30:03Z',
+          source: 'backend_fixture_groups',
+          buses: [
+            {
+              name: 'Backend DTO Drums',
+              role: 'Group',
+              level: -13.4,
+              lufs: -16.1,
+              channels: 1,
+              active_channels: 1,
+              muted_channels: 0,
+              dynamic: 7.2,
+              confidence: 98,
+              status: 'Active',
+              color: 'green',
+              members: ['01 Backend Kick']
+            },
+            {
+              name: 'Backend DTO Vocals',
+              role: 'Group',
+              level: -44,
+              lufs: -50,
+              channels: 1,
+              active_channels: 0,
+              muted_channels: 0,
+              dynamic: 3.1,
+              confidence: 91,
+              status: 'Inactive',
+              color: 'purple',
+              members: ['02 Backend Lead Vox']
+            }
+          ]
+        },
+        get_memory_knowledge_snapshot: {
+          type: 'memory_knowledge_snapshot',
+          generated_at: '2026-05-19T20:30:04Z',
+          source: 'backend_fixture_memory',
+          memories: [
+            {
+              name: 'Backend DTO vocal memory',
+              type: 'DTO Memory',
+              size: '3.1 KB',
+              confidence: 97,
+              updated: 'backend fixture'
+            },
+            {
+              name: 'Backend DTO decision memory',
+              type: 'Decision History',
+              size: '2.0 KB',
+              confidence: 92,
+              updated: 'queue'
+            }
+          ]
+        },
+        get_training_sessions_snapshot: {
+          type: 'training_sessions_snapshot',
+          generated_at: '2026-05-19T20:30:05Z',
+          source: 'backend_fixture_training',
+          sessions: [
+            {
+              name: 'Backend DTO training set',
+              status: 'Review',
+              examples: 42,
+              score: '91%',
+              updated: 'backend fixture'
+            }
+          ]
+        },
+        get_rules_library_snapshot: {
+          type: 'rules_library_snapshot',
+          generated_at: '2026-05-19T20:30:06Z',
+          source: 'backend_fixture_rules',
+          rules: [
+            {
+              name: 'Backend DTO no direct writes',
+              category: 'Safety',
+              confidence: '100%',
+              state: 'Locked'
+            },
+            {
+              name: 'Backend DTO supervised gate only',
+              category: 'Control',
+              confidence: '100%',
+              state: 'Active'
+            }
+          ]
+        },
+        get_agent_communications_snapshot: {
+          type: 'agent_communications_snapshot',
+          generated_at: '2026-05-19T20:30:07Z',
+          source: 'backend_fixture_agent_bus',
+          communications: [
+            {
+              time: '2026-05-19T20:30:07Z',
+              from: 'Backend DTO Director',
+              to: 'Operator',
+              topic: 'Backend DTO communication online',
+              status: 'Info',
+              tone: 'blue'
+            }
+          ]
+        },
+        get_processing_pipeline_snapshot: {
+          type: 'processing_pipeline_snapshot',
+          generated_at: '2026-05-19T20:30:07Z',
+          source: 'backend_fixture_processing',
+          main_pipeline_id: 'main_live_assist',
+          main_pipeline_status: 'canonical',
+          live_apply_policy: 'supervised_fader_gain_only'
+        },
+        get_main_pipeline_preview: {
+          type: 'main_pipeline_preview',
+          generated_at: '2026-05-19T20:30:08Z',
+          source: 'backend_fixture_pipeline_preview',
+          status: 'ok',
+          pipeline_id: 'main_live_assist',
+          pipeline_status: 'canonical',
+          executor_policy: {
+            preview_only: true,
+            queue_mutation: false,
+            live_write: false,
+            allowed_requested_change_value_types: ['fader', 'gain']
+          },
+          summary: {
+            proposal_count: 1
+          },
+          proposals: [
+            {
+              id: 'preview-backend-1',
+              title: 'Backend preview fader move',
+              requested_change: {
+                value_type: 'fader',
+                channel: 2,
+                value: -9.5
+              }
+            }
+          ],
+          blockers: []
+        },
+        apply_operator_proposal: {
+          type: 'operator_proposal_apply_result',
+          status: 'applied',
+          success: true,
+          proposal: {
+            id: 'proposal-backend-1',
+            title: 'Backend proposal fader move'
+          },
+          apply_result: {
+            status: 'applied',
+            channel: 2,
+            value_type: 'fader',
+            effective_value: -9.5,
+            readback_status: 'verified_from_cache',
+            rollback_available: true,
+            rollback_value: -8
+          }
+        }
+      };
+
+      class FakeWebSocket {
+        static CONNECTING = 0;
+        static OPEN = 1;
+        static CLOSING = 2;
+        static CLOSED = 3;
+        readyState = FakeWebSocket.CONNECTING;
+        onopen: null | (() => void) = null;
+        onmessage: null | ((event: { data: string }) => void) = null;
+        onerror: null | ((event: unknown) => void) = null;
+        onclose: null | (() => void) = null;
+        url: string;
+
+        constructor(url: string) {
+          this.url = url;
+          setTimeout(() => {
+            this.readyState = FakeWebSocket.OPEN;
+            this.onopen?.();
+          }, 0);
+        }
+
+        send(raw: string) {
+          const message = JSON.parse(raw);
+          window.dispatchEvent(new CustomEvent('automixer-ws-send', { detail: message.type }));
+          const response = payloads[message.type];
+          if (response) {
+            setTimeout(() => this.onmessage?.({ data: JSON.stringify(response) }), 0);
+          }
+        }
+
+        close() {
+          this.readyState = FakeWebSocket.CLOSED;
+          this.onclose?.();
+        }
+      }
+
+      Object.defineProperty(window, 'WebSocket', {
+        configurable: true,
+        value: FakeWebSocket
+      });
+    });
+
+    await page.exposeFunction('recordWsSend', (type: string) => sentTypes.push(type));
+    await page.addInitScript(() => {
+      window.addEventListener('automixer-ws-send', event => {
+        const detail = (event as CustomEvent<string>).detail;
+        void (window as unknown as { recordWsSend: (type: string) => Promise<void> }).recordWsSend(detail);
+      });
+    });
+
+    await page.goto('/#/dashboard');
+    await expect(page.locator('header').filter({ hasText: 'Status' }).getByText(/Live data/i)).toBeVisible();
+    await expect(page.getByText(/Product Layer live/i)).toBeVisible();
+    await expect(page.getByText('WING 10.10.10.20')).toBeVisible();
+    await expect(page.getByText('-18.2').first()).toBeVisible();
+    await expect(page.getByText('-2.4').first()).toBeVisible();
+    await expect(page.locator('aside').getByText('Ready for live').first()).toBeVisible();
+    await expect(page.locator('aside').getByText('Audio capture running').first()).toBeVisible();
+    await expect(page.getByText('Backend Kick')).toBeVisible();
+
+    await page.goto('/#/task-queue');
+    await expect(page.getByText('Backend proposal fader move').first()).toBeVisible();
+    await expect(page.getByText('Backend Decision Agent').first()).toBeVisible();
+    await expect(page.getByText('Backend Lead Vox').first()).toBeVisible();
+    await page.locator('.am-table-row').filter({ hasText: 'Backend proposal fader move' }).getByRole('button', { name: 'Apply' }).click();
+    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend Lead Vox');
+    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend supervised gate');
+    await page.getByRole('button', { name: 'Request Supervised Apply' }).click();
+    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend Result');
+    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('verified_from_cache');
+    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('rollback available');
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await page.goto('/#/agents');
+    await expect(page.getByText('Backend Director').first()).toBeVisible();
+    await expect(page.getByText('Backend Executor').first()).toBeVisible();
+
+    await page.goto('/#/communications');
+    await expect(page.getByText('Backend DTO Director').first()).toBeVisible();
+    await expect(page.getByText('Backend DTO communication online').first()).toBeVisible();
+    await expect(page.getByText('Backend DTO').first()).toBeVisible();
+
+    await page.goto('/#/memory');
+    await expect(page.getByText('Backend DTO vocal memory').first()).toBeVisible();
+    await expect(page.getByText('Backend DTO decision memory').first()).toBeVisible();
+    await expect(page.getByText('Backend DTO').first()).toBeVisible();
+
+    await page.goto('/#/performance');
+    await expect(page.getByText('Backend Director').first()).toBeVisible();
+    await expect(page.locator('aside').getByText('Gate ready').first()).toBeVisible();
+
+    await page.goto('/#/settings');
+    await expect(page.getByText('supervised_approval_required').first()).toBeVisible();
+    await expect(page.getByText('supervised_manual_gate').first()).toBeVisible();
+    await expect(page.getByText('fader, gain').first()).toBeVisible();
+
+    await page.goto('/#/groups');
+    await expect(page.getByText('Backend DTO Drums').first()).toBeVisible();
+    await expect(page.getByText('Backend DTO Vocals').first()).toBeVisible();
+    await expect(page.getByText('Backend Kick').first()).toBeVisible();
+    await expect(page.getByText('groups_buses_snapshot / backend_fixture_groups').first()).toBeVisible();
+
+    await page.goto('/#/devices');
+    await expect(page.getByText('Backend WING').first()).toBeVisible();
+
+    await page.goto('/#/system');
+    await expect(page.getByText('Backend Core Node').first()).toBeVisible();
+    await expect(page.getByText('Backend Mixer Node').first()).toBeVisible();
+
+    await page.goto('/#/routing');
+    await expect(page.getByText('Backend Routing Segment').first()).toBeVisible();
+    await expect(page.getByText('Backend Tap Point').first()).toBeVisible();
+
+    await page.goto('/#/osc-midi');
+    await expect(page.getByText('Backend WING').first()).toBeVisible();
+    await expect(page.getByText('supervised_manual_gate').first()).toBeVisible();
+    await expect(page.getByText('Direct OSC writes').first()).toBeVisible();
+
+    await page.goto('/#/logs');
+    await expect(page.getByText('Dashboard snapshot received.').first()).toBeVisible();
+    await expect(page.getByText('Connection topology received.').first()).toBeVisible();
+
+    await page.goto('/#/training');
+    await expect(page.getByText('Backend DTO training set').first()).toBeVisible();
+    await expect(page.getByText('42').first()).toBeVisible();
+
+    await page.goto('/#/rules');
+    await expect(page.getByText('Backend DTO no direct writes').first()).toBeVisible();
+    await expect(page.getByText('Backend DTO supervised gate only').first()).toBeVisible();
+
+    expect(sentTypes).toEqual(expect.arrayContaining([
+      'get_operator_mode',
+      'get_dashboard_snapshot',
+      'get_channel_inventory',
+      'get_decision_queue',
+      'get_operator_agent_roster',
+      'get_connection_topology',
+      'get_groups_buses_snapshot',
+      'get_memory_knowledge_snapshot',
+      'get_training_sessions_snapshot',
+      'get_rules_library_snapshot',
+      'get_agent_communications_snapshot',
+      'apply_operator_proposal'
+    ]));
+    expect(sentTypes).not.toEqual(expect.arrayContaining([
+      'connect_wing',
+      'auto_connect',
+      'set_fader',
+      'set_gain',
+      'set_eq',
+      'set_compressor',
+      'route_output',
+      'route_multiple_outputs',
+      'set_channel_input',
+      'set_channel_alt_input',
+      'load_snap',
+      'save_snap',
+      'undo_restore_snapshot',
+      'set_insert',
+      'set_fx_model',
+      'set_fx_on',
+      'set_fx_mix',
+      'set_fx_parameter',
+      'reset_phase_delay',
+      'start_auto_eq',
+      'apply_eq_correction',
+      'start_realtime_fader',
+      'apply_auto_balance',
+      'start_auto_soundcheck',
+      'start_auto_compressor',
+      'start_auto_compressor_soundcheck',
+      'start_auto_compressor_live'
+    ]));
+  });
+});

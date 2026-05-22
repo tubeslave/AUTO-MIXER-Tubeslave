@@ -19,7 +19,7 @@ fi
 
 echo ""
 echo "Step 3/3: Building Electron app..."
-npm run dist
+npm run dist:frontend
 
 echo ""
 echo "======================================"

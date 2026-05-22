@@ -341,6 +341,46 @@ class WingClient(MixerClientBase):
             logger.error(f"Send failed: {e}")
             return False
 
+    def query_parameter(self, address: str, timeout: float = 0.5) -> Dict[str, Any]:
+        """Query one OSC address and wait briefly for physical readback.
+
+        The caller decides whether a timeout can fall back to the state cache.
+        This helper itself performs only a query message: ``send(address)`` with
+        no values.
+        """
+
+        event = threading.Event()
+        captured: Dict[str, Any] = {"value": None, "args": None}
+
+        def callback(_address: str, *args: Any) -> None:
+            captured["args"] = args
+            if len(args) >= 3:
+                captured["value"] = args[2]
+            elif len(args) == 1:
+                captured["value"] = args[0]
+            else:
+                captured["value"] = self.state.get(address)
+            event.set()
+
+        self.subscribe(address, callback)
+        try:
+            if not self.send(address):
+                return {"status": "send_failed", "address": address, "value": None}
+            if not event.wait(max(0.0, float(timeout))):
+                return {"status": "timeout", "address": address, "value": None}
+            return {
+                "status": "received",
+                "address": address,
+                "value": captured["value"],
+                "args": captured["args"],
+            }
+        finally:
+            callbacks = self.callbacks.get(address)
+            if callbacks and callback in callbacks:
+                callbacks.remove(callback)
+            if callbacks == []:
+                self.callbacks.pop(address, None)
+
     def subscribe(self, address_pattern: str, callback: Callable):
         """Subscribe to OSC address changes"""
         if address_pattern not in self.callbacks:
@@ -375,7 +415,8 @@ class WingClient(MixerClientBase):
         for ch in range(1, 9):
             self.send(f"/ch/{ch}/fdr")      # Fader
             self.send(f"/ch/{ch}/mute")     # Mute
-            self.send(f"/ch/{ch}/name")     # Name
+            self.send(f"/ch/{ch}/$name")    # Source/linked name
+            self.send(f"/ch/{ch}/name")     # Strip name fallback
             time.sleep(0.02)
         
         # Scan mains
@@ -396,6 +437,7 @@ class WingClient(MixerClientBase):
         # First, scan all channel names (important for voice control)
         logger.info("Scanning channel names...")
         for ch in range(1, 41):
+            self.send(f"/ch/{ch}/$name")
             self.send(f"/ch/{ch}/name")
             self.send(f"/ch/{ch}/fdr")
             self.send(f"/ch/{ch}/mute")
@@ -406,7 +448,7 @@ class WingClient(MixerClientBase):
         # Log found channel names
         found_names = []
         for ch in range(1, 41):
-            name = self.state.get(f"/ch/{ch}/name")
+            name = self.state.get(f"/ch/{ch}/$name") or self.state.get(f"/ch/{ch}/name")
             if name:
                 found_names.append(f"Ch{ch}: {name}")
         if found_names:
@@ -509,7 +551,7 @@ class WingClient(MixerClientBase):
             db_value = 10.0
         
         logger.info(f"Setting fader /ch/{channel}/fdr = {db_value:.2f} dB")
-        self.send(address, db_value)
+        return self.send(address, db_value)
 
     def get_channel_mute(self, channel: int) -> Optional[int]:
         """Get channel mute state"""
