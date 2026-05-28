@@ -201,77 +201,129 @@
     "safe_gain_calibration": {
       "target_lufs": -18.0,
       "max_peak_limit": -3.0,
+      "target_peak_db": -10.0,
       "noise_gate_threshold": -40.0,
       "min_signal_presence": 0.05,
       "learning_duration_sec": 30.0,
+      "method_id": "input_trim_preamp_character",
+      "default_mode": "soundcheck",
+      "local_input_preamp": {
+        "enabled": true,
+        "character": "clean",
+        "source": "wing_rack_local_midas_preamp",
+        "local_input_channels": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+        "clean_gain_max_db": 6.0,
+        "coloration_start_db": 9.0,
+        "saturation_start_db": 12.0,
+        "soundcheck_allow_boost": true,
+        "live_allow_boost": false,
+        "soundcheck_max_boost_db": 3.0,
+        "soundcheck_max_cut_db": 6.0,
+        "live_max_cut_db": 1.0,
+        "target_deadband_db": 1.0,
+        "quiet_source_margin_db": 6.0,
+        "soundcheck_boost_min_presence": 0.25,
+        "soundcheck_boost_max_crest_db": 16.0,
+        "soundcheck_boost_min_lufs": -48.0,
+        "clip_safety_margin_db": 1.0,
+        "isolated_peak_min_spread_db": 6.0,
+        "soundcheck_boost_max_lufs_std_db": 7.0,
+        "soundcheck_boost_max_peak_std_db": 8.0,
+        "soundcheck_boost_max_peak_spread_db": 6.0,
+        "soundcheck_boost_min_noise_margin_db": 10.0,
+        "recommendation_hysteresis_db": 0.75,
+        "opposite_direction_hold_db": 1.5,
+        "gain_up_min_stable_windows": 2,
+        "stable_window_tolerance_db": 1.0,
+        "digital_clip_threshold_db": -0.1,
+        "scream_peak_threshold_db": -4.0,
+        "scream_lufs_threshold_db": -16.0
+      },
       "preset_targets": {
         "kick": {
           "target_lufs": -25.0,
-          "max_peak_limit": -6.0
+          "max_peak_limit": -6.0,
+          "target_peak_db": -9.0
         },
         "snare": {
           "target_lufs": -25.0,
-          "max_peak_limit": -6.0
+          "max_peak_limit": -6.0,
+          "target_peak_db": -9.0
         },
         "tom": {
           "target_lufs": -25.0,
-          "max_peak_limit": -6.0
+          "max_peak_limit": -6.0,
+          "target_peak_db": -9.0
         },
         "hihat": {
           "target_lufs": -35.0,
-          "max_peak_limit": -12.0
+          "max_peak_limit": -12.0,
+          "target_peak_db": -14.0
         },
         "ride": {
           "target_lufs": -35.0,
-          "max_peak_limit": -12.0
+          "max_peak_limit": -12.0,
+          "target_peak_db": -14.0
         },
         "overheads": {
           "target_lufs": -35.0,
-          "max_peak_limit": -12.0
+          "max_peak_limit": -12.0,
+          "target_peak_db": -14.0
         },
         "room": {
           "target_lufs": -40.0,
-          "max_peak_limit": -18.0
+          "max_peak_limit": -18.0,
+          "target_peak_db": -16.0
         },
         "bass": {
           "target_lufs": -25.0,
-          "max_peak_limit": -12.0
+          "max_peak_limit": -12.0,
+          "target_peak_db": -10.0
         },
         "leadVocal": {
           "target_lufs": -22.0,
-          "max_peak_limit": -6.0
+          "max_peak_limit": -6.0,
+          "target_peak_db": -8.0
         },
         "backingVocal": {
           "target_lufs": -22.0,
-          "max_peak_limit": -6.0
+          "max_peak_limit": -6.0,
+          "target_peak_db": -10.0
         },
         "electricGuitar": {
           "target_lufs": -25.0,
-          "max_peak_limit": -12.0
+          "max_peak_limit": -12.0,
+          "target_peak_db": -10.0
         },
         "acousticGuitar": {
           "target_lufs": -25.0,
-          "max_peak_limit": -12.0
+          "max_peak_limit": -12.0,
+          "target_peak_db": -10.0
         },
         "keyboard": {
           "target_lufs": -18.0,
-          "max_peak_limit": -3.0
+          "max_peak_limit": -3.0,
+          "target_peak_db": -14.0
         },
         "playback": {
           "target_lufs": -25.0,
-          "max_peak_limit": -12.0
+          "max_peak_limit": -12.0,
+          "target_peak_db": -14.0
         },
         "accordion": {
           "target_lufs": -25.0,
-          "max_peak_limit": -12.0
+          "max_peak_limit": -12.0,
+          "target_peak_db": -10.0
         },
         "custom": {
           "target_lufs": -18.0,
-          "max_peak_limit": -3.0
+          "max_peak_limit": -3.0,
+          "target_peak_db": -10.0
         },
         "cymbals": {
           "target_lufs": -35.0,
-          "max_peak_limit": -12.0
+          "max_peak_limit": -12.0,
+          "target_peak_db": -14.0
         }
       }
     }

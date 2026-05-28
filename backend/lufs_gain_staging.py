@@ -23,6 +23,542 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+INPUT_TRIM_AUTOGAIN_METHOD_ID = "input_trim_preamp_character"
+INPUT_TRIM_ROLE = "input_headroom_not_mix_balance"
+
+
+def _coerce_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _coerce_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    if value is None:
+        return default
+    return bool(value)
+
+
+def _coerce_channel_tuple(value: Any, default: range) -> tuple[int, ...]:
+    if isinstance(value, str):
+        channels = []
+        for part in value.split(","):
+            try:
+                channels.append(int(part.strip()))
+            except ValueError:
+                continue
+        return tuple(channels) if channels else tuple(default)
+    if isinstance(value, (list, tuple, set)):
+        channels = []
+        for item in value:
+            try:
+                channels.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        return tuple(channels) if channels else tuple(default)
+    return tuple(default)
+
+
+_PREAMP_CHARACTER_PRESETS: Dict[str, Dict[str, Any]] = {
+    "clean": {
+        "clean_gain_max_db": 6.0,
+        "coloration_start_db": 9.0,
+        "saturation_start_db": 12.0,
+        "soundcheck_max_boost_db": 3.0,
+    },
+    "warm": {
+        "clean_gain_max_db": 8.0,
+        "coloration_start_db": 6.0,
+        "saturation_start_db": 12.0,
+        "soundcheck_max_boost_db": 2.0,
+    },
+    "drive_protected": {
+        "clean_gain_max_db": 3.0,
+        "coloration_start_db": 6.0,
+        "saturation_start_db": 9.0,
+        "soundcheck_allow_boost": False,
+        "soundcheck_max_boost_db": 0.0,
+    },
+}
+
+
+@dataclass(frozen=True)
+class ChannelPersonalityProfile:
+    """Preset-level gain-staging behavior, separate from artistic balance."""
+
+    family: str
+    boost_policy: str = "allow"
+    min_presence: Optional[float] = None
+    max_crest_db: Optional[float] = None
+    min_lufs: Optional[float] = None
+    max_lufs_std_db: Optional[float] = None
+    min_noise_margin_db: Optional[float] = None
+    isolated_peak_min_spread_db: Optional[float] = None
+    confidence_bias: float = 0.0
+
+    def as_report(self) -> Dict[str, Any]:
+        return {
+            "family": self.family,
+            "boost_policy": self.boost_policy,
+            "confidence_bias": float(self.confidence_bias),
+        }
+
+
+_DEFAULT_CHANNEL_PERSONALITY = ChannelPersonalityProfile(
+    family="general",
+    min_presence=0.25,
+    max_crest_db=16.0,
+    min_lufs=-48.0,
+    max_lufs_std_db=7.0,
+    min_noise_margin_db=10.0,
+    isolated_peak_min_spread_db=6.0,
+)
+
+_PRESET_CHANNEL_PERSONALITIES: Dict[str, ChannelPersonalityProfile] = {
+    "leadvocal": ChannelPersonalityProfile(
+        family="lead_vocal",
+        min_presence=0.35,
+        max_crest_db=18.0,
+        min_lufs=-48.0,
+        max_lufs_std_db=7.0,
+        min_noise_margin_db=12.0,
+        isolated_peak_min_spread_db=6.0,
+        confidence_bias=0.03,
+    ),
+    "backingvocal": ChannelPersonalityProfile(
+        family="backing_vocal",
+        min_presence=0.30,
+        max_crest_db=17.0,
+        min_lufs=-48.0,
+        max_lufs_std_db=7.0,
+        min_noise_margin_db=12.0,
+        isolated_peak_min_spread_db=6.0,
+        confidence_bias=0.01,
+    ),
+    "speech": ChannelPersonalityProfile(
+        family="speech",
+        min_presence=0.40,
+        max_crest_db=16.0,
+        min_lufs=-48.0,
+        max_lufs_std_db=6.0,
+        min_noise_margin_db=14.0,
+        isolated_peak_min_spread_db=6.0,
+        confidence_bias=0.02,
+    ),
+    "kick": ChannelPersonalityProfile(
+        family="transient_percussion",
+        boost_policy="operator_review",
+        min_presence=0.20,
+        max_crest_db=14.0,
+        min_lufs=-46.0,
+        max_lufs_std_db=8.0,
+        min_noise_margin_db=14.0,
+        isolated_peak_min_spread_db=5.0,
+        confidence_bias=-0.08,
+    ),
+    "snare": ChannelPersonalityProfile(
+        family="transient_percussion",
+        boost_policy="operator_review",
+        min_presence=0.18,
+        max_crest_db=14.0,
+        min_lufs=-46.0,
+        max_lufs_std_db=8.0,
+        min_noise_margin_db=14.0,
+        isolated_peak_min_spread_db=5.0,
+        confidence_bias=-0.08,
+    ),
+    "tom": ChannelPersonalityProfile(
+        family="transient_percussion",
+        boost_policy="operator_review",
+        min_presence=0.18,
+        max_crest_db=14.0,
+        min_lufs=-46.0,
+        max_lufs_std_db=8.0,
+        min_noise_margin_db=14.0,
+        isolated_peak_min_spread_db=5.0,
+        confidence_bias=-0.08,
+    ),
+    "hihat": ChannelPersonalityProfile(
+        family="cymbal",
+        boost_policy="operator_review",
+        min_presence=0.20,
+        max_crest_db=18.0,
+        min_lufs=-47.0,
+        max_lufs_std_db=7.0,
+        min_noise_margin_db=14.0,
+        isolated_peak_min_spread_db=5.0,
+        confidence_bias=-0.08,
+    ),
+    "ride": ChannelPersonalityProfile(
+        family="cymbal",
+        boost_policy="operator_review",
+        min_presence=0.20,
+        max_crest_db=18.0,
+        min_lufs=-47.0,
+        max_lufs_std_db=7.0,
+        min_noise_margin_db=14.0,
+        isolated_peak_min_spread_db=5.0,
+        confidence_bias=-0.08,
+    ),
+    "cymbals": ChannelPersonalityProfile(
+        family="cymbal",
+        boost_policy="operator_review",
+        min_presence=0.20,
+        max_crest_db=18.0,
+        min_lufs=-47.0,
+        max_lufs_std_db=7.0,
+        min_noise_margin_db=14.0,
+        isolated_peak_min_spread_db=5.0,
+        confidence_bias=-0.08,
+    ),
+    "overheads": ChannelPersonalityProfile(
+        family="drum_image",
+        boost_policy="operator_review",
+        min_presence=0.30,
+        max_crest_db=18.0,
+        min_lufs=-47.0,
+        max_lufs_std_db=7.0,
+        min_noise_margin_db=14.0,
+        isolated_peak_min_spread_db=5.0,
+        confidence_bias=-0.06,
+    ),
+    "room": ChannelPersonalityProfile(
+        family="drum_room",
+        boost_policy="operator_review",
+        min_presence=0.30,
+        max_crest_db=18.0,
+        min_lufs=-47.0,
+        max_lufs_std_db=7.0,
+        min_noise_margin_db=14.0,
+        isolated_peak_min_spread_db=5.0,
+        confidence_bias=-0.06,
+    ),
+    "bass": ChannelPersonalityProfile(
+        family="sustained_instrument",
+        min_presence=0.45,
+        max_crest_db=14.0,
+        min_lufs=-48.0,
+        max_lufs_std_db=5.0,
+        min_noise_margin_db=10.0,
+        isolated_peak_min_spread_db=6.0,
+        confidence_bias=0.02,
+    ),
+    "electricguitar": ChannelPersonalityProfile(
+        family="compressed_instrument",
+        min_presence=0.40,
+        max_crest_db=14.0,
+        min_lufs=-48.0,
+        max_lufs_std_db=5.5,
+        min_noise_margin_db=10.0,
+        isolated_peak_min_spread_db=6.0,
+        confidence_bias=0.01,
+    ),
+    "acousticguitar": ChannelPersonalityProfile(
+        family="acoustic_instrument",
+        min_presence=0.35,
+        max_crest_db=16.0,
+        min_lufs=-48.0,
+        max_lufs_std_db=6.0,
+        min_noise_margin_db=12.0,
+        isolated_peak_min_spread_db=6.0,
+    ),
+    "keyboard": ChannelPersonalityProfile(
+        family="keyboard",
+        min_presence=0.55,
+        max_crest_db=12.0,
+        min_lufs=-50.0,
+        max_lufs_std_db=4.0,
+        min_noise_margin_db=8.0,
+        isolated_peak_min_spread_db=6.0,
+        confidence_bias=0.04,
+    ),
+    "accordion": ChannelPersonalityProfile(
+        family="sustained_instrument",
+        min_presence=0.45,
+        max_crest_db=14.0,
+        min_lufs=-48.0,
+        max_lufs_std_db=5.5,
+        min_noise_margin_db=10.0,
+        isolated_peak_min_spread_db=6.0,
+        confidence_bias=0.01,
+    ),
+    "playback": ChannelPersonalityProfile(
+        family="playback",
+        min_presence=0.60,
+        max_crest_db=10.0,
+        min_lufs=-52.0,
+        max_lufs_std_db=3.0,
+        min_noise_margin_db=8.0,
+        isolated_peak_min_spread_db=7.0,
+        confidence_bias=0.06,
+    ),
+}
+
+
+def _preset_key(preset: str) -> str:
+    return "".join(ch for ch in str(preset or "custom").lower() if ch.isalnum())
+
+
+def _channel_personality_for_preset(preset: str) -> ChannelPersonalityProfile:
+    return _PRESET_CHANNEL_PERSONALITIES.get(_preset_key(preset), _DEFAULT_CHANNEL_PERSONALITY)
+
+
+def _gain_direction(delta_db: Optional[float], threshold_db: float = 0.25) -> str:
+    if delta_db is None:
+        return "unknown"
+    if delta_db > threshold_db:
+        return "up"
+    if delta_db < -threshold_db:
+        return "down"
+    return "hold"
+
+
+@dataclass(frozen=True)
+class LocalInputGainProfile:
+    """Model the local mixer gain knob as a tone/drive stage, not just trim."""
+
+    enabled: bool = True
+    character: str = "clean"
+    source: str = "wing_rack_local_midas_preamp"
+    local_input_channels: tuple[int, ...] = field(default_factory=lambda: tuple(range(1, 25)))
+    min_gain_db: float = -18.0
+    hard_max_gain_db: float = 18.0
+    clean_gain_max_db: float = 6.0
+    coloration_start_db: float = 9.0
+    saturation_start_db: float = 12.0
+    soundcheck_allow_boost: bool = True
+    live_allow_boost: bool = False
+    soundcheck_max_boost_db: float = 3.0
+    soundcheck_max_cut_db: float = 6.0
+    live_max_cut_db: float = 1.0
+    target_deadband_db: float = 1.0
+    quiet_source_margin_db: float = 6.0
+    soundcheck_boost_min_presence: float = 0.25
+    soundcheck_boost_max_crest_db: float = 16.0
+    soundcheck_boost_min_lufs: float = -48.0
+    clip_safety_margin_db: float = 1.0
+    isolated_peak_min_spread_db: float = 6.0
+    soundcheck_boost_max_lufs_std_db: float = 7.0
+    soundcheck_boost_max_peak_std_db: float = 8.0
+    soundcheck_boost_max_peak_spread_db: float = 6.0
+    soundcheck_boost_min_noise_margin_db: float = 10.0
+    recommendation_hysteresis_db: float = 0.75
+    opposite_direction_hold_db: float = 1.5
+    gain_up_min_stable_windows: int = 2
+    stable_window_tolerance_db: float = 1.0
+    digital_clip_threshold_db: float = -0.1
+    scream_peak_threshold_db: float = -4.0
+    scream_lufs_threshold_db: float = -16.0
+
+    @classmethod
+    def from_config(cls, config: Optional[Dict[str, Any]] = None) -> "LocalInputGainProfile":
+        config = dict(config or {})
+        character = str(config.get("character") or "clean").strip().lower()
+        preset = dict(_PREAMP_CHARACTER_PRESETS.get(character, {}))
+        merged = {**preset, **config, "character": character}
+        return cls(
+            enabled=_coerce_bool(merged.get("enabled"), True),
+            character=character,
+            source=str(merged.get("source") or "wing_rack_local_midas_preamp"),
+            local_input_channels=_coerce_channel_tuple(
+                merged.get("local_input_channels"),
+                range(1, 25),
+            ),
+            min_gain_db=_coerce_float(merged.get("min_gain_db"), -18.0),
+            hard_max_gain_db=_coerce_float(merged.get("hard_max_gain_db"), 18.0),
+            clean_gain_max_db=_coerce_float(merged.get("clean_gain_max_db"), 6.0),
+            coloration_start_db=_coerce_float(merged.get("coloration_start_db"), 9.0),
+            saturation_start_db=_coerce_float(merged.get("saturation_start_db"), 12.0),
+            soundcheck_allow_boost=_coerce_bool(merged.get("soundcheck_allow_boost"), True),
+            live_allow_boost=_coerce_bool(merged.get("live_allow_boost"), False),
+            soundcheck_max_boost_db=_coerce_float(merged.get("soundcheck_max_boost_db"), 3.0),
+            soundcheck_max_cut_db=_coerce_float(merged.get("soundcheck_max_cut_db"), 6.0),
+            live_max_cut_db=_coerce_float(merged.get("live_max_cut_db"), 1.0),
+            target_deadband_db=_coerce_float(merged.get("target_deadband_db"), 1.0),
+            quiet_source_margin_db=_coerce_float(merged.get("quiet_source_margin_db"), 6.0),
+            soundcheck_boost_min_presence=_coerce_float(merged.get("soundcheck_boost_min_presence"), 0.25),
+            soundcheck_boost_max_crest_db=_coerce_float(merged.get("soundcheck_boost_max_crest_db"), 16.0),
+            soundcheck_boost_min_lufs=_coerce_float(merged.get("soundcheck_boost_min_lufs"), -48.0),
+            clip_safety_margin_db=_coerce_float(merged.get("clip_safety_margin_db"), 1.0),
+            isolated_peak_min_spread_db=_coerce_float(merged.get("isolated_peak_min_spread_db"), 6.0),
+            soundcheck_boost_max_lufs_std_db=_coerce_float(merged.get("soundcheck_boost_max_lufs_std_db"), 7.0),
+            soundcheck_boost_max_peak_std_db=_coerce_float(merged.get("soundcheck_boost_max_peak_std_db"), 8.0),
+            soundcheck_boost_max_peak_spread_db=_coerce_float(merged.get("soundcheck_boost_max_peak_spread_db"), 6.0),
+            soundcheck_boost_min_noise_margin_db=_coerce_float(merged.get("soundcheck_boost_min_noise_margin_db"), 10.0),
+            recommendation_hysteresis_db=_coerce_float(merged.get("recommendation_hysteresis_db"), 0.75),
+            opposite_direction_hold_db=_coerce_float(merged.get("opposite_direction_hold_db"), 1.5),
+            gain_up_min_stable_windows=max(1, int(_coerce_float(merged.get("gain_up_min_stable_windows"), 2))),
+            stable_window_tolerance_db=_coerce_float(merged.get("stable_window_tolerance_db"), 1.0),
+            digital_clip_threshold_db=_coerce_float(merged.get("digital_clip_threshold_db"), -0.1),
+            scream_peak_threshold_db=_coerce_float(merged.get("scream_peak_threshold_db"), -4.0),
+            scream_lufs_threshold_db=_coerce_float(merged.get("scream_lufs_threshold_db"), -16.0),
+        )
+
+    def is_local_input(self, mixer_channel: Optional[int]) -> bool:
+        if mixer_channel is None:
+            return False
+        try:
+            return int(mixer_channel) in self.local_input_channels
+        except (TypeError, ValueError):
+            return False
+
+    def zone_for_gain(self, gain_db: Optional[float]) -> str:
+        if gain_db is None:
+            return "unknown"
+        if gain_db >= self.saturation_start_db:
+            return "saturation_risk"
+        if gain_db >= self.coloration_start_db:
+            return "colored"
+        if gain_db <= self.clean_gain_max_db:
+            return "clean"
+        return "transition"
+
+    def distortion_risk(self, target_gain_db: Optional[float], *, local_input: bool) -> str:
+        if not self.enabled or not local_input or target_gain_db is None:
+            return "unknown"
+        zone = self.zone_for_gain(target_gain_db)
+        if zone == "saturation_risk":
+            return "high"
+        if zone in {"colored", "transition"}:
+            return "medium"
+        return "low"
+
+    def max_cut_for_mode(self, mode: str) -> float:
+        return self.live_max_cut_db if mode == "live" else self.soundcheck_max_cut_db
+
+    def max_boost_for_mode(self, mode: str) -> float:
+        if mode == "live":
+            return self.soundcheck_max_boost_db if self.live_allow_boost else 0.0
+        return self.soundcheck_max_boost_db if self.soundcheck_allow_boost else 0.0
+
+    def soundcheck_boost_thresholds(self, preset: str) -> Dict[str, Any]:
+        personality = _channel_personality_for_preset(preset)
+        return {
+            "personality": personality,
+            "min_presence": max(
+                float(self.soundcheck_boost_min_presence),
+                float(personality.min_presence)
+                if personality.min_presence is not None
+                else float(self.soundcheck_boost_min_presence),
+            ),
+            "max_crest_db": (
+                float(personality.max_crest_db)
+                if personality.max_crest_db is not None
+                else float(self.soundcheck_boost_max_crest_db)
+            ),
+            "min_lufs": max(
+                float(self.soundcheck_boost_min_lufs),
+                float(personality.min_lufs)
+                if personality.min_lufs is not None
+                else float(self.soundcheck_boost_min_lufs),
+            ),
+            "max_lufs_std_db": (
+                float(personality.max_lufs_std_db)
+                if personality.max_lufs_std_db is not None
+                else float(self.soundcheck_boost_max_lufs_std_db)
+            ),
+            "max_peak_std_db": float(self.soundcheck_boost_max_peak_std_db),
+            "max_peak_spread_db": float(self.soundcheck_boost_max_peak_spread_db),
+            "min_noise_margin_db": max(
+                float(self.soundcheck_boost_min_noise_margin_db),
+                float(personality.min_noise_margin_db)
+                if personality.min_noise_margin_db is not None
+                else float(self.soundcheck_boost_min_noise_margin_db),
+            ),
+            "isolated_peak_min_spread_db": (
+                float(personality.isolated_peak_min_spread_db)
+                if personality.isolated_peak_min_spread_db is not None
+                else float(self.isolated_peak_min_spread_db)
+            ),
+        }
+
+    def soundcheck_boost_guard(
+        self,
+        *,
+        signal_presence_ratio: float,
+        crest_factor_db: float,
+        integrated_lufs: float,
+        preset: str,
+        lufs_std_db: float,
+        peak_std_db: float,
+        isolated_peak_spread_db: float,
+        noise_floor_margin_db: Optional[float],
+    ) -> tuple[Optional[str], str, Dict[str, Any]]:
+        thresholds = self.soundcheck_boost_thresholds(preset)
+        personality = thresholds["personality"]
+        evidence = {
+            "personality": personality.as_report(),
+            "min_presence": float(thresholds["min_presence"]),
+            "max_crest_db": float(thresholds["max_crest_db"]),
+            "min_lufs": float(thresholds["min_lufs"]),
+            "max_lufs_std_db": float(thresholds["max_lufs_std_db"]),
+            "max_peak_std_db": float(thresholds["max_peak_std_db"]),
+            "max_peak_spread_db": float(thresholds["max_peak_spread_db"]),
+            "min_noise_margin_db": float(thresholds["min_noise_margin_db"]),
+            "noise_floor_margin_db": (
+                float(noise_floor_margin_db)
+                if noise_floor_margin_db is not None
+                else None
+            ),
+        }
+        if signal_presence_ratio < thresholds["min_presence"]:
+            return (
+                "unstable_presence_boost_block",
+                "Soundcheck boost blocked: signal presence is too sparse for a stable input-gain decision.",
+                evidence,
+            )
+        if crest_factor_db > thresholds["max_crest_db"]:
+            return (
+                "transient_dominant_boost_block",
+                "Soundcheck boost blocked: high crest factor suggests transient-dominant material; preserve headroom.",
+                evidence,
+            )
+        if integrated_lufs < thresholds["min_lufs"]:
+            return (
+                "noise_floor_boost_block",
+                "Soundcheck boost blocked: integrated level is too close to the noise floor for automatic gain raise.",
+                evidence,
+            )
+        if lufs_std_db > thresholds["max_lufs_std_db"]:
+            return (
+                "unstable_dynamics_boost_block",
+                "Soundcheck boost blocked: loudness varies too much for a stable automatic gain raise.",
+                evidence,
+            )
+        if peak_std_db > thresholds["max_peak_std_db"]:
+            return (
+                "unstable_dynamics_boost_block",
+                "Soundcheck boost blocked: peak level varies too much for a stable automatic gain raise.",
+                evidence,
+            )
+        if isolated_peak_spread_db > thresholds["max_peak_spread_db"]:
+            return (
+                "isolated_peak_boost_block",
+                "Soundcheck boost blocked: an isolated peak already constrains safe input headroom.",
+                evidence,
+            )
+        if (
+            noise_floor_margin_db is not None
+            and noise_floor_margin_db < thresholds["min_noise_margin_db"]
+        ):
+            return (
+                "noise_floor_margin_boost_block",
+                "Soundcheck boost blocked: source level is too close to measured noise floor.",
+                evidence,
+            )
+        if personality.boost_policy == "operator_review":
+            return (
+                "source_personality_boost_review",
+                "Soundcheck boost requires operator review for this source type.",
+                evidence,
+            )
+        return None, "", evidence
+
 
 class AnalysisState(Enum):
     """Analysis state for Safe Static Gain system."""
@@ -43,6 +579,7 @@ class SignalStats:
     active_samples: int = 0
     rms_values: List[float] = field(default_factory=list)
     peak_values: List[float] = field(default_factory=list)
+    inactive_rms_values: List[float] = field(default_factory=list)
 
     noise_gate_threshold_db: float = -40.0
 
@@ -50,6 +587,14 @@ class SignalStats:
 
     suggested_gain_db: float = 0.0
     gain_limited_by: str = "none"
+    target_peak_db: float = -10.0
+    current_trim_db: Optional[float] = None
+    target_trim_db: Optional[float] = None
+    suggestion_confidence: float = 0.0
+    operator_action: str = "none"
+    operator_note: str = ""
+    input_gain_character: Dict[str, Any] = field(default_factory=dict)
+    safety_policy: Dict[str, Any] = field(default_factory=dict)
 
     def update_sample(self, true_peak_db: float, lufs: float, sample_rms_db: float):
         """Update stats with new sample measurement."""
@@ -62,6 +607,8 @@ class SignalStats:
 
             if true_peak_db > self.max_true_peak_db:
                 self.max_true_peak_db = true_peak_db
+        else:
+            self.inactive_rms_values.append(sample_rms_db)
 
         self.signal_presence_ratio = self.active_samples / max(self.total_samples, 1)
 
@@ -152,6 +699,442 @@ class SignalStats:
                    f"Crest={self.crest_factor_db:.1f}dB, Gain={self.suggested_gain_db:+.1f}dB "
                    f"(limited_by={self.gain_limited_by})")
 
+    def calculate_input_trim_recommendation(
+        self,
+        *,
+        current_trim_db: Optional[float],
+        target_peak_db: float = -10.0,
+        max_peak_limit: float = -3.0,
+        target_lufs: float = -18.0,
+        min_signal_presence: float = 0.05,
+        preamp_profile: Optional[LocalInputGainProfile] = None,
+        mode: str = "soundcheck",
+        mixer_channel: Optional[int] = None,
+        preset: str = "custom",
+        previous_recommendation: Optional[Dict[str, Any]] = None,
+    ):
+        """Calculate the canonical autogain move for input trim.
+
+        Input gain is treated as a preamp/drive control for local mixer inputs.
+        The recommendation therefore targets headroom first and refuses to use
+        live boosts or clean-range-breaking boosts as a loudness balancer.
+        """
+
+        profile = preamp_profile or LocalInputGainProfile()
+        mode = "live" if str(mode).lower() == "live" else "soundcheck"
+        current_trim = _coerce_float(current_trim_db, 0.0)
+        self.current_trim_db = current_trim
+        self.target_peak_db = float(target_peak_db)
+        self.target_trim_db = current_trim
+        self.suggested_gain_db = 0.0
+        self.gain_limited_by = "none"
+        self.operator_action = "none"
+        self.operator_note = ""
+        self.suggestion_confidence = 0.0
+
+        local_input = profile.is_local_input(mixer_channel)
+        current_zone = profile.zone_for_gain(current_trim) if profile.enabled else "disabled"
+
+        self.safety_policy = {
+            "method_id": INPUT_TRIM_AUTOGAIN_METHOD_ID,
+            "role": INPUT_TRIM_ROLE,
+            "mode": mode,
+            "balance_surface": "fader",
+            "live_policy": "trim_down_only" if mode == "live" else "operator_reviewed_soundcheck",
+        }
+
+        if self.signal_presence_ratio < min_signal_presence:
+            self.gain_limited_by = "silent_or_bleed_only"
+            self.operator_action = "check_source"
+            self.operator_note = "Signal presence is too low; do not raise preamp gain from bleed."
+            self.input_gain_character = {
+                "source": profile.source,
+                "local_input": local_input,
+                "current_zone": current_zone,
+                "target_zone": current_zone,
+                "distortion_risk": "unknown",
+            }
+            logger.info(
+                f"Ch{self.channel_id}: input trim skipped; signal presence={self.signal_presence_ratio:.1%}"
+            )
+            return
+
+        self.calculate_integrated_lufs()
+        self.calculate_crest_factor()
+
+        boost_thresholds = profile.soundcheck_boost_thresholds(preset)
+        channel_personality = boost_thresholds["personality"]
+        peak_p95_db = (
+            float(np.percentile(self.peak_values, 95))
+            if self.peak_values
+            else float(self.max_true_peak_db)
+        )
+        isolated_peak_spread_db = max(0.0, float(self.max_true_peak_db) - peak_p95_db)
+        lufs_std_db = float(np.std(self.rms_values)) if self.rms_values else 0.0
+        peak_std_db = float(np.std(self.peak_values)) if self.peak_values else 0.0
+        inactive_noise_values = [v for v in self.inactive_rms_values if v > -95.0]
+        noise_floor_db = (
+            float(np.percentile(inactive_noise_values, 90))
+            if inactive_noise_values
+            else None
+        )
+        noise_floor_margin_db = (
+            float(self.integrated_lufs - noise_floor_db)
+            if noise_floor_db is not None
+            else None
+        )
+        digital_clip_detected = self.max_true_peak_db >= profile.digital_clip_threshold_db
+        preamp_saturation_detected = (
+            bool(local_input)
+            and profile.enabled
+            and current_zone == "saturation_risk"
+            and self.max_true_peak_db > max_peak_limit
+        )
+        vocal_scream_detected = (
+            channel_personality.family in {"lead_vocal", "backing_vocal", "speech"}
+            and self.max_true_peak_db >= profile.scream_peak_threshold_db
+            and self.integrated_lufs >= profile.scream_lufs_threshold_db
+        )
+        overload_classification = "normal"
+        if digital_clip_detected:
+            overload_classification = "digital_clip"
+        elif preamp_saturation_detected:
+            overload_classification = "preamp_saturation_risk"
+        elif vocal_scream_detected:
+            overload_classification = "vocal_scream_or_shout"
+        elif isolated_peak_spread_db > boost_thresholds["max_peak_spread_db"]:
+            overload_classification = "isolated_spike"
+        overload_state = {
+            "classification": overload_classification,
+            "digital_clip_detected": bool(digital_clip_detected),
+            "preamp_saturation_detected": bool(preamp_saturation_detected),
+            "vocal_scream_detected": bool(vocal_scream_detected),
+            "digital_clip_threshold_db": float(profile.digital_clip_threshold_db),
+            "scream_peak_threshold_db": float(profile.scream_peak_threshold_db),
+            "scream_lufs_threshold_db": float(profile.scream_lufs_threshold_db),
+        }
+        peak_error = self.target_peak_db - self.max_true_peak_db
+        deadband = max(0.1, profile.target_deadband_db)
+        desired_delta = 0.0
+        reason = "within_input_headroom_window"
+        boost_guard = {
+            "active": False,
+            "reason": None,
+            "personality": channel_personality.as_report(),
+            "min_presence": float(boost_thresholds["min_presence"]),
+            "max_crest_db": float(boost_thresholds["max_crest_db"]),
+            "min_lufs": float(boost_thresholds["min_lufs"]),
+            "max_lufs_std_db": float(boost_thresholds["max_lufs_std_db"]),
+            "max_peak_std_db": float(boost_thresholds["max_peak_std_db"]),
+            "max_peak_spread_db": float(boost_thresholds["max_peak_spread_db"]),
+            "min_noise_margin_db": float(boost_thresholds["min_noise_margin_db"]),
+            "noise_floor_margin_db": (
+                float(noise_floor_margin_db)
+                if noise_floor_margin_db is not None
+                else None
+            ),
+        }
+        hysteresis_state = {
+            "active": False,
+            "reason": None,
+            "recommendation_hysteresis_db": float(profile.recommendation_hysteresis_db),
+            "opposite_direction_hold_db": float(profile.opposite_direction_hold_db),
+            "previous_direction": "unknown",
+            "current_direction": "hold",
+        }
+
+        if digital_clip_detected:
+            clip_target = float(max_peak_limit) - max(0.0, profile.clip_safety_margin_db)
+            desired_delta = clip_target - self.max_true_peak_db
+            reason = "digital_clip_headroom"
+        elif preamp_saturation_detected:
+            clean_zone_delta = profile.clean_gain_max_db - current_trim
+            desired_delta = min(peak_error, clean_zone_delta)
+            reason = "preamp_saturation_trim_down"
+        elif self.max_true_peak_db > max_peak_limit:
+            if isolated_peak_spread_db >= boost_thresholds["isolated_peak_min_spread_db"]:
+                clip_target = float(max_peak_limit) - max(0.0, profile.clip_safety_margin_db)
+                desired_delta = clip_target - self.max_true_peak_db
+                reason = "isolated_peak_headroom"
+            else:
+                desired_delta = peak_error
+                reason = "peak_headroom"
+        elif self.max_true_peak_db > self.target_peak_db + deadband:
+            desired_delta = peak_error
+            reason = "target_peak"
+        elif self.max_true_peak_db < self.target_peak_db - profile.quiet_source_margin_db:
+            desired_delta = peak_error
+            reason = "quiet_source"
+
+        if desired_delta > 0.0 and mode == "live" and not profile.live_allow_boost:
+            self.gain_limited_by = "live_down_only"
+            self.operator_action = "operator_review"
+            self.operator_note = "Live mode blocks input gain boosts; use fader or manual source check."
+            desired_delta = 0.0
+
+        max_cut = max(0.0, profile.max_cut_for_mode(mode))
+        max_boost = max(0.0, profile.max_boost_for_mode(mode))
+        if desired_delta < 0.0:
+            desired_delta = max(desired_delta, -max_cut)
+        elif desired_delta > 0.0:
+            desired_delta = min(desired_delta, max_boost)
+            if max_boost <= 0.0:
+                self.gain_limited_by = "boost_disabled"
+                self.operator_action = "operator_review"
+                self.operator_note = "Configured preamp profile blocks automatic gain boosts."
+
+        if desired_delta > 0.0 and mode == "soundcheck":
+            guard_reason, guard_note, guard_evidence = profile.soundcheck_boost_guard(
+                signal_presence_ratio=self.signal_presence_ratio,
+                crest_factor_db=self.crest_factor_db,
+                integrated_lufs=self.integrated_lufs,
+                preset=preset,
+                lufs_std_db=lufs_std_db,
+                peak_std_db=peak_std_db,
+                isolated_peak_spread_db=isolated_peak_spread_db,
+                noise_floor_margin_db=noise_floor_margin_db,
+            )
+            boost_guard.update(guard_evidence)
+            if guard_reason:
+                boost_guard["active"] = True
+                boost_guard["reason"] = guard_reason
+                self.gain_limited_by = guard_reason
+                self.operator_action = "operator_review"
+                self.operator_note = guard_note
+                desired_delta = 0.0
+
+        target_trim = current_trim + desired_delta
+        target_trim = max(profile.min_gain_db, min(profile.hard_max_gain_db, target_trim))
+        desired_delta = target_trim - current_trim
+
+        if (
+            desired_delta > 0.0
+            and profile.enabled
+            and local_input
+            and target_trim > profile.clean_gain_max_db
+        ):
+            capped_target = min(profile.clean_gain_max_db, profile.hard_max_gain_db)
+            capped_delta = capped_target - current_trim
+            if capped_delta > 0.0:
+                target_trim = capped_target
+                desired_delta = capped_delta
+                self.gain_limited_by = "preamp_clean_range"
+                self.operator_note = (
+                    "Boost capped at the clean local preamp range; further gain would change tone."
+                )
+            else:
+                target_trim = current_trim
+                desired_delta = 0.0
+                self.gain_limited_by = "preamp_character_limit"
+                self.operator_action = "manual_gain_or_source_check"
+                self.operator_note = (
+                    "Local gain is already above the clean range; do not auto-boost into preamp drive."
+                )
+
+        previous_delta = None
+        if isinstance(previous_recommendation, dict):
+            raw_previous_delta = previous_recommendation.get("suggested_gain_db")
+            if raw_previous_delta is not None:
+                previous_delta = _coerce_float(raw_previous_delta, 0.0)
+
+        previous_direction = _gain_direction(previous_delta)
+        current_direction = _gain_direction(desired_delta)
+        hysteresis_state["previous_direction"] = previous_direction
+        hysteresis_state["current_direction"] = current_direction
+        urgent_headroom_cut = desired_delta < 0.0 and self.max_true_peak_db > max_peak_limit
+        if (
+            current_direction in {"up", "down"}
+            and previous_direction in {"up", "down"}
+            and current_direction != previous_direction
+            and not urgent_headroom_cut
+            and abs(desired_delta) <= max(0.0, profile.opposite_direction_hold_db)
+        ):
+            desired_delta = 0.0
+            target_trim = current_trim
+            self.gain_limited_by = "anti_oscillation_hold"
+            self.operator_action = "hold"
+            self.operator_note = (
+                "Recommendation held: small opposite-direction trim move would risk gain oscillation."
+            )
+            hysteresis_state.update({
+                "active": True,
+                "reason": "small_opposite_direction_change",
+                "held_previous_delta_db": float(previous_delta or 0.0),
+            })
+
+        candidate_delta = desired_delta
+        candidate_direction = _gain_direction(candidate_delta)
+        previous_stability = {}
+        if isinstance(previous_recommendation, dict):
+            previous_character = previous_recommendation.get("input_gain_character")
+            if isinstance(previous_character, dict):
+                previous_stability = previous_character.get("stability") or {}
+        previous_candidate_direction = (
+            str(previous_stability.get("candidate_direction") or previous_direction)
+            if isinstance(previous_stability, dict)
+            else previous_direction
+        )
+        previous_candidate_delta = None
+        if isinstance(previous_stability, dict) and previous_stability.get("candidate_delta_db") is not None:
+            previous_candidate_delta = _coerce_float(previous_stability.get("candidate_delta_db"), 0.0)
+        previous_evidence_windows = 0
+        if isinstance(previous_stability, dict):
+            previous_evidence_windows = max(0, int(_coerce_float(previous_stability.get("evidence_windows"), 0.0)))
+        same_stable_candidate = (
+            candidate_direction in {"up", "down"}
+            and previous_candidate_direction == candidate_direction
+            and (
+                previous_candidate_delta is None
+                or abs(candidate_delta - previous_candidate_delta) <= max(0.0, profile.stable_window_tolerance_db)
+            )
+        )
+        evidence_windows = (
+            previous_evidence_windows + 1
+            if same_stable_candidate
+            else (1 if candidate_direction in {"up", "down"} else 0)
+        )
+        stability_state = {
+            "active": False,
+            "reason": None,
+            "candidate_direction": candidate_direction,
+            "candidate_delta_db": float(candidate_delta),
+            "evidence_windows": int(evidence_windows),
+            "required_gain_up_windows": int(profile.gain_up_min_stable_windows),
+            "stable_window_tolerance_db": float(profile.stable_window_tolerance_db),
+        }
+        if (
+            candidate_direction == "up"
+            and mode == "soundcheck"
+            and evidence_windows < profile.gain_up_min_stable_windows
+        ):
+            desired_delta = 0.0
+            target_trim = current_trim
+            self.gain_limited_by = "gain_up_stability_wait"
+            self.operator_action = "operator_review"
+            self.operator_note = (
+                "Soundcheck boost held until the same gain-up evidence repeats across stable windows."
+            )
+            stability_state.update({
+                "active": True,
+                "reason": "waiting_for_repeated_gain_up_evidence",
+            })
+
+        target_zone = profile.zone_for_gain(target_trim) if profile.enabled else "disabled"
+        distortion_risk = profile.distortion_risk(target_trim, local_input=local_input)
+        direction = "down" if desired_delta < 0.0 else "up" if desired_delta > 0.0 else "hold"
+        source_behavior = "stable_dynamic"
+        if self.signal_presence_ratio < boost_thresholds["min_presence"]:
+            source_behavior = "sparse_source"
+        elif isolated_peak_spread_db > boost_thresholds["max_peak_spread_db"]:
+            source_behavior = "isolated_peak_source"
+        elif self.crest_factor_db > boost_thresholds["max_crest_db"]:
+            source_behavior = "transient_dominant"
+        elif (
+            lufs_std_db > boost_thresholds["max_lufs_std_db"]
+            or peak_std_db > boost_thresholds["max_peak_std_db"]
+        ):
+            source_behavior = "unstable_dynamic"
+        elif (
+            noise_floor_margin_db is not None
+            and noise_floor_margin_db < boost_thresholds["min_noise_margin_db"]
+        ):
+            source_behavior = "low_noise_margin"
+        elif channel_personality.boost_policy == "operator_review":
+            source_behavior = "operator_review_source"
+        elif self.crest_factor_db <= 8.0 and lufs_std_db <= 3.0 and peak_std_db <= 3.0:
+            source_behavior = "compressed_stable"
+
+        if abs(desired_delta) < 0.25:
+            desired_delta = 0.0
+            target_trim = current_trim
+            if self.gain_limited_by == "none":
+                self.gain_limited_by = reason
+            if self.operator_action == "none":
+                self.operator_action = "hold"
+            self.operator_note = self.operator_note or "Input trim is already inside the safe headroom window."
+        else:
+            self.gain_limited_by = self.gain_limited_by if self.gain_limited_by != "none" else reason
+            self.operator_action = "apply_trim_proposal"
+            self.operator_note = self.operator_note or (
+                "Trim down protects input headroom."
+                if desired_delta < 0.0
+                else "Soundcheck-only clean-range boost; do not use as mix balance."
+            )
+
+        direction = "down" if desired_delta < 0.0 else "up" if desired_delta > 0.0 else "hold"
+        confidence = 0.88
+        confidence += channel_personality.confidence_bias
+        if direction == "up":
+            confidence -= 0.12
+            if channel_personality.boost_policy == "operator_review":
+                confidence -= 0.20
+        if distortion_risk == "medium":
+            confidence -= 0.10
+        elif distortion_risk == "high":
+            confidence -= 0.25
+        if local_input is False and profile.enabled:
+            confidence -= 0.05
+        if source_behavior in {
+            "sparse_source",
+            "isolated_peak_source",
+            "transient_dominant",
+            "unstable_dynamic",
+            "low_noise_margin",
+            "operator_review_source",
+        }:
+            confidence -= 0.06
+        if (
+            noise_floor_margin_db is not None
+            and noise_floor_margin_db < boost_thresholds["min_noise_margin_db"]
+        ):
+            confidence -= 0.12
+        if desired_delta == 0.0:
+            confidence = min(confidence, 0.55)
+
+        self.suggested_gain_db = float(np.clip(desired_delta, -24.0, 24.0))
+        self.target_trim_db = float(target_trim)
+        self.suggestion_confidence = max(0.0, min(0.95, confidence))
+        self.input_gain_character = {
+            "source": profile.source,
+            "character": profile.character,
+            "local_input": bool(local_input),
+            "current_zone": current_zone,
+            "target_zone": target_zone,
+            "distortion_risk": distortion_risk,
+            "clean_gain_max_db": float(profile.clean_gain_max_db),
+            "coloration_start_db": float(profile.coloration_start_db),
+            "saturation_start_db": float(profile.saturation_start_db),
+            "direction": direction,
+            "gain_changes_tone": bool(profile.enabled and local_input),
+            "source_behavior": source_behavior,
+            "boost_guard": boost_guard,
+            "hysteresis": hysteresis_state,
+            "stability": stability_state,
+            "overload": overload_state,
+            "channel_personality": channel_personality.as_report(),
+            "integrated_lufs": float(self.integrated_lufs),
+            "crest_factor_db": float(self.crest_factor_db),
+            "signal_presence_ratio": float(self.signal_presence_ratio),
+            "peak_p95_db": float(peak_p95_db),
+            "isolated_peak_spread_db": float(isolated_peak_spread_db),
+            "isolated_peak_min_spread_db": float(boost_thresholds["isolated_peak_min_spread_db"]),
+            "lufs_std_db": float(lufs_std_db),
+            "peak_std_db": float(peak_std_db),
+            "noise_floor_db": float(noise_floor_db) if noise_floor_db is not None else None,
+            "noise_floor_margin_db": (
+                float(noise_floor_margin_db)
+                if noise_floor_margin_db is not None
+                else None
+            ),
+        }
+
+        logger.info(
+            f"Ch{self.channel_id}: input trim {current_trim:+.1f}->{target_trim:+.1f} dB "
+            f"(delta={self.suggested_gain_db:+.1f}, peak={self.max_true_peak_db:.1f}, "
+            f"target_peak={self.target_peak_db:.1f}, mode={mode}, zone={current_zone}->{target_zone}, "
+            f"limited_by={self.gain_limited_by})"
+        )
+
     def get_report(self) -> Dict[str, Any]:
         """Generate analysis report."""
         return {
@@ -162,6 +1145,17 @@ class SignalStats:
             'signal_presence': round(self.signal_presence_ratio * 100, 1),
             'suggested_gain_db': round(self.suggested_gain_db, 1),
             'limited_by': self.gain_limited_by,
+            'method_id': INPUT_TRIM_AUTOGAIN_METHOD_ID,
+            'input_trim_role': INPUT_TRIM_ROLE,
+            'target_peak_db': round(float(self.target_peak_db), 1),
+            'current_trim_db': round(float(self.current_trim_db), 1) if self.current_trim_db is not None else None,
+            'target_trim_db': round(float(self.target_trim_db), 1) if self.target_trim_db is not None else None,
+            'confidence': round(float(self.suggestion_confidence), 2),
+            'operator_action': self.operator_action,
+            'operator_note': self.operator_note,
+            'auto_apply_allowed': self.operator_action == "apply_trim_proposal" and self.suggested_gain_db < 0.0,
+            'input_gain_character': dict(self.input_gain_character),
+            'safety_policy': dict(self.safety_policy),
             'samples_analyzed': self.total_samples,
             'active_samples': self.active_samples
         }
@@ -1274,9 +2268,13 @@ class SafeGainCalibrator:
 
         self.target_lufs = cal_config.get('target_lufs', -18.0)
         self.max_peak_limit = cal_config.get('max_peak_limit', -3.0)
+        self.target_peak_db = cal_config.get('target_peak_db', -10.0)
         self.noise_gate_threshold = cal_config.get('noise_gate_threshold', -40.0)
         self.min_signal_presence = cal_config.get('min_signal_presence', 0.05)
         self.learning_duration = cal_config.get('learning_duration_sec', 30.0)  # По умолчанию 30 секунд
+        self.method_id = str(cal_config.get('method_id') or INPUT_TRIM_AUTOGAIN_METHOD_ID)
+        self.default_mode = str(cal_config.get('default_mode') or cal_config.get('mode') or 'soundcheck')
+        self.local_input_preamp = LocalInputGainProfile.from_config(cal_config.get('local_input_preamp', {}))
         logger.info(f"SafeGainCalibrator initialized with learning_duration={self.learning_duration} seconds")
 
         # Channel settings for preset-based metrics
@@ -1425,11 +2423,33 @@ class SafeGainCalibrator:
             
             logger.info(f"Ch{ch_id} ({preset}): using target_lufs={target_lufs:.1f}, max_peak_limit={max_peak_limit:.1f}")
             
-            stats.calculate_safe_gain(
-                target_lufs=target_lufs,
-                max_peak_limit=max_peak_limit,
-                min_signal_presence=self.min_signal_presence
+            target_peak_db = preset_metrics.get(
+                'target_peak_db',
+                self._default_target_peak_for_preset(preset, max_peak_limit),
             )
+            mixer_ch = self.channel_mapping.get(ch_id, ch_id)
+            current_trim = self._current_trim_for_mixer_channel(mixer_ch)
+            previous_recommendation = self.suggestions.get(ch_id)
+
+            if self.method_id == "legacy_lufs_safe_gain":
+                stats.calculate_safe_gain(
+                    target_lufs=target_lufs,
+                    max_peak_limit=max_peak_limit,
+                    min_signal_presence=self.min_signal_presence
+                )
+            else:
+                stats.calculate_input_trim_recommendation(
+                    current_trim_db=current_trim,
+                    target_peak_db=target_peak_db,
+                    max_peak_limit=max_peak_limit,
+                    target_lufs=target_lufs,
+                    min_signal_presence=self.min_signal_presence,
+                    preamp_profile=self.local_input_preamp,
+                    mode=self.default_mode,
+                    mixer_channel=mixer_ch,
+                    preset=preset,
+                    previous_recommendation=previous_recommendation,
+                )
 
             self.suggestions[ch_id] = stats.get_report()
 
@@ -1460,6 +2480,56 @@ class SafeGainCalibrator:
 
         return self.suggestions.copy()
 
+    def _current_trim_for_mixer_channel(self, mixer_channel: int) -> Optional[float]:
+        if self.mixer_client is None:
+            return None
+        try:
+            if hasattr(self.mixer_client, "get_channel_gain"):
+                value = self.mixer_client.get_channel_gain(mixer_channel)
+                if value is not None:
+                    return float(value)
+        except Exception:
+            logger.debug(f"Could not read current trim for channel {mixer_channel}", exc_info=True)
+        state = getattr(self.mixer_client, "state", None)
+        if isinstance(state, dict):
+            for address in (
+                f"/ch/{mixer_channel}/in/set/trim",
+                f"/ch/{mixer_channel:02d}/in/set/trim",
+                f"/ch/{mixer_channel}/gain",
+            ):
+                try:
+                    value = state.get(address)
+                    if value is not None:
+                        return float(value)
+                except (TypeError, ValueError):
+                    continue
+        return None
+
+    def _default_target_peak_for_preset(self, preset: str, max_peak_limit: float) -> float:
+        preset_defaults = {
+            "kick": -9.0,
+            "snare": -9.0,
+            "tom": -9.0,
+            "hihat": -14.0,
+            "ride": -14.0,
+            "cymbals": -14.0,
+            "overheads": -14.0,
+            "room": -16.0,
+            "bass": -10.0,
+            "leadVocal": -8.0,
+            "backVocal": -10.0,
+            "backingVocal": -10.0,
+            "electricGuitar": -10.0,
+            "acousticGuitar": -10.0,
+            "accordion": -10.0,
+            "synth": -14.0,
+            "keyboard": -14.0,
+            "playback": -14.0,
+            "custom": float(self.target_peak_db),
+        }
+        target = preset_defaults.get(str(preset), float(self.target_peak_db))
+        return min(float(max_peak_limit) - 1.0, float(target))
+
     def apply_corrections(self, channel_ids: Optional[List[int]] = None) -> bool:
         """
         Применение рекомендованных коррекций к микшеру.
@@ -1489,15 +2559,20 @@ class SafeGainCalibrator:
                 continue
 
             suggestion = self.suggestions[ch_id]
+            if suggestion.get('auto_apply_allowed') is False:
+                logger.info(f"Channel {ch_id}: SafeGain suggestion queued only; auto apply blocked by policy")
+                continue
             gain = suggestion['suggested_gain_db']
 
             mixer_ch = self.channel_mapping.get(ch_id, ch_id)
 
             try:
                 current_trim = self.mixer_client.get_channel_gain(mixer_ch) or 0.0
-                new_trim = current_trim + gain
+                new_trim = suggestion.get('target_trim_db')
+                if new_trim is None:
+                    new_trim = current_trim + gain
 
-                new_trim = np.clip(new_trim, -24.0, 24.0)
+                new_trim = np.clip(new_trim, self.local_input_preamp.min_gain_db, self.local_input_preamp.hard_max_gain_db)
 
                 self.mixer_client.set_channel_gain(mixer_ch, new_trim)
                 logger.info(f"Channel {mixer_ch}: TRIM {current_trim:.1f} -> {new_trim:.1f} dB "
@@ -1528,6 +2603,7 @@ class SafeGainCalibrator:
             stats.active_samples = 0
             stats.rms_values.clear()
             stats.peak_values.clear()
+            stats.inactive_rms_values.clear()
         self.suggestions.clear()
         self.learning_start_time = None
         self.learning_progress = 0.0
@@ -1542,7 +2618,36 @@ class SafeGainCalibrator:
             'suggestions_ready': len(self.suggestions) > 0,
             'target_lufs': self.target_lufs,
             'max_peak_limit': self.max_peak_limit,
-            'learning_duration': self.learning_duration
+            'target_peak_db': self.target_peak_db,
+            'learning_duration': self.learning_duration,
+            'method_id': self.method_id,
+            'default_mode': self.default_mode,
+            'local_input_preamp': {
+                'enabled': self.local_input_preamp.enabled,
+                'character': self.local_input_preamp.character,
+                'source': self.local_input_preamp.source,
+                'clean_gain_max_db': self.local_input_preamp.clean_gain_max_db,
+                'coloration_start_db': self.local_input_preamp.coloration_start_db,
+                'saturation_start_db': self.local_input_preamp.saturation_start_db,
+                'soundcheck_allow_boost': self.local_input_preamp.soundcheck_allow_boost,
+                'live_allow_boost': self.local_input_preamp.live_allow_boost,
+                'soundcheck_boost_min_presence': self.local_input_preamp.soundcheck_boost_min_presence,
+                'soundcheck_boost_max_crest_db': self.local_input_preamp.soundcheck_boost_max_crest_db,
+                'soundcheck_boost_min_lufs': self.local_input_preamp.soundcheck_boost_min_lufs,
+                'clip_safety_margin_db': self.local_input_preamp.clip_safety_margin_db,
+                'isolated_peak_min_spread_db': self.local_input_preamp.isolated_peak_min_spread_db,
+                'soundcheck_boost_max_lufs_std_db': self.local_input_preamp.soundcheck_boost_max_lufs_std_db,
+                'soundcheck_boost_max_peak_std_db': self.local_input_preamp.soundcheck_boost_max_peak_std_db,
+                'soundcheck_boost_max_peak_spread_db': self.local_input_preamp.soundcheck_boost_max_peak_spread_db,
+                'soundcheck_boost_min_noise_margin_db': self.local_input_preamp.soundcheck_boost_min_noise_margin_db,
+                'recommendation_hysteresis_db': self.local_input_preamp.recommendation_hysteresis_db,
+                'opposite_direction_hold_db': self.local_input_preamp.opposite_direction_hold_db,
+                'gain_up_min_stable_windows': self.local_input_preamp.gain_up_min_stable_windows,
+                'stable_window_tolerance_db': self.local_input_preamp.stable_window_tolerance_db,
+                'digital_clip_threshold_db': self.local_input_preamp.digital_clip_threshold_db,
+                'scream_peak_threshold_db': self.local_input_preamp.scream_peak_threshold_db,
+                'scream_lufs_threshold_db': self.local_input_preamp.scream_lufs_threshold_db,
+            }
         }
     
     def update_settings(self, settings: Dict[str, Any]):
@@ -1564,3 +2669,23 @@ class SafeGainCalibrator:
         if 'max_peak_limit' in settings:
             self.max_peak_limit = float(settings['max_peak_limit'])
             logger.info(f"Updated max_peak_limit to {self.max_peak_limit}")
+
+        if 'target_peak_db' in settings:
+            self.target_peak_db = float(settings['target_peak_db'])
+            logger.info(f"Updated target_peak_db to {self.target_peak_db}")
+
+        if 'default_mode' in settings or 'mode' in settings:
+            self.default_mode = str(settings.get('default_mode') or settings.get('mode') or self.default_mode)
+            logger.info(f"Updated SafeGain mode to {self.default_mode}")
+
+        if 'method_id' in settings:
+            self.method_id = str(settings['method_id'] or INPUT_TRIM_AUTOGAIN_METHOD_ID)
+            logger.info(f"Updated SafeGain method_id to {self.method_id}")
+
+        if isinstance(settings.get('local_input_preamp'), dict):
+            self.local_input_preamp = LocalInputGainProfile.from_config(settings['local_input_preamp'])
+            logger.info(
+                f"Updated local input preamp profile: character={self.local_input_preamp.character}, "
+                f"clean_max={self.local_input_preamp.clean_gain_max_db}, "
+                f"saturation={self.local_input_preamp.saturation_start_db}"
+            )
