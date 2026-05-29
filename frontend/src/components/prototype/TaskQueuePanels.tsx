@@ -117,6 +117,12 @@ export function TaskDetailsPanel({
           )}
         </div>
       </div>
+      {task.reason && (
+        <div className="mt-3 border-l-2 border-audio/40 pl-2">
+          <div className="am-label mb-1">Backend Reason</div>
+          <p className="break-words text-[10px] leading-4 text-muted">{task.reason}</p>
+        </div>
+      )}
       {blockers.length > 0 && (
         <div className="mt-3 rounded-[6px] border border-danger/30 bg-danger/10 p-2">
           <div className="am-label mb-1 text-danger">Apply Blockers</div>
@@ -484,7 +490,7 @@ export function TaskQueueWorkspace({
           { label: 'Pending', predicate: task => task.status === 'Pending' },
           { label: 'Applied', predicate: task => task.status === 'Applied' }
         ]}
-        getSearchText={task => `${task.title} ${task.agent} ${task.target} ${task.status} ${task.priority}`}
+        getSearchText={task => `${task.title} ${task.agent} ${task.target} ${task.status} ${task.priority} ${task.reason ?? ''}`}
         columns={[
           { key: 'priority', label: 'Priority', width: '0.75fr', render: task => <StatusBadge tone={toneForPriority(task.priority)}>{task.priority}</StatusBadge> },
           {

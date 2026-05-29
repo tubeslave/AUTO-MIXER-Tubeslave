@@ -452,17 +452,48 @@ test.describe('Automixer backend Product Layer adapter', () => {
           pending_actions: [
             {
               id: 'proposal-backend-1',
-              title: 'Backend proposal fader move',
+              title: 'Backend SafeGain trim move',
               target: 'Backend Lead Vox',
-              kind: 'fader',
+              kind: 'gain',
               severity: 'high',
               status: 'pending',
               source: 'Backend Decision Agent',
+              reason: 'SafeGain measured input headroom and suggests an input trim adjustment. Ensemble context inactive (ensemble_time_context_stale); time stale; sources 1/2; lag 10/2 samples; operator review only.',
               created_at: '2026-05-19T20:29:00Z',
               requested_change: {
-                value_type: 'fader',
+                value_type: 'gain',
                 channel: 2,
-                value: -9.5
+                value: -9.5,
+                safety_evidence: [
+                  {
+                    label: 'Ensemble context',
+                    value: 'ensemble_time_context_stale',
+                    reason: 'ensemble_time_context_stale'
+                  },
+                  {
+                    label: 'Ensemble time coherence',
+                    value: 'stale',
+                    reason: 'ensemble_time_context_stale'
+                  },
+                  {
+                    label: 'Ensemble time sources',
+                    value: 1,
+                    target: 2
+                  },
+                  {
+                    label: 'Ensemble lag samples',
+                    value: 10,
+                    target: 2
+                  },
+                  {
+                    label: 'Ensemble apply policy',
+                    value: 'operator_review_only'
+                  },
+                  {
+                    label: 'Distortion risk',
+                    value: 'low'
+                  }
+                ]
               },
               can_apply: true
             }
@@ -486,7 +517,7 @@ test.describe('Automixer backend Product Layer adapter', () => {
               source: 'Backend Decision Agent',
               mode: 'supervised',
               target: 2,
-              action_type: 'fader',
+              action_type: 'gain',
               status: 'applied',
               current_value: -9,
               proposed_value: -9.5,
@@ -951,12 +982,12 @@ test.describe('Automixer backend Product Layer adapter', () => {
           success: true,
           proposal: {
             id: 'proposal-backend-1',
-            title: 'Backend proposal fader move'
+            title: 'Backend SafeGain trim move'
           },
           apply_result: {
             status: 'applied',
             channel: 2,
-            value_type: 'fader',
+            value_type: 'gain',
             effective_value: -9.5,
             readback_status: 'verified_from_cache',
             rollback_available: true,
@@ -1025,7 +1056,13 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('Backend Kick')).toBeVisible();
 
     await page.goto('/#/task-queue');
-    await expect(page.getByText('Backend proposal fader move').first()).toBeVisible();
+    await expect(page.getByText('Backend SafeGain trim move').first()).toBeVisible();
+    await page.locator('.am-table-row').filter({ hasText: 'Backend SafeGain trim move' }).click();
+    await expect(page.locator('aside').filter({ hasText: 'Task Details' })).toContainText('Backend Reason');
+    await expect(page.locator('aside').filter({ hasText: 'Task Details' })).toContainText('Ensemble context inactive');
+    await expect(page.locator('section').filter({ hasText: 'Safety Evidence' }).first()).toContainText('Ensemble context');
+    await expect(page.locator('section').filter({ hasText: 'Safety Evidence' }).first()).toContainText('stale');
+    await expect(page.locator('section').filter({ hasText: 'Safety Evidence' }).first()).toContainText('1/2');
     await expect(page.getByText('Backend Auto EQ: proposal contract only').first()).toBeVisible();
     const reviewOnlyRow = page.locator('.am-table-row').filter({ hasText: 'Backend Auto EQ: proposal contract only' });
     await expect(reviewOnlyRow.getByRole('button', { name: 'Apply' })).toHaveCount(0);
@@ -1042,7 +1079,7 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('Offline replay requested. Live writes remain disabled.').first()).toBeVisible();
     await expect(page.getByText('fixture-replay-started').first()).toBeVisible();
     await expect(page.getByText('3 rows').first()).toBeVisible();
-    await page.locator('.am-table-row').filter({ hasText: 'Backend proposal fader move' }).getByRole('button', { name: 'Apply' }).click();
+    await page.locator('.am-table-row').filter({ hasText: 'Backend SafeGain trim move' }).getByRole('button', { name: 'Apply' }).click();
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend Lead Vox');
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend supervised gate');
     await page.getByRole('button', { name: 'Request Supervised Apply' }).click();

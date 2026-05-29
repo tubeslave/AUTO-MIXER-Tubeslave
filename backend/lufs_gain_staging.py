@@ -4175,8 +4175,18 @@ class SignalStats:
             risk_flags.append(str(trim_smoothing_state.get("reason") or "trim_smoothing_active"))
         if bool(soundcheck_convergence_state.get("active")):
             risk_flags.append(str(soundcheck_convergence_state.get("reason") or "soundcheck_convergence_active"))
+        ensemble_context_reason = str(soundcheck_ensemble_context_state.get("reason") or "")
         if bool(soundcheck_ensemble_context_state.get("active")):
             risk_flags.append("ensemble_context_vocal_understaged")
+        elif (
+            confidence_candidate_direction == "up"
+            and bool(soundcheck_ensemble_context_state.get("provided"))
+            and ensemble_context_reason in {
+                "ensemble_time_context_missing",
+                "ensemble_time_context_stale",
+            }
+        ):
+            risk_flags.append(ensemble_context_reason)
         if bool(soundcheck_convergence_state.get("setup_check_required")):
             risk_flags.append("source_setup_check_required")
         if bool(transient_window_profile.get("repeated_hit_unstable")):

@@ -218,6 +218,7 @@ export interface Task {
   applyBlockers?: string[];
   correctionDomain?: string;
   requestedValueType?: string;
+  safetyEvidence?: SafetyEvidenceItem[];
   proposalContract?: ProposalOnlyContract;
 }
 

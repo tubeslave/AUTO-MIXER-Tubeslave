@@ -18,6 +18,7 @@ import type {
   ReplayRunRecord,
   RoutingSegment,
   RuleLibrarySnapshotRow,
+  SafetyEvidenceItem,
   SafetyMonitorState,
   Task,
   Tone,
@@ -128,6 +129,48 @@ function taskStatusFromBackend(status: unknown): Task['status'] {
   if (['dismissed', 'rejected'].includes(normalized)) return 'Rejected';
   if (normalized.includes('blocked') || normalized.includes('review')) return 'Review';
   return 'Pending';
+}
+
+function toneForSafetyEvidence(label: string, value: string): Tone {
+  const normalized = `${label} ${value}`.toLowerCase();
+  if (normalized.includes('blocked') || normalized.includes('danger') || normalized.includes('fail')) return 'red';
+  if (
+    normalized.includes('missing')
+    || normalized.includes('stale')
+    || normalized.includes('review')
+    || normalized.includes('required')
+    || normalized.includes('operator_review_only')
+  ) {
+    return 'yellow';
+  }
+  if (
+    normalized.includes('clear')
+    || normalized.includes('ready')
+    || normalized.includes('active')
+    || normalized.includes('coherent')
+    || normalized.includes('low')
+    || normalized.includes('not_restricted')
+  ) {
+    return 'green';
+  }
+  return 'blue';
+}
+
+function adaptSafetyEvidence(value: unknown): SafetyEvidenceItem[] | undefined {
+  const rows = asArray(value);
+  if (!rows.length) return undefined;
+
+  return rows.map((row, index) => {
+    const label = str(row.label, `Evidence ${index + 1}`);
+    const rawValue = str(row.value, str(row.reason, 'review'));
+    const target = str(row.target);
+    const displayValue = target && rawValue ? `${rawValue}/${target}` : rawValue || 'review';
+    return {
+      label,
+      value: displayValue.replace(/_/g, ' '),
+      tone: toneForSafetyEvidence(label, displayValue)
+    };
+  });
 }
 
 function cleanToken(value: unknown, fallback = ''): string {
@@ -412,7 +455,8 @@ export function adaptTasks(payload: unknown, fallback: Task[]): Task[] {
       applyBlockers: Array.isArray(row.apply_blockers)
         ? row.apply_blockers.map(item => String(item)).filter(Boolean)
         : undefined,
-      requestedValueType: str(requestedChange.value_type)
+      requestedValueType: str(requestedChange.value_type),
+      safetyEvidence: adaptSafetyEvidence(requestedChange.safety_evidence)
     };
   });
 }

@@ -3770,3 +3770,211 @@ def test_safe_gain_proposal_carries_preamp_character_evidence():
     assert change["rollback_value"] == 0.0
     assert any(item["label"] == "Preamp zone" for item in change["safety_evidence"])
     assert any(item["label"] == "Role" and item["value"] == "input_headroom_not_mix_balance" for item in change["safety_evidence"])
+
+
+def test_safe_gain_proposal_carries_ensemble_time_context_evidence():
+    suggestion = {
+        "channel": 1,
+        "method_id": "input_trim_preamp_character",
+        "input_trim_role": "input_headroom_not_mix_balance",
+        "peak_db": -20.0,
+        "target_peak_db": -10.0,
+        "suggested_gain_db": 3.0,
+        "target_trim_db": 3.0,
+        "confidence": 0.74,
+        "input_gain_character": {
+            "character": "clean",
+            "current_zone": "clean",
+            "target_zone": "clean",
+            "distortion_risk": "low",
+            "soundcheck_ensemble_context": {
+                "provided": True,
+                "active": False,
+                "reason": "ensemble_time_context_stale",
+                "time_coherence_enabled": True,
+                "time_coherence_evaluable": True,
+                "time_coherent": False,
+                "time_coherent_loud_sources": 1,
+                "required_time_coherent_sources": 2,
+                "reference_max_lag_samples": 10,
+                "max_context_lag_samples": 2,
+                "operator_review_only": True,
+            },
+        },
+    }
+
+    class Mixer:
+        def get_channel_gain(self, channel):
+            return 0.0
+
+    proposals = build_safe_gain_operator_proposals(
+        {1: suggestion},
+        channel_mapping={1: 1},
+        mixer_client=Mixer(),
+    )
+
+    evidence = {
+        item["label"]: item
+        for item in proposals[0]["requested_change"]["safety_evidence"]
+    }
+    assert evidence["Ensemble context"]["value"] == "ensemble_time_context_stale"
+    assert evidence["Ensemble time coherence"]["value"] == "stale"
+    assert evidence["Ensemble time coherence"]["reason"] == "ensemble_time_context_stale"
+    assert evidence["Ensemble time sources"]["value"] == 1
+    assert evidence["Ensemble time sources"]["target"] == 2
+    assert evidence["Ensemble lag samples"]["value"] == 10
+    assert evidence["Ensemble lag samples"]["target"] == 2
+    assert evidence["Ensemble apply policy"]["value"] == "operator_review_only"
+
+
+def test_safe_gain_proposal_carries_active_ensemble_context_reason():
+    suggestion = {
+        "channel": 1,
+        "method_id": "input_trim_preamp_character",
+        "input_trim_role": "input_headroom_not_mix_balance",
+        "peak_db": -21.0,
+        "target_peak_db": -10.0,
+        "suggested_gain_db": 6.0,
+        "target_trim_db": 6.0,
+        "confidence": 0.82,
+        "input_gain_character": {
+            "character": "clean",
+            "current_zone": "clean",
+            "target_zone": "clean",
+            "distortion_risk": "low",
+            "soundcheck_ensemble_context": {
+                "provided": True,
+                "active": True,
+                "reason": "ensemble_context_vocal_understaged",
+                "time_coherence_enabled": True,
+                "time_coherence_evaluable": True,
+                "time_coherent": True,
+                "time_coherent_loud_sources": 3,
+                "required_time_coherent_sources": 2,
+                "reference_max_lag_samples": 1,
+                "max_context_lag_samples": 2,
+                "operator_review_only": True,
+            },
+        },
+    }
+
+    class Mixer:
+        def get_channel_gain(self, channel):
+            return 0.0
+
+    proposals = build_safe_gain_operator_proposals(
+        {1: suggestion},
+        channel_mapping={1: 1},
+        mixer_client=Mixer(),
+    )
+
+    evidence = {
+        item["label"]: item
+        for item in proposals[0]["requested_change"]["safety_evidence"]
+    }
+    assert evidence["Ensemble context"]["value"] == "active"
+    assert evidence["Ensemble context"]["reason"] == "ensemble_context_vocal_understaged"
+    assert evidence["Ensemble time coherence"]["value"] == "coherent"
+    assert evidence["Ensemble time coherence"]["reason"] == "ensemble_context_vocal_understaged"
+    assert evidence["Ensemble time sources"]["value"] == 3
+    assert evidence["Ensemble time sources"]["target"] == 2
+    assert evidence["Ensemble lag samples"]["value"] == 1
+    assert evidence["Ensemble lag samples"]["target"] == 2
+    assert evidence["Ensemble apply policy"]["value"] == "operator_review_only"
+
+
+def test_safe_gain_proposal_reason_summarizes_ensemble_context_for_cockpit():
+    suggestion = {
+        "channel": 1,
+        "method_id": "input_trim_preamp_character",
+        "input_trim_role": "input_headroom_not_mix_balance",
+        "peak_db": -20.0,
+        "target_peak_db": -10.0,
+        "suggested_gain_db": 3.0,
+        "target_trim_db": 3.0,
+        "confidence": 0.74,
+        "input_gain_character": {
+            "character": "clean",
+            "current_zone": "clean",
+            "target_zone": "clean",
+            "distortion_risk": "low",
+            "soundcheck_ensemble_context": {
+                "provided": True,
+                "active": False,
+                "reason": "ensemble_time_context_stale",
+                "time_coherence_enabled": True,
+                "time_coherence_evaluable": True,
+                "time_coherent": False,
+                "time_coherent_loud_sources": 1,
+                "required_time_coherent_sources": 2,
+                "reference_max_lag_samples": 10,
+                "max_context_lag_samples": 2,
+                "operator_review_only": True,
+            },
+        },
+    }
+
+    class Mixer:
+        def get_channel_gain(self, channel):
+            return 0.0
+
+    proposals = build_safe_gain_operator_proposals(
+        {1: suggestion},
+        channel_mapping={1: 1},
+        mixer_client=Mixer(),
+    )
+
+    reason = proposals[0]["reason"]
+    assert "Ensemble context inactive (ensemble_time_context_stale)" in reason
+    assert "time stale" in reason
+    assert "sources 1/2" in reason
+    assert "lag 10/2 samples" in reason
+    assert "operator review only" in reason
+
+
+def test_safe_gain_proposal_marks_missing_ensemble_time_context_as_missing():
+    suggestion = {
+        "channel": 1,
+        "method_id": "input_trim_preamp_character",
+        "input_trim_role": "input_headroom_not_mix_balance",
+        "peak_db": -20.0,
+        "target_peak_db": -10.0,
+        "suggested_gain_db": 3.0,
+        "target_trim_db": 3.0,
+        "confidence": 0.7,
+        "input_gain_character": {
+            "character": "clean",
+            "current_zone": "clean",
+            "target_zone": "clean",
+            "distortion_risk": "low",
+            "soundcheck_ensemble_context": {
+                "provided": True,
+                "active": False,
+                "reason": "ensemble_time_context_missing",
+                "time_coherence_enabled": True,
+                "time_coherence_evaluable": False,
+                "operator_review_only": True,
+            },
+        },
+    }
+
+    class Mixer:
+        def get_channel_gain(self, channel):
+            return 0.0
+
+    proposals = build_safe_gain_operator_proposals(
+        {1: suggestion},
+        channel_mapping={1: 1},
+        mixer_client=Mixer(),
+    )
+
+    evidence = {
+        item["label"]: item
+        for item in proposals[0]["requested_change"]["safety_evidence"]
+    }
+    assert evidence["Ensemble context"]["value"] == "ensemble_time_context_missing"
+    assert evidence["Ensemble time coherence"]["value"] == "missing"
+    assert evidence["Ensemble time coherence"]["reason"] == "ensemble_time_context_missing"
+    assert evidence["Ensemble apply policy"]["value"] == "operator_review_only"
+    assert "Ensemble time sources" not in evidence
+    assert "Ensemble lag samples" not in evidence

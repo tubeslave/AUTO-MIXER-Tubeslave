@@ -119,10 +119,103 @@ def _safe_gain_evidence(suggestion: Dict[str, Any], gain_db: float) -> List[Dict
             },
             {"label": "Distortion risk", "value": character.get("distortion_risk")},
         ])
+        ensemble = character.get("soundcheck_ensemble_context")
+        if isinstance(ensemble, dict) and (ensemble.get("provided") or ensemble.get("reason")):
+            reason = str(ensemble.get("reason") or "unknown")
+            time_coherence_enabled = bool(ensemble.get("time_coherence_enabled"))
+            evidence.append({
+                "label": "Ensemble context",
+                "value": "active" if ensemble.get("active") else reason,
+                "reason": reason,
+            })
+            if time_coherence_enabled:
+                if not ensemble.get("time_coherence_evaluable", True):
+                    time_value = "missing"
+                elif ensemble.get("time_coherent"):
+                    time_value = "coherent"
+                else:
+                    time_value = "stale"
+                evidence.append({
+                    "label": "Ensemble time coherence",
+                    "value": time_value,
+                    "reason": reason,
+                })
+                coherent_sources = _coerce_int(ensemble.get("time_coherent_loud_sources"))
+                required_sources = _coerce_int(ensemble.get("required_time_coherent_sources"))
+                if coherent_sources is not None and required_sources is not None:
+                    evidence.append({
+                        "label": "Ensemble time sources",
+                        "value": coherent_sources,
+                        "target": required_sources,
+                    })
+                reference_lag = _coerce_int(ensemble.get("reference_max_lag_samples"))
+                max_lag = _coerce_int(ensemble.get("max_context_lag_samples"))
+                if reference_lag is not None and max_lag is not None:
+                    evidence.append({
+                        "label": "Ensemble lag samples",
+                        "value": reference_lag,
+                        "target": max_lag,
+                    })
+            if ensemble.get("operator_review_only") is not None:
+                evidence.append({
+                    "label": "Ensemble apply policy",
+                    "value": "operator_review_only" if ensemble.get("operator_review_only") else "not_restricted",
+                })
     note = suggestion.get("operator_note")
     if note:
         evidence.append({"label": "Operator note", "value": str(note)})
     return evidence
+
+
+def _safe_gain_ensemble_context_summary(suggestion: Dict[str, Any]) -> Optional[str]:
+    character = suggestion.get("input_gain_character")
+    if not isinstance(character, dict):
+        return None
+    ensemble = character.get("soundcheck_ensemble_context")
+    if not isinstance(ensemble, dict) or not (ensemble.get("provided") or ensemble.get("reason")):
+        return None
+
+    reason = str(ensemble.get("reason") or "unknown")
+    context_state = "active" if ensemble.get("active") else "inactive"
+    parts = [f"Ensemble context {context_state} ({reason})"]
+    time_coherence_enabled = bool(ensemble.get("time_coherence_enabled"))
+    if time_coherence_enabled:
+        if not ensemble.get("time_coherence_evaluable", True):
+            time_value = "missing"
+        elif ensemble.get("time_coherent"):
+            time_value = "coherent"
+        else:
+            time_value = "stale"
+        parts.append(f"time {time_value}")
+
+        coherent_sources = _coerce_int(ensemble.get("time_coherent_loud_sources"))
+        required_sources = _coerce_int(ensemble.get("required_time_coherent_sources"))
+        if coherent_sources is not None and required_sources is not None:
+            parts.append(f"sources {coherent_sources}/{required_sources}")
+
+        reference_lag = _coerce_int(ensemble.get("reference_max_lag_samples"))
+        max_lag = _coerce_int(ensemble.get("max_context_lag_samples"))
+        if reference_lag is not None and max_lag is not None:
+            parts.append(f"lag {reference_lag}/{max_lag} samples")
+
+    if ensemble.get("operator_review_only"):
+        parts.append("operator review only")
+    return "; ".join(parts) + "."
+
+
+def _safe_gain_reason(suggestion: Dict[str, Any], requested_change: Optional[Dict[str, Any]]) -> str:
+    if requested_change:
+        reason = (
+            suggestion.get("operator_note")
+            or "SafeGain measured input headroom and suggests an input trim adjustment."
+        )
+    else:
+        reason = "SafeGain has a trim suggestion, but current cached trim is unknown."
+
+    ensemble_summary = _safe_gain_ensemble_context_summary(suggestion)
+    if ensemble_summary:
+        return f"{reason} {ensemble_summary}"
+    return str(reason)
 
 
 def build_safe_gain_operator_proposals(
@@ -187,12 +280,7 @@ def build_safe_gain_operator_proposals(
                 "severity": _safe_gain_severity(raw_suggestion, gain_db),
                 "confidence": confidence if current_trim is not None else min(confidence, 0.7),
                 "source": source,
-                "reason": (
-                    raw_suggestion.get("operator_note")
-                    or "SafeGain measured input headroom and suggests an input trim adjustment."
-                    if requested_change
-                    else "SafeGain has a trim suggestion, but current cached trim is unknown."
-                ),
+                "reason": _safe_gain_reason(raw_suggestion, requested_change),
                 "requested_change": requested_change,
                 "raw": {
                     "audio_channel": audio_channel,

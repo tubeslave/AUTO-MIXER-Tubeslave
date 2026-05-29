@@ -242,6 +242,12 @@ export function proposalPreviewForTask(task: Task): ProposalPreview {
 }
 
 export function safetyEvidenceForTask(task: Task, mode: AutomixerMode): SafetyEvidenceItem[] {
+  if (task.safetyEvidence?.length) {
+    const ensemble = task.safetyEvidence.filter(row => row.label.toLowerCase().includes('ensemble'));
+    const remaining = task.safetyEvidence.filter(row => !row.label.toLowerCase().includes('ensemble'));
+    return [...ensemble, ...remaining].slice(0, 6);
+  }
+
   if (task.reviewOnly) {
     const contract = task.proposalContract;
     const evidence = contract?.safetyEvidenceRequired ?? [];
