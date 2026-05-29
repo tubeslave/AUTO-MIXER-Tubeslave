@@ -8,7 +8,7 @@ import signal
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Set, Optional, Union, List, Dict, Any, TYPE_CHECKING
 import websockets
@@ -106,6 +106,10 @@ _load_repo_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def convert_numpy_types(obj: Any) -> Any:
@@ -387,7 +391,7 @@ class AutoMixerServer:
                 "first_seen": self._operator_apply_idempotency_keys[key],
             }
         self._operator_apply_idempotency_keys[key] = {
-            "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "created_at": _utc_timestamp(),
             "proposal_id": proposal_id,
             "approval_id": approval_id,
         }
@@ -716,7 +720,7 @@ class AutoMixerServer:
             self._manual_write_artifacts_dir.mkdir(parents=True, exist_ok=True)
             path = self._manual_write_artifacts_dir / "manual_write_events.jsonl"
             event = {
-                "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "timestamp": _utc_timestamp(),
                 "event_type": str(event_type),
                 "result": convert_numpy_types(result),
             }

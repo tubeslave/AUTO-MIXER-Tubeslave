@@ -41,7 +41,7 @@ if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
 fi
 
 cleanup() {
-  rm -rf "${LOCK_DIR}"
+  rmdir "${LOCK_DIR}" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 

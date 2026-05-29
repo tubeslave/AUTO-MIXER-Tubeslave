@@ -192,6 +192,57 @@ class TestAutoMixerServerInit:
         assert server._is_shutting_down is False
         assert server._shutdown_event is None
 
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_operator_apply_idempotency_key_records_utc_first_seen(self, mock_config, mock_bleed):
+        server = AutoMixerServer()
+
+        first = server.reserve_operator_apply_idempotency_key(
+            "apply-1",
+            proposal_id="proposal-1",
+            approval_id="approval-1",
+        )
+        duplicate = server.reserve_operator_apply_idempotency_key(
+            "apply-1",
+            proposal_id="proposal-2",
+            approval_id="approval-2",
+        )
+
+        assert first == {
+            "reserved": True,
+            "reason": "reserved",
+            "idempotency_key": "apply-1",
+        }
+        assert duplicate["reserved"] is False
+        assert duplicate["reason"] == "duplicate_idempotency_key"
+        assert duplicate["idempotency_key"] == "apply-1"
+        assert duplicate["first_seen"]["proposal_id"] == "proposal-1"
+        assert duplicate["first_seen"]["approval_id"] == "approval-1"
+        assert duplicate["first_seen"]["created_at"].endswith("Z")
+        assert "+00:00" not in duplicate["first_seen"]["created_at"]
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_manual_write_event_records_utc_timestamp(self, mock_config, mock_bleed, tmp_path):
+        server = AutoMixerServer()
+        server._manual_write_artifacts_dir = tmp_path
+
+        artifact_path = server._record_manual_write_event(
+            "manual_write_blocked",
+            {
+                "status": "blocked",
+                "reason": "unit_test",
+                "value": np.float64(-12.5),
+            },
+        )
+
+        assert artifact_path == str(tmp_path / "manual_write_events.jsonl")
+        event = json.loads((tmp_path / "manual_write_events.jsonl").read_text(encoding="utf-8"))
+        assert event["event_type"] == "manual_write_blocked"
+        assert event["timestamp"].endswith("Z")
+        assert "+00:00" not in event["timestamp"]
+        assert event["result"]["value"] == -12.5
+
 
 class TestAutoMixerServerConfigNormalization:
 
