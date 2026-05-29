@@ -28,7 +28,7 @@ readback, rollback, cooldown, and emergency-stop proof.
 
 ## Current Execution Status
 
-Last updated: 2026-05-22
+Last updated: 2026-05-28
 
 - Phase 0 local health baseline is complete. Backend tests and frontend build
   are green after cleanup.
@@ -58,6 +58,9 @@ Last updated: 2026-05-22
   `Docs/PROCESSING_METHODS_INVENTORY.md`. The registry marks
   `main_live_assist` as the canonical pipeline and keeps live execution limited
   to supervised `fader`/`gain`.
+- The registry snapshot now publishes a UI-facing `module_status_map`, and the
+  frontend Settings surface renders it as a status-only module table with
+  entrypoints, UI surfaces, live-write scope, and next-step blockers.
 - Slice 2 preview is implemented as a read-only `main_live_assist` surface:
   `get_main_pipeline_preview`, `backend/processing_proposal_adapters.py`, and
   `backend/processing_pipeline_preview.py`. It returns proposal candidates and
@@ -107,6 +110,73 @@ Last updated: 2026-05-22
   safety tests, fake gain proof, full backend/frontend checks, and package
   smoke passed. This does not change live readiness wording or approve physical
   `gain` proof.
+- The 2026-05-26 no-WING validation slice adds a repeatable offline harness:
+  `backend/offline_validation_harness.py`,
+  `tools/offline_operator_validation_harness.py`, and
+  `tests/test_offline_validation_harness.py`. It validates fixture-based
+  analysis, proposal safety review, simulated apply/readback/rollback,
+  emergency-stop block proof, and mode gating without hardware, network, OSC,
+  or live writes. The runbook is `Docs/OFFLINE_NO_WING_VALIDATION_RUNBOOK.md`
+  and the report is
+  `Docs/reports/AUTOMIXER_OFFLINE_NO_WING_VALIDATION_20260526.md`.
+- The 2026-05-26 no-WING release-check slice adds
+  `tools/no_wing_release_check.py` and `tests/test_no_wing_release_check.py`.
+  This runner performs a reproducible local preflight, blocks forbidden live
+  command entrypoints in its command plan, checks that the backend port is not
+  already occupied, runs backend/offline/frontend/build checks, optionally runs
+  the Electron/macOS package build with `--include-package`, and writes artifacts
+  under `artifacts/no_wing_release_check/`. It is still offline evidence only
+  and does not replace the separate real-WING supervised gain proof.
+  The full local run
+  `artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/`
+  passed backend, offline harness, frontend TypeScript/unit/e2e/build, package
+  build, and diff checks; the packaged `.app` contains the backend executable
+  and required config resources.
+- The 2026-05-28 automation foundation status update records the safe
+  agentic-mixing base implemented by
+  `Docs/adr/automation-foundation-layer-20260527.md` and
+  `.ai/briefs/automation-foundation-layer-20260527.md`. The system now records
+  `AutomationDecisionTrace` evidence for proposal, replay, blocked, apply,
+  readback, and rollback decisions; exposes read-only Product Layer DTOs for
+  `decision_traces`, `safety_monitor`, `replay_runs`, and
+  `channel_intelligence`; and writes replay artifacts
+  `decision_traces.jsonl`, `metrics_before_after.json`, and `report.md`.
+- The supervised apply path now requires an `idempotency_key`, rejects duplicate
+  apply keys, enforces bounded deltas before the manual gate, and keeps live
+  execution limited to supervised `fader`/`gain` proposals. EQ, compressor,
+  gate, pan, phase/delay, FX, routing, snapshots, scenes, training, and rules
+  remain proposal-only, shadow-only, offline-only, or quarantined.
+- Current foundation-layer validation is green in the unrestricted local
+  environment: full backend suite `1208 passed, 1 skipped`, focused Product
+  Layer/offline/proposal-runner tests passed, frontend TypeScript passed,
+  frontend unit `13 passed`, frontend e2e `8 passed`, frontend build passed,
+  and `git diff --check` passed. This remains dry-run/supervised-safe evidence
+  and does not approve autonomous live mixing.
+- The Task Queue cockpit now exposes a `Replay Engine / Evidence` panel backed
+  by the new replay, trace, and channel-intelligence DTOs. The panel can request
+  `start_replay_run` for offline evidence generation only; it does not introduce
+  a live mixer write path.
+- Backend `start_replay_run` now also records one `offline_replay_v1`
+  `replay_run` decision trace in the shared trace store. That trace is
+  eligible for decision memory as offline evidence and explicitly carries
+  `offline_only=true`, `live_write=false`, and `mixer_transport_allowed=false`.
+- `replay_runs` DTO rows now expose run-level `trace_count`, `offline_only`,
+  and `live_write` evidence, and the cockpit Replay/Evidence panel renders
+  those policy facts instead of relying only on report paths.
+- The frontend now turns `replay_run_started` into an immediate local
+  `replay_runs` echo, then refreshes the backend read model. This keeps the
+  latest offline replay visible in the cockpit without adding any live write
+  command.
+- Shadow gain rides v0 are implemented as trace-only evidence in
+  `backend/shadow_gain_rides.py` and `operator_analysis`. They can produce
+  bounded `gain_ride_shadow` traces during explicit operator analysis, enforce a
+  `0.5 dB` max step, block oscillation/pumping risk, and never create applyable
+  queue proposals or mixer writes.
+- Decision memory v1 is implemented in `backend/decision_memory.py`. It derives
+  append-only memory entries only from verified or offline decision traces,
+  excludes `shadow_only` traces, and surfaces those entries through
+  `memory_knowledge_snapshot` as context. Memory still has no executor authority
+  and does not change live readiness.
 
 ## 1. Goals And Objectives
 

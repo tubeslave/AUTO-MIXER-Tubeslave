@@ -386,10 +386,7 @@ function App() {
   };
 
   const handleBypass = () => {
-    if (!mixerConnected) return;
-    if (!window.confirm('Сбросить все модули и фейдеры на 0dB?')) return;
-    setStatusMessage('Bypass...');
-    websocketService.bypassMixer();
+    setStatusMessage('Bypass заблокирован: live reset должен идти отдельным proof/rollback flow, не из legacy UI.');
   };
 
   const handleConnect = () => {
@@ -689,8 +686,8 @@ function App() {
                     <button className="btn-sm" onClick={handleScanMixer} disabled={!mixerConnected}>
                       Скан
                     </button>
-                    <button className="btn-sm danger" onClick={handleBypass} disabled={!mixerConnected}>
-                      Bypass
+                    <button className="btn-sm danger" onClick={handleBypass} title="Live reset is quarantined in the MVP operator flow">
+                      Bypass locked
                     </button>
                   </div>
 

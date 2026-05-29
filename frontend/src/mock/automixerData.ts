@@ -151,6 +151,20 @@ export function decisionPolicyForMode(mode: AutomixerMode): DecisionPolicy {
 }
 
 export function proposalPreviewForTask(task: Task): ProposalPreview {
+  if (task.reviewOnly) {
+    const contract = task.proposalContract;
+    const valueType = task.requestedValueType?.replace(/_/g, ' ') || 'review';
+    const evidence = contract?.safetyEvidenceRequired?.slice(0, 2).map(item => item.replace(/_/g, ' ')).join(' + ');
+    return {
+      parameter: valueType,
+      delta: 'Review only',
+      risk: 'High',
+      proof: evidence || 'Hardware proof missing',
+      rollback: contract?.rollbackRequired ? 'Rollback required' : 'Not approved',
+      tone: 'red'
+    };
+  }
+
   if (task.title.includes('Lead Vocal')) {
     return {
       parameter: 'Vocal fader',
@@ -228,6 +242,19 @@ export function proposalPreviewForTask(task: Task): ProposalPreview {
 }
 
 export function safetyEvidenceForTask(task: Task, mode: AutomixerMode): SafetyEvidenceItem[] {
+  if (task.reviewOnly) {
+    const contract = task.proposalContract;
+    const evidence = contract?.safetyEvidenceRequired ?? [];
+    return [
+      { label: 'Live apply', value: 'Blocked', tone: 'red' },
+      { label: 'Value type', value: task.requestedValueType?.replace(/_/g, ' ') || 'Unsupported', tone: 'red' },
+      { label: 'Readback', value: contract?.readbackRequired ? 'Required' : 'Missing', tone: 'yellow' },
+      { label: 'Rollback', value: contract?.rollbackRequired ? 'Required' : 'Missing', tone: 'yellow' },
+      { label: 'Evidence', value: evidence[0]?.replace(/_/g, ' ') || 'Required', tone: 'yellow' },
+      { label: 'Promotion', value: 'Not proven', tone: 'red' }
+    ];
+  }
+
   const proposal = proposalPreviewForTask(task);
   const highRisk = proposal.risk === 'High' || task.priority === 'High';
   const canOnlyReview = mode === 'Analyze' || mode === 'Assist';
@@ -243,6 +270,16 @@ export function safetyEvidenceForTask(task: Task, mode: AutomixerMode): SafetyEv
 }
 
 export function applyPlanForTask(task: Task, mode: AutomixerMode): ApplyPlanStep[] {
+  if (task.reviewOnly) {
+    return [
+      { label: 'Snap', value: 'N/A', tone: 'muted' },
+      { label: 'Gate', value: 'Review', tone: 'yellow' },
+      { label: 'Apply', value: 'Blocked', tone: 'red' },
+      { label: 'Read', value: 'Required', tone: 'yellow' },
+      { label: 'Undo', value: 'No live', tone: 'red' }
+    ];
+  }
+
   const proposal = proposalPreviewForTask(task);
   const snapshotState = proposal.risk === 'Low' ? 'Ready' : 'Required';
 

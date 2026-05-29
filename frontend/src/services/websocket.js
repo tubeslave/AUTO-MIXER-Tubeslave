@@ -244,6 +244,40 @@ class WebSocketService extends BaseWebSocketTransport {
     });
   }
 
+  getDecisionTraces(limit = 50) {
+    this.send({
+      type: 'get_decision_traces',
+      limit
+    });
+  }
+
+  getSafetyMonitor() {
+    this.send({
+      type: 'get_safety_monitor'
+    });
+  }
+
+  getReplayRuns(limit = 20) {
+    this.send({
+      type: 'get_replay_runs',
+      limit
+    });
+  }
+
+  startReplayRun(runId = '') {
+    this.send({
+      type: 'start_replay_run',
+      run_id: runId
+    });
+  }
+
+  getChannelIntelligence(totalChannels = 48) {
+    this.send({
+      type: 'get_channel_intelligence',
+      total_channels: totalChannels
+    });
+  }
+
   getOperatorAgentRoster() {
     this.send({
       type: 'get_operator_agent_roster'
@@ -346,12 +380,14 @@ class WebSocketService extends BaseWebSocketTransport {
   }
 
   applyOperatorProposal(proposalId, approved = false, reason = 'frontend_supervised_apply') {
+    const idempotencyKey = `frontend-${proposalId}-${Date.now()}`;
     this.send({
       type: 'apply_operator_proposal',
       proposal_id: proposalId,
       approved,
       reason,
-      approval_id: `frontend-${proposalId}`
+      approval_id: `frontend-${proposalId}`,
+      idempotency_key: idempotencyKey
     });
   }
 
@@ -485,7 +521,9 @@ class WebSocketService extends BaseWebSocketTransport {
       channels: channels,
       channel_settings: channelSettings,
       channel_mapping: channelMapping,
-      learning_duration_sec: options.learning_duration_sec
+      mode: options.mode || 'soundcheck',
+      learning_duration_sec: options.learning_duration_sec,
+      safe_gain_settings: options.safe_gain_settings || options.processing || {}
     });
   }
 

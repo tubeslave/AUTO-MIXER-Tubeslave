@@ -15,6 +15,9 @@ const SIGNAL_PRESETS = {
 
 const DEFAULT_SETTINGS = {
   targetLufs: -23, truePeakLimit: -1, ratio: 4, learningDurationSec: 30,
+  mode: 'soundcheck', targetPeakDb: -10,
+  preampCharacter: 'clean', cleanGainMaxDb: 6, saturationStartDb: 12,
+  soundcheckAllowBoost: true,
   emaFastAlpha: 0.4, emaSlowAlpha: 0.08, switchThresholdDb: 3.0,
   maxRateDbPerFrame: 2.0, hysteresisDb: 0.5,
 };
@@ -128,12 +131,21 @@ function GainStagingTab({ selectedChannels, availableChannels, selectedDevice, a
       const mapping = {};
       selectedChannels.forEach(ch => { mapping[ch] = ch; });
       websocketService.startRealtimeCorrection(selectedDevice, selectedChannels, channelSettings, mapping, {
+        mode: settings.mode,
         learning_duration_sec: settings.learningDurationSec,
-        processing: {
-          target_lufs: settings.targetLufs, true_peak_limit: settings.truePeakLimit,
-          ratio: settings.ratio, ema_fast_alpha: settings.emaFastAlpha,
-          ema_slow_alpha: settings.emaSlowAlpha, switch_threshold_db: settings.switchThresholdDb,
-          max_rate_db_per_frame: settings.maxRateDbPerFrame, hysteresis_db: settings.hysteresisDb,
+        safe_gain_settings: {
+          method_id: 'input_trim_preamp_character',
+          default_mode: settings.mode,
+          target_lufs: settings.targetLufs,
+          max_peak_limit: settings.truePeakLimit,
+          target_peak_db: settings.targetPeakDb,
+          local_input_preamp: {
+            character: settings.preampCharacter,
+            clean_gain_max_db: settings.cleanGainMaxDb,
+            saturation_start_db: settings.saturationStartDb,
+            soundcheck_allow_boost: settings.soundcheckAllowBoost,
+            live_allow_boost: false
+          }
         }
       });
     }
@@ -141,8 +153,7 @@ function GainStagingTab({ selectedChannels, availableChannels, selectedDevice, a
 
   const handleResetTrim = () => {
     if (selectedChannels.length === 0) return;
-    websocketService.resetTrim(selectedChannels);
-    setStatusMessage('TRIM → 0dB');
+    setStatusMessage('Reset TRIM заблокирован: создайте supervised gain proposal через Task Queue.');
   };
 
   const getChannelName = (id) => {
@@ -165,7 +176,7 @@ function GainStagingTab({ selectedChannels, availableChannels, selectedDevice, a
             {running ? 'Стоп' : 'Старт'}
           </button>
           <button className="btn-sm" onClick={handleResetTrim} disabled={running || selectedChannels.length === 0}>
-            Reset TRIM
+            Reset TRIM locked
           </button>
           <div className={`run-indicator ${running ? 'on' : ''}`}>{running ? 'AGC ●' : ''}</div>
         </div>
@@ -178,6 +189,13 @@ function GainStagingTab({ selectedChannels, availableChannels, selectedDevice, a
           </div>
           {showSettings && (
             <div className="settings-body">
+              <div className="setting-row">
+                <label>Режим</label>
+                <select value={settings.mode} onChange={e => setSettings(s => ({...s, mode: e.target.value}))} disabled={running}>
+                  <option value="soundcheck">Soundcheck</option>
+                  <option value="live">Live</option>
+                </select>
+              </div>
               <div className="setting-row">
                 <label>Target LUFS</label>
                 <input type="range" min="-30" max="-14" step="1" value={settings.targetLufs}
@@ -195,6 +213,37 @@ function GainStagingTab({ selectedChannels, availableChannels, selectedDevice, a
                 <input type="range" min="-6" max="0" step="0.5" value={settings.truePeakLimit}
                   onChange={e => setSettings(s => ({...s, truePeakLimit: parseFloat(e.target.value)}))} disabled={running} />
                 <span className="val">{settings.truePeakLimit} dBTP</span>
+              </div>
+              <div className="setting-row">
+                <label>Target Peak</label>
+                <input type="range" min="-18" max="-6" step="0.5" value={settings.targetPeakDb}
+                  onChange={e => setSettings(s => ({...s, targetPeakDb: parseFloat(e.target.value)}))} disabled={running} />
+                <span className="val">{settings.targetPeakDb} dBFS</span>
+              </div>
+              <div className="setting-row">
+                <label>Local Gain</label>
+                <select value={settings.preampCharacter} onChange={e => setSettings(s => ({...s, preampCharacter: e.target.value}))} disabled={running}>
+                  <option value="clean">Clean</option>
+                  <option value="warm">Warm</option>
+                  <option value="drive_protected">Drive protected</option>
+                </select>
+              </div>
+              <div className="setting-row">
+                <label>Clean Max</label>
+                <input type="range" min="0" max="12" step="0.5" value={settings.cleanGainMaxDb}
+                  onChange={e => setSettings(s => ({...s, cleanGainMaxDb: parseFloat(e.target.value)}))} disabled={running} />
+                <span className="val">{settings.cleanGainMaxDb} dB</span>
+              </div>
+              <div className="setting-row">
+                <label>Saturation</label>
+                <input type="range" min="6" max="18" step="0.5" value={settings.saturationStartDb}
+                  onChange={e => setSettings(s => ({...s, saturationStartDb: parseFloat(e.target.value)}))} disabled={running} />
+                <span className="val">{settings.saturationStartDb} dB</span>
+              </div>
+              <div className="setting-row">
+                <label>Boost SC</label>
+                <input type="checkbox" checked={settings.soundcheckAllowBoost}
+                  onChange={e => setSettings(s => ({...s, soundcheckAllowBoost: e.target.checked}))} disabled={running || settings.mode === 'live'} />
               </div>
               <div className="setting-row">
                 <label>Анализ</label>

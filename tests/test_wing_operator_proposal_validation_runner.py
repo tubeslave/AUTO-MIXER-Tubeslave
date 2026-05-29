@@ -132,6 +132,53 @@ async def test_dry_run_plans_without_creating_or_applying_proposal(
 
 
 @pytest.mark.asyncio
+async def test_dry_run_uses_readonly_physical_read_when_backend_state_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist"},
+            {"type": "state_update", "state": {}},
+            {
+                "type": "mixer_parameter_value",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "address": "/ch/3/in/set/trim",
+                "channel": 3,
+                "value_type": "gain",
+                "value": 1.0,
+            },
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    args = parse_args(tmp_path, "--channel", "3", "--value-type", "gain", "--delta-db", "-0.25")
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 0
+    assert [request["type"] for request in websocket.sent] == [
+        "get_operator_mode",
+        "get_state",
+        "query_mixer_parameter",
+    ]
+    query = websocket.sent[2]
+    assert query == {
+        "type": "query_mixer_parameter",
+        "channel": 3,
+        "value_type": "gain",
+        "address": "/ch/3/in/set/trim",
+    }
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "planned"
+    assert summary["address"] == "/ch/3/in/set/trim"
+    assert summary["old_value"] == 1.0
+    assert summary["old_value_source"] == "physical_readback"
+    assert summary["old_value_status"] == "verified_from_physical_readback"
+    assert summary["target_value"] == 0.75
+
+
+@pytest.mark.asyncio
 async def test_execute_path_uses_apply_operator_proposal_only_for_write(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

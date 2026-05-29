@@ -41,7 +41,7 @@ emergency-stop proof.
 | AutoSoundcheck Engine | `canonical` guarded | `gain_fader` | Analyze and form recommendations. | Free live executor behavior |
 | Supervised Manual Fader/Gain Gate | `canonical` | `gain_fader` | Only MVP live executor. | EQ, compressor, FX, routing, reset |
 | Auto Fader v1 | `proposal_only` | `gain_fader` | Balance proposals. | Direct live fader automation |
-| LUFS Gain Staging | `proposal_only` | `gain_fader` | Ayaic-style level-plane guidance. | Standalone live writer |
+| LUFS Gain Staging | `proposal_only` | `gain_fader` | Ayaic-style level-plane guidance and offline input-trim render. | Standalone live writer |
 | Live Shared Mix Planner | `proposal_only` | `gain_fader` | Grouped balance proposals. | Routing/name/master-processing writes |
 | Auto EQ | `proposal_only` | `eq` | EQ recommendations and blockers. | Direct `set_eq` in main live pipeline |
 | Cross-Adaptive EQ | `proposal_only` | `eq` | Masking-aware proposal/offline candidate. | Direct live EQ apply |
@@ -80,6 +80,11 @@ Product Layer websocket surface: `get_processing_pipeline_snapshot`.
 Main pipeline preview surface: `get_main_pipeline_preview`.
 
 Dashboard runtime summary: `dashboard_snapshot.runtime.processing`.
+
+UI module map: `processing_pipeline_snapshot.module_status_map` is rendered in
+the frontend Settings surface as a status-only table. It lists each module's
+entrypoint, UI surface, live-write scope, blocked reason, and next step. This
+table is informational only and does not create a new apply path.
 
 The registry is declarative and must stay free of mixer-client imports. It is a
 read-only contract for agents and UI surfaces, not an execution engine.
@@ -131,3 +136,173 @@ Rules:
 - `requested_change.value_type` may be only `fader` or `gain` for
   `main_live_assist`.
 - Apply remains `apply_operator_proposal` -> supervised manual gate.
+
+## Slice 3 proposal-only correction contracts
+
+Implementation source:
+
+- `backend/processing_proposal_adapters.py`
+- `backend/processing_pipeline_preview.py`
+- `backend/operator_proposal_queue.py`
+
+Preview websocket output:
+
+- `proposal_only_contracts`: non-queueable correction contracts for EQ,
+  compressor, gate, pan, phase/delay, FX/sends, routing, and direct FX/rack
+  surfaces;
+- `summary.proposal_only_contract_count`: number of visible contracts;
+- each contract has `queue_action=not_queueable_until_promoted`,
+  `can_import_to_queue=false`, and `can_apply_live=false`;
+- each contract declares required future evidence: `target`, `old_value`,
+  `proposed_value`, `safety_evidence`, `required_approval`,
+  `readback_required`, and `rollback_value`.
+
+Operator queue rule:
+
+- only `fader` and `gain` proposals are applyable;
+- any other `requested_change.value_type` remains visible for review but gets an
+  explicit `apply_blockers` entry such as `unsupported_value_type:eq`;
+- unsupported proposal apply still fails closed in `apply_operator_proposal` and
+  does not call the supervised manual write gate.
+
+This slice does not promote EQ, compressor, gate, pan, phase, FX, routing,
+snapshot, scene, or reset behavior to live execution.
+
+## Slice 4 automation foundation layer
+
+Implementation sources:
+
+- `backend/automation_trace.py`
+- `backend/handlers/product_state_handlers.py`
+- `backend/operator_product_state.py`
+- `backend/offline_validation_harness.py`
+- `frontend/src/services/useOperatorBackend.ts`
+- `frontend/src/services/operatorAdapters.ts`
+- `frontend/src/components/prototype/TaskQueuePanels.tsx`
+
+Purpose:
+
+- create one append-only evidence shape for proposal, offline replay, shadow,
+  blocked, apply, readback, rollback, and safety decisions;
+- make the cockpit show decision evidence from backend DTOs instead of new mock
+  data;
+- support offline replay reports without importing WING/OSC live transport;
+- harden supervised apply without widening the live-write surface.
+
+Decision trace contract:
+
+| Field | Requirement |
+| --- | --- |
+| `decision_id` | Stable row id for the trace. |
+| `idempotency_key` | Required for supervised apply requests. Duplicate apply keys fail closed. |
+| `source` | Producer, such as Product Layer, offline replay, or operator UI. |
+| `mode` | Operator mode or replay/shadow context. |
+| `target` | Channel, bus, or subsystem target. |
+| `action_type` | Intended action; only `fader` and `gain` may reach the live executor. |
+| `current_value` | Current or pre-read value when available. |
+| `proposed_value` | Proposed value or null for blocked/advisory decisions. |
+| `delta` | Proposed change amount used for bounds checks. |
+| `safety_limits` | Per-target bounds and policy evidence. |
+| `pre_read` | Required before live supervised apply. |
+| `readback` | Readback evidence after apply when available. |
+| `rollback` | Rollback target and result evidence when available. |
+| `proof_status` | `proposed`, `blocked`, `applied`, `partial`, `verified`, or similar UI-safe status. |
+| `blocked_reason` | Required when a decision fails closed. |
+| `created_at` | ISO timestamp for audit ordering. |
+
+Product Layer websocket surfaces:
+
+- `get_decision_traces` -> `decision_traces`;
+- `get_safety_monitor` -> `safety_monitor`;
+- `get_replay_runs` -> `replay_runs`;
+- `start_replay_run` -> offline/dry-run replay only;
+- `get_channel_intelligence` -> `channel_intelligence`.
+
+Apply hardening:
+
+- `apply_operator_proposal` requires `approved=true`, `approval_id`, `reason`,
+  and `idempotency_key`;
+- duplicate idempotency keys are rejected before the manual gate;
+- fader proposals are bounded to a maximum `1.0 dB` step;
+- gain-ride proposals are bounded to a maximum `0.5 dB` step;
+- auto-generated upward `fader` or `gain` moves are blocked unless explicitly
+  operator-authored;
+- any non-`fader`/`gain` action type stays quarantined and must produce a
+  blocked/proposal trace, not a WING write.
+
+Replay contract:
+
+- offline replay writes `decision_traces.jsonl`;
+- offline replay writes `metrics_before_after.json`;
+- offline replay writes `report.md`;
+- `start_replay_run` records a summary `offline_replay_v1` decision trace in
+  the shared trace store;
+- the replay summary trace can feed decision memory as `offline` evidence;
+- `replay_runs` rows expose run-level `trace_count`, `offline_only`, and
+  `live_write` evidence for cockpit display;
+- MuQ/perceptual scores remain advisory-only and never grant live-apply
+  authority.
+
+This slice is a foundation for agentic live mixing, not autonomous live mixing.
+It improves evidence, replay, memory readiness, and cockpit visibility while
+preserving the existing supervised-only live boundary.
+
+## Slice 5 shadow gain rides v0
+
+Implementation sources:
+
+- `backend/shadow_gain_rides.py`
+- `backend/operator_analysis.py`
+- `tests/test_operator_product_state.py`
+
+Purpose:
+
+- generate conservative vocal/intelligibility ride candidates as evidence;
+- record `gain_ride_shadow` decision traces during explicit operator analysis;
+- keep all ride output shadow-only until a separate promotion plan, fake tests,
+  physical readback, rollback, cooldown, and emergency-stop proof exist.
+
+Rules:
+
+- max step is `0.5 dB`;
+- candidates are built only for active vocal channels with usable meter data;
+- upward rides require peak headroom at or below `-6.0 dBFS`;
+- near-peak channels can only produce shadow-down candidates;
+- oscillation risk blocks candidates after alternating recent directions;
+- high pumping risk blocks candidates;
+- generated traces use `proof_status=shadow_only`;
+- generated traces set `live_apply_allowed=false`;
+- generated traces are not queue proposals and do not call
+  `apply_operator_proposal`.
+
+This slice intentionally does not promote gain rides to live execution. It gives
+the Director, Replay Engine, Channel Intelligence, and future memory layer more
+evidence to inspect.
+
+## Slice 6 decision memory v1
+
+Implementation sources:
+
+- `backend/decision_memory.py`
+- `backend/server.py`
+- `backend/operator_product_state.py`
+- `tests/test_operator_product_state.py`
+
+Purpose:
+
+- persist append-only operational memory from decision traces;
+- include only verified or offline evidence;
+- expose derived memory rows through `memory_knowledge_snapshot`;
+- keep memory as proposal context, not apply authority.
+
+Rules:
+
+- `proof_status=verified` traces can become `verified` decision memory;
+- offline/replay traces can become `offline` decision memory;
+- `shadow_only` traces do not become decision memory;
+- memory rows do not contain direct OSC/write command keys;
+- memory rows do not change operator mode, proposal status, or live readiness;
+- memory must never call `apply_operator_proposal` or any direct mixer method.
+
+This slice makes successful/verified/offline evidence durable for future
+proposal context while preserving the supervised live boundary.

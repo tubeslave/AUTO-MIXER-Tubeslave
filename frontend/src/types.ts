@@ -43,6 +43,78 @@ export interface ProposalApplyResult {
   updatedAt: string;
 }
 
+export interface DecisionTraceRecord {
+  decisionId: string;
+  proposalId?: string;
+  source: string;
+  mode?: string;
+  target?: string;
+  actionType: string;
+  status: string;
+  delta?: string;
+  proofStatus: string;
+  blockedReason?: string;
+  createdAt: string;
+  tone: Tone;
+}
+
+export interface SafetyMonitorState {
+  operatorMode: string;
+  liveWritePolicy: string;
+  applyPath: string;
+  emergencyStopped: boolean;
+  resetRequired: boolean;
+  ready: boolean;
+  mixerConnected: boolean;
+  approvedLiveWriteKinds: string[];
+  blockedSurfaces: string[];
+  lastProofStatus: string;
+  lastReadbackStatus: string;
+  traceCount: number;
+  blockedTraceCount: number;
+  sourceLabel: string;
+}
+
+export interface ReplayRunRecord {
+  runId: string;
+  status: string;
+  reason: string;
+  generatedAt: string;
+  reportPath: string;
+  tracePath: string;
+  metricsPath: string;
+  traceCount: number;
+  offlineOnly: boolean;
+  liveWrite: boolean;
+}
+
+export interface ChannelIntelligenceRecord {
+  channel: number;
+  name: string;
+  role: string;
+  group: string;
+  risk: string;
+  gainRideState: string;
+  recentTraceCount: number;
+  liveApplyAllowed: boolean;
+}
+
+export interface ModuleStatusRecord {
+  moduleId: string;
+  label: string;
+  domain: string;
+  status: string;
+  entrypoint: string;
+  module: string;
+  uiSurface: string;
+  canWriteLive: boolean;
+  liveWriteKinds: string[];
+  pipelineProfiles: string[];
+  blockedReason: string;
+  nextStep: string;
+  tone: Tone;
+}
+
 export interface ToastState {
   message: string;
   tone: Tone;
@@ -142,6 +214,25 @@ export interface Task {
   canApply?: boolean;
   backendStatus?: string;
   reason?: string;
+  reviewOnly?: boolean;
+  applyBlockers?: string[];
+  correctionDomain?: string;
+  requestedValueType?: string;
+  proposalContract?: ProposalOnlyContract;
+}
+
+export interface ProposalOnlyContract {
+  valueType: string;
+  targetKind: string;
+  requiredFields: string[];
+  oldValueSource: string;
+  safetyEvidenceRequired: string[];
+  requiredApproval: string;
+  readbackRequired: boolean;
+  rollbackRequired: boolean;
+  liveApplyAllowed: boolean;
+  allowedLiveWriteKinds: string[];
+  promotionNext: string;
 }
 
 export interface DecisionChainStep {
@@ -398,6 +489,7 @@ export interface UiActions {
   rollbackLastAction: () => void;
   refreshBackend: () => void;
   runBackendAnalysis: () => void;
+  startReplayRun: () => void;
   pushToast: (message: string, tone?: Tone) => void;
   dismissToast: () => void;
 }

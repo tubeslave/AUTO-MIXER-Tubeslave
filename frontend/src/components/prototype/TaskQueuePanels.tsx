@@ -9,9 +9,13 @@ import { applyPlanForTask, safetyEvidenceForTask } from '../../mock/automixerDat
 import { textClassForTone, toneForMode, toneForPriority, toneFromState } from '../../utils/prototypeTone';
 import type {
   ApplyPlanStep,
+  ChannelIntelligenceRecord,
+  DecisionTraceRecord,
   DecisionPolicy,
   Metric,
   ProposalPreview,
+  ReplayRunRecord,
+  SafetyMonitorState,
   SafetyEvidenceItem,
   Task,
   Tone,
@@ -26,10 +30,10 @@ export type TaskRow = Task & {
 function taskQueueMetrics(taskRows: TaskRow[]): Metric[] {
   return [
     { label: 'Total Queue', value: String(taskRows.length), sub: 'operator proposals', tone: 'blue' },
-    { label: 'High Risk', value: String(taskRows.filter(task => task.priority === 'High').length), sub: 'needs review', tone: 'red' },
+    { label: 'Applyable', value: String(taskRows.filter(task => task.canApply !== false).length), sub: 'fader / gain only', tone: 'green' },
+    { label: 'Review Only', value: String(taskRows.filter(task => task.reviewOnly || task.canApply === false).length), sub: 'no live apply', tone: 'red' },
     { label: 'Pending', value: String(taskRows.filter(task => task.status === 'Pending').length), sub: 'operator wait', tone: 'yellow' },
-    { label: 'Applied', value: String(taskRows.filter(task => task.status === 'Applied').length), sub: 'mock state', tone: 'green' },
-    { label: 'Rejected', value: String(taskRows.filter(task => task.status === 'Rejected').length), sub: 'mock state', tone: 'red' }
+    { label: 'Applied', value: String(taskRows.filter(task => task.status === 'Applied').length), sub: 'supervised history', tone: 'green' }
   ];
 }
 
@@ -45,6 +49,19 @@ function focusTaskDetail(actions: UiActions, task: TaskRow) {
 }
 
 function requestTaskApply(task: TaskRow, ui: UiState, actions: UiActions) {
+  if (task.canApply === false || task.reviewOnly) {
+    actions.selectTask(task.id);
+    actions.focusAction({
+      action: 'Review only',
+      target: task.title,
+      detail: `Apply is blocked: ${(task.applyBlockers ?? ['unsupported_value_type']).join(', ')}.`,
+      tone: 'red',
+      timestamp: '10:24:15'
+    });
+    actions.pushToast(`${task.title} is review-only. Live apply is blocked.`, 'red');
+    return;
+  }
+
   if (ui.mode === 'Supervised') {
     actions.openSupervisedProposal(task.id);
     return;
@@ -65,6 +82,8 @@ export function TaskDetailsPanel({
   policy: DecisionPolicy;
 }) {
   const proposal = task.proposal;
+  const applyBlocked = task.canApply === false || task.reviewOnly;
+  const blockers = task.applyBlockers ?? [];
 
   return (
     <Panel title="Task Details">
@@ -76,6 +95,7 @@ export function TaskDetailsPanel({
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
         <StatusBadge tone={toneFromState(task.status)}>{task.status}</StatusBadge>
         <StatusBadge tone={toneForMode(ui.mode)}>{ui.mode}</StatusBadge>
+        {task.reviewOnly && <StatusBadge tone="red">Review only</StatusBadge>}
         <span className="rounded-[4px] border border-line bg-row px-1.5 py-0.5 text-muted">{task.agent}</span>
         <span className="font-mono text-muted">{task.time}</span>
       </div>
@@ -90,8 +110,23 @@ export function TaskDetailsPanel({
           <span className="text-muted">Delta</span><span className="truncate font-bold text-audio">{proposal.delta}</span>
           <span className="text-muted">Proof</span><span className="truncate text-text">{proposal.proof}</span>
           <span className="text-muted">Rollback</span><span className="truncate text-text">{proposal.rollback}</span>
+          {task.requestedValueType && (
+            <>
+              <span className="text-muted">Value type</span><span className="truncate text-danger">{task.requestedValueType.replace(/_/g, ' ')}</span>
+            </>
+          )}
         </div>
       </div>
+      {blockers.length > 0 && (
+        <div className="mt-3 rounded-[6px] border border-danger/30 bg-danger/10 p-2">
+          <div className="am-label mb-1 text-danger">Apply Blockers</div>
+          <div className="space-y-1 text-[10px] text-muted">
+            {blockers.slice(0, 4).map(blocker => (
+              <div className="truncate" key={blocker}>{blocker.replace(/_/g, ' ')}</div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="mt-3">
         <div className="am-label mb-2">Decision Chain</div>
         <div className="space-y-1.5">
@@ -106,7 +141,11 @@ export function TaskDetailsPanel({
         <p className="mt-3 text-[10px] leading-4 text-muted">{policy.hint}</p>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <button className="am-button text-online" onClick={() => requestTaskApply(task, ui, actions)} type="button">{policy.actionLabel}</button>
+        {applyBlocked ? (
+          <button className="am-button text-audio" onClick={() => focusTaskDetail(actions, task)} type="button">Inspect</button>
+        ) : (
+          <button className="am-button text-online" onClick={() => requestTaskApply(task, ui, actions)} type="button">{policy.actionLabel}</button>
+        )}
         <button className="am-button text-danger" onClick={() => actions.setTaskStatus(task.id, 'Rejected')} type="button">Reject</button>
       </div>
     </Panel>
@@ -166,6 +205,112 @@ function OperatorDecisionPanel({ ui, policy }: { ui: UiState; policy: DecisionPo
   );
 }
 
+function SafetyMonitorPanel({ safety }: { safety: SafetyMonitorState }) {
+  return (
+    <Panel title="Safety Monitor">
+      <div className="grid grid-cols-2 gap-1">
+        {[
+          { label: 'Mode', value: safety.operatorMode, tone: safety.operatorMode === 'supervised' ? 'yellow' as const : 'blue' as const },
+          { label: 'Policy', value: safety.liveWritePolicy, tone: safety.liveWritePolicy.includes('fader_gain') ? 'green' as const : 'yellow' as const },
+          { label: 'Emergency', value: safety.resetRequired ? 'Reset required' : 'Clear', tone: safety.resetRequired ? 'red' as const : 'green' as const },
+          { label: 'Traces', value: `${safety.traceCount} / ${safety.blockedTraceCount} blocked`, tone: safety.blockedTraceCount ? 'yellow' as const : 'green' as const }
+        ].map(row => (
+          <div className="rounded-[5px] border border-line bg-row px-1.5 py-1" key={row.label}>
+            <div className="truncate text-[8px] uppercase tracking-[0.06em] text-dim">{row.label}</div>
+            <div className={`truncate text-[9px] font-bold ${textClassForTone(row.tone)}`}>{row.value}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 truncate text-[10px] text-muted">
+        Blocked: {safety.blockedSurfaces.slice(0, 4).join(', ') || 'none'}
+      </div>
+    </Panel>
+  );
+}
+
+function DecisionTracePanel({ traces }: { traces: DecisionTraceRecord[] }) {
+  const rows = traces.slice(0, 4);
+  return (
+    <Panel title="Decision Traces">
+      <div className="space-y-1">
+        {rows.map(trace => (
+          <div className="grid grid-cols-[38px_1fr_62px] items-center gap-2 border-b border-line pb-1 text-[9px]" key={trace.decisionId}>
+            <span className="font-mono text-dim">{trace.createdAt}</span>
+            <span className="truncate text-text">{trace.actionType} {trace.delta ? `· ${trace.delta} dB` : ''}</span>
+            <StatusBadge tone={trace.tone}>{trace.blockedReason ? 'blocked' : trace.proofStatus}</StatusBadge>
+          </div>
+        ))}
+        {!rows.length && <div className="rounded-[5px] border border-line bg-row px-2 py-2 text-[10px] text-muted">No backend traces yet.</div>}
+      </div>
+    </Panel>
+  );
+}
+
+function toneForReplayStatus(status: string): Tone {
+  const normalized = status.toLowerCase();
+  if (normalized.includes('fail') || normalized.includes('blocked')) return 'red';
+  if (normalized.includes('pass') || normalized.includes('clear') || normalized.includes('complete')) return 'green';
+  if (normalized.includes('running') || normalized.includes('requested')) return 'blue';
+  return 'yellow';
+}
+
+function ReplayEvidencePanel({
+  traces,
+  replayRuns,
+  channelIntelligence,
+  onStartReplay
+}: {
+  traces: DecisionTraceRecord[];
+  replayRuns: ReplayRunRecord[];
+  channelIntelligence: ChannelIntelligenceRecord[];
+  onStartReplay: () => void;
+}) {
+  const latestRun = replayRuns[0];
+  const latestTrace = traces[0];
+  const channel = channelIntelligence.find(row => row.recentTraceCount > 0) ?? channelIntelligence[0];
+
+  return (
+    <Panel
+      title="Replay Engine / Evidence"
+      action={<button className="am-button py-1 text-[9px] text-audio" onClick={onStartReplay} type="button">Start Offline</button>}
+    >
+      <div className="flex items-center justify-between gap-2 rounded-[5px] border border-line bg-row px-1.5 py-1">
+        <div className="min-w-0">
+          <div className="truncate text-[8px] uppercase tracking-[0.06em] text-dim">Latest run</div>
+          <div className="truncate text-[9px] font-bold text-text">{latestRun?.runId ?? 'No replay yet'}</div>
+        </div>
+        <StatusBadge tone={toneForReplayStatus(latestRun?.status ?? 'idle')}>{latestRun?.status ?? 'idle'}</StatusBadge>
+      </div>
+      <div className="mt-1 grid grid-cols-2 gap-1">
+        <div className="rounded-[5px] border border-line bg-row px-1.5 py-1">
+          <div className="truncate text-[8px] uppercase tracking-[0.06em] text-dim">Policy</div>
+          <div className="truncate text-[9px] font-bold text-muted">
+            {latestRun?.offlineOnly === false ? 'review' : 'offline only'} ·{' '}
+            <span className={latestRun?.liveWrite ? 'text-danger' : 'text-success'}>
+              {latestRun?.liveWrite ? 'live write' : 'no live write'}
+            </span>
+          </div>
+        </div>
+        <div className="rounded-[5px] border border-line bg-row px-1.5 py-1">
+          <div className="truncate text-[8px] uppercase tracking-[0.06em] text-dim">Trace</div>
+          <div className="truncate text-[9px] font-bold text-text">
+            {latestRun ? `${latestRun.traceCount} rows` : latestTrace ? `${latestTrace.actionType} ${latestTrace.delta ? `${latestTrace.delta} dB` : ''}` : 'No decision trace'}
+          </div>
+        </div>
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-2 text-[9px]">
+        <span className="truncate text-text">{channel ? `${channel.channel} ${channel.name}` : 'No channel evidence'}</span>
+        <StatusBadge tone={channel?.liveApplyAllowed ? 'yellow' : 'blue'}>{channel?.gainRideState ?? 'shadow'}</StatusBadge>
+      </div>
+      {latestRun && (
+        <div className="mt-0.5 truncate text-[8px] text-muted">
+          Report: {latestRun.reportPath || 'pending'}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 function SupervisedApplyModal({
   task,
   ui,
@@ -182,7 +327,7 @@ function SupervisedApplyModal({
   onConfirm: () => void;
 }) {
   const proposal = task.proposal;
-  const canRequestBackendGate = ui.mode === 'Supervised' && ui.backend.canApplyToConsole && Boolean(task.canApply ?? true);
+  const canRequestBackendGate = ui.mode === 'Supervised' && ui.backend.canApplyToConsole && Boolean(task.canApply ?? true) && !task.reviewOnly;
   const approvalLabel = ui.mode !== 'Supervised'
     ? 'Blocked by mode'
     : canRequestBackendGate
@@ -281,7 +426,7 @@ function SupervisedApplyModal({
         <div className="mt-4 flex justify-end gap-2">
           <button className="am-button" onClick={onClose} type="button">Cancel</button>
           <button className="am-button border-warn/40 bg-warn/10 text-warn" onClick={onConfirm} type="button">
-            Request Supervised Apply
+            {task.reviewOnly ? 'Apply Blocked' : 'Request Supervised Apply'}
           </button>
         </div>
       </div>
@@ -296,7 +441,11 @@ export function TaskQueueWorkspace({
   actions,
   policy,
   evidence,
-  applyPlan
+  applyPlan,
+  decisionTraces,
+  safetyMonitor,
+  replayRuns,
+  channelIntelligence
 }: {
   taskRows: TaskRow[];
   selectedTask: TaskRow;
@@ -305,6 +454,10 @@ export function TaskQueueWorkspace({
   policy: DecisionPolicy;
   evidence: SafetyEvidenceItem[];
   applyPlan: ApplyPlanStep[];
+  decisionTraces: DecisionTraceRecord[];
+  safetyMonitor: SafetyMonitorState;
+  replayRuns: ReplayRunRecord[];
+  channelIntelligence: ChannelIntelligenceRecord[];
 }) {
   const modalTask = ui.supervisedProposalTaskId
     ? taskRows.find(task => task.id === ui.supervisedProposalTaskId)
@@ -313,7 +466,7 @@ export function TaskQueueWorkspace({
   const modalApplyPlan = modalTask ? applyPlanForTask(modalTask, ui.mode) : applyPlan;
 
   return (
-    <div className="relative grid h-full grid-rows-[76px_1fr_108px] gap-2">
+    <div className="relative grid h-full grid-rows-[76px_1fr_118px] gap-2">
       <div className="grid grid-cols-5 gap-2">
         {taskQueueMetrics(taskRows).map(metric => <MetricCard metric={metric} key={metric.label} />)}
       </div>
@@ -327,13 +480,24 @@ export function TaskQueueWorkspace({
         filters={[
           { label: 'All', predicate: () => true },
           { label: 'High', predicate: task => task.priority === 'High' },
+          { label: 'Review only', predicate: task => Boolean(task.reviewOnly || task.canApply === false) },
           { label: 'Pending', predicate: task => task.status === 'Pending' },
           { label: 'Applied', predicate: task => task.status === 'Applied' }
         ]}
         getSearchText={task => `${task.title} ${task.agent} ${task.target} ${task.status} ${task.priority}`}
         columns={[
           { key: 'priority', label: 'Priority', width: '0.75fr', render: task => <StatusBadge tone={toneForPriority(task.priority)}>{task.priority}</StatusBadge> },
-          { key: 'title', label: 'Task', width: '1.55fr' },
+          {
+            key: 'title',
+            label: 'Task',
+            width: '1.55fr',
+            render: task => (
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate">{task.title}</span>
+                {task.reviewOnly && <StatusBadge tone="red">Review</StatusBadge>}
+              </span>
+            )
+          },
           { key: 'agent', label: 'Created By', width: '1.15fr' },
           { key: 'target', label: 'Target / Move', width: '1fr', render: task => <span className="truncate"><span className="text-text">{task.target}</span><span className="ml-2 font-mono text-audio">{task.proposal.delta}</span></span> },
           { key: 'status', label: 'Status', width: '0.9fr', render: task => <StatusBadge tone={toneFromState(task.status)}>{task.status}</StatusBadge> },
@@ -344,7 +508,7 @@ export function TaskQueueWorkspace({
             width: '90px',
             render: task => (
               <ActionCluster
-                actions={['Detail', 'Apply', 'Reject']}
+                actions={task.canApply === false || task.reviewOnly ? ['Detail', 'Reject'] : ['Detail', 'Apply', 'Reject']}
                 onAction={action => {
                   if (action === 'Apply') requestTaskApply(task, ui, actions);
                   else if (action === 'Reject') actions.setTaskStatus(task.id, 'Rejected');
@@ -355,10 +519,17 @@ export function TaskQueueWorkspace({
           }
         ]}
       />
-      <div className="grid grid-cols-[1.2fr_1fr_1fr] gap-2">
+      <div className="grid grid-cols-[1fr_1fr_1fr_1.05fr_1.25fr] gap-2">
         <ApplyPlanPanel plan={applyPlan} />
         <SafetyEvidencePanel evidence={evidence} />
         <OperatorDecisionPanel ui={ui} policy={policy} />
+        <SafetyMonitorPanel safety={safetyMonitor} />
+        <ReplayEvidencePanel
+          channelIntelligence={channelIntelligence}
+          onStartReplay={actions.startReplayRun}
+          replayRuns={replayRuns}
+          traces={decisionTraces}
+        />
       </div>
       {modalTask && (
         <SupervisedApplyModal

@@ -5,18 +5,24 @@ import {
   adaptBackendState,
   adaptBusesFromChannels,
   adaptBusesSnapshot,
+  adaptChannelIntelligence,
   adaptChannels,
   adaptCommunicationsSnapshot,
   adaptDashboardRuntime,
+  adaptDecisionTraces,
   adaptDevices,
   adaptDirectorRuntime,
   adaptOverviewMetrics,
   adaptPerformanceRecords,
+  adaptProposalOnlyContractTasks,
+  adaptReplayRuns,
   adaptMemorySnapshot,
+  adaptModuleStatusRecords,
   adaptRulesSnapshot,
   adaptRuntimeCommunications,
   adaptRuntimeMemories,
   adaptRoutingSegments,
+  adaptSafetyMonitor,
   adaptTrainingSnapshot,
   adaptTasks,
   adaptTopologyLinks,
@@ -48,15 +54,20 @@ import type {
   Channel,
   Communication,
   DashboardRuntime,
+  DecisionTraceRecord,
   DeviceRecord,
   DirectorRuntime,
+  ChannelIntelligenceRecord,
   LogRecord,
   MemoryRecord,
   Metric,
+  ModuleStatusRecord,
   PerformanceRecord,
   ProposalApplyResult,
+  ReplayRunRecord,
   RuleLibrarySnapshotRow,
   RoutingSegment,
+  SafetyMonitorState,
   Task,
   TrainingSessionSnapshotRow,
   TopologyLink,
@@ -67,6 +78,10 @@ type ProductLayerPayloads = {
   dashboard?: unknown;
   channels?: unknown;
   decisions?: unknown;
+  decisionTraces?: unknown;
+  safetyMonitor?: unknown;
+  replayRuns?: unknown;
+  channelIntelligence?: unknown;
   agents?: unknown;
   topology?: unknown;
   mode?: unknown;
@@ -84,9 +99,14 @@ export interface OperatorViewData {
   buses: BusRecord[];
   agents: Agent[];
   tasks: Task[];
+  decisionTraces: DecisionTraceRecord[];
+  safetyMonitor: SafetyMonitorState;
+  replayRuns: ReplayRunRecord[];
+  channelIntelligence: ChannelIntelligenceRecord[];
   overviewMetrics: Metric[];
   devices: DeviceRecord[];
   logs: LogRecord[];
+  moduleStatuses: ModuleStatusRecord[];
   communications: Communication[];
   memories: MemoryRecord[];
   trainingSessions: TrainingSessionSnapshotRow[];
@@ -111,6 +131,10 @@ const EXPECTED_RUNTIME_PAYLOADS: (keyof ProductLayerPayloads)[] = [
   'dashboard',
   'channels',
   'decisions',
+  'decisionTraces',
+  'safetyMonitor',
+  'replayRuns',
+  'channelIntelligence',
   'agents',
   'topology',
   'mode',
@@ -205,6 +229,79 @@ function proposalIdFromPayload(payload: unknown): string | undefined {
   return String(data.proposal_id ?? proposal.id ?? data.id ?? '').trim() || undefined;
 }
 
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {};
+}
+
+function stringValue(value: unknown, fallback = ''): string {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+}
+
+function numberValue(value: unknown, fallback = 0): number {
+  const next = Number(value);
+  return Number.isFinite(next) ? next : fallback;
+}
+
+function replayRowsFromPayload(payload: unknown): Record<string, unknown>[] {
+  const data = recordValue(payload);
+  const rows = Array.isArray(data.runs) ? data.runs : [];
+  return rows.filter((row): row is Record<string, unknown> => Boolean(row && typeof row === 'object'));
+}
+
+function mergeReplayRunsPayload(current: unknown, incoming: unknown): unknown {
+  const currentRows = replayRowsFromPayload(current);
+  const incomingRows = replayRowsFromPayload(incoming);
+  if (!currentRows.length || !incomingRows.length) return incoming;
+  const incomingIds = new Set(incomingRows.map(row => stringValue(row.run_id)));
+  const localRows = currentRows.filter(row => row.local_echo === true && !incomingIds.has(stringValue(row.run_id)));
+  if (!localRows.length) return incoming;
+  return {
+    ...recordValue(incoming),
+    runs: [...localRows, ...incomingRows],
+    summary: {
+      ...recordValue(recordValue(incoming).summary),
+      run_count: localRows.length + incomingRows.length,
+      offline_only: true,
+      live_write: false
+    }
+  };
+}
+
+function replayRunsPayloadFromStarted(current: unknown, payload: unknown): unknown {
+  const data = recordValue(payload);
+  const artifacts = recordValue(data.artifacts);
+  const result = recordValue(data.result);
+  const summary = recordValue(result.summary);
+  const runId = stringValue(data.run_id || artifacts.run_id, `frontend-replay-${Date.now()}`);
+  const row = {
+    run_id: runId,
+    status: stringValue(data.status || result.status, 'requested'),
+    reason: stringValue(data.reason || result.reason || result.write_policy, 'offline_replay_requested'),
+    generated_at: stringValue(data.generated_at || result.generated_at, new Date().toISOString()),
+    report_path: stringValue(artifacts.report_path),
+    decision_traces_path: stringValue(artifacts.decision_traces_path),
+    metrics_path: stringValue(artifacts.metrics_path),
+    trace_count: numberValue(data.trace_count ?? result.trace_count ?? summary.trace_count),
+    offline_only: data.offline_only !== false,
+    live_write: Boolean(data.live_write),
+    local_echo: true
+  };
+  const currentRows = replayRowsFromPayload(current).filter(existing => stringValue(existing.run_id) !== runId);
+  return {
+    type: 'replay_runs',
+    status: 'ok',
+    source: 'replay_run_started_local_echo',
+    generated_at: row.generated_at,
+    summary: {
+      run_count: currentRows.length + 1,
+      offline_only: row.offline_only,
+      live_write: row.live_write
+    },
+    runs: [row, ...currentRows]
+  };
+}
+
 function applyResultFromPayload(payload: unknown, fallbackStatus = 'updated'): ProposalApplyResult {
   const data = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
   const rawResult = data.apply_result && typeof data.apply_result === 'object'
@@ -253,6 +350,10 @@ export function useOperatorBackend() {
     websocketService.getDashboardSnapshot();
     websocketService.getChannelInventory(48);
     websocketService.getDecisionQueue(50);
+    websocketService.getDecisionTraces(50);
+    websocketService.getSafetyMonitor();
+    websocketService.getReplayRuns(20);
+    websocketService.getChannelIntelligence(48);
     websocketService.getOperatorAgentRoster();
     websocketService.getConnectionTopology();
     websocketService.getGroupsBusesSnapshot();
@@ -290,6 +391,16 @@ export function useOperatorBackend() {
       return;
     }
     websocketService.runOperatorAnalysis(48, true);
+  }, [refreshBackend]);
+
+  const startReplayRun = useCallback((runId?: string) => {
+    if (!socketIsOpen()) {
+      refreshBackend();
+      setLogs(current => appendBackendLog(current, 'replay_run', 'Connect backend before starting offline replay.', 'WARN'));
+      return;
+    }
+    websocketService.startReplayRun(runId ?? `frontend-replay-${Date.now()}`);
+    setLogs(current => appendBackendLog(current, 'replay_run', 'Offline replay requested. Live writes remain disabled.', 'INFO'));
   }, [refreshBackend]);
 
   const setBackendMode = useCallback((mode: AutomixerMode) => {
@@ -331,6 +442,27 @@ export function useOperatorBackend() {
     const handleDecisions = (payload: unknown) => {
       setPayloads(current => ({ ...current, decisions: payload }));
       setLogs(current => appendBackendLog(current, 'decision_queue', 'Decision queue received.', 'SUCCESS'));
+    };
+    const handleDecisionTraces = (payload: unknown) => {
+      setPayloads(current => ({ ...current, decisionTraces: payload }));
+      setLogs(current => appendBackendLog(current, 'decision_traces', 'Decision traces received.', 'SUCCESS'));
+    };
+    const handleSafetyMonitor = (payload: unknown) => {
+      setPayloads(current => ({ ...current, safetyMonitor: payload }));
+      setLogs(current => appendBackendLog(current, 'safety_monitor', 'Safety monitor received.', 'SUCCESS'));
+    };
+    const handleReplayRuns = (payload: unknown) => {
+      setPayloads(current => ({ ...current, replayRuns: mergeReplayRunsPayload(current.replayRuns, payload) }));
+      setLogs(current => appendBackendLog(current, 'replay_runs', 'Replay runs received.', 'SUCCESS'));
+    };
+    const handleReplayRunStarted = (payload: unknown) => {
+      setLogs(current => appendBackendLog(current, 'replay_run', 'Offline replay run completed.', 'SUCCESS'));
+      setPayloads(current => ({ ...current, replayRuns: replayRunsPayloadFromStarted(current.replayRuns, payload) }));
+      refreshBackend();
+    };
+    const handleChannelIntelligence = (payload: unknown) => {
+      setPayloads(current => ({ ...current, channelIntelligence: payload }));
+      setLogs(current => appendBackendLog(current, 'channel_intelligence', 'Channel intelligence received.', 'SUCCESS'));
     };
     const handleAgents = (payload: unknown) => {
       setPayloads(current => ({ ...current, agents: payload }));
@@ -417,6 +549,11 @@ export function useOperatorBackend() {
     websocketService.on('dashboard_snapshot', handleDashboard);
     websocketService.on('channel_inventory', handleChannels);
     websocketService.on('decision_queue', handleDecisions);
+    websocketService.on('decision_traces', handleDecisionTraces);
+    websocketService.on('safety_monitor', handleSafetyMonitor);
+    websocketService.on('replay_runs', handleReplayRuns);
+    websocketService.on('replay_run_started', handleReplayRunStarted);
+    websocketService.on('channel_intelligence', handleChannelIntelligence);
     websocketService.on('operator_agent_roster', handleAgents);
     websocketService.on('connection_topology', handleTopology);
     websocketService.on('groups_buses_snapshot', handleGroups);
@@ -456,6 +593,11 @@ export function useOperatorBackend() {
       websocketService.off('dashboard_snapshot', handleDashboard);
       websocketService.off('channel_inventory', handleChannels);
       websocketService.off('decision_queue', handleDecisions);
+      websocketService.off('decision_traces', handleDecisionTraces);
+      websocketService.off('safety_monitor', handleSafetyMonitor);
+      websocketService.off('replay_runs', handleReplayRuns);
+      websocketService.off('replay_run_started', handleReplayRunStarted);
+      websocketService.off('channel_intelligence', handleChannelIntelligence);
       websocketService.off('operator_agent_roster', handleAgents);
       websocketService.off('connection_topology', handleTopology);
       websocketService.off('groups_buses_snapshot', handleGroups);
@@ -498,14 +640,19 @@ export function useOperatorBackend() {
       statusTone: dataState === 'partial' || dataState === 'stale' ? 'yellow' : base.statusTone,
       proposalApplyResult
     };
-  }, [connectionState, payloads.agents, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisions, payloads.groups, payloads.memory, payloads.mode, payloads.pipelinePreview, payloads.processing, payloads.rules, payloads.topology, payloads.training, proposalApplyResult]);
+  }, [connectionState, payloads.agents, payloads.channelIntelligence, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisionTraces, payloads.decisions, payloads.groups, payloads.memory, payloads.mode, payloads.pipelinePreview, payloads.processing, payloads.replayRuns, payloads.rules, payloads.safetyMonitor, payloads.topology, payloads.training, proposalApplyResult]);
 
   const viewData: OperatorViewData = useMemo(() => {
     const channels = adaptChannels(payloads.channels, mockChannels);
     const derivedBuses = adaptBusesFromChannels(channels, mockBuses);
     const buses = adaptBusesSnapshot(payloads.groups, derivedBuses);
     const agents = adaptAgents(payloads.agents, mockAgents);
-    const tasks = adaptTasks(payloads.decisions, mockTasks);
+    const queueTasks = adaptTasks(payloads.decisions, mockTasks);
+    const reviewOnlyTasks = payloads.pipelinePreview ? adaptProposalOnlyContractTasks(payloads.pipelinePreview) : [];
+    const tasks = [...queueTasks, ...reviewOnlyTasks];
+    const decisionTraces = adaptDecisionTraces(payloads.decisionTraces);
+    const replayRuns = adaptReplayRuns(payloads.replayRuns);
+    const channelIntelligence = adaptChannelIntelligence(payloads.channelIntelligence);
     const overviewMetrics = adaptOverviewMetrics(payloads.dashboard, payloads.agents, payloads.decisions, mockOverviewMetrics);
     const devices = adaptDevices(payloads.topology, mockDevices);
     const topologyNodes = adaptTopologyNodes(payloads.topology);
@@ -513,7 +660,9 @@ export function useOperatorBackend() {
     const routingSegments = adaptRoutingSegments(payloads.topology);
     const dashboardRuntime = adaptDashboardRuntime(payloads.dashboard, payloads.agents, payloads.decisions);
     const directorRuntime = adaptDirectorRuntime(payloads.dashboard, payloads.agents, payloads.pipelinePreview);
+    const safetyMonitor = adaptSafetyMonitor(payloads.safetyMonitor, backend);
     const performanceRecords = adaptPerformanceRecords(payloads.agents, payloads.decisions, mockPerformance);
+    const moduleStatuses = adaptModuleStatusRecords(payloads.processing);
     const runtimeCommunications = adaptRuntimeCommunications(logs, agents, tasks, mockCommunications);
     const communications = adaptCommunicationsSnapshot(payloads.communications, runtimeCommunications);
     const hasRuntimePayloads = Boolean(payloads.channels || payloads.agents || payloads.decisions || payloads.dashboard || payloads.topology);
@@ -528,9 +677,14 @@ export function useOperatorBackend() {
       buses,
       agents,
       tasks,
+      decisionTraces,
+      safetyMonitor,
+      replayRuns,
+      channelIntelligence,
       overviewMetrics,
       devices,
       logs,
+      moduleStatuses,
       communications,
       memories,
       trainingSessions,
@@ -549,16 +703,17 @@ export function useOperatorBackend() {
         communications: payloadSource(payloads.communications, payloads.dashboard ? 'runtime_derived' : 'mock')
       }
     };
-  }, [logs, payloads.agents, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisions, payloads.groups, payloads.memory, payloads.pipelinePreview, payloads.processing, payloads.rules, payloads.topology, payloads.training]);
+  }, [backend, logs, payloads.agents, payloads.channelIntelligence, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisionTraces, payloads.decisions, payloads.groups, payloads.memory, payloads.pipelinePreview, payloads.processing, payloads.replayRuns, payloads.rules, payloads.safetyMonitor, payloads.topology, payloads.training]);
 
   const backendActions = useMemo(() => ({
     refreshBackend,
     runBackendAnalysis,
+    startReplayRun,
     setBackendMode,
     acceptProposal,
     dismissProposal,
     applyProposal
-  }), [acceptProposal, applyProposal, dismissProposal, refreshBackend, runBackendAnalysis, setBackendMode]);
+  }), [acceptProposal, applyProposal, dismissProposal, refreshBackend, runBackendAnalysis, setBackendMode, startReplayRun]);
 
   return {
     backend,

@@ -231,6 +231,7 @@ async def run(args: argparse.Namespace) -> int:
                 "proposal_id": proposal_id,
                 "approved": True,
                 "approval_id": f"gain-proof-dry-run:apply-approved:{run_id}",
+                "idempotency_key": f"gain-proof-dry-run:apply-approved:{run_id}",
                 "reason": args.reason,
             },
         )
@@ -254,6 +255,7 @@ async def run(args: argparse.Namespace) -> int:
                 "proposal_id": cooldown_id,
                 "approved": True,
                 "approval_id": f"gain-proof-dry-run:cooldown-approved:{run_id}",
+                "idempotency_key": f"gain-proof-dry-run:cooldown-approved:{run_id}",
                 "reason": f"cooldown:{args.reason}",
             },
         )
@@ -301,6 +303,7 @@ async def run(args: argparse.Namespace) -> int:
                 "proposal_id": emergency_id,
                 "approved": True,
                 "approval_id": f"gain-proof-dry-run:emergency-approved:{run_id}",
+                "idempotency_key": f"gain-proof-dry-run:emergency-approved:{run_id}",
                 "reason": f"emergency:{args.reason}",
             },
         )

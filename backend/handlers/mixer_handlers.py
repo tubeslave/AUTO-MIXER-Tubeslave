@@ -1,5 +1,58 @@
 """Mixer control message handlers (fader, gain, EQ band, compressor, state)."""
 
+from typing import Any, Optional
+
+
+def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int], Optional[str], Optional[str], Optional[str]]:
+    value_type = server._normalize_manual_write_kind(data.get("value_type"))
+    channel = data.get("channel")
+    address = str(data.get("address") or "").strip()
+
+    if value_type in {"fader", "gain"} and channel is not None:
+        try:
+            channel_int = int(channel)
+        except (TypeError, ValueError):
+            return None, None, None, "invalid_channel"
+        if channel_int < 1 or channel_int > 48:
+            return None, None, None, "channel_out_of_range"
+        expected_address = server._manual_write_address(channel_int, value_type)
+        if address and address != expected_address:
+            return None, None, None, "address_value_type_mismatch"
+        return channel_int, value_type, expected_address, None
+
+    if address:
+        parts = address.split("/")
+        if len(parts) == 4 and parts[1] == "ch" and parts[3] == "fdr":
+            parsed_type = "fader"
+        elif len(parts) == 6 and parts[1] == "ch" and parts[3:] == ["in", "set", "trim"]:
+            parsed_type = "gain"
+        else:
+            return None, None, None, "unsupported_address"
+        try:
+            channel_int = int(parts[2])
+        except (TypeError, ValueError):
+            return None, None, None, "invalid_channel"
+        if channel_int < 1 or channel_int > 48:
+            return None, None, None, "channel_out_of_range"
+        if value_type and value_type != parsed_type:
+            return None, None, None, "address_value_type_mismatch"
+        return channel_int, parsed_type, server._manual_write_address(channel_int, parsed_type), None
+
+    return None, None, None, "missing_read_target"
+
+
+def _readonly_parameter_blocked_payload(data: dict, reason: str) -> dict[str, Any]:
+    return {
+        "type": "mixer_parameter_read_blocked",
+        "status": "blocked",
+        "reason": reason,
+        "request": {
+            "channel": data.get("channel"),
+            "value_type": data.get("value_type"),
+            "address": data.get("address"),
+        },
+    }
+
 
 def register_handlers(server):
     async def handle_set_fader(websocket, data):
@@ -108,6 +161,30 @@ def register_handlers(server):
                 "state": server.mixer_client.get_state()
             })
 
+    async def handle_query_mixer_parameter(websocket, data):
+        channel, value_type, address, error = _parse_readonly_parameter_request(server, data)
+        if error:
+            await server.send_to_client(websocket, _readonly_parameter_blocked_payload(data, error))
+            return
+
+        result = await server._manual_write_read_value(
+            channel=channel,
+            value_type=value_type,
+            address=address,
+            prefer_physical=True,
+        )
+        await server.send_to_client(websocket, {
+            "type": "mixer_parameter_value",
+            "status": result.get("status") or "readback_unavailable",
+            "channel": channel,
+            "value_type": value_type,
+            "address": address,
+            "value": result.get("value"),
+            "source": result.get("source") or "unavailable",
+            "error": result.get("error"),
+            "raw": result.get("raw"),
+        })
+
     return {
         "set_fader": handle_set_fader,
         "set_gain": handle_set_gain,
@@ -115,4 +192,5 @@ def register_handlers(server):
         "set_compressor": handle_set_compressor,
         "rollback_last_manual_write": handle_rollback_last_manual_write,
         "get_state": handle_get_state,
+        "query_mixer_parameter": handle_query_mixer_parameter,
     }

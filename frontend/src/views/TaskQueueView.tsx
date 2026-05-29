@@ -14,8 +14,12 @@ export function TaskQueue(ui: UiState, actions: UiActions, data: OperatorViewDat
     <TaskQueueWorkspace
       actions={actions}
       applyPlan={applyPlan}
+      channelIntelligence={data.channelIntelligence}
+      decisionTraces={data.decisionTraces}
       evidence={evidence}
       policy={policy}
+      replayRuns={data.replayRuns}
+      safetyMonitor={data.safetyMonitor}
       selectedTask={selectedTask}
       taskRows={taskRows}
       ui={ui}

@@ -12,6 +12,7 @@ try:
         MAIN_PIPELINE_ID,
         adapt_operator_analysis_gain_fader_proposals,
         adapt_safe_gain_suggestions,
+        build_proposal_only_method_contracts,
         build_registry_blockers,
     )
     from processing_registry import (
@@ -28,6 +29,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         MAIN_PIPELINE_ID,
         adapt_operator_analysis_gain_fader_proposals,
         adapt_safe_gain_suggestions,
+        build_proposal_only_method_contracts,
         build_registry_blockers,
     )
     from backend.processing_registry import (
@@ -161,6 +163,7 @@ def build_main_pipeline_preview(
 
     proposals = operator_proposals + safe_gain_proposals
     blockers = build_registry_blockers(pipeline_id=MAIN_PIPELINE_ID)
+    proposal_only_contracts = build_proposal_only_method_contracts(pipeline_id=MAIN_PIPELINE_ID)
     registry_snapshot = build_processing_registry_snapshot(include_methods=include_methods)
 
     analysis_status = str(analysis_report.get("status") or "unknown")
@@ -199,6 +202,7 @@ def build_main_pipeline_preview(
             "proposal_count": len(proposals),
             "operator_analysis_proposal_count": len(operator_proposals),
             "safe_gain_proposal_count": len(safe_gain_proposals),
+            "proposal_only_contract_count": len(proposal_only_contracts),
             "blocker_count": len(blockers),
             "queue_mutation": False,
             "live_write": False,
@@ -224,8 +228,15 @@ def build_main_pipeline_preview(
                 "status": "active",
                 "output": "blocked_method_visibility",
             },
+            {
+                "adapter_id": "proposal_only_contracts",
+                "method_id": "processing_registry",
+                "status": "active",
+                "output": "non_fader_gain_contract_visibility",
+            },
         ],
         "proposals": proposals,
+        "proposal_only_contracts": proposal_only_contracts,
         "blockers": blockers,
         "analysis": {
             "status": analysis_report.get("status"),

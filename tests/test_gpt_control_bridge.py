@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import http.client
+from io import BytesIO
 import json
 import os
-import threading
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 from tools.gpt_control_bridge import server as bridge
@@ -148,12 +146,11 @@ def test_safety_flags_always_block_writes(tmp_path: Path) -> None:
 
 def test_no_write_routes_exist(tmp_path: Path) -> None:
     client = FakePaperclipClient(make_routes())
-    with running_server(make_config(tmp_path), client) as address:
-        for method in ("POST", "PATCH", "DELETE", "PUT"):
-            status, payload = request_json(method, address, "/v1/context/automixer")
-            assert status == 405
-            assert payload["error"] == "write_methods_disabled"
-            assert payload["safety_flags"]["write_routes_enabled"] is False
+    for method in ("POST", "PATCH", "DELETE", "PUT"):
+        status, payload = dispatch_handler(method, "/v1/context/automixer", make_config(tmp_path), client)
+        assert status == 405
+        assert payload["error"] == "write_methods_disabled"
+        assert payload["safety_flags"]["write_routes_enabled"] is False
 
 
 def test_non_loopback_bind_host_is_rejected() -> None:
@@ -192,44 +189,48 @@ def test_recommended_next_action_changes_when_active_runs_exist_vs_none(tmp_path
     assert with_runs["active_runs_summary"]["total"] == 1
 
 
-def test_health_endpoint_over_http(tmp_path: Path) -> None:
-    with running_server(make_config(tmp_path), FakePaperclipClient(make_routes())) as address:
-        status, payload = request_json("GET", address, "/health")
+def test_health_endpoint_returns_payload_without_socket(tmp_path: Path) -> None:
+    status, payload = dispatch_handler("GET", "/health", make_config(tmp_path), FakePaperclipClient(make_routes()))
 
     assert status == 200
     assert payload["ok"] is True
     assert payload["read_only"] is True
 
 
-class running_server:
-    def __init__(self, config: bridge.BridgeConfig, client: FakePaperclipClient) -> None:
-        self.config = config
-        self.client = client
-        self.httpd: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
+def test_build_config_from_env_reads_environment(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("PAPERCLIP_API_URL", "http://127.0.0.1:3200/")
+    monkeypatch.setenv("AUTOMIXER_PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setenv("PAPERCLIP_COMPANY_ID", "company-env")
+    monkeypatch.setenv("GPT_CONTROL_BRIDGE_PAPERCLIP_TIMEOUT_SECONDS", "1.25")
 
-    def __enter__(self) -> tuple[str, int]:
-        handler = bridge.make_handler(self.config, client_factory=lambda _config: self.client)
-        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
-        self.thread.start()
-        return self.httpd.server_address
+    config = bridge.build_config_from_env()
 
-    def __exit__(self, exc_type, exc, tb) -> None:
-        assert self.httpd is not None
-        self.httpd.shutdown()
-        self.httpd.server_close()
-        if self.thread is not None:
-            self.thread.join(timeout=2)
+    assert config.paperclip_api_url == "http://127.0.0.1:3200"
+    assert config.project_root == tmp_path.resolve()
+    assert config.paperclip_company_id == "company-env"
+    assert config.paperclip_timeout_seconds == 1.25
 
 
-def request_json(method: str, address: tuple[str, int], path: str) -> tuple[int, dict]:
-    host, port = address
-    conn = http.client.HTTPConnection(host, port, timeout=3)
-    try:
-        conn.request(method, path)
-        response = conn.getresponse()
-        payload = json.loads(response.read().decode("utf-8"))
-        return response.status, payload
-    finally:
-        conn.close()
+def dispatch_handler(
+    method: str,
+    path: str,
+    config: bridge.BridgeConfig,
+    client: FakePaperclipClient,
+) -> tuple[int, dict]:
+    handler_class = bridge.make_handler(config, client_factory=lambda _config: client)
+    handler = object.__new__(handler_class)
+    handler.path = path
+    handler.command = method
+    handler.request_version = "HTTP/1.1"
+    handler.requestline = f"{method} {path} HTTP/1.1"
+    handler.client_address = ("127.0.0.1", 0)
+    handler.server = object()
+    handler.rfile = BytesIO()
+    handler.wfile = BytesIO()
+
+    getattr(handler, f"do_{method}")()
+
+    raw_response = handler.wfile.getvalue()
+    header_bytes, body_bytes = raw_response.split(b"\r\n\r\n", 1)
+    status = int(header_bytes.split(maxsplit=2)[1])
+    return status, json.loads(body_bytes.decode("utf-8"))

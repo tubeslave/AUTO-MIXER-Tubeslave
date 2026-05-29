@@ -4,16 +4,23 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend.automation_trace import AutomationTraceStore
+from backend.decision_memory import DecisionMemoryStore, decision_memory_entry_from_trace
 from backend.operator_analysis import build_operator_analysis_report
+from backend.shadow_gain_rides import build_shadow_gain_ride_candidates, shadow_gain_ride_trace
 from backend.operator_product_state import (
     build_agent_communications_snapshot,
+    build_channel_intelligence,
     build_channel_inventory,
     build_decision_queue,
+    build_decision_traces,
     build_groups_buses_snapshot,
     build_memory_knowledge_snapshot,
     build_operator_agent_roster,
     build_processing_pipeline_snapshot,
+    build_replay_runs,
     build_rules_library_snapshot,
+    build_safety_monitor,
     build_training_sessions_snapshot,
 )
 from backend.processing_pipeline_preview import build_main_pipeline_preview
@@ -322,6 +329,182 @@ def test_frontend_read_model_snapshots_are_display_only(server):
         assert not (set(_walk_keys(snapshot)) & forbidden_keys)
 
 
+def test_foundation_read_model_snapshots_are_display_only(server, tmp_path):
+    server.mixer_client = CachedMixer()
+    server.connection_mode = "wing"
+    server.audio_capture = FakeAudioCapture()
+    server.automation_trace_store = AutomationTraceStore(tmp_path)
+    server.record_automation_decision_trace(
+        source="unit",
+        mode="dry_run",
+        target=2,
+        action_type="fader",
+        status="blocked",
+        current_value=-2.5,
+        proposed_value=-1.0,
+        delta=1.5,
+        blocked_reason="unit_blocked",
+    )
+
+    snapshots = [
+        build_decision_traces(server),
+        build_safety_monitor(server),
+        build_replay_runs(server),
+        build_channel_intelligence(server, total_channels=4),
+    ]
+
+    assert [snapshot["type"] for snapshot in snapshots] == [
+        "decision_traces",
+        "safety_monitor",
+        "replay_runs",
+        "channel_intelligence",
+    ]
+    assert snapshots[0]["summary"]["blocked_count"] == 1
+    assert snapshots[1]["live_write_policy"]["direct_writes_allowed"] is False
+    assert snapshots[2]["summary"]["offline_only"] is True
+    assert snapshots[2]["summary"]["live_write"] is False
+    assert snapshots[3]["summary"]["shadow_only"] is True
+    assert snapshots[3]["summary"]["live_apply_allowed"] is False
+
+    forbidden_direct_command_keys = {
+        "apply_operator_proposal",
+        "load_snap",
+        "route_output",
+        "route_multiple_outputs",
+        "save_snap",
+        "set_channel_alt_input",
+        "set_channel_input",
+        "set_compressor",
+        "set_eq",
+        "set_fx_mix",
+        "set_fx_model",
+        "set_fx_on",
+        "set_fx_parameter",
+        "set_fader",
+        "set_gain",
+        "set_insert",
+        "start_auto_compressor",
+        "start_auto_compressor_live",
+        "start_auto_compressor_soundcheck",
+    }
+    for snapshot in snapshots:
+        assert not (set(_walk_keys(snapshot)) & forbidden_direct_command_keys)
+
+
+def test_decision_memory_accepts_verified_and_offline_evidence_only():
+    verified = decision_memory_entry_from_trace({
+        "decision_id": "trace-verified",
+        "source": "operator",
+        "mode": "supervised",
+        "target": 2,
+        "action_type": "fader",
+        "status": "applied",
+        "proof_status": "verified",
+    })
+    offline = decision_memory_entry_from_trace({
+        "decision_id": "trace-offline",
+        "source": "offline_replay",
+        "mode": "offline",
+        "target": 2,
+        "action_type": "gain",
+        "status": "simulated",
+        "proof_status": "advisory",
+    })
+    shadow = decision_memory_entry_from_trace({
+        "decision_id": "trace-shadow",
+        "source": "shadow_gain_ride_v0",
+        "mode": "assist",
+        "target": 2,
+        "action_type": "gain_ride_shadow",
+        "status": "shadow_proposed",
+        "proof_status": "shadow_only",
+    })
+
+    assert verified is not None
+    assert verified["evidence_quality"] == "verified"
+    assert offline is not None
+    assert offline["evidence_quality"] == "offline"
+    assert shadow is None
+
+
+def test_verified_traces_feed_decision_memory_snapshot(server, tmp_path):
+    server.automation_trace_store = AutomationTraceStore(tmp_path)
+    server.decision_memory_store = DecisionMemoryStore(tmp_path)
+
+    server.record_automation_decision_trace(
+        source="unit",
+        mode="supervised",
+        target=2,
+        action_type="fader",
+        status="applied",
+        current_value=-8.0,
+        proposed_value=-8.5,
+        delta=-0.5,
+        proof_status="verified",
+    )
+    server.record_automation_decision_trace(
+        source="shadow_gain_ride_v0",
+        mode="assist",
+        target=2,
+        action_type="gain_ride_shadow",
+        status="shadow_proposed",
+        delta=0.5,
+        proof_status="shadow_only",
+    )
+
+    entries = server.get_decision_memory_entries()
+    snapshot = build_memory_knowledge_snapshot(server)
+
+    assert len(entries) == 1
+    assert entries[0]["source_decision_id"]
+    assert entries[0]["evidence_quality"] == "verified"
+    assert snapshot["summary"]["decision_memory_records"] == 1
+    assert snapshot["memories"][0]["type"] == "Verified Decision Evidence"
+    assert "gain_ride_shadow" not in snapshot["memories"][0]["name"]
+
+
+@pytest.mark.asyncio
+async def test_start_replay_run_records_offline_evidence_without_live_gate(server, tmp_path):
+    artifact_root = tmp_path / "replay"
+    trace_root = tmp_path / "trace"
+    server._replay_artifacts_dir = artifact_root
+    server.automation_trace_store = AutomationTraceStore(trace_root)
+    server.decision_memory_store = DecisionMemoryStore(trace_root)
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["start_replay_run"](
+        object(),
+        {"run_id": "unit-replay", "total_channels": 8},
+    )
+
+    server._apply_manual_console_write.assert_not_called()
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "replay_run_started"
+    assert payload["offline_only"] is True
+    assert payload["live_write"] is False
+    assert payload["run_id"] == "unit-replay"
+    assert (artifact_root / "unit-replay" / "summary.json").exists()
+    assert (artifact_root / "unit-replay" / "decision_traces.jsonl").exists()
+
+    traces = server.get_automation_decision_traces()
+    assert traces[-1]["source"] == "offline_replay_v1"
+    assert traces[-1]["action_type"] == "replay_run"
+    assert traces[-1]["proof_status"] == "offline"
+    assert traces[-1]["safety_limits"]["mixer_transport_allowed"] is False
+    assert traces[-1]["metadata"]["live_write"] is False
+
+    memory_entries = server.get_decision_memory_entries()
+    assert memory_entries[-1]["evidence_quality"] == "offline"
+    assert memory_entries[-1]["action_type"] == "replay_run"
+
+    replay_runs = build_replay_runs(server)
+    assert replay_runs["runs"][0]["run_id"] == "unit-replay"
+    assert replay_runs["runs"][0]["trace_count"] >= 1
+    assert replay_runs["runs"][0]["offline_only"] is True
+    assert replay_runs["runs"][0]["live_write"] is False
+
+
 def test_dashboard_snapshot_tolerates_missing_supervised_pilot_status(server):
     if hasattr(server, "get_supervised_pilot_status"):
         delattr(server, "get_supervised_pilot_status")
@@ -353,6 +536,15 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
         for method in payload["methods"]
         if method["status"] in {"placeholder", "quarantined", "deprecated"}
     )
+    module_map = {row["module_id"]: row for row in payload["module_status_map"]}
+    assert module_map["product_operator_state"]["ui_surface"].startswith("Control Center")
+    assert module_map["supervised_manual_fader_gain"]["entrypoint"] == "apply_operator_proposal -> supervised manual gate"
+    assert module_map["supervised_manual_fader_gain"]["can_write_live"] is True
+    assert module_map["supervised_manual_fader_gain"]["live_write_kinds"] == ["fader", "gain"]
+    assert module_map["auto_eq"]["can_write_live"] is False
+    assert module_map["auto_eq"]["next_step"].startswith("proposal_adapter") or "ADR" in module_map["auto_eq"]["next_step"]
+    assert module_map["automixer_production_mix_v1"]["entrypoint"] == "none in this checkout"
+    assert module_map["ai_mixing_pipeline_legacy"]["status"] == "deprecated"
 
 
 def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
@@ -403,6 +595,35 @@ def test_main_pipeline_preview_keeps_non_fader_gain_methods_blocked(server):
     assert executor_policy["executor_method_ids"] == ["supervised_manual_fader_gain"]
 
 
+def test_main_pipeline_preview_exposes_non_fader_gain_proposal_contracts(server):
+    payload = build_main_pipeline_preview(server, total_channels=4)
+    contracts = {item["method_id"]: item for item in payload["proposal_only_contracts"]}
+
+    for method_id, value_type in {
+        "auto_eq": "eq",
+        "auto_compressor": "compressor",
+        "auto_gate_caig": "gate",
+        "auto_panner": "pan",
+        "phase_alignment": "phase_delay",
+        "auto_fx": "fx_send",
+        "routing_snapshot_reset_writes": "routing",
+    }.items():
+        contract = contracts[method_id]
+        assert contract["adapter_id"] == "proposal_only_contracts"
+        assert contract["queue_action"] == "not_queueable_until_promoted"
+        assert contract["can_import_to_queue"] is False
+        assert contract["can_apply_live"] is False
+        assert contract["proposal_contract"]["value_type"] == value_type
+        assert contract["proposal_contract"]["live_apply_allowed"] is False
+        assert contract["proposal_contract"]["readback_required"] is True
+        assert contract["proposal_contract"]["rollback_required"] is True
+        assert contract["proposal_contract"]["allowed_live_write_kinds"] == ["fader", "gain"]
+        assert f"unsupported_value_type:{value_type}" in contract["blockers"]
+        assert "requested_change" not in contract
+
+    assert payload["summary"]["proposal_only_contract_count"] >= len(contracts)
+
+
 def test_main_pipeline_preview_includes_safe_gain_as_preview_only(server):
     server.mixer_client = CachedMixer()
     server.safe_gain_calibrator = FakeSafeGainCalibrator()
@@ -425,14 +646,19 @@ def test_main_pipeline_preview_includes_safe_gain_as_preview_only(server):
 
 
 @pytest.mark.asyncio
-async def test_product_state_handlers_round_trip(server):
+async def test_product_state_handlers_round_trip(server, tmp_path):
     server.mixer_client = CachedMixer()
     server.connection_mode = "wing"
     server.audio_capture = FakeAudioCapture()
+    server.automation_trace_store = AutomationTraceStore(tmp_path)
     server.send_to_client = AsyncMock()
 
     await server._dispatch["get_channel_inventory"](object(), {"total_channels": 2})
     await server._dispatch["get_decision_queue"](object(), {"limit": 5})
+    await server._dispatch["get_decision_traces"](object(), {"limit": 5})
+    await server._dispatch["get_safety_monitor"](object(), {})
+    await server._dispatch["get_replay_runs"](object(), {"limit": 2})
+    await server._dispatch["get_channel_intelligence"](object(), {"total_channels": 4})
     await server._dispatch["get_operator_agent_roster"](object(), {})
     await server._dispatch["get_connection_topology"](object(), {})
     await server._dispatch["get_groups_buses_snapshot"](object(), {})
@@ -447,6 +673,10 @@ async def test_product_state_handlers_round_trip(server):
     assert [payload["type"] for payload in payloads] == [
         "channel_inventory",
         "decision_queue",
+        "decision_traces",
+        "safety_monitor",
+        "replay_runs",
+        "channel_intelligence",
         "operator_agent_roster",
         "connection_topology",
         "groups_buses_snapshot",
@@ -460,17 +690,21 @@ async def test_product_state_handlers_round_trip(server):
     assert payloads[0]["channels"][1]["name"] == "Lead Vocal"
     assert payloads[1]["reason"] == "mixing_agent_runtime_not_initialized"
     assert payloads[1]["proposal_queue_available"] is True
-    assert payloads[2]["summary"]["agent_count"] >= 8
-    assert payloads[3]["connection"]["connected"] is True
-    assert payloads[4]["buses"]
-    assert payloads[5]["memories"]
-    assert payloads[6]["sessions"]
-    assert payloads[7]["rules"]
-    assert payloads[8]["communications"]
-    assert payloads[9]["methods"] == []
-    assert payloads[9]["summary"]["live_apply_policy"] == "supervised_fader_gain_only"
-    assert payloads[10]["executor_policy"]["preview_only"] is True
-    assert payloads[10]["summary"]["queue_mutation"] is False
+    assert payloads[2]["summary"]["trace_count"] == 0
+    assert payloads[3]["live_write_policy"]["direct_writes_allowed"] is False
+    assert payloads[4]["summary"]["offline_only"] is True
+    assert payloads[5]["summary"]["shadow_only"] is True
+    assert payloads[6]["summary"]["agent_count"] >= 8
+    assert payloads[7]["connection"]["connected"] is True
+    assert payloads[8]["buses"]
+    assert payloads[9]["memories"]
+    assert payloads[10]["sessions"]
+    assert payloads[11]["rules"]
+    assert payloads[12]["communications"]
+    assert payloads[13]["methods"] == []
+    assert payloads[13]["summary"]["live_apply_policy"] == "supervised_fader_gain_only"
+    assert payloads[14]["executor_policy"]["preview_only"] is True
+    assert payloads[14]["summary"]["queue_mutation"] is False
 
 
 @pytest.mark.asyncio
@@ -569,7 +803,7 @@ async def test_operator_proposal_apply_is_blocked_outside_supervised_mode(server
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True},
+        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "unit-outside-mode"},
     )
 
     payload = server.send_to_client.await_args.args[1]
@@ -599,7 +833,7 @@ async def test_supervised_apply_blocks_incomplete_requested_change(server):
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True},
+        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "unit-incomplete"},
     )
 
     server._apply_manual_console_write.assert_not_called()
@@ -607,6 +841,47 @@ async def test_supervised_apply_blocks_incomplete_requested_change(server):
     assert payload["type"] == "operator_proposal_apply_blocked"
     assert payload["status"] == "apply_blocked"
     assert payload["apply_result"]["reason"] == "proposal_has_no_applyable_requested_change"
+
+
+@pytest.mark.asyncio
+async def test_non_fader_gain_operator_proposal_is_review_only(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "title": "Lead Vocal: review EQ cut",
+            "requested_change": {
+                "value_type": "eq",
+                "channel": 2,
+                "value": -2.0,
+                "current_value": 0.0,
+                "rollback_value": 0.0,
+                "safety_evidence": [{"label": "Frequency", "value": "350 Hz"}],
+            },
+            "reason": "proposal-only EQ review",
+        },
+    )
+
+    proposal = build_decision_queue(server)["pending_actions"][0]
+    assert proposal["can_apply"] is False
+    assert proposal["requires_approval"] is False
+    assert "unsupported_value_type:eq" in proposal["apply_blockers"]
+
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {"proposal_id": proposal["id"], "approved": True, "idempotency_key": "unit-eq-review"},
+    )
+
+    server._apply_manual_console_write.assert_not_called()
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_blocked"
+    assert payload["apply_result"]["reason"] == "unsupported_value_type"
+    assert payload["apply_result"]["value_type"] == "eq"
 
 
 @pytest.mark.asyncio
@@ -620,9 +895,9 @@ async def test_supervised_linked_proposal_apply_routes_each_change_through_manua
             "status": "applied",
             "channel": 9,
             "value_type": "fader",
-            "effective_value": -4.5,
+            "effective_value": -0.5,
             "old_value": 0.0,
-            "readback_value": -4.5,
+            "readback_value": -0.5,
             "readback_status": "verified_from_cache",
             "rollback_available": True,
             "rollback_value": 0.0,
@@ -633,9 +908,9 @@ async def test_supervised_linked_proposal_apply_routes_each_change_through_manua
             "status": "applied",
             "channel": 10,
             "value_type": "fader",
-            "effective_value": -4.5,
+            "effective_value": -0.5,
             "old_value": 0.0,
-            "readback_value": -4.5,
+            "readback_value": -0.5,
             "readback_status": "verified_from_cache",
             "rollback_available": True,
             "rollback_value": 0.0,
@@ -651,8 +926,8 @@ async def test_supervised_linked_proposal_apply_routes_each_change_through_manua
             "title": "GUITAR L/R: linked faders",
             "kind": "linked_fader",
             "requested_changes": [
-                {"value_type": "fader", "channel": 9, "value": -4.5, "current_value": 0.0, "delta_db": -4.5},
-                {"value_type": "fader", "channel": 10, "value": -4.5, "current_value": 0.0, "delta_db": -4.5},
+                {"value_type": "fader", "channel": 9, "value": -0.5, "current_value": 0.0, "delta_db": -0.5},
+                {"value_type": "fader", "channel": 10, "value": -0.5, "current_value": 0.0, "delta_db": -0.5},
             ],
             "reason": "unit",
         },
@@ -664,7 +939,7 @@ async def test_supervised_linked_proposal_apply_routes_each_change_through_manua
 
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal["id"], "approved": True, "approval_id": "linked-unit"},
+        {"proposal_id": proposal["id"], "approved": True, "approval_id": "linked-unit", "idempotency_key": "linked-unit"},
     )
 
     assert server._apply_manual_console_write.await_count == 2
@@ -691,8 +966,8 @@ async def test_supervised_linked_apply_blocks_when_pre_read_is_missing(server):
             "title": "GUITAR L/R: linked faders",
             "kind": "linked_fader",
             "requested_changes": [
-                {"value_type": "fader", "channel": 9, "value": -4.5, "current_value": 0.0, "delta_db": -4.5},
-                {"value_type": "fader", "channel": 10, "value": -4.5, "current_value": 0.0, "delta_db": -4.5},
+                {"value_type": "fader", "channel": 9, "value": -0.5, "current_value": 0.0, "delta_db": -0.5},
+                {"value_type": "fader", "channel": 10, "value": -0.5, "current_value": 0.0, "delta_db": -0.5},
             ],
             "reason": "unit",
         },
@@ -701,7 +976,7 @@ async def test_supervised_linked_apply_blocks_when_pre_read_is_missing(server):
 
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal["id"], "approved": True, "approval_id": "linked-unit"},
+        {"proposal_id": proposal["id"], "approved": True, "approval_id": "linked-unit", "idempotency_key": "linked-pre-read"},
     )
 
     server._apply_manual_console_write.assert_not_called()
@@ -723,9 +998,9 @@ async def test_supervised_linked_apply_rolls_back_first_channel_when_second_fail
             "status": "applied",
             "channel": 9,
             "value_type": "fader",
-            "effective_value": -4.5,
+            "effective_value": -0.5,
             "old_value": 0.0,
-            "readback_value": -4.5,
+            "readback_value": -0.5,
             "readback_status": "verified_from_cache",
             "rollback_available": True,
             "rollback_value": 0.0,
@@ -744,11 +1019,11 @@ async def test_supervised_linked_apply_rolls_back_first_channel_when_second_fail
             "channel": 9,
             "value_type": "fader",
             "effective_value": 0.0,
-            "old_value": -4.5,
+            "old_value": -0.5,
             "readback_value": 0.0,
             "readback_status": "verified_from_cache",
             "rollback_available": True,
-            "rollback_value": -4.5,
+            "rollback_value": -0.5,
             "approval_id": "rollback:linked-unit:1",
             "source": "operator_proposal_linked_rollback:proposal",
         },
@@ -761,8 +1036,8 @@ async def test_supervised_linked_apply_rolls_back_first_channel_when_second_fail
             "title": "GUITAR L/R: linked faders",
             "kind": "linked_fader",
             "requested_changes": [
-                {"value_type": "fader", "channel": 9, "value": -4.5, "current_value": 0.0, "delta_db": -4.5},
-                {"value_type": "fader", "channel": 10, "value": -4.5, "current_value": 0.0, "delta_db": -4.5},
+                {"value_type": "fader", "channel": 9, "value": -0.5, "current_value": 0.0, "delta_db": -0.5},
+                {"value_type": "fader", "channel": 10, "value": -0.5, "current_value": 0.0, "delta_db": -0.5},
             ],
             "reason": "unit",
         },
@@ -771,7 +1046,7 @@ async def test_supervised_linked_apply_rolls_back_first_channel_when_second_fail
 
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal["id"], "approved": True, "approval_id": "linked-unit"},
+        {"proposal_id": proposal["id"], "approved": True, "approval_id": "linked-unit", "idempotency_key": "linked-rollback"},
     )
 
     assert server._apply_manual_console_write.await_count == 3
@@ -791,6 +1066,7 @@ async def test_supervised_operator_proposal_apply_routes_through_manual_gate(ser
     server.operator_mode = "supervised"
     server.mixer_client = MagicMock()
     server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
     server._apply_manual_console_write = AsyncMock(return_value={
         "status": "applied",
         "channel": 2,
@@ -812,7 +1088,7 @@ async def test_supervised_operator_proposal_apply_routes_through_manual_gate(ser
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True, "reason": "operator approved"},
+        {"proposal_id": proposal_id, "approved": True, "reason": "operator approved", "idempotency_key": "unit-supervised-apply"},
     )
 
     server._apply_manual_console_write.assert_awaited_once()
@@ -822,6 +1098,166 @@ async def test_supervised_operator_proposal_apply_routes_through_manual_gate(ser
     queue = build_decision_queue(server)
     assert queue["summary"]["pending_count"] == 0
     assert queue["summary"]["applied_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_supervised_apply_requires_idempotency_key(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "title": "Lead Vocal: supervised fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.0,
+            "reason": "unit",
+        },
+    )
+    proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {"proposal_id": proposal_id, "approved": True},
+    )
+
+    server._apply_manual_console_write.assert_not_called()
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_blocked"
+    assert payload["reason"] == "missing_idempotency_key"
+
+
+@pytest.mark.asyncio
+async def test_supervised_apply_blocks_duplicate_idempotency_key(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -3.0,
+        "old_value": -2.5,
+        "readback_value": -3.0,
+        "readback_status": "verified_from_cache",
+        "rollback_available": True,
+        "rollback_value": -2.5,
+    })
+    server.send_to_client = AsyncMock()
+
+    for proposal_id in ("dup-1", "dup-2"):
+        await server._dispatch["create_operator_proposal"](
+            object(),
+            {
+                "id": proposal_id,
+                "title": f"{proposal_id}: supervised fader",
+                "channel": 2,
+                "value_type": "fader",
+                "value": -3.0,
+                "reason": "unit",
+            },
+        )
+
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {"proposal_id": "dup-1", "approved": True, "idempotency_key": "same-key"},
+    )
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {"proposal_id": "dup-2", "approved": True, "idempotency_key": "same-key"},
+    )
+
+    assert server._apply_manual_console_write.await_count == 1
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_blocked"
+    assert payload["reason"] == "duplicate_idempotency_key"
+
+
+@pytest.mark.asyncio
+async def test_supervised_apply_blocks_large_delta_before_manual_gate(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": 0.0}
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "title": "Lead Vocal: too much fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -2.5,
+            "reason": "unit",
+        },
+    )
+    proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "large-delta"},
+    )
+
+    server._apply_manual_console_write.assert_not_called()
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_blocked"
+    assert payload["apply_result"]["reason"] == "delta_limit_exceeded"
+    assert payload["apply_result"]["max_delta_db"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_decision_trace_and_safety_monitor_expose_apply_evidence(server, tmp_path):
+    server.operator_mode = "supervised"
+    server.automation_trace_store = AutomationTraceStore(tmp_path)
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -3.0,
+        "old_value": -2.5,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -3.0,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -2.5,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "title": "Lead Vocal: traceable fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.0,
+            "reason": "unit",
+        },
+    )
+    proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "trace-key"},
+    )
+
+    traces = build_decision_traces(server)
+    assert traces["summary"]["trace_count"] >= 2
+    assert traces["traces"][-1]["idempotency_key"] == "trace-key"
+    assert traces["traces"][-1]["proof_status"] == "verified"
+    monitor = build_safety_monitor(server)
+    assert monitor["type"] == "safety_monitor"
+    assert monitor["live_write_policy"]["direct_writes_allowed"] is False
+    assert "eq" in monitor["blocked_surfaces"]
 
 
 def test_operator_analysis_reports_without_creating_in_analyze_mode(server):
@@ -838,6 +1274,90 @@ def test_operator_analysis_reports_without_creating_in_analyze_mode(server):
     assert report["created_count"] == 0
     assert report["observations"][0]["rule"] == "peak_risk"
     assert queue["summary"]["pending_count"] == 0
+
+
+def test_shadow_gain_ride_candidates_are_trace_only_and_bounded():
+    candidates = build_shadow_gain_ride_candidates([
+        {
+            "id": 2,
+            "name": "Lead Vox",
+            "role": "Vocal",
+            "group": "VOCALS",
+            "status": "active",
+            "lufs": -27.2,
+            "peak_db": -9.0,
+            "control_state": {"fader_db": -8.0},
+        }
+    ])
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate["action_type"] == "gain_ride_shadow"
+    assert candidate["delta_db"] == 0.5
+    assert candidate["live_apply_allowed"] is False
+    assert candidate["safety_limits"]["live_promotion_allowed"] is False
+    assert candidate["scoring"]["intelligibility_proxy"] == "improved"
+
+    trace = shadow_gain_ride_trace(candidate, mode="assist")
+    assert trace["action_type"] == "gain_ride_shadow"
+    assert trace["proof_status"] == "shadow_only"
+    assert trace["readback"]["status"] == "not_available_shadow_only"
+    assert trace["metadata"]["live_apply_allowed"] is False
+
+
+def test_shadow_gain_ride_candidates_block_oscillation():
+    recent_traces = [
+        {"target": 2, "action_type": "gain_ride_shadow", "delta": 0.5},
+        {"target": 2, "action_type": "gain_ride_shadow", "delta": -0.5},
+        {"target": 2, "action_type": "gain_ride_shadow", "delta": 0.5},
+    ]
+
+    candidates = build_shadow_gain_ride_candidates(
+        [
+            {
+                "id": 2,
+                "name": "Lead Vox",
+                "role": "Vocal",
+                "group": "VOCALS",
+                "status": "active",
+                "lufs": -27.2,
+                "peak_db": -9.0,
+                "control_state": {"fader_db": -8.0},
+            }
+        ],
+        recent_traces=recent_traces,
+    )
+
+    assert candidates[0]["status"] == "blocked"
+    assert candidates[0]["blocked_reason"] == "shadow_gain_ride_oscillation_risk"
+    assert candidates[0]["scoring"]["oscillation_risk"] == "blocked"
+
+
+def test_operator_analysis_records_shadow_gain_ride_traces_without_queue_mutation(server):
+    server.mixer_client = CachedMixer()
+    server.mixer_client.state.update({
+        "/ch/16/$name": "Lead Vox",
+        "/ch/16/fdr": -8.0,
+        "/ch/16/in/set/trim": 0.0,
+    })
+    server.connection_mode = "wing"
+    server.audio_capture = StaticMeterCapture(
+        num_channels=16,
+        rms={16: -24.0},
+        peak={16: -9.0},
+        lufs={16: -27.2},
+    )
+
+    report = build_operator_analysis_report(server, total_channels=16, create_proposals=True)
+    queue = build_decision_queue(server)
+    traces = build_decision_traces(server)
+
+    assert report["shadow_gain_ride_count"] == 1
+    assert report["shadow_gain_ride_trace_count"] == 1
+    assert report["shadow_gain_rides"][0]["live_apply_allowed"] is False
+    assert queue["summary"]["pending_count"] == 0
+    assert traces["traces"][-1]["action_type"] == "gain_ride_shadow"
+    assert traces["traces"][-1]["proof_status"] == "shadow_only"
 
 
 def test_operator_analysis_creates_applyable_proposal_when_fader_cache_exists(server):

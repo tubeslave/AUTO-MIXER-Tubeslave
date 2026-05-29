@@ -469,6 +469,128 @@ test.describe('Automixer backend Product Layer adapter', () => {
           ],
           history: []
         },
+        get_decision_traces: {
+          type: 'decision_traces',
+          status: 'ok',
+          source: 'backend_fixture_trace_store',
+          summary: {
+            trace_count: 1,
+            applied_count: 1,
+            blocked_count: 0,
+            verified_count: 1
+          },
+          traces: [
+            {
+              decision_id: 'trace-fixture-1',
+              proposal_id: 'proposal-backend-1',
+              source: 'Backend Decision Agent',
+              mode: 'supervised',
+              target: 2,
+              action_type: 'fader',
+              status: 'applied',
+              current_value: -9,
+              proposed_value: -9.5,
+              delta: -0.5,
+              proof_status: 'verified',
+              created_at: '2026-05-19T20:29:05Z'
+            }
+          ]
+        },
+        get_safety_monitor: {
+          type: 'safety_monitor',
+          status: 'ok',
+          source: 'backend_fixture_safety',
+          operator_mode: {
+            mode: 'supervised',
+            live_write_policy: 'supervised_approval_required',
+            apply_path: 'supervised_manual_gate',
+            capabilities: {
+              can_apply_to_console: true,
+              allowed_live_write_kinds: ['fader', 'gain']
+            }
+          },
+          manual_write_supervision: {
+            emergency_stopped: false,
+            reset_required: false,
+            approved_live_write_kinds: ['fader', 'gain']
+          },
+          live_write_policy: {
+            policy: 'supervised_fader_gain_only',
+            apply_path: 'supervised_manual_gate',
+            approved_live_write_kinds: ['fader', 'gain'],
+            direct_writes_allowed: false,
+            autonomous_apply_allowed: false
+          },
+          proof: {
+            last_proof_status: 'verified',
+            last_readback: { status: 'verified_from_cache' }
+          },
+          blocked_surfaces: ['eq', 'compressor', 'routing', 'snapshots', 'autonomous_apply'],
+          summary: {
+            ready: false,
+            mixer_connected: true,
+            emergency_stopped: false,
+            reset_required: false,
+            trace_count: 1,
+            blocked_trace_count: 0
+          }
+        },
+        get_replay_runs: {
+          type: 'replay_runs',
+          status: 'ok',
+          source: 'backend_fixture_replay',
+          runs: [
+            {
+              run_id: 'fixture-replay-1',
+              status: 'passed',
+              reason: 'offline_simulated_apply_readback_rollback_complete',
+              generated_at: '2026-05-19T20:28:00Z',
+              trace_count: 7,
+              offline_only: true,
+              live_write: false,
+              report_path: 'artifacts/replay/fixture-replay-1/report.md',
+              decision_traces_path: 'artifacts/replay/fixture-replay-1/decision_traces.jsonl',
+              metrics_path: 'artifacts/replay/fixture-replay-1/metrics_before_after.json'
+            }
+          ]
+        },
+        start_replay_run: {
+          type: 'replay_run_started',
+          status: 'passed',
+          success: true,
+          offline_only: true,
+          live_write: false,
+          run_id: 'fixture-replay-started',
+          artifacts: {
+            report_path: 'artifacts/replay/fixture-replay-started/report.md',
+            decision_traces_path: 'artifacts/replay/fixture-replay-started/decision_traces.jsonl',
+            metrics_path: 'artifacts/replay/fixture-replay-started/metrics_before_after.json'
+          },
+          result: {
+            status: 'passed',
+            write_policy: 'offline_only_no_live_writes',
+            summary: {
+              trace_count: 3
+            }
+          }
+        },
+        get_channel_intelligence: {
+          type: 'channel_intelligence',
+          status: 'ok',
+          source: 'backend_fixture_channel_intelligence',
+          channels: [
+            {
+              channel: 2,
+              name: 'Backend Lead Vox',
+              role: 'Vocal',
+              group: 'VOCALS',
+              risk: 'low',
+              gain_ride_state: 'shadow_proposal_only',
+              recent_trace_count: 1,
+              live_apply_allowed: false
+            }
+          ]
+        },
         get_operator_agent_roster: {
           type: 'operator_agent_roster',
           status: 'ok',
@@ -683,7 +805,51 @@ test.describe('Automixer backend Product Layer adapter', () => {
           source: 'backend_fixture_processing',
           main_pipeline_id: 'main_live_assist',
           main_pipeline_status: 'canonical',
-          live_apply_policy: 'supervised_fader_gain_only'
+          live_apply_policy: 'supervised_fader_gain_only',
+          module_status_map: [
+            {
+              module_id: 'product_operator_state',
+              label: 'Backend Product State',
+              domain: 'product_layer',
+              status: 'canonical',
+              entrypoint: 'get_dashboard_snapshot / get_decision_queue / get_safety_monitor',
+              module: 'backend/operator_product_state.py',
+              ui_surface: 'Control Center dashboard, Task Queue, Safety Monitor',
+              can_write_live: false,
+              live_write_kinds: [],
+              pipeline_profiles: ['main_live_assist'],
+              blocked_reason: '',
+              next_step: 'Keep as canonical read model.'
+            },
+            {
+              module_id: 'supervised_manual_fader_gain',
+              label: 'Backend Supervised Fader/Gain',
+              domain: 'gain_fader',
+              status: 'canonical',
+              entrypoint: 'apply_operator_proposal -> supervised manual gate',
+              module: 'backend/server.py',
+              ui_surface: 'Task Queue supervised apply',
+              can_write_live: true,
+              live_write_kinds: ['fader', 'gain'],
+              pipeline_profiles: ['main_live_assist'],
+              blocked_reason: '',
+              next_step: 'Keep proof evidence narrow.'
+            },
+            {
+              module_id: 'automixer_production_mix_v1',
+              label: 'Backend Production Mix v1',
+              domain: 'offline_mix',
+              status: 'deprecated',
+              entrypoint: 'none in this checkout',
+              module: 'automixer.production_mix_v1',
+              ui_surface: 'Hidden from live cockpit',
+              can_write_live: false,
+              live_write_kinds: [],
+              pipeline_profiles: ['quarantine'],
+              blocked_reason: 'legacy entrypoint unavailable',
+              next_step: 'Restore as offline entrypoint or retire.'
+            }
+          ]
         },
         get_main_pipeline_preview: {
           type: 'main_pipeline_preview',
@@ -699,7 +865,8 @@ test.describe('Automixer backend Product Layer adapter', () => {
             allowed_requested_change_value_types: ['fader', 'gain']
           },
           summary: {
-            proposal_count: 1
+            proposal_count: 1,
+            proposal_only_contract_count: 2
           },
           proposals: [
             {
@@ -709,6 +876,70 @@ test.describe('Automixer backend Product Layer adapter', () => {
                 value_type: 'fader',
                 channel: 2,
                 value: -9.5
+              }
+            }
+          ],
+          proposal_only_contracts: [
+            {
+              id: 'main_live_assist:proposal_only_contract:auto_eq',
+              adapter_id: 'proposal_only_contracts',
+              method_id: 'auto_eq',
+              method_label: 'Backend Auto EQ',
+              domain: 'eq',
+              status: 'proposal_only',
+              title: 'Backend Auto EQ: proposal contract only',
+              reason: 'EQ recommendations are review-only until hardware readback and rollback are proven.',
+              risk: 'medium',
+              target: 'channel_eq_band',
+              queue_action: 'not_queueable_until_promoted',
+              can_import_to_queue: false,
+              can_apply_live: false,
+              blockers: [
+                'unsupported_value_type:eq',
+                'not_in_supervised_fader_gain_executor',
+                'hardware_readback_and_rollback_not_proven'
+              ],
+              proposal_contract: {
+                value_type: 'eq',
+                target_kind: 'channel_eq_band',
+                required_fields: ['target', 'old_value', 'proposed_value', 'safety_evidence', 'rollback_value'],
+                old_value_source: 'cached_or_physical_eq_band_read_required_before_promotion',
+                safety_evidence_required: ['frequency_match', 'feedback_notch_preserved'],
+                required_approval: 'operator_supervised',
+                readback_required: true,
+                rollback_required: true,
+                live_apply_allowed: false,
+                allowed_live_write_kinds: ['fader', 'gain'],
+                promotion_next: 'proposal_adapter_no_direct_set_eq'
+              }
+            },
+            {
+              id: 'main_live_assist:proposal_only_contract:auto_compressor',
+              adapter_id: 'proposal_only_contracts',
+              method_id: 'auto_compressor',
+              method_label: 'Backend Auto Compressor',
+              domain: 'dynamics',
+              status: 'proposal_only',
+              title: 'Backend Auto Compressor: proposal contract only',
+              reason: 'Compressor recommendations are review-only until supervised dynamics proof exists.',
+              risk: 'medium',
+              target: 'channel_dynamics',
+              queue_action: 'not_queueable_until_promoted',
+              can_import_to_queue: false,
+              can_apply_live: false,
+              blockers: ['unsupported_value_type:compressor', 'not_in_supervised_fader_gain_executor'],
+              proposal_contract: {
+                value_type: 'compressor',
+                target_kind: 'channel_dynamics',
+                required_fields: ['target', 'old_value', 'proposed_value', 'safety_evidence', 'rollback_value'],
+                old_value_source: 'cached_or_physical_dynamics_read_required_before_promotion',
+                safety_evidence_required: ['gain_reduction_estimate', 'true_peak_headroom'],
+                required_approval: 'operator_supervised',
+                readback_required: true,
+                rollback_required: true,
+                live_apply_allowed: false,
+                allowed_live_write_kinds: ['fader', 'gain'],
+                promotion_next: 'proposal_adapter_and_hardware_proof_required'
               }
             }
           ],
@@ -795,8 +1026,22 @@ test.describe('Automixer backend Product Layer adapter', () => {
 
     await page.goto('/#/task-queue');
     await expect(page.getByText('Backend proposal fader move').first()).toBeVisible();
+    await expect(page.getByText('Backend Auto EQ: proposal contract only').first()).toBeVisible();
+    const reviewOnlyRow = page.locator('.am-table-row').filter({ hasText: 'Backend Auto EQ: proposal contract only' });
+    await expect(reviewOnlyRow.getByRole('button', { name: 'Apply' })).toHaveCount(0);
+    await reviewOnlyRow.getByRole('button', { name: 'Detail' }).click();
+    await expect(page.locator('aside').getByText('Apply Blockers').first()).toBeVisible();
+    await expect(page.locator('aside').getByText('unsupported value type:eq').first()).toBeVisible();
     await expect(page.getByText('Backend Decision Agent').first()).toBeVisible();
     await expect(page.getByText('Backend Lead Vox').first()).toBeVisible();
+    await expect(page.getByText('Replay Engine / Evidence').first()).toBeVisible();
+    await expect(page.getByText('fixture-replay-1').first()).toBeVisible();
+    await expect(page.getByText('no live write').first()).toBeVisible();
+    await expect(page.getByText('shadow_proposal_only').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Start Offline' }).click();
+    await expect(page.getByText('Offline replay requested. Live writes remain disabled.').first()).toBeVisible();
+    await expect(page.getByText('fixture-replay-started').first()).toBeVisible();
+    await expect(page.getByText('3 rows').first()).toBeVisible();
     await page.locator('.am-table-row').filter({ hasText: 'Backend proposal fader move' }).getByRole('button', { name: 'Apply' }).click();
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend Lead Vox');
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend supervised gate');
@@ -828,6 +1073,9 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('supervised_approval_required').first()).toBeVisible();
     await expect(page.getByText('supervised_manual_gate').first()).toBeVisible();
     await expect(page.getByText('fader, gain').first()).toBeVisible();
+    await expect(page.getByText('Backend Product State').first()).toBeVisible();
+    await expect(page.getByText('Control Center dashboard, Task Queue, Safety Monitor').first()).toBeVisible();
+    await expect(page.getByText('Backend Production Mix v1').first()).toBeVisible();
 
     await page.goto('/#/groups');
     await expect(page.getByText('Backend DTO Drums').first()).toBeVisible();
@@ -868,6 +1116,10 @@ test.describe('Automixer backend Product Layer adapter', () => {
       'get_dashboard_snapshot',
       'get_channel_inventory',
       'get_decision_queue',
+      'get_decision_traces',
+      'get_safety_monitor',
+      'get_replay_runs',
+      'get_channel_intelligence',
       'get_operator_agent_roster',
       'get_connection_topology',
       'get_groups_buses_snapshot',
@@ -875,8 +1127,12 @@ test.describe('Automixer backend Product Layer adapter', () => {
       'get_training_sessions_snapshot',
       'get_rules_library_snapshot',
       'get_agent_communications_snapshot',
+      'get_processing_pipeline_snapshot',
+      'get_main_pipeline_preview',
+      'start_replay_run',
       'apply_operator_proposal'
     ]));
+    expect(sentTypes.filter(type => type === 'get_replay_runs').length).toBeGreaterThanOrEqual(2);
     expect(sentTypes).not.toEqual(expect.arrayContaining([
       'connect_wing',
       'auto_connect',

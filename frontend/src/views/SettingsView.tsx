@@ -1,11 +1,12 @@
-import { Knob, Panel, StatusBadge } from '../components/prototype/AutomixerComponents';
+import { DataTable, Knob, Panel, StatusBadge } from '../components/prototype/AutomixerComponents';
 import type { OperatorViewData } from '../services/useOperatorBackend';
-import type { Tone, UiActions, UiState } from '../types';
-import { MiniBarRow, SettingRows, tableView, TechnicalChecklist } from './viewHelpers';
+import type { ModuleStatusRecord, Tone, UiActions, UiState } from '../types';
+import { tableView, TechnicalChecklist } from './viewHelpers';
 
 const settingsSections = [
   'Backend Policy',
   'Runtime Guard',
+  'Module Status',
   'Mix Defaults',
   'Mode Policy',
   'Write Policy',
@@ -13,11 +14,108 @@ const settingsSections = [
   'Transport'
 ];
 
+const fallbackModuleStatuses: ModuleStatusRecord[] = [
+  {
+    moduleId: 'product_operator_state',
+    label: 'Product Operator State',
+    domain: 'product_layer',
+    status: 'mock',
+    entrypoint: 'get_dashboard_snapshot / get_decision_queue',
+    module: 'backend/operator_product_state.py',
+    uiSurface: 'Control Center, Task Queue, Settings',
+    canWriteLive: false,
+    liveWriteKinds: [],
+    pipelineProfiles: ['main_live_assist'],
+    blockedReason: '',
+    nextStep: 'Connect backend to load the canonical module status map.',
+    tone: 'blue'
+  },
+  {
+    moduleId: 'supervised_manual_fader_gain',
+    label: 'Supervised Manual Fader/Gain',
+    domain: 'gain_fader',
+    status: 'mock',
+    entrypoint: 'apply_operator_proposal -> supervised manual gate',
+    module: 'backend/server.py',
+    uiSurface: 'Task Queue supervised apply',
+    canWriteLive: true,
+    liveWriteKinds: ['fader', 'gain'],
+    pipelineProfiles: ['main_live_assist'],
+    blockedReason: '',
+    nextStep: 'Connect backend for live policy and proof state.',
+    tone: 'yellow'
+  },
+  {
+    moduleId: 'legacy_reset_surfaces',
+    label: 'Legacy Reset Surfaces',
+    domain: 'quarantine',
+    status: 'mock_blocked',
+    entrypoint: 'blocked from cockpit',
+    module: 'backend/server.py',
+    uiSurface: 'Hidden from live cockpit',
+    canWriteLive: false,
+    liveWriteKinds: [],
+    pipelineProfiles: ['quarantine'],
+    blockedReason: 'direct live reset is not an MVP apply path',
+    nextStep: 'Use proposal/supervised proof flow instead of direct reset buttons.',
+    tone: 'red'
+  }
+];
+
 function connectionToneFor(state: UiState['backend']['connectionState']): Tone {
   if (state === 'connected') return 'green';
   if (state === 'connecting') return 'yellow';
   if (state === 'error') return 'red';
   return 'blue';
+}
+
+function moduleStatusRows(data: OperatorViewData) {
+  return data.moduleStatuses.length ? data.moduleStatuses : fallbackModuleStatuses;
+}
+
+function writeScopeLabel(row: ModuleStatusRecord) {
+  if (!row.canWriteLive) return 'blocked';
+  return row.liveWriteKinds.length ? row.liveWriteKinds.join(', ') : 'live';
+}
+
+function ModuleStatusTable({
+  rows,
+  onFocus
+}: {
+  rows: ModuleStatusRecord[];
+  onFocus: () => void;
+}) {
+  return (
+    <div className="grid min-h-0 grid-rows-[40px_1fr] gap-2">
+      <div className="am-panel flex items-center justify-between px-3">
+        <div>
+          <div className="am-label">Module Status</div>
+          <div className="text-[9px] text-muted">entrypoint / UI surface / live write scope</div>
+        </div>
+        <button className="am-button" onClick={onFocus} type="button">Focus</button>
+      </div>
+      <DataTable
+        rows={rows}
+        rowKey={row => row.moduleId}
+        searchable
+        searchPlaceholder="Search module, entrypoint, UI..."
+        filters={[
+          { label: 'All', predicate: () => true },
+          { label: 'Live', predicate: row => row.canWriteLive },
+          { label: 'Review', predicate: row => row.status.includes('proposal') || !row.canWriteLive },
+          { label: 'Quarantine', predicate: row => row.status.includes('quarantined') || row.pipelineProfiles.includes('quarantine') }
+        ]}
+        getSearchText={row => `${row.label} ${row.moduleId} ${row.status} ${row.domain} ${row.entrypoint} ${row.uiSurface} ${row.nextStep}`}
+        columns={[
+          { key: 'label', label: 'Module', width: '1.05fr', render: row => <span title={row.moduleId}>{row.label}</span> },
+          { key: 'status', label: 'Status', width: '0.72fr', render: row => <StatusBadge tone={row.tone}>{row.status}</StatusBadge> },
+          { key: 'uiSurface', label: 'UI Surface', width: '1.1fr' },
+          { key: 'write', label: 'Write', width: '0.72fr', render: row => <StatusBadge tone={row.canWriteLive ? 'yellow' : 'red'}>{writeScopeLabel(row)}</StatusBadge> },
+          { key: 'nextStep', label: 'Next Step', width: '1.45fr' }
+        ]}
+      />
+    </div>
+  );
 }
 
 function SettingsInspector({
@@ -33,6 +131,10 @@ function SettingsInspector({
 }) {
   const backend = ui.backend;
   const connectionTone = connectionToneFor(backend.connectionState);
+  const modules = moduleStatusRows(data);
+  const liveModuleCount = modules.filter(row => row.canWriteLive).length;
+  const reviewOnlyCount = modules.filter(row => !row.canWriteLive).length;
+  const quarantinedCount = modules.filter(row => row.status.includes('quarantined') || row.pipelineProfiles.includes('quarantine')).length;
   const rowsBySection: Record<string, { label: string; value: string; tone?: Tone }[]> = {
     'Backend Policy': [
       { label: 'Connection', value: backend.statusLabel, tone: backend.statusTone },
@@ -45,6 +147,13 @@ function SettingsInspector({
       { label: 'Audio', value: data.directorRuntime.audioLabel, tone: data.directorRuntime.audioTone },
       { label: 'Queue', value: data.directorRuntime.proposalQueueLabel, tone: data.directorRuntime.proposalQueueTone },
       { label: 'Manual gate', value: data.directorRuntime.manualGateLabel, tone: data.directorRuntime.manualGateTone }
+    ],
+    'Module Status': [
+      { label: 'Modules', value: String(modules.length), tone: modules.length ? 'blue' : 'yellow' },
+      { label: 'Live executors', value: String(liveModuleCount), tone: liveModuleCount === 1 ? 'green' : 'yellow' },
+      { label: 'Review/status only', value: String(reviewOnlyCount), tone: reviewOnlyCount ? 'yellow' : 'green' },
+      { label: 'Quarantine', value: String(quarantinedCount), tone: quarantinedCount ? 'red' : 'green' },
+      { label: 'Allowed writes', value: writeScope, tone: backend.writeScope.length ? 'yellow' : 'red' }
     ],
     'Mix Defaults': [
       { label: 'LUFS target', value: '-14 LUFS', tone: 'blue' },
@@ -96,7 +205,8 @@ function SettingsInspector({
         <TechnicalChecklist rows={[
           { label: 'OSC writes', value: 'Disabled', tone: 'red' },
           { label: 'Routing writes', value: 'Disabled', tone: 'red' },
-          { label: 'Apply UX', value: 'Supervised only', tone: 'yellow' }
+          { label: 'Apply UX', value: 'Supervised only', tone: 'yellow' },
+          { label: 'Module map', value: `${modules.length} rows`, tone: modules.length ? 'blue' : 'yellow' }
         ]} />
       </Panel>
     </div>
@@ -109,6 +219,7 @@ export function Settings(ui: UiState, actions: UiActions, data: OperatorViewData
   const selectedSection = settingsSections.includes(ui.selectedSettingsSection) ? ui.selectedSettingsSection : settingsSections[0];
   const writeScope = backend.writeScope.length ? backend.writeScope.join(', ') : 'none';
   const connectionTone = connectionToneFor(backend.connectionState);
+  const modules = moduleStatusRows(data);
   const approvalLabel = backend.canApplyToConsole
     ? (backend.requiresApproval ? 'Required' : 'Not required')
     : 'No apply';
@@ -117,10 +228,10 @@ export function Settings(ui: UiState, actions: UiActions, data: OperatorViewData
     : 'red';
 
   return tableView('7. Settings', 'System, automation, and mix defaults', (
-    <div className="grid h-full grid-rows-[38px_1fr_108px] gap-2">
+    <div className="grid h-full grid-rows-[38px_1fr_116px] gap-2">
       <div className="am-panel flex items-center justify-between px-3">
         <div className="flex gap-1 text-[10px] font-semibold uppercase text-muted">
-          {settingsSections.slice(0, 5).map(section => (
+          {settingsSections.slice(0, 6).map(section => (
             <button
               className={`rounded-[4px] border px-2 py-1 transition ${selectedSection === section ? 'border-audio bg-audio/10 text-audio' : 'border-transparent text-muted hover:text-text'}`}
               key={section}
@@ -180,18 +291,13 @@ export function Settings(ui: UiState, actions: UiActions, data: OperatorViewData
             ]} />
           </div>
         </Panel>
-        <Panel title="Mix Defaults" action={<button className="am-button" onClick={() => actions.selectSettingsSection('Mix Defaults')} type="button">Focus</button>}>
-          <SettingRows rows={['Default LUFS Target -14 LUFS', 'True Peak Limit -1 dBTP', 'Max Fader Ceiling 0 dB', 'Minimum Headroom 3 dB', 'Snapshot Before Apply On']} />
-          <div className="mt-5 space-y-3">
-            <MiniBarRow label="Vocal Priority" value="72%" meter={-14} tone="purple" />
-            <MiniBarRow label="Drum Stability" value="84%" meter={-10} tone="green" />
-            <MiniBarRow label="Safety Margin" value="High" meter={-18} tone="yellow" />
-          </div>
-        </Panel>
+        <ModuleStatusTable rows={modules} onFocus={() => actions.selectSettingsSection('Module Status')} />
       </div>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-5 gap-2">
+        <Panel title="Mix Defaults"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Mix Defaults')} type="button"><TechnicalChecklist rows={[{ label: 'LUFS target', value: '-14 LUFS', tone: 'blue' }, { label: 'Safety margin', value: 'High', tone: 'yellow' }]} /></button></Panel>
         <Panel title="Mode Policy"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Mode Policy')} type="button"><TechnicalChecklist rows={[{ label: 'Current mode', value: ui.mode, tone: backend.canApplyToConsole ? 'yellow' : 'blue' }, { label: 'Create proposals', value: backend.canCreateProposals ? 'Allowed' : 'Blocked', tone: backend.canCreateProposals ? 'green' : 'yellow' }]} /></button></Panel>
         <Panel title="Write Policy"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Write Policy')} type="button"><TechnicalChecklist rows={[{ label: 'Console apply', value: backend.canApplyToConsole ? 'Supervised' : 'Blocked', tone: backend.canApplyToConsole ? 'yellow' : 'red' }, { label: 'Scope', value: writeScope, tone: backend.writeScope.length ? 'yellow' : 'red' }]} /></button></Panel>
+        <Panel title="Module Status"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Module Status')} type="button"><TechnicalChecklist rows={[{ label: 'Modules', value: String(modules.length), tone: 'blue' }, { label: 'Live writes', value: String(modules.filter(row => row.canWriteLive).length), tone: 'yellow' }]} /></button></Panel>
         <Panel title="Audit"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Audit')} type="button"><TechnicalChecklist rows={[{ label: 'Decision log', value: data.logs.length ? 'On' : 'Empty', tone: data.logs.length ? 'green' : 'yellow' }, { label: 'Console diff', value: 'Read-only', tone: 'blue' }]} /></button></Panel>
         <Panel title="Transport"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Transport')} type="button"><TechnicalChecklist rows={[{ label: 'Websocket', value: backend.connectionState, tone: connectionTone }, { label: 'Product Layer', value: backend.dataStateLabel, tone: backend.dataStateTone }, { label: 'OSC writes', value: 'No direct path', tone: 'red' }]} /></button></Panel>
       </div>

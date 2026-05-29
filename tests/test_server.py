@@ -1123,6 +1123,90 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_gain.assert_called_once_with(1, 2.0)
 
     @pytest.mark.asyncio
+    async def test_websocket_gain_accepts_wing_trim_quantized_physical_readback(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server.mixer_client.state = {}
+        physical = {"/ch/4/in/set/trim": 0.0}
+
+        def query_parameter(address):
+            return {"status": "received", "address": address, "value": physical.get(address)}
+
+        def apply_gain(channel, value):
+            physical[f"/ch/{channel}/in/set/trim"] = -0.1999988555908203
+            return True
+
+        server.mixer_client.query_parameter = MagicMock(side_effect=query_parameter)
+        server.mixer_client.set_channel_gain.side_effect = apply_gain
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_gain"](
+            websocket,
+            {"channel": 4, "value": -0.25, "approved": True, "approval_id": "unit-gain-quantized"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_applied"
+        assert payload["status"] == "applied"
+        assert payload["old_value"] == 0.0
+        assert payload["readback_value"] == -0.1999988555908203
+        assert payload["readback_status"] == "verified_from_physical_readback"
+        assert payload["proof_status"] == "verified"
+        assert payload["rollback_available"] is True
+        server.mixer_client.set_channel_gain.assert_called_once_with(4, -0.25)
+
+    @pytest.mark.asyncio
+    async def test_query_mixer_parameter_reads_gain_without_writing(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.mixer_client.state = {}
+        server.mixer_client.query_parameter = MagicMock(
+            return_value={"status": "received", "address": "/ch/3/in/set/trim", "value": 1.25}
+        )
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["query_mixer_parameter"](
+            websocket,
+            {"channel": 3, "value_type": "gain", "address": "/ch/3/in/set/trim"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "mixer_parameter_value"
+        assert payload["status"] == "verified_from_physical_readback"
+        assert payload["source"] == "physical_readback"
+        assert payload["channel"] == 3
+        assert payload["value_type"] == "gain"
+        assert payload["address"] == "/ch/3/in/set/trim"
+        assert payload["value"] == 1.25
+        server.mixer_client.query_parameter.assert_called_once_with("/ch/3/in/set/trim")
+        server.mixer_client.set_channel_gain.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_query_mixer_parameter_blocks_unsupported_address(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.mixer_client.query_parameter = MagicMock(return_value={"value": -1.0})
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["query_mixer_parameter"](
+            websocket,
+            {"address": "/main/1/fdr"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "mixer_parameter_read_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "unsupported_address"
+        server.mixer_client.query_parameter.assert_not_called()
+        server.mixer_client.set_channel_gain.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_websocket_gain_blocks_when_pre_read_unavailable(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"

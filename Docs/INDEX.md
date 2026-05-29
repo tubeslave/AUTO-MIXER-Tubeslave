@@ -25,6 +25,8 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_RC_STAGING_HANDOFF_20260521.md` | Release-candidate staging order, package evidence, and strict live boundary before the physical `gain` proof. |
 | `Docs/reports/AUTOMIXER_PRE_LIVE_GAIN_REVIEW_20260521.md` | Pre-live code review, focused tests, and refreshed fake gain proof before any physical `gain` validation. |
 | `Docs/reports/AUTOMIXER_OFFLINE_NO_WING_EXECUTION_20260522.md` | No-WING execution slice: safety audit refresh, fake gain proof, full checks, and package smoke. |
+| `Docs/reports/AUTOMIXER_AUTOMATION_FOUNDATION_LAYER_20260527.md` | Automation foundation layer: decision traces, safety monitor, replay DTOs, idempotent supervised apply, and current validation evidence. |
+| `Docs/adr/automation-foundation-layer-20260527.md` | ADR for the safe agentic-mixing foundation layer and its live-write boundary. |
 | `Docs/STRUCTURING_COMPLETION_20260518.md` | What was moved, what remains, and the next work boundary. |
 | `Docs/PROJECT_CLEANUP_BACKLOG.md` | Remaining cleanup backlog and rules. |
 
@@ -53,6 +55,7 @@ paths, Product Layer, or cleanup policy.
 | --- | --- |
 | Product Layer plan | `Docs/PROJECT_IMPLEMENTATION_PLAN.md` |
 | Processing pipeline selection | `Docs/PROCESSING_METHODS_INVENTORY.md`, `Docs/adr/processing-pipeline-selection.md` |
+| Automation foundation layer | `Docs/adr/automation-foundation-layer-20260527.md`, `Docs/reports/AUTOMIXER_AUTOMATION_FOUNDATION_LAYER_20260527.md` |
 | Paperclip/GPT workflow | `Docs/PAPERCLIP_DIRECTOR_WORKFLOW.md` |
 | Operational memory | `Docs/OPERATIONAL_MEMORY.md` |
 | Tooling overview | `Docs/TOOLS.md` |

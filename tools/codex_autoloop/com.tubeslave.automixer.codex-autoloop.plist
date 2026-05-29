@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tubeslave.automixer.codex-autoloop</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/codex_autoloop/run_codex_cycle.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StartInterval</key>
+  <integer>1200</integer>
+
+  <key>KeepAlive</key>
+  <false/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/dmitrijvolkov/.nvm/versions/node/v24.15.0/bin</string>
+    <key>CODEX_AUTOLOOP_LAUNCHD</key>
+    <string>1</string>
+    <key>CODEX_AUTOLOOP_EXPECTED_PROJECT_ROOT</key>
+    <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/logs/codex_autoloop/launchd.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/logs/codex_autoloop/launchd.err.log</string>
+</dict>
+</plist>

@@ -216,7 +216,9 @@ test('main cockpit source does not call direct live write websocket methods', ()
   const cockpitSources = [
     path.join(srcRoot, 'AutomixerPrototype.tsx'),
     path.join(srcRoot, 'App.js'),
-    path.join(srcRoot, 'services/useOperatorBackend.ts')
+    path.join(srcRoot, 'services/useOperatorBackend.ts'),
+    path.join(srcRoot, 'components/GainStagingTab.js'),
+    path.join(srcRoot, 'components/IPhoneControlSurface.js')
   ];
   const forbiddenCalls = [
     '.setFader(',
@@ -225,7 +227,9 @@ test('main cockpit source does not call direct live write websocket methods', ()
     '.setCompressor(',
     '.routeOutput(',
     '.loadSnap(',
-    '.saveSnap('
+    '.saveSnap(',
+    '.resetTrim(',
+    '.bypassMixer('
   ];
 
   for (const sourcePath of cockpitSources) {

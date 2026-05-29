@@ -15,6 +15,7 @@ import numpy as np
 import threading
 import logging
 import time
+import re
 from typing import Dict, List, Callable, Optional, Any
 from collections import deque
 from scipy import signal
@@ -304,8 +305,149 @@ def _preset_key(preset: str) -> str:
     return "".join(ch for ch in str(preset or "custom").lower() if ch.isalnum())
 
 
+_SPECTRAL_FREQUENCY_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s*(khz|k|hz)?", re.IGNORECASE)
+
+
+def _normalized_spectral_label(label: str) -> str:
+    chars = [
+        ch if ch.isalnum() else "_"
+        for ch in str(label or "").strip().lower()
+    ]
+    normalized = "".join(chars)
+    while "__" in normalized:
+        normalized = normalized.replace("__", "_")
+    return normalized.strip("_")
+
+
+def _frequency_hz_from_spectral_label(label: str) -> Optional[float]:
+    raw_label = str(label or "").strip().lower()
+    for match in _SPECTRAL_FREQUENCY_PATTERN.finditer(raw_label):
+        unit = (match.group(2) or "").lower()
+        value = _coerce_float(match.group(1), 0.0)
+        if unit in {"khz", "k"}:
+            return float(value * 1000.0)
+        if unit == "hz":
+            return float(value)
+        if value >= 20.0:
+            return float(value)
+    return None
+
+
+def _canonical_spectral_band_name(label: str) -> str:
+    normalized = _normalized_spectral_label(label)
+    frequency_hz = _frequency_hz_from_spectral_label(label)
+    if frequency_hz is not None:
+        if frequency_hz < 80.0:
+            return "sub"
+        if frequency_hz < 180.0:
+            return "low"
+        if frequency_hz < 600.0:
+            return "low_mid"
+        if frequency_hz < 2000.0:
+            return "mid"
+        if frequency_hz < 7000.0:
+            return "presence"
+        return "air"
+    if not normalized:
+        return "unknown"
+    if any(token in normalized for token in ("low_mid", "lowmid", "lowermid", "lower_mid")):
+        return "low_mid"
+    if any(token in normalized for token in ("upper_mid", "uppermid", "presence", "sibilance")):
+        return "presence"
+    if any(token in normalized for token in ("air", "brilliance", "cymbal")):
+        return "air"
+    if "sub" in normalized:
+        return "sub"
+    if "fundamental" in normalized:
+        return "fundamental"
+    if "body" in normalized:
+        return "body"
+    if "bass" in normalized or "low" in normalized:
+        return "low"
+    if "high" in normalized or "treble" in normalized:
+        return "air"
+    if "mid" in normalized:
+        return "mid"
+    return normalized
+
+
 def _channel_personality_for_preset(preset: str) -> ChannelPersonalityProfile:
     return _PRESET_CHANNEL_PERSONALITIES.get(_preset_key(preset), _DEFAULT_CHANNEL_PERSONALITY)
+
+
+_GENERIC_TRANSIENT_BODY_BAND_PROFILE: Dict[str, Any] = {
+    "name": "generic_low_body",
+    "applicable": True,
+    "primary_tokens": ("low", "body", "fundamental"),
+    "secondary_tokens": ("low_mid", "lowmid"),
+    "match_policy": "primary_preferred_secondary_fallback",
+}
+
+_TRANSIENT_BODY_BAND_PROFILES: Dict[str, Dict[str, Any]] = {
+    "kick": {
+        "name": "kick_low_fundamental",
+        "applicable": True,
+        "primary_tokens": ("sub", "low", "fundamental", "kick", "thump"),
+        "secondary_tokens": ("low_mid", "lowmid", "body"),
+        "match_policy": "primary_preferred_secondary_fallback",
+    },
+    "snare": {
+        "name": "snare_low_mid_body",
+        "applicable": True,
+        "primary_tokens": ("low_mid", "lowmid", "body", "snare_body"),
+        "secondary_tokens": ("mid", "fundamental"),
+        "match_policy": "primary_preferred_secondary_fallback",
+    },
+    "tom": {
+        "name": "tom_body_fundamental",
+        "applicable": True,
+        "primary_tokens": ("low_mid", "lowmid", "body", "fundamental", "tom"),
+        "secondary_tokens": ("low",),
+        "match_policy": "primary_preferred_secondary_fallback",
+    },
+}
+
+_TRANSIENT_NON_BODY_REFERENCE_PROFILES: Dict[str, Dict[str, Any]] = {
+    "cymbal": {
+        "name": "cymbal_no_body_reference",
+        "applicable": False,
+        "primary_tokens": (),
+        "secondary_tokens": (),
+        "match_policy": "disabled_for_high_band_transient_source",
+    },
+    "drum_image": {
+        "name": "drum_image_no_body_reference",
+        "applicable": False,
+        "primary_tokens": (),
+        "secondary_tokens": (),
+        "match_policy": "disabled_for_multi_source_image_channel",
+    },
+    "drum_room": {
+        "name": "drum_room_no_body_reference",
+        "applicable": False,
+        "primary_tokens": (),
+        "secondary_tokens": (),
+        "match_policy": "disabled_for_ambient_image_channel",
+    },
+}
+
+
+def _transient_body_band_profile_for_preset(preset: str, family: str) -> Dict[str, Any]:
+    preset_profile = _TRANSIENT_BODY_BAND_PROFILES.get(_preset_key(preset))
+    if preset_profile:
+        return dict(preset_profile)
+    family_profile = _TRANSIENT_NON_BODY_REFERENCE_PROFILES.get(str(family or "").strip().lower())
+    if family_profile:
+        return dict(family_profile)
+    if family == "transient_percussion":
+        return dict(_GENERIC_TRANSIENT_BODY_BAND_PROFILE)
+    return {
+        "name": "not_applicable",
+        "applicable": False,
+        "primary_tokens": (),
+        "secondary_tokens": (),
+        "match_policy": "not_transient_percussion",
+    }
 
 
 def _gain_direction(delta_db: Optional[float], threshold_db: float = 0.25) -> str:
@@ -316,6 +458,45 @@ def _gain_direction(delta_db: Optional[float], threshold_db: float = 0.25) -> st
     if delta_db < -threshold_db:
         return "down"
     return "hold"
+
+
+def _rolling_average(previous: Optional[float], current: Optional[float], previous_windows: int) -> Optional[float]:
+    if current is None:
+        return previous
+    if previous is None or previous_windows <= 0:
+        return float(current)
+    return float((float(previous) * previous_windows + float(current)) / (previous_windows + 1))
+
+
+def _bucket_db(value: Optional[float], step_db: float) -> Optional[float]:
+    if value is None:
+        return None
+    step = max(0.1, float(step_db))
+    return float(round(float(value) / step) * step)
+
+
+def _compact_confidence_factor(factor: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "name": str(factor.get("name") or ""),
+        "delta": float(_coerce_float(factor.get("delta"), 0.0)),
+        "reason": str(factor.get("reason") or ""),
+    }
+
+
+def _dominant_confidence_factors(
+    factors: List[Dict[str, Any]],
+    *,
+    positive: bool,
+    limit: int = 3,
+) -> List[Dict[str, Any]]:
+    compact = [_compact_confidence_factor(factor) for factor in factors]
+    if positive:
+        selected = [factor for factor in compact if factor["delta"] > 0.0]
+        selected.sort(key=lambda factor: factor["delta"], reverse=True)
+    else:
+        selected = [factor for factor in compact if factor["delta"] < 0.0]
+        selected.sort(key=lambda factor: factor["delta"])
+    return selected[:max(0, int(limit))]
 
 
 @dataclass(frozen=True)
@@ -334,6 +515,26 @@ class LocalInputGainProfile:
     soundcheck_allow_boost: bool = True
     live_allow_boost: bool = False
     soundcheck_max_boost_db: float = 3.0
+    soundcheck_convergence_enabled: bool = True
+    soundcheck_convergence_large_gap_db: float = 12.0
+    soundcheck_convergence_max_boost_db: float = 12.0
+    soundcheck_convergence_vocal_max_boost_db: float = 9.0
+    soundcheck_convergence_playback_max_boost_db: float = 6.0
+    soundcheck_convergence_setup_check_db: float = 15.0
+    soundcheck_convergence_gain_up_step_db: float = 3.0
+    soundcheck_ensemble_context_enabled: bool = True
+    soundcheck_ensemble_min_other_active_sources: int = 2
+    soundcheck_ensemble_min_other_presence: float = 0.25
+    soundcheck_ensemble_min_reference_peak_db: float = -18.0
+    soundcheck_ensemble_min_reference_lufs: float = -30.0
+    soundcheck_ensemble_vocal_under_peak_gap_db: float = 8.0
+    soundcheck_ensemble_vocal_under_lufs_gap_db: float = 6.0
+    soundcheck_ensemble_vocal_min_crest_db: float = 6.0
+    soundcheck_ensemble_max_boost_db: float = 6.0
+    soundcheck_ensemble_gain_up_step_db: float = 6.0
+    soundcheck_ensemble_confidence_bonus: float = 0.08
+    soundcheck_ensemble_time_coherence_enabled: bool = True
+    soundcheck_ensemble_max_context_lag_samples: int = 2
     soundcheck_max_cut_db: float = 6.0
     live_max_cut_db: float = 1.0
     target_deadband_db: float = 1.0
@@ -354,6 +555,100 @@ class LocalInputGainProfile:
     digital_clip_threshold_db: float = -0.1
     scream_peak_threshold_db: float = -4.0
     scream_lufs_threshold_db: float = -16.0
+    predictive_clip_window_db: float = 2.0
+    predictive_clip_density_threshold: float = 0.30
+    predictive_clip_sustained_density_threshold: float = 0.55
+    predictive_clip_min_rising_trend_db: float = 1.0
+    predictive_clip_min_cut_db: float = 0.5
+    predictive_clip_max_cut_db: float = 1.5
+    vocal_gain_up_guard_enabled: bool = True
+    vocal_gain_up_presence_min_bands: int = 1
+    vocal_gain_up_presence_max_std_db: float = 4.0
+    vocal_gain_up_presence_max_span_db: float = 10.0
+    vocal_gain_up_scream_cooldown_windows: int = 2
+    trim_smoothing_enabled: bool = True
+    trim_smoothing_gain_up_step_db: float = 1.0
+    trim_smoothing_gain_down_step_db: float = 1.5
+    trend_memory_max_windows: int = 4
+    behavior_flip_gain_up_hold: bool = True
+    channel_profile_min_windows: int = 3
+    channel_profile_max_windows: int = 8
+    channel_profile_unstable_ratio_block: float = 0.5
+    channel_profile_lufs_std_block_db: float = 6.5
+    channel_profile_noise_margin_block_db: float = 12.0
+    live_freeze_gain_up_profile: bool = True
+    channel_profile_lifecycle_enabled: bool = True
+    channel_profile_default_decay_factor: float = 0.5
+    channel_profile_min_decay_factor: float = 0.0
+    channel_profile_recovery_enabled: bool = True
+    channel_profile_recovery_min_windows: int = 3
+    channel_profile_recovery_max_lufs_std_db: float = 3.0
+    channel_profile_recovery_max_peak_std_db: float = 3.0
+    channel_profile_recovery_max_crest_db: float = 14.0
+    channel_profile_recovery_min_noise_margin_db: float = 16.0
+    source_signature_change_hold_enabled: bool = True
+    source_signature_change_min_fields: int = 2
+    decision_confidence_enabled: bool = True
+    decision_confidence_gain_up_min_score: float = 0.72
+    decision_confidence_hysteresis_enabled: bool = True
+    decision_confidence_borderline_margin: float = 0.08
+    decision_confidence_stable_windows: int = 2
+    decision_confidence_score_tolerance: float = 0.08
+    decision_confidence_time_memory_enabled: bool = True
+    decision_confidence_default_sample_sec: float = 1.0
+    decision_confidence_min_window_sec: float = 1.0
+    decision_confidence_max_age_sec: float = 30.0
+    decision_confidence_max_gap_ratio: float = 4.0
+    decision_confidence_min_memory_strength: float = 0.5
+    decision_confidence_decay_half_life_sec: float = 20.0
+    decision_confidence_vocal_decay_half_life_sec: float = 12.0
+    decision_confidence_playback_decay_half_life_sec: float = 45.0
+    source_signature_drift_memory_penalty_enabled: bool = True
+    source_signature_drift_penalty_per_field: float = 0.30
+    source_signature_drift_max_penalty: float = 0.80
+    source_signature_drift_vocal_noise_weight: float = 1.70
+    source_signature_drift_vocal_crest_weight: float = 1.40
+    source_signature_drift_playback_lufs_weight: float = 1.40
+    source_signature_drift_playback_peak_gap_weight: float = 1.40
+    source_signature_continuous_drift_enabled: bool = True
+    source_signature_continuous_drift_penalty_per_unit: float = 0.35
+    source_signature_continuous_drift_max_penalty: float = 0.60
+    source_signature_spectral_drift_enabled: bool = True
+    source_signature_spectral_drift_min_common_bands: int = 3
+    source_signature_spectral_drift_penalty_per_db: float = 0.08
+    source_signature_spectral_drift_max_penalty: float = 0.65
+    source_signature_spectral_vocal_presence_weight: float = 1.35
+    source_signature_spectral_playback_weight: float = 0.55
+    source_signature_spectral_drum_high_band_weight: float = 0.60
+    source_signature_spectral_quality_gate_enabled: bool = True
+    source_signature_spectral_min_band_samples: int = 3
+    source_signature_spectral_min_band_coverage: float = 0.60
+    source_signature_spectral_max_band_std_db: float = 6.0
+    source_signature_spectral_max_band_span_db: float = 14.0
+    source_signature_spectral_stuck_band_std_db: float = 0.02
+    source_signature_spectral_stuck_signal_std_db: float = 1.0
+    source_signature_spectral_quality_penalty_per_rejected_band: float = 0.15
+    source_signature_spectral_quality_max_penalty: float = 0.55
+    source_signature_spectral_vocal_presence_max_std_db: float = 4.0
+    source_signature_spectral_vocal_presence_max_span_db: float = 10.0
+    source_signature_spectral_playback_max_band_std_db: float = 9.0
+    source_signature_spectral_playback_max_band_span_db: float = 20.0
+    source_signature_spectral_transient_high_band_max_std_db: float = 10.0
+    source_signature_spectral_transient_high_band_max_span_db: float = 24.0
+    source_signature_spectral_transient_high_band_identity_weight: float = 0.25
+    source_signature_spectral_transient_attack_high_band_identity_weight: float = 0.10
+    transient_window_profile_enabled: bool = True
+    transient_window_min_samples: int = 6
+    transient_window_attack_top_ratio: float = 0.20
+    transient_window_attack_body_gap_db: float = 8.0
+    transient_window_high_band_lift_db: float = 6.0
+    transient_window_min_repeated_hits: int = 3
+    transient_window_hit_body_std_max_db: float = 3.0
+    transient_window_hit_gap_std_max_db: float = 4.0
+    transient_window_body_reference_enabled: bool = True
+    transient_window_source_specific_body_band_profiles: bool = True
+    transient_window_body_band_reference_enabled: bool = True
+    transient_window_body_band_std_max_db: float = 3.0
 
     @classmethod
     def from_config(cls, config: Optional[Dict[str, Any]] = None) -> "LocalInputGainProfile":
@@ -377,6 +672,88 @@ class LocalInputGainProfile:
             soundcheck_allow_boost=_coerce_bool(merged.get("soundcheck_allow_boost"), True),
             live_allow_boost=_coerce_bool(merged.get("live_allow_boost"), False),
             soundcheck_max_boost_db=_coerce_float(merged.get("soundcheck_max_boost_db"), 3.0),
+            soundcheck_convergence_enabled=_coerce_bool(
+                merged.get("soundcheck_convergence_enabled"),
+                True,
+            ),
+            soundcheck_convergence_large_gap_db=max(
+                0.0,
+                _coerce_float(merged.get("soundcheck_convergence_large_gap_db"), 12.0),
+            ),
+            soundcheck_convergence_max_boost_db=max(
+                0.0,
+                _coerce_float(merged.get("soundcheck_convergence_max_boost_db"), 12.0),
+            ),
+            soundcheck_convergence_vocal_max_boost_db=max(
+                0.0,
+                _coerce_float(merged.get("soundcheck_convergence_vocal_max_boost_db"), 9.0),
+            ),
+            soundcheck_convergence_playback_max_boost_db=max(
+                0.0,
+                _coerce_float(merged.get("soundcheck_convergence_playback_max_boost_db"), 6.0),
+            ),
+            soundcheck_convergence_setup_check_db=max(
+                0.0,
+                _coerce_float(merged.get("soundcheck_convergence_setup_check_db"), 15.0),
+            ),
+            soundcheck_convergence_gain_up_step_db=max(
+                0.1,
+                _coerce_float(merged.get("soundcheck_convergence_gain_up_step_db"), 3.0),
+            ),
+            soundcheck_ensemble_context_enabled=_coerce_bool(
+                merged.get("soundcheck_ensemble_context_enabled"),
+                True,
+            ),
+            soundcheck_ensemble_min_other_active_sources=max(
+                1,
+                int(_coerce_float(merged.get("soundcheck_ensemble_min_other_active_sources"), 2)),
+            ),
+            soundcheck_ensemble_min_other_presence=float(np.clip(
+                _coerce_float(merged.get("soundcheck_ensemble_min_other_presence"), 0.25),
+                0.0,
+                1.0,
+            )),
+            soundcheck_ensemble_min_reference_peak_db=_coerce_float(
+                merged.get("soundcheck_ensemble_min_reference_peak_db"),
+                -18.0,
+            ),
+            soundcheck_ensemble_min_reference_lufs=_coerce_float(
+                merged.get("soundcheck_ensemble_min_reference_lufs"),
+                -30.0,
+            ),
+            soundcheck_ensemble_vocal_under_peak_gap_db=max(
+                0.0,
+                _coerce_float(merged.get("soundcheck_ensemble_vocal_under_peak_gap_db"), 8.0),
+            ),
+            soundcheck_ensemble_vocal_under_lufs_gap_db=max(
+                0.0,
+                _coerce_float(merged.get("soundcheck_ensemble_vocal_under_lufs_gap_db"), 6.0),
+            ),
+            soundcheck_ensemble_vocal_min_crest_db=max(
+                0.0,
+                _coerce_float(merged.get("soundcheck_ensemble_vocal_min_crest_db"), 6.0),
+            ),
+            soundcheck_ensemble_max_boost_db=max(
+                0.0,
+                _coerce_float(merged.get("soundcheck_ensemble_max_boost_db"), 6.0),
+            ),
+            soundcheck_ensemble_gain_up_step_db=max(
+                0.1,
+                _coerce_float(merged.get("soundcheck_ensemble_gain_up_step_db"), 6.0),
+            ),
+            soundcheck_ensemble_confidence_bonus=float(np.clip(
+                _coerce_float(merged.get("soundcheck_ensemble_confidence_bonus"), 0.08),
+                0.0,
+                0.20,
+            )),
+            soundcheck_ensemble_time_coherence_enabled=_coerce_bool(
+                merged.get("soundcheck_ensemble_time_coherence_enabled"),
+                True,
+            ),
+            soundcheck_ensemble_max_context_lag_samples=max(
+                0,
+                int(_coerce_float(merged.get("soundcheck_ensemble_max_context_lag_samples"), 2)),
+            ),
             soundcheck_max_cut_db=_coerce_float(merged.get("soundcheck_max_cut_db"), 6.0),
             live_max_cut_db=_coerce_float(merged.get("live_max_cut_db"), 1.0),
             target_deadband_db=_coerce_float(merged.get("target_deadband_db"), 1.0),
@@ -397,6 +774,377 @@ class LocalInputGainProfile:
             digital_clip_threshold_db=_coerce_float(merged.get("digital_clip_threshold_db"), -0.1),
             scream_peak_threshold_db=_coerce_float(merged.get("scream_peak_threshold_db"), -4.0),
             scream_lufs_threshold_db=_coerce_float(merged.get("scream_lufs_threshold_db"), -16.0),
+            predictive_clip_window_db=_coerce_float(merged.get("predictive_clip_window_db"), 2.0),
+            predictive_clip_density_threshold=_coerce_float(merged.get("predictive_clip_density_threshold"), 0.30),
+            predictive_clip_sustained_density_threshold=_coerce_float(
+                merged.get("predictive_clip_sustained_density_threshold"),
+                0.55,
+            ),
+            predictive_clip_min_rising_trend_db=_coerce_float(merged.get("predictive_clip_min_rising_trend_db"), 1.0),
+            predictive_clip_min_cut_db=_coerce_float(merged.get("predictive_clip_min_cut_db"), 0.5),
+            predictive_clip_max_cut_db=_coerce_float(merged.get("predictive_clip_max_cut_db"), 1.5),
+            vocal_gain_up_guard_enabled=_coerce_bool(
+                merged.get("vocal_gain_up_guard_enabled"),
+                True,
+            ),
+            vocal_gain_up_presence_min_bands=max(
+                1,
+                int(_coerce_float(merged.get("vocal_gain_up_presence_min_bands"), 1)),
+            ),
+            vocal_gain_up_presence_max_std_db=max(
+                0.0,
+                _coerce_float(merged.get("vocal_gain_up_presence_max_std_db"), 4.0),
+            ),
+            vocal_gain_up_presence_max_span_db=max(
+                0.0,
+                _coerce_float(merged.get("vocal_gain_up_presence_max_span_db"), 10.0),
+            ),
+            vocal_gain_up_scream_cooldown_windows=max(
+                0,
+                int(_coerce_float(merged.get("vocal_gain_up_scream_cooldown_windows"), 2)),
+            ),
+            trim_smoothing_enabled=_coerce_bool(
+                merged.get("trim_smoothing_enabled"),
+                True,
+            ),
+            trim_smoothing_gain_up_step_db=max(
+                0.1,
+                _coerce_float(merged.get("trim_smoothing_gain_up_step_db"), 1.0),
+            ),
+            trim_smoothing_gain_down_step_db=max(
+                0.1,
+                _coerce_float(merged.get("trim_smoothing_gain_down_step_db"), 1.5),
+            ),
+            trend_memory_max_windows=max(1, int(_coerce_float(merged.get("trend_memory_max_windows"), 4))),
+            behavior_flip_gain_up_hold=_coerce_bool(merged.get("behavior_flip_gain_up_hold"), True),
+            channel_profile_min_windows=max(1, int(_coerce_float(merged.get("channel_profile_min_windows"), 3))),
+            channel_profile_max_windows=max(1, int(_coerce_float(merged.get("channel_profile_max_windows"), 8))),
+            channel_profile_unstable_ratio_block=_coerce_float(
+                merged.get("channel_profile_unstable_ratio_block"),
+                0.5,
+            ),
+            channel_profile_lufs_std_block_db=_coerce_float(
+                merged.get("channel_profile_lufs_std_block_db"),
+                6.5,
+            ),
+            channel_profile_noise_margin_block_db=_coerce_float(
+                merged.get("channel_profile_noise_margin_block_db"),
+                12.0,
+            ),
+            live_freeze_gain_up_profile=_coerce_bool(merged.get("live_freeze_gain_up_profile"), True),
+            channel_profile_lifecycle_enabled=_coerce_bool(
+                merged.get("channel_profile_lifecycle_enabled"),
+                True,
+            ),
+            channel_profile_default_decay_factor=float(np.clip(
+                _coerce_float(merged.get("channel_profile_default_decay_factor"), 0.5),
+                0.0,
+                1.0,
+            )),
+            channel_profile_min_decay_factor=float(np.clip(
+                _coerce_float(merged.get("channel_profile_min_decay_factor"), 0.0),
+                0.0,
+                1.0,
+            )),
+            channel_profile_recovery_enabled=_coerce_bool(
+                merged.get("channel_profile_recovery_enabled"),
+                True,
+            ),
+            channel_profile_recovery_min_windows=max(
+                1,
+                int(_coerce_float(merged.get("channel_profile_recovery_min_windows"), 3)),
+            ),
+            channel_profile_recovery_max_lufs_std_db=_coerce_float(
+                merged.get("channel_profile_recovery_max_lufs_std_db"),
+                3.0,
+            ),
+            channel_profile_recovery_max_peak_std_db=_coerce_float(
+                merged.get("channel_profile_recovery_max_peak_std_db"),
+                3.0,
+            ),
+            channel_profile_recovery_max_crest_db=_coerce_float(
+                merged.get("channel_profile_recovery_max_crest_db"),
+                14.0,
+            ),
+            channel_profile_recovery_min_noise_margin_db=_coerce_float(
+                merged.get("channel_profile_recovery_min_noise_margin_db"),
+                16.0,
+            ),
+            source_signature_change_hold_enabled=_coerce_bool(
+                merged.get("source_signature_change_hold_enabled"),
+                True,
+            ),
+            source_signature_change_min_fields=max(
+                1,
+                int(_coerce_float(merged.get("source_signature_change_min_fields"), 2)),
+            ),
+            decision_confidence_enabled=_coerce_bool(
+                merged.get("decision_confidence_enabled"),
+                True,
+            ),
+            decision_confidence_gain_up_min_score=float(np.clip(
+                _coerce_float(merged.get("decision_confidence_gain_up_min_score"), 0.72),
+                0.0,
+                0.95,
+            )),
+            decision_confidence_hysteresis_enabled=_coerce_bool(
+                merged.get("decision_confidence_hysteresis_enabled"),
+                True,
+            ),
+            decision_confidence_borderline_margin=float(np.clip(
+                _coerce_float(merged.get("decision_confidence_borderline_margin"), 0.08),
+                0.0,
+                0.30,
+            )),
+            decision_confidence_stable_windows=max(
+                1,
+                int(_coerce_float(merged.get("decision_confidence_stable_windows"), 2)),
+            ),
+            decision_confidence_score_tolerance=float(np.clip(
+                _coerce_float(merged.get("decision_confidence_score_tolerance"), 0.08),
+                0.0,
+                0.30,
+            )),
+            decision_confidence_time_memory_enabled=_coerce_bool(
+                merged.get("decision_confidence_time_memory_enabled"),
+                True,
+            ),
+            decision_confidence_default_sample_sec=max(
+                0.01,
+                _coerce_float(merged.get("decision_confidence_default_sample_sec"), 1.0),
+            ),
+            decision_confidence_min_window_sec=max(
+                0.1,
+                _coerce_float(merged.get("decision_confidence_min_window_sec"), 1.0),
+            ),
+            decision_confidence_max_age_sec=max(
+                0.1,
+                _coerce_float(merged.get("decision_confidence_max_age_sec"), 30.0),
+            ),
+            decision_confidence_max_gap_ratio=max(
+                1.0,
+                _coerce_float(merged.get("decision_confidence_max_gap_ratio"), 4.0),
+            ),
+            decision_confidence_min_memory_strength=float(np.clip(
+                _coerce_float(merged.get("decision_confidence_min_memory_strength"), 0.5),
+                0.0,
+                1.0,
+            )),
+            decision_confidence_decay_half_life_sec=max(
+                0.1,
+                _coerce_float(merged.get("decision_confidence_decay_half_life_sec"), 20.0),
+            ),
+            decision_confidence_vocal_decay_half_life_sec=max(
+                0.1,
+                _coerce_float(merged.get("decision_confidence_vocal_decay_half_life_sec"), 12.0),
+            ),
+            decision_confidence_playback_decay_half_life_sec=max(
+                0.1,
+                _coerce_float(merged.get("decision_confidence_playback_decay_half_life_sec"), 45.0),
+            ),
+            source_signature_drift_memory_penalty_enabled=_coerce_bool(
+                merged.get("source_signature_drift_memory_penalty_enabled"),
+                True,
+            ),
+            source_signature_drift_penalty_per_field=float(np.clip(
+                _coerce_float(merged.get("source_signature_drift_penalty_per_field"), 0.30),
+                0.0,
+                1.0,
+            )),
+            source_signature_drift_max_penalty=float(np.clip(
+                _coerce_float(merged.get("source_signature_drift_max_penalty"), 0.80),
+                0.0,
+                1.0,
+            )),
+            source_signature_drift_vocal_noise_weight=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_drift_vocal_noise_weight"), 1.70),
+            ),
+            source_signature_drift_vocal_crest_weight=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_drift_vocal_crest_weight"), 1.40),
+            ),
+            source_signature_drift_playback_lufs_weight=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_drift_playback_lufs_weight"), 1.40),
+            ),
+            source_signature_drift_playback_peak_gap_weight=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_drift_playback_peak_gap_weight"), 1.40),
+            ),
+            source_signature_continuous_drift_enabled=_coerce_bool(
+                merged.get("source_signature_continuous_drift_enabled"),
+                True,
+            ),
+            source_signature_continuous_drift_penalty_per_unit=float(np.clip(
+                _coerce_float(merged.get("source_signature_continuous_drift_penalty_per_unit"), 0.35),
+                0.0,
+                1.0,
+            )),
+            source_signature_continuous_drift_max_penalty=float(np.clip(
+                _coerce_float(merged.get("source_signature_continuous_drift_max_penalty"), 0.60),
+                0.0,
+                1.0,
+            )),
+            source_signature_spectral_drift_enabled=_coerce_bool(
+                merged.get("source_signature_spectral_drift_enabled"),
+                True,
+            ),
+            source_signature_spectral_drift_min_common_bands=max(
+                1,
+                int(_coerce_float(merged.get("source_signature_spectral_drift_min_common_bands"), 3)),
+            ),
+            source_signature_spectral_drift_penalty_per_db=float(np.clip(
+                _coerce_float(merged.get("source_signature_spectral_drift_penalty_per_db"), 0.08),
+                0.0,
+                1.0,
+            )),
+            source_signature_spectral_drift_max_penalty=float(np.clip(
+                _coerce_float(merged.get("source_signature_spectral_drift_max_penalty"), 0.65),
+                0.0,
+                1.0,
+            )),
+            source_signature_spectral_vocal_presence_weight=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_vocal_presence_weight"), 1.35),
+            ),
+            source_signature_spectral_playback_weight=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_playback_weight"), 0.55),
+            ),
+            source_signature_spectral_drum_high_band_weight=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_drum_high_band_weight"), 0.60),
+            ),
+            source_signature_spectral_quality_gate_enabled=_coerce_bool(
+                merged.get("source_signature_spectral_quality_gate_enabled"),
+                True,
+            ),
+            source_signature_spectral_min_band_samples=max(
+                1,
+                int(_coerce_float(merged.get("source_signature_spectral_min_band_samples"), 3)),
+            ),
+            source_signature_spectral_min_band_coverage=float(np.clip(
+                _coerce_float(merged.get("source_signature_spectral_min_band_coverage"), 0.60),
+                0.0,
+                1.0,
+            )),
+            source_signature_spectral_max_band_std_db=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_max_band_std_db"), 6.0),
+            ),
+            source_signature_spectral_max_band_span_db=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_max_band_span_db"), 14.0),
+            ),
+            source_signature_spectral_stuck_band_std_db=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_stuck_band_std_db"), 0.02),
+            ),
+            source_signature_spectral_stuck_signal_std_db=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_stuck_signal_std_db"), 1.0),
+            ),
+            source_signature_spectral_quality_penalty_per_rejected_band=float(np.clip(
+                _coerce_float(
+                    merged.get("source_signature_spectral_quality_penalty_per_rejected_band"),
+                    0.15,
+                ),
+                0.0,
+                1.0,
+            )),
+            source_signature_spectral_quality_max_penalty=float(np.clip(
+                _coerce_float(merged.get("source_signature_spectral_quality_max_penalty"), 0.55),
+                0.0,
+                1.0,
+            )),
+            source_signature_spectral_vocal_presence_max_std_db=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_vocal_presence_max_std_db"), 4.0),
+            ),
+            source_signature_spectral_vocal_presence_max_span_db=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_vocal_presence_max_span_db"), 10.0),
+            ),
+            source_signature_spectral_playback_max_band_std_db=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_playback_max_band_std_db"), 9.0),
+            ),
+            source_signature_spectral_playback_max_band_span_db=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_playback_max_band_span_db"), 20.0),
+            ),
+            source_signature_spectral_transient_high_band_max_std_db=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_transient_high_band_max_std_db"), 10.0),
+            ),
+            source_signature_spectral_transient_high_band_max_span_db=max(
+                0.0,
+                _coerce_float(merged.get("source_signature_spectral_transient_high_band_max_span_db"), 24.0),
+            ),
+            source_signature_spectral_transient_high_band_identity_weight=max(
+                0.0,
+                _coerce_float(
+                    merged.get("source_signature_spectral_transient_high_band_identity_weight"),
+                    0.25,
+                ),
+            ),
+            source_signature_spectral_transient_attack_high_band_identity_weight=max(
+                0.0,
+                _coerce_float(
+                    merged.get("source_signature_spectral_transient_attack_high_band_identity_weight"),
+                    0.10,
+                ),
+            ),
+            transient_window_profile_enabled=_coerce_bool(
+                merged.get("transient_window_profile_enabled"),
+                True,
+            ),
+            transient_window_min_samples=max(
+                1,
+                int(_coerce_float(merged.get("transient_window_min_samples"), 6)),
+            ),
+            transient_window_attack_top_ratio=float(np.clip(
+                _coerce_float(merged.get("transient_window_attack_top_ratio"), 0.20),
+                0.05,
+                0.50,
+            )),
+            transient_window_attack_body_gap_db=max(
+                0.0,
+                _coerce_float(merged.get("transient_window_attack_body_gap_db"), 8.0),
+            ),
+            transient_window_high_band_lift_db=max(
+                0.0,
+                _coerce_float(merged.get("transient_window_high_band_lift_db"), 6.0),
+            ),
+            transient_window_min_repeated_hits=max(
+                1,
+                int(_coerce_float(merged.get("transient_window_min_repeated_hits"), 3)),
+            ),
+            transient_window_hit_body_std_max_db=max(
+                0.0,
+                _coerce_float(merged.get("transient_window_hit_body_std_max_db"), 3.0),
+            ),
+            transient_window_hit_gap_std_max_db=max(
+                0.0,
+                _coerce_float(merged.get("transient_window_hit_gap_std_max_db"), 4.0),
+            ),
+            transient_window_body_reference_enabled=_coerce_bool(
+                merged.get("transient_window_body_reference_enabled"),
+                True,
+            ),
+            transient_window_source_specific_body_band_profiles=_coerce_bool(
+                merged.get("transient_window_source_specific_body_band_profiles"),
+                True,
+            ),
+            transient_window_body_band_reference_enabled=_coerce_bool(
+                merged.get("transient_window_body_band_reference_enabled"),
+                True,
+            ),
+            transient_window_body_band_std_max_db=max(
+                0.0,
+                _coerce_float(merged.get("transient_window_body_band_std_max_db"), 3.0),
+            ),
         )
 
     def is_local_input(self, mixer_channel: Optional[int]) -> bool:
@@ -435,6 +1183,14 @@ class LocalInputGainProfile:
         if mode == "live":
             return self.soundcheck_max_boost_db if self.live_allow_boost else 0.0
         return self.soundcheck_max_boost_db if self.soundcheck_allow_boost else 0.0
+
+    def soundcheck_convergence_cap_for(self, personality: ChannelPersonalityProfile) -> float:
+        family = str(personality.family or "general")
+        if family in {"lead_vocal", "backing_vocal", "speech"}:
+            return float(self.soundcheck_convergence_vocal_max_boost_db)
+        if family == "playback":
+            return float(self.soundcheck_convergence_playback_max_boost_db)
+        return float(self.soundcheck_convergence_max_boost_db)
 
     def soundcheck_boost_thresholds(self, preset: str) -> Dict[str, Any]:
         personality = _channel_personality_for_preset(preset)
@@ -580,6 +1336,9 @@ class SignalStats:
     rms_values: List[float] = field(default_factory=list)
     peak_values: List[float] = field(default_factory=list)
     inactive_rms_values: List[float] = field(default_factory=list)
+    spectral_band_values: Dict[str, List[float]] = field(default_factory=dict)
+    active_window_samples: List[Dict[str, Any]] = field(default_factory=list)
+    active_sample_indices: List[int] = field(default_factory=list)
 
     noise_gate_threshold_db: float = -40.0
 
@@ -596,14 +1355,45 @@ class SignalStats:
     input_gain_character: Dict[str, Any] = field(default_factory=dict)
     safety_policy: Dict[str, Any] = field(default_factory=dict)
 
-    def update_sample(self, true_peak_db: float, lufs: float, sample_rms_db: float):
+    def update_sample(
+        self,
+        true_peak_db: float,
+        lufs: float,
+        sample_rms_db: float,
+        spectral_bands_db: Optional[Dict[str, float]] = None,
+    ):
         """Update stats with new sample measurement."""
         self.total_samples += 1
 
         if true_peak_db > self.noise_gate_threshold_db:
             self.active_samples += 1
+            self.active_sample_indices.append(int(self.total_samples))
             self.peak_values.append(true_peak_db)
             self.rms_values.append(lufs)
+            clean_spectral_bands: Dict[str, float] = {}
+            if isinstance(spectral_bands_db, dict):
+                canonical_band_values: Dict[str, List[float]] = {}
+                for band_name, band_db in spectral_bands_db.items():
+                    try:
+                        value = float(band_db)
+                    except (TypeError, ValueError):
+                        continue
+                    if not np.isfinite(value):
+                        continue
+                    key = _canonical_spectral_band_name(str(band_name))
+                    if not key:
+                        continue
+                    canonical_band_values.setdefault(key, []).append(value)
+                for key, values in canonical_band_values.items():
+                    value = float(np.mean(values))
+                    self.spectral_band_values.setdefault(key, []).append(value)
+                    clean_spectral_bands[key] = value
+            self.active_window_samples.append({
+                "sample_index": int(self.total_samples),
+                "peak_db": float(true_peak_db),
+                "lufs": float(lufs),
+                "spectral_bands_db": clean_spectral_bands,
+            })
 
             if true_peak_db > self.max_true_peak_db:
                 self.max_true_peak_db = true_peak_db
@@ -611,6 +1401,434 @@ class SignalStats:
             self.inactive_rms_values.append(sample_rms_db)
 
         self.signal_presence_ratio = self.active_samples / max(self.total_samples, 1)
+
+    def calculate_spectral_fingerprint(self) -> Dict[str, Any]:
+        """Summarize active-window band energy as a level-normalized source fingerprint."""
+        band_levels_db: Dict[str, float] = {}
+        band_sample_counts: Dict[str, int] = {}
+        band_std_db: Dict[str, float] = {}
+        band_span_db: Dict[str, float] = {}
+        active_sample_count = max(0, int(self.active_samples))
+        signal_lufs_std_db = float(np.std(self.rms_values)) if self.rms_values else 0.0
+        signal_peak_std_db = float(np.std(self.peak_values)) if self.peak_values else 0.0
+        for band_name, values in sorted(self.spectral_band_values.items()):
+            finite_values = [float(value) for value in values if np.isfinite(value)]
+            if not finite_values:
+                continue
+            band_levels_db[band_name] = float(np.median(finite_values))
+            band_sample_counts[band_name] = len(finite_values)
+            band_std_db[band_name] = float(np.std(finite_values))
+            band_span_db[band_name] = float(max(finite_values) - min(finite_values))
+
+        if not band_levels_db:
+            return {
+                "available": False,
+                "band_count": 0,
+                "bands_db": {},
+                "relative_bands_db": {},
+                "band_sample_counts": {},
+                "band_coverage_ratios": {},
+                "band_std_db": {},
+                "band_span_db": {},
+                "active_sample_count": active_sample_count,
+                "signal_lufs_std_db": signal_lufs_std_db,
+                "signal_peak_std_db": signal_peak_std_db,
+                "signal_variability_db": max(signal_lufs_std_db, signal_peak_std_db),
+                "reference_db": None,
+            }
+
+        reference_db = float(np.mean(list(band_levels_db.values())))
+        relative_bands_db = {
+            band_name: float(level_db - reference_db)
+            for band_name, level_db in band_levels_db.items()
+        }
+        band_coverage_ratios = {
+            band_name: float(sample_count / max(active_sample_count, 1))
+            for band_name, sample_count in band_sample_counts.items()
+        }
+        return {
+            "available": True,
+            "band_count": len(band_levels_db),
+            "bands_db": band_levels_db,
+            "relative_bands_db": relative_bands_db,
+            "band_sample_counts": band_sample_counts,
+            "band_coverage_ratios": band_coverage_ratios,
+            "band_std_db": band_std_db,
+            "band_span_db": band_span_db,
+            "active_sample_count": active_sample_count,
+            "signal_lufs_std_db": signal_lufs_std_db,
+            "signal_peak_std_db": signal_peak_std_db,
+            "signal_variability_db": max(signal_lufs_std_db, signal_peak_std_db),
+            "reference_db": reference_db,
+        }
+
+    def calculate_transient_window_profile(
+        self,
+        *,
+        enabled: bool,
+        min_samples: int,
+        attack_top_ratio: float,
+        attack_body_gap_db: float,
+        high_band_lift_db: float,
+        min_repeated_hits: int,
+        hit_body_std_max_db: float,
+        hit_gap_std_max_db: float,
+        body_band_reference_enabled: bool,
+        body_band_std_max_db: float,
+        body_band_profile: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Split active samples into attack/body windows for transient-source gain staging."""
+        samples = self.active_window_samples
+        sample_count = len(samples)
+        if not enabled:
+            return {"enabled": False, "active": False, "reason": "disabled"}
+        if sample_count < max(1, min_samples):
+            return {
+                "enabled": True,
+                "active": False,
+                "reason": "too_few_samples",
+                "sample_count": int(sample_count),
+                "min_samples": int(min_samples),
+            }
+
+        peaks = [float(sample["peak_db"]) for sample in samples]
+        attack_percentile = 100.0 * (1.0 - float(np.clip(attack_top_ratio, 0.05, 0.50)))
+        attack_threshold_db = float(np.percentile(peaks, attack_percentile))
+        attack_samples = [
+            sample
+            for sample in samples
+            if float(sample["peak_db"]) >= attack_threshold_db
+        ]
+        body_samples = [
+            sample
+            for sample in samples
+            if float(sample["peak_db"]) < attack_threshold_db
+        ]
+        if not body_samples:
+            body_samples = samples
+
+        attack_peaks = [float(sample["peak_db"]) for sample in attack_samples]
+        body_peaks = [float(sample["peak_db"]) for sample in body_samples]
+        attack_peak_p95_db = float(np.percentile(attack_peaks, 95)) if attack_peaks else float(max(peaks))
+        body_peak_median_db = float(np.median(body_peaks)) if body_peaks else float(np.median(peaks))
+        attack_body_gap = float(attack_peak_p95_db - body_peak_median_db)
+
+        high_band_tokens = ("presence", "air", "high", "upper", "sibilance", "cymbal")
+        body_band_profile = dict(body_band_profile or _GENERIC_TRANSIENT_BODY_BAND_PROFILE)
+        body_band_profile_name = str(body_band_profile.get("name") or "generic_low_body")
+        body_band_profile_applicable = _coerce_bool(body_band_profile.get("applicable"), True)
+        body_band_primary_tokens = tuple(
+            str(token).strip().lower()
+            for token in body_band_profile.get("primary_tokens", ())
+            if str(token).strip()
+        )
+        body_band_secondary_tokens = tuple(
+            str(token).strip().lower()
+            for token in body_band_profile.get("secondary_tokens", ())
+            if str(token).strip()
+        )
+        body_band_match_policy = str(
+            body_band_profile.get("match_policy")
+            or "primary_preferred_secondary_fallback"
+        )
+        effective_body_band_reference_enabled = bool(
+            body_band_reference_enabled
+            and body_band_profile_applicable
+            and (body_band_primary_tokens or body_band_secondary_tokens)
+        )
+
+        def _band_values(window_samples: List[Dict[str, Any]], tokens: tuple[str, ...]) -> List[float]:
+            values = []
+            for sample in window_samples:
+                spectral_bands = sample.get("spectral_bands_db")
+                if not isinstance(spectral_bands, dict):
+                    continue
+                high_values = [
+                    float(value)
+                    for band_name, value in spectral_bands.items()
+                    if any(token in str(band_name).lower() for token in tokens)
+                ]
+                if high_values:
+                    values.append(float(np.mean(high_values)))
+            return values
+
+        def _high_band_values(window_samples: List[Dict[str, Any]]) -> List[float]:
+            return _band_values(window_samples, high_band_tokens)
+
+        def _normalized_band_name(band_name: str) -> str:
+            chars = [
+                ch if ch.isalnum() else "_"
+                for ch in str(band_name).strip().lower()
+            ]
+            normalized = "".join(chars)
+            while "__" in normalized:
+                normalized = normalized.replace("__", "_")
+            return normalized.strip("_")
+
+        def _body_band_matches(band_name: str, tokens: tuple[str, ...]) -> bool:
+            normalized_name = _normalized_band_name(band_name)
+            compact_name = normalized_name.replace("_", "")
+            if not normalized_name:
+                return False
+            for token in tokens:
+                normalized_token = _normalized_band_name(token)
+                compact_token = normalized_token.replace("_", "")
+                if not normalized_token:
+                    continue
+                if normalized_name == normalized_token or compact_name == compact_token:
+                    return True
+                if normalized_name in {"low_mid", "lowmid"} and normalized_token == "low":
+                    continue
+                if normalized_token in normalized_name.split("_"):
+                    return True
+            return False
+
+        def _body_band_summary(window_samples: List[Dict[str, Any]]) -> Dict[str, Any]:
+            values = []
+            primary_match_count = 0
+            secondary_match_count = 0
+            primary_used = False
+            secondary_used = False
+            if not effective_body_band_reference_enabled:
+                return {
+                    "values": values,
+                    "primary_match_count": primary_match_count,
+                    "secondary_match_count": secondary_match_count,
+                    "source": "disabled",
+                }
+            for sample in window_samples:
+                spectral_bands = sample.get("spectral_bands_db")
+                if not isinstance(spectral_bands, dict):
+                    continue
+                primary_values = [
+                    float(value)
+                    for band_name, value in spectral_bands.items()
+                    if _body_band_matches(band_name, body_band_primary_tokens)
+                ]
+                secondary_values = [
+                    float(value)
+                    for band_name, value in spectral_bands.items()
+                    if _body_band_matches(band_name, body_band_secondary_tokens)
+                ]
+                primary_match_count += len(primary_values)
+                secondary_match_count += len(secondary_values)
+                if primary_values:
+                    values.append(float(np.mean(primary_values)))
+                    primary_used = True
+                elif secondary_values:
+                    values.append(float(np.mean(secondary_values)))
+                    secondary_used = True
+            source = "primary" if primary_used else "secondary_fallback" if secondary_used else "unavailable"
+            return {
+                "values": values,
+                "primary_match_count": primary_match_count,
+                "secondary_match_count": secondary_match_count,
+                "source": source,
+            }
+
+        attack_high_values = _high_band_values(attack_samples)
+        body_high_values = _high_band_values(body_samples)
+        high_band_available = bool(attack_high_values and body_high_values)
+        high_band_lift = (
+            float(np.median(attack_high_values) - np.median(body_high_values))
+            if high_band_available
+            else None
+        )
+        attack_dominant = attack_body_gap >= attack_body_gap_db
+        high_band_transient_dominant = bool(
+            high_band_lift is not None
+            and high_band_lift >= high_band_lift_db
+        )
+        attack_run_profiles: List[Dict[str, Any]] = []
+        in_attack_run = False
+        attack_run: List[Dict[str, Any]] = []
+        preceding_body_run: List[Dict[str, Any]] = []
+        body_run: List[Dict[str, Any]] = []
+        for sample in samples:
+            is_attack_sample = float(sample["peak_db"]) >= attack_threshold_db
+            if is_attack_sample:
+                if not in_attack_run:
+                    attack_run = []
+                    preceding_body_run = body_run
+                    body_run = []
+                    in_attack_run = True
+                attack_run.append(sample)
+            else:
+                if in_attack_run and attack_run:
+                    attack_peaks_for_run = [float(item["peak_db"]) for item in attack_run]
+                    body_peaks_for_run = [
+                        float(item["peak_db"])
+                        for item in preceding_body_run
+                    ]
+                    if body_peaks_for_run:
+                        hit_body_median_db = float(np.median(body_peaks_for_run))
+                        hit_attack_p95_db = float(np.percentile(attack_peaks_for_run, 95))
+                        body_band_summary_for_run = _body_band_summary(preceding_body_run)
+                        body_band_values_for_run = body_band_summary_for_run["values"]
+                        attack_run_profiles.append({
+                            "attack_sample_count": int(len(attack_run)),
+                            "body_sample_count": int(len(preceding_body_run)),
+                            "attack_peak_p95_db": hit_attack_p95_db,
+                            "body_peak_median_db": hit_body_median_db,
+                            "attack_body_gap_db": float(hit_attack_p95_db - hit_body_median_db),
+                            "body_band_median_db": (
+                                float(np.median(body_band_values_for_run))
+                                if body_band_values_for_run
+                                else None
+                            ),
+                            "body_band_source": body_band_summary_for_run["source"],
+                            "body_band_primary_match_count": int(
+                                body_band_summary_for_run["primary_match_count"]
+                            ),
+                            "body_band_secondary_match_count": int(
+                                body_band_summary_for_run["secondary_match_count"]
+                            ),
+                        })
+                    in_attack_run = False
+                    attack_run = []
+                    preceding_body_run = []
+                body_run.append(sample)
+        if in_attack_run and attack_run:
+            body_peaks_for_run = [float(item["peak_db"]) for item in preceding_body_run]
+            if body_peaks_for_run:
+                attack_peaks_for_run = [float(item["peak_db"]) for item in attack_run]
+                hit_body_median_db = float(np.median(body_peaks_for_run))
+                hit_attack_p95_db = float(np.percentile(attack_peaks_for_run, 95))
+                body_band_summary_for_run = _body_band_summary(preceding_body_run)
+                body_band_values_for_run = body_band_summary_for_run["values"]
+                attack_run_profiles.append({
+                    "attack_sample_count": int(len(attack_run)),
+                    "body_sample_count": int(len(preceding_body_run)),
+                    "attack_peak_p95_db": hit_attack_p95_db,
+                    "body_peak_median_db": hit_body_median_db,
+                    "attack_body_gap_db": float(hit_attack_p95_db - hit_body_median_db),
+                    "body_band_median_db": (
+                        float(np.median(body_band_values_for_run))
+                        if body_band_values_for_run
+                        else None
+                    ),
+                    "body_band_source": body_band_summary_for_run["source"],
+                    "body_band_primary_match_count": int(
+                        body_band_summary_for_run["primary_match_count"]
+                    ),
+                    "body_band_secondary_match_count": int(
+                        body_band_summary_for_run["secondary_match_count"]
+                    ),
+                })
+
+        hit_body_values = [profile["body_peak_median_db"] for profile in attack_run_profiles]
+        hit_gap_values = [profile["attack_body_gap_db"] for profile in attack_run_profiles]
+        hit_body_band_values = [
+            profile["body_band_median_db"]
+            for profile in attack_run_profiles
+            if profile.get("body_band_median_db") is not None
+        ]
+        hit_count = len(attack_run_profiles)
+        repeated_hit_evaluable = hit_count >= max(1, min_repeated_hits)
+        hit_body_std_db = float(np.std(hit_body_values)) if hit_body_values else 0.0
+        hit_gap_std_db = float(np.std(hit_gap_values)) if hit_gap_values else 0.0
+        body_band_reference_available = bool(
+            effective_body_band_reference_enabled
+            and len(hit_body_band_values) >= max(1, min_repeated_hits)
+        )
+        hit_body_band_std_db = float(np.std(hit_body_band_values)) if hit_body_band_values else 0.0
+        hit_body_band_median_db = (
+            float(np.median(hit_body_band_values))
+            if hit_body_band_values
+            else None
+        )
+        repeated_hit_body_band_stable = bool(
+            body_band_reference_available
+            and hit_body_band_std_db <= body_band_std_max_db
+        )
+        repeated_hit_body_band_unstable = bool(
+            body_band_reference_available
+            and hit_body_band_std_db > body_band_std_max_db
+        )
+        repeated_hit_body_stable = bool(
+            repeated_hit_evaluable
+            and hit_body_std_db <= hit_body_std_max_db
+        )
+        repeated_hit_gap_stable = bool(
+            repeated_hit_evaluable
+            and hit_gap_std_db <= hit_gap_std_max_db
+        )
+        repeated_hit_unstable = bool(
+            repeated_hit_evaluable
+            and not (
+                repeated_hit_body_stable
+                and repeated_hit_gap_stable
+                and not repeated_hit_body_band_unstable
+            )
+        )
+
+        return {
+            "enabled": True,
+            "active": True,
+            "reason": "ok",
+            "sample_count": int(sample_count),
+            "attack_sample_count": int(len(attack_samples)),
+            "body_sample_count": int(len(body_samples)),
+            "attack_top_ratio": float(attack_top_ratio),
+            "attack_threshold_db": float(attack_threshold_db),
+            "attack_peak_p95_db": float(attack_peak_p95_db),
+            "body_peak_median_db": float(body_peak_median_db),
+            "attack_body_gap_db": float(attack_body_gap),
+            "attack_body_gap_threshold_db": float(attack_body_gap_db),
+            "attack_dominant": bool(attack_dominant),
+            "high_band_available": bool(high_band_available),
+            "attack_high_band_median_db": (
+                float(np.median(attack_high_values))
+                if attack_high_values
+                else None
+            ),
+            "body_high_band_median_db": (
+                float(np.median(body_high_values))
+                if body_high_values
+                else None
+            ),
+            "high_band_lift_db": high_band_lift,
+            "high_band_lift_threshold_db": float(high_band_lift_db),
+            "high_band_transient_dominant": bool(high_band_transient_dominant),
+            "hit_profiles": attack_run_profiles,
+            "hit_count": int(hit_count),
+            "min_repeated_hits": int(min_repeated_hits),
+            "repeated_hit_evaluable": bool(repeated_hit_evaluable),
+            "hit_body_std_db": float(hit_body_std_db),
+            "hit_body_std_max_db": float(hit_body_std_max_db),
+            "hit_gap_std_db": float(hit_gap_std_db),
+            "hit_gap_std_max_db": float(hit_gap_std_max_db),
+            "body_band_reference_enabled": bool(body_band_reference_enabled),
+            "body_band_reference_applicable": bool(body_band_profile_applicable),
+            "body_band_profile": body_band_profile_name,
+            "body_band_primary_tokens": list(body_band_primary_tokens),
+            "body_band_secondary_tokens": list(body_band_secondary_tokens),
+            "body_band_match_policy": body_band_match_policy,
+            "body_band_reference_available": bool(body_band_reference_available),
+            "hit_body_band_median_db": hit_body_band_median_db,
+            "hit_body_band_std_db": float(hit_body_band_std_db),
+            "hit_body_band_std_max_db": float(body_band_std_max_db),
+            "body_band_reference": {
+                "enabled": bool(body_band_reference_enabled),
+                "applicable": bool(body_band_profile_applicable),
+                "available": bool(body_band_reference_available),
+                "confident": bool(repeated_hit_body_band_stable),
+                "profile": body_band_profile_name,
+                "primary_tokens": list(body_band_primary_tokens),
+                "secondary_tokens": list(body_band_secondary_tokens),
+                "match_policy": body_band_match_policy,
+                "hit_body_band_count": int(len(hit_body_band_values)),
+                "body_band_median_db": hit_body_band_median_db,
+                "hit_body_band_std_db": float(hit_body_band_std_db),
+                "hit_body_band_std_max_db": float(body_band_std_max_db),
+                "policy": "operator_review_evidence_only",
+            },
+            "repeated_hit_body_stable": bool(repeated_hit_body_stable),
+            "repeated_hit_gap_stable": bool(repeated_hit_gap_stable),
+            "repeated_hit_body_band_stable": bool(repeated_hit_body_band_stable),
+            "repeated_hit_body_band_unstable": bool(repeated_hit_body_band_unstable),
+            "repeated_hit_unstable": bool(repeated_hit_unstable),
+        }
 
     def calculate_integrated_lufs(self):
         """Calculate integrated LUFS from collected RMS values.
@@ -712,6 +1930,9 @@ class SignalStats:
         mixer_channel: Optional[int] = None,
         preset: str = "custom",
         previous_recommendation: Optional[Dict[str, Any]] = None,
+        analysis_timestamp_sec: Optional[float] = None,
+        analysis_window_sec: Optional[float] = None,
+        ensemble_context: Optional[Dict[str, Any]] = None,
     ):
         """Calculate the canonical autogain move for input trim.
 
@@ -723,6 +1944,17 @@ class SignalStats:
         profile = preamp_profile or LocalInputGainProfile()
         mode = "live" if str(mode).lower() == "live" else "soundcheck"
         current_trim = _coerce_float(current_trim_db, 0.0)
+        current_analysis_timestamp_sec = _coerce_float(
+            time.time() if analysis_timestamp_sec is None else analysis_timestamp_sec,
+            time.time(),
+        )
+        current_analysis_window_sec = max(
+            profile.decision_confidence_min_window_sec,
+            _coerce_float(
+                analysis_window_sec,
+                self.total_samples * profile.decision_confidence_default_sample_sec,
+            ),
+        )
         self.current_trim_db = current_trim
         self.target_peak_db = float(target_peak_db)
         self.target_trim_db = current_trim
@@ -783,6 +2015,41 @@ class SignalStats:
             if noise_floor_db is not None
             else None
         )
+        near_clip_threshold_db = float(max_peak_limit) - max(0.0, profile.predictive_clip_window_db)
+        near_clip_peak_density = (
+            sum(1 for peak in self.peak_values if peak >= near_clip_threshold_db) / len(self.peak_values)
+            if self.peak_values
+            else 0.0
+        )
+        trend_window_size = max(1, min(5, len(self.peak_values) // 3)) if self.peak_values else 0
+        if trend_window_size > 0:
+            first_peak_window = self.peak_values[:trend_window_size]
+            recent_peak_window = self.peak_values[-trend_window_size:]
+            peak_trend_db = float(np.percentile(recent_peak_window, 90) - np.percentile(first_peak_window, 90))
+        else:
+            peak_trend_db = 0.0
+        predicted_peak_db = float(self.max_true_peak_db + max(0.0, peak_trend_db))
+        predictive_clip_risk = (
+            self.max_true_peak_db <= max_peak_limit
+            and self.max_true_peak_db >= near_clip_threshold_db
+            and near_clip_peak_density >= profile.predictive_clip_density_threshold
+            and (
+                peak_trend_db >= profile.predictive_clip_min_rising_trend_db
+                or near_clip_peak_density >= profile.predictive_clip_sustained_density_threshold
+            )
+        )
+        predictive_clip_state = {
+            "active": bool(predictive_clip_risk),
+            "near_clip_threshold_db": float(near_clip_threshold_db),
+            "near_clip_peak_density": float(near_clip_peak_density),
+            "density_threshold": float(profile.predictive_clip_density_threshold),
+            "sustained_density_threshold": float(profile.predictive_clip_sustained_density_threshold),
+            "peak_trend_db": float(peak_trend_db),
+            "min_rising_trend_db": float(profile.predictive_clip_min_rising_trend_db),
+            "predicted_peak_db": float(predicted_peak_db),
+            "min_cut_db": float(profile.predictive_clip_min_cut_db),
+            "max_cut_db": float(profile.predictive_clip_max_cut_db),
+        }
         digital_clip_detected = self.max_true_peak_db >= profile.digital_clip_threshold_db
         preamp_saturation_detected = (
             bool(local_input)
@@ -802,6 +2069,8 @@ class SignalStats:
             overload_classification = "preamp_saturation_risk"
         elif vocal_scream_detected:
             overload_classification = "vocal_scream_or_shout"
+        elif predictive_clip_risk:
+            overload_classification = "predictive_clip_risk"
         elif isolated_peak_spread_db > boost_thresholds["max_peak_spread_db"]:
             overload_classification = "isolated_spike"
         overload_state = {
@@ -809,10 +2078,106 @@ class SignalStats:
             "digital_clip_detected": bool(digital_clip_detected),
             "preamp_saturation_detected": bool(preamp_saturation_detected),
             "vocal_scream_detected": bool(vocal_scream_detected),
+            "predictive_clip_detected": bool(predictive_clip_risk),
             "digital_clip_threshold_db": float(profile.digital_clip_threshold_db),
             "scream_peak_threshold_db": float(profile.scream_peak_threshold_db),
             "scream_lufs_threshold_db": float(profile.scream_lufs_threshold_db),
         }
+        transient_body_band_profile = (
+            _transient_body_band_profile_for_preset(preset, channel_personality.family)
+            if profile.transient_window_source_specific_body_band_profiles
+            else dict(_GENERIC_TRANSIENT_BODY_BAND_PROFILE)
+        )
+        transient_window_profile = self.calculate_transient_window_profile(
+            enabled=profile.transient_window_profile_enabled,
+            min_samples=profile.transient_window_min_samples,
+            attack_top_ratio=profile.transient_window_attack_top_ratio,
+            attack_body_gap_db=profile.transient_window_attack_body_gap_db,
+            high_band_lift_db=profile.transient_window_high_band_lift_db,
+            min_repeated_hits=profile.transient_window_min_repeated_hits,
+            hit_body_std_max_db=profile.transient_window_hit_body_std_max_db,
+            hit_gap_std_max_db=profile.transient_window_hit_gap_std_max_db,
+            body_band_reference_enabled=profile.transient_window_body_band_reference_enabled,
+            body_band_std_max_db=profile.transient_window_body_band_std_max_db,
+            body_band_profile=transient_body_band_profile,
+        )
+        body_reference_applicable = bool(channel_personality.family == "transient_percussion")
+        if (
+            profile.transient_window_body_reference_enabled
+            and body_reference_applicable
+        ):
+            hit_profiles = transient_window_profile.get("hit_profiles")
+            hit_body_values = [
+                _coerce_float(hit_profile.get("body_peak_median_db"), 0.0)
+                for hit_profile in hit_profiles
+                if isinstance(hit_profile, dict)
+                and hit_profile.get("body_peak_median_db") is not None
+            ] if isinstance(hit_profiles, list) else []
+            if hit_body_values:
+                body_reference_db = float(np.median(hit_body_values))
+                body_reference_raw_delta_db = float(self.target_peak_db - body_reference_db)
+                attack_headroom_cap_db = float(
+                    max_peak_limit - self.max_true_peak_db - max(0.0, profile.clip_safety_margin_db)
+                )
+                headroom_limited_delta_db = float(min(body_reference_raw_delta_db, attack_headroom_cap_db))
+                review_delta_db = float(min(
+                    max(0.0, headroom_limited_delta_db),
+                    max(0.0, profile.soundcheck_max_boost_db),
+                ))
+                body_band_reference = transient_window_profile.get("body_band_reference")
+                body_band_confident = (
+                    not profile.transient_window_body_band_reference_enabled
+                    or (
+                        isinstance(body_band_reference, dict)
+                        and body_band_reference.get("available")
+                        and body_band_reference.get("confident")
+                    )
+                )
+                body_reference_confident = bool(
+                    transient_window_profile.get("repeated_hit_evaluable")
+                    and transient_window_profile.get("repeated_hit_body_stable")
+                    and transient_window_profile.get("repeated_hit_gap_stable")
+                    and body_band_confident
+                    and attack_headroom_cap_db > 0.0
+                )
+                transient_window_profile["body_reference"] = {
+                    "enabled": True,
+                    "applicable": True,
+                    "available": True,
+                    "confident": bool(body_reference_confident),
+                    "body_peak_median_db": float(body_reference_db),
+                    "raw_delta_to_target_db": float(body_reference_raw_delta_db),
+                    "attack_headroom_cap_db": float(attack_headroom_cap_db),
+                    "headroom_limited_delta_db": float(headroom_limited_delta_db),
+                    "operator_review_delta_db": float(review_delta_db),
+                    "soundcheck_max_boost_db": float(profile.soundcheck_max_boost_db),
+                    "body_band_reference": (
+                        body_band_reference
+                        if isinstance(body_band_reference, dict)
+                        else None
+                    ),
+                    "policy": "operator_review_only",
+                }
+            else:
+                transient_window_profile["body_reference"] = {
+                    "enabled": True,
+                    "applicable": True,
+                    "available": False,
+                    "confident": False,
+                    "policy": "operator_review_only",
+                }
+        else:
+            if channel_personality.family in {"cymbal", "drum_image", "drum_room"}:
+                body_reference_policy = "image_or_cymbal_review_only"
+            else:
+                body_reference_policy = "not_applicable"
+            transient_window_profile["body_reference"] = {
+                "enabled": bool(profile.transient_window_body_reference_enabled),
+                "applicable": bool(body_reference_applicable),
+                "available": False,
+                "confident": False,
+                "policy": body_reference_policy,
+            }
         peak_error = self.target_peak_db - self.max_true_peak_db
         deadband = max(0.1, profile.target_deadband_db)
         desired_delta = 0.0
@@ -859,6 +2224,20 @@ class SignalStats:
             else:
                 desired_delta = peak_error
                 reason = "peak_headroom"
+        elif predictive_clip_risk:
+            predictive_target_db = float(max_peak_limit) - max(0.0, profile.clip_safety_margin_db)
+            predictive_delta = predictive_target_db - predicted_peak_db
+            if predictive_delta >= 0.0:
+                predictive_delta = -max(0.0, profile.predictive_clip_min_cut_db)
+            desired_delta = min(predictive_delta, -max(0.0, profile.predictive_clip_min_cut_db))
+            desired_delta = max(desired_delta, -max(0.0, profile.predictive_clip_max_cut_db))
+            reason = "predictive_clip_risk"
+        elif (
+            overload_classification == "isolated_spike"
+            and self.max_true_peak_db > self.target_peak_db + deadband
+        ):
+            desired_delta = 0.0
+            reason = "isolated_spike_hold"
         elif self.max_true_peak_db > self.target_peak_db + deadband:
             desired_delta = peak_error
             reason = "target_peak"
@@ -872,8 +2251,259 @@ class SignalStats:
             self.operator_note = "Live mode blocks input gain boosts; use fader or manual source check."
             desired_delta = 0.0
 
+        raw_desired_delta = float(desired_delta)
+        base_max_boost = max(0.0, profile.max_boost_for_mode(mode))
+        clean_range_remaining_db = (
+            max(0.0, profile.clean_gain_max_db - current_trim)
+            if profile.enabled and local_input
+            else None
+        )
+        ensemble_context = ensemble_context if isinstance(ensemble_context, dict) else {}
+        ensemble_other_active_sources = int(_coerce_float(
+            ensemble_context.get("other_active_sources"),
+            0.0,
+        ))
+        ensemble_other_loud_sources = int(_coerce_float(
+            ensemble_context.get("other_loud_sources"),
+            ensemble_other_active_sources,
+        ))
+        ensemble_reference_peak_db = (
+            _coerce_float(ensemble_context.get("reference_peak_db"), 0.0)
+            if ensemble_context.get("reference_peak_db") is not None
+            else None
+        )
+        ensemble_reference_lufs = (
+            _coerce_float(ensemble_context.get("reference_lufs"), 0.0)
+            if ensemble_context.get("reference_lufs") is not None
+            else None
+        )
+
+        def _optional_ensemble_int(key: str) -> Optional[int]:
+            value = ensemble_context.get(key)
+            if value is None:
+                return None
+            return int(_coerce_float(value, 0.0))
+
+        ensemble_time_coherence_enabled = bool(profile.soundcheck_ensemble_time_coherence_enabled)
+        ensemble_time_coherence_evaluable = bool(
+            _coerce_bool(ensemble_context.get("time_coherence_evaluable"), False)
+            if ensemble_context
+            else False
+        )
+        ensemble_time_coherent_loud_sources = int(_coerce_float(
+            ensemble_context.get("time_coherent_loud_sources"),
+            ensemble_other_loud_sources if not ensemble_time_coherence_enabled else 0.0,
+        ))
+        ensemble_required_time_coherent_sources = max(1, int(_coerce_float(
+            ensemble_context.get("required_time_coherent_sources"),
+            profile.soundcheck_ensemble_min_other_active_sources,
+        )))
+        explicit_time_coherent = ensemble_context.get("time_coherent")
+        if not ensemble_time_coherence_enabled:
+            ensemble_time_coherent = True
+        elif explicit_time_coherent is not None:
+            ensemble_time_coherent = bool(_coerce_bool(explicit_time_coherent, False))
+        else:
+            ensemble_time_coherent = bool(
+                ensemble_time_coherence_evaluable
+                and ensemble_time_coherent_loud_sources >= ensemble_required_time_coherent_sources
+            )
+        ensemble_context_lag_limit_samples = max(0, int(_coerce_float(
+            ensemble_context.get("max_context_lag_samples"),
+            profile.soundcheck_ensemble_max_context_lag_samples,
+        )))
+        ensemble_peak_gap_db = (
+            float(ensemble_reference_peak_db - self.max_true_peak_db)
+            if ensemble_reference_peak_db is not None
+            else None
+        )
+        ensemble_lufs_gap_db = (
+            float(ensemble_reference_lufs - self.integrated_lufs)
+            if ensemble_reference_lufs is not None
+            else None
+        )
+        ensemble_vocal_family = channel_personality.family in {"lead_vocal", "backing_vocal", "speech"}
+        ensemble_reference_loud_enough = bool(
+            ensemble_reference_peak_db is not None
+            and ensemble_reference_lufs is not None
+            and ensemble_reference_peak_db >= profile.soundcheck_ensemble_min_reference_peak_db
+            and ensemble_reference_lufs >= profile.soundcheck_ensemble_min_reference_lufs
+        )
+        ensemble_gap_supports_gain_up = bool(
+            ensemble_peak_gap_db is not None
+            and ensemble_peak_gap_db >= profile.soundcheck_ensemble_vocal_under_peak_gap_db
+            and (
+                (
+                    ensemble_lufs_gap_db is not None
+                    and ensemble_lufs_gap_db >= profile.soundcheck_ensemble_vocal_under_lufs_gap_db
+                )
+                or self.crest_factor_db >= profile.soundcheck_ensemble_vocal_min_crest_db
+            )
+        )
+        soundcheck_ensemble_context_state = {
+            "enabled": bool(profile.soundcheck_ensemble_context_enabled),
+            "provided": bool(ensemble_context),
+            "active": False,
+            "reason": None,
+            "source_family": channel_personality.family,
+            "family_applicable": bool(ensemble_vocal_family),
+            "other_active_sources": int(ensemble_other_active_sources),
+            "other_loud_sources": int(ensemble_other_loud_sources),
+            "min_other_active_sources": int(profile.soundcheck_ensemble_min_other_active_sources),
+            "reference_peak_db": (
+                float(ensemble_reference_peak_db)
+                if ensemble_reference_peak_db is not None
+                else None
+            ),
+            "reference_lufs": (
+                float(ensemble_reference_lufs)
+                if ensemble_reference_lufs is not None
+                else None
+            ),
+            "min_reference_peak_db": float(profile.soundcheck_ensemble_min_reference_peak_db),
+            "min_reference_lufs": float(profile.soundcheck_ensemble_min_reference_lufs),
+            "vocal_peak_gap_db": (
+                float(ensemble_peak_gap_db)
+                if ensemble_peak_gap_db is not None
+                else None
+            ),
+            "vocal_lufs_gap_db": (
+                float(ensemble_lufs_gap_db)
+                if ensemble_lufs_gap_db is not None
+                else None
+            ),
+            "required_peak_gap_db": float(profile.soundcheck_ensemble_vocal_under_peak_gap_db),
+            "required_lufs_gap_db": float(profile.soundcheck_ensemble_vocal_under_lufs_gap_db),
+            "vocal_crest_factor_db": float(self.crest_factor_db),
+            "required_vocal_min_crest_db": float(profile.soundcheck_ensemble_vocal_min_crest_db),
+            "reference_loud_enough": bool(ensemble_reference_loud_enough),
+            "gap_supports_gain_up": bool(ensemble_gap_supports_gain_up),
+            "max_boost_db": float(profile.soundcheck_ensemble_max_boost_db),
+            "gain_up_step_db": float(profile.soundcheck_ensemble_gain_up_step_db),
+            "confidence_bonus": float(profile.soundcheck_ensemble_confidence_bonus),
+            "time_coherence_enabled": bool(ensemble_time_coherence_enabled),
+            "time_coherence_evaluable": bool(ensemble_time_coherence_evaluable),
+            "time_coherent": bool(ensemble_time_coherent),
+            "time_coherent_loud_sources": int(ensemble_time_coherent_loud_sources),
+            "required_time_coherent_sources": int(ensemble_required_time_coherent_sources),
+            "max_context_lag_samples": int(ensemble_context_lag_limit_samples),
+            "target_first_active_sample_index": _optional_ensemble_int("target_first_active_sample_index"),
+            "target_last_active_sample_index": _optional_ensemble_int("target_last_active_sample_index"),
+            "reference_latest_active_sample_index": _optional_ensemble_int("reference_latest_active_sample_index"),
+            "reference_max_lag_samples": _optional_ensemble_int("reference_max_lag_samples"),
+            "operator_review_only": True,
+        }
+        if not ensemble_context:
+            soundcheck_ensemble_context_state["reason"] = "missing_ensemble_context"
+        elif not ensemble_vocal_family:
+            soundcheck_ensemble_context_state["reason"] = "non_vocal_source"
+        elif ensemble_other_loud_sources < profile.soundcheck_ensemble_min_other_active_sources:
+            soundcheck_ensemble_context_state["reason"] = "insufficient_loud_ensemble_sources"
+        elif ensemble_time_coherence_enabled and not ensemble_time_coherence_evaluable:
+            soundcheck_ensemble_context_state["reason"] = "ensemble_time_context_missing"
+        elif ensemble_time_coherence_enabled and not ensemble_time_coherent:
+            soundcheck_ensemble_context_state["reason"] = "ensemble_time_context_stale"
+        elif not ensemble_reference_loud_enough:
+            soundcheck_ensemble_context_state["reason"] = "ensemble_reference_not_loud_enough"
+        elif not ensemble_gap_supports_gain_up:
+            soundcheck_ensemble_context_state["reason"] = "vocal_not_understaged_vs_ensemble"
+        elif raw_desired_delta <= 0.0:
+            soundcheck_ensemble_context_state["reason"] = "no_gain_up_candidate"
+        elif mode != "soundcheck":
+            soundcheck_ensemble_context_state["reason"] = "not_soundcheck"
+        elif not profile.soundcheck_ensemble_context_enabled:
+            soundcheck_ensemble_context_state["reason"] = "disabled"
+        else:
+            soundcheck_ensemble_context_state.update({
+                "active": True,
+                "reason": "ensemble_context_vocal_understaged",
+            })
+        soundcheck_convergence_gap_db = max(0.0, raw_desired_delta)
+        soundcheck_convergence_family_cap = (
+            max(0.0, profile.soundcheck_convergence_cap_for(channel_personality))
+            if profile.soundcheck_convergence_enabled
+            else 0.0
+        )
+        soundcheck_ensemble_boost_cap = (
+            max(0.0, min(
+                profile.soundcheck_ensemble_max_boost_db,
+                profile.soundcheck_convergence_cap_for(channel_personality),
+            ))
+            if soundcheck_ensemble_context_state.get("active")
+            else 0.0
+        )
+        soundcheck_convergence_state = {
+            "enabled": bool(profile.soundcheck_convergence_enabled),
+            "active": False,
+            "reason": None,
+            "mode": mode,
+            "source_family": channel_personality.family,
+            "source_policy": channel_personality.boost_policy,
+            "requested_delta_db": float(soundcheck_convergence_gap_db),
+            "large_gap_threshold_db": float(profile.soundcheck_convergence_large_gap_db),
+            "base_max_boost_db": float(base_max_boost),
+            "family_cap_db": float(soundcheck_convergence_family_cap),
+            "effective_max_boost_db": float(base_max_boost),
+            "clean_range_remaining_db": (
+                float(clean_range_remaining_db)
+                if clean_range_remaining_db is not None
+                else None
+            ),
+            "setup_check_threshold_db": float(profile.soundcheck_convergence_setup_check_db),
+            "setup_check_required": False,
+            "setup_check_reason": None,
+            "ensemble_assisted": bool(soundcheck_ensemble_context_state.get("active")),
+            "ensemble_boost_cap_db": float(soundcheck_ensemble_boost_cap),
+            "operator_review_only": True,
+        }
+        if (
+            mode == "soundcheck"
+            and profile.soundcheck_convergence_enabled
+            and soundcheck_convergence_gap_db > 0.0
+        ):
+            setup_check_reasons = []
+            if soundcheck_convergence_gap_db >= profile.soundcheck_convergence_setup_check_db:
+                setup_check_reasons.append("requested_gain_exceeds_setup_check_threshold")
+            if (
+                soundcheck_convergence_gap_db >= profile.soundcheck_convergence_large_gap_db
+                and clean_range_remaining_db is not None
+                and soundcheck_convergence_gap_db > clean_range_remaining_db
+            ):
+                setup_check_reasons.append("requested_gain_exceeds_clean_range")
+            if setup_check_reasons:
+                soundcheck_convergence_state.update({
+                    "setup_check_required": True,
+                    "setup_check_reason": setup_check_reasons[0],
+                    "setup_check_reasons": setup_check_reasons,
+                })
+            if (
+                soundcheck_convergence_gap_db >= profile.soundcheck_convergence_large_gap_db
+                and channel_personality.boost_policy != "operator_review"
+                and soundcheck_convergence_family_cap > base_max_boost
+            ):
+                base_max_boost = soundcheck_convergence_family_cap
+                soundcheck_convergence_state.update({
+                    "active": True,
+                    "reason": "large_soundcheck_gain_gap",
+                    "effective_max_boost_db": float(base_max_boost),
+                })
+            if (
+                soundcheck_ensemble_context_state.get("active")
+                and channel_personality.boost_policy != "operator_review"
+                and soundcheck_ensemble_boost_cap > base_max_boost
+            ):
+                base_max_boost = soundcheck_ensemble_boost_cap
+                soundcheck_convergence_state.update({
+                    "active": True,
+                    "reason": (
+                        soundcheck_convergence_state.get("reason")
+                        or "ensemble_context_vocal_understaged"
+                    ),
+                    "effective_max_boost_db": float(base_max_boost),
+                })
+
         max_cut = max(0.0, profile.max_cut_for_mode(mode))
-        max_boost = max(0.0, profile.max_boost_for_mode(mode))
+        max_boost = max(0.0, base_max_boost)
         if desired_delta < 0.0:
             desired_delta = max(desired_delta, -max_cut)
         elif desired_delta > 0.0:
@@ -882,6 +2512,7 @@ class SignalStats:
                 self.gain_limited_by = "boost_disabled"
                 self.operator_action = "operator_review"
                 self.operator_note = "Configured preamp profile blocks automatic gain boosts."
+        soundcheck_convergence_state["post_mode_cap_delta_db"] = float(desired_delta)
 
         if desired_delta > 0.0 and mode == "soundcheck":
             guard_reason, guard_note, guard_evidence = profile.soundcheck_boost_guard(
@@ -902,6 +2533,7 @@ class SignalStats:
                 self.operator_action = "operator_review"
                 self.operator_note = guard_note
                 desired_delta = 0.0
+        soundcheck_convergence_state["post_boost_guard_delta_db"] = float(desired_delta)
 
         target_trim = current_trim + desired_delta
         target_trim = max(profile.min_gain_db, min(profile.hard_max_gain_db, target_trim))
@@ -930,12 +2562,17 @@ class SignalStats:
                 self.operator_note = (
                     "Local gain is already above the clean range; do not auto-boost into preamp drive."
                 )
+        soundcheck_convergence_state["post_clean_range_delta_db"] = float(desired_delta)
 
         previous_delta = None
+        previous_character: Dict[str, Any] = {}
         if isinstance(previous_recommendation, dict):
             raw_previous_delta = previous_recommendation.get("suggested_gain_db")
             if raw_previous_delta is not None:
                 previous_delta = _coerce_float(raw_previous_delta, 0.0)
+            raw_previous_character = previous_recommendation.get("input_gain_character")
+            if isinstance(raw_previous_character, dict):
+                previous_character = raw_previous_character
 
         previous_direction = _gain_direction(previous_delta)
         current_direction = _gain_direction(desired_delta)
@@ -965,10 +2602,8 @@ class SignalStats:
         candidate_delta = desired_delta
         candidate_direction = _gain_direction(candidate_delta)
         previous_stability = {}
-        if isinstance(previous_recommendation, dict):
-            previous_character = previous_recommendation.get("input_gain_character")
-            if isinstance(previous_character, dict):
-                previous_stability = previous_character.get("stability") or {}
+        if isinstance(previous_character, dict):
+            previous_stability = previous_character.get("stability") or {}
         previous_candidate_direction = (
             str(previous_stability.get("candidate_direction") or previous_direction)
             if isinstance(previous_stability, dict)
@@ -1044,6 +2679,1446 @@ class SignalStats:
         elif self.crest_factor_db <= 8.0 and lufs_std_db <= 3.0 and peak_std_db <= 3.0:
             source_behavior = "compressed_stable"
 
+        previous_trend_memory = previous_character.get("trend_memory") if isinstance(previous_character, dict) else {}
+        if not isinstance(previous_trend_memory, dict):
+            previous_trend_memory = {}
+        previous_behavior = (
+            previous_character.get("source_behavior")
+            if isinstance(previous_character, dict)
+            else None
+        )
+        previous_behavior_history = previous_trend_memory.get("behavior_history") or []
+        if not isinstance(previous_behavior_history, list):
+            previous_behavior_history = []
+        memory_limit = max(1, int(profile.trend_memory_max_windows))
+        behavior_history = [str(item) for item in previous_behavior_history[-(memory_limit - 1):]]
+        behavior_history.append(source_behavior)
+        previous_predictive_clip_windows = max(
+            0,
+            int(_coerce_float(previous_trend_memory.get("predictive_clip_windows"), 0.0)),
+        )
+        predictive_clip_windows = (
+            previous_predictive_clip_windows + 1
+            if predictive_clip_risk
+            else 0
+        )
+        behavior_flip = bool(previous_behavior and previous_behavior != source_behavior)
+        spectral_fingerprint = self.calculate_spectral_fingerprint()
+        vocal_family = channel_personality.family in {"lead_vocal", "backing_vocal", "speech"}
+        previous_vocal_scream_cooldown_windows = max(
+            0,
+            int(_coerce_float(previous_trend_memory.get("vocal_scream_cooldown_windows"), 0.0)),
+        )
+        vocal_scream_cooldown_windows = (
+            int(profile.vocal_gain_up_scream_cooldown_windows)
+            if vocal_scream_detected
+            else max(0, previous_vocal_scream_cooldown_windows - 1)
+        )
+
+        def _vocal_presence_band_state(band_name: str) -> Optional[Dict[str, Any]]:
+            band_counts = spectral_fingerprint.get("band_sample_counts")
+            band_std_values = spectral_fingerprint.get("band_std_db")
+            band_span_values = spectral_fingerprint.get("band_span_db")
+            if not isinstance(band_counts, dict) or band_name not in band_counts:
+                return None
+            band_count = int(_coerce_float(band_counts.get(band_name), 0.0))
+            band_std_db = (
+                _coerce_float(band_std_values.get(band_name), 0.0)
+                if isinstance(band_std_values, dict)
+                else 0.0
+            )
+            band_span_db = (
+                _coerce_float(band_span_values.get(band_name), 0.0)
+                if isinstance(band_span_values, dict)
+                else 0.0
+            )
+            stable = bool(
+                band_std_db <= profile.vocal_gain_up_presence_max_std_db
+                and band_span_db <= profile.vocal_gain_up_presence_max_span_db
+            )
+            return {
+                "samples": int(band_count),
+                "std_db": float(band_std_db),
+                "span_db": float(band_span_db),
+                "max_std_db": float(profile.vocal_gain_up_presence_max_std_db),
+                "max_span_db": float(profile.vocal_gain_up_presence_max_span_db),
+                "stable": bool(stable),
+            }
+
+        vocal_presence_bands = {
+            band_name: band_state
+            for band_name in ("presence", "air")
+            if (band_state := _vocal_presence_band_state(band_name)) is not None
+        }
+        vocal_presence_available = bool(
+            len(vocal_presence_bands) >= profile.vocal_gain_up_presence_min_bands
+        )
+        vocal_presence_unstable = bool(
+            vocal_presence_available
+            and any(not band_state["stable"] for band_state in vocal_presence_bands.values())
+        )
+        vocal_scream_history_active = bool(
+            vocal_family
+            and vocal_scream_cooldown_windows > 0
+            and not vocal_scream_detected
+        )
+        vocal_gain_up_guard_state = {
+            "enabled": bool(profile.vocal_gain_up_guard_enabled),
+            "family_applicable": bool(vocal_family),
+            "presence_min_bands": int(profile.vocal_gain_up_presence_min_bands),
+            "presence_available": bool(vocal_presence_available),
+            "presence_bands": vocal_presence_bands,
+            "presence_unstable": bool(vocal_presence_unstable),
+            "scream_detected": bool(vocal_scream_detected),
+            "previous_scream_cooldown_windows": int(previous_vocal_scream_cooldown_windows),
+            "scream_cooldown_windows": int(vocal_scream_cooldown_windows),
+            "scream_history_active": bool(vocal_scream_history_active),
+            "active": False,
+            "reason": None,
+        }
+        if profile.vocal_gain_up_guard_enabled and vocal_family:
+            if vocal_scream_history_active:
+                vocal_gain_up_guard_state.update({
+                    "active": True,
+                    "reason": "recent_vocal_scream_or_shout",
+                })
+            elif vocal_presence_unstable:
+                vocal_gain_up_guard_state.update({
+                    "active": True,
+                    "reason": "unstable_vocal_presence_band",
+                })
+        source_signature = {
+            "family": channel_personality.family,
+            "behavior": source_behavior,
+            "crest_db": float(self.crest_factor_db),
+            "crest_bucket_db": _bucket_db(self.crest_factor_db, 3.0),
+            "integrated_lufs_db": float(self.integrated_lufs),
+            "integrated_lufs_bucket_db": _bucket_db(self.integrated_lufs, 6.0),
+            "peak_lufs_gap_db": float(self.max_true_peak_db - self.integrated_lufs),
+            "peak_lufs_gap_bucket_db": _bucket_db(self.max_true_peak_db - self.integrated_lufs, 3.0),
+            "noise_margin_db": float(noise_floor_margin_db) if noise_floor_margin_db is not None else None,
+            "noise_margin_bucket_db": _bucket_db(noise_floor_margin_db, 6.0),
+            "spectral_fingerprint": spectral_fingerprint,
+        }
+        previous_source_signature = previous_trend_memory.get("source_signature")
+        if not isinstance(previous_source_signature, dict):
+            previous_source_signature = {}
+        signature_compare_fields = [
+            "family",
+            "crest_bucket_db",
+            "integrated_lufs_bucket_db",
+            "peak_lufs_gap_bucket_db",
+            "noise_margin_bucket_db",
+        ]
+        source_signature_changed_fields = [
+            field_name
+            for field_name in signature_compare_fields
+            if (
+                previous_source_signature.get(field_name) is not None
+                and source_signature.get(field_name) is not None
+                and previous_source_signature.get(field_name) != source_signature.get(field_name)
+            )
+        ]
+        source_family_changed = bool(
+            previous_source_signature.get("family") is not None
+            and previous_source_signature.get("family") != source_signature["family"]
+        )
+        source_identity_changed = bool(
+            previous_source_signature
+            and (
+                source_family_changed
+                or len(source_signature_changed_fields) >= profile.source_signature_change_min_fields
+            )
+        )
+        trend_memory_state = {
+            "behavior_history": behavior_history,
+            "previous_source_behavior": previous_behavior,
+            "current_source_behavior": source_behavior,
+            "behavior_flip": behavior_flip,
+            "source_signature": source_signature,
+            "previous_source_signature": previous_source_signature or None,
+            "source_identity_changed": source_identity_changed,
+            "source_family_changed": source_family_changed,
+            "source_signature_changed_fields": source_signature_changed_fields,
+            "source_signature_change_min_fields": int(profile.source_signature_change_min_fields),
+            "predictive_clip_windows": int(predictive_clip_windows),
+            "vocal_scream_cooldown_windows": int(vocal_scream_cooldown_windows),
+            "vocal_gain_up_guard": vocal_gain_up_guard_state,
+            "near_clip_peak_density": float(near_clip_peak_density),
+            "peak_trend_db": float(peak_trend_db),
+            "noise_floor_margin_db": (
+                float(noise_floor_margin_db)
+                if noise_floor_margin_db is not None
+                else None
+            ),
+        }
+        if (
+            profile.behavior_flip_gain_up_hold
+            and behavior_flip
+            and candidate_direction == "up"
+            and desired_delta > 0.0
+            and mode == "soundcheck"
+        ):
+            desired_delta = 0.0
+            target_trim = current_trim
+            self.gain_limited_by = "behavior_change_stability_wait"
+            self.operator_action = "operator_review"
+            self.operator_note = (
+                "Soundcheck boost held: source behavior changed between analysis windows."
+            )
+            stability_state.update({
+                "active": True,
+                "reason": "waiting_for_consistent_source_behavior",
+            })
+        if (
+            profile.source_signature_change_hold_enabled
+            and source_identity_changed
+            and candidate_direction == "up"
+            and desired_delta > 0.0
+            and mode == "soundcheck"
+        ):
+            desired_delta = 0.0
+            target_trim = current_trim
+            self.gain_limited_by = "source_identity_change_wait"
+            self.operator_action = "operator_review"
+            self.operator_note = (
+                "Soundcheck boost held: source signature changed between analysis windows."
+            )
+            stability_state.update({
+                "active": True,
+                "reason": "waiting_for_source_identity_confirmation",
+            })
+
+        previous_channel_profile = previous_character.get("channel_profile") if isinstance(previous_character, dict) else {}
+        if not isinstance(previous_channel_profile, dict):
+            previous_channel_profile = {}
+        previous_profile_lifecycle = (
+            previous_character.get("profile_lifecycle")
+            if isinstance(previous_character, dict)
+            else {}
+        )
+        if not isinstance(previous_profile_lifecycle, dict):
+            previous_profile_lifecycle = {}
+        requested_lifecycle_action = str(previous_profile_lifecycle.get("action") or "none").strip().lower()
+        if requested_lifecycle_action not in {"none", "reset", "lock", "unlock", "decay"}:
+            requested_lifecycle_action = "none"
+        lifecycle_reason = previous_profile_lifecycle.get("reason")
+        if lifecycle_reason is not None:
+            lifecycle_reason = str(lifecycle_reason)
+        profile_locked = _coerce_bool(previous_profile_lifecycle.get("profile_locked"), False)
+        if "locked" in previous_profile_lifecycle:
+            profile_locked = _coerce_bool(previous_profile_lifecycle.get("locked"), profile_locked)
+        raw_previous_profile_windows = min(
+            max(0, int(_coerce_float(previous_channel_profile.get("windows"), 0.0))),
+            max(0, int(profile.channel_profile_max_windows) - 1),
+        )
+        original_previous_profile_windows = raw_previous_profile_windows
+        applied_lifecycle_action = "none"
+        lifecycle_decay_factor = float(np.clip(
+            _coerce_float(
+                previous_profile_lifecycle.get("decay_factor"),
+                profile.channel_profile_default_decay_factor,
+            ),
+            profile.channel_profile_min_decay_factor,
+            1.0,
+        ))
+        if profile.channel_profile_lifecycle_enabled:
+            if requested_lifecycle_action == "reset":
+                previous_channel_profile = {}
+                raw_previous_profile_windows = 0
+                profile_locked = False
+                lifecycle_decay_factor = 0.0
+                applied_lifecycle_action = "reset"
+            elif requested_lifecycle_action == "lock":
+                profile_locked = True
+                applied_lifecycle_action = "lock"
+            elif requested_lifecycle_action == "unlock":
+                profile_locked = False
+                applied_lifecycle_action = "unlock"
+            elif requested_lifecycle_action == "decay":
+                raw_previous_profile_windows = int(round(raw_previous_profile_windows * lifecycle_decay_factor))
+                applied_lifecycle_action = "decay"
+        else:
+            requested_lifecycle_action = "none"
+            profile_locked = False
+        previous_profile_windows = min(
+            raw_previous_profile_windows,
+            max(0, int(profile.channel_profile_max_windows) - 1),
+        )
+        profile_lifecycle_state = {
+            "enabled": bool(profile.channel_profile_lifecycle_enabled),
+            "requested_action": requested_lifecycle_action,
+            "applied_action": applied_lifecycle_action,
+            "reason": lifecycle_reason,
+            "profile_locked": bool(profile_locked),
+            "decay_factor": float(lifecycle_decay_factor),
+            "previous_windows": int(original_previous_profile_windows),
+            "retained_windows": int(previous_profile_windows),
+        }
+        risky_behaviors = {
+            "sparse_source",
+            "isolated_peak_source",
+            "transient_dominant",
+            "unstable_dynamic",
+            "low_noise_margin",
+            "operator_review_source",
+        }
+        live_freezes_gain_up_profile = bool(mode == "live" and profile.live_freeze_gain_up_profile)
+        gain_up_profile_frozen = bool(live_freezes_gain_up_profile or profile_locked)
+        current_unstable_ratio = 1.0 if source_behavior in risky_behaviors else 0.0
+        previous_noise_margin_min = (
+            previous_channel_profile.get("noise_margin_min_db")
+            if previous_profile_windows > 0
+            else None
+        )
+        if gain_up_profile_frozen:
+            crest_avg_db = previous_channel_profile.get("crest_avg_db")
+            lufs_std_avg_db = previous_channel_profile.get("lufs_std_avg_db")
+            near_clip_density_avg = previous_channel_profile.get("near_clip_density_avg")
+            unstable_behavior_ratio = _coerce_float(
+                previous_channel_profile.get("unstable_behavior_ratio"),
+                0.0,
+            )
+            noise_margin_min_db = (
+                float(previous_noise_margin_min)
+                if previous_noise_margin_min is not None
+                else None
+            )
+            channel_profile_windows = previous_profile_windows
+        else:
+            crest_avg_db = _rolling_average(
+                previous_channel_profile.get("crest_avg_db"),
+                self.crest_factor_db,
+                previous_profile_windows,
+            )
+            lufs_std_avg_db = _rolling_average(
+                previous_channel_profile.get("lufs_std_avg_db"),
+                lufs_std_db,
+                previous_profile_windows,
+            )
+            near_clip_density_avg = _rolling_average(
+                previous_channel_profile.get("near_clip_density_avg"),
+                near_clip_peak_density,
+                previous_profile_windows,
+            )
+            unstable_behavior_ratio = _rolling_average(
+                previous_channel_profile.get("unstable_behavior_ratio"),
+                current_unstable_ratio,
+                previous_profile_windows,
+            ) or 0.0
+            if noise_floor_margin_db is None:
+                noise_margin_min_db = (
+                    float(previous_noise_margin_min)
+                    if previous_noise_margin_min is not None
+                    else None
+                )
+            elif previous_noise_margin_min is None:
+                noise_margin_min_db = float(noise_floor_margin_db)
+            else:
+                noise_margin_min_db = min(float(previous_noise_margin_min), float(noise_floor_margin_db))
+            channel_profile_windows = min(previous_profile_windows + 1, int(profile.channel_profile_max_windows))
+        if gain_up_profile_frozen and noise_floor_margin_db is None:
+            noise_margin_min_db = (
+                float(previous_noise_margin_min)
+                if previous_noise_margin_min is not None
+                else None
+            )
+        current_live_risk = bool(
+            mode == "live"
+            and (
+                predictive_clip_risk
+                or candidate_direction == "down"
+                or overload_classification != "normal"
+                or self.max_true_peak_db > self.target_peak_db + deadband
+            )
+        )
+        previous_live_risk_windows = max(
+            0,
+            int(_coerce_float(previous_channel_profile.get("live_risk_windows"), 0.0)),
+        )
+        previous_live_overload_events = max(
+            0,
+            int(_coerce_float(previous_channel_profile.get("live_overload_events"), 0.0)),
+        )
+        previous_live_peak_density_max = _coerce_float(
+            previous_channel_profile.get("live_peak_density_max"),
+            0.0,
+        )
+        live_risk_windows = previous_live_risk_windows + (1 if current_live_risk else 0)
+        live_overload_events = previous_live_overload_events + (
+            1 if mode == "live" and overload_classification != "normal" else 0
+        )
+        live_peak_density_max = max(
+            previous_live_peak_density_max,
+            near_clip_peak_density if mode == "live" else 0.0,
+        )
+        previous_recovery_windows = (
+            max(0, int(_coerce_float(previous_channel_profile.get("recovery_windows"), 0.0)))
+            if previous_profile_windows > 0
+            else 0
+        )
+        recovery_policy_family = channel_personality.family
+        recovery_allowed = bool(profile.channel_profile_recovery_enabled)
+        recovery_required_windows = int(profile.channel_profile_recovery_min_windows)
+        recovery_max_lufs_std_db = float(profile.channel_profile_recovery_max_lufs_std_db)
+        recovery_max_peak_std_db = float(profile.channel_profile_recovery_max_peak_std_db)
+        recovery_max_crest_db = float(profile.channel_profile_recovery_max_crest_db)
+        recovery_min_noise_margin_db = float(profile.channel_profile_recovery_min_noise_margin_db)
+        if recovery_policy_family in {"lead_vocal", "backing_vocal", "speech"}:
+            recovery_required_windows = max(recovery_required_windows, 4)
+            recovery_max_lufs_std_db = min(recovery_max_lufs_std_db, 2.5)
+            recovery_max_peak_std_db = min(recovery_max_peak_std_db, 2.5)
+            recovery_min_noise_margin_db = max(recovery_min_noise_margin_db, 18.0)
+        elif recovery_policy_family == "playback":
+            recovery_required_windows = min(recovery_required_windows, 2)
+            recovery_max_lufs_std_db = min(recovery_max_lufs_std_db, 2.0)
+            recovery_max_peak_std_db = min(recovery_max_peak_std_db, 2.0)
+            recovery_max_crest_db = min(recovery_max_crest_db, 11.0)
+        if channel_personality.boost_policy == "operator_review":
+            recovery_allowed = False
+        recovery_candidate = bool(
+            recovery_allowed
+            and mode == "soundcheck"
+            and not gain_up_profile_frozen
+            and source_behavior in {"stable_dynamic", "compressed_stable"}
+            and lufs_std_db <= recovery_max_lufs_std_db
+            and peak_std_db <= recovery_max_peak_std_db
+            and self.crest_factor_db <= recovery_max_crest_db
+            and (
+                noise_floor_margin_db is None
+                or noise_floor_margin_db >= recovery_min_noise_margin_db
+            )
+        )
+        if gain_up_profile_frozen:
+            recovery_windows = previous_recovery_windows
+        else:
+            recovery_windows = previous_recovery_windows + 1 if recovery_candidate else 0
+        profile_blocks_gain_up_by_history_raw = (
+            channel_profile_windows >= profile.channel_profile_min_windows
+            and (
+                unstable_behavior_ratio >= profile.channel_profile_unstable_ratio_block
+                or (lufs_std_avg_db is not None and lufs_std_avg_db > profile.channel_profile_lufs_std_block_db)
+                or (
+                    noise_margin_min_db is not None
+                    and noise_margin_min_db < profile.channel_profile_noise_margin_block_db
+                )
+            )
+        )
+        profile_recovered_from_history = bool(
+            profile_blocks_gain_up_by_history_raw
+            and recovery_windows >= recovery_required_windows
+            and recovery_candidate
+        )
+        profile_blocks_gain_up_by_history = bool(
+            profile_blocks_gain_up_by_history_raw
+            and not profile_recovered_from_history
+        )
+        profile_blocks_gain_up = bool(profile_locked or profile_blocks_gain_up_by_history)
+        if profile_locked:
+            learning_mode = "profile_locked"
+        elif live_freezes_gain_up_profile:
+            learning_mode = "live_risk_only"
+        else:
+            learning_mode = "soundcheck_learning"
+        channel_profile_state = {
+            "phase": mode,
+            "learning_mode": learning_mode,
+            "gain_up_profile_frozen": gain_up_profile_frozen,
+            "profile_locked": bool(profile_locked),
+            "windows": int(channel_profile_windows),
+            "profile_ready": bool(channel_profile_windows >= profile.channel_profile_min_windows),
+            "profile_blocks_gain_up": bool(profile_blocks_gain_up),
+            "profile_blocks_gain_up_by_history": bool(profile_blocks_gain_up_by_history),
+            "profile_blocks_gain_up_by_history_raw": bool(profile_blocks_gain_up_by_history_raw),
+            "profile_recovered_from_history": bool(profile_recovered_from_history),
+            "recovery_allowed": bool(recovery_allowed),
+            "recovery_policy_family": recovery_policy_family,
+            "recovery_candidate": bool(recovery_candidate),
+            "recovery_windows": int(recovery_windows),
+            "recovery_required_windows": int(recovery_required_windows),
+            "recovery_max_lufs_std_db": float(recovery_max_lufs_std_db),
+            "recovery_max_peak_std_db": float(recovery_max_peak_std_db),
+            "recovery_max_crest_db": float(recovery_max_crest_db),
+            "recovery_min_noise_margin_db": float(recovery_min_noise_margin_db),
+            "crest_avg_db": float(crest_avg_db) if crest_avg_db is not None else None,
+            "lufs_std_avg_db": float(lufs_std_avg_db) if lufs_std_avg_db is not None else None,
+            "near_clip_density_avg": (
+                float(near_clip_density_avg)
+                if near_clip_density_avg is not None
+                else None
+            ),
+            "noise_margin_min_db": (
+                float(noise_margin_min_db)
+                if noise_margin_min_db is not None
+                else None
+            ),
+            "unstable_behavior_ratio": float(unstable_behavior_ratio),
+            "unstable_ratio_block": float(profile.channel_profile_unstable_ratio_block),
+            "lufs_std_block_db": float(profile.channel_profile_lufs_std_block_db),
+            "noise_margin_block_db": float(profile.channel_profile_noise_margin_block_db),
+            "live_risk_windows": int(live_risk_windows),
+            "live_overload_events": int(live_overload_events),
+            "live_peak_density_max": float(live_peak_density_max),
+            "live_current_risk": current_live_risk,
+        }
+        if (
+            profile_locked
+            and candidate_direction == "up"
+            and desired_delta > 0.0
+            and mode == "soundcheck"
+        ):
+            desired_delta = 0.0
+            target_trim = current_trim
+            self.gain_limited_by = "channel_profile_locked_review"
+            self.operator_action = "operator_review"
+            self.operator_note = (
+                "Soundcheck boost held: this channel profile is locked for engineer review."
+            )
+            stability_state.update({
+                "active": True,
+                "reason": "waiting_for_profile_unlock_or_engineer_review",
+            })
+        elif (
+            profile_blocks_gain_up_by_history
+            and candidate_direction == "up"
+            and desired_delta > 0.0
+            and mode == "soundcheck"
+        ):
+            desired_delta = 0.0
+            target_trim = current_trim
+            self.gain_limited_by = "channel_profile_stability_wait"
+            self.operator_action = "operator_review"
+            self.operator_note = (
+                "Soundcheck boost held: this channel's recent profile is not stable enough for input gain-up."
+            )
+            stability_state.update({
+                "active": True,
+                "reason": "waiting_for_channel_profile_stability",
+            })
+
+        if (
+            vocal_gain_up_guard_state.get("active")
+            and candidate_direction == "up"
+            and desired_delta > 0.0
+            and mode == "soundcheck"
+        ):
+            desired_delta = 0.0
+            target_trim = current_trim
+            guard_reason = str(vocal_gain_up_guard_state.get("reason") or "")
+            if guard_reason == "recent_vocal_scream_or_shout":
+                self.gain_limited_by = "vocal_scream_history_wait"
+                self.operator_note = (
+                    "Soundcheck boost held: recent vocal shout history needs another stable window."
+                )
+                stability_reason = "waiting_after_recent_vocal_scream_or_shout"
+            else:
+                self.gain_limited_by = "vocal_presence_stability_wait"
+                self.operator_note = (
+                    "Soundcheck boost held: vocal presence band is not stable enough for input gain-up."
+                )
+                stability_reason = "waiting_for_stable_vocal_presence_band"
+            self.operator_action = "operator_review"
+            stability_state.update({
+                "active": True,
+                "reason": stability_reason,
+            })
+
+        previous_trim_smoothing = (
+            previous_character.get("trim_smoothing")
+            if isinstance(previous_character, dict)
+            else {}
+        )
+        if not isinstance(previous_trim_smoothing, dict):
+            previous_trim_smoothing = {}
+        previous_smoothed_delta = (
+            _coerce_float(previous_trim_smoothing.get("smoothed_delta_db"), 0.0)
+            if previous_trim_smoothing.get("smoothed_delta_db") is not None
+            else previous_delta
+        )
+        previous_apply_status = ""
+        previous_applied_value = None
+        if isinstance(previous_recommendation, dict):
+            previous_apply_status = str(
+                previous_recommendation.get("status")
+                or previous_recommendation.get("apply_status")
+                or previous_recommendation.get("operator_status")
+                or ""
+            ).strip().lower()
+            if previous_recommendation.get("applied") is not None:
+                previous_applied_value = _coerce_bool(previous_recommendation.get("applied"), False)
+        if previous_trim_smoothing.get("applied") is not None:
+            previous_applied_value = _coerce_bool(previous_trim_smoothing.get("applied"), False)
+        previous_explicitly_unapplied = bool(
+            previous_applied_value is False
+            or previous_apply_status in {
+                "dismissed",
+                "rejected",
+                "ignored",
+                "expired",
+                "apply_blocked",
+                "apply_error",
+            }
+        )
+        smoothing_reference_delta = (
+            0.0
+            if previous_explicitly_unapplied
+            else previous_smoothed_delta
+        )
+        convergence_smoothing_start = bool(
+            soundcheck_convergence_state.get("active")
+            and desired_delta > 0.0
+            and smoothing_reference_delta is None
+        )
+        if convergence_smoothing_start:
+            smoothing_reference_delta = 0.0
+        effective_gain_up_step_db = (
+            max(
+                0.1,
+                profile.soundcheck_ensemble_gain_up_step_db
+                if soundcheck_ensemble_context_state.get("active")
+                else profile.soundcheck_convergence_gain_up_step_db,
+            )
+            if soundcheck_convergence_state.get("active")
+            else profile.trim_smoothing_gain_up_step_db
+        )
+        trim_smoothing_state = {
+            "enabled": bool(profile.trim_smoothing_enabled),
+            "candidate_delta_db": float(desired_delta),
+            "previous_smoothed_delta_db": (
+                float(previous_smoothed_delta)
+                if previous_smoothed_delta is not None
+                else None
+            ),
+            "previous_apply_status": previous_apply_status or None,
+            "previous_applied": previous_applied_value,
+            "previous_explicitly_unapplied": bool(previous_explicitly_unapplied),
+            "reference_delta_db": (
+                float(smoothing_reference_delta)
+                if smoothing_reference_delta is not None
+                else None
+            ),
+            "reference_source": (
+                "current_trim_due_to_unapplied_previous"
+                if previous_explicitly_unapplied
+                else (
+                    "soundcheck_convergence_start"
+                    if convergence_smoothing_start
+                    else "previous_smoothed_delta"
+                )
+            ),
+            "gain_up_step_db": float(effective_gain_up_step_db),
+            "base_gain_up_step_db": float(profile.trim_smoothing_gain_up_step_db),
+            "soundcheck_convergence_gain_up_step_db": float(
+                profile.soundcheck_convergence_gain_up_step_db
+            ),
+            "soundcheck_ensemble_gain_up_step_db": float(
+                profile.soundcheck_ensemble_gain_up_step_db
+            ),
+            "soundcheck_convergence_active": bool(soundcheck_convergence_state.get("active")),
+            "soundcheck_ensemble_context_active": bool(soundcheck_ensemble_context_state.get("active")),
+            "gain_down_step_db": float(profile.trim_smoothing_gain_down_step_db),
+            "urgent_headroom_bypass": bool(urgent_headroom_cut),
+            "active": False,
+            "reason": None,
+            "smoothed_delta_db": float(desired_delta),
+        }
+        if (
+            profile.trim_smoothing_enabled
+            and smoothing_reference_delta is not None
+            and desired_delta != 0.0
+            and not urgent_headroom_cut
+        ):
+            smoothed_delta = desired_delta
+            smoothing_reason = None
+            previous_delta_for_smoothing = float(smoothing_reference_delta)
+            if desired_delta > 0.0:
+                max_gain_up_delta = max(0.0, previous_delta_for_smoothing) + effective_gain_up_step_db
+                if desired_delta > max_gain_up_delta:
+                    smoothed_delta = max_gain_up_delta
+                    smoothing_reason = "gain_up_slew_limited"
+            elif desired_delta < 0.0:
+                max_gain_down_delta = min(0.0, previous_delta_for_smoothing) - profile.trim_smoothing_gain_down_step_db
+                if desired_delta < max_gain_down_delta:
+                    smoothed_delta = max_gain_down_delta
+                    smoothing_reason = "gain_down_slew_limited"
+            if smoothing_reason is not None and abs(smoothed_delta - desired_delta) > 1e-9:
+                desired_delta = float(smoothed_delta)
+                target_trim = current_trim + desired_delta
+                self.gain_limited_by = f"trim_smoothing_{smoothing_reason}"
+                self.operator_note = (
+                    "Trim proposal slew-limited to avoid abrupt input gain changes."
+                )
+                trim_smoothing_state.update({
+                    "active": True,
+                    "reason": smoothing_reason,
+                    "smoothed_delta_db": float(desired_delta),
+                })
+        else:
+            trim_smoothing_state["smoothed_delta_db"] = float(desired_delta)
+        soundcheck_convergence_state["post_smoothing_delta_db"] = float(desired_delta)
+
+        confidence_candidate_delta = desired_delta
+        confidence_candidate_direction = _gain_direction(confidence_candidate_delta)
+        decision_confidence_factors = []
+        decision_score = 0.82
+
+        def _confidence_factor(name: str, delta: float, reason_text: str, active: bool = True) -> None:
+            nonlocal decision_score
+            if not active:
+                return
+            decision_score += float(delta)
+            decision_confidence_factors.append({
+                "name": name,
+                "delta": float(delta),
+                "reason": reason_text,
+            })
+
+        _confidence_factor(
+            "channel_personality_bias",
+            channel_personality.confidence_bias,
+            f"{channel_personality.family} baseline",
+            abs(channel_personality.confidence_bias) > 0.0,
+        )
+        _confidence_factor(
+            "gain_up_caution",
+            -0.08,
+            "positive input-gain changes can alter preamp structure",
+            confidence_candidate_direction == "up",
+        )
+        _confidence_factor(
+            "large_soundcheck_gain_gap",
+            -0.03,
+            "large soundcheck gain gap needs engineer attention while converging",
+            (
+                confidence_candidate_direction == "up"
+                and bool(soundcheck_convergence_state.get("active"))
+                and not bool(soundcheck_ensemble_context_state.get("active"))
+            ),
+        )
+        _confidence_factor(
+            "ensemble_context_vocal_understaged",
+            profile.soundcheck_ensemble_confidence_bonus,
+            "other soundcheck sources are already loud enough and the vocal input is under-staged",
+            (
+                confidence_candidate_direction == "up"
+                and bool(soundcheck_ensemble_context_state.get("active"))
+            ),
+        )
+        _confidence_factor(
+            "headroom_cut_preferred",
+            0.05,
+            "trim-down protects input headroom",
+            confidence_candidate_direction == "down",
+        )
+        _confidence_factor(
+            "operator_review_personality",
+            -0.25,
+            "source personality requires engineer review for gain-up",
+            channel_personality.boost_policy == "operator_review",
+        )
+        _confidence_factor(
+            "distortion_risk_medium",
+            -0.10,
+            "target trim approaches coloration range",
+            distortion_risk == "medium",
+        )
+        _confidence_factor(
+            "distortion_risk_high",
+            -0.25,
+            "target trim approaches saturation range",
+            distortion_risk == "high",
+        )
+        _confidence_factor(
+            "non_local_input",
+            -0.05,
+            "channel is outside the configured local-input preamp set",
+            local_input is False and profile.enabled,
+        )
+        _confidence_factor(
+            "unstable_source_behavior",
+            -0.08,
+            f"source behavior is {source_behavior}",
+            source_behavior in risky_behaviors,
+        )
+        _confidence_factor(
+            "behavior_flip",
+            -0.18,
+            "source behavior changed between windows",
+            behavior_flip,
+        )
+        _confidence_factor(
+            "source_identity_change",
+            -0.28,
+            "source signature changed between windows",
+            source_identity_changed,
+        )
+        _confidence_factor(
+            "profile_locked",
+            -0.30,
+            "channel profile is locked for engineer review",
+            profile_locked,
+        )
+        _confidence_factor(
+            "profile_history_risk",
+            -0.18,
+            "long-term channel profile still blocks gain-up",
+            profile_blocks_gain_up_by_history,
+        )
+        _confidence_factor(
+            "profile_recovery",
+            0.05,
+            "short-term recovery lane is stable",
+            recovery_candidate,
+        )
+        _confidence_factor(
+            "transient_hit_instability",
+            -0.12,
+            "percussion hit-to-hit body level or attack gap is unstable",
+            bool(transient_window_profile.get("repeated_hit_unstable")),
+        )
+        _confidence_factor(
+            "transient_body_band_instability",
+            -0.10,
+            "percussion low/low-mid body-band reference is unstable",
+            bool(transient_window_profile.get("repeated_hit_body_band_unstable")),
+        )
+        _confidence_factor(
+            "recovered_history_caution",
+            -0.04,
+            "long-term risk was overridden by repeated recovery evidence",
+            profile_recovered_from_history,
+        )
+        _confidence_factor(
+            "predictive_clip_cut",
+            0.04,
+            "preemptive trim-down is protecting near-clip headroom",
+            predictive_clip_risk and confidence_candidate_direction == "down",
+        )
+        _confidence_factor(
+            "clip_or_overload_risk",
+            -0.35,
+            "clipping or overload evidence makes gain-up unsafe",
+            (
+                digital_clip_detected
+                or preamp_saturation_detected
+                or vocal_scream_detected
+                or predictive_clip_risk
+            )
+            and confidence_candidate_direction == "up",
+        )
+        _confidence_factor(
+            "low_noise_margin",
+            -0.20,
+            "source is too close to the noise floor",
+            (
+                noise_floor_margin_db is not None
+                and noise_floor_margin_db < boost_thresholds["min_noise_margin_db"]
+            ),
+        )
+        _confidence_factor(
+            "healthy_noise_margin",
+            0.04,
+            "noise floor margin is healthy",
+            (
+                noise_floor_margin_db is not None
+                and noise_floor_margin_db >= boost_thresholds["min_noise_margin_db"] + 6.0
+            ),
+        )
+        _confidence_factor(
+            "stability_wait",
+            -0.16,
+            "candidate does not yet have stable repeated evidence",
+            bool(stability_state.get("active")),
+        )
+        _confidence_factor(
+            "stable_gain_up_evidence",
+            0.04,
+            "gain-up evidence repeated across stable windows",
+            (
+                confidence_candidate_direction == "up"
+                and not stability_state.get("active")
+                and evidence_windows >= profile.gain_up_min_stable_windows
+            ),
+        )
+        _confidence_factor(
+            "boost_guard_active",
+            -0.20,
+            "boost guard rejected the gain-up candidate",
+            bool(boost_guard.get("active")),
+        )
+        _confidence_factor(
+            "anti_oscillation_active",
+            -0.12,
+            "hysteresis is holding a small direction change",
+            bool(hysteresis_state.get("active")),
+        )
+        decision_score = float(np.clip(decision_score, 0.0, 0.95))
+        confidence_required_score = (
+            float(profile.decision_confidence_gain_up_min_score)
+            if confidence_candidate_direction == "up"
+            else None
+        )
+        confidence_threshold_met = (
+            True
+            if confidence_required_score is None
+            else decision_score >= confidence_required_score
+        )
+        previous_decision_confidence = (
+            previous_character.get("decision_confidence")
+            if isinstance(previous_character, dict)
+            else {}
+        )
+        if not isinstance(previous_decision_confidence, dict):
+            previous_decision_confidence = {}
+        previous_confidence_score = (
+            _coerce_float(previous_decision_confidence.get("score"), -1.0)
+            if previous_decision_confidence.get("score") is not None
+            else None
+        )
+        previous_confidence_windows = max(
+            0,
+            int(_coerce_float(previous_decision_confidence.get("confidence_windows"), 0.0)),
+        )
+        previous_confidence_timestamp_sec = (
+            _coerce_float(previous_decision_confidence.get("analysis_timestamp_sec"), 0.0)
+            if previous_decision_confidence.get("analysis_timestamp_sec") is not None
+            else None
+        )
+        previous_confidence_window_sec = (
+            max(
+                profile.decision_confidence_min_window_sec,
+                _coerce_float(previous_decision_confidence.get("analysis_window_sec"), 0.0),
+            )
+            if previous_decision_confidence.get("analysis_window_sec") is not None
+            else None
+        )
+        confidence_elapsed_sec = (
+            max(0.0, current_analysis_timestamp_sec - previous_confidence_timestamp_sec)
+            if previous_confidence_timestamp_sec is not None
+            else None
+        )
+        confidence_max_gap_sec = min(
+            profile.decision_confidence_max_age_sec,
+            profile.decision_confidence_max_gap_ratio
+            * max(
+                current_analysis_window_sec,
+                previous_confidence_window_sec or profile.decision_confidence_min_window_sec,
+            ),
+        )
+        previous_confidence_timing_known = bool(
+            previous_confidence_timestamp_sec is not None
+            and previous_confidence_window_sec is not None
+        )
+        previous_confidence_expired = bool(
+            profile.decision_confidence_time_memory_enabled
+            and previous_confidence_windows > 0
+            and (
+                not previous_confidence_timing_known
+                or (
+                    confidence_elapsed_sec is not None
+                    and confidence_elapsed_sec > confidence_max_gap_sec
+                )
+            )
+        )
+        if channel_personality.family in {"lead_vocal", "backing_vocal", "speech"}:
+            confidence_decay_family = "vocal"
+            confidence_decay_half_life_sec = profile.decision_confidence_vocal_decay_half_life_sec
+        elif channel_personality.family == "playback":
+            confidence_decay_family = "playback"
+            confidence_decay_half_life_sec = profile.decision_confidence_playback_decay_half_life_sec
+        else:
+            confidence_decay_family = "general"
+            confidence_decay_half_life_sec = profile.decision_confidence_decay_half_life_sec
+        if (
+            profile.decision_confidence_time_memory_enabled
+            and previous_confidence_timing_known
+            and confidence_elapsed_sec is not None
+            and not previous_confidence_expired
+        ):
+            confidence_memory_strength = float(
+                0.5 ** (confidence_elapsed_sec / max(0.1, confidence_decay_half_life_sec))
+            )
+        elif not profile.decision_confidence_time_memory_enabled and previous_confidence_windows > 0:
+            confidence_memory_strength = 1.0
+        else:
+            confidence_memory_strength = 0.0
+        confidence_time_memory_strength = confidence_memory_strength
+        source_signature_drift_field_count = len(source_signature_changed_fields)
+        source_signature_drift_weights = {field_name: 1.0 for field_name in source_signature_changed_fields}
+        def _signature_drift_weight(bucket_field: str) -> float:
+            if channel_personality.family in {"lead_vocal", "backing_vocal", "speech"}:
+                if bucket_field == "noise_margin_bucket_db":
+                    return float(profile.source_signature_drift_vocal_noise_weight)
+                if bucket_field == "crest_bucket_db":
+                    return float(profile.source_signature_drift_vocal_crest_weight)
+            elif channel_personality.family == "playback":
+                if bucket_field == "integrated_lufs_bucket_db":
+                    return float(profile.source_signature_drift_playback_lufs_weight)
+                if bucket_field == "peak_lufs_gap_bucket_db":
+                    return float(profile.source_signature_drift_playback_peak_gap_weight)
+            return 1.0
+        continuous_drift_specs = {
+            "crest_db": ("crest_bucket_db", 3.0),
+            "integrated_lufs_db": ("integrated_lufs_bucket_db", 6.0),
+            "peak_lufs_gap_db": ("peak_lufs_gap_bucket_db", 3.0),
+            "noise_margin_db": ("noise_margin_bucket_db", 6.0),
+        }
+        if channel_personality.family in {"lead_vocal", "backing_vocal", "speech"}:
+            if "noise_margin_bucket_db" in source_signature_drift_weights:
+                source_signature_drift_weights["noise_margin_bucket_db"] = _signature_drift_weight(
+                    "noise_margin_bucket_db"
+                )
+            if "crest_bucket_db" in source_signature_drift_weights:
+                source_signature_drift_weights["crest_bucket_db"] = _signature_drift_weight("crest_bucket_db")
+        elif channel_personality.family == "playback":
+            if "integrated_lufs_bucket_db" in source_signature_drift_weights:
+                source_signature_drift_weights["integrated_lufs_bucket_db"] = _signature_drift_weight(
+                    "integrated_lufs_bucket_db"
+                )
+            if "peak_lufs_gap_bucket_db" in source_signature_drift_weights:
+                source_signature_drift_weights["peak_lufs_gap_bucket_db"] = _signature_drift_weight(
+                    "peak_lufs_gap_bucket_db"
+                )
+        source_signature_continuous_distances = {}
+        source_signature_continuous_weighted_units = {}
+        for raw_field, (bucket_field, normalizer_db) in continuous_drift_specs.items():
+            previous_raw_value = previous_source_signature.get(raw_field)
+            current_raw_value = source_signature.get(raw_field)
+            if previous_raw_value is None or current_raw_value is None:
+                continue
+            raw_distance_db = abs(
+                _coerce_float(current_raw_value, 0.0)
+                - _coerce_float(previous_raw_value, 0.0)
+            )
+            normalized_distance = raw_distance_db / max(0.1, normalizer_db)
+            field_weight = source_signature_drift_weights.get(bucket_field, _signature_drift_weight(bucket_field))
+            source_signature_continuous_distances[raw_field] = {
+                "previous_db": float(_coerce_float(previous_raw_value, 0.0)),
+                "current_db": float(_coerce_float(current_raw_value, 0.0)),
+                "distance_db": float(raw_distance_db),
+                "normalizer_db": float(normalizer_db),
+                "normalized": float(normalized_distance),
+                "weight": float(field_weight),
+            }
+            source_signature_continuous_weighted_units[raw_field] = float(normalized_distance * field_weight)
+        source_signature_drift_weight_sum = float(sum(source_signature_drift_weights.values()))
+        source_signature_continuous_weight_sum = float(sum(source_signature_continuous_weighted_units.values()))
+        def _signature_relative_spectral_bands(signature: Dict[str, Any]) -> Dict[str, float]:
+            fingerprint = signature.get("spectral_fingerprint")
+            if not isinstance(fingerprint, dict):
+                return {}
+            relative_bands = fingerprint.get("relative_bands_db")
+            if not isinstance(relative_bands, dict):
+                return {}
+            result = {}
+            for band_name, band_db in relative_bands.items():
+                try:
+                    value = float(band_db)
+                except (TypeError, ValueError):
+                    continue
+                if np.isfinite(value):
+                    result[str(band_name)] = value
+            return result
+
+        def _signature_spectral_band_quality(signature: Dict[str, Any], band_name: str) -> Dict[str, Any]:
+            if not profile.source_signature_spectral_quality_gate_enabled:
+                return {"usable": True, "reason": "quality_gate_disabled"}
+            fingerprint = signature.get("spectral_fingerprint")
+            if not isinstance(fingerprint, dict):
+                return {"usable": False, "reason": "missing_fingerprint"}
+            band_counts = fingerprint.get("band_sample_counts")
+            band_coverages = fingerprint.get("band_coverage_ratios")
+            band_std_values = fingerprint.get("band_std_db")
+            band_span_values = fingerprint.get("band_span_db")
+            if not isinstance(band_counts, dict) or not isinstance(band_coverages, dict):
+                return {"usable": True, "reason": "legacy_fingerprint_without_quality"}
+            band_count = int(_coerce_float(band_counts.get(band_name), 0.0))
+            band_coverage = _coerce_float(band_coverages.get(band_name), 0.0)
+            band_std_db = (
+                _coerce_float(band_std_values.get(band_name), 0.0)
+                if isinstance(band_std_values, dict)
+                else 0.0
+            )
+            band_span_db = (
+                _coerce_float(band_span_values.get(band_name), 0.0)
+                if isinstance(band_span_values, dict)
+                else 0.0
+            )
+            signal_variability_db = _coerce_float(fingerprint.get("signal_variability_db"), 0.0)
+            normalized_name = str(band_name).lower()
+            is_high_or_presence_band = any(
+                token in normalized_name
+                for token in ("presence", "air", "high", "upper", "sibilance", "cymbal")
+            )
+            quality_profile = "general"
+            max_band_std_db = float(profile.source_signature_spectral_max_band_std_db)
+            max_band_span_db = float(profile.source_signature_spectral_max_band_span_db)
+            if channel_personality.family == "playback":
+                quality_profile = "playback"
+                max_band_std_db = float(profile.source_signature_spectral_playback_max_band_std_db)
+                max_band_span_db = float(profile.source_signature_spectral_playback_max_band_span_db)
+            elif (
+                channel_personality.family in {"lead_vocal", "backing_vocal", "speech"}
+                and is_high_or_presence_band
+            ):
+                quality_profile = "vocal_presence"
+                max_band_std_db = float(profile.source_signature_spectral_vocal_presence_max_std_db)
+                max_band_span_db = float(profile.source_signature_spectral_vocal_presence_max_span_db)
+            elif (
+                channel_personality.family
+                in {"transient_percussion", "cymbal", "drum_image", "drum_room"}
+                and is_high_or_presence_band
+            ):
+                quality_profile = "transient_high_band"
+                max_band_std_db = float(profile.source_signature_spectral_transient_high_band_max_std_db)
+                max_band_span_db = float(profile.source_signature_spectral_transient_high_band_max_span_db)
+            if band_count < profile.source_signature_spectral_min_band_samples:
+                return {
+                    "usable": False,
+                    "reason": "too_few_band_samples",
+                    "quality_profile": quality_profile,
+                    "samples": int(band_count),
+                    "min_samples": int(profile.source_signature_spectral_min_band_samples),
+                    "coverage": float(band_coverage),
+                }
+            if band_coverage < profile.source_signature_spectral_min_band_coverage:
+                return {
+                    "usable": False,
+                    "reason": "low_band_coverage",
+                    "quality_profile": quality_profile,
+                    "samples": int(band_count),
+                    "coverage": float(band_coverage),
+                    "min_coverage": float(profile.source_signature_spectral_min_band_coverage),
+                }
+            if band_std_db > max_band_std_db:
+                return {
+                    "usable": False,
+                    "reason": "high_band_variance",
+                    "quality_profile": quality_profile,
+                    "samples": int(band_count),
+                    "coverage": float(band_coverage),
+                    "std_db": float(band_std_db),
+                    "max_std_db": float(max_band_std_db),
+                    "span_db": float(band_span_db),
+                }
+            if band_span_db > max_band_span_db:
+                return {
+                    "usable": False,
+                    "reason": "high_band_span",
+                    "quality_profile": quality_profile,
+                    "samples": int(band_count),
+                    "coverage": float(band_coverage),
+                    "std_db": float(band_std_db),
+                    "span_db": float(band_span_db),
+                    "max_span_db": float(max_band_span_db),
+                }
+            if (
+                signal_variability_db >= profile.source_signature_spectral_stuck_signal_std_db
+                and band_std_db <= profile.source_signature_spectral_stuck_band_std_db
+            ):
+                return {
+                    "usable": False,
+                    "reason": "stuck_band_output",
+                    "quality_profile": quality_profile,
+                    "samples": int(band_count),
+                    "coverage": float(band_coverage),
+                    "std_db": float(band_std_db),
+                    "max_stuck_std_db": float(profile.source_signature_spectral_stuck_band_std_db),
+                    "signal_variability_db": float(signal_variability_db),
+                    "min_signal_variability_db": float(
+                        profile.source_signature_spectral_stuck_signal_std_db
+                    ),
+                }
+            return {
+                "usable": True,
+                "reason": "usable",
+                "quality_profile": quality_profile,
+                "samples": int(band_count),
+                "coverage": float(band_coverage),
+                "std_db": float(band_std_db),
+                "span_db": float(band_span_db),
+                "max_std_db": float(max_band_std_db),
+                "max_span_db": float(max_band_span_db),
+            }
+
+        previous_spectral_bands = _signature_relative_spectral_bands(previous_source_signature)
+        current_spectral_bands = _signature_relative_spectral_bands(source_signature)
+        source_signature_spectral_all_common_bands = sorted(
+            set(previous_spectral_bands).intersection(current_spectral_bands)
+        )
+        source_signature_spectral_common_bands = []
+        source_signature_spectral_rejected_bands = {}
+        for band_name in source_signature_spectral_all_common_bands:
+            previous_quality = _signature_spectral_band_quality(previous_source_signature, band_name)
+            current_quality = _signature_spectral_band_quality(source_signature, band_name)
+            if previous_quality.get("usable") and current_quality.get("usable"):
+                source_signature_spectral_common_bands.append(band_name)
+            else:
+                source_signature_spectral_rejected_bands[band_name] = {
+                    "previous": previous_quality,
+                    "current": current_quality,
+                }
+        source_signature_spectral_distances = {}
+        source_signature_spectral_band_weights = {}
+        source_signature_spectral_distance_db = 0.0
+        source_signature_spectral_unweighted_distance_db = 0.0
+        source_signature_spectral_quality_rejected_count = int(len(source_signature_spectral_rejected_bands))
+        source_signature_spectral_quality_penalty = 0.0
+        if (
+            profile.source_signature_spectral_quality_gate_enabled
+            and source_signature_spectral_quality_rejected_count > 0
+            and not source_identity_changed
+        ):
+            source_signature_spectral_quality_penalty = min(
+                profile.source_signature_spectral_quality_max_penalty,
+                source_signature_spectral_quality_rejected_count
+                * profile.source_signature_spectral_quality_penalty_per_rejected_band,
+            )
+            confidence_memory_strength *= max(0.0, 1.0 - source_signature_spectral_quality_penalty)
+        def _spectral_drift_weight(band_name: str) -> float:
+            normalized_name = str(band_name).lower()
+            is_high_or_presence_band = any(
+                token in normalized_name
+                for token in ("presence", "air", "high", "upper", "sibilance", "cymbal")
+            )
+            if channel_personality.family == "playback":
+                return float(profile.source_signature_spectral_playback_weight)
+            if (
+                channel_personality.family in {"lead_vocal", "backing_vocal", "speech"}
+                and is_high_or_presence_band
+            ):
+                return float(profile.source_signature_spectral_vocal_presence_weight)
+            if (
+                channel_personality.family
+                in {"transient_percussion", "cymbal", "drum_image", "drum_room"}
+                and is_high_or_presence_band
+            ):
+                if transient_window_profile.get("high_band_transient_dominant"):
+                    return float(
+                        profile.source_signature_spectral_transient_attack_high_band_identity_weight
+                    )
+                return float(profile.source_signature_spectral_transient_high_band_identity_weight)
+            return 1.0
+
+        if (
+            len(source_signature_spectral_common_bands)
+            >= profile.source_signature_spectral_drift_min_common_bands
+        ):
+            weighted_distance_sum = 0.0
+            for band_name in source_signature_spectral_common_bands:
+                previous_band_db = previous_spectral_bands[band_name]
+                current_band_db = current_spectral_bands[band_name]
+                band_distance_db = abs(current_band_db - previous_band_db)
+                band_weight = _spectral_drift_weight(band_name)
+                source_signature_spectral_distances[band_name] = {
+                    "previous_relative_db": float(previous_band_db),
+                    "current_relative_db": float(current_band_db),
+                    "distance_db": float(band_distance_db),
+                    "weight": float(band_weight),
+                }
+                source_signature_spectral_band_weights[band_name] = float(band_weight)
+                weighted_distance_sum += float(band_distance_db * band_weight)
+            source_signature_spectral_unweighted_distance_db = float(
+                np.mean([
+                    band_state["distance_db"]
+                    for band_state in source_signature_spectral_distances.values()
+                ])
+            )
+            source_signature_spectral_distance_db = float(
+                weighted_distance_sum / max(len(source_signature_spectral_common_bands), 1)
+            )
+        source_signature_drift_penalty = 0.0
+        if (
+            profile.source_signature_drift_memory_penalty_enabled
+            and source_signature_drift_field_count > 0
+            and not source_identity_changed
+        ):
+            source_signature_drift_penalty = min(
+                profile.source_signature_drift_max_penalty,
+                source_signature_drift_weight_sum * profile.source_signature_drift_penalty_per_field,
+            )
+            confidence_memory_strength *= max(0.0, 1.0 - source_signature_drift_penalty)
+        source_signature_continuous_drift_penalty = 0.0
+        if (
+            profile.source_signature_continuous_drift_enabled
+            and source_signature_continuous_weight_sum > 0.0
+            and not source_identity_changed
+        ):
+            source_signature_continuous_drift_penalty = min(
+                profile.source_signature_continuous_drift_max_penalty,
+                source_signature_continuous_weight_sum
+                * profile.source_signature_continuous_drift_penalty_per_unit,
+            )
+            confidence_memory_strength *= max(0.0, 1.0 - source_signature_continuous_drift_penalty)
+        source_signature_spectral_drift_penalty = 0.0
+        if (
+            profile.source_signature_spectral_drift_enabled
+            and source_signature_spectral_distance_db > 0.0
+            and not source_identity_changed
+        ):
+            source_signature_spectral_drift_penalty = min(
+                profile.source_signature_spectral_drift_max_penalty,
+                source_signature_spectral_distance_db
+                * profile.source_signature_spectral_drift_penalty_per_db,
+            )
+            confidence_memory_strength *= max(0.0, 1.0 - source_signature_spectral_drift_penalty)
+        confidence_borderline = bool(
+            confidence_candidate_direction == "up"
+            and confidence_required_score is not None
+            and confidence_threshold_met
+            and decision_score <= confidence_required_score + profile.decision_confidence_borderline_margin
+        )
+        same_confidence_candidate = bool(
+            confidence_candidate_direction == "up"
+            and previous_decision_confidence.get("candidate_direction") == "up"
+            and previous_confidence_score is not None
+            and previous_confidence_score >= float(confidence_required_score or 0.0)
+            and not previous_confidence_expired
+            and confidence_memory_strength >= profile.decision_confidence_min_memory_strength
+            and abs(decision_score - previous_confidence_score) <= profile.decision_confidence_score_tolerance
+        )
+        confidence_windows = (
+            previous_confidence_windows + 1
+            if confidence_threshold_met and same_confidence_candidate
+            else (1 if confidence_threshold_met and confidence_candidate_direction == "up" else 0)
+        )
+        confidence_hysteresis_stable = bool(
+            not confidence_borderline
+            or confidence_windows >= profile.decision_confidence_stable_windows
+        )
+        decision_confidence_state = {
+            "enabled": bool(profile.decision_confidence_enabled),
+            "candidate_direction": confidence_candidate_direction,
+            "candidate_delta_db": float(confidence_candidate_delta),
+            "score": float(decision_score),
+            "gain_up_min_score": float(profile.decision_confidence_gain_up_min_score),
+            "required_score": confidence_required_score,
+            "threshold_met": bool(confidence_threshold_met),
+            "hysteresis_enabled": bool(profile.decision_confidence_hysteresis_enabled),
+            "borderline": bool(confidence_borderline),
+            "borderline_margin": float(profile.decision_confidence_borderline_margin),
+            "score_tolerance": float(profile.decision_confidence_score_tolerance),
+            "time_memory_enabled": bool(profile.decision_confidence_time_memory_enabled),
+            "analysis_timestamp_sec": float(current_analysis_timestamp_sec),
+            "analysis_window_sec": float(current_analysis_window_sec),
+            "previous_timestamp_sec": previous_confidence_timestamp_sec,
+            "previous_window_sec": previous_confidence_window_sec,
+            "elapsed_since_previous_sec": confidence_elapsed_sec,
+            "max_gap_sec": float(confidence_max_gap_sec),
+            "previous_confidence_expired": bool(previous_confidence_expired),
+            "memory_decay_family": confidence_decay_family,
+            "memory_decay_half_life_sec": float(confidence_decay_half_life_sec),
+            "time_memory_strength": float(confidence_time_memory_strength),
+            "source_signature_drift_penalty_enabled": bool(
+                profile.source_signature_drift_memory_penalty_enabled
+            ),
+            "source_signature_drift_fields": source_signature_changed_fields,
+            "source_signature_drift_field_weights": source_signature_drift_weights,
+            "source_signature_drift_field_count": int(source_signature_drift_field_count),
+            "source_signature_drift_weight_sum": float(source_signature_drift_weight_sum),
+            "source_signature_drift_penalty": float(source_signature_drift_penalty),
+            "source_signature_continuous_drift_enabled": bool(
+                profile.source_signature_continuous_drift_enabled
+            ),
+            "source_signature_continuous_distances": source_signature_continuous_distances,
+            "source_signature_continuous_weighted_units": source_signature_continuous_weighted_units,
+            "source_signature_continuous_weight_sum": float(source_signature_continuous_weight_sum),
+            "source_signature_continuous_drift_penalty": float(source_signature_continuous_drift_penalty),
+            "source_signature_spectral_drift_enabled": bool(
+                profile.source_signature_spectral_drift_enabled
+            ),
+            "source_signature_spectral_min_common_bands": int(
+                profile.source_signature_spectral_drift_min_common_bands
+            ),
+            "source_signature_spectral_quality_gate_enabled": bool(
+                profile.source_signature_spectral_quality_gate_enabled
+            ),
+            "source_signature_spectral_min_band_samples": int(
+                profile.source_signature_spectral_min_band_samples
+            ),
+            "source_signature_spectral_min_band_coverage": float(
+                profile.source_signature_spectral_min_band_coverage
+            ),
+            "source_signature_spectral_all_common_bands": source_signature_spectral_all_common_bands,
+            "source_signature_spectral_rejected_bands": source_signature_spectral_rejected_bands,
+            "source_signature_spectral_quality_rejected_count": int(
+                source_signature_spectral_quality_rejected_count
+            ),
+            "source_signature_spectral_quality_penalty_per_rejected_band": float(
+                profile.source_signature_spectral_quality_penalty_per_rejected_band
+            ),
+            "source_signature_spectral_quality_max_penalty": float(
+                profile.source_signature_spectral_quality_max_penalty
+            ),
+            "source_signature_spectral_quality_penalty": float(
+                source_signature_spectral_quality_penalty
+            ),
+            "source_signature_spectral_common_bands": source_signature_spectral_common_bands,
+            "source_signature_spectral_common_band_count": int(len(source_signature_spectral_common_bands)),
+            "source_signature_spectral_distances": source_signature_spectral_distances,
+            "source_signature_spectral_band_weights": source_signature_spectral_band_weights,
+            "source_signature_spectral_unweighted_distance_db": float(
+                source_signature_spectral_unweighted_distance_db
+            ),
+            "source_signature_spectral_distance_db": float(source_signature_spectral_distance_db),
+            "source_signature_spectral_drift_penalty": float(source_signature_spectral_drift_penalty),
+            "memory_strength": float(confidence_memory_strength),
+            "min_memory_strength": float(profile.decision_confidence_min_memory_strength),
+            "confidence_windows": int(confidence_windows),
+            "required_confidence_windows": int(profile.decision_confidence_stable_windows),
+            "hysteresis_stable": bool(confidence_hysteresis_stable),
+            "previous_score": previous_confidence_score,
+            "gated": False,
+            "gate_reason": None,
+            "factors": decision_confidence_factors,
+        }
+        if (
+            profile.decision_confidence_enabled
+            and confidence_candidate_direction == "up"
+            and desired_delta > 0.0
+            and mode == "soundcheck"
+            and not confidence_threshold_met
+        ):
+            desired_delta = 0.0
+            target_trim = current_trim
+            self.gain_limited_by = "decision_confidence_gain_up_hold"
+            self.operator_action = "operator_review"
+            self.operator_note = (
+                "Soundcheck boost held: combined confidence is too low for automatic input gain-up."
+            )
+            stability_state.update({
+                "active": True,
+                "reason": "waiting_for_higher_gain_up_confidence",
+            })
+            decision_confidence_state.update({
+                "gated": True,
+                "gate_reason": "gain_up_confidence_below_threshold",
+            })
+        elif (
+            profile.decision_confidence_enabled
+            and profile.decision_confidence_hysteresis_enabled
+            and confidence_candidate_direction == "up"
+            and desired_delta > 0.0
+            and mode == "soundcheck"
+            and confidence_borderline
+            and not confidence_hysteresis_stable
+        ):
+            desired_delta = 0.0
+            target_trim = current_trim
+            self.gain_limited_by = "decision_confidence_stability_wait"
+            self.operator_action = "operator_review"
+            self.operator_note = (
+                "Soundcheck boost held: confidence is borderline and needs a repeated stable window."
+            )
+            stability_state.update({
+                "active": True,
+                "reason": "waiting_for_stable_gain_up_confidence",
+            })
+            decision_confidence_state.update({
+                "gated": True,
+                "gate_reason": "gain_up_confidence_borderline_wait",
+            })
+
         if abs(desired_delta) < 0.25:
             desired_delta = 0.0
             target_trim = current_trim
@@ -1061,39 +4136,201 @@ class SignalStats:
                 else "Soundcheck-only clean-range boost; do not use as mix balance."
             )
 
+        target_zone = profile.zone_for_gain(target_trim) if profile.enabled else "disabled"
+        distortion_risk = profile.distortion_risk(target_trim, local_input=local_input)
         direction = "down" if desired_delta < 0.0 else "up" if desired_delta > 0.0 else "hold"
-        confidence = 0.88
-        confidence += channel_personality.confidence_bias
-        if direction == "up":
-            confidence -= 0.12
-            if channel_personality.boost_policy == "operator_review":
-                confidence -= 0.20
-        if distortion_risk == "medium":
-            confidence -= 0.10
-        elif distortion_risk == "high":
-            confidence -= 0.25
-        if local_input is False and profile.enabled:
-            confidence -= 0.05
-        if source_behavior in {
-            "sparse_source",
-            "isolated_peak_source",
-            "transient_dominant",
-            "unstable_dynamic",
-            "low_noise_margin",
-            "operator_review_source",
-        }:
-            confidence -= 0.06
-        if (
-            noise_floor_margin_db is not None
-            and noise_floor_margin_db < boost_thresholds["min_noise_margin_db"]
-        ):
-            confidence -= 0.12
+        confidence = decision_score
         if desired_delta == 0.0:
             confidence = min(confidence, 0.55)
 
         self.suggested_gain_db = float(np.clip(desired_delta, -24.0, 24.0))
         self.target_trim_db = float(target_trim)
         self.suggestion_confidence = max(0.0, min(0.95, confidence))
+        decision_confidence_state["final_direction"] = direction
+        decision_confidence_state["final_score"] = float(self.suggestion_confidence)
+        if direction == "down":
+            foh_headline = f"Trim down {abs(self.suggested_gain_db):.1f} dB: {self.gain_limited_by}"
+        elif direction == "up":
+            foh_headline = f"Trim up {self.suggested_gain_db:.1f} dB: {self.gain_limited_by}"
+        elif self.operator_action == "operator_review":
+            foh_headline = f"Hold for operator review: {self.gain_limited_by}"
+        else:
+            foh_headline = f"Hold: {self.gain_limited_by}"
+        body_reference = transient_window_profile.get("body_reference")
+        body_band_reference = None
+        if isinstance(body_reference, dict):
+            body_band_reference = body_reference.get("body_band_reference")
+        risk_flags = []
+        if mode == "live" and confidence_candidate_direction == "up":
+            risk_flags.append("live_gain_up_blocked")
+        if self.max_true_peak_db > max_peak_limit:
+            risk_flags.append("peak_over_limit")
+        if overload_classification != "normal":
+            risk_flags.append(overload_classification)
+        if bool(boost_guard.get("active")):
+            risk_flags.append(str(boost_guard.get("reason") or "boost_guard_active"))
+        if bool(vocal_gain_up_guard_state.get("active")):
+            risk_flags.append(str(vocal_gain_up_guard_state.get("reason") or "vocal_gain_up_guard"))
+        if bool(trim_smoothing_state.get("active")):
+            risk_flags.append(str(trim_smoothing_state.get("reason") or "trim_smoothing_active"))
+        if bool(soundcheck_convergence_state.get("active")):
+            risk_flags.append(str(soundcheck_convergence_state.get("reason") or "soundcheck_convergence_active"))
+        if bool(soundcheck_ensemble_context_state.get("active")):
+            risk_flags.append("ensemble_context_vocal_understaged")
+        if bool(soundcheck_convergence_state.get("setup_check_required")):
+            risk_flags.append("source_setup_check_required")
+        if bool(transient_window_profile.get("repeated_hit_unstable")):
+            risk_flags.append("transient_hit_unstable")
+        if channel_personality.boost_policy == "operator_review" and confidence_candidate_direction == "up":
+            risk_flags.append("operator_review_source")
+
+        safe_to_auto_apply = bool(self.operator_action == "apply_trim_proposal" and direction == "down")
+        if safe_to_auto_apply:
+            foh_next_action = "apply_trim_down"
+            foh_readiness = "auto_apply_trim_down"
+        elif (
+            bool(soundcheck_convergence_state.get("setup_check_required"))
+            and (
+                direction == "up"
+                or confidence_candidate_direction == "up"
+                or soundcheck_convergence_state.get("requested_delta_db", 0.0) > 0.0
+            )
+        ):
+            foh_next_action = "check_source_setup_and_review_gain_up"
+            foh_readiness = "operator_review_gain_up"
+        elif direction == "up":
+            foh_next_action = "review_soundcheck_gain_up"
+            foh_readiness = "operator_review_gain_up"
+        elif self.operator_action == "operator_review":
+            foh_next_action = "operator_review"
+            foh_readiness = "hold_for_review"
+        elif self.operator_action == "check_source":
+            foh_next_action = "check_source"
+            foh_readiness = "insufficient_signal"
+        else:
+            foh_next_action = "hold"
+            foh_readiness = "hold_safe"
+
+        spectral_available = bool(spectral_fingerprint.get("available"))
+        spectral_band_count = int(_coerce_float(spectral_fingerprint.get("band_count"), 0.0))
+        measurement_warnings = []
+        if self.total_samples < profile.transient_window_min_samples:
+            measurement_warnings.append("short_analysis_window")
+        if self.signal_presence_ratio < min_signal_presence:
+            measurement_warnings.append("insufficient_signal_presence")
+        if not spectral_available:
+            measurement_warnings.append("missing_spectral_fingerprint")
+        elif spectral_band_count < profile.source_signature_spectral_drift_min_common_bands:
+            measurement_warnings.append("limited_spectral_band_count")
+        if noise_floor_db is None:
+            measurement_warnings.append("missing_noise_floor_reference")
+        if self.active_samples < profile.source_signature_spectral_min_band_samples:
+            measurement_warnings.append("few_active_samples")
+        if "insufficient_signal_presence" in measurement_warnings:
+            measurement_readiness = "insufficient_signal"
+        elif "short_analysis_window" in measurement_warnings:
+            measurement_readiness = "short_window"
+        elif "missing_spectral_fingerprint" in measurement_warnings:
+            measurement_readiness = "level_only"
+        elif "missing_noise_floor_reference" in measurement_warnings:
+            measurement_readiness = "usable_without_noise_floor"
+        elif "limited_spectral_band_count" in measurement_warnings:
+            measurement_readiness = "limited_spectral_context"
+        else:
+            measurement_readiness = "full_context"
+
+        foh_summary = {
+            "policy": "display_only_no_apply_authority",
+            "headline": foh_headline,
+            "readiness": foh_readiness,
+            "next_action": foh_next_action,
+            "safe_to_auto_apply": safe_to_auto_apply,
+            "candidate_direction": confidence_candidate_direction,
+            "candidate_delta_db": float(confidence_candidate_delta),
+            "final_direction": direction,
+            "suggested_delta_db": float(self.suggested_gain_db),
+            "operator_action": self.operator_action,
+            "limited_by": self.gain_limited_by,
+            "gate_reason": decision_confidence_state.get("gate_reason"),
+            "risk_flags": risk_flags,
+            "score": float(decision_score),
+            "final_score": float(self.suggestion_confidence),
+            "required_score": confidence_required_score,
+            "dominant_blockers": _dominant_confidence_factors(
+                decision_confidence_factors,
+                positive=False,
+            ),
+            "supporting_evidence": _dominant_confidence_factors(
+                decision_confidence_factors,
+                positive=True,
+            ),
+            "evidence_window": {
+                "analysis_timestamp_sec": float(current_analysis_timestamp_sec),
+                "analysis_window_sec": float(current_analysis_window_sec),
+                "samples_analyzed": int(self.total_samples),
+                "active_samples": int(self.active_samples),
+                "source_behavior": source_behavior,
+                "stability_active": bool(stability_state.get("active")),
+                "stability_reason": stability_state.get("reason"),
+                "stability_evidence_windows": int(stability_state.get("evidence_windows") or 0),
+                "required_gain_up_windows": int(stability_state.get("required_gain_up_windows") or 0),
+                "confidence_windows": int(confidence_windows),
+                "required_confidence_windows": int(profile.decision_confidence_stable_windows),
+                "threshold_met": bool(confidence_threshold_met),
+                "borderline": bool(confidence_borderline),
+                "hysteresis_stable": bool(confidence_hysteresis_stable),
+                "memory_strength": float(confidence_memory_strength),
+                "min_memory_strength": float(profile.decision_confidence_min_memory_strength),
+                "trim_smoothing_active": bool(trim_smoothing_state.get("active")),
+                "trim_smoothing_reason": trim_smoothing_state.get("reason"),
+                "transient_repeated_hit_evaluable": bool(
+                    transient_window_profile.get("repeated_hit_evaluable")
+                ),
+                "transient_repeated_hit_unstable": bool(
+                    transient_window_profile.get("repeated_hit_unstable")
+                ),
+                "transient_body_band_confident": (
+                    bool(body_band_reference.get("confident"))
+                    if isinstance(body_band_reference, dict)
+                    else None
+                ),
+            },
+            "gain_structure": {
+                "current_trim_db": float(current_trim),
+                "target_trim_db": float(target_trim),
+                "current_zone": current_zone,
+                "target_zone": target_zone,
+                "distortion_risk": distortion_risk,
+                "gain_changes_tone": bool(profile.enabled and local_input),
+            },
+            "headroom": {
+                "max_true_peak_db": float(self.max_true_peak_db),
+                "peak_p95_db": float(peak_p95_db),
+                "target_peak_db": float(self.target_peak_db),
+                "max_peak_limit_db": float(max_peak_limit),
+                "predicted_peak_db": float(predicted_peak_db),
+                "near_clip_peak_density": float(near_clip_peak_density),
+                "overload_classification": overload_classification,
+            },
+            "soundcheck_ensemble_context": soundcheck_ensemble_context_state,
+            "soundcheck_convergence": soundcheck_convergence_state,
+            "measurement_quality": {
+                "readiness": measurement_readiness,
+                "warnings": measurement_warnings,
+                "samples_analyzed": int(self.total_samples),
+                "active_samples": int(self.active_samples),
+                "signal_presence_ratio": float(self.signal_presence_ratio),
+                "spectral_available": spectral_available,
+                "spectral_band_count": int(spectral_band_count),
+                "noise_floor_available": noise_floor_db is not None,
+                "noise_floor_db": (
+                    float(noise_floor_db)
+                    if noise_floor_db is not None
+                    else None
+                ),
+            },
+        }
+        decision_confidence_state["foh_summary"] = foh_summary
         self.input_gain_character = {
             "source": profile.source,
             "character": profile.character,
@@ -1110,7 +4347,18 @@ class SignalStats:
             "boost_guard": boost_guard,
             "hysteresis": hysteresis_state,
             "stability": stability_state,
+            "trim_smoothing": trim_smoothing_state,
+            "soundcheck_ensemble_context": soundcheck_ensemble_context_state,
+            "soundcheck_convergence": soundcheck_convergence_state,
             "overload": overload_state,
+            "predictive_clip": predictive_clip_state,
+            "vocal_gain_up_guard": vocal_gain_up_guard_state,
+            "transient_window_profile": transient_window_profile,
+            "trend_memory": trend_memory_state,
+            "channel_profile": channel_profile_state,
+            "profile_lifecycle": profile_lifecycle_state,
+            "decision_confidence": decision_confidence_state,
+            "foh_summary": foh_summary,
             "channel_personality": channel_personality.as_report(),
             "integrated_lufs": float(self.integrated_lufs),
             "crest_factor_db": float(self.crest_factor_db),
@@ -2407,9 +5655,145 @@ class SafeGainCalibrator:
         if self.learning_progress >= 1.0 and self.state == AnalysisState.LEARNING:
             self._finalize_analysis()
 
+    def _soundcheck_ensemble_context_for_channel(self, audio_channel: int) -> Dict[str, Any]:
+        """Summarize other active sources so gain staging can separate solo-mic caution from ensemble context."""
+        if not self.local_input_preamp.soundcheck_ensemble_context_enabled:
+            return {"enabled": False, "other_active_sources": 0, "other_loud_sources": 0}
+
+        target_stats = self.channels.get(audio_channel)
+        target_active_indices = list(getattr(target_stats, "active_sample_indices", []) or [])
+        target_first_active = min(target_active_indices) if target_active_indices else None
+        target_last_active = max(target_active_indices) if target_active_indices else None
+        max_context_lag_samples = max(
+            0,
+            int(self.local_input_preamp.soundcheck_ensemble_max_context_lag_samples),
+        )
+
+        def _source_time_context(other_stats: SignalStats) -> Dict[str, Any]:
+            other_active_indices = list(getattr(other_stats, "active_sample_indices", []) or [])
+            first_active = min(other_active_indices) if other_active_indices else None
+            last_active = max(other_active_indices) if other_active_indices else None
+            overlaps_target = bool(
+                target_first_active is not None
+                and target_last_active is not None
+                and first_active is not None
+                and last_active is not None
+                and first_active <= target_last_active
+                and last_active >= target_first_active
+            )
+            lag_samples = (
+                max(0, int(target_last_active - last_active))
+                if target_last_active is not None and last_active is not None
+                else None
+            )
+            recent_to_target = bool(
+                lag_samples is not None
+                and lag_samples <= max_context_lag_samples
+            )
+            return {
+                "first_active_sample_index": first_active,
+                "last_active_sample_index": last_active,
+                "overlaps_target_window": overlaps_target,
+                "lag_samples": lag_samples,
+                "time_coherent": bool(overlaps_target and recent_to_target),
+            }
+
+        active_sources = []
+        loud_sources = []
+        for other_channel, other_stats in self.channels.items():
+            if other_channel == audio_channel or other_stats.total_samples <= 0:
+                continue
+            if other_stats.signal_presence_ratio < self.local_input_preamp.soundcheck_ensemble_min_other_presence:
+                continue
+            time_context = _source_time_context(other_stats)
+            source = {
+                "channel": int(other_channel),
+                "presence": float(other_stats.signal_presence_ratio),
+                "peak_db": float(other_stats.max_true_peak_db),
+                "lufs": float(other_stats.integrated_lufs),
+                "crest_factor_db": float(other_stats.crest_factor_db),
+                "preset": str(self.channel_settings.get(other_channel, {}).get("preset", "custom")),
+                **time_context,
+            }
+            active_sources.append(source)
+            if (
+                other_stats.max_true_peak_db >= self.local_input_preamp.soundcheck_ensemble_min_reference_peak_db
+                or other_stats.integrated_lufs >= self.local_input_preamp.soundcheck_ensemble_min_reference_lufs
+            ):
+                loud_sources.append(source)
+
+        coherent_loud_sources = [
+            source
+            for source in loud_sources
+            if bool(source.get("time_coherent"))
+        ]
+        if self.local_input_preamp.soundcheck_ensemble_time_coherence_enabled:
+            reference_sources = coherent_loud_sources
+        else:
+            reference_sources = loud_sources or active_sources
+        if reference_sources:
+            reference_peak_db = float(np.percentile(
+                [source["peak_db"] for source in reference_sources],
+                75,
+            ))
+            reference_lufs = float(np.percentile(
+                [source["lufs"] for source in reference_sources],
+                75,
+            ))
+            reference_crest_db = float(reference_peak_db - reference_lufs)
+        else:
+            reference_peak_db = None
+            reference_lufs = None
+            reference_crest_db = None
+        timestamp_sources = reference_sources or loud_sources
+        latest_reference_active = (
+            max(
+                int(source["last_active_sample_index"])
+                for source in timestamp_sources
+                if source.get("last_active_sample_index") is not None
+            )
+            if any(source.get("last_active_sample_index") is not None for source in timestamp_sources)
+            else None
+        )
+        reference_max_lag_samples = (
+            max(0, int(target_last_active - latest_reference_active))
+            if target_last_active is not None and latest_reference_active is not None
+            else None
+        )
+        time_coherence_evaluable = bool(
+            target_last_active is not None
+            and any(source.get("last_active_sample_index") is not None for source in loud_sources)
+        )
+        required_time_coherent_sources = int(self.local_input_preamp.soundcheck_ensemble_min_other_active_sources)
+
+        return {
+            "enabled": True,
+            "other_active_sources": int(len(active_sources)),
+            "other_loud_sources": int(len(loud_sources)),
+            "time_coherence_enabled": bool(self.local_input_preamp.soundcheck_ensemble_time_coherence_enabled),
+            "time_coherence_evaluable": bool(time_coherence_evaluable),
+            "time_coherent": bool(len(coherent_loud_sources) >= required_time_coherent_sources),
+            "time_coherent_loud_sources": int(len(coherent_loud_sources)),
+            "required_time_coherent_sources": int(required_time_coherent_sources),
+            "max_context_lag_samples": int(max_context_lag_samples),
+            "target_first_active_sample_index": target_first_active,
+            "target_last_active_sample_index": target_last_active,
+            "reference_latest_active_sample_index": latest_reference_active,
+            "reference_max_lag_samples": reference_max_lag_samples,
+            "reference_peak_db": reference_peak_db,
+            "reference_lufs": reference_lufs,
+            "reference_crest_db": reference_crest_db,
+            "sources": loud_sources[:8],
+        }
+
     def _finalize_analysis(self):
         """Завершение фазы анализа и расчет рекомендаций."""
         logger.info("Learning phase completed. Calculating suggestions...")
+
+        for stats in self.channels.values():
+            if stats.total_samples > 0:
+                stats.calculate_integrated_lufs()
+                stats.calculate_crest_factor()
 
         for ch_id, stats in self.channels.items():
             # Получаем пресет для канала
@@ -2449,6 +5833,7 @@ class SafeGainCalibrator:
                     mixer_channel=mixer_ch,
                     preset=preset,
                     previous_recommendation=previous_recommendation,
+                    ensemble_context=self._soundcheck_ensemble_context_for_channel(ch_id),
                 )
 
             self.suggestions[ch_id] = stats.get_report()
@@ -2631,6 +6016,27 @@ class SafeGainCalibrator:
                 'saturation_start_db': self.local_input_preamp.saturation_start_db,
                 'soundcheck_allow_boost': self.local_input_preamp.soundcheck_allow_boost,
                 'live_allow_boost': self.local_input_preamp.live_allow_boost,
+                'soundcheck_max_boost_db': self.local_input_preamp.soundcheck_max_boost_db,
+                'soundcheck_convergence_enabled': self.local_input_preamp.soundcheck_convergence_enabled,
+                'soundcheck_convergence_large_gap_db': self.local_input_preamp.soundcheck_convergence_large_gap_db,
+                'soundcheck_convergence_max_boost_db': self.local_input_preamp.soundcheck_convergence_max_boost_db,
+                'soundcheck_convergence_vocal_max_boost_db': self.local_input_preamp.soundcheck_convergence_vocal_max_boost_db,
+                'soundcheck_convergence_playback_max_boost_db': self.local_input_preamp.soundcheck_convergence_playback_max_boost_db,
+                'soundcheck_convergence_setup_check_db': self.local_input_preamp.soundcheck_convergence_setup_check_db,
+                'soundcheck_convergence_gain_up_step_db': self.local_input_preamp.soundcheck_convergence_gain_up_step_db,
+                'soundcheck_ensemble_context_enabled': self.local_input_preamp.soundcheck_ensemble_context_enabled,
+                'soundcheck_ensemble_min_other_active_sources': self.local_input_preamp.soundcheck_ensemble_min_other_active_sources,
+                'soundcheck_ensemble_min_other_presence': self.local_input_preamp.soundcheck_ensemble_min_other_presence,
+                'soundcheck_ensemble_min_reference_peak_db': self.local_input_preamp.soundcheck_ensemble_min_reference_peak_db,
+                'soundcheck_ensemble_min_reference_lufs': self.local_input_preamp.soundcheck_ensemble_min_reference_lufs,
+                'soundcheck_ensemble_vocal_under_peak_gap_db': self.local_input_preamp.soundcheck_ensemble_vocal_under_peak_gap_db,
+                'soundcheck_ensemble_vocal_under_lufs_gap_db': self.local_input_preamp.soundcheck_ensemble_vocal_under_lufs_gap_db,
+                'soundcheck_ensemble_vocal_min_crest_db': self.local_input_preamp.soundcheck_ensemble_vocal_min_crest_db,
+                'soundcheck_ensemble_max_boost_db': self.local_input_preamp.soundcheck_ensemble_max_boost_db,
+                'soundcheck_ensemble_gain_up_step_db': self.local_input_preamp.soundcheck_ensemble_gain_up_step_db,
+                'soundcheck_ensemble_confidence_bonus': self.local_input_preamp.soundcheck_ensemble_confidence_bonus,
+                'soundcheck_ensemble_time_coherence_enabled': self.local_input_preamp.soundcheck_ensemble_time_coherence_enabled,
+                'soundcheck_ensemble_max_context_lag_samples': self.local_input_preamp.soundcheck_ensemble_max_context_lag_samples,
                 'soundcheck_boost_min_presence': self.local_input_preamp.soundcheck_boost_min_presence,
                 'soundcheck_boost_max_crest_db': self.local_input_preamp.soundcheck_boost_max_crest_db,
                 'soundcheck_boost_min_lufs': self.local_input_preamp.soundcheck_boost_min_lufs,
@@ -2647,6 +6053,100 @@ class SafeGainCalibrator:
                 'digital_clip_threshold_db': self.local_input_preamp.digital_clip_threshold_db,
                 'scream_peak_threshold_db': self.local_input_preamp.scream_peak_threshold_db,
                 'scream_lufs_threshold_db': self.local_input_preamp.scream_lufs_threshold_db,
+                'predictive_clip_window_db': self.local_input_preamp.predictive_clip_window_db,
+                'predictive_clip_density_threshold': self.local_input_preamp.predictive_clip_density_threshold,
+                'predictive_clip_sustained_density_threshold': self.local_input_preamp.predictive_clip_sustained_density_threshold,
+                'predictive_clip_min_rising_trend_db': self.local_input_preamp.predictive_clip_min_rising_trend_db,
+                'predictive_clip_min_cut_db': self.local_input_preamp.predictive_clip_min_cut_db,
+                'predictive_clip_max_cut_db': self.local_input_preamp.predictive_clip_max_cut_db,
+                'vocal_gain_up_guard_enabled': self.local_input_preamp.vocal_gain_up_guard_enabled,
+                'vocal_gain_up_presence_min_bands': self.local_input_preamp.vocal_gain_up_presence_min_bands,
+                'vocal_gain_up_presence_max_std_db': self.local_input_preamp.vocal_gain_up_presence_max_std_db,
+                'vocal_gain_up_presence_max_span_db': self.local_input_preamp.vocal_gain_up_presence_max_span_db,
+                'vocal_gain_up_scream_cooldown_windows': self.local_input_preamp.vocal_gain_up_scream_cooldown_windows,
+                'trim_smoothing_enabled': self.local_input_preamp.trim_smoothing_enabled,
+                'trim_smoothing_gain_up_step_db': self.local_input_preamp.trim_smoothing_gain_up_step_db,
+                'trim_smoothing_gain_down_step_db': self.local_input_preamp.trim_smoothing_gain_down_step_db,
+                'trend_memory_max_windows': self.local_input_preamp.trend_memory_max_windows,
+                'behavior_flip_gain_up_hold': self.local_input_preamp.behavior_flip_gain_up_hold,
+                'channel_profile_min_windows': self.local_input_preamp.channel_profile_min_windows,
+                'channel_profile_max_windows': self.local_input_preamp.channel_profile_max_windows,
+                'channel_profile_unstable_ratio_block': self.local_input_preamp.channel_profile_unstable_ratio_block,
+                'channel_profile_lufs_std_block_db': self.local_input_preamp.channel_profile_lufs_std_block_db,
+                'channel_profile_noise_margin_block_db': self.local_input_preamp.channel_profile_noise_margin_block_db,
+                'live_freeze_gain_up_profile': self.local_input_preamp.live_freeze_gain_up_profile,
+                'channel_profile_lifecycle_enabled': self.local_input_preamp.channel_profile_lifecycle_enabled,
+                'channel_profile_default_decay_factor': self.local_input_preamp.channel_profile_default_decay_factor,
+                'channel_profile_min_decay_factor': self.local_input_preamp.channel_profile_min_decay_factor,
+                'channel_profile_recovery_enabled': self.local_input_preamp.channel_profile_recovery_enabled,
+                'channel_profile_recovery_min_windows': self.local_input_preamp.channel_profile_recovery_min_windows,
+                'channel_profile_recovery_max_lufs_std_db': self.local_input_preamp.channel_profile_recovery_max_lufs_std_db,
+                'channel_profile_recovery_max_peak_std_db': self.local_input_preamp.channel_profile_recovery_max_peak_std_db,
+                'channel_profile_recovery_max_crest_db': self.local_input_preamp.channel_profile_recovery_max_crest_db,
+                'channel_profile_recovery_min_noise_margin_db': self.local_input_preamp.channel_profile_recovery_min_noise_margin_db,
+                'source_signature_change_hold_enabled': self.local_input_preamp.source_signature_change_hold_enabled,
+                'source_signature_change_min_fields': self.local_input_preamp.source_signature_change_min_fields,
+                'decision_confidence_enabled': self.local_input_preamp.decision_confidence_enabled,
+                'decision_confidence_gain_up_min_score': self.local_input_preamp.decision_confidence_gain_up_min_score,
+                'decision_confidence_hysteresis_enabled': self.local_input_preamp.decision_confidence_hysteresis_enabled,
+                'decision_confidence_borderline_margin': self.local_input_preamp.decision_confidence_borderline_margin,
+                'decision_confidence_stable_windows': self.local_input_preamp.decision_confidence_stable_windows,
+                'decision_confidence_score_tolerance': self.local_input_preamp.decision_confidence_score_tolerance,
+                'decision_confidence_time_memory_enabled': self.local_input_preamp.decision_confidence_time_memory_enabled,
+                'decision_confidence_default_sample_sec': self.local_input_preamp.decision_confidence_default_sample_sec,
+                'decision_confidence_min_window_sec': self.local_input_preamp.decision_confidence_min_window_sec,
+                'decision_confidence_max_age_sec': self.local_input_preamp.decision_confidence_max_age_sec,
+                'decision_confidence_max_gap_ratio': self.local_input_preamp.decision_confidence_max_gap_ratio,
+                'decision_confidence_min_memory_strength': self.local_input_preamp.decision_confidence_min_memory_strength,
+                'decision_confidence_decay_half_life_sec': self.local_input_preamp.decision_confidence_decay_half_life_sec,
+                'decision_confidence_vocal_decay_half_life_sec': self.local_input_preamp.decision_confidence_vocal_decay_half_life_sec,
+                'decision_confidence_playback_decay_half_life_sec': self.local_input_preamp.decision_confidence_playback_decay_half_life_sec,
+                'source_signature_drift_memory_penalty_enabled': self.local_input_preamp.source_signature_drift_memory_penalty_enabled,
+                'source_signature_drift_penalty_per_field': self.local_input_preamp.source_signature_drift_penalty_per_field,
+                'source_signature_drift_max_penalty': self.local_input_preamp.source_signature_drift_max_penalty,
+                'source_signature_drift_vocal_noise_weight': self.local_input_preamp.source_signature_drift_vocal_noise_weight,
+                'source_signature_drift_vocal_crest_weight': self.local_input_preamp.source_signature_drift_vocal_crest_weight,
+                'source_signature_drift_playback_lufs_weight': self.local_input_preamp.source_signature_drift_playback_lufs_weight,
+                'source_signature_drift_playback_peak_gap_weight': self.local_input_preamp.source_signature_drift_playback_peak_gap_weight,
+                'source_signature_continuous_drift_enabled': self.local_input_preamp.source_signature_continuous_drift_enabled,
+                'source_signature_continuous_drift_penalty_per_unit': self.local_input_preamp.source_signature_continuous_drift_penalty_per_unit,
+                'source_signature_continuous_drift_max_penalty': self.local_input_preamp.source_signature_continuous_drift_max_penalty,
+                'source_signature_spectral_drift_enabled': self.local_input_preamp.source_signature_spectral_drift_enabled,
+                'source_signature_spectral_drift_min_common_bands': self.local_input_preamp.source_signature_spectral_drift_min_common_bands,
+                'source_signature_spectral_drift_penalty_per_db': self.local_input_preamp.source_signature_spectral_drift_penalty_per_db,
+                'source_signature_spectral_drift_max_penalty': self.local_input_preamp.source_signature_spectral_drift_max_penalty,
+                'source_signature_spectral_vocal_presence_weight': self.local_input_preamp.source_signature_spectral_vocal_presence_weight,
+                'source_signature_spectral_playback_weight': self.local_input_preamp.source_signature_spectral_playback_weight,
+                'source_signature_spectral_drum_high_band_weight': self.local_input_preamp.source_signature_spectral_drum_high_band_weight,
+                'source_signature_spectral_quality_gate_enabled': self.local_input_preamp.source_signature_spectral_quality_gate_enabled,
+                'source_signature_spectral_min_band_samples': self.local_input_preamp.source_signature_spectral_min_band_samples,
+                'source_signature_spectral_min_band_coverage': self.local_input_preamp.source_signature_spectral_min_band_coverage,
+                'source_signature_spectral_max_band_std_db': self.local_input_preamp.source_signature_spectral_max_band_std_db,
+                'source_signature_spectral_max_band_span_db': self.local_input_preamp.source_signature_spectral_max_band_span_db,
+                'source_signature_spectral_stuck_band_std_db': self.local_input_preamp.source_signature_spectral_stuck_band_std_db,
+                'source_signature_spectral_stuck_signal_std_db': self.local_input_preamp.source_signature_spectral_stuck_signal_std_db,
+                'source_signature_spectral_quality_penalty_per_rejected_band': self.local_input_preamp.source_signature_spectral_quality_penalty_per_rejected_band,
+                'source_signature_spectral_quality_max_penalty': self.local_input_preamp.source_signature_spectral_quality_max_penalty,
+                'source_signature_spectral_vocal_presence_max_std_db': self.local_input_preamp.source_signature_spectral_vocal_presence_max_std_db,
+                'source_signature_spectral_vocal_presence_max_span_db': self.local_input_preamp.source_signature_spectral_vocal_presence_max_span_db,
+                'source_signature_spectral_playback_max_band_std_db': self.local_input_preamp.source_signature_spectral_playback_max_band_std_db,
+                'source_signature_spectral_playback_max_band_span_db': self.local_input_preamp.source_signature_spectral_playback_max_band_span_db,
+                'source_signature_spectral_transient_high_band_max_std_db': self.local_input_preamp.source_signature_spectral_transient_high_band_max_std_db,
+                'source_signature_spectral_transient_high_band_max_span_db': self.local_input_preamp.source_signature_spectral_transient_high_band_max_span_db,
+                'source_signature_spectral_transient_high_band_identity_weight': self.local_input_preamp.source_signature_spectral_transient_high_band_identity_weight,
+                'source_signature_spectral_transient_attack_high_band_identity_weight': self.local_input_preamp.source_signature_spectral_transient_attack_high_band_identity_weight,
+                'transient_window_profile_enabled': self.local_input_preamp.transient_window_profile_enabled,
+                'transient_window_min_samples': self.local_input_preamp.transient_window_min_samples,
+                'transient_window_attack_top_ratio': self.local_input_preamp.transient_window_attack_top_ratio,
+                'transient_window_attack_body_gap_db': self.local_input_preamp.transient_window_attack_body_gap_db,
+                'transient_window_high_band_lift_db': self.local_input_preamp.transient_window_high_band_lift_db,
+                'transient_window_min_repeated_hits': self.local_input_preamp.transient_window_min_repeated_hits,
+                'transient_window_hit_body_std_max_db': self.local_input_preamp.transient_window_hit_body_std_max_db,
+                'transient_window_hit_gap_std_max_db': self.local_input_preamp.transient_window_hit_gap_std_max_db,
+                'transient_window_body_reference_enabled': self.local_input_preamp.transient_window_body_reference_enabled,
+                'transient_window_source_specific_body_band_profiles': self.local_input_preamp.transient_window_source_specific_body_band_profiles,
+                'transient_window_body_band_reference_enabled': self.local_input_preamp.transient_window_body_band_reference_enabled,
+                'transient_window_body_band_std_max_db': self.local_input_preamp.transient_window_body_band_std_max_db,
             }
         }
     

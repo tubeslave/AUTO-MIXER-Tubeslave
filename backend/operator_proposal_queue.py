@@ -12,8 +12,14 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
+try:
+    from processing_registry import LIVE_ALLOWED_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_registry import LIVE_ALLOWED_WRITE_KINDS
+
 
 FINAL_STATUSES = {"accepted", "dismissed", "applied", "apply_blocked", "apply_error"}
+APPLYABLE_VALUE_TYPES = set(LIVE_ALLOWED_WRITE_KINDS)
 
 
 def utc_now() -> str:
@@ -35,13 +41,38 @@ def _coerce_float(value: Any) -> Optional[float]:
 
 
 def _is_applyable_change(change: Optional[Dict[str, Any]]) -> bool:
+    return not _apply_blockers_for_change(change)
+
+
+def _apply_blockers_for_change(change: Optional[Dict[str, Any]]) -> List[str]:
     if not isinstance(change, dict):
-        return False
-    return bool(change.get("value_type")) and change.get("channel") is not None and change.get("value") is not None
+        return ["missing_requested_change"]
+
+    blockers: List[str] = []
+    value_type = str(change.get("value_type") or "").strip().lower()
+    if not value_type:
+        blockers.append("missing_value_type")
+    elif value_type not in APPLYABLE_VALUE_TYPES:
+        blockers.append(f"unsupported_value_type:{value_type}")
+    if change.get("channel") is None:
+        blockers.append("missing_channel")
+    if change.get("value") is None:
+        blockers.append("missing_value")
+    return blockers
 
 
 def _are_applyable_changes(changes: List[Dict[str, Any]]) -> bool:
     return bool(changes) and all(_is_applyable_change(change) for change in changes)
+
+
+def _apply_blockers_for_changes(changes: List[Dict[str, Any]]) -> List[str]:
+    if not changes:
+        return ["missing_requested_change"]
+
+    blockers: List[str] = []
+    for change in changes:
+        blockers.extend(_apply_blockers_for_change(change))
+    return sorted(set(blockers))
 
 
 @dataclass
@@ -64,7 +95,12 @@ class OperatorProposal:
     result: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        can_apply = _are_applyable_changes(self.requested_changes) if self.requested_changes else _is_applyable_change(self.requested_change)
+        apply_blockers = (
+            _apply_blockers_for_changes(self.requested_changes)
+            if self.requested_changes
+            else _apply_blockers_for_change(self.requested_change)
+        )
+        can_apply = not apply_blockers
         return {
             "id": self.id,
             "title": self.title,
@@ -83,6 +119,7 @@ class OperatorProposal:
             "mode_at_creation": self.mode_at_creation,
             "can_apply": can_apply,
             "requires_approval": can_apply,
+            "apply_blockers": apply_blockers,
             "raw": dict(self.raw),
             "result": dict(self.result) if self.result else None,
         }

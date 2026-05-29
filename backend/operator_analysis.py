@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from operator_product_state import build_channel_inventory
+from shadow_gain_rides import build_shadow_gain_ride_candidates, shadow_gain_ride_trace
 
 
 PEAK_RISK_THRESHOLD_DB = -3.0
@@ -441,8 +442,25 @@ def build_operator_analysis_report(
     previewed: List[Dict[str, Any]] = []
     created: List[Dict[str, Any]] = []
     blocked: List[Dict[str, Any]] = []
+    shadow_gain_rides: List[Dict[str, Any]] = []
+    shadow_traces_recorded = 0
 
     if audio_running:
+        recent_traces = (
+            server.get_automation_decision_traces(200)
+            if hasattr(server, "get_automation_decision_traces")
+            else []
+        )
+        shadow_gain_rides = build_shadow_gain_ride_candidates(
+            inventory["channels"],
+            recent_traces=recent_traces,
+        )
+        if should_create and shadow_gain_rides and hasattr(server, "record_automation_decision_trace"):
+            mode = str(operator_mode.get("mode") or "assist")
+            for candidate in shadow_gain_rides:
+                server.record_automation_decision_trace(**shadow_gain_ride_trace(candidate, mode=mode))
+                shadow_traces_recorded += 1
+
         paired_channels = set()
         for observation in _build_stereo_level_observations(inventory["channels"]):
             paired_channels.update(int(channel) for channel in observation.get("channels", []))
@@ -492,7 +510,10 @@ def build_operator_analysis_report(
         "observation_count": len(observations),
         "created_count": len(created),
         "blocked_count": len(blocked),
+        "shadow_gain_ride_count": len(shadow_gain_rides),
+        "shadow_gain_ride_trace_count": shadow_traces_recorded,
         "observations": observations,
+        "shadow_gain_rides": shadow_gain_rides,
         "proposals_preview": previewed,
         "proposals_created": created,
         "proposals_blocked": blocked,

@@ -6,14 +6,19 @@ import type {
   Channel,
   Communication,
   DashboardRuntime,
+  DecisionTraceRecord,
   DeviceRecord,
   DirectorRuntime,
+  ChannelIntelligenceRecord,
   LogRecord,
   MemoryRecord,
   Metric,
+  ModuleStatusRecord,
   PerformanceRecord,
+  ReplayRunRecord,
   RoutingSegment,
   RuleLibrarySnapshotRow,
+  SafetyMonitorState,
   Task,
   Tone,
   TrainingSessionSnapshotRow,
@@ -125,6 +130,10 @@ function taskStatusFromBackend(status: unknown): Task['status'] {
   return 'Pending';
 }
 
+function cleanToken(value: unknown, fallback = ''): string {
+  return str(value, fallback).replace(/_/g, ' ');
+}
+
 function agentStatusFromBackend(status: unknown): Agent['status'] {
   const normalized = str(status, 'STANDBY').toUpperCase();
   if (normalized === 'ACTIVE') return 'ACTIVE';
@@ -170,6 +179,17 @@ function toneValue(value: unknown, fallback: Tone = 'blue'): Tone {
     return normalized as Tone;
   }
   return fallback;
+}
+
+function toneForModuleStatus(status: string, canWriteLive: boolean): Tone {
+  const normalized = status.toLowerCase();
+  if (normalized === 'canonical' && canWriteLive) return 'green';
+  if (normalized === 'canonical') return 'blue';
+  if (normalized === 'proposal_only' || normalized === 'shadow_only' || normalized === 'offline_only') return 'yellow';
+  if (normalized === 'lab') return 'purple';
+  if (normalized === 'placeholder' || normalized === 'quarantined') return 'red';
+  if (normalized === 'deprecated') return 'muted';
+  return canWriteLive ? 'yellow' : 'blue';
 }
 
 function busName(group: string): string {
@@ -275,6 +295,36 @@ export function adaptChannels(payload: unknown, fallback: Channel[]): Channel[] 
   });
 }
 
+export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[] {
+  const data = asRecord(payload);
+  const rows = asArray(data.module_status_map);
+  if (!rows.length) return [];
+
+  return rows.map(row => {
+    const status = str(row.status, 'unknown');
+    const canWriteLive = Boolean(row.can_write_live);
+    return {
+      moduleId: str(row.module_id, str(row.id, 'unknown_module')),
+      label: str(row.label, str(row.module_id, 'Unknown module')),
+      domain: str(row.domain, 'unknown'),
+      status,
+      entrypoint: str(row.entrypoint, str(row.module, 'none')),
+      module: str(row.module, ''),
+      uiSurface: str(row.ui_surface, 'Status-only surface'),
+      canWriteLive,
+      liveWriteKinds: Array.isArray(row.live_write_kinds)
+        ? row.live_write_kinds.map(item => String(item)).filter(Boolean)
+        : [],
+      pipelineProfiles: Array.isArray(row.pipeline_profiles)
+        ? row.pipeline_profiles.map(item => String(item)).filter(Boolean)
+        : [],
+      blockedReason: str(row.blocked_reason, ''),
+      nextStep: str(row.next_step, 'No next step published.'),
+      tone: toneForModuleStatus(status, canWriteLive)
+    };
+  });
+}
+
 export function adaptBusesFromChannels(channels: Channel[], fallback: BusRecord[]): BusRecord[] {
   if (!channels.length) return fallback;
 
@@ -358,7 +408,64 @@ export function adaptTasks(payload: unknown, fallback: Task[]): Task[] {
       target: str(row.target, String(base?.target ?? requestedChange.channel ?? 'Session')),
       canApply,
       backendStatus: str(row.status, 'pending'),
-      reason: str(row.reason, str(raw.reason, ''))
+      reason: str(row.reason, str(raw.reason, '')),
+      applyBlockers: Array.isArray(row.apply_blockers)
+        ? row.apply_blockers.map(item => String(item)).filter(Boolean)
+        : undefined,
+      requestedValueType: str(requestedChange.value_type)
+    };
+  });
+}
+
+export function adaptProposalOnlyContractTasks(payload: unknown): Task[] {
+  const data = asRecord(payload);
+  const rows = asArray(data.proposal_only_contracts);
+  if (!rows.length) return [];
+
+  return rows.map((row, index) => {
+    const contract = asRecord(row.proposal_contract);
+    const valueType = str(contract.value_type, str(row.value_type, 'review'));
+    const blockers = Array.isArray(row.blockers)
+      ? row.blockers.map(item => String(item)).filter(Boolean)
+      : [`unsupported_value_type:${valueType}`];
+    const methodLabel = str(row.method_label, str(row.method_id, 'Correction method'));
+    const domain = str(row.domain, 'review');
+    const id = str(row.id, `proposal-only-${index + 1}`);
+    return {
+      id,
+      proposalId: id,
+      priority: row.risk === 'blocked' ? 'High' : 'Medium',
+      title: str(row.title, `${methodLabel}: proposal contract only`),
+      agent: methodLabel,
+      status: 'Review',
+      time: timeLabel(data.generated_at, 'review'),
+      target: cleanToken(row.target, cleanToken(contract.target_kind, domain)),
+      canApply: false,
+      backendStatus: 'proposal_only',
+      reason: str(row.reason, 'Correction exists but live apply is not promoted.'),
+      reviewOnly: true,
+      applyBlockers: blockers,
+      correctionDomain: domain,
+      requestedValueType: valueType,
+      proposalContract: {
+        valueType,
+        targetKind: str(contract.target_kind, str(row.target, domain)),
+        requiredFields: Array.isArray(contract.required_fields)
+          ? contract.required_fields.map(item => String(item))
+          : [],
+        oldValueSource: str(contract.old_value_source, 'readback_required_before_promotion'),
+        safetyEvidenceRequired: Array.isArray(contract.safety_evidence_required)
+          ? contract.safety_evidence_required.map(item => String(item))
+          : [],
+        requiredApproval: str(contract.required_approval, 'operator_supervised'),
+        readbackRequired: Boolean(contract.readback_required),
+        rollbackRequired: Boolean(contract.rollback_required),
+        liveApplyAllowed: Boolean(contract.live_apply_allowed),
+        allowedLiveWriteKinds: Array.isArray(contract.allowed_live_write_kinds)
+          ? contract.allowed_live_write_kinds.map(item => String(item))
+          : [],
+        promotionNext: str(contract.promotion_next, 'hardware_readback_and_rollback_required')
+      }
     };
   });
 }
@@ -912,6 +1019,92 @@ export function adaptRoutingSegments(payload: unknown): RoutingSegment[] {
       usedBy: Array.isArray(row.used_by) ? row.used_by.map(item => String(item)) : []
     };
   });
+}
+
+function toneForTrace(row: UnknownRecord): Tone {
+  const status = str(row.status).toLowerCase();
+  const blocked = str(row.blocked_reason);
+  const proof = str(row.proof_status).toLowerCase();
+  if (blocked || status.includes('blocked') || status.includes('error')) return 'red';
+  if (proof === 'verified' || status === 'applied') return 'green';
+  if (status.includes('created') || status.includes('pending')) return 'blue';
+  return 'yellow';
+}
+
+export function adaptDecisionTraces(payload: unknown): DecisionTraceRecord[] {
+  return asArray(asRecord(payload).traces).slice(-24).reverse().map((row, index) => ({
+    decisionId: str(row.decision_id, `trace-${index + 1}`),
+    proposalId: str(row.proposal_id) || undefined,
+    source: str(row.source, 'automation_trace_store'),
+    mode: str(row.mode) || undefined,
+    target: str(row.target) || undefined,
+    actionType: str(row.action_type, 'proposal'),
+    status: str(row.status, 'observed'),
+    delta: row.delta === null || row.delta === undefined ? undefined : String(row.delta),
+    proofStatus: str(row.proof_status, 'unverified'),
+    blockedReason: str(row.blocked_reason) || undefined,
+    createdAt: timeLabel(row.created_at, 'now'),
+    tone: toneForTrace(row)
+  }));
+}
+
+export function adaptSafetyMonitor(payload: unknown, backend: BackendUiState): SafetyMonitorState {
+  const data = asRecord(payload);
+  const liveWritePolicy = asRecord(data.live_write_policy);
+  const manual = asRecord(data.manual_write_supervision);
+  const proof = asRecord(data.proof);
+  const lastReadback = asRecord(proof.last_readback);
+  const summary = asRecord(data.summary);
+  const mode = asRecord(data.operator_mode);
+  const blockedSurfaces = Array.isArray(data.blocked_surfaces)
+    ? data.blocked_surfaces.map(item => String(item))
+    : ['eq', 'compressor', 'routing', 'snapshots', 'autonomous_apply'];
+  return {
+    operatorMode: str(mode.mode, backend.liveWritePolicy === 'mock_frontend_only' ? 'mock' : 'unknown'),
+    liveWritePolicy: str(liveWritePolicy.policy, backend.liveWritePolicy),
+    applyPath: str(liveWritePolicy.apply_path, backend.applyPath),
+    emergencyStopped: Boolean(manual.emergency_stopped),
+    resetRequired: Boolean(manual.reset_required),
+    ready: Boolean(summary.ready),
+    mixerConnected: Boolean(summary.mixer_connected),
+    approvedLiveWriteKinds: Array.isArray(liveWritePolicy.approved_live_write_kinds)
+      ? liveWritePolicy.approved_live_write_kinds.map(item => String(item))
+      : backend.writeScope,
+    blockedSurfaces,
+    lastProofStatus: str(proof.last_proof_status, 'none'),
+    lastReadbackStatus: str(lastReadback.status, 'none'),
+    traceCount: Math.trunc(num(summary.trace_count, 0)),
+    blockedTraceCount: Math.trunc(num(summary.blocked_trace_count, 0)),
+    sourceLabel: str(data.source, backend.sourceLabel)
+  };
+}
+
+export function adaptReplayRuns(payload: unknown): ReplayRunRecord[] {
+  return asArray(asRecord(payload).runs).map((row, index) => ({
+    runId: str(row.run_id, `replay-${index + 1}`),
+    status: str(row.status, 'unknown'),
+    reason: str(row.reason, ''),
+    generatedAt: timeLabel(row.generated_at, 'runtime'),
+    reportPath: str(row.report_path, ''),
+    tracePath: str(row.decision_traces_path, ''),
+    metricsPath: str(row.metrics_path, ''),
+    traceCount: Math.trunc(num(row.trace_count, 0)),
+    offlineOnly: row.offline_only !== false,
+    liveWrite: Boolean(row.live_write)
+  }));
+}
+
+export function adaptChannelIntelligence(payload: unknown): ChannelIntelligenceRecord[] {
+  return asArray(asRecord(payload).channels).map((row, index) => ({
+    channel: Math.trunc(num(row.channel, index + 1)),
+    name: str(row.name, `Ch ${index + 1}`),
+    role: str(row.role, 'Channel'),
+    group: str(row.group, 'CHANNELS'),
+    risk: str(row.risk, 'low'),
+    gainRideState: str(row.gain_ride_state, 'shadow_proposal_only'),
+    recentTraceCount: Math.trunc(num(row.recent_trace_count, 0)),
+    liveApplyAllowed: Boolean(row.live_apply_allowed)
+  }));
 }
 
 export function appendBackendLog(

@@ -90,11 +90,39 @@ def _sorted_suggestion_items(suggestions: Dict[Any, Any]) -> Iterable[Tuple[Any,
 def _safe_gain_severity(suggestion: Dict[str, Any], gain_db: float) -> str:
     limited_by = str(suggestion.get("limited_by") or "").lower()
     peak_db = _coerce_float(suggestion.get("peak_db"))
-    if limited_by == "peak" or (peak_db is not None and peak_db >= -1.0) or abs(gain_db) >= 8.0:
+    character = suggestion.get("input_gain_character") or {}
+    distortion_risk = str(character.get("distortion_risk") or "").lower() if isinstance(character, dict) else ""
+    if limited_by in {"peak", "peak_headroom"} or distortion_risk == "high" or (peak_db is not None and peak_db >= -1.0) or abs(gain_db) >= 8.0:
         return "high"
     if abs(gain_db) >= 4.0:
         return "medium"
     return "low"
+
+
+def _safe_gain_evidence(suggestion: Dict[str, Any], gain_db: float) -> List[Dict[str, Any]]:
+    evidence: List[Dict[str, Any]] = [
+        {"label": "Method", "value": suggestion.get("method_id") or "safe_gain"},
+        {"label": "Role", "value": suggestion.get("input_trim_role") or "input_headroom"},
+        {"label": "Direction", "value": "gain_down" if gain_db < 0 else "gain_up"},
+    ]
+    target_peak = _round(suggestion.get("target_peak_db"))
+    peak = _round(suggestion.get("peak_db"))
+    if peak is not None:
+        evidence.append({"label": "Peak", "value": peak, "target": target_peak})
+    character = suggestion.get("input_gain_character")
+    if isinstance(character, dict):
+        evidence.extend([
+            {"label": "Preamp character", "value": character.get("character")},
+            {
+                "label": "Preamp zone",
+                "value": f"{character.get('current_zone')} -> {character.get('target_zone')}",
+            },
+            {"label": "Distortion risk", "value": character.get("distortion_risk")},
+        ])
+    note = suggestion.get("operator_note")
+    if note:
+        evidence.append({"label": "Operator note", "value": str(note)})
+    return evidence
 
 
 def build_safe_gain_operator_proposals(
@@ -127,7 +155,9 @@ def build_safe_gain_operator_proposals(
 
         mixer_channel = _mapping_lookup(channel_mapping, audio_channel) or audio_channel
         current_trim = _safe_current_trim(mixer_client, mixer_channel)
-        target_trim = _clip((current_trim or 0.0) + gain_db, -24.0, 24.0)
+        suggested_target = _coerce_float(raw_suggestion.get("target_trim_db"))
+        target_trim = suggested_target if suggested_target is not None else (current_trim or 0.0) + gain_db
+        target_trim = _clip(target_trim, -18.0, 18.0)
         requested_change = None
         if current_trim is not None:
             requested_change = {
@@ -136,9 +166,17 @@ def build_safe_gain_operator_proposals(
                 "value": round(target_trim, 1),
                 "current_value": round(current_trim, 1),
                 "delta_db": round(gain_db, 1),
+                "old_value": round(current_trim, 1),
+                "proposed_value": round(target_trim, 1),
+                "rollback_value": round(current_trim, 1),
+                "readback_required": True,
+                "safety_evidence": _safe_gain_evidence(raw_suggestion, gain_db),
             }
 
         sign = "+" if gain_db >= 0 else ""
+        confidence = _coerce_float(raw_suggestion.get("confidence"))
+        if confidence is None:
+            confidence = 0.86 if current_trim is not None else 0.7
         proposals.append(
             {
                 "id": f"safe_gain:{audio_channel}:{mixer_channel}",
@@ -147,10 +185,11 @@ def build_safe_gain_operator_proposals(
                 "channel": mixer_channel,
                 "kind": "gain" if requested_change else "analysis",
                 "severity": _safe_gain_severity(raw_suggestion, gain_db),
-                "confidence": 0.86 if current_trim is not None else 0.7,
+                "confidence": confidence if current_trim is not None else min(confidence, 0.7),
                 "source": source,
                 "reason": (
-                    "SafeGain measured channel loudness and suggests an input trim adjustment."
+                    raw_suggestion.get("operator_note")
+                    or "SafeGain measured input headroom and suggests an input trim adjustment."
                     if requested_change
                     else "SafeGain has a trim suggestion, but current cached trim is unknown."
                 ),

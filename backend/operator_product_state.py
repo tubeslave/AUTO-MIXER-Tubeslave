@@ -6,7 +6,9 @@ changes. They translate the backend runtime into stable UI contracts.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from dante_routing_config import get_module_signal_info, get_routing_as_dict
@@ -472,6 +474,210 @@ def build_processing_pipeline_snapshot(server: Any, include_methods: bool = True
     return snapshot
 
 
+def build_decision_traces(server: Any, limit: int = 50) -> Dict[str, Any]:
+    traces = (
+        _safe_call(server.get_automation_decision_traces, limit, default=[])
+        if hasattr(server, "get_automation_decision_traces")
+        else []
+    )
+    if not isinstance(traces, list):
+        traces = []
+    blocked_count = sum(1 for row in traces if isinstance(row, dict) and row.get("blocked_reason"))
+    applied_count = sum(1 for row in traces if isinstance(row, dict) and row.get("status") == "applied")
+    verified_count = sum(1 for row in traces if isinstance(row, dict) and row.get("proof_status") == "verified")
+    return {
+        "type": "decision_traces",
+        "generated_at": _utc_now(),
+        "status": "ok",
+        "source": "automation_trace_store",
+        "artifact_path": str(getattr(getattr(server, "automation_trace_store", None), "path", "")),
+        "summary": {
+            "trace_count": len(traces),
+            "applied_count": applied_count,
+            "blocked_count": blocked_count,
+            "verified_count": verified_count,
+        },
+        "traces": traces,
+    }
+
+
+def build_safety_monitor(server: Any) -> Dict[str, Any]:
+    operator_mode = server.get_operator_mode_status()
+    dashboard = build_dashboard_snapshot(server)
+    connection = dashboard.get("connection", {})
+    safety = dashboard.get("safety", {})
+    ready_for_live = safety.get("ready_for_live") if isinstance(safety, dict) else {}
+    if not isinstance(ready_for_live, dict):
+        ready_for_live = {}
+    manual = (
+        _safe_call(server.get_manual_write_supervision_status, default={})
+        if hasattr(server, "get_manual_write_supervision_status")
+        else {}
+    )
+    traces = build_decision_traces(server, limit=12)
+    last_trace = traces["traces"][-1] if traces["traces"] else None
+    quarantined_surfaces = [
+        "eq",
+        "compressor",
+        "gate",
+        "pan",
+        "phase_delay",
+        "fx_sends",
+        "routing",
+        "snapshots",
+        "training_rules",
+        "autonomous_apply",
+    ]
+    return {
+        "type": "safety_monitor",
+        "generated_at": _utc_now(),
+        "status": "ok",
+        "source": "runtime_policy",
+        "operator_mode": operator_mode,
+        "connection": connection,
+        "manual_write_supervision": manual,
+        "ready_for_live": ready_for_live,
+        "live_write_policy": {
+            "apply_path": operator_mode.get("apply_path"),
+            "policy": operator_mode.get("live_write_policy"),
+            "approved_live_write_kinds": manual.get("approved_live_write_kinds", ["fader", "gain"]),
+            "requires_approval": operator_mode.get("capabilities", {}).get("requires_approval", True),
+            "direct_writes_allowed": False,
+            "autonomous_apply_allowed": False,
+        },
+        "proof": {
+            "last_trace": last_trace,
+            "last_pre_read": (last_trace or {}).get("pre_read"),
+            "last_readback": (last_trace or {}).get("readback"),
+            "last_rollback": (last_trace or {}).get("rollback"),
+            "last_proof_status": (last_trace or {}).get("proof_status"),
+        },
+        "blocked_surfaces": quarantined_surfaces,
+        "summary": {
+            "ready": bool(ready_for_live.get("ready")),
+            "mixer_connected": bool(connection.get("connected")),
+            "emergency_stopped": bool(manual.get("emergency_stopped")),
+            "reset_required": bool(manual.get("reset_required")),
+            "trace_count": traces["summary"]["trace_count"],
+            "blocked_trace_count": traces["summary"]["blocked_count"],
+        },
+    }
+
+
+def _load_replay_summary(path: Path) -> Optional[Dict[str, Any]]:
+    try:
+        with path.open(encoding="utf-8") as handle:
+            value = json.load(handle)
+        return value if isinstance(value, dict) else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def build_replay_runs(server: Any, limit: int = 20) -> Dict[str, Any]:
+    root = Path(
+        getattr(server, "_replay_artifacts_dir", None)
+        or Path(__file__).resolve().parents[1] / "artifacts" / "replay"
+    )
+    rows: List[Dict[str, Any]] = []
+    if root.exists():
+        for summary_path in sorted(root.glob("*/summary.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+            summary = _load_replay_summary(summary_path)
+            if not summary:
+                continue
+            metrics = _load_replay_summary(summary_path.parent / "metrics_before_after.json") or {}
+            rows.append(
+                {
+                    "run_id": summary_path.parent.name,
+                    "status": summary.get("status", "unknown"),
+                    "reason": summary.get("reason"),
+                    "generated_at": summary.get("generated_at"),
+                    "connection_policy": summary.get("connection_policy"),
+                    "write_policy": summary.get("write_policy"),
+                    "summary": summary.get("summary", {}),
+                    "trace_count": metrics.get("trace_count", 0),
+                    "offline_only": metrics.get("offline_only", True),
+                    "live_write": metrics.get("live_write", False),
+                    "before_after_available": metrics.get("before_after_available", False),
+                    "report_path": str(summary_path.parent / "report.md"),
+                    "summary_path": str(summary_path),
+                    "decision_traces_path": str(summary_path.parent / "decision_traces.jsonl"),
+                    "metrics_path": str(summary_path.parent / "metrics_before_after.json"),
+                }
+            )
+            if len(rows) >= limit:
+                break
+    return {
+        "type": "replay_runs",
+        "generated_at": _utc_now(),
+        "status": "ok",
+        "source": "offline_replay_artifacts",
+        "artifact_root": str(root),
+        "summary": {
+            "run_count": len(rows),
+            "offline_only": True,
+            "live_write": False,
+        },
+        "runs": rows,
+    }
+
+
+def build_channel_intelligence(server: Any, total_channels: int = DEFAULT_CHANNEL_COUNT) -> Dict[str, Any]:
+    inventory = build_channel_inventory(server, total_channels=total_channels)
+    traces = build_decision_traces(server, limit=200).get("traces", [])
+    traces_by_channel: Dict[int, List[Dict[str, Any]]] = {}
+    for trace in traces:
+        if not isinstance(trace, dict):
+            continue
+        target = trace.get("target")
+        try:
+            channel = int(target)
+        except (TypeError, ValueError):
+            continue
+        traces_by_channel.setdefault(channel, []).append(trace)
+
+    rows = []
+    for channel in inventory.get("channels", []):
+        number = int(channel.get("number") or channel.get("id") or 0)
+        meter = channel.get("meter", {}) if isinstance(channel.get("meter"), dict) else {}
+        channel_traces = traces_by_channel.get(number, [])
+        peak = _round(channel.get("peak_db") or meter.get("peak_db"))
+        lufs = _round(channel.get("lufs") or meter.get("lufs"))
+        risk = "low"
+        if peak is not None and peak > -3:
+            risk = "peak_watch"
+        if peak is not None and peak > -1:
+            risk = "clip_risk"
+        rows.append(
+            {
+                "channel": number,
+                "name": channel.get("name"),
+                "role": channel.get("role"),
+                "group": channel.get("group"),
+                "status": channel.get("status"),
+                "peak_db": peak,
+                "lufs": lufs,
+                "recent_trace_count": len(channel_traces),
+                "last_trace_status": channel_traces[-1].get("status") if channel_traces else None,
+                "intelligibility_state": "shadow_only",
+                "gain_ride_state": "shadow_proposal_only",
+                "risk": risk,
+                "live_apply_allowed": False,
+            }
+        )
+    return {
+        "type": "channel_intelligence",
+        "generated_at": _utc_now(),
+        "status": "ok",
+        "source": "runtime_inventory_and_traces",
+        "summary": {
+            "channel_count": len(rows),
+            "shadow_only": True,
+            "live_apply_allowed": False,
+        },
+        "channels": rows,
+    }
+
+
 def _agent_record(
     *,
     agent_id: str,
@@ -846,8 +1052,26 @@ def build_memory_knowledge_snapshot(server: Any) -> Dict[str, Any]:
     roster = build_operator_agent_roster(server)
     queue = build_decision_queue(server, limit=12)
     inventory = build_channel_inventory(server, total_channels=24)
+    decision_memory = (
+        _safe_call(server.get_decision_memory_entries, 12, default=[])
+        if hasattr(server, "get_decision_memory_entries")
+        else []
+    )
 
     memories: List[Dict[str, Any]] = []
+    for entry in decision_memory[:8]:
+        confidence = entry.get("confidence")
+        quality = str(entry.get("evidence_quality") or "evidence")
+        memories.append(
+            {
+                "name": str(entry.get("summary") or "Decision evidence memory"),
+                "type": f"{quality.title()} Decision Evidence",
+                "size": "3.2 KB",
+                "confidence": round(float(confidence or 0.82) * 100),
+                "updated": str(entry.get("trace_created_at") or entry.get("created_at") or "trace"),
+            }
+        )
+
     for agent in roster.get("agents", [])[:8]:
         confidence = agent.get("confidence")
         memories.append(
@@ -893,6 +1117,7 @@ def build_memory_knowledge_snapshot(server: Any) -> Dict[str, Any]:
             "memory_count": len(memories),
             "agent_records": len(roster.get("agents", [])),
             "queue_records": len(queue.get("history", [])) + len(queue.get("pending_actions", [])),
+            "decision_memory_records": len(decision_memory),
         },
         "memories": memories[:32],
     }

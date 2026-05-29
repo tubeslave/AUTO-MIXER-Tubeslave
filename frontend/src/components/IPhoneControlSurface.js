@@ -234,8 +234,8 @@ function IPhoneControlSurface({
   };
 
   const confirmBypass = () => {
-    if (!window.confirm('Bypass отключит обработку и сбросит фейдеры WING на 0 dB. Продолжить?')) return;
     onBypass();
+    setMessage('Bypass заблокирован: live reset выведен из remote UI.');
   };
 
   const renderChannelCard = (channel) => {
@@ -507,7 +507,7 @@ function IPhoneControlSurface({
       <footer className="iphone-command-pad">
         <button type="button" className="apply" onClick={applyPending}>Apply</button>
         <button type="button" className="rollback" onClick={restoreBackup}>Откат</button>
-        <button type="button" className="bypass" onClick={confirmBypass}>Bypass</button>
+        <button type="button" className="bypass" onClick={confirmBypass}>Bypass locked</button>
         <button type="button" className="stop" onClick={emergencyStop}>СТОП</button>
       </footer>
 

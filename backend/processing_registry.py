@@ -164,13 +164,14 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
     ),
     ProcessingMethod(
         id="lufs_gain_staging",
-        label="LUFS Gain Staging",
+        label="Input Trim Autogain",
         domain="gain_fader",
         status="proposal_only",
-        summary="Ayaic-style level-plane and LUFS guidance for gain/fader proposals.",
-        module="backend/lufs_gain_staging.py",
+        summary="Main input-trim autogain: headroom-first proposals/offline renders with local preamp character and distortion safeguards.",
+        module="backend/lufs_gain_staging.py + tools/offline_input_trim_autogain_mix.py",
         can_analyze=True,
         can_propose=True,
+        can_render_offline=True,
         pipeline_profiles=("main_live_assist", "offline_mix"),
     ),
     ProcessingMethod(
@@ -522,6 +523,59 @@ PROMOTION_LADDER = (
     },
 )
 
+MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
+    "product_operator_state": {
+        "entrypoint": "get_dashboard_snapshot / get_decision_queue / get_safety_monitor",
+        "ui_surface": "Control Center dashboard, Task Queue, Safety Monitor",
+        "next_step": "Keep as the canonical read model and route new automation through proposals.",
+    },
+    "auto_soundcheck_engine": {
+        "entrypoint": "run_operator_analysis / import_soundcheck_recommendations",
+        "ui_surface": "Dashboard analysis and Task Queue proposals",
+        "next_step": "Keep live behavior guarded; emit fader/gain proposals before any apply.",
+    },
+    "supervised_manual_fader_gain": {
+        "entrypoint": "apply_operator_proposal -> supervised manual gate",
+        "ui_surface": "Task Queue supervised apply",
+        "next_step": "Complete separate physical gain proof before widening readiness claims.",
+    },
+    "auto_fader_v1": {
+        "entrypoint": "main_pipeline_preview proposal adapter",
+        "ui_surface": "Task Queue preview/proposal rows",
+        "next_step": "Expand proposal evidence without adding direct fader writes.",
+    },
+    "lufs_gain_staging": {
+        "entrypoint": "safe_gain_suggestions / input-trim proposal adapter / tools/offline_input_trim_autogain_mix.py",
+        "ui_surface": "Gain staging, Task Queue proposals, offline stem render",
+        "next_step": "Keep live trim moves proposal-first with rollback/readback metadata.",
+    },
+    "live_shared_mix": {
+        "entrypoint": "main_pipeline_preview proposal adapter",
+        "ui_surface": "Task Queue linked fader proposals",
+        "next_step": "Keep grouped balance as linked fader/gain proposals only.",
+    },
+    "mix_agent_conservative": {
+        "entrypoint": "python -m mix_agent analyze|suggest|apply",
+        "ui_surface": "Offline reports; no live cockpit apply",
+        "next_step": "Import useful findings as proposals/reports, never direct WING writes.",
+    },
+    "offline_agent_mix": {
+        "entrypoint": "tools/offline_agent_mix.py",
+        "ui_surface": "Offline reports; no live cockpit apply",
+        "next_step": "Keep as offline/lab renderer until a narrow adapter exists.",
+    },
+    "automixer_production_mix_v1": {
+        "entrypoint": "none in this checkout",
+        "ui_surface": "Hidden from live cockpit",
+        "next_step": "Restore as an explicit offline entrypoint or retire as legacy.",
+    },
+    "ai_mixing_pipeline_legacy": {
+        "entrypoint": "none in this checkout",
+        "ui_surface": "Hidden from live cockpit",
+        "next_step": "Keep deprecated until a replacement decision is made.",
+    },
+}
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -541,6 +595,38 @@ def get_processing_method(method_id: str) -> Optional[ProcessingMethod]:
 
 def get_pipeline_profile(profile_id: str) -> Optional[PipelineProfile]:
     return next((profile for profile in PIPELINE_PROFILES if profile.id == profile_id), None)
+
+
+def build_module_status_map() -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for method in PROCESSING_METHODS:
+        override = MODULE_STATUS_OVERRIDES.get(method.id, {})
+        next_step = (
+            override.get("next_step")
+            or method.promotion_next
+            or (
+                "Requires separate ADR, tests, physical readback, rollback, cooldown, and emergency-stop proof."
+                if method.status in {"proposal_only", "lab"}
+                else "Keep isolated from the main live pipeline."
+            )
+        )
+        rows.append(
+            {
+                "module_id": method.id,
+                "label": method.label,
+                "domain": method.domain,
+                "status": method.status,
+                "entrypoint": override.get("entrypoint", method.module),
+                "module": method.module,
+                "ui_surface": override.get("ui_surface", "Processing registry / status-only surfaces"),
+                "can_write_live": method.can_write_live,
+                "live_write_kinds": list(method.live_write_kinds),
+                "pipeline_profiles": list(method.pipeline_profiles),
+                "blocked_reason": method.blocked_reason,
+                "next_step": next_step,
+            }
+        )
+    return rows
 
 
 def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[str, Any]:
@@ -572,6 +658,7 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
             "live_apply_policy": "supervised_fader_gain_only",
         },
         "pipeline_profiles": profiles,
+        "module_status_map": build_module_status_map(),
         "methods": methods if include_methods else [],
         "promotion_ladder": list(PROMOTION_LADDER),
     }

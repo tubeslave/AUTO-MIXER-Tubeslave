@@ -2,15 +2,19 @@
 
 from operator_product_state import (
     build_agent_communications_snapshot,
+    build_channel_intelligence,
     build_operator_agent_roster,
     build_processing_pipeline_snapshot,
     build_channel_inventory,
     build_connection_topology,
     build_dashboard_snapshot,
     build_decision_queue,
+    build_decision_traces,
     build_groups_buses_snapshot,
     build_memory_knowledge_snapshot,
+    build_replay_runs,
     build_rules_library_snapshot,
+    build_safety_monitor,
     build_training_sessions_snapshot,
 )
 from operator_analysis import build_operator_analysis_report
@@ -18,6 +22,7 @@ from processing_pipeline_preview import build_main_pipeline_preview
 
 
 VERIFIED_MANUAL_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
+APPLY_DELTA_LIMITS_DB = {"fader": 1.0, "gain": 0.5}
 
 
 def manual_write_result_verified(result):
@@ -32,6 +37,162 @@ def register_handlers(server):
     def proposal_id_or_index(data):
         return data.get("proposal_id") or data.get("id"), data.get("index")
 
+    def coerce_float(value):
+        try:
+            if value is None:
+                return None
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def is_operator_authored(proposal, data):
+        raw = getattr(proposal, "raw", {}) if proposal is not None else {}
+        return bool(
+            data.get("operator_authored")
+            or raw.get("operator_authored")
+            or raw.get("authored_by") == "operator"
+            or raw.get("source") == "operator_authored"
+        )
+
+    def trace_payload_for_result(
+        *,
+        proposal=None,
+        operator_mode=None,
+        requested_change=None,
+        normalized_change=None,
+        apply_result=None,
+        idempotency_key=None,
+        status="blocked",
+        blocked_reason=None,
+        metadata=None,
+    ):
+        change = normalized_change or requested_change or {}
+        result = apply_result or {}
+        value_type = str(result.get("value_type") or change.get("value_type") or getattr(proposal, "kind", "") or "").strip().lower()
+        target = result.get("channel", change.get("channel", getattr(proposal, "target", None)))
+        current_value = result.get("old_value", change.get("old_value", change.get("current_value")))
+        proposed_value = result.get("effective_value", result.get("requested_value", change.get("effective_value", change.get("value"))))
+        delta = result.get("delta_db", change.get("delta_db"))
+        if delta is None:
+            current_float = coerce_float(current_value)
+            proposed_float = coerce_float(proposed_value)
+            if current_float is not None and proposed_float is not None:
+                delta = round(proposed_float - current_float, 3)
+        mode = (operator_mode or {}).get("mode") if isinstance(operator_mode, dict) else getattr(server, "operator_mode", None)
+        readback = None
+        if result.get("readback_status") or result.get("readback_value") is not None:
+            readback = {
+                "status": result.get("readback_status"),
+                "source": result.get("readback_source"),
+                "value": result.get("readback_value"),
+            }
+        rollback = None
+        if result.get("rollback_available") is not None or result.get("rollback_status") is not None:
+            rollback = {
+                "available": result.get("rollback_available"),
+                "value": result.get("rollback_value"),
+                "status": result.get("rollback_status"),
+                "readback_status": result.get("rollback_readback_status"),
+                "proof_status": result.get("rollback_proof_status"),
+            }
+        pre_read = None
+        pre_read_status = result.get("pre_read_status", change.get("pre_read_status"))
+        pre_read_value = result.get("pre_read_value", change.get("pre_read_value", current_value))
+        if pre_read_status or pre_read_value is not None:
+            pre_read = {
+                "status": pre_read_status,
+                "source": result.get("pre_read_source", change.get("pre_read_source")),
+                "value": pre_read_value,
+            }
+        return {
+            "idempotency_key": idempotency_key,
+            "proposal_id": getattr(proposal, "id", None),
+            "source": getattr(proposal, "source", "operator_proposal_queue") if proposal else "operator_apply",
+            "mode": mode,
+            "target": target,
+            "action_type": value_type or "proposal",
+            "status": status,
+            "current_value": current_value,
+            "proposed_value": proposed_value,
+            "delta": delta,
+            "safety_limits": {
+                "allowed_live_write_kinds": ["fader", "gain"],
+                "max_delta_db": APPLY_DELTA_LIMITS_DB.get(value_type),
+                "upward_auto_generated_moves_allowed": False,
+            },
+            "pre_read": pre_read,
+            "readback": readback,
+            "rollback": rollback,
+            "proof_status": result.get("proof_status", "blocked" if blocked_reason else "unverified"),
+            "blocked_reason": blocked_reason,
+            "metadata": metadata or {},
+        }
+
+    def record_apply_trace(**kwargs):
+        recorder = getattr(server, "record_automation_decision_trace", None)
+        if callable(recorder):
+            recorder(**trace_payload_for_result(**kwargs))
+
+    async def validate_change_before_apply(
+        change,
+        *,
+        proposal,
+        data,
+        operator_mode,
+        linked=False,
+    ):
+        normalized, error = normalize_linked_change(change)
+        if error:
+            return None, {
+                "reason": error,
+                "requested_change": change,
+            }
+        read_value = None
+        read_helper = getattr(server, "_manual_write_read_value", None)
+        if callable(read_helper):
+            read_value = await read_helper(
+                channel=normalized["channel"],
+                value_type=normalized["value_type"],
+                address=normalized["address"],
+                prefer_physical=True,
+            )
+            old_value = read_value.get("value")
+        else:
+            state = getattr(getattr(server, "mixer_client", None), "state", {})
+            old_value = state.get(normalized["address"]) if isinstance(state, dict) else None
+        old_float = coerce_float(old_value)
+        if old_float is None:
+            return None, {
+                "reason": "linked_pre_read_unavailable" if linked else "pre_read_unavailable",
+                "channel": normalized["channel"],
+                "value_type": normalized["value_type"],
+                "address": normalized["address"],
+                "pre_read_status": (read_value or {}).get("status"),
+                "pre_read_source": (read_value or {}).get("source"),
+            }
+        normalized["old_value"] = old_value
+        normalized["pre_read_value"] = old_value
+        normalized["pre_read_status"] = (read_value or {}).get("status")
+        normalized["pre_read_source"] = (read_value or {}).get("source")
+        normalized["delta_db"] = round(float(normalized["effective_value"]) - old_float, 3)
+        max_delta = APPLY_DELTA_LIMITS_DB.get(normalized["value_type"])
+        if max_delta is not None and abs(normalized["delta_db"]) > max_delta:
+            return normalized, {
+                "reason": "delta_limit_exceeded",
+                "channel": normalized["channel"],
+                "value_type": normalized["value_type"],
+                "delta_db": normalized["delta_db"],
+                "max_delta_db": max_delta,
+            }
+        if normalized["delta_db"] > 0 and not is_operator_authored(proposal, data):
+            return normalized, {
+                "reason": "upward_move_requires_operator_authored_proposal",
+                "channel": normalized["channel"],
+                "value_type": normalized["value_type"],
+                "delta_db": normalized["delta_db"],
+            }
+        return normalized, None
+
     async def handle_get_dashboard_snapshot(websocket, data):
         await server.send_to_client(websocket, build_dashboard_snapshot(server))
 
@@ -45,6 +206,76 @@ def register_handlers(server):
     async def handle_get_decision_queue(websocket, data):
         limit = data.get("limit", 50)
         await server.send_to_client(websocket, build_decision_queue(server, limit=limit))
+
+    async def handle_get_decision_traces(websocket, data):
+        limit = data.get("limit", 50)
+        await server.send_to_client(websocket, build_decision_traces(server, limit=limit))
+
+    async def handle_get_safety_monitor(websocket, data):
+        del data
+        await server.send_to_client(websocket, build_safety_monitor(server))
+
+    async def handle_get_replay_runs(websocket, data):
+        limit = data.get("limit", 20)
+        await server.send_to_client(websocket, build_replay_runs(server, limit=limit))
+
+    async def handle_start_replay_run(websocket, data):
+        try:
+            from offline_validation_harness import run_offline_validation, write_offline_validation_artifacts
+        except ImportError:  # pragma: no cover - package import compatibility
+            from backend.offline_validation_harness import run_offline_validation, write_offline_validation_artifacts
+
+        run_id = str(data.get("run_id") or "").strip() or None
+        result = run_offline_validation(total_channels=int(data.get("total_channels", 16) or 16))
+        paths = write_offline_validation_artifacts(
+            result,
+            artifact_root=getattr(server, "_replay_artifacts_dir", "artifacts/replay"),
+            run_id=run_id,
+        )
+        recorder = getattr(server, "record_automation_decision_trace", None)
+        if callable(recorder):
+            recorder(
+                source="offline_replay_v1",
+                mode="offline",
+                target=paths.get("run_id"),
+                action_type="replay_run",
+                status=result.get("status"),
+                safety_limits={
+                    "offline_only": True,
+                    "live_write": False,
+                    "mixer_transport_allowed": False,
+                    "allowed_live_write_kinds": [],
+                },
+                proof_status="offline",
+                blocked_reason=None if result.get("status") in {"passed", "clear"} else result.get("reason"),
+                metadata={
+                    "run_id": paths.get("run_id"),
+                    "artifact_paths": paths,
+                    "summary": result.get("summary", {}),
+                    "connection_policy": result.get("connection_policy"),
+                    "write_policy": result.get("write_policy"),
+                    "forbidden_messages": result.get("forbidden_messages", []),
+                    "offline_only": True,
+                    "live_write": False,
+                },
+            )
+        payload = {
+            "type": "replay_run_started",
+            "status": result.get("status"),
+            "success": result.get("status") in {"passed", "clear"},
+            "offline_only": True,
+            "live_write": False,
+            "run_id": (paths.get("run_dir") or "").split("/")[-1],
+            "result": result,
+            "artifacts": paths,
+        }
+        await server.send_to_client(websocket, payload)
+
+    async def handle_get_channel_intelligence(websocket, data):
+        await server.send_to_client(
+            websocket,
+            build_channel_intelligence(server, total_channels=data.get("total_channels", 48)),
+        )
 
     async def handle_get_connection_topology(websocket, data):
         await server.send_to_client(websocket, build_connection_topology(server))
@@ -132,6 +363,28 @@ def register_handlers(server):
         payload = dict(data.get("proposal") or data)
         payload.pop("type", None)
         result = server.operator_proposal_queue.create(payload, server.get_operator_mode_status())
+        proposal = result.get("proposal") if isinstance(result, dict) else None
+        if isinstance(proposal, dict):
+            requested_change = proposal.get("requested_change") or {}
+            recorder = getattr(server, "record_automation_decision_trace", None)
+            if callable(recorder):
+                recorder(
+                    proposal_id=proposal.get("id"),
+                    source=proposal.get("source") or "operator_proposal_queue",
+                    mode=proposal.get("mode_at_creation"),
+                    target=proposal.get("target"),
+                    action_type=proposal.get("kind") or requested_change.get("value_type") or "proposal",
+                    status="proposal_created" if result.get("status") in {"created", "exists"} else str(result.get("status")),
+                    proposed_value=requested_change.get("value"),
+                    delta=requested_change.get("delta_db"),
+                    safety_limits={
+                        "allowed_live_write_kinds": ["fader", "gain"],
+                        "proposal_only_if_unsupported": True,
+                    },
+                    proof_status="pending",
+                    blocked_reason=result.get("reason") if not result.get("success") else None,
+                    metadata={"result_status": result.get("status")},
+                )
         await server.send_to_client(websocket, result)
 
     async def handle_accept_operator_proposal(websocket, data):
@@ -201,7 +454,7 @@ def register_handlers(server):
             rollback_results.append(rollback_result)
         return rollback_results
 
-    async def apply_linked_operator_proposal(websocket, data, proposal, operator_mode, requested_changes):
+    async def apply_linked_operator_proposal(websocket, data, proposal, operator_mode, requested_changes, idempotency_key):
         allowed_kinds = set(operator_mode["capabilities"].get("allowed_live_write_kinds") or [])
         if not operator_mode["capabilities"]["can_apply_to_console"]:
             result = linked_change_blocked_result(
@@ -210,10 +463,28 @@ def register_handlers(server):
                 operator_mode=operator_mode,
                 requested_changes=requested_changes,
             )
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=requested_changes[0] if requested_changes else {},
+                idempotency_key=idempotency_key,
+                status="blocked",
+                blocked_reason="operator_mode_blocks_live_write",
+                metadata={"linked": True, "requested_changes": requested_changes},
+            )
             await server.send_to_client(websocket, {"type": "operator_proposal_apply_blocked", **result})
             return
 
         if not bool(data.get("approved", False)):
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=requested_changes[0] if requested_changes else {},
+                idempotency_key=idempotency_key,
+                status="blocked",
+                blocked_reason="approval_required",
+                metadata={"linked": True},
+            )
             await server.send_to_client(websocket, {
                 "type": "operator_proposal_apply_blocked",
                 "status": "blocked",
@@ -225,25 +496,59 @@ def register_handlers(server):
 
         if not server.mixer_client or not getattr(server.mixer_client, "is_connected", True):
             result = linked_change_blocked_result(proposal, "mixer_not_connected")
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=requested_changes[0] if requested_changes else {},
+                idempotency_key=idempotency_key,
+                status="blocked",
+                blocked_reason="mixer_not_connected",
+                metadata={"linked": True},
+            )
             await server.send_to_client(websocket, {"type": "operator_proposal_apply_blocked", **result})
             return
 
         apply_manual_console_write = getattr(server, "_apply_manual_console_write", None)
         if apply_manual_console_write is None:
             result = linked_change_blocked_result(proposal, "supervised_apply_path_unavailable")
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=requested_changes[0] if requested_changes else {},
+                idempotency_key=idempotency_key,
+                status="blocked",
+                blocked_reason="supervised_apply_path_unavailable",
+                metadata={"linked": True},
+            )
             await server.send_to_client(websocket, {"type": "operator_proposal_apply_blocked", **result})
             return
 
         normalized_changes = []
-        state = getattr(server.mixer_client, "state", {})
         for raw_change in requested_changes:
-            normalized, error = normalize_linked_change(raw_change)
+            normalized, error = await validate_change_before_apply(
+                raw_change,
+                proposal=proposal,
+                data=data,
+                operator_mode=operator_mode,
+                linked=True,
+            )
             if error:
                 result = linked_change_blocked_result(
                     proposal,
-                    error,
+                    error["reason"],
                     requested_change=raw_change,
                     requested_changes=requested_changes,
+                    **{key: value for key, value in error.items() if key not in {"reason", "requested_change"}},
+                )
+                record_apply_trace(
+                    proposal=proposal,
+                    operator_mode=operator_mode,
+                    requested_change=raw_change,
+                    normalized_change=normalized,
+                    idempotency_key=idempotency_key,
+                    status="blocked",
+                    blocked_reason=error["reason"],
+                    metadata={"linked": True, "requested_changes": requested_changes},
                 )
                 await server.send_to_client(websocket, {"type": "operator_proposal_apply_blocked", **result})
                 return
@@ -254,33 +559,17 @@ def register_handlers(server):
                     value_type=normalized["value_type"],
                     allowed_live_write_kinds=sorted(allowed_kinds),
                 )
-                await server.send_to_client(websocket, {"type": "operator_proposal_apply_blocked", **result})
-                return
-            read_value = None
-            read_helper = getattr(server, "_manual_write_read_value", None)
-            if callable(read_helper):
-                read_value = await read_helper(
-                    channel=normalized["channel"],
-                    value_type=normalized["value_type"],
-                    address=normalized["address"],
-                    prefer_physical=True,
-                )
-                old_value = read_value.get("value")
-            else:
-                old_value = state.get(normalized["address"]) if isinstance(state, dict) else None
-            if old_value is None:
-                result = linked_change_blocked_result(
-                    proposal,
-                    "linked_pre_read_unavailable",
-                    channel=normalized["channel"],
-                    value_type=normalized["value_type"],
-                    address=normalized["address"],
-                    pre_read_status=(read_value or {}).get("status"),
-                    pre_read_source=(read_value or {}).get("source"),
+                record_apply_trace(
+                    proposal=proposal,
+                    operator_mode=operator_mode,
+                    normalized_change=normalized,
+                    idempotency_key=idempotency_key,
+                    status="blocked",
+                    blocked_reason="unsupported_value_type",
+                    metadata={"linked": True},
                 )
                 await server.send_to_client(websocket, {"type": "operator_proposal_apply_blocked", **result})
                 return
-            normalized["old_value"] = old_value
             normalized_changes.append(normalized)
 
         approval_id = data.get("approval_id") or proposal.id
@@ -297,6 +586,16 @@ def register_handlers(server):
                 approval_id=f"{approval_id}:{index + 1}",
             )
             applied_results.append(apply_result)
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                normalized_change=change,
+                apply_result=apply_result,
+                idempotency_key=idempotency_key,
+                status=apply_result.get("status", "unknown"),
+                blocked_reason=apply_result.get("reason") if apply_result.get("status") != "applied" else None,
+                metadata={"linked": True, "linked_index": index + 1},
+            )
             verified = manual_write_result_verified(apply_result)
             rollback_ready = bool(apply_result.get("rollback_available"))
             if apply_result.get("status") != "applied" or not verified or not rollback_ready:
@@ -319,6 +618,16 @@ def register_handlers(server):
                     rollback_results=rollback_results,
                     requested_changes=requested_changes,
                 )
+                for rollback_result in rollback_results:
+                    record_apply_trace(
+                        proposal=proposal,
+                        operator_mode=operator_mode,
+                        apply_result=rollback_result,
+                        idempotency_key=idempotency_key,
+                        status=rollback_result.get("status", "unknown"),
+                        blocked_reason=rollback_result.get("reason") if rollback_result.get("status") != "applied" else None,
+                        metadata={"linked": True, "rollback": True},
+                    )
                 await server.send_to_client(websocket, {"type": "operator_proposal_apply_blocked", **result})
                 return
 
@@ -346,6 +655,21 @@ def register_handlers(server):
         proposal = server.operator_proposal_queue.find(proposal_id=proposal_id, index=index)
         operator_mode = server.get_operator_mode_status()
         if proposal is None:
+            recorder = getattr(server, "record_automation_decision_trace", None)
+            if callable(recorder):
+                recorder(
+                    idempotency_key=data.get("idempotency_key"),
+                    proposal_id=proposal_id,
+                    source="operator_apply",
+                    mode=operator_mode.get("mode"),
+                    target=None,
+                    action_type="proposal_apply",
+                    status="blocked",
+                    safety_limits={"requires_idempotency_key": True},
+                    proof_status="blocked",
+                    blocked_reason="proposal_not_found",
+                    metadata={"index": index},
+                )
             await server.send_to_client(websocket, {
                 "type": "operator_proposal_apply_blocked",
                 "status": "blocked",
@@ -356,9 +680,37 @@ def register_handlers(server):
             })
             return
 
+        idempotency_key = str(data.get("idempotency_key") or "").strip()
+        reservation = server.reserve_operator_apply_idempotency_key(
+            idempotency_key,
+            proposal_id=getattr(proposal, "id", None),
+            approval_id=data.get("approval_id"),
+        )
+        if not reservation.get("reserved"):
+            reason = reservation.get("reason")
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=(proposal.requested_change or {}),
+                idempotency_key=idempotency_key or None,
+                status="blocked",
+                blocked_reason=reason,
+                metadata={"idempotency": reservation},
+            )
+            await server.send_to_client(websocket, {
+                "type": "operator_proposal_apply_blocked",
+                "status": "blocked",
+                "success": False,
+                "reason": reason,
+                "proposal": proposal.to_dict(),
+                "idempotency_key": idempotency_key or None,
+                "idempotency": reservation,
+            })
+            return
+
         requested_changes = getattr(proposal, "requested_changes", []) or []
         if requested_changes:
-            await apply_linked_operator_proposal(websocket, data, proposal, operator_mode, requested_changes)
+            await apply_linked_operator_proposal(websocket, data, proposal, operator_mode, requested_changes, idempotency_key)
             return
 
         requested_change = proposal.requested_change or {}
@@ -377,6 +729,14 @@ def register_handlers(server):
                     "requested_change": requested_change or None,
                 },
             )
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=requested_change,
+                idempotency_key=idempotency_key,
+                status="blocked",
+                blocked_reason="proposal_has_no_applyable_requested_change",
+            )
             await server.send_to_client(websocket, {
                 "type": "operator_proposal_apply_blocked",
                 **result,
@@ -391,6 +751,14 @@ def register_handlers(server):
                     "reason": "operator_mode_blocks_live_write",
                     "operator_mode": operator_mode,
                 },
+            )
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=requested_change,
+                idempotency_key=idempotency_key,
+                status="blocked",
+                blocked_reason="operator_mode_blocks_live_write",
             )
             await server.send_to_client(websocket, {
                 "type": "operator_proposal_apply_blocked",
@@ -408,6 +776,14 @@ def register_handlers(server):
                     "allowed_live_write_kinds": sorted(allowed_kinds),
                 },
             )
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=requested_change,
+                idempotency_key=idempotency_key,
+                status="blocked",
+                blocked_reason="unsupported_value_type",
+            )
             await server.send_to_client(websocket, {
                 "type": "operator_proposal_apply_blocked",
                 **result,
@@ -415,6 +791,14 @@ def register_handlers(server):
             return
 
         if not bool(data.get("approved", False)):
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=requested_change,
+                idempotency_key=idempotency_key,
+                status="blocked",
+                blocked_reason="approval_required",
+            )
             await server.send_to_client(websocket, {
                 "type": "operator_proposal_apply_blocked",
                 "status": "blocked",
@@ -429,6 +813,14 @@ def register_handlers(server):
                 proposal,
                 {"status": "blocked", "reason": "mixer_not_connected"},
             )
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=requested_change,
+                idempotency_key=idempotency_key,
+                status="blocked",
+                blocked_reason="mixer_not_connected",
+            )
             await server.send_to_client(websocket, {
                 "type": "operator_proposal_apply_blocked",
                 **result,
@@ -440,6 +832,46 @@ def register_handlers(server):
             result = server.operator_proposal_queue.mark_apply_result(
                 proposal,
                 {"status": "blocked", "reason": "supervised_apply_path_unavailable"},
+            )
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=requested_change,
+                idempotency_key=idempotency_key,
+                status="blocked",
+                blocked_reason="supervised_apply_path_unavailable",
+            )
+            await server.send_to_client(websocket, {
+                "type": "operator_proposal_apply_blocked",
+                **result,
+            })
+            return
+
+        normalized_change, safety_error = await validate_change_before_apply(
+            requested_change,
+            proposal=proposal,
+            data=data,
+            operator_mode=operator_mode,
+            linked=False,
+        )
+        if safety_error:
+            result = server.operator_proposal_queue.mark_apply_result(
+                proposal,
+                {
+                    "status": "blocked",
+                    "reason": safety_error["reason"],
+                    "requested_change": requested_change,
+                    **{key: value for key, value in safety_error.items() if key not in {"reason", "requested_change"}},
+                },
+            )
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=requested_change,
+                normalized_change=normalized_change,
+                idempotency_key=idempotency_key,
+                status="blocked",
+                blocked_reason=safety_error["reason"],
             )
             await server.send_to_client(websocket, {
                 "type": "operator_proposal_apply_blocked",
@@ -458,12 +890,27 @@ def register_handlers(server):
             approval_id=data.get("approval_id") or proposal.id,
         )
         result = server.operator_proposal_queue.mark_apply_result(proposal, apply_result)
+        record_apply_trace(
+            proposal=proposal,
+            operator_mode=operator_mode,
+            requested_change=requested_change,
+            normalized_change=normalized_change,
+            apply_result=apply_result,
+            idempotency_key=idempotency_key,
+            status=apply_result.get("status", "unknown"),
+            blocked_reason=apply_result.get("reason") if apply_result.get("status") != "applied" else None,
+        )
         await server.send_to_client(websocket, {"type": "operator_proposal_apply_result", **result})
 
     return {
         "get_dashboard_snapshot": handle_get_dashboard_snapshot,
         "get_channel_inventory": handle_get_channel_inventory,
         "get_decision_queue": handle_get_decision_queue,
+        "get_decision_traces": handle_get_decision_traces,
+        "get_safety_monitor": handle_get_safety_monitor,
+        "get_replay_runs": handle_get_replay_runs,
+        "start_replay_run": handle_start_replay_run,
+        "get_channel_intelligence": handle_get_channel_intelligence,
         "get_connection_topology": handle_get_connection_topology,
         "get_operator_agent_roster": handle_get_operator_agent_roster,
         "get_groups_buses_snapshot": handle_get_groups_buses_snapshot,

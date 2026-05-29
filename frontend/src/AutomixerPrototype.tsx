@@ -209,6 +209,34 @@ export default function App() {
     pushToast('Mock UI state rolled back. No console command sent.', 'yellow');
   }, [pushToast]);
 
+  const startReplayRun = useCallback(() => {
+    const runId = `frontend-replay-${Date.now()}`;
+    if (!connected) {
+      backendActions.refreshBackend();
+      setActionFocus({
+        action: 'Replay Connect',
+        target: 'Offline replay',
+        detail: 'Backend connection is required before starting an offline replay run. No mixer command was sent.',
+        tone: 'yellow',
+        timestamp: '10:24:15'
+      });
+      setLastAction('Replay waiting for backend');
+      pushToast('Connect backend before starting offline replay. No live write sent.', 'yellow');
+      return;
+    }
+
+    backendActions.startReplayRun(runId);
+    setActionFocus({
+      action: 'Replay Requested',
+      target: runId,
+      detail: 'Offline replay requested through Product Layer. This is dry-run evidence generation only.',
+      tone: 'blue',
+      timestamp: '10:24:15'
+    });
+    setLastAction(`Offline replay ${runId} requested`);
+    pushToast('Offline replay requested. Live writes remain disabled.', 'blue');
+  }, [backendActions, connected, pushToast]);
+
   const ui: UiState = useMemo(() => ({
     mode,
     backend,
@@ -262,9 +290,10 @@ export default function App() {
     rollbackLastAction,
     refreshBackend: backendActions.refreshBackend,
     runBackendAnalysis: backendActions.runBackendAnalysis,
+    startReplayRun,
     pushToast,
     dismissToast: () => setToast(null)
-  }), [backendActions.refreshBackend, backendActions.runBackendAnalysis, closeSupervisedProposal, confirmSupervisedApply, createSnapshot, focusAction, openSupervisedProposal, pushToast, rollbackLastAction, setTaskStatus, updateMode]);
+  }), [backendActions.refreshBackend, backendActions.runBackendAnalysis, closeSupervisedProposal, confirmSupervisedApply, createSnapshot, focusAction, openSupervisedProposal, pushToast, rollbackLastAction, setTaskStatus, startReplayRun, updateMode]);
 
   const view = useMemo(() => buildView(activeRoute, ui, actions, viewData), [activeRoute, ui, actions, viewData]);
 

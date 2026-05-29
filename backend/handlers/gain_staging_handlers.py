@@ -17,7 +17,8 @@ def register_handlers(server):
             channel_settings=data.get("channel_settings", {}),
             channel_mapping=data.get("channel_mapping"),
             mode=data.get("mode", "lufs"),
-            learning_duration_sec=data.get("learning_duration_sec")
+            learning_duration_sec=data.get("learning_duration_sec"),
+            safe_gain_settings=data.get("safe_gain_settings") or data.get("processing") or {},
         )
 
     async def handle_stop_realtime_correction(websocket, data):

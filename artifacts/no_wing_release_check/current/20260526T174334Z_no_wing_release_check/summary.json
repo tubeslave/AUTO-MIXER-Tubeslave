@@ -1,0 +1,132 @@
+{
+  "connection_policy": "no_hardware_no_network_no_live_writes",
+  "failed_checks": [],
+  "generated_at": "2026-05-26T17:43:34Z",
+  "live_write": false,
+  "results": [
+    {
+      "command": null,
+      "cwd": null,
+      "detail": {
+        "host": "127.0.0.1",
+        "listener_detected": false,
+        "policy": "port_must_not_have_unexpected_listener",
+        "port": 8765
+      },
+      "duration_sec": 0.0,
+      "finished_at": "2026-05-26T17:43:34Z",
+      "name": "backend_port_free",
+      "returncode": null,
+      "started_at": "2026-05-26T17:43:34Z",
+      "status": "passed",
+      "stderr_log": null,
+      "stdout_log": null
+    },
+    {
+      "command": "/usr/local/bin/python3 -m pytest tests/ -x --tb=short -q",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 71.963,
+      "finished_at": "2026-05-26T17:44:46Z",
+      "name": "backend_pytest",
+      "returncode": 0,
+      "started_at": "2026-05-26T17:43:34Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/backend_pytest.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/backend_pytest.stdout.log"
+    },
+    {
+      "command": "/usr/local/bin/python3 tools/offline_operator_validation_harness.py --artifact-root artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/offline_validation",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.052,
+      "finished_at": "2026-05-26T17:44:46Z",
+      "name": "offline_operator_validation_harness",
+      "returncode": 0,
+      "started_at": "2026-05-26T17:44:46Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/offline_operator_validation_harness.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/offline_operator_validation_harness.stdout.log"
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend",
+      "detail": null,
+      "duration_sec": 1.648,
+      "finished_at": "2026-05-26T17:44:48Z",
+      "name": "frontend_typescript",
+      "returncode": 0,
+      "started_at": "2026-05-26T17:44:46Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/frontend_typescript.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/frontend_typescript.stdout.log"
+    },
+    {
+      "command": "npm test -- --watch=false",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend",
+      "detail": null,
+      "duration_sec": 0.184,
+      "finished_at": "2026-05-26T17:44:48Z",
+      "name": "frontend_unit",
+      "returncode": 0,
+      "started_at": "2026-05-26T17:44:48Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/frontend_unit.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/frontend_unit.stdout.log"
+    },
+    {
+      "command": "npm run test:e2e",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend",
+      "detail": null,
+      "duration_sec": 4.315,
+      "finished_at": "2026-05-26T17:44:52Z",
+      "name": "frontend_e2e",
+      "returncode": 0,
+      "started_at": "2026-05-26T17:44:48Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/frontend_e2e.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/frontend_e2e.stdout.log"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend",
+      "detail": null,
+      "duration_sec": 0.971,
+      "finished_at": "2026-05-26T17:44:53Z",
+      "name": "frontend_build",
+      "returncode": 0,
+      "started_at": "2026-05-26T17:44:52Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/frontend_build.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/frontend_build.stdout.log"
+    },
+    {
+      "command": "npm run dist",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend",
+      "detail": null,
+      "duration_sec": 215.948,
+      "finished_at": "2026-05-26T17:48:29Z",
+      "name": "frontend_dist_package",
+      "returncode": 0,
+      "started_at": "2026-05-26T17:44:53Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/frontend_dist_package.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/frontend_dist_package.stdout.log"
+    },
+    {
+      "command": "git diff --check",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.061,
+      "finished_at": "2026-05-26T17:48:29Z",
+      "name": "diff_check",
+      "returncode": 0,
+      "started_at": "2026-05-26T17:48:29Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/diff_check.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check/current/20260526T174334Z_no_wing_release_check/logs/diff_check.stdout.log"
+    }
+  ],
+  "status": "passed",
+  "type": "no_wing_release_check"
+}

@@ -31,6 +31,7 @@ EXPECTED_ROLLBACK_EVENTS = {
     "manual_write_rollback_blocked",
     "manual_write_rollback_error",
 }
+EXPECTED_PARAMETER_EVENTS = {"mixer_parameter_value", "mixer_parameter_read_blocked"}
 VERIFIED_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
 
 
@@ -68,6 +69,53 @@ def as_float(value: Any) -> Optional[float]:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+async def read_current_parameter(
+    ws: Any,
+    recorder: EventRecorder,
+    *,
+    channel: int,
+    value_type: str,
+    address: str,
+    state: Dict[str, Any],
+    timeout: float,
+) -> tuple[Optional[float], Dict[str, Any]]:
+    cached_value = as_float(state.get(address))
+    if cached_value is not None:
+        return cached_value, {
+            "status": "verified_from_cache",
+            "source": "mixer_state_cache",
+            "address": address,
+            "value": cached_value,
+        }
+
+    try:
+        payload = await send_and_wait(
+            ws,
+            recorder,
+            {
+                "type": "query_mixer_parameter",
+                "channel": channel,
+                "value_type": value_type,
+                "address": address,
+            },
+            EXPECTED_PARAMETER_EVENTS,
+            timeout=timeout,
+        )
+    except Exception as exc:
+        return None, {
+            "type": "mixer_parameter_read_error",
+            "status": "readback_unavailable",
+            "source": "physical_readback",
+            "address": address,
+            "error": str(exc),
+        }
+
+    if payload.get("type") == "mixer_parameter_read_blocked":
+        return None, payload
+
+    return as_float(payload.get("value")), payload
 
 
 class EventRecorder:
@@ -313,13 +361,22 @@ async def run(args: argparse.Namespace) -> int:
             )
             state = state_payload.get("state") or {}
             address = address_for(args.channel, args.value_type)
-            old_value = as_float(state.get(address))
+            old_value, old_value_read = await read_current_parameter(
+                ws,
+                recorder,
+                channel=args.channel,
+                value_type=args.value_type,
+                address=address,
+                state=state,
+                timeout=args.timeout,
+            )
             if old_value is None:
                 summary.update({
                     "status": "blocked",
-                    "reason": "current_value_missing_from_backend_state",
+                    "reason": "current_value_unavailable_from_backend_state_and_physical_readback",
                     "operator_mode": mode.get("mode"),
                     "address": address,
+                    "old_value_read": old_value_read,
                 })
                 recorder.write_summary(summary)
                 print(json.dumps(summary, indent=2, sort_keys=True))
@@ -344,6 +401,9 @@ async def run(args: argparse.Namespace) -> int:
                 "operator_mode": mode.get("mode"),
                 "address": address,
                 "old_value": old_value,
+                "old_value_read": old_value_read,
+                "old_value_source": old_value_read.get("source"),
+                "old_value_status": old_value_read.get("status"),
                 "target_value": target_value,
             })
 
@@ -387,6 +447,7 @@ async def run(args: argparse.Namespace) -> int:
                         "proposal_id": blocked_proposal_id,
                         "approved": True,
                         "approval_id": f"{args.approval_prefix}:blocked-apply:{run_id}",
+                        "idempotency_key": f"{args.approval_prefix}:blocked-apply:{run_id}",
                         "reason": f"blocked-proof:{args.reason}",
                     },
                     EXPECTED_APPLY_EVENTS,
@@ -447,6 +508,7 @@ async def run(args: argparse.Namespace) -> int:
                     "proposal_id": proposal_id,
                     "approved": True,
                     "approval_id": f"{args.approval_prefix}:apply-approved:{run_id}",
+                    "idempotency_key": f"{args.approval_prefix}:apply-approved:{run_id}",
                     "reason": args.reason,
                 },
                 EXPECTED_APPLY_EVENTS,
@@ -517,6 +579,7 @@ async def run(args: argparse.Namespace) -> int:
                         "proposal_id": emergency_proposal_id,
                         "approved": True,
                         "approval_id": f"{args.approval_prefix}:emergency-proof:{run_id}",
+                        "idempotency_key": f"{args.approval_prefix}:emergency-proof:{run_id}",
                         "reason": f"emergency-proof:{args.reason}",
                     },
                     EXPECTED_APPLY_EVENTS,

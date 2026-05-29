@@ -114,6 +114,7 @@
       "icon": "public/icon.png",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "timestamp": null,
       "entitlements": "public/entitlements.mac.plist",
       "entitlementsInherit": "public/entitlements.mac.plist"
     },

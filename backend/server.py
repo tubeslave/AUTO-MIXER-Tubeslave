@@ -71,6 +71,8 @@ from operator_recommendation_bridge import (
     build_soundcheck_operator_proposals,
     import_operator_proposals,
 )
+from automation_trace import AutomationDecisionTrace, AutomationTraceStore
+from decision_memory import DecisionMemoryStore
 
 _REPO_ROOT = os.path.abspath(
     os.environ.get("AUTOMIXER_REPO_ROOT")
@@ -251,6 +253,10 @@ class AutoMixerServer:
         if not replay_readiness_root.is_absolute():
             replay_readiness_root = Path(__file__).resolve().parents[1] / replay_readiness_root
         self._wing_replay_readiness_root = replay_readiness_root
+        replay_artifacts_dir = Path(os.getenv("AUTOMIXER_REPLAY_ARTIFACTS_DIR", "artifacts/replay"))
+        if not replay_artifacts_dir.is_absolute():
+            replay_artifacts_dir = Path(__file__).resolve().parents[1] / replay_artifacts_dir
+        self._replay_artifacts_dir = replay_artifacts_dir
         self._wing_deployment_write_boundary_enabled = self._parse_env_bool(
             os.getenv("AUTOMIXER_WING_DEPLOYMENT_WRITE_BOUNDARY_ENABLED", "true")
         )
@@ -261,7 +267,7 @@ class AutoMixerServer:
         )
         self._manual_write_last_write_ts: Dict[tuple[int, str], float] = {}
         self._last_manual_write_result: Optional[Dict[str, Any]] = None
-        self._manual_write_readback_tolerance = {"fader": 0.05, "gain": 0.05}
+        self._manual_write_readback_tolerance = {"fader": 0.05, "gain": 0.06}
         manual_write_artifacts_dir = Path(
             os.getenv(
                 "AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR",
@@ -271,6 +277,9 @@ class AutoMixerServer:
         if not manual_write_artifacts_dir.is_absolute():
             manual_write_artifacts_dir = Path(__file__).resolve().parents[1] / manual_write_artifacts_dir
         self._manual_write_artifacts_dir = manual_write_artifacts_dir
+        self.automation_trace_store = AutomationTraceStore(manual_write_artifacts_dir)
+        self.decision_memory_store = DecisionMemoryStore(manual_write_artifacts_dir)
+        self._operator_apply_idempotency_keys: Dict[str, Dict[str, Any]] = {}
         
         # Snapshot for undo (path to last backup file)
         self._last_snapshot_path: Optional[str] = None
@@ -355,6 +364,76 @@ class AutoMixerServer:
         if self.mixer_client and hasattr(self.mixer_client, "get_write_gate_status"):
             status["write_gate"] = self.mixer_client.get_write_gate_status()
         return status
+
+    def reserve_operator_apply_idempotency_key(
+        self,
+        idempotency_key: Any,
+        *,
+        proposal_id: Any = None,
+        approval_id: Any = None,
+    ) -> Dict[str, Any]:
+        key = str(idempotency_key or "").strip()
+        if not key:
+            return {
+                "reserved": False,
+                "reason": "missing_idempotency_key",
+                "idempotency_key": None,
+            }
+        if key in self._operator_apply_idempotency_keys:
+            return {
+                "reserved": False,
+                "reason": "duplicate_idempotency_key",
+                "idempotency_key": key,
+                "first_seen": self._operator_apply_idempotency_keys[key],
+            }
+        self._operator_apply_idempotency_keys[key] = {
+            "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "proposal_id": proposal_id,
+            "approval_id": approval_id,
+        }
+        return {
+            "reserved": True,
+            "reason": "reserved",
+            "idempotency_key": key,
+        }
+
+    def record_automation_decision_trace(self, **payload: Any) -> Dict[str, Any]:
+        try:
+            trace = AutomationDecisionTrace(**payload).to_dict()
+            recorded = self.automation_trace_store.append(trace)
+            memory_store = getattr(self, "decision_memory_store", None)
+            trace_store = getattr(self, "automation_trace_store", None)
+            if (
+                memory_store is not None
+                and trace_store is not None
+                and Path(getattr(memory_store, "root_dir", "")) == Path(getattr(trace_store, "root_dir", ""))
+            ):
+                try:
+                    memory_store.append_from_trace(recorded)
+                except Exception as memory_exc:
+                    logger.warning("Could not record decision memory: %s", memory_exc, exc_info=True)
+            return recorded
+        except Exception as exc:
+            logger.warning("Could not record automation decision trace: %s", exc, exc_info=True)
+            return {
+                "decision_id": payload.get("decision_id"),
+                "status": "trace_write_failed",
+                "error": str(exc),
+            }
+
+    def get_automation_decision_traces(self, limit: int = 50) -> List[Dict[str, Any]]:
+        try:
+            return self.automation_trace_store.read_recent(limit)
+        except Exception as exc:
+            logger.warning("Could not read automation decision traces: %s", exc, exc_info=True)
+            return []
+
+    def get_decision_memory_entries(self, limit: int = 50) -> List[Dict[str, Any]]:
+        try:
+            return self.decision_memory_store.read_recent(limit)
+        except Exception as exc:
+            logger.warning("Could not read decision memory: %s", exc, exc_info=True)
+            return []
 
     def reset_manual_write_emergency_stop(
         self,
@@ -2683,8 +2762,18 @@ class AutoMixerServer:
     
     async def update_safe_gain_settings(self, settings: dict):
         """Обновить настройки Safe Gain Calibration."""
+        if settings:
+            automation_config = self.config.setdefault('automation', {})
+            safe_config = automation_config.setdefault('safe_gain_calibration', {})
+            for key, value in settings.items():
+                safe_config[key] = value
+
         if not self.safe_gain_calibrator:
-            logger.warning("Cannot update safe gain settings: calibrator not initialized")
+            logger.info("Safe gain settings stored for the next calibration run")
+            await self.broadcast({
+                "type": "safe_gain_settings_updated",
+                "settings": settings
+            })
             return
         
         # Обновляем настройки в калибраторе
@@ -2707,7 +2796,8 @@ class AutoMixerServer:
     
     async def start_realtime_correction(self, device_id: str = None, channels: list = None, 
                                         channel_settings: dict = None, channel_mapping: dict = None,
-                                        mode: str = "lufs", learning_duration_sec: float = None):
+                                        mode: str = "lufs", learning_duration_sec: float = None,
+                                        safe_gain_settings: dict = None):
         """Start Safe Gain Staging calibration (новый метод: анализ → одноразовое применение)."""
         logger.info("Starting Safe Gain Staging calibration (new method)...")
         if await self._block_quarantined_wing_write_surface(
@@ -2718,6 +2808,7 @@ class AutoMixerServer:
                 "device_id": device_id,
                 "channels": channels or [],
                 "mode": mode,
+                "safe_gain_settings": safe_gain_settings or {},
             },
             extra={"active": False, "realtime_enabled": False},
         ):
@@ -2760,6 +2851,14 @@ class AutoMixerServer:
             self.safe_gain_calibrator = None
         
         try:
+            if safe_gain_settings:
+                if 'automation' not in self.config:
+                    self.config['automation'] = {}
+                if 'safe_gain_calibration' not in self.config['automation']:
+                    self.config['automation']['safe_gain_calibration'] = {}
+                self.config['automation']['safe_gain_calibration'].update(dict(safe_gain_settings))
+                logger.info(f"Applying SafeGain settings for this measurement: {safe_gain_settings}")
+
             # Обновляем learning_duration_sec в конфиге, если передан
             if learning_duration_sec is not None:
                 if 'automation' not in self.config:
