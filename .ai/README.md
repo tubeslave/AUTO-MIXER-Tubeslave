@@ -10,6 +10,9 @@ This directory is the shared memory layer between Codex.app, Codex CLI, Kimi CLI
 - `.ai/decisions/` - optional short decision notes
 - `.ai/memory/` - durable project memory
 - `.ai/templates/` - reusable task templates
+- `.ai/agent-core/` - shared agent rules, workflow, safety, source policy, and lint policy
+- `.ai/project-layer/` - Automixer-specific goal, architecture, WING policy, safety, tasks, decisions, experiments, reports, and glossary
+- `.ai/pipeline/` - Markdown memory pipeline, Codex/Paperclip cycles, and append templates
 
 ## Project-Specific Notes
 
@@ -39,3 +42,16 @@ This directory is the shared memory layer between Codex.app, Codex CLI, Kimi CLI
 ## Standard Test Command
 
 `PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q`
+
+## Memory Pipeline
+
+The Markdown memory pipeline uses Agent Core + Project Layer + Pipeline:
+
+1. Read `.ai/agent-core/` and `.ai/project-layer/` before planning.
+2. Capture raw observations into `.ai/project-layer/experiments.md` or session reports.
+3. Promote stable choices into `.ai/project-layer/decisions.md` or `Docs/adr/`.
+4. Keep Paperclip-facing summaries in `.paperclip/reports/`.
+5. Run `python3 tools/memory/memory_lint.py` after memory changes.
+
+Memory files and tools are documentation or append-only helpers. They do not
+grant permission for live OSC/WING writes.

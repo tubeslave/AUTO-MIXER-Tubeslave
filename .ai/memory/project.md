@@ -3,6 +3,8 @@
 ## Stable Conventions
 
 - Read `AGENTS.md` and `CLAUDE.md` before planning or editing.
+- Read `.ai/agent-core/` and `.ai/project-layer/` before starting new Automixer
+  tasks; these files are the current Markdown memory layer.
 - Use `Docs/adr/` for accepted architecture decisions.
 - Default test gate: `PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q`
 - Keep diffs small and avoid new production dependencies without written justification.
@@ -12,6 +14,9 @@
 - Prefer safer output changes over louder ones.
 - Preserve true-peak headroom before increasing gain.
 - Respect feedback protection and mixer-safety constraints from `CLAUDE.md`.
+- Live OSC/WING writes require explicit approval for the exact action. Default
+  WING, OSC, Dante, gain, trim, fader, routing, mute, snapshot, EQ, dynamics,
+  and FX work to audit-only or dry-run.
 - Never change secrets or `.env` files as part of council work.
 
 ## Architecture Reminders
@@ -40,3 +45,12 @@
 - MuQ-A1 FX-led rock passes should treat `0.9` whole-mix score as an aspirational, not fixed, gate unless calibrated against references; on SONG REPA the provided commercial reference scored `0.7959`, while subtle reference-guided FX plus section-selective modulation reached `0.7725` without clipping.
 - Operator accepted the `MIX_AYAIC_FX_SOFTPRINT_FINAL` direction for Desktop/MIX: use AYAIC Mix Monolith-inspired level-plane/relative balance, shared filtered FX returns, real MuQ-A1 audit, and light mix-print mastering. Avoid MuQ score chasing through segment EQ, clipping, heavy limiting, or aggressive compression when this direction is requested.
 - Operator accepted Ayaic level-plane balancing as the default rule for offline mixes and real-console soundcheck/live work: gain staging and balance must measure both individual sources and the summed stems/groups. Use Ayaic planes as the primary default (`-22` lead/main, `-25` strong sources and Drums/Bass/Guitars/BG Vocal buses, `-27` tucked backing vocals, `-30` keys/synth/ambient support, `-35` FX/deep effects), while live safety limits override target loudness.
+
+## Memory Pipeline Lessons
+
+- Agent Core, Project Layer, and Pipeline files under `.ai/` are the first-read
+  memory layer for Codex, Kimi, Paperclip, and humans.
+- Memory updates are documentation or append-only records; they do not grant
+  runtime authority.
+- Use `tools/memory/memory_lint.py` to verify required memory files, sections,
+  and safety wording after changes.

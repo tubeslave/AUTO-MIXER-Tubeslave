@@ -13,6 +13,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/PROJECT_IMPLEMENTATION_PLAN.md` | Product goal, MVP phases, safety boundaries, schedule. |
 | `Docs/PROJECT_STRUCTURE_MAP.md` | Canonical domain map and status labels. |
 | `Docs/PROCESSING_METHODS_INVENTORY.md` | Canonical processing-method and pipeline-profile selection. |
+| `Docs/memory_pipeline.md` | Agent Core + Project Layer + memory pipeline for Codex, Kimi, and Paperclip work. |
 | `Docs/HEALTH_BASELINE_20260518.md` | Current post-cleanup test/build/audit baseline. |
 | `Docs/PHASE1_SUPERVISED_WRITE_PROGRESS_20260519.md` | First Phase 1 supervised-write implementation slice and verification. |
 | `Docs/reports/AUTOMIXER_HANDOFF_WING_VALIDATION_20260520.md` | Current cockpit/package handoff and narrow real WING supervised proposal proof. |
@@ -57,6 +58,7 @@ paths, Product Layer, or cleanup policy.
 | Processing pipeline selection | `Docs/PROCESSING_METHODS_INVENTORY.md`, `Docs/adr/processing-pipeline-selection.md` |
 | Automation foundation layer | `Docs/adr/automation-foundation-layer-20260527.md`, `Docs/reports/AUTOMIXER_AUTOMATION_FOUNDATION_LAYER_20260527.md` |
 | Paperclip/GPT workflow | `Docs/PAPERCLIP_DIRECTOR_WORKFLOW.md` |
+| Markdown memory pipeline | `Docs/memory_pipeline.md`, `.ai/agent-core/`, `.ai/project-layer/`, `.ai/pipeline/` |
 | Operational memory | `Docs/OPERATIONAL_MEMORY.md` |
 | Tooling overview | `Docs/TOOLS.md` |
 | Local Paperclip-readable reports | `.paperclip/reports/` |
