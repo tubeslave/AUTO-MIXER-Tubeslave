@@ -1,0 +1,67 @@
+{
+  "connection_policy": "no_hardware_no_network_no_live_writes",
+  "failed_checks": [],
+  "generated_at": "2026-05-30T07:57:29Z",
+  "live_write": false,
+  "results": [
+    {
+      "command": null,
+      "cwd": null,
+      "detail": {
+        "host": "127.0.0.1",
+        "listener_detected": false,
+        "policy": "port_must_not_have_unexpected_listener",
+        "port": 8765
+      },
+      "duration_sec": 0.0,
+      "finished_at": "2026-05-30T07:57:29Z",
+      "name": "backend_port_free",
+      "returncode": null,
+      "started_at": "2026-05-30T07:57:29Z",
+      "status": "passed",
+      "stderr_log": null,
+      "stdout_log": null
+    },
+    {
+      "command": "/Users/dmitrijvolkov/.pyenv/versions/3.11.7/bin/python -m pytest tests/test_offline_validation_harness.py -q --tb=short -q",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.334,
+      "finished_at": "2026-05-30T07:57:29Z",
+      "name": "backend_pytest",
+      "returncode": 0,
+      "started_at": "2026-05-30T07:57:29Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_show_assist_20260530/20260530T075729Z_no_wing_release_check/logs/backend_pytest.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_show_assist_20260530/20260530T075729Z_no_wing_release_check/logs/backend_pytest.stdout.log"
+    },
+    {
+      "command": "/Users/dmitrijvolkov/.pyenv/versions/3.11.7/bin/python tools/offline_operator_validation_harness.py --artifact-root artifacts/no_wing_release_check_show_assist_20260530/20260530T075729Z_no_wing_release_check/offline_validation",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.119,
+      "finished_at": "2026-05-30T07:57:29Z",
+      "name": "offline_operator_validation_harness",
+      "returncode": 0,
+      "started_at": "2026-05-30T07:57:29Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_show_assist_20260530/20260530T075729Z_no_wing_release_check/logs/offline_operator_validation_harness.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_show_assist_20260530/20260530T075729Z_no_wing_release_check/logs/offline_operator_validation_harness.stdout.log"
+    },
+    {
+      "command": "git diff --check",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.06,
+      "finished_at": "2026-05-30T07:57:29Z",
+      "name": "diff_check",
+      "returncode": 0,
+      "started_at": "2026-05-30T07:57:29Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_show_assist_20260530/20260530T075729Z_no_wing_release_check/logs/diff_check.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_show_assist_20260530/20260530T075729Z_no_wing_release_check/logs/diff_check.stdout.log"
+    }
+  ],
+  "status": "passed",
+  "type": "no_wing_release_check"
+}

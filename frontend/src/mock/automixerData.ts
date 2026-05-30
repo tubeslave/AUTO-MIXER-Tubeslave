@@ -275,6 +275,25 @@ export function safetyEvidenceForTask(task: Task, mode: AutomixerMode): SafetyEv
   ];
 }
 
+export function ensembleEvidenceForTask(task: Task): SafetyEvidenceItem[] {
+  if (!task.safetyEvidence?.length) return [];
+
+  const preferredLabels = [
+    'ensemble context',
+    'ensemble time coherence',
+    'ensemble time sources',
+    'ensemble lag samples',
+    'ensemble apply policy'
+  ];
+  const evidenceByLabel = new Map(
+    task.safetyEvidence.map(row => [row.label.toLowerCase(), row])
+  );
+
+  return preferredLabels
+    .map(label => evidenceByLabel.get(label))
+    .filter((row): row is SafetyEvidenceItem => Boolean(row));
+}
+
 export function applyPlanForTask(task: Task, mode: AutomixerMode): ApplyPlanStep[] {
   if (task.reviewOnly) {
     return [

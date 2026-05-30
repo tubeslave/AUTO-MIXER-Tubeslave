@@ -1044,6 +1044,27 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_wing_observation_only_blocks_even_approved_manual_write(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server._wing_observation_only = True
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_fader"](
+            websocket,
+            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-observe"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "wing_observation_only_active"
+        assert payload["manual_write_supervision"]["wing_observation_only"] is True
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_websocket_fader_routes_approved_write_through_manual_gate(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"

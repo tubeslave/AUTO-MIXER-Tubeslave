@@ -677,6 +677,51 @@ def test_safe_gain_calibrator_ignores_stale_ensemble_context_for_bolder_gain_up(
     assert ensemble["reference_max_lag_samples"] == 10
 
 
+def test_safe_gain_calibrator_reports_disabled_ensemble_context_before_source_counts():
+    calibrator = SafeGainCalibrator(config={
+        "automation": {
+            "safe_gain_calibration": {
+                "local_input_preamp": {
+                    "soundcheck_ensemble_context_enabled": False,
+                },
+            },
+        },
+    })
+    calibrator.add_channel(1)
+    calibrator.add_channel(2)
+    calibrator.channel_settings = {
+        1: {"preset": "leadVocal"},
+        2: {"preset": "bass"},
+    }
+    calibrator.channels[1] = _stats_with_signal(peak_db=-20.0, lufs=-30.0)
+    calibrator.channels[2] = _stats_with_signal(peak_db=-9.0, lufs=-18.0)
+    calibrator.suggestions[1] = {
+        "input_gain_character": {
+            "stability": {
+                "candidate_direction": "up",
+                "candidate_delta_db": 3.0,
+                "evidence_windows": 1,
+            }
+        }
+    }
+
+    calibrator._finalize_analysis()
+
+    vocal = calibrator.suggestions[1]
+    ensemble = vocal["input_gain_character"]["soundcheck_ensemble_context"]
+    convergence = vocal["input_gain_character"]["soundcheck_convergence"]
+    confidence_factors = {
+        factor["name"]: factor["delta"]
+        for factor in vocal["input_gain_character"]["decision_confidence"]["factors"]
+    }
+
+    assert ensemble["enabled"] is False
+    assert ensemble["active"] is False
+    assert ensemble["reason"] == "disabled"
+    assert convergence["ensemble_assisted"] is False
+    assert "ensemble_context_vocal_understaged" not in confidence_factors
+
+
 def test_foh_summary_marks_full_measurement_context_when_spectral_and_noise_floor_exist():
     stats = SignalStats(channel_id=1)
     for _ in range(12):
@@ -3978,3 +4023,62 @@ def test_safe_gain_proposal_marks_missing_ensemble_time_context_as_missing():
     assert evidence["Ensemble apply policy"]["value"] == "operator_review_only"
     assert "Ensemble time sources" not in evidence
     assert "Ensemble lag samples" not in evidence
+
+
+def test_safe_gain_proposal_summarizes_disabled_ensemble_context_without_time_noise():
+    suggestion = {
+        "channel": 1,
+        "method_id": "input_trim_preamp_character",
+        "input_trim_role": "input_headroom_not_mix_balance",
+        "peak_db": -20.0,
+        "target_peak_db": -10.0,
+        "suggested_gain_db": 3.0,
+        "target_trim_db": 3.0,
+        "confidence": 0.7,
+        "input_gain_character": {
+            "character": "clean",
+            "current_zone": "clean",
+            "target_zone": "clean",
+            "distortion_risk": "low",
+            "soundcheck_ensemble_context": {
+                "enabled": False,
+                "provided": True,
+                "active": False,
+                "reason": "disabled",
+                "time_coherence_enabled": True,
+                "time_coherence_evaluable": False,
+                "time_coherent": False,
+                "time_coherent_loud_sources": 0,
+                "required_time_coherent_sources": 2,
+                "max_context_lag_samples": 2,
+                "operator_review_only": True,
+            },
+        },
+    }
+
+    class Mixer:
+        def get_channel_gain(self, channel):
+            return 0.0
+
+    proposals = build_safe_gain_operator_proposals(
+        {1: suggestion},
+        channel_mapping={1: 1},
+        mixer_client=Mixer(),
+    )
+
+    evidence = {
+        item["label"]: item
+        for item in proposals[0]["requested_change"]["safety_evidence"]
+    }
+    reason = proposals[0]["reason"]
+
+    assert evidence["Ensemble context"]["value"] == "disabled"
+    assert evidence["Ensemble context"]["reason"] == "disabled"
+    assert evidence["Ensemble apply policy"]["value"] == "operator_review_only"
+    assert "Ensemble time coherence" not in evidence
+    assert "Ensemble time sources" not in evidence
+    assert "Ensemble lag samples" not in evidence
+    assert "Ensemble context inactive (disabled)" in reason
+    assert "operator review only" in reason
+    assert "time missing" not in reason
+    assert "sources 0/2" not in reason

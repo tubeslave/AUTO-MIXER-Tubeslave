@@ -172,6 +172,7 @@ def register_handlers(server):
         engine.on_state_change = on_state_with_recommendation_import
         engine.start_async()
 
+        live_action_config = getattr(engine, "correction_executor_config", None)
         await server.send_to_client(websocket, {
             "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
             "status": "started",
@@ -181,6 +182,10 @@ def register_handlers(server):
             "mixer_type": mixer_type,
             "mixer_ip": mixer_ip,
             "selected_channels": selected_channels,
+            "live_action_profile": getattr(live_action_config, "profile_id", ""),
+            "live_action_executor_enabled": bool(
+                getattr(live_action_config, "enabled", False)
+            ),
             "message": "New AutoSoundcheckEngine started",
         })
 

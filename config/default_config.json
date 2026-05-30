@@ -462,6 +462,27 @@
     "max_compressor_threshold_change_db_per_step": 2.0,
     "min_seconds_between_quality_decisions": 5.0
   },
+  "telemetry": {
+    "enabled": false,
+    "storage_dir": "data/telemetry/sessions",
+    "schema_version": "0.1",
+    "write_jsonl": true,
+    "write_parquet": false,
+    "collect_interval_ms": 1000,
+    "collect_channel_meters": true,
+    "collect_bus_meters": true,
+    "collect_processing_snapshots": true,
+    "collect_engineer_actions": true,
+    "spl": {
+      "enabled": false,
+      "provider": "mock",
+      "file_path": null
+    },
+    "safety": {
+      "allow_live_writes": false,
+      "telemetry_read_only": true
+    }
+  },
   "safety": {
     "max_fader": 10,
     "max_gain": 18,

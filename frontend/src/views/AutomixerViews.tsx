@@ -40,28 +40,28 @@ const fallbackDashboardRuntime: DashboardRuntime = {
 
 const fallbackDirectorRuntime: DirectorRuntime = {
   currentGoal: 'Maintain vocal intelligibility and balanced live mix while keeping all writes supervised.',
-  readyLabel: 'Mock ready',
-  readyTone: 'blue',
+  readyLabel: 'Mock only',
+  readyTone: 'red',
   audioLabel: 'Mock meters',
-  audioTone: 'blue',
+  audioTone: 'yellow',
   proposalQueueLabel: 'Mock queue',
   proposalQueueTone: 'blue',
   liveWritePolicy: 'mock_frontend_only',
   manualGateLabel: 'UI only',
-  manualGateTone: 'blue',
+  manualGateTone: 'yellow',
   resetRequired: false,
   hardwareProofItems: [
-    { label: 'Fader proof', value: 'Mock only', tone: 'blue' },
-    { label: 'Readback', value: 'Mock only', tone: 'blue' },
-    { label: 'Rollback', value: 'Mock only', tone: 'blue' },
-    { label: 'Final readiness', value: 'Prototype', tone: 'blue' }
+    { label: 'Fader proof', value: 'Not live proven', tone: 'yellow' },
+    { label: 'Readback', value: 'Not live proven', tone: 'yellow' },
+    { label: 'Rollback', value: 'Not live proven', tone: 'yellow' },
+    { label: 'Final readiness', value: 'Mock only', tone: 'red' }
   ],
   blockedReasons: [],
   statusItems: [
-    { label: 'Mixer connected', value: 'Mock', tone: 'blue' },
+    { label: 'Mixer connected', value: 'No', tone: 'red' },
     { label: 'Gain staging', value: 'Mock', tone: 'blue' },
     { label: 'Auto fader', value: 'Mock', tone: 'blue' },
-    { label: 'No clipping', value: 'Assumed', tone: 'green' }
+    { label: 'No clipping', value: 'Unverified', tone: 'yellow' }
   ],
   sourceLabel: 'Mock'
 };

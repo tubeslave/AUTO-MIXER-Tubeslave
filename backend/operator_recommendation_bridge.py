@@ -122,7 +122,8 @@ def _safe_gain_evidence(suggestion: Dict[str, Any], gain_db: float) -> List[Dict
         ensemble = character.get("soundcheck_ensemble_context")
         if isinstance(ensemble, dict) and (ensemble.get("provided") or ensemble.get("reason")):
             reason = str(ensemble.get("reason") or "unknown")
-            time_coherence_enabled = bool(ensemble.get("time_coherence_enabled"))
+            ensemble_enabled = ensemble.get("enabled") is not False and reason != "disabled"
+            time_coherence_enabled = bool(ensemble.get("time_coherence_enabled")) and ensemble_enabled
             evidence.append({
                 "label": "Ensemble context",
                 "value": "active" if ensemble.get("active") else reason,
@@ -178,7 +179,8 @@ def _safe_gain_ensemble_context_summary(suggestion: Dict[str, Any]) -> Optional[
     reason = str(ensemble.get("reason") or "unknown")
     context_state = "active" if ensemble.get("active") else "inactive"
     parts = [f"Ensemble context {context_state} ({reason})"]
-    time_coherence_enabled = bool(ensemble.get("time_coherence_enabled"))
+    ensemble_enabled = ensemble.get("enabled") is not False and reason != "disabled"
+    time_coherence_enabled = bool(ensemble.get("time_coherence_enabled")) and ensemble_enabled
     if time_coherence_enabled:
         if not ensemble.get("time_coherence_evaluable", True):
             time_value = "missing"

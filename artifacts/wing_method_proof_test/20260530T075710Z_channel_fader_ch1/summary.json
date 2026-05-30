@@ -1,0 +1,171 @@
+{
+  "action": "channel_fader",
+  "artifact_dir": "artifacts/wing_method_proof_test/20260530T075710Z_channel_fader_ch1",
+  "channel": 1,
+  "event_path": "artifacts/wing_method_proof_test/20260530T075710Z_channel_fader_ch1/gated_events.jsonl",
+  "execute": true,
+  "finished_at": "2026-05-30T07:57:10Z",
+  "mixer_calls": [
+    {
+      "channel": 1,
+      "method": "set_fader",
+      "value": -9.5
+    },
+    {
+      "channel": 1,
+      "method": "set_fader",
+      "value": -10.0
+    }
+  ],
+  "mixer_mode": "fake_mixer",
+  "physical_wing": false,
+  "proof_run": false,
+  "result": {
+    "action": {
+      "channel_id": 1,
+      "delta_db": 0.5,
+      "is_lead": false,
+      "reason": "wing_method_proof_runner",
+      "target_db": -9.5
+    },
+    "allowed": true,
+    "demoted": false,
+    "dry_run": false,
+    "eligible": true,
+    "message": "sent_and_verified",
+    "pre_read": {
+      "bounded": false,
+      "source": "method:get_fader",
+      "target_value": -9.5,
+      "value": -10.0,
+      "value_type": "fader"
+    },
+    "pre_read_ok": true,
+    "profile_id": "show_assist_auto_v1",
+    "readback": {
+      "source": "method:get_fader",
+      "target_value": -9.5,
+      "tolerance": 0.25,
+      "value": -9.5,
+      "value_type": "fader"
+    },
+    "readback_ok": true,
+    "rollback_action": {
+      "channel_id": 1,
+      "delta_db": 0.0,
+      "is_lead": false,
+      "reason": "rollback wing_method_proof_runner",
+      "target_db": -10.0
+    },
+    "rollback_available": true,
+    "rollback_decision": null,
+    "rollback_sent": false,
+    "runtime_state": "SOURCE_LEARNING",
+    "safety_decision": {
+      "action": {
+        "channel_id": 1,
+        "delta_db": 0.5,
+        "is_lead": false,
+        "reason": "wing_method_proof_runner",
+        "target_db": -9.5
+      },
+      "allowed": true,
+      "bounded": false,
+      "message": "sent",
+      "payload": {
+        "action_type": "ChannelFaderMove",
+        "channel_id": 1,
+        "delta_db": 0.5,
+        "is_lead": false,
+        "reason": "wing_method_proof_runner",
+        "target_db": -9.5
+      },
+      "rate_limited": false,
+      "runtime_state": "SOURCE_LEARNING",
+      "sent": true,
+      "supported": true
+    },
+    "sent": true,
+    "target": {
+      "action_type": "ChannelFaderMove",
+      "channel_id": 1
+    },
+    "write_sent": true
+  },
+  "rollback_check": true,
+  "rollback_result": {
+    "action": {
+      "channel_id": 1,
+      "delta_db": -0.5,
+      "is_lead": false,
+      "reason": "rollback wing_method_proof_runner",
+      "target_db": -10.0
+    },
+    "allowed": true,
+    "demoted": false,
+    "dry_run": false,
+    "eligible": true,
+    "message": "sent_and_verified",
+    "pre_read": {
+      "bounded": false,
+      "source": "method:get_fader",
+      "target_value": -10.0,
+      "value": -9.5,
+      "value_type": "fader"
+    },
+    "pre_read_ok": true,
+    "profile_id": "show_assist_auto_v1",
+    "readback": {
+      "source": "method:get_fader",
+      "target_value": -10.0,
+      "tolerance": 0.25,
+      "value": -10.0,
+      "value_type": "fader"
+    },
+    "readback_ok": true,
+    "rollback_action": {
+      "channel_id": 1,
+      "delta_db": 0.0,
+      "is_lead": false,
+      "reason": "rollback rollback wing_method_proof_runner",
+      "target_db": -9.5
+    },
+    "rollback_available": true,
+    "rollback_decision": null,
+    "rollback_sent": false,
+    "runtime_state": "ROLLBACK",
+    "safety_decision": {
+      "action": {
+        "channel_id": 1,
+        "delta_db": -0.5,
+        "is_lead": false,
+        "reason": "rollback wing_method_proof_runner",
+        "target_db": -10.0
+      },
+      "allowed": true,
+      "bounded": false,
+      "message": "sent",
+      "payload": {
+        "action_type": "ChannelFaderMove",
+        "channel_id": 1,
+        "delta_db": -0.5,
+        "is_lead": false,
+        "reason": "rollback wing_method_proof_runner",
+        "target_db": -10.0
+      },
+      "rate_limited": false,
+      "runtime_state": "ROLLBACK",
+      "sent": true,
+      "supported": true
+    },
+    "sent": true,
+    "target": {
+      "action_type": "ChannelFaderMove",
+      "channel_id": 1
+    },
+    "write_sent": true
+  },
+  "run_id": "20260530T075710Z_channel_fader_ch1",
+  "started_at": "2026-05-30T07:57:10Z",
+  "status": "passed"
+}

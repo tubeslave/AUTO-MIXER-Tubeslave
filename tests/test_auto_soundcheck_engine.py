@@ -14,7 +14,8 @@ from autofoh_analysis import extract_analysis_features
 from autofoh_detectors import LeadMaskingAnalyzer, aggregate_stem_features
 from autofoh_models import RuntimeState
 from autofoh_profiles import build_phase_learning_snapshot, build_soundcheck_profile
-from autofoh_safety import AutoFOHSafetyController, ChannelEQMove
+from autofoh_safety import AutoFOHSafetyController, ChannelEQMove, ChannelFaderMove
+from correction_action_executor import CorrectionActionExecutorConfig, GatedCorrectionActionExecutor
 from feedback_detector import FeedbackEvent
 from observation_mixer import ObservationMixerClient
 from signal_metrics import ChannelMetrics, InterChannelMetrics, LevelMetrics
@@ -54,6 +55,57 @@ def test_observation_mode_wraps_mixer_and_intercepts_writes():
     assert isinstance(engine.mixer_client, ObservationMixerClient)
     assert engine.mixer_client.set_channel_gain(1, 5.0) is True
     assert any("operation" in item for item in observed)
+
+
+class GatedEngineMixer:
+    is_connected = True
+    state = {}
+    callbacks = {}
+
+    def __init__(self):
+        self.fader = {1: -10.0}
+        self.calls = []
+
+    def get_fader(self, channel):
+        return self.fader.get(channel)
+
+    def set_fader(self, channel, value_db):
+        self.fader[channel] = value_db
+        self.calls.append(("set_fader", channel, value_db))
+        return True
+
+
+def test_engine_routes_actions_through_gated_executor_and_exports_bundle():
+    mixer = GatedEngineMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+        observe_only=True,
+    )
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(
+        mixer,
+        config=engine.action_safety_config,
+    )
+    engine.correction_executor = GatedCorrectionActionExecutor(
+        engine.safety_controller,
+        config=CorrectionActionExecutorConfig.from_config({
+            "promoted_action_types": {"ChannelFaderMove": True},
+        }),
+    )
+
+    decision = engine._execute_action(
+        ChannelFaderMove(channel_id=1, target_db=-9.5, reason="observe-only fader proof"),
+        runtime_state=RuntimeState.SOURCE_LEARNING,
+    )
+    bundle = engine.get_soundcheck_recommendation_bundle()
+
+    assert decision is not None
+    assert decision.sent is False
+    assert decision.message == "dry_run_only"
+    assert mixer.calls == []
+    assert bundle["recommendation_count"] == 1
+    assert bundle["proposals"][0]["action_type"] == "set_fader_db"
 
 
 class ResetTrackingMixer:

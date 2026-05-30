@@ -5,7 +5,7 @@ import {
   Panel,
   StatusBadge
 } from './AutomixerComponents';
-import { applyPlanForTask, safetyEvidenceForTask } from '../../mock/automixerData';
+import { applyPlanForTask, ensembleEvidenceForTask, safetyEvidenceForTask } from '../../mock/automixerData';
 import { textClassForTone, toneForMode, toneForPriority, toneFromState } from '../../utils/prototypeTone';
 import type {
   ApplyPlanStep,
@@ -84,6 +84,7 @@ export function TaskDetailsPanel({
   const proposal = task.proposal;
   const applyBlocked = task.canApply === false || task.reviewOnly;
   const blockers = task.applyBlockers ?? [];
+  const ensembleEvidence = ensembleEvidenceForTask(task);
 
   return (
     <Panel title="Task Details">
@@ -121,6 +122,19 @@ export function TaskDetailsPanel({
         <div className="mt-3 border-l-2 border-audio/40 pl-2">
           <div className="am-label mb-1">Backend Reason</div>
           <p className="break-words text-[10px] leading-4 text-muted">{task.reason}</p>
+        </div>
+      )}
+      {ensembleEvidence.length > 0 && (
+        <div className="mt-3 rounded-[6px] border border-warn/30 bg-warn/10 p-2">
+          <div className="am-label mb-2 text-warn">SafeGain Ensemble Context</div>
+          <div className="grid grid-cols-2 gap-1">
+            {ensembleEvidence.map(row => (
+              <div className="min-w-0 rounded-[5px] border border-line bg-panel2 px-1.5 py-1" key={`${row.label}-${row.value}`}>
+                <div className="truncate text-[8px] uppercase tracking-[0.06em] text-dim">{row.label}</div>
+                <div className={`truncate text-[9px] font-bold ${textClassForTone(row.tone)}`}>{row.value}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {blockers.length > 0 && (

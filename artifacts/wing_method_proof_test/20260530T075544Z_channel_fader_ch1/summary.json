@@ -1,0 +1,60 @@
+{
+  "action": "channel_fader",
+  "artifact_dir": "artifacts/wing_method_proof_test/20260530T075544Z_channel_fader_ch1",
+  "channel": 1,
+  "event_path": "artifacts/wing_method_proof_test/20260530T075544Z_channel_fader_ch1/gated_events.jsonl",
+  "execute": false,
+  "finished_at": "2026-05-30T07:55:44Z",
+  "mixer_calls": [],
+  "mixer_mode": "fake_mixer",
+  "physical_wing": false,
+  "proof_run": false,
+  "result": {
+    "action": {
+      "channel_id": 1,
+      "delta_db": 0.5,
+      "is_lead": false,
+      "reason": "wing_method_proof_runner",
+      "target_db": -9.5
+    },
+    "allowed": true,
+    "demoted": false,
+    "dry_run": true,
+    "eligible": true,
+    "message": "dry_run_only",
+    "pre_read": {
+      "bounded": false,
+      "source": "method:get_fader",
+      "target_value": -9.5,
+      "value": -10.0,
+      "value_type": "fader"
+    },
+    "pre_read_ok": true,
+    "profile_id": "show_assist_auto_v1",
+    "readback": {},
+    "readback_ok": false,
+    "rollback_action": {
+      "channel_id": 1,
+      "delta_db": 0.0,
+      "is_lead": false,
+      "reason": "rollback wing_method_proof_runner",
+      "target_db": -10.0
+    },
+    "rollback_available": true,
+    "rollback_decision": null,
+    "rollback_sent": false,
+    "runtime_state": "SOURCE_LEARNING",
+    "safety_decision": null,
+    "sent": false,
+    "target": {
+      "action_type": "ChannelFaderMove",
+      "channel_id": 1
+    },
+    "write_sent": false
+  },
+  "rollback_check": false,
+  "rollback_result": null,
+  "run_id": "20260530T075544Z_channel_fader_ch1",
+  "started_at": "2026-05-30T07:55:44Z",
+  "status": "passed"
+}

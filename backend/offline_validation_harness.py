@@ -446,6 +446,7 @@ def write_offline_validation_artifacts(
     *,
     artifact_root: str | Path = "artifacts/offline_validation",
     run_id: Optional[str] = None,
+    teacher_examples: Optional[Iterable[Dict[str, Any]]] = None,
 ) -> Dict[str, str]:
     run_id = run_id or f"{compact_stamp()}_offline_operator_validation"
     run_dir = Path(artifact_root) / run_id
@@ -454,7 +455,9 @@ def write_offline_validation_artifacts(
     events_path = run_dir / "events.jsonl"
     traces_path = run_dir / "decision_traces.jsonl"
     metrics_path = run_dir / "metrics_before_after.json"
+    teacher_examples_path = run_dir / "foundation_teacher_examples.jsonl"
     report_path = run_dir / "report.md"
+    teacher_rows = list(teacher_examples or [])
 
     with summary_path.open("w", encoding="utf-8") as handle:
         json.dump(result, handle, indent=2, ensure_ascii=False, sort_keys=True)
@@ -553,10 +556,16 @@ def write_offline_validation_artifacts(
         "before_after_available": False,
         "summary": result.get("summary", {}),
         "trace_count": trace_count,
+        "foundation_teacher_example_count": len(teacher_rows),
+        "foundation_teacher_examples_path": str(teacher_examples_path),
     }
     with metrics_path.open("w", encoding="utf-8") as handle:
         json.dump(metrics, handle, indent=2, ensure_ascii=False, sort_keys=True)
         handle.write("\n")
+
+    with teacher_examples_path.open("w", encoding="utf-8") as handle:
+        for row in teacher_rows:
+            handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
     with report_path.open("w", encoding="utf-8") as handle:
         handle.write(f"# Offline Replay Report {run_id}\n\n")
@@ -564,6 +573,7 @@ def write_offline_validation_artifacts(
         handle.write(f"- Reason: {result.get('reason')}\n")
         handle.write("- Policy: offline-only, no WING/OSC transport imports, no live writes\n")
         handle.write(f"- Decision traces: {trace_count}\n")
+        handle.write(f"- Foundation teacher examples: {len(teacher_rows)}\n")
         handle.write(f"- Summary: `{json.dumps(result.get('summary', {}), ensure_ascii=False, sort_keys=True)}`\n")
 
     return {
@@ -573,5 +583,6 @@ def write_offline_validation_artifacts(
         "events_path": str(events_path),
         "decision_traces_path": str(traces_path),
         "metrics_path": str(metrics_path),
+        "foundation_teacher_examples_path": str(teacher_examples_path),
         "report_path": str(report_path),
     }

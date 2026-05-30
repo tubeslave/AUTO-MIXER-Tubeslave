@@ -78,12 +78,17 @@ from autofoh_safety import (
     SafetyDecision,
     SendLevelAdjust,
 )
+from correction_action_executor import (
+    CorrectionActionExecutorConfig,
+    GatedCorrectionActionExecutor,
+)
 from live_shared_mix import (
     LiveSharedMixChannel,
     LiveSharedMixConfig,
     build_live_shared_mix_plan,
     normalize_live_role,
 )
+from soundcheck_recommendation_workflow import NoWriteSoundcheckRecommendationWorkflow
 from channel_recognizer import (
     classification_from_legacy_preset,
     recognize_instrument, recognize_instrument_spectral_fallback,
@@ -523,6 +528,7 @@ class AutoSoundcheckEngine:
         autofoh_evaluation = autofoh_config.get("evaluation", {})
         autofoh_logging = autofoh_config.get("logging", {})
         autofoh_soundcheck_profile = autofoh_config.get("soundcheck_profile", {})
+        autofoh_live_action_executor = autofoh_config.get("live_action_executor", {})
         self.shared_chat_mix_config = LiveSharedMixConfig.from_mapping(
             autofoh_config.get("shared_chat_mix", {})
         )
@@ -623,6 +629,9 @@ class AutoSoundcheckEngine:
         self.action_safety_config = AutoFOHSafetyConfig.from_config(
             autofoh_safety.get("action_limits", {})
         )
+        self.correction_executor_config = CorrectionActionExecutorConfig.from_config(
+            autofoh_live_action_executor
+        )
         self.evaluation_policy = AutoFOHEvaluationPolicy.from_config(autofoh_evaluation)
         self.autofoh_logging_enabled = bool(autofoh_logging.get("enabled", False))
         self.autofoh_log_path = str(autofoh_logging.get("path", "") or "")
@@ -678,9 +687,18 @@ class AutoSoundcheckEngine:
         self._feedback_actions_sent_by_channel: Dict[int, int] = {}
         self._feedback_actions_sent_total: int = 0
         self.safety_controller: Optional[AutoFOHSafetyController] = None
+        self.correction_executor: Optional[GatedCorrectionActionExecutor] = None
         self.autofoh_logger: Optional[AutoFOHStructuredLogger] = None
         self.autofoh_session_report: Optional[AutoFOHSessionReport] = None
         self.autofoh_session_report_summary: str = ""
+        self._soundcheck_recommendation_workflow = NoWriteSoundcheckRecommendationWorkflow(
+            context_metadata={
+                "profile_id": self.correction_executor_config.profile_id,
+                "observe_only": bool(self.observe_only),
+                "live_action_executor_enabled": bool(self.correction_executor_config.enabled),
+            }
+        )
+        self._soundcheck_action_proposals: List[Dict[str, Any]] = []
         self.perceptual_config = perceptual_config
         self.perceptual_evaluator: Optional[Any] = None
         self._perceptual_pending_audio: Dict[int, Dict[str, Any]] = {}
@@ -795,7 +813,8 @@ class AutoSoundcheckEngine:
             f"muq_eval_enabled={self._muq_eval_enabled()}, "
             f"shared_chat_mix={self.shared_chat_mix_config.enabled}, "
             f"log_enabled={self.autofoh_logging_enabled}, "
-            f"profile_enabled={self.soundcheck_profile_enabled}"
+            f"profile_enabled={self.soundcheck_profile_enabled}, "
+            f"live_action_profile={self.correction_executor_config.profile_id}"
         )
 
     def _configured_channel_count(self) -> int:
@@ -990,6 +1009,116 @@ class AutoSoundcheckEngine:
         }
         event_payload.update(payload)
         return logger_instance.log_event(event_type, **event_payload)
+
+    def _action_payload(self, action) -> Dict[str, Any]:
+        if action is None:
+            return {}
+        payload = {}
+        for key, value in getattr(action, "__dict__", {}).items():
+            payload[key] = value
+        payload.setdefault("action_type", getattr(action, "action_type", action.__class__.__name__))
+        return payload
+
+    def _record_soundcheck_recommendation_from_gated_result(self, gated_result, snapshot: Dict[str, Any]):
+        if gated_result is None:
+            return
+        action = gated_result.action
+        pre_read = dict(gated_result.pre_read or {})
+        target_value = pre_read.get("target_value")
+        current_value = pre_read.get("value")
+        metadata = {
+            "source": "gated_correction_executor",
+            "profile_id": gated_result.profile_id,
+            "message": gated_result.message,
+            "dry_run": bool(gated_result.dry_run),
+            "eligible": bool(gated_result.eligible),
+            "write_sent": bool(gated_result.write_sent),
+            "pre_read": pre_read,
+            "readback": dict(gated_result.readback or {}),
+            "target": dict(gated_result.target or {}),
+            "expected_effect": snapshot.get("expected_effect"),
+            "evaluation_band_name": snapshot.get("evaluation_band_name"),
+        }
+        rationale = {
+            "operator_note": (
+                "Review AutoFOH soundcheck action before live write; "
+                f"gate result: {gated_result.message}."
+            )
+        }
+        confidence = 0.7 if gated_result.message == "action_not_promoted_for_live_write" else 0.85
+
+        if isinstance(action, ChannelGainMove) and current_value is not None and target_value is not None:
+            self._soundcheck_recommendation_workflow.recommend_input_gain(
+                channel=action.channel_id,
+                current_trim_db=float(current_value),
+                target_trim_db=float(target_value),
+                confidence=confidence,
+                metadata=metadata,
+                rationale=rationale,
+            )
+            return
+
+        if isinstance(action, ChannelFaderMove) and current_value is not None and target_value is not None:
+            self._soundcheck_recommendation_workflow.recommend_fader(
+                channel=action.channel_id,
+                current_fader_db=float(current_value),
+                target_fader_db=float(target_value),
+                confidence=confidence,
+                metadata=metadata,
+                rationale=rationale,
+            )
+            return
+
+        channel = getattr(action, "channel_id", None)
+        proposal_id = f"gated:{len(self._soundcheck_action_proposals) + 1}"
+        action_payload = self._action_payload(action)
+        self._soundcheck_action_proposals.append(
+            {
+                "recommendation_id": proposal_id,
+                "kind": action.action_type,
+                "action_type": f"typed_correction:{action.action_type}",
+                "mode": "observe_only" if gated_result.dry_run else "approval_required",
+                "channel": channel,
+                "target": dict(gated_result.target or {}),
+                "current_state": {"value": current_value, "source": pre_read.get("source")},
+                "requested_state": action_payload,
+                "confidence": confidence,
+                "rationale": rationale,
+                "metadata": metadata,
+                "action_envelope": {
+                    "operator_summary": (
+                        f"Review AutoFOH {action.action_type} for "
+                        f"{'channel ' + str(channel) if channel else 'target'}."
+                    ),
+                    "live_mixer_writes": False,
+                    "transport_policy": "dry_run_only",
+                },
+                "safety": {
+                    "auto_apply_blocked": True,
+                    "live_mixer_writes": False,
+                    "transport_policy": "dry_run_only",
+                    "gate_message": gated_result.message,
+                },
+            }
+        )
+
+    def get_soundcheck_recommendation_bundle(self) -> Dict[str, Any]:
+        bundle = self._soundcheck_recommendation_workflow.build_bundle()
+        generic_proposals = list(self._soundcheck_action_proposals)
+        proposals = list(bundle.get("recommendations", [])) + generic_proposals
+        bundle["recommendations"] = proposals
+        bundle["proposals"] = proposals
+        bundle["recommendation_count"] = len(proposals)
+        bundle["context_metadata"] = {
+            **dict(bundle.get("context_metadata", {}) or {}),
+            "profile_id": self.correction_executor_config.profile_id,
+            "observe_only": bool(self.observe_only),
+            "live_action_executor_enabled": bool(self.correction_executor_config.enabled),
+            "promoted_action_types": dict(self.correction_executor_config.promoted_action_types),
+        }
+        bundle["live_mixer_writes"] = False
+        bundle["transport_policy"] = "dry_run_only"
+        return bundle
 
     @staticmethod
     def _safe_call(callback, default=None):
@@ -1865,7 +1994,24 @@ class AutoSoundcheckEngine:
                 },
             )
             return decision
-        decision = self.safety_controller.execute(action, effective_state)
+        gated_result = None
+        if self.correction_executor is not None:
+            gated_result = self.correction_executor.execute(
+                action,
+                effective_state,
+                dry_run=self.observe_only,
+            )
+            decision = gated_result.to_safety_decision()
+            if not decision.sent:
+                self._record_soundcheck_recommendation_from_gated_result(
+                    gated_result,
+                    snapshot,
+                )
+        else:
+            decision = self.safety_controller.execute(action, effective_state)
+        metadata = dict(snapshot.get("metadata", {}) or {})
+        if gated_result is not None:
+            metadata["gated_executor"] = gated_result.to_dict()
         self._log_autofoh_event(
             "action_decision",
             channel_id=getattr(decision.action, "channel_id", None),
@@ -1881,7 +2027,7 @@ class AutoSoundcheckEngine:
             expected_effect=snapshot.get("expected_effect"),
             evaluation_band_name=snapshot.get("evaluation_band_name"),
             pre_features=self._feature_snapshot_payload(snapshot.get("pre_features")),
-            metadata=snapshot.get("metadata", {}),
+            metadata=metadata,
         )
         if decision.sent and register_evaluation:
             pending = self._register_pending_action_evaluation(
@@ -2138,6 +2284,14 @@ class AutoSoundcheckEngine:
                     mixer_client=self.mixer_client,
                     config=self.action_safety_config,
                 )
+                if self.correction_executor_config.enabled:
+                    self.correction_executor = GatedCorrectionActionExecutor(
+                        self.safety_controller,
+                        config=self.correction_executor_config,
+                        event_logger=self._log_autofoh_event,
+                    )
+                else:
+                    self.correction_executor = None
                 return True
             else:
                 logger.error(f"Failed to connect to {self.mixer_type.upper()}")
@@ -6026,6 +6180,19 @@ class AutoSoundcheckEngine:
                 for dca_id, snapshot in sorted(self.dca_snapshots.items())
             },
             "observe_only": self.observe_only,
+            "live_action_executor_enabled": self.correction_executor_config.enabled,
+            "live_action_profile": self.correction_executor_config.profile_id,
+            "promoted_live_action_types": [
+                action_type
+                for action_type, promoted in sorted(
+                    self.correction_executor_config.promoted_action_types.items()
+                )
+                if promoted
+            ],
+            "soundcheck_recommendation_count": (
+                len(self._soundcheck_recommendation_workflow.list_recommendations())
+                + len(self._soundcheck_action_proposals)
+            ),
             "applied_channel_ids": sorted(self._applied_channels),
             "safety_action_history_size": len(self.safety_controller.history) if self.safety_controller else 0,
             "pending_action_evaluations": len(self._pending_action_evaluations),

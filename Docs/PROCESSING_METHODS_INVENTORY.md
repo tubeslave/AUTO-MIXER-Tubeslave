@@ -44,6 +44,8 @@ emergency-stop proof.
 | LUFS Gain Staging | `proposal_only` | `gain_fader` | Ayaic-style level-plane guidance and offline input-trim render. | Standalone live writer |
 | Live Shared Mix Planner | `proposal_only` | `gain_fader` | Grouped balance proposals. | Routing/name/master-processing writes |
 | Auto EQ | `proposal_only` | `eq` | EQ recommendations and blockers. | Direct `set_eq` in main live pipeline |
+| AutoEQ Audit Validation | `shadow_only` | `eq` | Validate EQ units, phase, IIR stability, splits, export and headroom. | Live EQ apply |
+| Diff-DEQ Dynamic EQ Playbook Bridge | `shadow_only` | `eq` | Import external PEQ+DRC predictions as dry-run research playbook entries. | Model runtime, live EQ/dynamics apply |
 | Cross-Adaptive EQ | `proposal_only` | `eq` | Masking-aware proposal/offline candidate. | Direct live EQ apply |
 | Auto Compressor | `proposal_only` | `dynamics` | Dynamics recommendations. | Direct live compressor apply |
 | Crest-Factor Compressor | `lab` | `dynamics` | Research/proposal candidate. | Live executor |

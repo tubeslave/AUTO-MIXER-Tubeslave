@@ -105,38 +105,50 @@ test('adaptTasks preserves SafeGain ensemble evidence for read-only cockpit disp
 });
 
 test('safetyEvidenceForTask keeps ensemble rows visible before generic evidence', async () => {
-  const { safetyEvidenceForTask } = await importTypeScript('mock/automixerData.ts');
+  const { ensembleEvidenceForTask, safetyEvidenceForTask } = await importTypeScript('mock/automixerData.ts');
 
-  const evidence = safetyEvidenceForTask(
-    {
-      id: 'proposal-safe-gain-1',
-      priority: 'High',
-      title: 'SafeGain trim review',
-      agent: 'SafeGain',
-      status: 'Pending',
-      time: '10:31',
-      safetyEvidence: [
-        { label: 'Distortion risk', value: 'low', tone: 'green' },
-        { label: 'Ensemble context', value: 'ensemble time context stale', tone: 'yellow' },
-        { label: 'Preamp zone', value: 'clean', tone: 'green' },
-        { label: 'Ensemble time coherence', value: 'stale', tone: 'yellow' },
-        { label: 'Readback', value: 'required', tone: 'yellow' },
-        { label: 'Ensemble lag samples', value: '10/2', tone: 'yellow' },
-        { label: 'Rollback', value: 'required', tone: 'yellow' },
-      ],
-    },
-    'Supervised',
-  );
+  const task = {
+    id: 'proposal-safe-gain-1',
+    priority: 'High',
+    title: 'SafeGain trim review',
+    agent: 'SafeGain',
+    status: 'Pending',
+    time: '10:31',
+    safetyEvidence: [
+      { label: 'Distortion risk', value: 'low', tone: 'green' },
+      { label: 'Ensemble context', value: 'ensemble time context stale', tone: 'yellow' },
+      { label: 'Preamp zone', value: 'clean', tone: 'green' },
+      { label: 'Ensemble time coherence', value: 'stale', tone: 'yellow' },
+      { label: 'Ensemble time sources', value: '1/2', tone: 'yellow' },
+      { label: 'Readback', value: 'required', tone: 'yellow' },
+      { label: 'Ensemble lag samples', value: '10/2', tone: 'yellow' },
+      { label: 'Rollback', value: 'required', tone: 'yellow' },
+      { label: 'Ensemble apply policy', value: 'operator review only', tone: 'yellow' },
+    ],
+  };
+
+  const evidence = safetyEvidenceForTask(task, 'Supervised');
 
   assert.deepEqual(
     evidence.map(row => row.label),
     [
       'Ensemble context',
       'Ensemble time coherence',
+      'Ensemble time sources',
       'Ensemble lag samples',
+      'Ensemble apply policy',
       'Distortion risk',
-      'Preamp zone',
-      'Readback',
+    ],
+  );
+
+  assert.deepEqual(
+    ensembleEvidenceForTask(task).map(row => row.label),
+    [
+      'Ensemble context',
+      'Ensemble time coherence',
+      'Ensemble time sources',
+      'Ensemble lag samples',
+      'Ensemble apply policy',
     ],
   );
 });

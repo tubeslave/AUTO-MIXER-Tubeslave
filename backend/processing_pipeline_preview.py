@@ -6,10 +6,17 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 try:
+    from agentic_method_foundation import (
+        build_agentic_recommendations,
+        build_inter_channel_context,
+        feature_snapshot_from_channel_inventory,
+    )
     from operator_analysis import build_operator_analysis_report
+    from operator_product_state import build_channel_inventory
     from operator_recommendation_bridge import build_safe_gain_operator_proposals
     from processing_proposal_adapters import (
         MAIN_PIPELINE_ID,
+        adapt_agentic_foundation_gain_fader_recommendations,
         adapt_operator_analysis_gain_fader_proposals,
         adapt_safe_gain_suggestions,
         build_proposal_only_method_contracts,
@@ -23,10 +30,17 @@ try:
         get_processing_method,
     )
 except ImportError:  # pragma: no cover - package import compatibility
+    from backend.agentic_method_foundation import (
+        build_agentic_recommendations,
+        build_inter_channel_context,
+        feature_snapshot_from_channel_inventory,
+    )
     from backend.operator_analysis import build_operator_analysis_report
+    from backend.operator_product_state import build_channel_inventory
     from backend.operator_recommendation_bridge import build_safe_gain_operator_proposals
     from backend.processing_proposal_adapters import (
         MAIN_PIPELINE_ID,
+        adapt_agentic_foundation_gain_fader_recommendations,
         adapt_operator_analysis_gain_fader_proposals,
         adapt_safe_gain_suggestions,
         build_proposal_only_method_contracts,
@@ -123,6 +137,50 @@ def _safe_gain_preview(server: Any) -> Dict[str, Any]:
     }
 
 
+def _agentic_foundation_preview(server: Any, *, total_channels: int) -> Dict[str, Any]:
+    inventory = build_channel_inventory(server, total_channels=total_channels)
+    audio_running = bool(inventory.get("audio_capture", {}).get("running"))
+    if not audio_running:
+        return {
+            "available": False,
+            "reason": "audio_capture_not_running",
+            "recommendation_count": 0,
+            "proposals": [],
+        }
+
+    snapshots = [
+        feature_snapshot_from_channel_inventory(channel)
+        for channel in inventory.get("channels", [])
+        if isinstance(channel, dict)
+    ]
+    context = build_inter_channel_context(snapshots)
+    recommendations = []
+    for snapshot in snapshots:
+        recommendations.extend(
+            recommendation.to_dict()
+            for recommendation in build_agentic_recommendations(snapshot, context=context)
+        )
+
+    proposals = adapt_agentic_foundation_gain_fader_recommendations(
+        recommendations,
+        pipeline_id=MAIN_PIPELINE_ID,
+    )
+    return {
+        "available": bool(recommendations),
+        "reason": None if recommendations else "no_agentic_foundation_recommendations",
+        "recommendation_count": len(recommendations),
+        "proposal_count": len(proposals),
+        "proposals": proposals,
+        "policy": {
+            "preview_only": True,
+            "queue_mutation": False,
+            "live_write": False,
+            "safe_action_types": ["gain_trim", "fader"],
+            "direction": "down_only",
+        },
+    }
+
+
 def build_main_pipeline_preview(
     server: Any,
     *,
@@ -161,7 +219,10 @@ def build_main_pipeline_preview(
         pipeline_id=MAIN_PIPELINE_ID,
     )
 
-    proposals = operator_proposals + safe_gain_proposals
+    agentic_foundation = _agentic_foundation_preview(server, total_channels=total_channels)
+    agentic_foundation_proposals = agentic_foundation.get("proposals", [])
+
+    proposals = operator_proposals + safe_gain_proposals + agentic_foundation_proposals
     blockers = build_registry_blockers(pipeline_id=MAIN_PIPELINE_ID)
     proposal_only_contracts = build_proposal_only_method_contracts(pipeline_id=MAIN_PIPELINE_ID)
     registry_snapshot = build_processing_registry_snapshot(include_methods=include_methods)
@@ -202,6 +263,8 @@ def build_main_pipeline_preview(
             "proposal_count": len(proposals),
             "operator_analysis_proposal_count": len(operator_proposals),
             "safe_gain_proposal_count": len(safe_gain_proposals),
+            "agentic_foundation_proposal_count": len(agentic_foundation_proposals),
+            "agentic_foundation_recommendation_count": int(agentic_foundation.get("recommendation_count", 0) or 0),
             "proposal_only_contract_count": len(proposal_only_contracts),
             "blocker_count": len(blockers),
             "queue_mutation": False,
@@ -221,6 +284,13 @@ def build_main_pipeline_preview(
                 "status": "active" if safe_gain.get("available") else "standby",
                 "output": "gain_proposals_preview",
                 "reason": safe_gain.get("reason"),
+            },
+            {
+                "adapter_id": "agentic_foundation_gain_fader",
+                "method_id": "agentic_method_foundation",
+                "status": "active" if agentic_foundation_proposals else "standby",
+                "output": "bounded_gain_fader_down_preview",
+                "reason": agentic_foundation.get("reason"),
             },
             {
                 "adapter_id": "registry_blockers",
@@ -248,6 +318,11 @@ def build_main_pipeline_preview(
         "safe_gain": {
             key: value
             for key, value in safe_gain.items()
+            if key != "proposals"
+        },
+        "agentic_foundation": {
+            key: value
+            for key, value in agentic_foundation.items()
             if key != "proposals"
         },
         "registry": {

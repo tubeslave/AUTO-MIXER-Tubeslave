@@ -85,6 +85,14 @@ PROPOSAL_ONLY_CONTRACTS = {
         "safety_evidence": ["insert_bypass_state", "parameter_bounds", "return_headroom", "rollback_value"],
     },
 }
+AGENTIC_FOUNDATION_SAFE_ACTION_TYPES = {
+    "gain_trim": "gain",
+    "fader": "fader",
+}
+AGENTIC_FOUNDATION_MAX_DOWN_STEP_DB = {
+    "gain": 0.5,
+    "fader": 1.0,
+}
 
 
 def _coerce_float(value: Any) -> Optional[float]:
@@ -245,6 +253,94 @@ def adapt_safe_gain_suggestions(
         for proposal in proposals
         if isinstance(proposal, dict)
     ]
+
+
+def adapt_agentic_foundation_gain_fader_recommendations(
+    recommendations: Iterable[Dict[str, Any]],
+    *,
+    pipeline_id: str = MAIN_PIPELINE_ID,
+) -> List[Dict[str, Any]]:
+    """Adapt bounded foundation gain/fader-down recommendations for preview.
+
+    The foundation layer is dry-run by design. This adapter only exposes
+    recommendations that are already safe in direction and size: known current
+    value, known proposed value, negative delta, and fader/gain value type.
+    Queue import still stays disabled by the Product Layer preview contract.
+    """
+
+    outputs: List[Dict[str, Any]] = []
+    for recommendation in recommendations:
+        if not isinstance(recommendation, dict):
+            continue
+        action_type = str(recommendation.get("action_type") or "").strip()
+        value_type = AGENTIC_FOUNDATION_SAFE_ACTION_TYPES.get(action_type)
+        if not value_type:
+            continue
+        channel = _coerce_int(recommendation.get("channel_id") or recommendation.get("channel"))
+        current_value = _coerce_float(recommendation.get("current_value"))
+        proposed_value = _coerce_float(recommendation.get("suggested_value"))
+        if channel is None or current_value is None or proposed_value is None:
+            continue
+        delta_db = round(proposed_value - current_value, 1)
+        max_step = AGENTIC_FOUNDATION_MAX_DOWN_STEP_DB[value_type]
+        if delta_db >= 0.0 or abs(delta_db) > max_step:
+            continue
+
+        title = (
+            f"Agentic foundation: channel {channel} {value_type} "
+            f"{current_value:.1f} -> {proposed_value:.1f} dB"
+        )
+        proposal = {
+            "id": recommendation.get("idempotency_key") or f"agentic_foundation:{value_type}:{channel}",
+            "title": title,
+            "target": channel,
+            "channel": channel,
+            "kind": value_type,
+            "severity": "medium",
+            "confidence": recommendation.get("confidence"),
+            "source": "agentic_method_foundation",
+            "reason": recommendation.get("reason") or "Foundation produced a bounded gain/fader-down recommendation.",
+            "requested_change": {
+                "value_type": value_type,
+                "channel": channel,
+                "value": round(proposed_value, 1),
+                "current_value": round(current_value, 1),
+                "old_value": round(current_value, 1),
+                "proposed_value": round(proposed_value, 1),
+                "rollback_value": round(current_value, 1),
+                "delta_db": delta_db,
+                "readback_required": True,
+                "safety_evidence": [
+                    {"label": "Source", "value": "agentic_foundation_v1"},
+                    {"label": "Direction", "value": f"{value_type}_down_only"},
+                    {"label": "Max step dB", "value": max_step},
+                    {"label": "Dry run", "value": True},
+                ],
+            },
+            "raw": {
+                "rule": "agentic_foundation_bounded_downward_preview",
+                "action_type": action_type,
+                "dry_run": recommendation.get("dry_run", True),
+                "safety_status": recommendation.get("safety_status"),
+                "risk_score": recommendation.get("risk_score"),
+                "evidence": recommendation.get("evidence", {}),
+                "idempotency_key": recommendation.get("idempotency_key"),
+                "live_write": False,
+                "queue_mutation": False,
+            },
+        }
+        output = _proposal_adapter_output(
+            proposal,
+            adapter_id="agentic_foundation_gain_fader",
+            method_id="agentic_method_foundation",
+            pipeline_id=pipeline_id,
+        )
+        output["can_import_to_queue"] = False
+        output["queue_action"] = "preview_only_not_queued"
+        output.setdefault("blockers", [])
+        output["blockers"] = sorted(set([*output["blockers"], "foundation_preview_requires_explicit_promotion"]))
+        outputs.append(output)
+    return outputs
 
 
 def build_registry_blockers(*, pipeline_id: str = MAIN_PIPELINE_ID) -> List[Dict[str, Any]]:

@@ -127,6 +127,36 @@ autofoh:
     use_loaded_target_corridor: true
     use_phase_target_action_guards: true
     replace_live_target_with_learned_corridor: true
+  live_action_executor:
+    enabled: true
+    profile_id: show_assist_auto_v1
+    require_pre_read: true
+    require_readback: true
+    rollback_required: true
+    auto_rollback_on_readback_failure: true
+    demote_on_first_failure: true
+    readback_tolerance_db: 0.25
+    readback_tolerance_ms: 0.05
+    artifact_path: artifacts/show_assist_auto_v1/gated_correction_events.jsonl
+    promoted_action_types:
+      ChannelGainMove: true
+      ChannelFaderMove: true
+      EmergencyFeedbackNotch: true
+      BusFaderMove: false
+      DCAFaderMove: false
+      MasterFaderMove: false
+      ChannelEQMove: false
+      BusEQMove: false
+      HighPassAdjust: false
+      CompressorAdjust: false
+      BusCompressorAdjust: false
+      CompressorMakeupAdjust: false
+      BusCompressorMakeupAdjust: false
+      GateAdjust: false
+      PanAdjust: false
+      DelayAdjust: false
+      PolarityAdjust: false
+      SendLevelAdjust: false
   safety:
     minimum_auto_apply_classification_confidence: 0.75
     new_or_unknown_channel_auto_corrections_enabled: false
@@ -235,6 +265,24 @@ source_knowledge:
   log_retrievals: true
   log_feedback: true
   default_limit: 8
+telemetry:
+  enabled: false
+  storage_dir: data/telemetry/sessions
+  schema_version: '0.1'
+  write_jsonl: true
+  write_parquet: false
+  collect_interval_ms: 1000
+  collect_channel_meters: true
+  collect_bus_meters: true
+  collect_processing_snapshots: true
+  collect_engineer_actions: true
+  spl:
+    enabled: false
+    provider: mock
+    file_path: null
+  safety:
+    allow_live_writes: false
+    telemetry_read_only: true
 logging:
   level: INFO
   json_output: false

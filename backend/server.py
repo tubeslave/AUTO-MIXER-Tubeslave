@@ -323,7 +323,7 @@ class AutoMixerServer:
 
     def _is_wing_deployment_write_boundary_active(self) -> bool:
         return (
-            self._wing_deployment_write_boundary_enabled
+            (self._wing_deployment_write_boundary_enabled or self._wing_observation_only)
             and self.connection_mode == "wing"
             and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient))
         )
@@ -356,6 +356,8 @@ class AutoMixerServer:
         status: Dict[str, Any] = {
             "deployment_write_boundary_enabled": self._wing_deployment_write_boundary_enabled,
             "deployment_write_boundary_active": self._is_wing_deployment_write_boundary_active(),
+            "wing_observation_only": self._wing_observation_only,
+            "wing_record_telemetry": self._wing_record_telemetry,
             "connection_mode": self.connection_mode,
             "approved_live_write_kinds": ["fader", "gain"],
             "operator_mode": self.operator_mode,
@@ -934,6 +936,20 @@ class AutoMixerServer:
                 value_type=write_kind,
                 source=source,
                 approval_id=approval_id,
+            )
+
+        if self.connection_mode == "wing" and self._wing_observation_only:
+            return self._manual_write_blocked_result(
+                reason="wing_observation_only_active",
+                channel=channel,
+                value=value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+                extra={
+                    "observation_only": True,
+                    "record_telemetry": self._wing_record_telemetry,
+                },
             )
 
         if self._manual_write_emergency_stopped:
@@ -2192,7 +2208,16 @@ class AutoMixerServer:
             logger.error(f"Error handling message: {e}", exc_info=True)
             await self._send_runtime_error(websocket, e)
 
-    async def connect_wing(self, ip: str, send_port: int = 2223, receive_port: int = 2223):
+    async def connect_wing(
+        self,
+        ip: str,
+        send_port: int = 2223,
+        receive_port: int = 2223,
+        *,
+        observation_only: Optional[bool] = None,
+        record_telemetry: Optional[bool] = None,
+        telemetry_session_label: Optional[str] = None,
+    ):
         """
         Connect directly to Wing mixer via OSC
         
@@ -2203,6 +2228,10 @@ class AutoMixerServer:
         # Disconnect existing connection if any
         await self.disconnect_mixer()
         self._agent_force_auto_apply = False
+        if observation_only is not None:
+            self._wing_observation_only = bool(observation_only)
+        if record_telemetry is not None:
+            self._wing_record_telemetry = bool(record_telemetry)
         
         try:
             osc_port = receive_port or send_port or 2223
@@ -2237,7 +2266,10 @@ class AutoMixerServer:
                     "connected": True,
                     "mode": "wing",
                     "ip": ip,
-                    "state": self.mixer_client.get_state()
+                    "state": self.mixer_client.get_state(),
+                    "observation_only": self._wing_observation_only,
+                    "record_telemetry": self._wing_record_telemetry,
+                    "telemetry_session_label": telemetry_session_label,
                 })
                 logger.info("Wing connected successfully (direct OSC)")
             else:

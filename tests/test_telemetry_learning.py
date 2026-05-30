@@ -1,0 +1,258 @@
+import json
+from pathlib import Path
+
+import pytest
+
+from backend.config_manager import ConfigManager
+from backend.telemetry.collectors import (
+    MockTelemetryCollector,
+    WingTelemetryCollector,
+    duplicate_decision_trace_as_engineer_action,
+)
+from backend.telemetry.learning_export import export_training_timeline, generate_summary_report, load_session
+from backend.telemetry.schemas import (
+    ChannelTelemetry,
+    EngineerAction,
+    LabelAnnotation,
+    SceneMetadata,
+    SPLTelemetry,
+    timestamp_ms,
+)
+from backend.telemetry.session_manager import TelemetrySessionManager, default_telemetry_config
+from backend.telemetry.spl_provider import FileSPLProvider, MockSPLProvider
+
+
+def _manager(tmp_path, *, enabled=True):
+    config = default_telemetry_config()
+    config["enabled"] = enabled
+    config["storage_dir"] = str(tmp_path / "sessions")
+    return TelemetrySessionManager(storage_dir=config["storage_dir"], config=config, repo_root=Path.cwd())
+
+
+def test_start_session_writes_session_scene_and_manifest(tmp_path):
+    manager = _manager(tmp_path)
+    session = manager.start_session(
+        mode="soundcheck",
+        venue_name="Test Venue",
+        artist_name="Test Artist",
+        scene_metadata=SceneMetadata(room_type="club", estimated_capacity=300),
+    )
+
+    assert session is not None
+    session_dir = tmp_path / "sessions" / session.session_id
+    assert (session_dir / "session.json").exists()
+    assert (session_dir / "scene_metadata.json").exists()
+    manifest = json.loads((session_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["session_id"] == session.session_id
+    assert manifest["schema_version"] == "0.1"
+    assert manifest["safety_mode"] == "dry-run"
+    assert manifest["files"]["channel_telemetry"] == "channel_telemetry.jsonl"
+
+
+def test_telemetry_disabled_does_not_create_session_files(tmp_path):
+    manager = _manager(tmp_path, enabled=False)
+    session = manager.start_session(mode="soundcheck")
+
+    assert session is None
+    assert not (tmp_path / "sessions").exists()
+
+
+def test_append_jsonl_events_and_manifest_counters(tmp_path):
+    manager = _manager(tmp_path)
+    session = manager.start_session(mode="rehearsal", venue_name="Room")
+    now = timestamp_ms()
+
+    manager.append_event(
+        "channel_telemetry",
+        ChannelTelemetry(
+            timestamp_ms=now,
+            session_id=session.session_id,
+            channel_id=1,
+            channel_name="Lead Vocal",
+            detected_instrument="vocal",
+            fader_db=-8.0,
+            trim_db=1.0,
+            mute=False,
+            solo=False,
+            pan=0.0,
+            meter_rms_dbfs=-18.0,
+            meter_peak_dbfs=-6.0,
+        ).to_dict(),
+    )
+    manager.append_event(
+        "engineer_actions",
+        EngineerAction(
+            timestamp_ms=now,
+            session_id=session.session_id,
+            actor="human",
+            target_type="channel",
+            target_id="1",
+            action_type="fader_move",
+            before_value=-9.0,
+            after_value=-8.0,
+            reason="vocal lift",
+            confidence=1.0,
+            safety_status="logged_only",
+        ).to_dict(),
+    )
+
+    session_dir = tmp_path / "sessions" / session.session_id
+    channel_rows = (session_dir / "channel_telemetry.jsonl").read_text(encoding="utf-8").splitlines()
+    manifest = json.loads((session_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert len(channel_rows) == 1
+    assert manifest["counters"]["channel_telemetry"] == 1
+    assert manifest["counters"]["engineer_actions"] == 1
+
+
+def test_stop_session_sets_ended_at_and_preserves_manifest(tmp_path):
+    manager = _manager(tmp_path)
+    session = manager.start_session(mode="concert")
+    stopped = manager.stop_session(session.session_id, reason="show ended")
+
+    assert stopped is not None
+    payload = json.loads((tmp_path / "sessions" / session.session_id / "session.json").read_text(encoding="utf-8"))
+    assert payload["ended_at"]
+    assert "show ended" in payload["notes"]
+    assert not (tmp_path / "sessions" / "current_session.json").exists()
+
+
+def test_mock_collector_writes_channel_bus_and_action_events(tmp_path):
+    manager = _manager(tmp_path)
+    session = manager.start_session(mode="offline_test")
+
+    counts = MockTelemetryCollector(channel_count=3).collect_once(manager)
+
+    session_dir = tmp_path / "sessions" / session.session_id
+    assert counts["channel_telemetry"] == 3
+    assert len((session_dir / "channel_telemetry.jsonl").read_text(encoding="utf-8").splitlines()) == 3
+    assert len((session_dir / "bus_telemetry.jsonl").read_text(encoding="utf-8").splitlines()) == 1
+    assert len((session_dir / "engineer_actions.jsonl").read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_mock_and_file_spl_providers_write_spl_telemetry(tmp_path):
+    manager = _manager(tmp_path)
+    session = manager.start_session(mode="soundcheck")
+
+    mock_row = MockSPLProvider(laeq_1s=86.5).read_once(session_id=session.session_id)
+    manager.append_event("spl_telemetry", mock_row.to_dict())
+    csv_path = tmp_path / "spl.csv"
+    csv_path.write_text("timestamp_ms,laeq_1s,lcpeak,lafmax,source\n123,88.1,105.0,91.2,meter\n", encoding="utf-8")
+    file_row = FileSPLProvider(csv_path).read_once(session_id=session.session_id)
+    manager.append_event("spl_telemetry", file_row.to_dict())
+
+    rows = [
+        json.loads(line)
+        for line in (tmp_path / "sessions" / session.session_id / "spl_telemetry.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert rows[0]["laeq_1s"] == 86.5
+    assert rows[1]["source"] == "meter"
+    assert rows[1]["timestamp_ms"] == 123
+
+
+def test_export_training_timeline_merges_events_by_timestamp(tmp_path):
+    manager = _manager(tmp_path)
+    session = manager.start_session(mode="offline_test")
+    manager.append_event(
+        "labels",
+        LabelAnnotation(
+            timestamp_ms=300,
+            session_id=session.session_id,
+            label="vocal_clear",
+            source="human",
+        ).to_dict(),
+    )
+    manager.append_event(
+        "spl_telemetry",
+        SPLTelemetry(timestamp_ms=100, session_id=session.session_id, laeq_1s=84.0).to_dict(),
+    )
+    timeline_path = tmp_path / "timeline.jsonl"
+
+    timeline = export_training_timeline(
+        session.session_id,
+        storage_dir=tmp_path / "sessions",
+        output_path=timeline_path,
+    )
+    summary = generate_summary_report(session.session_id, storage_dir=tmp_path / "sessions")
+
+    assert [row["event_type"] for row in timeline] == ["spl_telemetry", "labels"]
+    assert timeline_path.exists()
+    assert summary["timeline_event_count"] == 2
+    assert Path(summary["report_path"]).exists()
+    loaded = load_session(session.session_id, storage_dir=tmp_path / "sessions")
+    assert loaded["events"]["labels"][0]["label"] == "vocal_clear"
+
+
+class _CachedMixer:
+    state = {
+        "/ch/1/$name": "Kick",
+        "/ch/1/fdr": -10.0,
+        "/ch/1/in/set/trim": 1.5,
+        "/ch/1/mute": 0,
+        "/ch/1/pan": 0.0,
+        "/ch/1/gate/on": 1,
+        "/ch/1/dyn/on": 1,
+    }
+
+
+class _Capture:
+    def get_rms(self, channel):
+        return -20.0 + channel
+
+    def get_peak(self, channel):
+        return -8.0 + channel
+
+    def get_lufs(self, channel):
+        return -21.0 + channel
+
+
+def test_wing_collector_reads_cached_state_only(tmp_path):
+    manager = _manager(tmp_path)
+    session = manager.start_session(mode="soundcheck")
+    collector = WingTelemetryCollector(_CachedMixer(), _Capture(), channel_count=1)
+
+    counts = collector.collect_once(manager)
+
+    assert counts["channel_telemetry"] == 1
+    row = json.loads((tmp_path / "sessions" / session.session_id / "channel_telemetry.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert row["channel_name"] == "Kick"
+    assert row["fader_db"] == -10.0
+    assert row["trim_db"] == 1.5
+    assert row["meter_peak_dbfs"] == -7.0
+
+
+def test_decision_trace_can_be_duplicated_as_automixer_action(tmp_path):
+    manager = _manager(tmp_path)
+    session = manager.start_session(mode="offline_test")
+
+    row = duplicate_decision_trace_as_engineer_action(
+        manager,
+        {
+            "decision_id": "decision-1",
+            "source": "unit",
+            "target": 2,
+            "current_value": -8.0,
+            "proposed_value": -8.5,
+            "proof_status": "offline",
+        },
+    )
+
+    assert row["actor"] == "automixer"
+    assert row["target_type"] == "channel"
+    assert row["target_id"] == "2"
+    rows = (tmp_path / "sessions" / session.session_id / "engineer_actions.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(rows) == 1
+
+
+def test_config_default_telemetry_disabled():
+    config = ConfigManager().to_dict()
+    assert config["telemetry"]["enabled"] is False
+    assert config["telemetry"]["spl"]["enabled"] is False
+    assert config["telemetry"]["safety"]["allow_live_writes"] is False
+    assert config["telemetry"]["safety"]["telemetry_read_only"] is True
+
+
+def test_telemetry_modules_do_not_expose_live_write_calls():
+    root = Path("backend/telemetry")
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in root.glob("*.py"))
+    for forbidden in ("set_fader(", "set_gain(", "route_output(", "load_snap(", "save_snap(", "send("):
+        assert forbidden not in combined

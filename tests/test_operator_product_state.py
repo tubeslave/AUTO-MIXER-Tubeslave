@@ -468,6 +468,8 @@ async def test_start_replay_run_records_offline_evidence_without_live_gate(serve
     artifact_root = tmp_path / "replay"
     trace_root = tmp_path / "trace"
     server._replay_artifacts_dir = artifact_root
+    server.mixer_client = CachedMixer()
+    server.audio_capture = FakeAudioCapture()
     server.automation_trace_store = AutomationTraceStore(trace_root)
     server.decision_memory_store = DecisionMemoryStore(trace_root)
     server._apply_manual_console_write = AsyncMock()
@@ -484,8 +486,12 @@ async def test_start_replay_run_records_offline_evidence_without_live_gate(serve
     assert payload["offline_only"] is True
     assert payload["live_write"] is False
     assert payload["run_id"] == "unit-replay"
+    assert payload["foundation_teacher_example_count"] >= 1
     assert (artifact_root / "unit-replay" / "summary.json").exists()
     assert (artifact_root / "unit-replay" / "decision_traces.jsonl").exists()
+    assert (artifact_root / "unit-replay" / "foundation_teacher_examples.jsonl").exists()
+    teacher_rows = (artifact_root / "unit-replay" / "foundation_teacher_examples.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert teacher_rows
 
     traces = server.get_automation_decision_traces()
     assert traces[-1]["source"] == "offline_replay_v1"
@@ -493,6 +499,7 @@ async def test_start_replay_run_records_offline_evidence_without_live_gate(serve
     assert traces[-1]["proof_status"] == "offline"
     assert traces[-1]["safety_limits"]["mixer_transport_allowed"] is False
     assert traces[-1]["metadata"]["live_write"] is False
+    assert traces[-1]["metadata"]["foundation_teacher_example_count"] >= 1
 
     memory_entries = server.get_decision_memory_entries()
     assert memory_entries[-1]["evidence_quality"] == "offline"
@@ -501,6 +508,7 @@ async def test_start_replay_run_records_offline_evidence_without_live_gate(serve
     replay_runs = build_replay_runs(server)
     assert replay_runs["runs"][0]["run_id"] == "unit-replay"
     assert replay_runs["runs"][0]["trace_count"] >= 1
+    assert replay_runs["runs"][0]["foundation_teacher_example_count"] >= 1
     assert replay_runs["runs"][0]["offline_only"] is True
     assert replay_runs["runs"][0]["live_write"] is False
 
@@ -564,11 +572,25 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     assert payload["executor_policy"]["queue_mutation"] is False
     assert payload["executor_policy"]["live_write"] is False
     assert payload["executor_policy"]["allowed_requested_change_value_types"] == ["fader", "gain"]
-    assert payload["summary"]["proposal_count"] == 1
+    assert payload["summary"]["proposal_count"] == 2
+    assert payload["summary"]["operator_analysis_proposal_count"] == 1
+    assert payload["summary"]["agentic_foundation_proposal_count"] == 1
     assert queue["summary"]["pending_count"] == 0
     assert payload["proposals"][0]["adapter_id"] == "operator_analysis_gain_fader"
     assert payload["proposals"][0]["requested_change"]["value_type"] == "fader"
     assert payload["proposals"][0]["requested_change"]["channel"] == 2
+    agentic_proposals = [
+        proposal
+        for proposal in payload["proposals"]
+        if proposal["adapter_id"] == "agentic_foundation_gain_fader"
+    ]
+    assert len(agentic_proposals) == 1
+    assert agentic_proposals[0]["method_id"] == "agentic_method_foundation"
+    assert agentic_proposals[0]["queue_action"] == "preview_only_not_queued"
+    assert agentic_proposals[0]["can_import_to_queue"] is False
+    assert agentic_proposals[0]["requested_change"]["value_type"] == "fader"
+    assert agentic_proposals[0]["requested_change"]["channel"] == 2
+    assert agentic_proposals[0]["requested_change"]["delta_db"] < 0
     server.mixer_client.set_fader.assert_not_called()
     server.mixer_client.set_gain.assert_not_called()
     server.mixer_client.set_eq.assert_not_called()

@@ -267,6 +267,27 @@ class ConfigManager:
                 'log_feedback': True,
                 'default_limit': 8,
             },
+            'telemetry': {
+                'enabled': False,
+                'storage_dir': 'data/telemetry/sessions',
+                'schema_version': '0.1',
+                'write_jsonl': True,
+                'write_parquet': False,
+                'collect_interval_ms': 1000,
+                'collect_channel_meters': True,
+                'collect_bus_meters': True,
+                'collect_processing_snapshots': True,
+                'collect_engineer_actions': True,
+                'spl': {
+                    'enabled': False,
+                    'provider': 'mock',
+                    'file_path': None,
+                },
+                'safety': {
+                    'allow_live_writes': False,
+                    'telemetry_read_only': True,
+                },
+            },
             'logging': {
                 'level': 'INFO',
                 'json_output': False,

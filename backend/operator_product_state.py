@@ -28,6 +28,20 @@ except ImportError:  # pragma: no cover - package import compatibility
         build_pipeline_runtime_summary,
         build_processing_registry_snapshot,
     )
+try:
+    from agentic_method_foundation import (
+        build_agentic_recommendations,
+        build_inter_channel_context,
+        feature_snapshot_from_channel_inventory,
+        safety_review_recommendations,
+    )
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.agentic_method_foundation import (
+        build_agentic_recommendations,
+        build_inter_channel_context,
+        feature_snapshot_from_channel_inventory,
+        safety_review_recommendations,
+    )
 
 
 DEFAULT_CHANNEL_COUNT = 24
@@ -595,6 +609,7 @@ def build_replay_runs(server: Any, limit: int = 20) -> Dict[str, Any]:
                     "write_policy": summary.get("write_policy"),
                     "summary": summary.get("summary", {}),
                     "trace_count": metrics.get("trace_count", 0),
+                    "foundation_teacher_example_count": metrics.get("foundation_teacher_example_count", 0),
                     "offline_only": metrics.get("offline_only", True),
                     "live_write": metrics.get("live_write", False),
                     "before_after_available": metrics.get("before_after_available", False),
@@ -602,6 +617,8 @@ def build_replay_runs(server: Any, limit: int = 20) -> Dict[str, Any]:
                     "summary_path": str(summary_path),
                     "decision_traces_path": str(summary_path.parent / "decision_traces.jsonl"),
                     "metrics_path": str(summary_path.parent / "metrics_before_after.json"),
+                    "foundation_teacher_examples_path": metrics.get("foundation_teacher_examples_path")
+                    or str(summary_path.parent / "foundation_teacher_examples.jsonl"),
                 }
             )
             if len(rows) >= limit:
@@ -624,6 +641,13 @@ def build_replay_runs(server: Any, limit: int = 20) -> Dict[str, Any]:
 def build_channel_intelligence(server: Any, total_channels: int = DEFAULT_CHANNEL_COUNT) -> Dict[str, Any]:
     inventory = build_channel_inventory(server, total_channels=total_channels)
     traces = build_decision_traces(server, limit=200).get("traces", [])
+    feature_snapshots = [
+        feature_snapshot_from_channel_inventory(channel)
+        for channel in inventory.get("channels", [])
+        if isinstance(channel, dict)
+    ]
+    context = build_inter_channel_context(feature_snapshots)
+    snapshots_by_channel = {snapshot.channel_id: snapshot for snapshot in feature_snapshots}
     traces_by_channel: Dict[int, List[Dict[str, Any]]] = {}
     for trace in traces:
         if not isinstance(trace, dict):
@@ -647,6 +671,9 @@ def build_channel_intelligence(server: Any, total_channels: int = DEFAULT_CHANNE
             risk = "peak_watch"
         if peak is not None and peak > -1:
             risk = "clip_risk"
+        foundation_snapshot = snapshots_by_channel.get(number) or feature_snapshot_from_channel_inventory(channel)
+        foundation_recommendations = build_agentic_recommendations(foundation_snapshot, context=context)
+        foundation_review = safety_review_recommendations(foundation_recommendations)
         rows.append(
             {
                 "channel": number,
@@ -662,17 +689,29 @@ def build_channel_intelligence(server: Any, total_channels: int = DEFAULT_CHANNE
                 "gain_ride_state": "shadow_proposal_only",
                 "risk": risk,
                 "live_apply_allowed": False,
+                "foundation": {
+                    "source": foundation_snapshot.source,
+                    "features": foundation_snapshot.to_dict(),
+                    "recommendation_count": len(foundation_recommendations),
+                    "recommendations": [item.to_dict() for item in foundation_recommendations[:4]],
+                    "safety_review": foundation_review["summary"],
+                },
             }
         )
     return {
         "type": "channel_intelligence",
         "generated_at": _utc_now(),
         "status": "ok",
-        "source": "runtime_inventory_and_traces",
+        "source": "runtime_inventory_traces_and_agentic_foundation",
         "summary": {
             "channel_count": len(rows),
             "shadow_only": True,
             "live_apply_allowed": False,
+            "foundation_source": "agentic_foundation_v1",
+            "foundation_recommendation_count": sum(
+                int(row.get("foundation", {}).get("recommendation_count", 0))
+                for row in rows
+            ),
         },
         "channels": rows,
     }

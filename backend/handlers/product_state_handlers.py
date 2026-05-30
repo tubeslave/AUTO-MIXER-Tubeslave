@@ -221,16 +221,29 @@ def register_handlers(server):
 
     async def handle_start_replay_run(websocket, data):
         try:
-            from offline_validation_harness import run_offline_validation, write_offline_validation_artifacts
+            from agentic_method_foundation import build_offline_teacher_examples_from_channel_inventory
+            from offline_validation_harness import compact_stamp, run_offline_validation, write_offline_validation_artifacts
         except ImportError:  # pragma: no cover - package import compatibility
-            from backend.offline_validation_harness import run_offline_validation, write_offline_validation_artifacts
+            from backend.agentic_method_foundation import build_offline_teacher_examples_from_channel_inventory
+            from backend.offline_validation_harness import compact_stamp, run_offline_validation, write_offline_validation_artifacts
 
-        run_id = str(data.get("run_id") or "").strip() or None
-        result = run_offline_validation(total_channels=int(data.get("total_channels", 16) or 16))
+        total_channels = int(data.get("total_channels", 16) or 16)
+        run_id = str(data.get("run_id") or "").strip() or f"{compact_stamp()}_offline_operator_validation"
+        result = run_offline_validation(total_channels=total_channels)
+        inventory = build_channel_inventory(server, total_channels=total_channels)
+        teacher_examples = build_offline_teacher_examples_from_channel_inventory(
+            inventory.get("channels", []),
+            run_id=run_id,
+            reference_metrics={
+                "offline_validation_status": result.get("status"),
+                "offline_validation_summary": result.get("summary", {}),
+            },
+        )
         paths = write_offline_validation_artifacts(
             result,
             artifact_root=getattr(server, "_replay_artifacts_dir", "artifacts/replay"),
             run_id=run_id,
+            teacher_examples=teacher_examples,
         )
         recorder = getattr(server, "record_automation_decision_trace", None)
         if callable(recorder):
@@ -252,6 +265,7 @@ def register_handlers(server):
                     "run_id": paths.get("run_id"),
                     "artifact_paths": paths,
                     "summary": result.get("summary", {}),
+                    "foundation_teacher_example_count": len(teacher_examples),
                     "connection_policy": result.get("connection_policy"),
                     "write_policy": result.get("write_policy"),
                     "forbidden_messages": result.get("forbidden_messages", []),
@@ -268,6 +282,7 @@ def register_handlers(server):
             "run_id": (paths.get("run_dir") or "").split("/")[-1],
             "result": result,
             "artifacts": paths,
+            "foundation_teacher_example_count": len(teacher_examples),
         }
         await server.send_to_client(websocket, payload)
 

@@ -9,7 +9,14 @@ logger = logging.getLogger(__name__)
 
 def register_handlers(server):
     async def handle_connect_wing(websocket, data):
-        await server.connect_wing(data.get("ip"), data.get("send_port"), data.get("receive_port"))
+        await server.connect_wing(
+            data.get("ip"),
+            data.get("send_port"),
+            data.get("receive_port"),
+            observation_only=data.get("observation_only", data.get("observe_only")),
+            record_telemetry=data.get("record_telemetry"),
+            telemetry_session_label=data.get("telemetry_session_label"),
+        )
 
     async def handle_connect_dlive(websocket, data):
         await server.connect_dlive(
@@ -117,6 +124,9 @@ def register_handlers(server):
                 ip=discovered.ip,
                 send_port=discovered.port,
                 receive_port=discovered.port,
+                observation_only=data.get("observation_only", data.get("observe_only")),
+                record_telemetry=data.get("record_telemetry"),
+                telemetry_session_label=data.get("telemetry_session_label"),
             )
 
     return {

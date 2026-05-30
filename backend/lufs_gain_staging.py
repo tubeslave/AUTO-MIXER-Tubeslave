@@ -2393,7 +2393,9 @@ class SignalStats:
             "reference_max_lag_samples": _optional_ensemble_int("reference_max_lag_samples"),
             "operator_review_only": True,
         }
-        if not ensemble_context:
+        if not profile.soundcheck_ensemble_context_enabled:
+            soundcheck_ensemble_context_state["reason"] = "disabled"
+        elif not ensemble_context:
             soundcheck_ensemble_context_state["reason"] = "missing_ensemble_context"
         elif not ensemble_vocal_family:
             soundcheck_ensemble_context_state["reason"] = "non_vocal_source"
@@ -2411,8 +2413,6 @@ class SignalStats:
             soundcheck_ensemble_context_state["reason"] = "no_gain_up_candidate"
         elif mode != "soundcheck":
             soundcheck_ensemble_context_state["reason"] = "not_soundcheck"
-        elif not profile.soundcheck_ensemble_context_enabled:
-            soundcheck_ensemble_context_state["reason"] = "disabled"
         else:
             soundcheck_ensemble_context_state.update({
                 "active": True,

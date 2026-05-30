@@ -10,6 +10,7 @@ you want the background automation active.
 
 - `run_codex_cycle.sh` - one-shot wrapper that runs one Codex cycle and exits.
 - `codex_cycle_prompt.md` - prompt used by each Codex cycle.
+- `validate_cycle_report.py` - local checker for required cycle-report evidence.
 - `com.tubeslave.automixer.codex-autoloop.plist` - LaunchAgent definition.
 
 ## Behavior
@@ -17,6 +18,11 @@ you want the background automation active.
 - The LaunchAgent starts one Codex cycle every `1200` seconds.
 - Codex limit checks are disabled. The wrapper does not inspect quota state and
   does not skip runs based on limits.
+- Current policy supersedes older local reports that described a limit gate:
+  this checkout has no `check_codex_limits.py`, no `codex_limits.example.json`,
+  and no limit-state environment contract in the runner or plist. Reintroducing
+  limit gating should be a separate reviewed change with matching tests and
+  docs.
 - The wrapper has a hard project-root guard and refuses to run unless both the
   script path and git root resolve to
   `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`.
@@ -26,7 +32,20 @@ you want the background automation active.
 - Does not run immediately at login; `launchd` starts it on the 20-minute
   interval.
 - Uses a lock directory at `.codex_autoloop.lock` to avoid parallel runs.
+- Writes lock owner metadata to `.codex_autoloop.lock/owner.env` after acquiring
+  the lock, including pid, parent pid, UTC start time, host, project root, and
+  wrapper log path. If another run finds the lock, it prints that metadata when
+  available instead of guessing whether the lock is active or stale.
 - Writes wrapper logs to `logs/codex_autoloop/`.
+- After a successful Codex run, finds the new repo-local cycle report and
+  validates the required safety/report shape, including a report title timestamp
+  that matches the filename, a short plan section for the selected cycle tasks,
+  a maximum of three numbered/bulleted plan items, and non-empty evidence
+  sections for findings, changes, tests, remaining work, and risks. The
+  `Changed Files` section must also link back to the cycle report itself so the
+  audit artifact is visible in the file list. Reports must explicitly state that
+  no neighboring repositories or external local projects were analyzed,
+  modified, or used.
 - Requires `codex` CLI to be available.
 - Uses `codex exec -C <project> --sandbox workspace-write`.
 - Sets Codex approval policy to `never` for non-interactive execution.
@@ -43,6 +62,10 @@ chmod +x tools/codex_autoloop/run_codex_cycle.sh
 CODEX_AUTOLOOP_DRY_RUN=1 tools/codex_autoloop/run_codex_cycle.sh
 plutil -lint tools/codex_autoloop/com.tubeslave.automixer.codex-autoloop.plist
 ```
+
+Dry run still checks the project-root, prompt, validator, and lock contract, but
+it does not require a working Codex CLI executable because it never starts
+`codex exec`.
 
 If `shellcheck` is installed:
 
