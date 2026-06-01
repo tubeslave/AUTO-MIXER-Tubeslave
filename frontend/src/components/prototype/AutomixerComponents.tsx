@@ -260,7 +260,8 @@ export function DataTable<T>({
   getSearchText,
   rowKey,
   selectedRow,
-  onSelect
+  onSelect,
+  emptyState
 }: {
   columns: TableColumn<T>[];
   rows: T[];
@@ -272,6 +273,7 @@ export function DataTable<T>({
   rowKey?: (row: T, index: number) => string | number;
   selectedRow?: T;
   onSelect?: (row: T) => void;
+  emptyState?: ReactNode;
 }) {
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState(filters[0]?.label ?? 'All');
@@ -346,6 +348,11 @@ export function DataTable<T>({
           </div>
           );
         })}
+        {!filteredRows.length && (
+          <div className="px-3 py-5 text-[10px] text-muted">
+            {emptyState ?? 'No rows to display.'}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -525,9 +532,9 @@ export function Sidebar({
         <div className="mb-1 font-bold uppercase tracking-[0.08em] text-muted">System Health</div>
         {dashboardMode ? (
           <div className="space-y-1 text-muted">
-            <div className="font-bold text-online">✓ All systems normal</div>
-            <div>CPU: <span className="text-text">18%</span> · RAM: <span className="text-text">32%</span></div>
-            <div>DISK: <span className="text-text">512 GB free</span></div>
+            <div className="font-bold text-online">✓ Display-only health</div>
+            <div>CPU/RAM: <span className="text-text">visual baseline</span></div>
+            <div>DISK: <span className="text-text">visual baseline</span></div>
           </div>
         ) : (
           <>
@@ -651,11 +658,11 @@ export function BottomTransportBar({ ui, actions, dashboardMode = false }: { ui:
         </div>
         <div className="border-r border-line px-3">
           <div className="am-label">Automation</div>
-          <div className="mt-1 flex items-center gap-2"><span className="rounded-[3px] border border-online/40 bg-online/10 px-2 py-1 text-online">Ride</span><span className="font-bold text-text">On</span></div>
+          <div className="mt-1 flex items-center gap-2"><span className="rounded-[3px] border border-warn/40 bg-warn/10 px-2 py-1 text-warn">Display</span><span className="font-bold text-text">No write</span></div>
         </div>
-        <div className="border-r border-line px-3"><div className="whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.1em] text-muted">Safe Limit</div><div className="mt-1 font-bold uppercase text-text">Medium</div></div>
-        <div className="border-r border-line px-3"><div className="am-label">Step</div><div className="mt-1 font-bold uppercase text-text">Small</div></div>
-        <div className="flex h-full items-center justify-between px-3"><div><div className="am-label">Rollback</div><div className="mt-1 text-muted">Last action<br /><span className="text-text">10:24:15</span></div></div><button className="am-button px-2 text-lg leading-none" onClick={actions.rollbackLastAction}>↻</button></div>
+        <div className="border-r border-line px-3"><div className="whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.1em] text-muted">Safe Limit</div><div className="mt-1 font-bold uppercase text-text">Display</div></div>
+        <div className="border-r border-line px-3"><div className="am-label">Step</div><div className="mt-1 font-bold uppercase text-text">Display</div></div>
+        <div className="flex h-full items-center justify-between px-3"><div><div className="am-label">Rollback</div><div className="mt-1 text-muted">Display-only<br /><span className="text-text">no live action</span></div></div><button className="am-button px-2 text-lg leading-none" onClick={actions.rollbackLastAction}>↻</button></div>
       </footer>
     );
   }

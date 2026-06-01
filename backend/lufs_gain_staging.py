@@ -2312,6 +2312,17 @@ class SignalStats:
             ensemble_context.get("max_context_lag_samples"),
             profile.soundcheck_ensemble_max_context_lag_samples,
         )))
+        ensemble_min_other_loud_sources = int(profile.soundcheck_ensemble_min_other_active_sources)
+        ensemble_loud_source_margin = int(ensemble_other_loud_sources - ensemble_min_other_loud_sources)
+        ensemble_time_coherent_source_margin = int(
+            ensemble_time_coherent_loud_sources - ensemble_required_time_coherent_sources
+        )
+        ensemble_reference_max_lag_samples = _optional_ensemble_int("reference_max_lag_samples")
+        ensemble_reference_lag_margin_samples = (
+            int(ensemble_context_lag_limit_samples - ensemble_reference_max_lag_samples)
+            if ensemble_reference_max_lag_samples is not None
+            else None
+        )
         ensemble_peak_gap_db = (
             float(ensemble_reference_peak_db - self.max_true_peak_db)
             if ensemble_reference_peak_db is not None
@@ -2349,7 +2360,8 @@ class SignalStats:
             "family_applicable": bool(ensemble_vocal_family),
             "other_active_sources": int(ensemble_other_active_sources),
             "other_loud_sources": int(ensemble_other_loud_sources),
-            "min_other_active_sources": int(profile.soundcheck_ensemble_min_other_active_sources),
+            "min_other_active_sources": int(ensemble_min_other_loud_sources),
+            "other_loud_source_margin": int(ensemble_loud_source_margin),
             "reference_peak_db": (
                 float(ensemble_reference_peak_db)
                 if ensemble_reference_peak_db is not None
@@ -2386,11 +2398,13 @@ class SignalStats:
             "time_coherent": bool(ensemble_time_coherent),
             "time_coherent_loud_sources": int(ensemble_time_coherent_loud_sources),
             "required_time_coherent_sources": int(ensemble_required_time_coherent_sources),
+            "time_coherent_source_margin": int(ensemble_time_coherent_source_margin),
             "max_context_lag_samples": int(ensemble_context_lag_limit_samples),
             "target_first_active_sample_index": _optional_ensemble_int("target_first_active_sample_index"),
             "target_last_active_sample_index": _optional_ensemble_int("target_last_active_sample_index"),
             "reference_latest_active_sample_index": _optional_ensemble_int("reference_latest_active_sample_index"),
-            "reference_max_lag_samples": _optional_ensemble_int("reference_max_lag_samples"),
+            "reference_max_lag_samples": ensemble_reference_max_lag_samples,
+            "reference_lag_margin_samples": ensemble_reference_lag_margin_samples,
             "operator_review_only": True,
         }
         if not profile.soundcheck_ensemble_context_enabled:
@@ -5775,21 +5789,31 @@ class SafeGainCalibrator:
             and any(source.get("last_active_sample_index") is not None for source in loud_sources)
         )
         required_time_coherent_sources = int(self.local_input_preamp.soundcheck_ensemble_min_other_active_sources)
+        other_loud_source_margin = int(len(loud_sources) - required_time_coherent_sources)
+        time_coherent_source_margin = int(len(coherent_loud_sources) - required_time_coherent_sources)
+        reference_lag_margin_samples = (
+            int(max_context_lag_samples - reference_max_lag_samples)
+            if reference_max_lag_samples is not None
+            else None
+        )
 
         return {
             "enabled": True,
             "other_active_sources": int(len(active_sources)),
             "other_loud_sources": int(len(loud_sources)),
+            "other_loud_source_margin": int(other_loud_source_margin),
             "time_coherence_enabled": bool(self.local_input_preamp.soundcheck_ensemble_time_coherence_enabled),
             "time_coherence_evaluable": bool(time_coherence_evaluable),
             "time_coherent": bool(len(coherent_loud_sources) >= required_time_coherent_sources),
             "time_coherent_loud_sources": int(len(coherent_loud_sources)),
             "required_time_coherent_sources": int(required_time_coherent_sources),
+            "time_coherent_source_margin": int(time_coherent_source_margin),
             "max_context_lag_samples": int(max_context_lag_samples),
             "target_first_active_sample_index": target_first_active,
             "target_last_active_sample_index": target_last_active,
             "reference_latest_active_sample_index": latest_reference_active,
             "reference_max_lag_samples": reference_max_lag_samples,
+            "reference_lag_margin_samples": reference_lag_margin_samples,
             "reference_peak_db": reference_peak_db,
             "reference_lufs": reference_lufs,
             "reference_crest_db": reference_crest_db,

@@ -1,0 +1,13 @@
+{
+  "duration_s": 8.0,
+  "exit_code": 1,
+  "filter": "udp and (port 30223 or port 2222 or port 2223)",
+  "interface": "lo0",
+  "message": "tcpdump did not produce a pcap; wrote an empty placeholder.",
+  "output": "reports/latency/bench_smoke.pcap",
+  "output_exists": true,
+  "output_size_bytes": 24,
+  "port": 30223,
+  "status": "tcpdump_failed",
+  "tcpdump_log_tail": "tcpdump: lo0: You don't have permission to capture on that device\n((cannot open BPF device) /dev/bpf0: Permission denied)\n"
+}

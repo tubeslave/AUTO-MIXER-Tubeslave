@@ -302,6 +302,152 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.locator('body')).toContainText('No apply');
   });
 
+  test('keeps explicit empty backend DTO snapshots empty instead of injecting mock rows', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('automixer_backend_autoconnect', 'on');
+      const payloads: Record<string, unknown> = {
+        get_operator_mode: {
+          type: 'operator_mode_status',
+          mode: 'assist',
+          live_write_policy: 'read_only_empty_fixture',
+          apply_path: 'none',
+          capabilities: {
+            can_create_proposals: false,
+            can_apply_to_console: false,
+            requires_approval: true,
+            allowed_live_write_kinds: []
+          }
+        },
+        get_dashboard_snapshot: {
+          type: 'dashboard_snapshot',
+          generated_at: '2026-05-30T15:00:00Z',
+          operator_mode: {
+            mode: 'assist',
+            live_write_policy: 'read_only_empty_fixture',
+            apply_path: 'none',
+            capabilities: {
+              can_create_proposals: false,
+              can_apply_to_console: false,
+              requires_approval: true,
+              allowed_live_write_kinds: []
+            }
+          },
+          connection: { connected: false, connection_mode: 'wing', ip: '10.10.10.20' },
+          master_bus: {},
+          channel_summary: { total_channels: 0, active_channels: 0 },
+          decision_summary: { pending_count: 0, history_count: 0, applied_count: 0, blocked_count: 0 },
+          safety: {
+            live_write_policy: 'read_only_empty_fixture',
+            ready_for_live: { ready: false, checks: {} },
+            manual_write_supervision: { emergency_stopped: false }
+          }
+        },
+        get_groups_buses_snapshot: {
+          type: 'groups_buses_snapshot',
+          source: 'backend_empty_groups',
+          buses: []
+        },
+        get_memory_knowledge_snapshot: {
+          type: 'memory_knowledge_snapshot',
+          source: 'backend_empty_memory',
+          memories: []
+        },
+        get_training_sessions_snapshot: {
+          type: 'training_sessions_snapshot',
+          source: 'backend_empty_training',
+          sessions: []
+        },
+        get_rules_library_snapshot: {
+          type: 'rules_library_snapshot',
+          source: 'backend_empty_rules',
+          rules: []
+        },
+        get_agent_communications_snapshot: {
+          type: 'agent_communications_snapshot',
+          source: 'backend_empty_agent_bus',
+          communications: []
+        },
+        get_connection_topology: {
+          type: 'connection_topology',
+          source: 'backend_empty_topology',
+          connected_devices: [],
+          nodes: [],
+          links: [],
+          routing_scheme: []
+        }
+      };
+
+      class EmptySnapshotWebSocket {
+        static CONNECTING = 0;
+        static OPEN = 1;
+        static CLOSING = 2;
+        static CLOSED = 3;
+        readyState = EmptySnapshotWebSocket.CONNECTING;
+        onopen: null | (() => void) = null;
+        onmessage: null | ((event: { data: string }) => void) = null;
+        onerror: null | ((event: unknown) => void) = null;
+        onclose: null | (() => void) = null;
+
+        constructor() {
+          setTimeout(() => {
+            this.readyState = EmptySnapshotWebSocket.OPEN;
+            this.onopen?.();
+          }, 0);
+        }
+
+        send(raw: string) {
+          const message = JSON.parse(raw);
+          const response = payloads[message.type];
+          if (response) {
+            setTimeout(() => this.onmessage?.({ data: JSON.stringify(response) }), 0);
+          }
+        }
+
+        close() {
+          this.readyState = EmptySnapshotWebSocket.CLOSED;
+          this.onclose?.();
+        }
+      }
+
+      Object.defineProperty(window, 'WebSocket', {
+        configurable: true,
+        value: EmptySnapshotWebSocket
+      });
+    });
+
+    await page.goto('/#/groups');
+    await expect(page.getByText('No group/bus rows received').first()).toBeVisible();
+    await expect(page.getByText('Bass Bus')).toHaveCount(0);
+
+    await page.goto('/#/memory');
+    await expect(page.getByText('No memory rows received').first()).toBeVisible();
+    await expect(page.getByText('Bass DI compression memory')).toHaveCount(0);
+
+    await page.goto('/#/training');
+    await expect(page.getByText('No training sessions received').first()).toBeVisible();
+    await expect(page.getByText('Rock drums transient map')).toHaveCount(0);
+
+    await page.goto('/#/rules');
+    await expect(page.getByText('No rules received').first()).toBeVisible();
+    await expect(page.getByText('No boost without headroom')).toHaveCount(0);
+
+    await page.goto('/#/communications');
+    await expect(page.getByText('No rows to display.').first()).toBeVisible();
+    await expect(page.getByText('Backend DTO').first()).toBeVisible();
+
+    await page.goto('/#/system');
+    await expect(page.getByText('No topology nodes received').first()).toBeVisible();
+    await expect(page.getByText('WING Rack')).toHaveCount(0);
+
+    await page.goto('/#/routing');
+    await expect(page.getByText('No routing segment selected').first()).toBeVisible();
+    await expect(page.getByText('Bass Bus')).toHaveCount(0);
+
+    await page.goto('/#/devices');
+    await expect(page.getByText('No devices received').first()).toBeVisible();
+    await expect(page.getByText('Stage Box 1')).toHaveCount(0);
+  });
+
   test('renders backend payloads through the prototype UI without unsafe writes', async ({ page }) => {
     const sentTypes: string[] = [];
 

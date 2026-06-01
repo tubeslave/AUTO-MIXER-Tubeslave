@@ -13,6 +13,12 @@ from backend.agentic_method_foundation import (
     extract_channel_features,
     safety_review_recommendations,
 )
+from backend.context_aware_gate import (
+    ContextAwareGateAgent,
+    assert_no_live_transport_imports as context_gate_has_no_live_transport_imports,
+    extract_bleed_telemetry,
+    recommendation_to_decision_trace,
+)
 from backend.operator_product_state import build_channel_intelligence
 from backend.processing_proposal_adapters import adapt_agentic_foundation_gain_fader_recommendations
 
@@ -245,6 +251,104 @@ def test_channel_intelligence_exposes_agentic_foundation_as_read_only_dto():
 
 def test_agentic_foundation_has_no_live_transport_imports():
     assert assert_no_live_transport_imports()
+
+
+def test_context_aware_gate_treats_cymbal_bleed_differently_by_channel_context():
+    cymbal_bleed = _tone(10000.0, amplitude=0.22)
+    quiet_vocal_body = _tone(240.0, amplitude=0.03)
+    vocal_channel = quiet_vocal_body + cymbal_bleed
+    overhead_channel = cymbal_bleed
+
+    vocal_telemetry = extract_bleed_telemetry(
+        vocal_channel,
+        channel_id=12,
+        channel_label="Lead Vocal",
+        expected_instrument="Lead Vocal",
+        peer_samples=[cymbal_bleed],
+    )
+    overhead_telemetry = extract_bleed_telemetry(
+        overhead_channel,
+        channel_id=8,
+        channel_label="OH L",
+        expected_instrument="Overhead",
+        peer_samples=[cymbal_bleed],
+    )
+
+    agent = ContextAwareGateAgent()
+    vocal_recommendation = agent.recommend(vocal_telemetry)
+    overhead_recommendation = agent.recommend(overhead_telemetry)
+
+    assert vocal_telemetry.bleed_correlation_score > 0.7
+    assert vocal_telemetry.spectral_outlier_score > overhead_telemetry.spectral_outlier_score
+    assert vocal_recommendation is not None
+    assert vocal_recommendation.action_type == "expander"
+    assert vocal_recommendation.suggested_params["mode"] == "expander"
+    assert abs(vocal_recommendation.suggested_params["range_db"]) <= 8.0
+    assert vocal_recommendation.dry_run is True
+    assert "threshold-only gate" in vocal_recommendation.reason
+    assert overhead_recommendation is not None
+    assert overhead_recommendation.action_type == "expander"
+    assert overhead_recommendation.suggested_params["range_db"] == -3.0
+    assert "avoids hard gating" in overhead_recommendation.reason
+
+
+def test_context_aware_gate_recommendation_is_decision_trace_ready_without_live_write():
+    snare_bleed = extract_bleed_telemetry(
+        _tone(200.0, amplitude=0.18) + _tone(4000.0, amplitude=0.12),
+        channel_id=3,
+        channel_label="Snare Top",
+        expected_instrument="Snare",
+        peer_samples=[_tone(200.0, amplitude=0.18)],
+    )
+
+    recommendation = ContextAwareGateAgent().recommend(snare_bleed)
+
+    assert recommendation is not None
+    assert recommendation.dry_run is True
+    assert recommendation.safety_status in {"proposal_only", "review_required_high_risk"}
+    trace = recommendation_to_decision_trace(recommendation)
+    assert trace["source"] == "ContextAwareGateAgent"
+    assert trace["target"] == {"type": "channel", "id": 3}
+    assert trace["proof_status"] == "dry_run_only"
+    assert trace["blocked_reason"] == "gate_expander_live_write_quarantined"
+    assert trace["safety_limits"]["live_write_allowed"] is False
+    assert trace["metadata"]["evidence"]["telemetry"]["channel_label"] == "Snare Top"
+    assert trace["idempotency_key"].startswith("context-gate-")
+
+
+def test_agentic_foundation_uses_context_aware_gate_for_gate_recommendations():
+    snapshot = ChannelFeatureSnapshot(
+        channel_id=12,
+        role="Lead Vocal",
+        group="VOCALS",
+        noise_floor_db=-52.0,
+        signal_activity=0.25,
+        bleed_index=0.82,
+        band_energy_db={
+            "sub": -80.0,
+            "low": -70.0,
+            "low_mid": -52.0,
+            "mid": -48.0,
+            "presence": -40.0,
+            "air": -20.0,
+        },
+        false_open_risk=0.45,
+        false_close_risk=0.38,
+        chatter_risk=0.12,
+    )
+
+    recommendations = build_agentic_recommendations(snapshot)
+    gate = next(item for item in recommendations if item.agent_name == "ContextAwareGateAgent")
+
+    assert gate.action_type == "expander"
+    assert gate.safety_status in {"proposal_only", "review_required_high_risk"}
+    assert gate.dry_run is True
+    assert gate.evidence["live_write"] is False
+    assert gate.evidence["telemetry"]["expected_instrument"] == "vocal"
+
+
+def test_context_aware_gate_has_no_live_transport_imports():
+    assert context_gate_has_no_live_transport_imports()
 
 
 def test_agentic_foundation_adapter_exports_only_bounded_downward_gain_fader_preview():

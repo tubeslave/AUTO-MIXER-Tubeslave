@@ -14,10 +14,11 @@ import type { DeviceRecord, LogRecord, Metric, RoutingSegment, Tone, TopologyNod
 import {
   logKey,
   openActionFocus,
+  readOnlyEmptyState,
   runtimeRoutingSegments,
   runtimeTopologyLinks,
   runtimeTopologyNodes,
-  SettingRows,
+  sourceDisplay,
   statusToneForDevice,
   statusToneForLog,
   tableView,
@@ -117,7 +118,7 @@ function SystemTopologyDiagram({
 }: {
   nodes: TopologyNode[];
   links: ReturnType<typeof runtimeTopologyLinks>;
-  selectedNodeId: string;
+  selectedNodeId?: string;
   onSelect: (id: string) => void;
 }) {
   const nodeById = new Map(nodes.map(node => [node.id, node]));
@@ -151,6 +152,11 @@ function SystemTopologyDiagram({
           );
         })}
       </svg>
+      {!nodes.length && (
+        <div className="absolute inset-0 grid place-items-center px-6">
+          {readOnlyEmptyState('No topology nodes received', 'connection_topology_snapshot')}
+        </div>
+      )}
       {nodes.map((node, index) => {
         const box = nodeBox(node, index);
         return (
@@ -179,34 +185,41 @@ function SystemTopologyDiagram({
 function TopologyInspector({
   node,
   nodes,
-  data
+  data,
+  sourceRaw
 }: {
-  node: TopologyNode;
+  node?: TopologyNode;
   nodes: TopologyNode[];
   data: OperatorViewData;
+  sourceRaw: string;
 }) {
   return (
     <div className="flex h-full flex-col gap-2">
       <Panel title="Connection Status">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h3 className="truncate text-[15px] font-bold text-text">{node.label}</h3>
-          <StatusBadge tone={topologyTone(node)}>{node.status}</StatusBadge>
-        </div>
-        <TechnicalChecklist rows={[
-          { label: 'Kind', value: node.kind, tone: topologyTone(node) },
-          { label: 'Detail', value: node.detail, tone: 'blue' },
-          { label: 'Nodes', value: String(nodes.length), tone: 'purple' },
-          { label: 'Writes', value: 'Read-only', tone: 'red' }
-        ]} />
+        {node ? (
+          <>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="truncate text-[15px] font-bold text-text">{node.label}</h3>
+              <StatusBadge tone={topologyTone(node)}>{node.status}</StatusBadge>
+            </div>
+            <TechnicalChecklist rows={[
+              { label: 'Source', value: sourceDisplay(sourceRaw), tone: sourceDisplay(sourceRaw) === 'Backend DTO' ? 'green' : 'blue' },
+              { label: 'Kind', value: node.kind, tone: topologyTone(node) },
+              { label: 'Detail', value: node.detail, tone: 'blue' },
+              { label: 'Nodes', value: String(nodes.length), tone: 'purple' },
+              { label: 'Writes', value: 'Read-only', tone: 'red' }
+            ]} />
+          </>
+        ) : readOnlyEmptyState('No topology node selected', sourceRaw)}
       </Panel>
       <Panel title="Connected Devices" className="flex-1">
-        {(data.devices.length ? data.devices : devices).slice(0, 7).map(device => (
+        {data.devices.length ? data.devices.slice(0, 7).map(device => (
           <div className="mb-3 grid grid-cols-[1fr_68px_48px] gap-2 text-[10px]" key={device.name}>
             <span className="truncate text-text">{device.name}</span>
             <span className="font-mono text-muted">{device.sampleRate}</span>
             <span className={statusToneForDevice(device.status) === 'green' ? 'text-online' : 'text-warn'}>{device.status}</span>
           </div>
-        ))}
+        )) : readOnlyEmptyState('No connected devices received', sourceRaw)}
       </Panel>
       <Panel title="Connection Log">
         {(data.logs.length ? data.logs : logs).slice(0, 5).map(log => <p className="mb-1 truncate text-[10px] text-muted" key={`${log.time}-${log.source}`}>{log.time} · {log.message}</p>)}
@@ -235,6 +248,7 @@ function RoutingList({
     <div className="relative z-10 rounded-[7px] border border-line bg-[#0c141d]/95 p-2">
       <div className="am-label mb-2">{title}</div>
       <div className="space-y-1">
+        {!rows.length && <div className="rounded border border-line bg-row px-2 py-2 text-[9px] text-muted">No rows</div>}
         {rows.map((row, index) => {
           const selected = selectedId === row.id;
           const content = (
@@ -267,12 +281,14 @@ function AudioRoutingMatrix({
   data,
   routingRows,
   selectedSegmentId,
-  onSelectSegment
+  onSelectSegment,
+  sourceRaw
 }: {
   data: OperatorViewData;
   routingRows: RoutingSegment[];
-  selectedSegmentId: string;
+  selectedSegmentId?: string;
   onSelectSegment: (id: string) => void;
+  sourceRaw: string;
 }) {
   const inputRows = (data.channels.length ? data.channels : channels)
     .slice(0, 16)
@@ -283,8 +299,10 @@ function AudioRoutingMatrix({
       const requirement = segment.required ? 'REQ' : 'OPT';
       return { id: `output-${segment.id}`, label: `${requirement} · ${segment.tapPoint || segment.role}` };
     })
-    : ['Out 01 Main L', 'Out 02 Main R', 'Out 03 Monitor A', 'Out 04 Monitor B', 'Out 05 IEM L', 'Out 06 IEM R', 'Out 07 Broadcast L', 'Out 08 Broadcast R']
-      .map((label, index) => ({ id: `out-${index}`, label }));
+    : sourceDisplay(sourceRaw) === 'Mock'
+      ? ['Out 01 Main L', 'Out 02 Main R', 'Out 03 Monitor A', 'Out 04 Monitor B', 'Out 05 IEM L', 'Out 06 IEM R', 'Out 07 Broadcast L', 'Out 08 Broadcast R']
+        .map((label, index) => ({ id: `out-${index}`, label }))
+      : [];
   const colors = ['#00d4ff', '#a371f7', '#2dd36f', '#d29922', '#f85149'];
   const segmentCount = Math.max(segmentRows.length, 1);
 
@@ -314,27 +332,31 @@ function AudioRoutingMatrix({
   );
 }
 
-function RoutingInspector({ segment, sourceLabel }: { segment: RoutingSegment; sourceLabel: string }) {
+function RoutingInspector({ segment, sourceLabel, sourceRaw }: { segment?: RoutingSegment; sourceLabel: string; sourceRaw: string }) {
   return (
     <div className="flex h-full flex-col gap-2">
       <Panel title="Routing Segment">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h3 className="truncate text-[15px] font-bold text-text">{segment.labelShort}</h3>
-          <StatusBadge tone={segment.required ? 'yellow' : 'blue'}>{segment.required ? 'Required' : 'Optional'}</StatusBadge>
-        </div>
-        <TechnicalChecklist rows={[
-          { label: 'Source', value: sourceLabel, tone: sourceLabel === 'Runtime' ? 'green' : 'blue' },
-          { label: 'Channels', value: `${segment.start}-${segment.end}`, tone: 'blue' },
-          { label: 'Role', value: segment.role, tone: 'purple' },
-          { label: 'Tap point', value: segment.tapPoint, tone: 'green' },
-          { label: 'Stereo', value: segment.stereo ? 'Yes' : 'No', tone: segment.stereo ? 'green' : 'yellow' }
-        ]} />
+        {segment ? (
+          <>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="truncate text-[15px] font-bold text-text">{segment.labelShort}</h3>
+              <StatusBadge tone={segment.required ? 'yellow' : 'blue'}>{segment.required ? 'Required' : 'Optional'}</StatusBadge>
+            </div>
+            <TechnicalChecklist rows={[
+              { label: 'Source', value: sourceLabel, tone: sourceLabel === 'Backend DTO' || sourceLabel === 'Runtime-derived' ? 'green' : 'blue' },
+              { label: 'Channels', value: `${segment.start}-${segment.end}`, tone: 'blue' },
+              { label: 'Role', value: segment.role, tone: 'purple' },
+              { label: 'Tap point', value: segment.tapPoint, tone: 'green' },
+              { label: 'Stereo', value: segment.stereo ? 'Yes' : 'No', tone: segment.stereo ? 'green' : 'yellow' }
+            ]} />
+          </>
+        ) : readOnlyEmptyState('No routing segment selected', sourceRaw)}
       </Panel>
       <Panel title="Wing Hint">
-        <p className="text-[11px] leading-5 text-muted">{segment.wingRoutingHint}</p>
+        <p className="text-[11px] leading-5 text-muted">{segment?.wingRoutingHint || 'No routing hint is available from the current read-only source.'}</p>
       </Panel>
       <Panel title="Used By" className="flex-1">
-        {(segment.usedBy.length ? segment.usedBy : ['No assigned consumer']).map(item => (
+        {((segment?.usedBy.length ? segment.usedBy : ['No assigned consumer'])).map(item => (
           <div className="mb-2 rounded-[5px] border border-line bg-row px-2 py-1 text-[10px] text-muted" key={item}>{item}</div>
         ))}
         <div className="mt-4">
@@ -379,19 +401,24 @@ function OscMessageInspector({ row, ui }: { row: OscRow; ui: UiState }) {
   );
 }
 
-function DeviceInspector({ device }: { device: DeviceRecord }) {
+function DeviceInspector({ device, sourceRaw }: { device?: DeviceRecord; sourceRaw: string }) {
   return (
     <Panel title="Selected Device" className="h-full">
-      <h3 className="text-lg font-bold">{device.name}</h3>
-      <p className="mt-2 text-[11px] leading-5 text-muted">
-        {device.type}<br />
-        IP: {device.ip}<br />
-        Sample Rate: {device.sampleRate}<br />
-        I/O: {device.io}
-      </p>
-      <div className="mt-4"><StatusBadge tone={statusToneForDevice(device.status)}>{device.status}</StatusBadge></div>
-      <div className="mt-4 h-24"><Sparkline tone="green" filled /></div>
-      <button className="am-button mt-4" type="button">Inspect</button>
+      {device ? (
+        <>
+          <h3 className="text-lg font-bold">{device.name}</h3>
+          <p className="mt-2 text-[11px] leading-5 text-muted">
+            {device.type}<br />
+            IP: {device.ip}<br />
+            Sample Rate: {device.sampleRate}<br />
+            I/O: {device.io}
+          </p>
+          <div className="mt-4"><StatusBadge tone={statusToneForDevice(device.status)}>{device.status}</StatusBadge></div>
+          <div className="mt-4 text-[9px] uppercase tracking-[0.08em] text-dim">Activity trace is display-only</div>
+          <div className="mt-2 h-24"><Sparkline tone="green" filled /></div>
+          <button className="am-button mt-4" type="button">Inspect</button>
+        </>
+      ) : readOnlyEmptyState('No device selected', sourceRaw)}
     </Panel>
   );
 }
@@ -411,32 +438,49 @@ function LogInspector({ log }: { log: LogRecord }) {
 }
 
 export function SystemConnection(ui: UiState, actions: UiActions, data: OperatorViewData) {
-  const nodes = runtimeTopologyNodes(data.topologyNodes);
-  const links = runtimeTopologyLinks(data.topologyLinks);
+  const topologySourceRaw = data.topologyNodes.length || data.topologyLinks.length ? 'connection_topology_snapshot' : ui.backend.hasRuntimeData ? 'connection_topology_backend_empty' : 'mock';
+  const nodes = runtimeTopologyNodes(data.topologyNodes, topologySourceRaw);
+  const links = runtimeTopologyLinks(data.topologyLinks, topologySourceRaw);
   const selectedNode = nodes.find(node => node.id === ui.selectedTopologyNodeId) ?? nodes.find(node => node.id === 'automixer_core') ?? nodes[0];
   return tableView('10. System Connection', 'Live topology, latency, and connection status', (
     <div className="grid h-full grid-rows-[1fr_100px] gap-2">
-      <Panel title="System Topology"><SystemTopologyDiagram links={links} nodes={nodes} onSelect={actions.selectTopologyNode} selectedNodeId={selectedNode.id} /></Panel>
+      <Panel title="System Topology"><SystemTopologyDiagram links={links} nodes={nodes} onSelect={actions.selectTopologyNode} selectedNodeId={selectedNode?.id} /></Panel>
       <div className="grid grid-cols-3 gap-2">
-        <Panel title="Network Interfaces"><SettingRows rows={['Ethernet 1 1Gbps Up', 'Ethernet 2 1Gbps Standby']} /></Panel>
-        <Panel title="System Latency"><Sparkline tone="green" filled /></Panel>
-        <Panel title="Sync Status"><SettingRows rows={['System Clock Locked', 'Sample Rate 48 kHz', 'Latency Compensation 0.8 ms']} /></Panel>
+        <Panel title="Network Interfaces · Display-only">
+          <TechnicalChecklist rows={[
+            { label: 'Ethernet 1', value: '1Gbps Up', tone: 'blue' },
+            { label: 'Ethernet 2', value: '1Gbps Standby', tone: 'yellow' }
+          ]} />
+        </Panel>
+        <Panel title="System Latency · Display-only">
+          <div className="mb-2 text-[9px] uppercase tracking-[0.08em] text-dim">visual placeholder until latency DTO lands</div>
+          <Sparkline tone="green" filled />
+        </Panel>
+        <Panel title="Sync Status · Display-only">
+          <TechnicalChecklist rows={[
+            { label: 'System Clock', value: 'Locked', tone: 'green' },
+            { label: 'Sample Rate', value: '48 kHz', tone: 'blue' },
+            { label: 'Latency Comp', value: '0.8 ms', tone: 'blue' }
+          ]} />
+        </Panel>
       </div>
     </div>
-  ), <TopologyInspector data={data} node={selectedNode} nodes={nodes} />);
+  ), <TopologyInspector data={data} node={selectedNode} nodes={nodes} sourceRaw={topologySourceRaw} />);
 }
 
 export function AudioRouting(ui: UiState, actions: UiActions, data: OperatorViewData) {
-  const routingRows = runtimeRoutingSegments(data);
+  const routingSourceRaw = data.routingSegments.length ? 'connection_topology_snapshot' : ui.backend.hasRuntimeData ? 'routing_backend_empty' : 'mock';
+  const routingRows = runtimeRoutingSegments(data, routingSourceRaw);
   const selectedSegment = routingRows.find(segment => segment.id === ui.selectedRoutingSegmentId) ?? routingRows[0];
   return tableView('11. Audio Routing', 'Inputs, channel buses, and output map', (
     <AudioRoutingMatrix
       data={data}
       onSelectSegment={actions.selectRoutingSegment}
       routingRows={routingRows}
-      selectedSegmentId={selectedSegment.id}
+      selectedSegmentId={selectedSegment?.id}
+      sourceRaw={routingSourceRaw}
     />
-  ), <RoutingInspector segment={selectedSegment} sourceLabel={data.routingSegments.length ? 'Runtime' : 'Mock'} />);
+  ), <RoutingInspector segment={selectedSegment} sourceLabel={sourceDisplay(routingSourceRaw)} sourceRaw={routingSourceRaw} />);
 }
 
 export function OscMidi(ui: UiState, actions: UiActions, data: OperatorViewData) {
@@ -479,16 +523,17 @@ export function OscMidi(ui: UiState, actions: UiActions, data: OperatorViewData)
 }
 
 export function Devices(ui: UiState, actions: UiActions, data: OperatorViewData) {
-  const deviceRows = data.devices.length ? data.devices : devices;
-  const selectedDevice = deviceRows.find(device => device.name === ui.selectedDeviceName) ?? deviceRows[0] ?? devices[0];
+  const deviceSourceRaw = data.devices.length ? 'connection_topology_snapshot' : ui.backend.hasRuntimeData ? 'connection_topology_backend_empty' : 'mock';
+  const deviceRows = data.devices.length ? data.devices : sourceDisplay(deviceSourceRaw) === 'Mock' ? devices : [];
+  const selectedDevice = deviceRows.find(device => device.name === ui.selectedDeviceName) ?? deviceRows[0];
   return tableView('13. Devices', 'Audio devices and controller inventory', (
     <div className="grid h-full grid-rows-[76px_1fr_108px] gap-2">
       <div className="grid grid-cols-4 gap-2">
         {[
           { label: 'Connected', value: String(deviceRows.length), sub: ui.backend.sourceLabel, tone: 'green' },
-          { label: 'Audio I/O', value: '80 ch', sub: 'inputs + outputs', tone: 'blue' },
-          { label: 'Controllers', value: '2', sub: 'director surfaces', tone: 'purple' },
-          { label: 'Warnings', value: '0', sub: 'prototype health', tone: 'green' }
+          { label: 'Audio I/O', value: '80 ch', sub: 'display baseline', tone: 'blue' },
+          { label: 'Controllers', value: '2', sub: 'display baseline', tone: 'purple' },
+          { label: 'Warnings', value: '0', sub: 'display health', tone: 'green' }
         ].map(metric => <MetricCard metric={metric as Metric} key={metric.label} />)}
       </div>
       <DataTable
@@ -514,20 +559,21 @@ export function Devices(ui: UiState, actions: UiActions, data: OperatorViewData)
         onSelect={device => actions.selectDevice(device.name)}
         rowKey={device => device.name}
         rows={deviceRows}
+        emptyState={readOnlyEmptyState('No devices received', deviceSourceRaw)}
         searchable
         searchPlaceholder="Search device..."
         selectedRow={selectedDevice}
       />
       <div className="grid grid-cols-4 gap-2">
         {deviceHealth.map(item => (
-          <Panel title={item.name} key={item.name}>
+          <Panel title={`${item.name} · Display-only`} key={item.name}>
             <div className="flex items-center justify-between text-[11px]"><StatusBadge tone={item.tone as Tone}>{item.value}</StatusBadge><span className="font-mono text-muted">{item.latency}</span></div>
             <div className="mt-4 h-8"><Sparkline tone={item.tone as Tone} filled /></div>
           </Panel>
         ))}
       </div>
     </div>
-  ), <DeviceInspector device={selectedDevice} />);
+  ), <DeviceInspector device={selectedDevice} sourceRaw={deviceSourceRaw} />);
 }
 
 export function Logs(ui: UiState, actions: UiActions, data: OperatorViewData) {

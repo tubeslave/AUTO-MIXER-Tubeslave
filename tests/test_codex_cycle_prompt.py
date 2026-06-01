@@ -44,6 +44,8 @@ def test_codex_cycle_prompt_requires_complete_human_report_sections():
 
     assert "`automixer_codex_cycle_YYYYMMDDTHHMMSSZ.md`" in text
     assert "статус live safety: обязательно укажи, что live OSC/WING writes не выполнялись." in text
+    assert "`python3 tools/memory/memory_lint.py`" in text
+    assert "результат memory lint" in text
     assert "`## Объяснение простым языком`" in text
     assert "### Что было сделано" in text
     assert "### Зачем это нужно проекту" in text
@@ -58,3 +60,24 @@ def test_codex_cycle_prompt_requires_complete_human_report_sections():
     assert "1. Что нового проект научился делать?" in text
     assert "2. Что сейчас является самым слабым местом?" in text
     assert "3. Что даст наибольший прогресс в следующем цикле?" in text
+
+
+def test_codex_cycle_prompt_keeps_todo_scan_focused_on_owned_project_paths():
+    text = PROMPT_PATH.read_text(encoding="utf-8")
+
+    assert "Для TODO/FIXME scan фокусируйся на owned коде" in text
+    assert "excluded scan noise" in text
+    excluded_noise_paths = [
+        "`external/`",
+        "`models/training_state.json`",
+        "`backend/ai/knowledge/`",
+        "`frontend/node_modules/`",
+        "`node_modules/`",
+        "`artifacts/`",
+        "`Docs/archive/`",
+        "`Docs/manuals/`",
+        "`Docs/Behringer_WING_Official/`",
+    ]
+
+    for path in excluded_noise_paths:
+        assert path in text

@@ -11,6 +11,8 @@ you want the background automation active.
 - `run_codex_cycle.sh` - one-shot wrapper that runs one Codex cycle and exits.
 - `codex_cycle_prompt.md` - prompt used by each Codex cycle.
 - `validate_cycle_report.py` - local checker for required cycle-report evidence.
+- `../no_wing_release_check.py` - timeout-bounded offline release-check runner
+  for backend/frontend gates without WING access.
 - `com.tubeslave.automixer.codex-autoloop.plist` - LaunchAgent definition.
 
 ## Behavior
@@ -29,6 +31,11 @@ you want the background automation active.
 - The prompt explicitly forbids work in neighboring projects such as external
   Paperclip/PiperClip folders. Repo-local `.paperclip/reports/` is used only as
   an Automixer report directory.
+- The prompt keeps TODO/FIXME scans focused on owned Automixer code, tests,
+  tooling, and current docs. Vendored, generated, artifact, and reference
+  corpora such as `external/`, `models/training_state.json`,
+  `backend/ai/knowledge/`, `artifacts/`, and archived/manual docs are treated as
+  scan noise unless the selected task explicitly targets them.
 - Does not run immediately at login; `launchd` starts it on the 20-minute
   interval.
 - Uses a lock directory at `.codex_autoloop.lock` to avoid parallel runs.
@@ -38,14 +45,39 @@ you want the background automation active.
   available instead of guessing whether the lock is active or stale.
 - Writes wrapper logs to `logs/codex_autoloop/`.
 - After a successful Codex run, finds the new repo-local cycle report and
-  validates the required safety/report shape, including a report title timestamp
-  that matches the filename, a short plan section for the selected cycle tasks,
-  a maximum of three numbered/bulleted plan items, and non-empty evidence
-  sections for findings, changes, tests, remaining work, and risks. The
-  `Changed Files` section must also link back to the cycle report itself so the
-  audit artifact is visible in the file list. Reports must explicitly state that
-  no neighboring repositories or external local projects were analyzed,
-  modified, or used.
+  validates the required safety/report shape, including a valid, not-future UTC
+  report title timestamp that matches the filename, a short plan section with
+  one to three numbered/bulleted items for the selected cycle tasks,
+  discovery evidence for the branch/worktree, latest/recent repo-local report
+  directories, latest/recent test artifacts, TODO/FIXME scan, local `.ai`
+  tasks, and non-empty evidence sections for
+  findings, changes, tests, remaining work, risks, and each plain-language
+  explanation subsection. The TODO/FIXME evidence must state the owned-code
+  focus and the excluded vendored/generated/reference scan-noise boundary. The
+  tests section must state an outcome such as passed, failed, skipped, blocked,
+  or not run, not only list commands, and must include a memory lint result.
+  The `Changed Files` section must be
+  non-empty, include repo-local markdown links, and link back to the cycle
+  report itself so the audit artifact is visible in the file list. Reports must
+  explicitly state that no neighboring repositories or external local projects
+  were analyzed, modified, or used. The worktree evidence must mention both
+  modified/changed files and new/untracked files, even when one side is empty.
+  The plain-language project-state subsection must explicitly cover what
+  already works, what works partially, what is not implemented, and the current
+  risks. Reports must not contradict the repo-local boundary later by claiming
+  that external Paperclip/PiperClip ran the cycle or that neighboring project
+  paths such as `/Users/dmitrijvolkov/paperclip` were analyzed, modified, or
+  used.
+  Forbidden live command tokens must be listed in an explicitly negative audit
+  sentence, such as a statement that no such command was run. Non-destructive
+  action terms such as commit, push, reset, destructive cleanup, secret access,
+  and user-file deletion must also appear in an explicitly negative audit
+  sentence. The validator also rejects reports that include a valid no-action
+  audit in `## Scope` and then contradict it in later report sections with an
+  explicit executed/run/sent/applied/performed action sentence.
+- Focused offline release gates can use `tools/no_wing_release_check.py`; each
+  subprocess check has a default timeout and records a `timeout` result instead
+  of leaving an autonomous run silent indefinitely.
 - Requires `codex` CLI to be available.
 - Uses `codex exec -C <project> --sandbox workspace-write`.
 - Sets Codex approval policy to `never` for non-interactive execution.

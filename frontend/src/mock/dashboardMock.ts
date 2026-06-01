@@ -68,7 +68,7 @@ export const dashboardTabs: DashboardTab[] = [
 export const analyticsCards: DashboardMetricSpec[] = [
   { id: 'master', label: 'Master Bus', accent: 'green', caption: 'Main L/R safety window' },
   { id: 'spectrum', label: 'Spectrum', accent: 'blue', caption: 'Analyzer FFT preview' },
-  { id: 'loudness', label: 'Loudness', accent: 'yellow', caption: 'BS.1770 mock readout' },
+  { id: 'loudness', label: 'Loudness', accent: 'yellow', caption: 'BS.1770 readout source-labeled in UI' },
   { id: 'balance', label: 'Mix Balance', accent: 'purple', caption: 'Source group distribution' },
   { id: 'confidence', label: 'AI Confidence', accent: 'green', caption: 'Director consensus' }
 ];
@@ -87,7 +87,7 @@ export const mixBalanceSegments = [
   { label: 'FX', value: 13, color: '#ff4d4f' }
 ];
 
-// TODO(OSC channel state): hydrate fader, mute, solo, gate, and comp state from read-only OSC/channel snapshots.
+// TODO(OSC channel detail): replace fallback waveform, pan, gate, and comp labels with read-only OSC/channel snapshots.
 export const channelTelemetryById: Record<number, ChannelDashboardTelemetry> = {
   1: { waveform: [31, 66, 42, 78, 46, 84, 39, 72], meterL: -12.4, meterR: -13.2, gateLabel: 'G -42', compLabel: 'C 3.1', safeState: 'OK', pan: 0, muted: false, solo: false, accent: 'green' },
   2: { waveform: [28, 55, 39, 70, 43, 75, 36, 64], meterL: -14.1, meterR: -14.7, gateLabel: 'G -44', compLabel: 'C 2.8', safeState: 'OK', pan: 0, muted: false, solo: false, accent: 'green' },
@@ -128,7 +128,7 @@ export const agentSuggestions: AgentSuggestionMock[] = [
   { id: 'S-243', agent: 'Spectral', title: 'Clean guitar low-mid', delta: '-2.0 dB @ 260 Hz', risk: 'Medium', confidence: 84, tone: 'yellow' }
 ];
 
-// TODO(device health): replace event log health rows with live mixer, audio-device, and Product Layer health.
+// Mock-only fallback rows. Backend sources render runtime-derived event rows in the Director panel.
 export const directorEvents: DirectorEventMock[] = [
   { time: '10:31:08', source: 'Telemetry', message: 'Mock meter frame accepted for dashboard render.', tone: 'blue' },
   { time: '10:30:44', source: 'Director', message: 'No live OSC write issued from dashboard controls.', tone: 'green' },

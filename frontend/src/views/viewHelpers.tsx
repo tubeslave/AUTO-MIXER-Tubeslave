@@ -27,6 +27,40 @@ export function TechnicalChecklist({ rows }: { rows: { label: string; value: str
   );
 }
 
+export function sourceDisplay(source = 'mock') {
+  if (source === 'mock' || source.includes('mock')) return 'Mock';
+  if (source.includes('_snapshot')) return 'Backend DTO';
+  return 'Runtime-derived';
+}
+
+export function sourceTone(source = 'mock'): Tone {
+  const label = sourceDisplay(source);
+  if (label === 'Backend DTO') return 'green';
+  if (label === 'Runtime-derived') return 'blue';
+  return 'blue';
+}
+
+export function usesPrototypeFallback(source = 'mock') {
+  return source === 'mock' || source.includes('mock');
+}
+
+export function rowsForReadModelSource<T>(rows: T[], fallbackRows: T[], source = 'mock'): T[] {
+  if (rows.length) return rows;
+  return usesPrototypeFallback(source) ? fallbackRows : [];
+}
+
+export function readOnlyEmptyState(title: string, source = 'runtime') {
+  const label = sourceDisplay(source);
+  return (
+    <div className="rounded-[6px] border border-line bg-row px-3 py-4 text-[10px] leading-5 text-muted">
+      <b className="block text-text">{title}</b>
+      {label === 'Mock'
+        ? 'Prototype fallback has no rows for this table.'
+        : 'Backend/read-only source returned no rows. The UI is not injecting demo data.'}
+    </div>
+  );
+}
+
 export function statusToneForBus(status?: string): Tone {
   const normalized = (status ?? '').toLowerCase();
   if (normalized.includes('inactive')) return 'red';
@@ -69,12 +103,12 @@ export const fallbackTopologyLinks: TopologyLink[] = [
   { from: 'decision_queue', to: 'automixer_core', kind: 'proposal_flow', status: 'online' }
 ];
 
-export function runtimeTopologyNodes(nodes: TopologyNode[]) {
-  return nodes.length ? nodes : fallbackTopologyNodes;
+export function runtimeTopologyNodes(nodes: TopologyNode[], source = 'mock') {
+  return nodes.length ? nodes : usesPrototypeFallback(source) ? fallbackTopologyNodes : [];
 }
 
-export function runtimeTopologyLinks(links: TopologyLink[]) {
-  return links.length ? links : fallbackTopologyLinks;
+export function runtimeTopologyLinks(links: TopologyLink[], source = 'mock') {
+  return links.length ? links : usesPrototypeFallback(source) ? fallbackTopologyLinks : [];
 }
 
 export function fallbackRoutingSegments(): RoutingSegment[] {
@@ -96,8 +130,8 @@ export function fallbackRoutingSegments(): RoutingSegment[] {
   });
 }
 
-export function runtimeRoutingSegments(data: OperatorViewData) {
-  return data.routingSegments.length ? data.routingSegments : fallbackRoutingSegments();
+export function runtimeRoutingSegments(data: OperatorViewData, source = 'mock') {
+  return data.routingSegments.length ? data.routingSegments : usesPrototypeFallback(source) ? fallbackRoutingSegments() : [];
 }
 
 export function formatDb(value: number) {
@@ -130,9 +164,11 @@ export function runtimeMemoryTypes(records: MemoryRecord[]) {
 export type TrainingSessionRow = (typeof trainingSessions)[number];
 export type RuleRow = (typeof rules)[number];
 
-export function runtimeTrainingSessions(data: OperatorViewData): TrainingSessionRow[] {
+export function runtimeTrainingSessions(data: OperatorViewData, source = 'mock'): TrainingSessionRow[] {
   if (data.trainingSessions.length) return data.trainingSessions;
-  if (!data.memories.length && !data.tasks.length && !data.agents.length) return trainingSessions;
+  if (source.includes('_snapshot')) return [];
+  if (usesPrototypeFallback(source)) return trainingSessions;
+  if (!data.memories.length && !data.tasks.length && !data.agents.length && !data.channels.length) return [];
   const avgAgentConfidence = Math.round(data.agents.reduce((sum, agent) => sum + agent.confidence, 0) / Math.max(data.agents.length, 1));
   const reviewTasks = data.tasks.filter(task => task.status === 'Review' || task.status === 'Pending').length;
   return [
@@ -156,14 +192,15 @@ export function runtimeTrainingSessions(data: OperatorViewData): TrainingSession
       examples: data.channels.length,
       score: data.channels.length ? '92%' : 'N/A',
       updated: 'inventory'
-    },
-    ...trainingSessions.slice(0, 4)
+    }
   ];
 }
 
-export function runtimeRules(data: OperatorViewData): RuleRow[] {
+export function runtimeRules(data: OperatorViewData, source = 'mock'): RuleRow[] {
   if (data.rules.length) return data.rules;
-  if (!data.memories.length && !data.tasks.length) return rules;
+  if (source.includes('_snapshot')) return [];
+  if (usesPrototypeFallback(source)) return rules;
+  if (!data.memories.length && !data.tasks.length) return [];
   const taskRules: RuleRow[] = data.tasks.slice(0, 4).map((task: Task) => ({
     name: `${task.title} requires director review`,
     category: task.priority === 'High' ? 'Safety' : 'Decision',
@@ -173,8 +210,7 @@ export function runtimeRules(data: OperatorViewData): RuleRow[] {
   return [
     { name: 'Runtime memory writes stay disabled', category: 'Safety', confidence: '100%', state: 'Locked' },
     { name: `${data.directorRuntime.liveWritePolicy} apply policy`, category: 'Control', confidence: '100%', state: 'Locked' },
-    ...taskRules,
-    ...rules.slice(0, 6)
+    ...taskRules
   ];
 }
 

@@ -108,6 +108,7 @@ function fallbackViewData(): OperatorViewData {
     readModelSources: {
       groups: 'mock',
       memory: 'mock',
+      performance: 'mock',
       training: 'mock',
       rules: 'mock',
       communications: 'mock'

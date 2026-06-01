@@ -89,6 +89,7 @@ function AgentInspector({ agent }: { agent: Agent }) {
         <span className="text-muted">Confidence</span><span className="font-bold text-online">{agent.confidence}%</span>
         <span className="text-muted">Last</span><span className="truncate text-text">{agent.lastAction}</span>
       </div>
+      <div className="text-[8px] uppercase tracking-[0.08em] text-dim">Activity trace is display-only</div>
       <div className="h-14"><Sparkline values={agent.activity} tone={agent.tone} filled /></div>
     </div>
   );
@@ -161,7 +162,7 @@ export function CommunicationsWorkspace({
   const reviewCount = communications.filter(item => item.status === 'Review' || item.status === 'Pending').length;
   const sourceLabel = source.includes('_snapshot') ? 'Backend DTO' : source === 'mock' ? 'Mock' : 'Runtime-derived';
   const communicationMetrics: Metric[] = [
-    { label: 'Messages', value: String(communications.length), sub: 'runtime stream', tone: 'blue' },
+    { label: 'Messages', value: String(communications.length), sub: sourceLabel, tone: sourceLabel === 'Backend DTO' ? 'green' : 'blue' },
     { label: 'Approved', value: String(approvedCount), sub: 'success/info', tone: 'green' },
     { label: 'In Review', value: String(reviewCount), sub: 'pending/review', tone: 'yellow' },
     { label: 'Source', value: sourceLabel, sub: source, tone: sourceLabel === 'Backend DTO' ? 'green' : 'blue' }
@@ -203,7 +204,10 @@ export function CommunicationsWorkspace({
         ]}
       />
       <div className="grid grid-cols-3 gap-2">
-        <Panel title="Traffic by Agent">{agents.slice(0, 4).map(agent => <MiniBarRow label={agent.name} value={`${agent.confidence}%`} meter={-8 - (100 - agent.confidence)} tone={agent.tone} key={agent.id} />)}</Panel>
+        <Panel title="Traffic by Agent · Display Trace">
+          <div className="mb-2 text-[9px] uppercase tracking-[0.08em] text-dim">confidence-derived visual meters</div>
+          {agents.slice(0, 4).map(agent => <MiniBarRow label={agent.name} value={`${agent.confidence}%`} meter={-8 - (100 - agent.confidence)} tone={agent.tone} key={agent.id} />)}
+        </Panel>
         <Panel title="Message Filters"><TechnicalChecklist rows={[{ label: 'Write commands', value: 'Blocked', tone: 'red' }, { label: 'DTO source', value: source, tone: sourceLabel === 'Backend DTO' ? 'green' : 'blue' }, { label: 'Director broadcast', value: 'Read-only', tone: 'blue' }]} /></Panel>
         <Panel title="Last Broadcast"><p className="text-[11px] leading-5 text-muted">{communications[0]?.topic ?? 'Director keeps the system in supervised prototype mode. Decisions are displayed locally and no console write is sent.'}</p></Panel>
       </div>

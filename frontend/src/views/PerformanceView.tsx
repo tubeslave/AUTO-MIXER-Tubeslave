@@ -1,8 +1,8 @@
 import { DataTable, Panel, Sparkline, StatusBadge } from '../components/prototype/AutomixerComponents';
 import { performance as mockPerformance } from '../mock/automixerData';
 import type { OperatorViewData } from '../services/useOperatorBackend';
-import type { PerformanceRecord, UiActions, UiState } from '../types';
-import { tableView, TechnicalChecklist } from './viewHelpers';
+import type { PerformanceRecord, Tone, UiActions, UiState } from '../types';
+import { readOnlyEmptyState, rowsForReadModelSource, sourceDisplay, tableView, TechnicalChecklist } from './viewHelpers';
 
 function statusToneForPerformance(status: string) {
   const normalized = status.toLowerCase();
@@ -11,29 +11,36 @@ function statusToneForPerformance(status: string) {
   return 'green';
 }
 
-function PerformanceInspector({ record, sourceLabel }: { record: PerformanceRecord; sourceLabel: string }) {
+function PerformanceInspector({ record, sourceLabel, sourceRaw }: { record?: PerformanceRecord; sourceLabel: string; sourceRaw: string }) {
+  const sourceTone: Tone = sourceLabel === 'Backend DTO' || sourceLabel === 'Runtime-derived' ? 'green' : 'blue';
   return (
     <div className="flex h-full flex-col gap-2">
       <Panel title="Performance Inspector">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h3 className="truncate text-[15px] font-bold text-text">{record.agent}</h3>
-          <StatusBadge tone={statusToneForPerformance(record.status)}>{record.status}</StatusBadge>
-        </div>
-        <TechnicalChecklist rows={[
-          { label: 'CPU', value: record.cpu, tone: Number.parseFloat(record.cpu) > 28 ? 'yellow' : 'green' },
-          { label: 'Memory', value: record.memory, tone: 'blue' },
-          { label: 'Decisions', value: String(record.decisions), tone: 'purple' },
-          { label: 'Confidence', value: record.success, tone: Number.parseFloat(record.success) > 90 ? 'green' : 'yellow' },
-          { label: 'Latency', value: record.latency, tone: Number.parseFloat(record.latency) > 90 ? 'yellow' : 'green' }
-        ]} />
+        {record ? (
+          <>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="truncate text-[15px] font-bold text-text">{record.agent}</h3>
+              <StatusBadge tone={statusToneForPerformance(record.status)}>{record.status}</StatusBadge>
+            </div>
+            <TechnicalChecklist rows={[
+              { label: 'CPU', value: record.cpu, tone: Number.parseFloat(record.cpu) > 28 ? 'yellow' : 'green' },
+              { label: 'Memory', value: record.memory, tone: 'blue' },
+              { label: 'Decisions', value: String(record.decisions), tone: 'purple' },
+              { label: 'Confidence', value: record.success, tone: Number.parseFloat(record.success) > 90 ? 'green' : 'yellow' },
+              { label: 'Latency', value: record.latency, tone: Number.parseFloat(record.latency) > 90 ? 'yellow' : 'green' }
+            ]} />
+          </>
+        ) : readOnlyEmptyState('No performance agent selected', sourceRaw)}
       </Panel>
-      <Panel title="Agent Throughput" className="flex-1">
+      <Panel title="Agent Throughput · Display Trace" className="flex-1">
+        <div className="mb-2 text-[9px] uppercase tracking-[0.08em] text-dim">Sparkline is a visual trend placeholder</div>
         <div className="h-24"><Sparkline tone="blue" filled values={[25, 48, 38, 70, 55, 86, 58, 92, 64, 76]} /></div>
         <div className="mt-4 h-24"><Sparkline tone="green" filled values={[70, 78, 74, 82, 86, 80, 88, 91, 89, 94]} /></div>
       </Panel>
       <Panel title="Read-only Guard">
         <TechnicalChecklist rows={[
-          { label: 'Source', value: sourceLabel, tone: sourceLabel === 'Runtime' ? 'green' : 'blue' },
+          { label: 'Table source', value: sourceLabel, tone: sourceTone },
+          { label: 'Trend traces', value: 'Display-only', tone: 'yellow' },
           { label: 'Detail panel', value: 'Selected row', tone: 'green' },
           { label: 'Live writes', value: 'Disabled', tone: 'red' }
         ]} />
@@ -43,8 +50,10 @@ function PerformanceInspector({ record, sourceLabel }: { record: PerformanceReco
 }
 
 export function Performance(ui: UiState, actions: UiActions, data: OperatorViewData) {
-  const performanceRows = data.performanceRecords.length ? data.performanceRecords : mockPerformance;
-  const selectedRecord = performanceRows.find(row => row.agent === ui.selectedPerformanceAgent) ?? performanceRows[0] ?? mockPerformance[0];
+  const performanceSourceRaw = data.readModelSources.performance;
+  const performanceSource = sourceDisplay(performanceSourceRaw);
+  const performanceRows = rowsForReadModelSource(data.performanceRecords, mockPerformance, performanceSourceRaw);
+  const selectedRecord = performanceRows.find(row => row.agent === ui.selectedPerformanceAgent) ?? performanceRows[0];
   return tableView('6. Performance', 'Agent runtime and quality metrics', (
     <div className="grid h-full grid-cols-[1.5fr_1fr] gap-2">
       <DataTable
@@ -60,6 +69,7 @@ export function Performance(ui: UiState, actions: UiActions, data: OperatorViewD
           { label: 'Watch', predicate: row => row.status !== 'Good' }
         ]}
         getSearchText={row => `${row.agent} ${row.cpu} ${row.memory} ${row.success} ${row.status}`}
+        emptyState={readOnlyEmptyState('No performance rows received', performanceSourceRaw)}
         columns={[
           { key: 'agent', label: 'Agent', width: '1.25fr' },
           { key: 'cpu', label: 'CPU', width: '0.6fr' },
@@ -71,9 +81,15 @@ export function Performance(ui: UiState, actions: UiActions, data: OperatorViewD
         ]}
       />
       <div className="grid grid-rows-2 gap-2">
-        <Panel title="Decisions per Minute"><Sparkline tone="blue" filled values={[25, 48, 38, 70, 55, 86, 58, 92, 64, 76]} /></Panel>
-        <Panel title="Success Rate"><Sparkline tone="green" filled values={[70, 78, 74, 82, 86, 80, 88, 91, 89, 94]} /></Panel>
+        <Panel title="Decisions per Minute · Display Trace">
+          <div className="mb-2 text-[9px] uppercase tracking-[0.08em] text-dim">visual placeholder</div>
+          <Sparkline tone="blue" filled values={[25, 48, 38, 70, 55, 86, 58, 92, 64, 76]} />
+        </Panel>
+        <Panel title="Success Rate · Display Trace">
+          <div className="mb-2 text-[9px] uppercase tracking-[0.08em] text-dim">visual placeholder</div>
+          <Sparkline tone="green" filled values={[70, 78, 74, 82, 86, 80, 88, 91, 89, 94]} />
+        </Panel>
       </div>
     </div>
-  ), <PerformanceInspector record={selectedRecord} sourceLabel={data.performanceRecords.length ? 'Runtime' : 'Mock'} />);
+  ), <PerformanceInspector record={selectedRecord} sourceLabel={performanceSource} sourceRaw={performanceSourceRaw} />);
 }

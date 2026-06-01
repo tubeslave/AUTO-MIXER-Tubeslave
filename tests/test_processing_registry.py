@@ -64,6 +64,13 @@ def test_main_live_pipeline_executor_is_only_supervised_fader_gain():
         assert method is not None
         assert method.status not in blocked_statuses
 
+    context_gate = get_processing_method("context_aware_gate_agent")
+    assert context_gate is not None
+    assert context_gate.can_propose is True
+    assert context_gate.can_write_live is False
+    assert context_gate.status == "proposal_only"
+    assert "context_aware_gate_agent" in main.proposal_method_ids
+
 
 def test_secondary_pipelines_do_not_declare_live_write_executor():
     for pipeline_id in ("offline_mix", "shadow_quality", "lab_dsp", "quarantine"):

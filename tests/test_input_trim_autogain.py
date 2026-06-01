@@ -594,6 +594,49 @@ def test_soundcheck_ensemble_context_blocks_bolder_gain_up_when_sources_are_stal
     assert "ensemble_context_vocal_understaged" not in confidence_factors
 
 
+def test_soundcheck_ensemble_context_reports_source_and_lag_margins():
+    stats = _stats_with_signal(peak_db=-20.0, lufs=-30.0)
+
+    stats.calculate_input_trim_recommendation(
+        current_trim_db=0.0,
+        target_peak_db=-10.0,
+        max_peak_limit=-3.0,
+        target_lufs=-18.0,
+        preamp_profile=LocalInputGainProfile(),
+        mode="soundcheck",
+        mixer_channel=1,
+        preset="leadVocal",
+        previous_recommendation={
+            "input_gain_character": {
+                "stability": {
+                    "candidate_direction": "up",
+                    "candidate_delta_db": 3.0,
+                    "evidence_windows": 1,
+                }
+            }
+        },
+        ensemble_context={
+            "other_active_sources": 4,
+            "other_loud_sources": 2,
+            "time_coherence_evaluable": True,
+            "time_coherent_loud_sources": 1,
+            "required_time_coherent_sources": 2,
+            "max_context_lag_samples": 2,
+            "reference_latest_active_sample_index": 15,
+            "reference_max_lag_samples": 5,
+            "reference_peak_db": -9.0,
+            "reference_lufs": -18.0,
+        },
+    )
+
+    ensemble = stats.get_report()["input_gain_character"]["soundcheck_ensemble_context"]
+    assert ensemble["active"] is False
+    assert ensemble["reason"] == "ensemble_time_context_stale"
+    assert ensemble["other_loud_source_margin"] == 0
+    assert ensemble["time_coherent_source_margin"] == -1
+    assert ensemble["reference_lag_margin_samples"] == -3
+
+
 def test_safe_gain_calibrator_builds_ensemble_context_from_other_loud_channels():
     calibrator = SafeGainCalibrator()
     calibrator.add_channel(1)
@@ -624,6 +667,9 @@ def test_safe_gain_calibrator_builds_ensemble_context_from_other_loud_channels()
     assert vocal["suggested_gain_db"] == pytest.approx(6.0)
     assert ensemble["active"] is True
     assert ensemble["other_loud_sources"] == 2
+    assert ensemble["other_loud_source_margin"] == 0
+    assert ensemble["time_coherent_source_margin"] == 0
+    assert ensemble["reference_lag_margin_samples"] == 2
     assert ensemble["reference_peak_db"] == pytest.approx(-9.5)
     assert ensemble["reference_lufs"] == pytest.approx(-18.25)
 
@@ -675,6 +721,9 @@ def test_safe_gain_calibrator_ignores_stale_ensemble_context_for_bolder_gain_up(
     assert ensemble["reason"] == "ensemble_time_context_stale"
     assert ensemble["time_coherent_loud_sources"] == 0
     assert ensemble["reference_max_lag_samples"] == 10
+    assert ensemble["other_loud_source_margin"] == 0
+    assert ensemble["time_coherent_source_margin"] == -2
+    assert ensemble["reference_lag_margin_samples"] == -8
 
 
 def test_safe_gain_calibrator_reports_disabled_ensemble_context_before_source_counts():

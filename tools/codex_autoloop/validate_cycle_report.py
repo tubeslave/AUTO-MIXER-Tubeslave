@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -19,6 +20,7 @@ REPORT_TITLE_PATTERN = re.compile(
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^\]\n]+\]\(([^)\n]+)\)")
 
 REQUIRED_PHRASES = (
+    "## Scope",
     "## What Was Found",
     "## What Was Done",
     "## Tests And Checks",
@@ -52,11 +54,117 @@ REQUIRED_READINESS_SCORES = (
 )
 
 REQUIRED_NONEMPTY_SECTIONS = (
+    "## Scope",
     "## What Was Found",
     "## What Was Done",
+    "## Changed Files",
     "## Tests And Checks",
     "## What Remains",
     "## Risks",
+)
+
+REQUIRED_DISCOVERY_EVIDENCE = (
+    ("branch", ("Branch:", "Current branch", "текущая ветка")),
+    ("worktree state", ("git status", "worktree", "рабоч")),
+    ("modified files", ("modified", "changed files", "измененные", "изменённые")),
+    ("new/untracked files", ("untracked", "new files", "новые файлы")),
+    ("repo-local paperclip reports", (".paperclip/reports",)),
+    ("Docs reports", ("Docs/reports",)),
+    ("test artifacts", ("artifacts", "sessions", "test artifact", "тестовые артефакты")),
+    ("TODO/FIXME scan", ("TODO/FIXME",)),
+    ("local project tasks", (".ai/", ".ai/project-layer/current_tasks.md", "project issues", "локальные project issues")),
+)
+
+DISCOVERY_RECENCY_TERMS = (
+    "latest",
+    "recent",
+    "newest",
+    "last",
+    "послед",
+    "свеж",
+)
+
+REQUIRED_RECENT_DISCOVERY_EVIDENCE = (
+    ("repo-local paperclip reports", (".paperclip/reports",)),
+    ("Docs reports", ("Docs/reports",)),
+    ("test artifacts", ("test artifacts", "тестовые артефакты", "artifacts", "sessions")),
+)
+
+REQUIRED_SCOPE_PHRASES = (
+    "External Paperclip/PiperClip was not used as an agent runner",
+    "No neighboring repositories or external local projects were analyzed, modified, or used.",
+    "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.",
+    "Live safety status:",
+    "no live OSC/WING writes were executed",
+)
+
+PROJECT_BOUNDARY_AUDIT_TERMS = (
+    "/users/dmitrijvolkov/paperclip",
+    "/users/dmitrijvolkov/automixer-kimi-paperclip-analyst",
+    "external paperclip/piperclip",
+    "external paperclip",
+    "external piperclip",
+    "neighboring repositories",
+    "external local projects",
+)
+PROJECT_BOUNDARY_AUDIT_VERBS = (
+    "analyzed",
+    "analysed",
+    "modified",
+    "used",
+    "ran",
+    "read",
+    "opened",
+    "inspected",
+    "scanned",
+    "listed",
+    "checked",
+    "launched",
+    "invoked",
+    "was analyzed",
+    "were analyzed",
+    "was analysed",
+    "were analysed",
+    "was modified",
+    "were modified",
+    "was used",
+    "were used",
+    "was run",
+    "were run",
+    "was read",
+    "were read",
+    "was opened",
+    "were opened",
+    "was inspected",
+    "were inspected",
+    "was scanned",
+    "were scanned",
+    "was listed",
+    "were listed",
+    "was checked",
+    "were checked",
+    "was launched",
+    "were launched",
+    "was invoked",
+    "were invoked",
+)
+
+TODO_SCAN_FOCUS_PHRASES = (
+    "owned-code",
+    "owned code",
+    "owned код",
+    "owned",
+)
+
+TODO_SCAN_EXCLUSION_PHRASES = (
+    "excluding",
+    "excluded",
+    "excluded scan noise",
+    "vendored",
+    "generated",
+    "reference noise",
+    "scan noise",
+    "исключ",
 )
 
 PLAN_SECTION_HEADINGS = (
@@ -64,6 +172,17 @@ PLAN_SECTION_HEADINGS = (
     "## Plan Selected",
 )
 MAX_PLAN_ITEMS = 3
+
+TEST_RESULT_EVIDENCE_PATTERN = re.compile(
+    r"\b(pass(?:ed)?|fail(?:ed)?|skipped|blocked|not run)\b"
+    r"|не запуск|не удалось|прош|ошиб",
+    re.IGNORECASE,
+)
+MEMORY_LINT_EVIDENCE_TERMS = (
+    "memory lint",
+    "memory_lint.py",
+    "tools/memory/memory_lint.py",
+)
 
 MANDATORY_QUESTIONS_HEADING = "## Три обязательных вопроса"
 MANDATORY_QUESTIONS = (
@@ -76,13 +195,35 @@ REQUIRED_LIVE_SAFETY_PHRASES = (
     "No real console was contacted",
 )
 
-REQUIRED_NON_DESTRUCTIVE_PHRASES = (
-    "No commit",
+LIVE_WRITE_AUDIT_TERMS = (
+    "live osc/wing writes",
+)
+LIVE_WRITE_AUDIT_VERBS = (
+    "was executed",
+    "were executed",
+    "was performed",
+    "were performed",
+    "was sent",
+    "were sent",
+    "was run",
+    "were run",
+    "was applied",
+    "were applied",
+)
+
+NON_DESTRUCTIVE_ACTION_AUDIT_TERMS = (
+    "commit",
     "push",
     "reset",
     "destructive cleanup",
     "secret access",
     "user-file deletion",
+)
+NON_DESTRUCTIVE_ACTION_AUDIT_VERBS = (
+    "was performed",
+    "were performed",
+    "не выполня",
+    "не удал",
 )
 
 FORBIDDEN_LIVE_COMMANDS = (
@@ -95,6 +236,22 @@ FORBIDDEN_LIVE_COMMANDS = (
     "save_snap",
     "reset",
     "mute",
+)
+NEGATED_COMMAND_AUDIT_VERBS = (
+    "command was run",
+    "commands were run",
+    "command was sent",
+    "commands were sent",
+    "was run",
+    "were run",
+    "was sent",
+    "were sent",
+    "was executed",
+    "were executed",
+    "was applied",
+    "were applied",
+    "не выполня",
+    "не отправ",
 )
 
 NEXT_STEPS_HEADING = "### Что нужно сделать дальше"
@@ -113,6 +270,26 @@ REQUIRED_END_SECTION_ORDER = (
     "### Общая готовность направления",
 )
 
+REQUIRED_PLAIN_EXPLANATION_SUBSECTIONS = (
+    "### Что было сделано",
+    "### Зачем это нужно проекту",
+    "### В каком состоянии проект сейчас",
+    "### Какие проблемы были обнаружены",
+    "### Что нужно сделать дальше",
+    "### Общая готовность направления",
+)
+
+PROJECT_STATE_EXPLANATION_HEADING = "### В каком состоянии проект сейчас"
+REQUIRED_PROJECT_STATE_EVIDENCE = (
+    ("what already works", ("уже работает", "работает", "already works", "works")),
+    ("what works partially", ("частично", "partially")),
+    (
+        "what is not implemented",
+        ("еще не реализ", "ещё не реализ", "не реализ", "not implemented", "not yet implemented"),
+    ),
+    ("risks", ("риск", "risk")),
+)
+
 
 def _is_relative_to(path: Path, parent: Path) -> bool:
     try:
@@ -124,13 +301,14 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
 
 def _validate_readiness_scores(text: str) -> list[str]:
     errors: list[str] = []
+    section_body = _extract_heading_section(text, "### Общая готовность направления")
 
     for label in REQUIRED_READINESS_SCORES:
         pattern = re.compile(
             rf"^\s*(?:[-*]\s*)?{re.escape(label)}\s*:\s*(\d{{1,3}})\s*%\s*$",
             re.MULTILINE,
         )
-        match = pattern.search(text)
+        match = pattern.search(section_body)
         if not match:
             errors.append(f"missing readiness score: {label}: N%")
             continue
@@ -158,6 +336,40 @@ def _validate_report_title(text: str, report_path: Path) -> list[str]:
     return []
 
 
+def _validate_report_filename_timestamp(
+    report_path: Path,
+    *,
+    now: datetime | None = None,
+) -> list[str]:
+    timestamp = report_path.stem.removeprefix("automixer_codex_cycle_")
+    if timestamp == report_path.stem:
+        return []
+
+    try:
+        parsed = datetime.strptime(timestamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return [f"report filename timestamp must be a valid UTC timestamp: {timestamp}"]
+
+    if now is not None:
+        comparison_now = now if now.tzinfo is not None else now.replace(tzinfo=timezone.utc)
+        if parsed > comparison_now.astimezone(timezone.utc):
+            return [f"report filename timestamp must not be in the future: {timestamp}"]
+
+    return []
+
+
+def _extract_plan_items(text: str, heading: str) -> list[str]:
+    section_body = _extract_heading_section(text, heading)
+    if not section_body:
+        return []
+
+    return [
+        line
+        for line in section_body.splitlines()
+        if re.match(r"^\s*(?:[-*+]\s+|\d+[\.)]\s+)", line)
+    ]
+
+
 def _validate_plan_section(text: str) -> list[str]:
     for heading in PLAN_SECTION_HEADINGS:
         section_body = _extract_heading_section(text, heading)
@@ -172,15 +384,15 @@ def _validate_plan_section(text: str) -> list[str]:
 
 def _validate_plan_item_limit(text: str) -> list[str]:
     for heading in PLAN_SECTION_HEADINGS:
-        section_body = _extract_heading_section(text, heading)
-        if not section_body:
+        if not _extract_heading_section(text, heading):
             continue
 
-        plan_items = [
-            line
-            for line in section_body.splitlines()
-            if re.match(r"^\s*(?:[-*+]\s+|\d+[\.)]\s+)", line)
-        ]
+        plan_items = _extract_plan_items(text, heading)
+        if not plan_items:
+            return [
+                f"{heading} must contain between 1 and {MAX_PLAN_ITEMS} list items"
+            ]
+
         if len(plan_items) > MAX_PLAN_ITEMS:
             return [
                 f"{heading} must contain no more than {MAX_PLAN_ITEMS} list items"
@@ -198,6 +410,144 @@ def _validate_required_sections_have_content(text: str) -> list[str]:
             errors.append(f"required report section has no content: {heading}")
 
     return errors
+
+
+def _validate_scope_evidence(text: str) -> list[str]:
+    scope_body = _extract_heading_section(text, "## Scope")
+    if not scope_body:
+        return []
+
+    errors: list[str] = []
+    for phrase in REQUIRED_SCOPE_PHRASES:
+        if not _contains_required_phrase(scope_body, phrase):
+            errors.append(f"missing required Scope evidence: {phrase}")
+
+    return errors
+
+
+def _validate_project_boundary_contradictions(text: str) -> list[str]:
+    report_body_without_scope = _remove_heading_section(text, "## Scope")
+    normalized_report_body = _collapse_whitespace(report_body_without_scope).lower()
+
+    contradicted_terms = [
+        term
+        for term in PROJECT_BOUNDARY_AUDIT_TERMS
+        if term in normalized_report_body
+        and _has_affirmed_action_audit(
+            normalized_report_body,
+            term,
+            PROJECT_BOUNDARY_AUDIT_VERBS,
+        )
+    ]
+    if not contradicted_terms:
+        return []
+
+    return [
+        "report body contradicts repo-local project boundary evidence: "
+        + ", ".join(contradicted_terms)
+    ]
+
+
+def _validate_discovery_evidence(text: str) -> list[str]:
+    section_body = _extract_heading_section(text, "## What Was Found")
+    if not section_body:
+        return []
+
+    normalized_section = _collapse_whitespace(section_body).lower()
+    errors: list[str] = []
+    for label, phrases in REQUIRED_DISCOVERY_EVIDENCE:
+        if not any(phrase.lower() in normalized_section for phrase in phrases):
+            errors.append(f"What Was Found is missing discovery evidence: {label}")
+
+    return errors
+
+
+def _validate_recent_discovery_evidence(text: str) -> list[str]:
+    section_body = _extract_heading_section(text, "## What Was Found")
+    if not section_body:
+        return []
+
+    normalized_lines = [
+        _collapse_whitespace(line).lower()
+        for line in section_body.splitlines()
+    ]
+    errors: list[str] = []
+    for label, phrases in REQUIRED_RECENT_DISCOVERY_EVIDENCE:
+        has_recent_line = any(
+            any(phrase.lower() in line for phrase in phrases)
+            and any(term in line for term in DISCOVERY_RECENCY_TERMS)
+            for line in normalized_lines
+        )
+        if not has_recent_line:
+            errors.append(
+                f"What Was Found must mention latest/recent discovery evidence: {label}"
+            )
+
+    return errors
+
+
+def _validate_todo_scan_boundary_evidence(text: str) -> list[str]:
+    section_body = _extract_heading_section(text, "## What Was Found")
+    if not section_body:
+        return []
+
+    normalized_section = _collapse_whitespace(section_body).lower()
+    if "todo/fixme" not in normalized_section:
+        return []
+
+    errors: list[str] = []
+    if not any(phrase in normalized_section for phrase in TODO_SCAN_FOCUS_PHRASES):
+        errors.append(
+            "What Was Found TODO/FIXME scan must mention owned-code focus"
+        )
+
+    if not any(phrase in normalized_section for phrase in TODO_SCAN_EXCLUSION_PHRASES):
+        errors.append(
+            "What Was Found TODO/FIXME scan must mention excluded "
+            "vendored/generated/reference noise"
+        )
+
+    return errors
+
+
+def _validate_tests_and_checks_evidence(text: str) -> list[str]:
+    section_body = _extract_heading_section(text, "## Tests And Checks")
+    if not section_body:
+        return []
+
+    if TEST_RESULT_EVIDENCE_PATTERN.search(section_body):
+        return []
+
+    return [
+        "Tests And Checks must include outcome evidence: passed, failed, "
+        "skipped, blocked, or not run"
+    ]
+
+
+def _validate_memory_lint_evidence(text: str) -> list[str]:
+    section_body = _extract_heading_section(text, "## Tests And Checks")
+    if not section_body:
+        return []
+
+    lines = section_body.splitlines()
+    evidence_chunks: list[str] = []
+    for index, line in enumerate(lines):
+        normalized_line = line.lower()
+        if not any(term in normalized_line for term in MEMORY_LINT_EVIDENCE_TERMS):
+            continue
+
+        evidence_chunks.append("\n".join(lines[index:index + 3]))
+
+    if not evidence_chunks:
+        return ["Tests And Checks must include memory lint result"]
+
+    if any(TEST_RESULT_EVIDENCE_PATTERN.search(chunk) for chunk in evidence_chunks):
+        return []
+
+    return [
+        "Tests And Checks memory lint result must include outcome evidence: "
+        "passed, failed, skipped, blocked, or not run"
+    ]
 
 
 def _validate_ordered_end_sections(text: str) -> list[str]:
@@ -370,6 +720,35 @@ def _validate_plain_explanation_is_final_major_section(text: str) -> list[str]:
     return []
 
 
+def _validate_plain_explanation_subsections_have_content(text: str) -> list[str]:
+    if not _extract_heading_section(text, PLAIN_EXPLANATION_HEADING):
+        return []
+
+    errors: list[str] = []
+    for heading in REQUIRED_PLAIN_EXPLANATION_SUBSECTIONS:
+        section_body = _extract_heading_section(text, heading)
+        if not re.search(r"[0-9A-Za-zА-Яа-яЁё]", section_body):
+            errors.append(f"plain-language subsection has no content: {heading}")
+
+    return errors
+
+
+def _validate_project_state_explanation_evidence(text: str) -> list[str]:
+    section_body = _extract_heading_section(text, PROJECT_STATE_EXPLANATION_HEADING)
+    if not section_body:
+        return []
+
+    normalized_section = _collapse_whitespace(section_body).lower()
+    errors: list[str] = []
+    for label, phrases in REQUIRED_PROJECT_STATE_EVIDENCE:
+        if not any(phrase in normalized_section for phrase in phrases):
+            errors.append(
+                f"plain-language state subsection must mention {label}"
+            )
+
+    return errors
+
+
 def _validate_mandatory_question_answers(text: str) -> list[str]:
     section_body = _extract_heading_section(text, MANDATORY_QUESTIONS_HEADING)
     if not section_body:
@@ -403,12 +782,29 @@ def _validate_mandatory_question_answers(text: str) -> list[str]:
 
 def _validate_live_safety_evidence(text: str) -> list[str]:
     errors: list[str] = []
-    lower_text = text.lower()
-    normalized_lower_text = _collapse_whitespace(text).lower()
+    audit_section = _extract_heading_section(text, "## Scope") or text
+    lower_text = audit_section.lower()
+    normalized_lower_text = _collapse_whitespace(audit_section).lower()
 
     for phrase in REQUIRED_LIVE_SAFETY_PHRASES:
         if phrase.lower() not in normalized_lower_text:
             errors.append(f"missing required live-safety evidence: {phrase}")
+
+    contradicted_live_write_terms = [
+        term
+        for term in LIVE_WRITE_AUDIT_TERMS
+        if term in normalized_lower_text
+        and _has_affirmed_action_audit(
+            normalized_lower_text,
+            term,
+            LIVE_WRITE_AUDIT_VERBS,
+        )
+    ]
+    if contradicted_live_write_terms:
+        errors.append(
+            "live write audit contradicts no-write safety evidence: "
+            + ", ".join(contradicted_live_write_terms)
+        )
 
     missing_commands = [
         command
@@ -421,21 +817,276 @@ def _validate_live_safety_evidence(text: str) -> list[str]:
             + ", ".join(missing_commands)
         )
 
-    missing_non_destructive_phrases = [
-        phrase
-        for phrase in REQUIRED_NON_DESTRUCTIVE_PHRASES
-        if phrase.lower() not in normalized_lower_text
+    unnegated_commands = [
+        command
+        for command in FORBIDDEN_LIVE_COMMANDS
+        if command.lower() in lower_text
+        and not _has_negated_command_audit(normalized_lower_text, command)
     ]
-    if missing_non_destructive_phrases:
+    if unnegated_commands:
+        errors.append(
+            "forbidden command audit must explicitly say command was not run: "
+            + ", ".join(unnegated_commands)
+        )
+
+    contradicted_commands = [
+        command
+        for command in FORBIDDEN_LIVE_COMMANDS
+        if command.lower() in lower_text
+        and _has_affirmed_command_audit(normalized_lower_text, command)
+    ]
+    if contradicted_commands:
+        errors.append(
+            "forbidden command audit contradicts no-run safety evidence: "
+            + ", ".join(contradicted_commands)
+        )
+
+    missing_non_destructive_terms = [
+        term
+        for term in NON_DESTRUCTIVE_ACTION_AUDIT_TERMS
+        if term.lower() not in normalized_lower_text
+    ]
+    if missing_non_destructive_terms:
         errors.append(
             "missing non-destructive action audit evidence: "
-            + ", ".join(missing_non_destructive_phrases)
+            + ", ".join(missing_non_destructive_terms)
+        )
+
+    unnegated_non_destructive_terms = [
+        term
+        for term in NON_DESTRUCTIVE_ACTION_AUDIT_TERMS
+        if term.lower() in normalized_lower_text
+        and not _has_negated_action_audit(
+            normalized_lower_text,
+            term,
+            NON_DESTRUCTIVE_ACTION_AUDIT_VERBS,
+        )
+    ]
+    if unnegated_non_destructive_terms:
+        errors.append(
+            "non-destructive action audit must explicitly say action was not performed: "
+            + ", ".join(unnegated_non_destructive_terms)
+        )
+
+    contradicted_non_destructive_terms = [
+        term
+        for term in NON_DESTRUCTIVE_ACTION_AUDIT_TERMS
+        if term.lower() in normalized_lower_text
+        and _has_affirmed_action_audit(
+            normalized_lower_text,
+            term,
+            NON_DESTRUCTIVE_ACTION_AUDIT_VERBS,
+        )
+    ]
+    if contradicted_non_destructive_terms:
+        errors.append(
+            "non-destructive action audit contradicts no-action evidence: "
+            + ", ".join(contradicted_non_destructive_terms)
+        )
+
+    report_body_without_scope = _remove_heading_section(text, "## Scope")
+    normalized_report_body = _collapse_whitespace(report_body_without_scope).lower()
+    lower_report_body = report_body_without_scope.lower()
+
+    body_contradicted_live_write_terms = [
+        term
+        for term in LIVE_WRITE_AUDIT_TERMS
+        if term in normalized_report_body
+        and _has_affirmed_action_audit(
+            normalized_report_body,
+            term,
+            LIVE_WRITE_AUDIT_VERBS,
+        )
+    ]
+    if body_contradicted_live_write_terms:
+        errors.append(
+            "report body contradicts no-write safety evidence: "
+            + ", ".join(body_contradicted_live_write_terms)
+        )
+
+    body_contradicted_commands = [
+        command
+        for command in FORBIDDEN_LIVE_COMMANDS
+        if command.lower() in lower_report_body
+        and _has_affirmed_command_audit(normalized_report_body, command)
+    ]
+    if body_contradicted_commands:
+        errors.append(
+            "report body contradicts no-run safety evidence: "
+            + ", ".join(body_contradicted_commands)
+        )
+
+    body_contradicted_non_destructive_terms = [
+        term
+        for term in NON_DESTRUCTIVE_ACTION_AUDIT_TERMS
+        if term.lower() in normalized_report_body
+        and _has_affirmed_action_audit(
+            normalized_report_body,
+            term,
+            NON_DESTRUCTIVE_ACTION_AUDIT_VERBS,
+        )
+    ]
+    if body_contradicted_non_destructive_terms:
+        errors.append(
+            "report body contradicts no-action evidence: "
+            + ", ".join(body_contradicted_non_destructive_terms)
         )
 
     return errors
 
 
-def validate_report(report_path: Path, project_root: Path = PROJECT_ROOT) -> list[str]:
+def _has_negated_command_audit(normalized_lower_text: str, command: str) -> bool:
+    return _has_negated_action_audit(
+        normalized_lower_text,
+        command,
+        NEGATED_COMMAND_AUDIT_VERBS,
+    )
+
+
+def _has_affirmed_command_audit(normalized_lower_text: str, command: str) -> bool:
+    return _has_affirmed_action_audit(
+        normalized_lower_text,
+        command,
+        NEGATED_COMMAND_AUDIT_VERBS,
+    )
+
+
+def _has_negated_action_audit(
+    normalized_lower_text: str,
+    action: str,
+    audit_verbs: Iterable[str],
+) -> bool:
+    action_lower = action.lower()
+    for match in re.finditer(re.escape(action_lower), normalized_lower_text):
+        sentence_start = max(
+            normalized_lower_text.rfind(".", 0, match.start()),
+            normalized_lower_text.rfind("!", 0, match.start()),
+            normalized_lower_text.rfind("?", 0, match.start()),
+        ) + 1
+        sentence_end_candidates = [
+            index
+            for index in (
+                normalized_lower_text.find(".", match.end()),
+                normalized_lower_text.find("!", match.end()),
+                normalized_lower_text.find("?", match.end()),
+            )
+            if index != -1
+        ]
+        sentence_end = (
+            min(sentence_end_candidates)
+            if sentence_end_candidates
+            else len(normalized_lower_text)
+        )
+        sentence = normalized_lower_text[sentence_start:sentence_end].strip()
+        action_offset = match.start() - sentence_start
+        clause_start, clause_end = _action_clause_bounds(sentence, action_offset)
+        clause = sentence[clause_start:clause_end].strip()
+        before_action = sentence[clause_start:action_offset]
+        negated_before = re.search(r"\bno\b", before_action) is not None
+        negated_russian = "не " in clause
+        negated_execution = re.search(
+            r"\b(?:was|were)\s+not\s+(?:run|sent|executed|performed|applied)\b"
+            r"|\bcommands?\s+(?:was|were)\s+not\s+(?:run|sent|executed|applied)\b"
+            r"|\b(?:did|do|does)\s+not\s+(?:run|send|execute|perform|apply)\b"
+            r"|\bnever\s+(?:run|sent|executed|performed|applied)\b",
+            clause,
+        ) is not None
+        has_execution_verb = (
+            any(verb in clause for verb in audit_verbs)
+            or negated_execution
+        )
+        if (negated_before or negated_russian or negated_execution) and has_execution_verb:
+            return True
+
+    return False
+
+
+def _has_affirmed_action_audit(
+    normalized_lower_text: str,
+    action: str,
+    audit_verbs: Iterable[str],
+) -> bool:
+    action_lower = action.lower()
+    for match in re.finditer(re.escape(action_lower), normalized_lower_text):
+        sentence_start = max(
+            normalized_lower_text.rfind(".", 0, match.start()),
+            normalized_lower_text.rfind("!", 0, match.start()),
+            normalized_lower_text.rfind("?", 0, match.start()),
+        ) + 1
+        sentence_end_candidates = [
+            index
+            for index in (
+                normalized_lower_text.find(".", match.end()),
+                normalized_lower_text.find("!", match.end()),
+                normalized_lower_text.find("?", match.end()),
+            )
+            if index != -1
+        ]
+        sentence_end = (
+            min(sentence_end_candidates)
+            if sentence_end_candidates
+            else len(normalized_lower_text)
+        )
+        sentence = normalized_lower_text[sentence_start:sentence_end].strip()
+        action_offset = match.start() - sentence_start
+        clause_start, clause_end = _action_clause_bounds(sentence, action_offset)
+        clause = sentence[clause_start:clause_end].strip()
+        before_action = sentence[clause_start:action_offset]
+        has_negation = (
+            re.search(r"\bno\b", before_action) is not None
+            or "не " in clause
+            or re.search(
+                r"\b(?:was|were)\s+not\s+(?:run|sent|executed|performed|applied)\b"
+                r"|\bcommands?\s+(?:was|were)\s+not\s+(?:run|sent|executed|applied)\b"
+                r"|\b(?:did|do|does)\s+not\s+(?:run|send|execute|perform|apply)\b"
+                r"|\bnever\s+(?:run|sent|executed|performed|applied)\b",
+                clause,
+            )
+            is not None
+        )
+        has_execution_verb = any(verb in clause for verb in audit_verbs)
+        if has_execution_verb and not has_negation:
+            return True
+
+    return False
+
+
+def _action_clause_bounds(sentence: str, action_offset: int) -> tuple[int, int]:
+    """Return the contrast/semicolon-delimited clause containing an action."""
+
+    clause_start = 0
+    boundary_pattern = re.compile(r";|,\s*(?:but|however|though)\b|\b(?:but|however)\b")
+    for boundary in boundary_pattern.finditer(sentence):
+        if action_offset < boundary.start():
+            return clause_start, boundary.start()
+        clause_start = boundary.end()
+
+    return clause_start, len(sentence)
+
+
+def _remove_heading_section(text: str, heading: str) -> str:
+    heading_pattern = re.compile(rf"^{re.escape(heading)}\s*$", re.MULTILINE)
+    heading_match = heading_pattern.search(text)
+    if not heading_match:
+        return text
+
+    heading_level = len(heading) - len(heading.lstrip("#"))
+    remaining_text = text[heading_match.end():]
+    next_heading = re.search(rf"^#{{1,{heading_level}}}\s+", remaining_text, re.MULTILINE)
+    section_end = (
+        heading_match.end() + next_heading.start()
+        if next_heading
+        else len(text)
+    )
+    return text[:heading_match.start()] + "\n" + text[section_end:]
+
+
+def validate_report(
+    report_path: Path,
+    project_root: Path = PROJECT_ROOT,
+    *,
+    now: datetime | None = None,
+) -> list[str]:
     """Return validation errors for one Codex cycle report."""
 
     errors: list[str] = []
@@ -458,15 +1109,25 @@ def validate_report(report_path: Path, project_root: Path = PROJECT_ROOT) -> lis
         if not _contains_required_phrase(text, phrase):
             errors.append(f"missing required report phrase: {phrase}")
 
+    errors.extend(_validate_report_filename_timestamp(resolved_report, now=now))
     errors.extend(_validate_report_title(text, resolved_report))
     errors.extend(_validate_plan_section(text))
     errors.extend(_validate_plan_item_limit(text))
     errors.extend(_validate_required_sections_have_content(text))
+    errors.extend(_validate_scope_evidence(text))
+    errors.extend(_validate_project_boundary_contradictions(text))
+    errors.extend(_validate_discovery_evidence(text))
+    errors.extend(_validate_recent_discovery_evidence(text))
+    errors.extend(_validate_todo_scan_boundary_evidence(text))
+    errors.extend(_validate_tests_and_checks_evidence(text))
+    errors.extend(_validate_memory_lint_evidence(text))
     errors.extend(_validate_readiness_scores(text))
     errors.extend(_validate_ordered_end_sections(text))
     errors.extend(_validate_changed_file_links(text, resolved_report, root))
     errors.extend(_validate_next_steps_limit(text))
     errors.extend(_validate_plain_explanation_is_final_major_section(text))
+    errors.extend(_validate_plain_explanation_subsections_have_content(text))
+    errors.extend(_validate_project_state_explanation_evidence(text))
     errors.extend(_validate_mandatory_question_answers(text))
     errors.extend(_validate_live_safety_evidence(text))
 
@@ -480,7 +1141,11 @@ def main(argv: Iterable[str] | None = None, project_root: Path = PROJECT_ROOT) -
     parser.add_argument("report", type=Path, help="Path to automixer_codex_cycle_*.md")
     args = parser.parse_args(list(argv) if argv is not None else None)
 
-    errors = validate_report(args.report, project_root=project_root)
+    errors = validate_report(
+        args.report,
+        project_root=project_root,
+        now=datetime.now(timezone.utc),
+    )
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)

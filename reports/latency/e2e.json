@@ -1,0 +1,57 @@
+{
+  "buffer_results": [
+    {
+      "audio_peak": 0.847819447517395,
+      "buffer_samples": 128,
+      "e2e_ms": 2.791667,
+      "mode": "simulated_loopback",
+      "notes": [
+        "Simulated loopback uses one audio buffer plus half RTT as control offset.",
+        "No live WING/OSC write path was used."
+      ],
+      "onset_sample": 134,
+      "onset_threshold": 0.169563889503479,
+      "sample_rate_hz": 48000,
+      "status": "ok",
+      "t_audio_onset_ns": 2496865006775000,
+      "t_control_send_ns": 2496865003983333
+    },
+    {
+      "audio_peak": 0.8494716882705688,
+      "buffer_samples": 256,
+      "e2e_ms": 5.5625,
+      "mode": "simulated_loopback",
+      "notes": [
+        "Simulated loopback uses one audio buffer plus half RTT as control offset.",
+        "No live WING/OSC write path was used."
+      ],
+      "onset_sample": 267,
+      "onset_threshold": 0.16989433765411377,
+      "sample_rate_hz": 48000,
+      "status": "ok",
+      "t_audio_onset_ns": 2496865013799125,
+      "t_control_send_ns": 2496865008236625
+    },
+    {
+      "audio_peak": 0.849869966506958,
+      "buffer_samples": 512,
+      "e2e_ms": 11.083333,
+      "mode": "simulated_loopback",
+      "notes": [
+        "Simulated loopback uses one audio buffer plus half RTT as control offset.",
+        "No live WING/OSC write path was used."
+      ],
+      "onset_sample": 532,
+      "onset_threshold": 0.16997399330139162,
+      "sample_rate_hz": 48000,
+      "status": "ok",
+      "t_audio_onset_ns": 2496865019456083,
+      "t_control_send_ns": 2496865008372750
+    }
+  ],
+  "e2e_ms": 2.791667,
+  "mode": "simulated_loopback",
+  "sample_rate_hz": 48000,
+  "t_audio_onset_ns": 2496865006775000,
+  "t_control_send_ns": 2496865003983333
+}

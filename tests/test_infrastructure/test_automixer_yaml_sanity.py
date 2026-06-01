@@ -29,3 +29,8 @@ def test_automixer_yaml_parses_and_has_expected_sections():
     assert "audio" in data
     assert data["mixer"].get("type") in {"dlive", "wing"}
     assert data["audio"].get("sample_rate") == 48000
+    context_gate = data.get("context_aware_gate", {})
+    assert context_gate.get("enabled") is False
+    assert context_gate.get("dry_run") is True
+    assert context_gate.get("live_writes_enabled") is False
+    assert context_gate.get("safety", {}).get("gate_expander_proposal_only") is True

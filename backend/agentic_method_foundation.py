@@ -17,6 +17,11 @@ from typing import Any, Dict, Iterable, List, Optional, Protocol
 
 import numpy as np
 
+try:
+    from .context_aware_gate import BleedTelemetry, ContextAwareGateAgent
+except ImportError:  # pragma: no cover - direct PYTHONPATH=backend compatibility
+    from context_aware_gate import BleedTelemetry, ContextAwareGateAgent
+
 
 FOUNDATION_VERSION = "agentic_foundation_v1"
 EPSILON = 1e-12
@@ -686,36 +691,23 @@ def _gate_recommendations(
 ) -> List[AgentRecommendation]:
     _ = config
     recs: List[AgentRecommendation] = []
-    role = snapshot.role.lower()
-    is_musical_source = any(key in role for key in ("vocal", "guitar", "keys", "bass"))
-    noise = snapshot.noise_floor_db
-    bleed = snapshot.bleed_index or 0.0
-    if (noise is not None and noise > -58.0) or bleed >= 0.65:
-        gate_range = -6.0 if is_musical_source else -18.0
+    telemetry = BleedTelemetry.from_feature_snapshot(snapshot, channel_label=snapshot.role)
+    context_recommendation = ContextAwareGateAgent().recommend(telemetry)
+    if context_recommendation is not None:
+        payload = context_recommendation.to_dict()
         recs.append(
             _make_recommendation(
-                channel_id=snapshot.channel_id,
-                agent_name="Gate / Expander Agent",
-                action_type="gate",
-                suggested_params={
-                    "threshold_db": _round((noise or -70.0) + 6.0, 1),
-                    "range_db": gate_range,
-                    "attack_ms": 1.0 if is_musical_source else 0.2,
-                    "hold_ms": 120.0,
-                    "release_ms": 180.0,
-                },
-                confidence=0.67,
-                risk_score=0.48 if is_musical_source else 0.34,
-                reason="Noise/bleed suggests an expander review; aggressive live gating remains blocked.",
-                safety_status="proposal_only",
+                channel_id=int(payload["channel_id"]),
+                agent_name=str(payload["agent_name"]),
+                action_type=str(payload["action_type"]),
+                suggested_params=dict(payload.get("suggested_params") or {}),
+                confidence=float(payload.get("confidence") or 0.0),
+                risk_score=float(payload.get("risk_score") or 1.0),
+                reason=str(payload.get("reason") or "Context-aware gate/expander review."),
+                safety_status=str(payload.get("safety_status") or "proposal_only"),
                 dry_run=True,
-                evidence={
-                    "noise_floor_db": noise,
-                    "bleed_index": bleed,
-                    "false_open_risk": snapshot.false_open_risk,
-                    "false_close_risk": snapshot.false_close_risk,
-                    "chatter_risk": snapshot.chatter_risk,
-                },
+                idempotency_key=payload.get("idempotency_key"),
+                evidence=dict(payload.get("evidence") or {}),
             )
         )
     return recs

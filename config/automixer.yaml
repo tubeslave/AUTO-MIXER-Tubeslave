@@ -27,6 +27,20 @@ agent:
   cycle_interval: 0.5
   confidence_threshold: 0.6
   max_actions_per_cycle: 5
+context_aware_gate:
+  enabled: false
+  dry_run: true
+  live_writes_enabled: false
+  threshold_margin_db: 6.0
+  min_bleed_score_for_recommendation: 0.35
+  min_outlier_score_for_recommendation: 0.35
+  high_risk_threshold: 0.68
+  max_musical_range_db: 8.0
+  max_drum_range_db: 24.0
+  safety:
+    allow_live_writes: false
+    gate_expander_proposal_only: true
+    decision_trace_only: true
 ai:
   llm_backend: auto
   llm_model: gpt-5.4

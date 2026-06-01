@@ -1,4 +1,5 @@
 import importlib.util
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -44,7 +45,15 @@ was performed.
 
 ## What Was Found
 
-Repo state was inspected.
+Branch: `codex/project-structure-integration-20260518`.
+`git status --short` showed a dirty worktree with modified files and untracked
+files preserved.
+Latest repo-local `.paperclip/reports/` and `Docs/reports/` entries were
+inspected.
+Latest test artifacts under `artifacts/` and `sessions/` were inspected.
+TODO/FIXME scan, excluding vendored/generated/reference noise, found only
+bounded owned-code items.
+Local project tasks in `.ai/project-layer/current_tasks.md` were inspected.
 
 ## Short Plan
 
@@ -63,6 +72,9 @@ A safe local report validator was checked.
 ## Tests And Checks
 
 - `python3 -m pytest tests/test_codex_cycle_report_validator.py -q`
+  - Passed: fixture validator tests.
+- `python3 tools/memory/memory_lint.py`
+  - Passed: required memory files and safety wording are present.
 
 ## What Remains
 
@@ -98,7 +110,9 @@ Offline evidence is not live readiness.
 
 ### В каком состоянии проект сейчас
 
-Проект остается supervised-first.
+Уже работает безопасная форма отчета. Частично работает только локальная
+проверка отчета. Еще не реализовано live hardware proof. Главные риски остаются
+в разрыве между offline evidence и реальным пультом.
 
 ### Какие проблемы были обнаружены
 
@@ -157,6 +171,29 @@ def test_cycle_report_validator_rejects_missing_safety_and_explanation(tmp_path)
     assert any("1. Что нового проект научился делать?" in error for error in errors)
 
 
+def test_cycle_report_validator_rejects_missing_scope_section(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "## Scope\n\n"
+            "External Paperclip/PiperClip was not used as an agent runner.\n"
+            "No neighboring repositories or external local projects were analyzed, modified,\n"
+            "or used.\n"
+            "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.\n\n",
+            "External Paperclip/PiperClip was not used as an agent runner.\n"
+            "No neighboring repositories or external local projects were analyzed, modified,\n"
+            "or used.\n"
+            "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.\n\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "missing required report phrase: ## Scope" in errors
+
+
 def test_cycle_report_validator_rejects_missing_project_boundary_evidence(tmp_path):
     validator = load_validator_module()
     report_path = write_report(
@@ -174,6 +211,124 @@ def test_cycle_report_validator_rejects_missing_project_boundary_evidence(tmp_pa
     assert (
         "missing required report phrase: No neighboring repositories or external "
         "local projects were analyzed, modified, or used."
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_project_boundary_evidence_outside_scope(
+    tmp_path,
+):
+    validator = load_validator_module()
+    moved_boundary_report = VALID_REPORT.replace(
+        "No neighboring repositories or external local projects were analyzed, modified,\n"
+        "or used.\n",
+        "",
+    ).replace(
+        "A safe local report validator was checked.",
+        "No neighboring repositories or external local projects were analyzed, modified,\n"
+        "or used.\n"
+        "A safe local report validator was checked.",
+    )
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        moved_boundary_report,
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "missing required Scope evidence: No neighboring repositories or "
+        "external local projects were analyzed, modified, or used."
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_external_project_path_contradiction(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "A safe local report validator was checked.",
+            "I analyzed /Users/dmitrijvolkov/paperclip to compare dispatcher state.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert any(
+        "report body contradicts repo-local project boundary evidence" in error
+        and "/users/dmitrijvolkov/paperclip" in error
+        for error in errors
+    )
+
+
+def test_cycle_report_validator_rejects_external_project_read_contradiction(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "A safe local report validator was checked.",
+            "I read /Users/dmitrijvolkov/paperclip logs before choosing this task.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert any(
+        "report body contradicts repo-local project boundary evidence" in error
+        and "/users/dmitrijvolkov/paperclip" in error
+        for error in errors
+    )
+
+
+def test_cycle_report_validator_rejects_external_paperclip_runner_contradiction(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "A safe local report validator was checked.",
+            "External Paperclip/PiperClip was used as an agent runner for this cycle.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert any(
+        "report body contradicts repo-local project boundary evidence" in error
+        and "external paperclip/piperclip" in error
+        for error in errors
+    )
+
+
+def test_cycle_report_validator_rejects_live_safety_evidence_outside_scope(
+    tmp_path,
+):
+    validator = load_validator_module()
+    moved_safety_report = VALID_REPORT.replace(
+        "Live safety status: no live OSC/WING writes were executed.\n",
+        "",
+    ).replace(
+        "Branch: `codex/project-structure-integration-20260518`.",
+        "Branch: `codex/project-structure-integration-20260518`.\n"
+        "Live safety status: no live OSC/WING writes were executed.",
+    )
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        moved_safety_report,
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "missing required Scope evidence: Live safety status:" in errors
+    assert (
+        "missing required Scope evidence: no live OSC/WING writes were executed"
         in errors
     )
 
@@ -232,6 +387,254 @@ def test_cycle_report_validator_rejects_missing_forbidden_command_audit(tmp_path
     assert "missing forbidden command audit evidence: set_eq" in errors
 
 
+def test_cycle_report_validator_rejects_unnegated_forbidden_command_audit(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "No `set_fader`, `set_gain`, `set_eq`, `set_compressor`, `route_output`,\n"
+            "`load_snap`, `save_snap`, `reset`, or `mute` command was run.\n",
+            "`set_fader`, `set_gain`, `set_eq`, `set_compressor`, `route_output`,\n"
+            "`load_snap`, `save_snap`, `reset`, and `mute` were inspected as tokens.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert any(
+        error.startswith(
+            "forbidden command audit must explicitly say command was not run: "
+        )
+        for error in errors
+    )
+    assert any("set_fader" in error for error in errors)
+
+
+def test_cycle_report_validator_accepts_post_action_command_negation(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "No `set_fader`, `set_gain`, `set_eq`, `set_compressor`, `route_output`,\n"
+            "`load_snap`, `save_snap`, `reset`, or `mute` command was run.\n",
+            "`set_fader`, `set_gain`, `set_eq`, `set_compressor`, `route_output`,\n"
+            "`load_snap`, `save_snap`, `reset`, and `mute` commands were not run.\n",
+        ),
+    )
+
+    assert validator.validate_report(report_path, project_root=tmp_path) == []
+
+
+def test_cycle_report_validator_accepts_pre_action_command_negation(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "No `set_fader`, `set_gain`, `set_eq`, `set_compressor`, `route_output`,\n"
+            "`load_snap`, `save_snap`, `reset`, or `mute` command was run.\n",
+            "This cycle did not run `set_fader`, `set_gain`, `set_eq`,\n"
+            "`set_compressor`, `route_output`, `load_snap`, `save_snap`, `reset`,\n"
+            "or `mute` commands.\n",
+        ),
+    )
+
+    assert validator.validate_report(report_path, project_root=tmp_path) == []
+
+
+def test_cycle_report_validator_rejects_unrelated_negation_before_command_audit(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "No `set_fader`, `set_gain`, `set_eq`, `set_compressor`, `route_output`,\n"
+            "`load_snap`, `save_snap`, `reset`, or `mute` command was run.\n",
+            "This was not a dry run: `set_fader`, `set_gain`, `set_eq`,\n"
+            "`set_compressor`, `route_output`, `load_snap`, `save_snap`, `reset`,\n"
+            "and `mute` commands were run.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert any(
+        error.startswith(
+            "forbidden command audit must explicitly say command was not run: "
+        )
+        for error in errors
+    )
+    assert any("set_gain" in error for error in errors)
+
+
+def test_cycle_report_validator_rejects_contrasting_command_audit_clause(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "No `set_fader`, `set_gain`, `set_eq`, `set_compressor`, `route_output`,\n"
+            "`load_snap`, `save_snap`, `reset`, or `mute` command was run.\n",
+            "No real console was contacted, but `set_fader`, `set_gain`, `set_eq`,\n"
+            "`set_compressor`, `route_output`, `load_snap`, `save_snap`, `reset`,\n"
+            "and `mute` commands were run.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert any(
+        error.startswith(
+            "forbidden command audit must explicitly say command was not run: "
+        )
+        for error in errors
+    )
+    assert any("set_fader" in error for error in errors)
+
+
+def test_cycle_report_validator_rejects_later_affirmed_forbidden_command(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "`load_snap`, `save_snap`, `reset`, or `mute` command was run.\n",
+            "`load_snap`, `save_snap`, `reset`, or `mute` command was run.\n"
+            "A `set_fader` command was run during the cycle.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "forbidden command audit contradicts no-run safety evidence: set_fader"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_later_affirmed_live_write(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "Live safety status: no live OSC/WING writes were executed.\n",
+            "Live safety status: no live OSC/WING writes were executed.\n"
+            "Live OSC/WING writes were executed during the cycle.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "live write audit contradicts no-write safety evidence: "
+        "live osc/wing writes"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_later_sent_live_write(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "Live safety status: no live OSC/WING writes were executed.\n",
+            "Live safety status: no live OSC/WING writes were executed.\n"
+            "Live OSC/WING writes were sent during the cycle.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "live write audit contradicts no-write safety evidence: "
+        "live osc/wing writes"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_later_applied_live_write(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "Live safety status: no live OSC/WING writes were executed.\n",
+            "Live safety status: no live OSC/WING writes were executed.\n"
+            "Live OSC/WING writes were applied during the cycle.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "live write audit contradicts no-write safety evidence: "
+        "live osc/wing writes"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_body_affirmed_forbidden_command(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "A safe local report validator was checked.",
+            "A safe local report validator was checked.\n"
+            "A `set_gain` command was run during report validation.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "report body contradicts no-run safety evidence: set_gain" in errors
+
+
+def test_cycle_report_validator_rejects_body_applied_forbidden_command(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "A safe local report validator was checked.",
+            "A safe local report validator was checked.\n"
+            "A `set_gain` command was applied during report validation.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "report body contradicts no-run safety evidence: set_gain" in errors
+
+
+def test_cycle_report_validator_rejects_body_affirmed_live_write(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "A safe local report validator was checked.",
+            "A safe local report validator was checked.\n"
+            "Live OSC/WING writes were executed during report validation.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "report body contradicts no-write safety evidence: live osc/wing writes"
+        in errors
+    )
+
+
 def test_cycle_report_validator_rejects_missing_non_destructive_action_audit(tmp_path):
     validator = load_validator_module()
     report_path = write_report(
@@ -248,6 +651,156 @@ def test_cycle_report_validator_rejects_missing_non_destructive_action_audit(tmp
 
     assert any("missing non-destructive action audit evidence" in error for error in errors)
     assert any("destructive cleanup" in error for error in errors)
+
+
+def test_cycle_report_validator_rejects_unnegated_non_destructive_action_audit(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "No commit, push, reset, destructive cleanup, secret access, or user-file deletion\n"
+            "was performed.\n",
+            "No commit, reset, destructive cleanup, secret access, or user-file deletion\n"
+            "was performed.\n"
+            "A push was performed for release bookkeeping.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert any(
+        error.startswith(
+            "non-destructive action audit must explicitly say action was not performed: "
+        )
+        for error in errors
+    )
+    assert any("push" in error for error in errors)
+
+
+def test_cycle_report_validator_accepts_post_action_non_destructive_negation(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "No commit, push, reset, destructive cleanup, secret access, or user-file deletion\n"
+            "was performed.\n",
+            "Commit, push, reset, destructive cleanup, secret access, and user-file deletion\n"
+            "were not performed.\n",
+        ),
+    )
+
+    assert validator.validate_report(report_path, project_root=tmp_path) == []
+
+
+def test_cycle_report_validator_accepts_pre_action_non_destructive_negation(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "No commit, push, reset, destructive cleanup, secret access, or user-file deletion\n"
+            "was performed.\n",
+            "This cycle did not perform commit, push, reset, destructive cleanup,\n"
+            "secret access, or user-file deletion.\n",
+        ),
+    )
+
+    assert validator.validate_report(report_path, project_root=tmp_path) == []
+
+
+def test_cycle_report_validator_rejects_unrelated_negation_before_non_destructive_audit(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "No commit, push, reset, destructive cleanup, secret access, or user-file deletion\n"
+            "was performed.\n",
+            "This was not a release: commit, push, reset, destructive cleanup,\n"
+            "secret access, and user-file deletion were performed.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert any(
+        error.startswith(
+            "non-destructive action audit must explicitly say action was not performed: "
+        )
+        for error in errors
+    )
+    assert any("push" in error for error in errors)
+
+
+def test_cycle_report_validator_rejects_contrasting_non_destructive_audit_clause(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "No commit, push, reset, destructive cleanup, secret access, or user-file deletion\n"
+            "was performed.\n",
+            "Secret access was not performed, but commit, push, reset,\n"
+            "destructive cleanup, and user-file deletion were performed.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert any(
+        error.startswith(
+            "non-destructive action audit must explicitly say action was not performed: "
+        )
+        for error in errors
+    )
+    assert any("commit" in error for error in errors)
+
+
+def test_cycle_report_validator_rejects_later_affirmed_non_destructive_action(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "was performed.\n",
+            "was performed.\n"
+            "A commit was performed for release bookkeeping.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "non-destructive action audit contradicts no-action evidence: commit"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_body_affirmed_non_destructive_action(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "A safe local report validator was checked.",
+            "A safe local report validator was checked.\n"
+            "A commit was performed for report bookkeeping.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "report body contradicts no-action evidence: commit" in errors
 
 
 def test_cycle_report_validator_rejects_unanswered_mandatory_questions(tmp_path):
@@ -328,6 +881,46 @@ def test_cycle_report_validator_rejects_title_timestamp_mismatch(tmp_path):
     )
 
 
+def test_cycle_report_validator_rejects_invalid_calendar_timestamp(tmp_path):
+    validator = load_validator_module()
+    invalid_timestamp = "20260230T250000Z"
+    report_path = write_report(
+        tmp_path,
+        f"automixer_codex_cycle_{invalid_timestamp}.md",
+        VALID_REPORT.replace("20260530T000000Z", invalid_timestamp),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "report filename timestamp must be a valid UTC timestamp: "
+        f"{invalid_timestamp}"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_future_timestamp_when_now_is_provided(tmp_path):
+    validator = load_validator_module()
+    future_timestamp = "20260531T000000Z"
+    report_path = write_report(
+        tmp_path,
+        f"automixer_codex_cycle_{future_timestamp}.md",
+        VALID_REPORT.replace("20260530T000000Z", future_timestamp),
+    )
+
+    errors = validator.validate_report(
+        report_path,
+        project_root=tmp_path,
+        now=datetime(2026, 5, 30, 23, 59, 59, tzinfo=timezone.utc),
+    )
+
+    assert (
+        "report filename timestamp must not be in the future: "
+        f"{future_timestamp}"
+        in errors
+    )
+
+
 def test_cycle_report_validator_rejects_missing_short_plan(tmp_path):
     validator = load_validator_module()
     report_path = write_report(
@@ -365,6 +958,246 @@ def test_cycle_report_validator_rejects_empty_required_evidence_section(tmp_path
     assert "required report section has no content: ## What Remains" in errors
 
 
+def test_cycle_report_validator_rejects_empty_changed_files_section(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "## Changed Files\n\n"
+            "- [tools/codex_autoloop/validate_cycle_report.py]"
+            "(../../tools/codex_autoloop/validate_cycle_report.py)\n"
+            "- [automixer_codex_cycle_20260530T000000Z.md]"
+            "(automixer_codex_cycle_20260530T000000Z.md)\n\n",
+            "## Changed Files\n\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "required report section has no content: ## Changed Files" in errors
+
+
+def test_cycle_report_validator_rejects_empty_plain_language_subsection(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "### Зачем это нужно проекту\n\n"
+            "Чтобы безопасные циклы оставляли одинаковые доказательства.\n\n",
+            "### Зачем это нужно проекту\n\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "plain-language subsection has no content: ### Зачем это нужно проекту"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_incomplete_project_state_explanation(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "Уже работает безопасная форма отчета. Частично работает только локальная\n"
+            "проверка отчета. Еще не реализовано live hardware proof. Главные риски остаются\n"
+            "в разрыве между offline evidence и реальным пультом.",
+            "Проект остается supervised-first.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "plain-language state subsection must mention what already works" in errors
+    assert "plain-language state subsection must mention what works partially" in errors
+    assert "plain-language state subsection must mention what is not implemented" in errors
+    assert "plain-language state subsection must mention risks" in errors
+
+
+def test_cycle_report_validator_rejects_missing_discovery_evidence(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "TODO/FIXME scan, excluding vendored/generated/reference noise, found only\n"
+            "bounded owned-code items.\n",
+            "",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "What Was Found is missing discovery evidence: TODO/FIXME scan" in errors
+
+
+def test_cycle_report_validator_rejects_report_discovery_without_recent_evidence(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "Latest repo-local `.paperclip/reports/` and `Docs/reports/` entries were\n"
+            "inspected.\n",
+            "Repo-local `.paperclip/reports/` and `Docs/reports/` entries were\n"
+            "inspected.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "What Was Found must mention latest/recent discovery evidence: "
+        "repo-local paperclip reports"
+        in errors
+    )
+    assert "What Was Found must mention latest/recent discovery evidence: Docs reports" in errors
+
+
+def test_cycle_report_validator_rejects_test_artifacts_without_recent_evidence(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "Latest test artifacts under `artifacts/` and `sessions/` were inspected.",
+            "Test artifacts under `artifacts/` and `sessions/` were inspected.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "What Was Found must mention latest/recent discovery evidence: test artifacts"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_missing_modified_file_evidence(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "`git status --short` showed a dirty worktree with modified files and untracked\n"
+            "files preserved.\n",
+            "`git status --short` showed a dirty worktree with untracked\n"
+            "files preserved.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "What Was Found is missing discovery evidence: modified files" in errors
+
+
+def test_cycle_report_validator_rejects_missing_new_file_evidence(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "`git status --short` showed a dirty worktree with modified files and untracked\n"
+            "files preserved.\n",
+            "`git status --short` showed a dirty worktree with modified\n"
+            "files preserved.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "What Was Found is missing discovery evidence: new/untracked files" in errors
+
+
+def test_cycle_report_validator_rejects_todo_scan_without_boundary_evidence(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "TODO/FIXME scan, excluding vendored/generated/reference noise, found only\n"
+            "bounded owned-code items.\n",
+            "TODO/FIXME scan found local items.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "What Was Found TODO/FIXME scan must mention owned-code focus" in errors
+    assert (
+        "What Was Found TODO/FIXME scan must mention excluded "
+        "vendored/generated/reference noise"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_tests_without_outcome_evidence(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        (
+            VALID_REPORT
+            .replace("  - Passed: fixture validator tests.\n", "")
+            .replace(
+                "  - Passed: required memory files and safety wording are present.\n",
+                "",
+            )
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "Tests And Checks must include outcome evidence: passed, failed, "
+        "skipped, blocked, or not run"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_missing_memory_lint_result(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "- `python3 tools/memory/memory_lint.py`\n"
+            "  - Passed: required memory files and safety wording are present.\n",
+            "",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "Tests And Checks must include memory lint result" in errors
+
+
+def test_cycle_report_validator_rejects_memory_lint_without_outcome(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "- `python3 tools/memory/memory_lint.py`\n"
+            "  - Passed: required memory files and safety wording are present.\n",
+            "- `python3 tools/memory/memory_lint.py`\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "Tests And Checks memory lint result must include outcome evidence: "
+        "passed, failed, skipped, blocked, or not run"
+        in errors
+    )
+
+
 def test_cycle_report_validator_accepts_plan_selected_heading(tmp_path):
     validator = load_validator_module()
     report_path = write_report(
@@ -374,6 +1207,23 @@ def test_cycle_report_validator_accepts_plan_selected_heading(tmp_path):
     )
 
     assert validator.validate_report(report_path, project_root=tmp_path) == []
+
+
+def test_cycle_report_validator_rejects_plan_without_list_items(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "1. Keep the change inside repo-local report tooling.\n"
+            "2. Run focused validator tests.",
+            "Keep the change inside repo-local report tooling and run focused tests.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "## Short Plan must contain between 1 and 3 list items" in errors
 
 
 def test_cycle_report_validator_accepts_three_short_plan_items(tmp_path):
@@ -575,6 +1425,64 @@ def test_cycle_report_validator_rejects_missing_readiness_score(tmp_path):
     errors = validator.validate_report(report_path, project_root=tmp_path)
 
     assert "missing readiness score: Тестирование: N%" in errors
+
+
+def test_cycle_report_validator_rejects_readiness_scores_outside_readiness_section(
+    tmp_path,
+):
+    validator = load_validator_module()
+    misplaced_scores = """## What Was Found
+
+Branch: `codex/project-structure-integration-20260518`.
+`git status --short` showed a dirty worktree with modified files and untracked
+files preserved.
+Latest repo-local `.paperclip/reports/` and `Docs/reports/` entries were
+inspected.
+Latest test artifacts under `artifacts/` and `sessions/` were inspected.
+TODO/FIXME scan, excluding vendored/generated/reference noise, found only
+bounded owned-code items.
+Local project tasks in `.ai/project-layer/current_tasks.md` were inspected.
+Earlier readiness notes:
+- Исследование: 88%
+- Архитектура: 84%
+- Реализация: 78%
+- Тестирование: 91%
+- Готовность к реальному концерту: 24%"""
+    body = (
+        VALID_REPORT
+        .replace(
+            """## What Was Found
+
+Branch: `codex/project-structure-integration-20260518`.
+`git status --short` showed a dirty worktree with modified files and untracked
+files preserved.
+Latest repo-local `.paperclip/reports/` and `Docs/reports/` entries were
+inspected.
+Latest test artifacts under `artifacts/` and `sessions/` were inspected.
+TODO/FIXME scan, excluding vendored/generated/reference noise, found only
+bounded owned-code items.
+Local project tasks in `.ai/project-layer/current_tasks.md` were inspected.""",
+            misplaced_scores,
+        )
+        .replace(
+            "- Исследование: 88%\n"
+            "- Архитектура: 84%\n"
+            "- Реализация: 78%\n"
+            "- Тестирование: 91%\n"
+            "- Готовность к реальному концерту: 24%\n",
+            "",
+        )
+    )
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        body,
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "missing readiness score: Исследование: N%" in errors
+    assert "missing readiness score: Готовность к реальному концерту: N%" in errors
 
 
 def test_cycle_report_validator_rejects_out_of_range_readiness_score(tmp_path):

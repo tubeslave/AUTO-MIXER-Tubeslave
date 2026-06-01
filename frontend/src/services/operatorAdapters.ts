@@ -90,6 +90,17 @@ function num(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function boolish(value: unknown): boolean | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on', 'muted'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off', 'unmuted'].includes(normalized)) return false;
+  return undefined;
+}
+
 function metricNum(value: unknown, fallback: number): number {
   if (value === null || value === undefined || value === '') return fallback;
   return num(value, fallback);
@@ -320,7 +331,13 @@ export function adaptChannels(payload: unknown, fallback: Channel[]): Channel[] 
     const recognition = asRecord(row.ai_recognition);
     const id = Math.trunc(num(row.id ?? row.number, base?.id ?? index + 1));
     const status = str(row.status, 'unknown').toLowerCase();
+    const controlMute = boolish(control.mute ?? control.muted ?? row.mute ?? row.muted);
     const confidence = num(recognition.confidence, base?.confidence ?? 72);
+    const channelStatus: Channel['status'] = controlMute === true || status === 'muted'
+      ? 'MUTED'
+      : status === 'active'
+        ? 'ACTIVE'
+        : 'INACTIVE';
     return {
       id,
       name: str(row.name, base?.name ?? `Ch ${id}`),
@@ -329,7 +346,7 @@ export function adaptChannels(payload: unknown, fallback: Channel[]): Channel[] 
       level: num(row.level_db ?? meter.rms_db, base?.level ?? -60),
       lufs: num(row.lufs ?? meter.lufs, base?.lufs ?? -60),
       dynamic: num(row.dynamic_range_db ?? meter.dynamic_range_db, base?.dynamic ?? 0),
-      status: status === 'active' ? 'ACTIVE' : status === 'muted' ? 'MUTED' : 'INACTIVE',
+      status: channelStatus,
       recognition: `${str(recognition.label, str(row.role, base?.type ?? 'Channel'))}${confidence ? ` (${Math.round(confidence)}%)` : ''}`,
       group: str(row.group, base?.group ?? 'CHANNELS').toUpperCase(),
       fader: num(control.fader_db, base?.fader ?? -50),
@@ -402,8 +419,10 @@ export function adaptBusesFromChannels(channels: Channel[], fallback: BusRecord[
 }
 
 export function adaptBusesSnapshot(payload: unknown, fallback: BusRecord[]): BusRecord[] {
-  const rows = asArray(asRecord(payload).buses);
-  if (!rows.length) return fallback;
+  const data = asRecord(payload);
+  const hasBusesField = Array.isArray(data.buses);
+  const rows = asArray(data.buses);
+  if (!rows.length) return hasBusesField ? [] : fallback;
 
   return rows.map((row, index) => {
     const base = fallback[index] ?? fallback[fallback.length - 1];
@@ -813,8 +832,9 @@ export function adaptPerformanceRecords(
   fallback: PerformanceRecord[]
 ): PerformanceRecord[] {
   const roster = asRecord(agentRoster);
+  const hasAgentsField = Array.isArray(roster.agents);
   const rows = asArray(roster.agents);
-  if (!rows.length) return fallback;
+  if (!rows.length) return hasAgentsField ? [] : fallback;
 
   const summary = asRecord(asRecord(decisionQueue).summary);
   const pendingCount = Math.trunc(metricNum(summary.pending_count, 0));
@@ -891,8 +911,10 @@ export function adaptRuntimeCommunications(
 }
 
 export function adaptCommunicationsSnapshot(payload: unknown, fallback: Communication[]): Communication[] {
-  const rows = asArray(asRecord(payload).communications);
-  if (!rows.length) return fallback;
+  const data = asRecord(payload);
+  const hasCommunicationsField = Array.isArray(data.communications);
+  const rows = asArray(data.communications);
+  if (!rows.length) return hasCommunicationsField ? [] : fallback;
 
   return rows.map((row, index) => {
     const base = fallback[index] ?? fallback[fallback.length - 1];
@@ -952,8 +974,10 @@ export function adaptRuntimeMemories(
 }
 
 export function adaptMemorySnapshot(payload: unknown, fallback: MemoryRecord[]): MemoryRecord[] {
-  const rows = asArray(asRecord(payload).memories);
-  if (!rows.length) return fallback;
+  const data = asRecord(payload);
+  const hasMemoriesField = Array.isArray(data.memories);
+  const rows = asArray(data.memories);
+  if (!rows.length) return hasMemoriesField ? [] : fallback;
 
   return rows.map((row, index) => {
     const base = fallback[index] ?? fallback[fallback.length - 1];
@@ -971,8 +995,10 @@ export function adaptTrainingSnapshot(
   payload: unknown,
   fallback: TrainingSessionSnapshotRow[]
 ): TrainingSessionSnapshotRow[] {
-  const rows = asArray(asRecord(payload).sessions);
-  if (!rows.length) return fallback;
+  const data = asRecord(payload);
+  const hasSessionsField = Array.isArray(data.sessions);
+  const rows = asArray(data.sessions);
+  if (!rows.length) return hasSessionsField ? [] : fallback;
 
   return rows.map((row, index) => {
     const base = fallback[index] ?? fallback[fallback.length - 1];
@@ -990,8 +1016,10 @@ export function adaptRulesSnapshot(
   payload: unknown,
   fallback: RuleLibrarySnapshotRow[]
 ): RuleLibrarySnapshotRow[] {
-  const rows = asArray(asRecord(payload).rules);
-  if (!rows.length) return fallback;
+  const data = asRecord(payload);
+  const hasRulesField = Array.isArray(data.rules);
+  const rows = asArray(data.rules);
+  if (!rows.length) return hasRulesField ? [] : fallback;
 
   return rows.map((row, index) => {
     const base = fallback[index] ?? fallback[fallback.length - 1];
@@ -1008,8 +1036,9 @@ export function adaptDevices(payload: unknown, fallback: DeviceRecord[]): Device
   const data = asRecord(payload);
   const connectedDevices = asArray(data.connected_devices);
   const nodes = asArray(data.nodes);
+  const hasDeviceField = Array.isArray(data.connected_devices) || Array.isArray(data.nodes);
   const rows = connectedDevices.length ? connectedDevices : nodes;
-  if (!rows.length) return fallback;
+  if (!rows.length) return hasDeviceField ? [] : fallback;
 
   return rows.map((row, index) => {
     const base = fallback[index] ?? fallback[fallback.length - 1];

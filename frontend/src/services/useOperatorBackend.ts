@@ -120,6 +120,7 @@ export interface OperatorViewData {
   readModelSources: {
     groups: string;
     memory: string;
+    performance: string;
     training: string;
     rules: string;
     communications: string;
@@ -698,8 +699,9 @@ export function useOperatorBackend() {
       readModelSources: {
         groups: payloadSource(payloads.groups, payloads.channels ? 'runtime_channel_inventory' : 'mock'),
         memory: payloadSource(payloads.memory, payloads.dashboard ? 'runtime_derived' : 'mock'),
-        training: payloadSource(payloads.training, 'runtime_derived'),
-        rules: payloadSource(payloads.rules, 'runtime_derived'),
+        performance: payloadSource(payloads.agents, payloads.agents ? 'runtime_derived' : 'mock'),
+        training: payloadSource(payloads.training, hasRuntimePayloads ? 'runtime_derived' : 'mock'),
+        rules: payloadSource(payloads.rules, hasRuntimePayloads ? 'runtime_derived' : 'mock'),
         communications: payloadSource(payloads.communications, payloads.dashboard ? 'runtime_derived' : 'mock')
       }
     };

@@ -1,32 +1,30 @@
 import { ActionCluster, DataTable, LevelMeter, MetricCard, Panel, Sparkline, StatusBadge } from '../components/prototype/AutomixerComponents';
-import { memories, memoryTypes } from '../mock/automixerData';
+import { memories } from '../mock/automixerData';
 import type { OperatorViewData } from '../services/useOperatorBackend';
 import type { Metric, UiActions, UiState } from '../types';
 import { toneFromState } from '../utils/prototypeTone';
 import {
   openActionFocus,
+  readOnlyEmptyState,
+  rowsForReadModelSource,
   runtimeMemoryTypes,
   runtimeRules,
   runtimeTrainingSessions,
+  sourceDisplay,
   tableView,
   TechnicalChecklist
 } from './viewHelpers';
 
-function sourceDisplay(source: string) {
-  if (source === 'mock') return 'Mock';
-  if (source.includes('_snapshot')) return 'Backend DTO';
-  return 'Runtime-derived';
-}
-
 export function Memory(ui: UiState, actions: UiActions, data: OperatorViewData) {
-  const memoryRows = data.memories.length ? data.memories : memories;
-  const typeRows = runtimeMemoryTypes(memoryRows).length ? runtimeMemoryTypes(memoryRows) : memoryTypes;
+  const memorySourceRaw = data.readModelSources.memory;
+  const memoryRows = rowsForReadModelSource(data.memories, memories, memorySourceRaw);
+  const typeRows = runtimeMemoryTypes(memoryRows);
   const avgConfidence = Math.round(memoryRows.reduce((sum, row) => sum + row.confidence, 0) / Math.max(memoryRows.length, 1));
   const ruleLikeCount = memoryRows.filter(row => /rule|decision|safety/i.test(row.type)).length;
-  const selectedMemory = memoryRows.find(row => row.name === ui.selectedMemoryName) ?? memoryRows[0] ?? memories[0];
-  const memorySource = sourceDisplay(data.readModelSources.memory);
+  const selectedMemory = memoryRows.find(row => row.name === ui.selectedMemoryName) ?? memoryRows[0];
+  const memorySource = sourceDisplay(memorySourceRaw);
   const memoryMetrics: Metric[] = [
-    { label: 'Memory Rows', value: String(memoryRows.length), sub: 'runtime-derived', tone: 'blue' },
+    { label: 'Memory Rows', value: String(memoryRows.length), sub: memorySource, tone: memorySource === 'Backend DTO' ? 'green' : 'blue' },
     { label: 'Types', value: String(typeRows.length), sub: 'knowledge groups', tone: 'green' },
     { label: 'Rules / Decisions', value: String(ruleLikeCount), sub: 'review records', tone: 'purple' },
     { label: 'Confidence', value: `${avgConfidence}%`, sub: 'retrieval quality', tone: avgConfidence > 88 ? 'green' : 'yellow' }
@@ -35,9 +33,9 @@ export function Memory(ui: UiState, actions: UiActions, data: OperatorViewData) 
     <div className="grid h-full grid-rows-[86px_1fr_154px] gap-2">
       <div className="grid grid-cols-4 gap-2">{memoryMetrics.map(metric => <MetricCard metric={metric} key={metric.label} />)}</div>
       <div className="grid grid-cols-[1fr_1.2fr_1fr] gap-2">
-        <Panel title="Memory Types">{typeRows.map(type => <div className="mb-3 grid grid-cols-[1fr_74px_56px] items-center gap-2 text-[11px]" key={type.name}><span className="truncate">{type.name}</span><LevelMeter value={type.level} /><b className="text-right text-online">{type.freshness}</b></div>)}</Panel>
-        <Panel title="Memory Timeline"><div className="flex h-full items-end gap-3">{memoryRows.slice(0, 7).map((memory, i) => <div className="flex h-full flex-1 flex-col justify-end gap-1" key={`${memory.name}-${i}`}><i className="block w-full rounded-t bg-ai" style={{ height: `${Math.max(12, memory.confidence * 0.55)}%` }} /><i className="block w-full rounded-t bg-audio" style={{ height: `${Math.max(8, memory.confidence * 0.35)}%` }} /><i className="block w-full rounded-t bg-online" style={{ height: `${Math.max(6, memory.confidence * 0.25)}%` }} /></div>)}</div></Panel>
-        <Panel title="Knowledge Health"><TechnicalChecklist rows={[{ label: 'Runtime source', value: memorySource, tone: memorySource === 'Backend DTO' ? 'green' : 'blue' }, { label: 'DTO source', value: data.readModelSources.memory, tone: memorySource === 'Backend DTO' ? 'green' : 'blue' }, { label: 'Write learning', value: 'Disabled', tone: 'red' }, { label: 'Rule conflicts', value: ruleLikeCount ? 'Review' : 'Clear', tone: ruleLikeCount ? 'yellow' : 'green' }]} /></Panel>
+        <Panel title="Memory Types">{typeRows.length ? typeRows.map(type => <div className="mb-3 grid grid-cols-[1fr_74px_56px] items-center gap-2 text-[11px]" key={type.name}><span className="truncate">{type.name}</span><LevelMeter value={type.level} /><b className="text-right text-online">{type.freshness}</b></div>) : readOnlyEmptyState('No memory types available', memorySourceRaw)}</Panel>
+        <Panel title="Memory Timeline">{memoryRows.length ? <div className="flex h-full items-end gap-3">{memoryRows.slice(0, 7).map((memory, i) => <div className="flex h-full flex-1 flex-col justify-end gap-1" key={`${memory.name}-${i}`}><i className="block w-full rounded-t bg-ai" style={{ height: `${Math.max(12, memory.confidence * 0.55)}%` }} /><i className="block w-full rounded-t bg-audio" style={{ height: `${Math.max(8, memory.confidence * 0.35)}%` }} /><i className="block w-full rounded-t bg-online" style={{ height: `${Math.max(6, memory.confidence * 0.25)}%` }} /></div>)}</div> : readOnlyEmptyState('No memory timeline rows', memorySourceRaw)}</Panel>
+        <Panel title="Knowledge Health"><TechnicalChecklist rows={[{ label: 'Runtime source', value: memorySource, tone: memorySource === 'Backend DTO' ? 'green' : 'blue' }, { label: 'DTO source', value: memorySourceRaw, tone: memorySource === 'Backend DTO' ? 'green' : 'blue' }, { label: 'Write learning', value: 'Disabled', tone: 'red' }, { label: 'Rule conflicts', value: ruleLikeCount ? 'Review' : 'Clear', tone: ruleLikeCount ? 'yellow' : 'green' }]} /></Panel>
       </div>
       <DataTable
         rows={memoryRows}
@@ -53,6 +51,7 @@ export function Memory(ui: UiState, actions: UiActions, data: OperatorViewData) 
         ]}
         getSearchText={memory => `${memory.name} ${memory.type} ${memory.confidence}`}
         rowKey={memory => memory.name}
+        emptyState={readOnlyEmptyState('No memory rows received', memorySourceRaw)}
         columns={[
           { key: 'name', label: 'Recent Memories', width: '1.6fr' },
           { key: 'type', label: 'Type', width: '1fr' },
@@ -69,18 +68,19 @@ export function Memory(ui: UiState, actions: UiActions, data: OperatorViewData) 
   ), (
     <div className="flex h-full flex-col gap-2">
       <Panel title="Memory Inspector">
-        <h3 className="text-[15px] font-bold text-text">{selectedMemory.name}</h3>
-        <p className="mt-2 text-[11px] leading-5 text-muted">{selectedMemory.type} · {selectedMemory.confidence}% confidence. This prototype does not save new learning data to backend storage.</p>
+        <h3 className="text-[15px] font-bold text-text">{selectedMemory?.name ?? 'No memory selected'}</h3>
+        <p className="mt-2 text-[11px] leading-5 text-muted">{selectedMemory ? `${selectedMemory.type} · ${selectedMemory.confidence}% confidence. This prototype does not save new learning data to backend storage.` : 'Backend/read-only source returned no memory rows. Learning writes remain disabled.'}</p>
       </Panel>
-      <Panel title="Top Memories" className="flex-1">{memoryRows.slice(0, 6).map(memory => <div className="mb-3 grid grid-cols-[1fr_44px] gap-2 text-[11px]" key={memory.name}><span className="truncate text-muted">{memory.name}</span><b className="text-right text-online">{memory.confidence}%</b></div>)}</Panel>
+      <Panel title="Top Memories" className="flex-1">{memoryRows.length ? memoryRows.slice(0, 6).map(memory => <div className="mb-3 grid grid-cols-[1fr_44px] gap-2 text-[11px]" key={memory.name}><span className="truncate text-muted">{memory.name}</span><b className="text-right text-online">{memory.confidence}%</b></div>) : readOnlyEmptyState('No top memories', memorySourceRaw)}</Panel>
       <Panel title="Sync Status"><TechnicalChecklist rows={[{ label: 'Database', value: memorySource, tone: memorySource === 'Backend DTO' ? 'green' : 'blue' }, { label: 'Embeddings', value: 'Display only', tone: 'blue' }, { label: 'Live writes', value: 'Off', tone: 'red' }]} /></Panel>
     </div>
   ));
 }
 
 export function Training(ui: UiState, actions: UiActions, data: OperatorViewData) {
-  const sessionRows = runtimeTrainingSessions(data);
-  const trainingSource = sourceDisplay(data.readModelSources.training);
+  const trainingSourceRaw = data.readModelSources.training;
+  const sessionRows = runtimeTrainingSessions(data, trainingSourceRaw);
+  const trainingSource = sourceDisplay(trainingSourceRaw);
   const selectedSession = sessionRows.find(row => row.name === ui.selectedTrainingName) ?? sessionRows[0];
   const runningCount = sessionRows.filter(row => row.status === 'Running').length;
   const reviewCount = sessionRows.filter(row => row.status === 'Review' || row.status === 'Queued').length;
@@ -113,6 +113,7 @@ export function Training(ui: UiState, actions: UiActions, data: OperatorViewData
         ]}
         getSearchText={row => `${row.name} ${row.status} ${row.score}`}
         rowKey={row => row.name}
+        emptyState={readOnlyEmptyState('No training sessions received', trainingSourceRaw)}
         columns={[
           { key: 'name', label: 'Session' },
           { key: 'status', label: 'Status', render: row => <StatusBadge tone={toneFromState(row.status)}>{row.status}</StatusBadge> },
@@ -122,18 +123,19 @@ export function Training(ui: UiState, actions: UiActions, data: OperatorViewData
         ]}
       />
       <div className="grid grid-cols-3 gap-2">
-        <Panel title="Training Sources"><TechnicalChecklist rows={[{ label: 'DTO source', value: data.readModelSources.training, tone: trainingSource === 'Backend DTO' ? 'green' : 'blue' }, { label: 'Approved snapshots', value: 'Read-only', tone: 'blue' }, { label: 'Live recording', value: 'Off', tone: 'red' }]} /></Panel>
-        <Panel title="Model Drift"><Sparkline tone="yellow" filled values={sessionRows.slice(0, 10).map(row => Number(String(row.score).replace('%', '')) || 50)} /></Panel>
+        <Panel title="Training Sources"><TechnicalChecklist rows={[{ label: 'DTO source', value: trainingSourceRaw, tone: trainingSource === 'Backend DTO' ? 'green' : 'blue' }, { label: 'Approved snapshots', value: 'Read-only', tone: 'blue' }, { label: 'Live recording', value: 'Off', tone: 'red' }]} /></Panel>
+        <Panel title="Model Drift">{sessionRows.length ? <Sparkline tone="yellow" filled values={sessionRows.slice(0, 10).map(row => Number(String(row.score).replace('%', '')) || 50)} /> : readOnlyEmptyState('No training drift rows', trainingSourceRaw)}</Panel>
         <Panel title="Next Import"><p className="text-[11px] leading-5 text-muted">Training import remains operator-approved and local-only. This prototype displays candidate training sets but does not write learning data.</p></Panel>
       </div>
     </div>
-  ), <Panel title="Training Queue" className="h-full"><h3 className="text-[15px] font-bold text-text">{selectedSession?.name ?? 'No training session'}</h3><p className="mt-2 text-[11px] leading-5 text-muted">{selectedSession?.status ?? 'Idle'} · {selectedSession?.examples ?? 0} examples · {selectedSession?.score ?? 'N/A'} score.</p><div className="mt-4 h-20"><Sparkline tone="purple" filled values={sessionRows.slice(0, 10).map(row => Number(row.examples) || 20)} /></div><div className="mt-4"><TechnicalChecklist rows={[{ label: 'Auto learn', value: 'Off', tone: 'red' }, { label: 'Dataset writes', value: 'Disabled', tone: 'red' }, { label: 'Review queue', value: String(reviewCount), tone: reviewCount ? 'yellow' : 'green' }]} /></div></Panel>);
+  ), <Panel title="Training Queue" className="h-full"><h3 className="text-[15px] font-bold text-text">{selectedSession?.name ?? 'No training session'}</h3><p className="mt-2 text-[11px] leading-5 text-muted">{selectedSession?.status ?? 'Idle'} · {selectedSession?.examples ?? 0} examples · {selectedSession?.score ?? 'N/A'} score.</p><div className="mt-4 h-20">{sessionRows.length ? <Sparkline tone="purple" filled values={sessionRows.slice(0, 10).map(row => Number(row.examples) || 20)} /> : readOnlyEmptyState('No training rows selected', trainingSourceRaw)}</div><div className="mt-4"><TechnicalChecklist rows={[{ label: 'Auto learn', value: 'Off', tone: 'red' }, { label: 'Dataset writes', value: 'Disabled', tone: 'red' }, { label: 'Review queue', value: String(reviewCount), tone: reviewCount ? 'yellow' : 'green' }]} /></div></Panel>);
 }
 
 export function RulesLibrary(ui: UiState, actions: UiActions, data: OperatorViewData) {
-  const ruleRows = runtimeRules(data);
+  const rulesSourceRaw = data.readModelSources.rules;
+  const ruleRows = runtimeRules(data, rulesSourceRaw);
   const selectedRule = ruleRows.find(row => row.name === ui.selectedRuleName) ?? ruleRows[0];
-  const rulesSource = sourceDisplay(data.readModelSources.rules);
+  const rulesSource = sourceDisplay(rulesSourceRaw);
   return tableView('16. Rules Library', 'Operational mix rules and safety policy library', (
     <div className="grid h-full grid-rows-[76px_1fr_108px] gap-2">
       <div className="grid grid-cols-5 gap-2">
@@ -159,6 +161,7 @@ export function RulesLibrary(ui: UiState, actions: UiActions, data: OperatorView
         ]}
         getSearchText={row => `${row.name} ${row.category} ${row.state}`}
         rowKey={row => row.name}
+        emptyState={readOnlyEmptyState('No rules received', rulesSourceRaw)}
         columns={[
           { key: 'name', label: 'Rule' },
           { key: 'category', label: 'Category' },
@@ -167,10 +170,10 @@ export function RulesLibrary(ui: UiState, actions: UiActions, data: OperatorView
         ]}
       />
       <div className="grid grid-cols-3 gap-2">
-        <Panel title="Policy Layers"><TechnicalChecklist rows={[{ label: 'DTO source', value: data.readModelSources.rules, tone: rulesSource === 'Backend DTO' ? 'green' : 'blue' }, { label: 'Safety limits', value: 'Locked', tone: 'purple' }, { label: 'Learning rules', value: 'Review', tone: 'yellow' }]} /></Panel>
-        <Panel title="Rule Confidence"><Sparkline tone="green" filled values={ruleRows.slice(0, 10).map(rule => Number(rule.confidence.replace('%', '')) || 80)} /></Panel>
+        <Panel title="Policy Layers"><TechnicalChecklist rows={[{ label: 'DTO source', value: rulesSourceRaw, tone: rulesSource === 'Backend DTO' ? 'green' : 'blue' }, { label: 'Safety limits', value: 'Locked', tone: 'purple' }, { label: 'Learning rules', value: 'Review', tone: 'yellow' }]} /></Panel>
+        <Panel title="Rule Confidence">{ruleRows.length ? <Sparkline tone="green" filled values={ruleRows.slice(0, 10).map(rule => Number(rule.confidence.replace('%', '')) || 80)} /> : readOnlyEmptyState('No rule confidence rows', rulesSourceRaw)}</Panel>
         <Panel title="Conflict Watch"><p className="text-[11px] leading-5 text-muted">Rules that imply a gain increase remain blocked until headroom and rollback proof exist.</p></Panel>
       </div>
     </div>
-  ), <Panel title="Rule Inspector" className="h-full"><h3 className="text-base font-bold">{selectedRule?.name ?? 'No boost without headroom'}</h3><p className="mt-2 text-[11px] leading-5 text-muted">{selectedRule?.category ?? 'Safety'} · {selectedRule?.confidence ?? '100%'} confidence · {selectedRule?.state ?? 'Locked'} state. Locked/read-only policy rule.</p><div className="mt-5"><TechnicalChecklist rows={[{ label: 'Priority', value: 'Safety wins', tone: 'purple' }, { label: 'Write path', value: 'Disabled', tone: 'red' }, { label: 'Rollback', value: 'Required', tone: 'yellow' }]} /></div></Panel>);
+  ), <Panel title="Rule Inspector" className="h-full"><h3 className="text-base font-bold">{selectedRule?.name ?? 'No rule selected'}</h3><p className="mt-2 text-[11px] leading-5 text-muted">{selectedRule ? `${selectedRule.category} · ${selectedRule.confidence} confidence · ${selectedRule.state} state. Locked/read-only policy rule.` : 'Backend/read-only source returned no rule rows. Policy writes remain disabled.'}</p><div className="mt-5"><TechnicalChecklist rows={[{ label: 'Priority', value: 'Safety wins', tone: 'purple' }, { label: 'Write path', value: 'Disabled', tone: 'red' }, { label: 'Rollback', value: 'Required', tone: 'yellow' }]} /></div></Panel>);
 }

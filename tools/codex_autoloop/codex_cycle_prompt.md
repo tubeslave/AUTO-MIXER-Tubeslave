@@ -47,6 +47,13 @@ Automixer.
 - TODO/FIXME;
 - локальные project issues/tasks, если они доступны в `.ai/`, `.paperclip/`, `Docs/`.
 
+Для TODO/FIXME scan фокусируйся на owned коде, тестах, tooling и текущей
+документации Automixer. Исключай vendored/generated/reference шум:
+`external/`, `models/training_state.json`, `backend/ai/knowledge/`,
+`frontend/node_modules/`, `node_modules/`, `artifacts/`, `Docs/archive/`,
+`Docs/manuals/`, `Docs/Behringer_WING_Official/`. Если TODO/FIXME найден только
+в таких путях, отметь это как excluded scan noise, а не как активную задачу.
+
 ## 2. Свериться с целью проекта
 
 Прочитай:
@@ -96,6 +103,7 @@ Automixer.
 - внеси маленький scoped diff;
 - добавь или обнови тесты, если меняешь поведение;
 - запусти релевантные проверки;
+- запусти `python3 tools/memory/memory_lint.py` и зафиксируй результат;
 - не останавливайся на середине;
 - если безопасной кодовой задачи нет, улучши report/docs/tests вокруг текущих safety gaps.
 
@@ -113,6 +121,7 @@ Automixer.
 - краткий план выбранных безопасных задач;
 - что было сделано;
 - какие тесты запущены;
+- результат memory lint;
 - что осталось;
 - какие риски есть;
 - ссылки на измененные файлы;

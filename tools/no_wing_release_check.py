@@ -15,7 +15,7 @@ import os
 import socket
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -24,15 +24,47 @@ from typing import Iterable, Sequence
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "no_wing_release_check"
 DEFAULT_BACKEND_PORT = 8765
+DEFAULT_COMMAND_TIMEOUT_SEC = 900
 
 FORBIDDEN_COMMAND_TOKENS = (
     "wing_operator_proposal_validation_runner.py",
+    "wing_supervised_smoke_runner.py",
     "apply_operator_proposal",
     "set_fader",
+    "set_channel_fader",
+    "set_main_fader",
+    "set_bus_fader",
+    "set_dca_fader",
     "set_gain",
+    "set_channel_gain",
+    "set_eq",
+    "set_eq_band",
+    "set_bus_eq_band",
+    "set_compressor",
+    "set_compressor_gain",
+    "set_bus_compressor",
+    "set_gate",
+    "set_gate_on",
+    "set_hpf",
+    "set_delay",
+    "set_polarity",
     "route_output",
+    "route_multiple_outputs",
     "load_snap",
     "save_snap",
+    "reset",
+    "reset_channel_processing",
+    "reset_phase_delay",
+    "mute",
+    "set_channel_input",
+    "set_channel_alt_input",
+    "set_insert",
+    "set_fx_model",
+    "set_fx_on",
+    "set_fx_mix",
+    "set_fx_parameter",
+    "set_send_level",
+    "set_channel_send",
     "connect_wing",
     "mixer_discovery",
     "WingClient",
@@ -53,6 +85,7 @@ class CommandCheck:
     command: tuple[str, ...]
     cwd: str
     env: dict[str, str] | None = None
+    timeout_sec: float | None = None
 
     def shell_display(self) -> str:
         return " ".join(self.command)
@@ -80,6 +113,7 @@ def build_checks(
     include_frontend: bool = True,
     include_package: bool = False,
     quick: bool = False,
+    command_timeout_sec: float | None = DEFAULT_COMMAND_TIMEOUT_SEC,
 ) -> list[CommandCheck]:
     offline_artifact_root = (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "offline_validation"
     checks = [
@@ -150,6 +184,8 @@ def build_checks(
             cwd=str(repo_root),
         )
     )
+    if command_timeout_sec is not None:
+        checks = [replace(check, timeout_sec=command_timeout_sec) for check in checks]
     return checks
 
 
@@ -188,37 +224,64 @@ def _write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _coerce_timeout_output(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+    return value
+
+
 def run_command_check(check: CommandCheck, log_dir: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     env = os.environ.copy()
     if check.env:
         env.update(check.env)
-    completed = subprocess.run(
-        check.command,
-        cwd=check.cwd,
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    detail: dict[str, object] | None = None
+    try:
+        completed = subprocess.run(
+            check.command,
+            cwd=check.cwd,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=check.timeout_sec,
+        )
+        stdout = completed.stdout
+        stderr = completed.stderr
+        status = "passed" if completed.returncode == 0 else "failed"
+        returncode = completed.returncode
+    except subprocess.TimeoutExpired as exc:
+        stdout = _coerce_timeout_output(exc.stdout)
+        stderr = _coerce_timeout_output(exc.stderr)
+        timeout_note = f"Command timed out after {check.timeout_sec} seconds."
+        stderr = f"{stderr.rstrip()}\n{timeout_note}\n" if stderr else f"{timeout_note}\n"
+        status = "timeout"
+        returncode = None
+        detail = {
+            "timeout_sec": check.timeout_sec,
+            "reason": "command_timeout",
+        }
     finished = datetime.now(timezone.utc)
 
     stdout_log = log_dir / f"{check.name}.stdout.log"
     stderr_log = log_dir / f"{check.name}.stderr.log"
-    _write_text(stdout_log, completed.stdout)
-    _write_text(stderr_log, completed.stderr)
+    _write_text(stdout_log, stdout)
+    _write_text(stderr_log, stderr)
 
     return CheckResult(
         name=check.name,
-        status="passed" if completed.returncode == 0 else "failed",
+        status=status,
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
         duration_sec=round((finished - started).total_seconds(), 3),
         command=check.shell_display(),
         cwd=check.cwd,
-        returncode=completed.returncode,
+        returncode=returncode,
         stdout_log=str(stdout_log),
         stderr_log=str(stderr_log),
+        detail=detail,
     )
 
 
@@ -264,6 +327,7 @@ def run_release_checks(
     quick: bool = False,
     continue_on_failure: bool = False,
     backend_port: int = DEFAULT_BACKEND_PORT,
+    command_timeout_sec: float | None = DEFAULT_COMMAND_TIMEOUT_SEC,
 ) -> dict[str, object]:
     generated_at = utc_now()
     run_dir = artifact_root / f"{compact_stamp()}_no_wing_release_check"
@@ -274,6 +338,7 @@ def run_release_checks(
         include_frontend=include_frontend,
         include_package=include_package,
         quick=quick,
+        command_timeout_sec=command_timeout_sec,
     )
     validate_no_live_commands(checks)
 
@@ -330,6 +395,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_BACKEND_PORT,
         help="Local backend port that should be free before checks start.",
     )
+    parser.add_argument(
+        "--command-timeout-sec",
+        type=float,
+        default=DEFAULT_COMMAND_TIMEOUT_SEC,
+        help="Timeout in seconds for each subprocess check. Use <= 0 to disable.",
+    )
     return parser
 
 
@@ -342,6 +413,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         quick=args.quick,
         continue_on_failure=args.continue_on_failure,
         backend_port=args.backend_port,
+        command_timeout_sec=args.command_timeout_sec if args.command_timeout_sec > 0 else None,
     )
     print(json.dumps(summary, indent=2, ensure_ascii=False, sort_keys=True))
     return 0 if summary.get("status") == "passed" else 1
