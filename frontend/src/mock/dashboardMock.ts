@@ -56,6 +56,28 @@ export interface DirectorEventMock {
   tone: Tone;
 }
 
+export interface DashboardMockSafetyContract {
+  source: 'frontend_dashboard_mock';
+  sourceLabel: 'Display-only';
+  sourceTone: Tone;
+  caption: string;
+  readOnly: true;
+  liveWrite: false;
+  canApplyToConsole: false;
+  runtimeAuthority: false;
+}
+
+export const dashboardMockSafetyContract: DashboardMockSafetyContract = {
+  source: 'frontend_dashboard_mock',
+  sourceLabel: 'Display-only',
+  sourceTone: 'yellow',
+  caption: 'Display-only analyzer trace',
+  readOnly: true,
+  liveWrite: false,
+  canApplyToConsole: false,
+  runtimeAuthority: false
+};
+
 export const dashboardTabs: DashboardTab[] = [
   'Channels',
   'Overview',
@@ -76,7 +98,8 @@ export const analyticsCards: DashboardMetricSpec[] = [
 // TODO(WebSocket telemetry): replace these traces with backend meter frames.
 export const masterBusTrace = [58, 64, 52, 69, 61, 74, 66, 80, 63, 76, 70, 84, 68, 78];
 
-// TODO(analyzer metrics): connect spectrum, phase, dynamics, and LUFS history to analyzer payloads.
+// Runtime dashboard DTO spectrum bins override this visual fallback when present.
+// TODO(analyzer metrics): connect phase, dynamics, and LUFS history to analyzer payloads.
 export const spectrumBins = [28, 42, 36, 58, 76, 64, 48, 82, 70, 55, 43, 61, 78, 66, 51, 34, 47, 72, 86, 62, 40, 30];
 
 export const mixBalanceSegments = [
@@ -87,7 +110,8 @@ export const mixBalanceSegments = [
   { label: 'FX', value: 13, color: '#ff4d4f' }
 ];
 
-// TODO(OSC channel detail): replace fallback waveform, pan, gate, and comp labels with read-only OSC/channel snapshots.
+// Runtime channel snapshots override meter/mute/safety, pan, gate, and comp labels when present.
+// Waveform stays a display-only fallback until analyzer frames have a backend DTO.
 export const channelTelemetryById: Record<number, ChannelDashboardTelemetry> = {
   1: { waveform: [31, 66, 42, 78, 46, 84, 39, 72], meterL: -12.4, meterR: -13.2, gateLabel: 'G -42', compLabel: 'C 3.1', safeState: 'OK', pan: 0, muted: false, solo: false, accent: 'green' },
   2: { waveform: [28, 55, 39, 70, 43, 75, 36, 64], meterL: -14.1, meterR: -14.7, gateLabel: 'G -44', compLabel: 'C 2.8', safeState: 'OK', pan: 0, muted: false, solo: false, accent: 'green' },

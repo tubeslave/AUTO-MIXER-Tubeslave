@@ -9,7 +9,7 @@ import {
 } from '../../mock/dashboardMock';
 import type { AnalysisCardMock, ChannelDashboardTelemetry, DashboardTab } from '../../mock/dashboardMock';
 import type { Channel, DashboardRuntime, Tone, UiActions, UiState } from '../../types';
-import { dashboardTelemetryForChannel } from './dashboardTelemetryModel';
+import { dashboardSpectrumTrace, dashboardTelemetryForChannel } from './dashboardTelemetryModel';
 
 const toneColors: Record<Tone, string> = {
   green: '#00d26a',
@@ -136,6 +136,7 @@ function AnalyticsRow({ runtime }: { runtime: DashboardRuntime }) {
     return `${parts}, ${segment.color} ${previous}% ${next}%`;
   }, 'transparent 0 0');
   const runtimeSource = runtimeSourcePill(runtime);
+  const spectrumTrace = dashboardSpectrumTrace(runtime, spectrumBins);
 
   return (
     <div className="grid h-[145px] grid-cols-[172px_250px_128px_188px_minmax(0,1fr)] gap-1">
@@ -157,11 +158,11 @@ function AnalyticsRow({ runtime }: { runtime: DashboardRuntime }) {
         </div>
       </MetricShell>
 
-      <MetricShell title="Spectrum" caption="Static analyzer trace for visual QA" accent="blue" sourceLabel="Display-only" sourceTone="yellow">
+      <MetricShell title="Spectrum" caption={spectrumTrace.caption} accent="blue" sourceLabel={spectrumTrace.sourceLabel} sourceTone={spectrumTrace.sourceTone}>
         <div className="relative h-[102px] rounded-[3px] border border-line/60 bg-[#07101a] p-2">
           <div className="absolute inset-y-2 left-2 flex flex-col justify-between font-mono text-[7px] text-dim"><span>-12</span><span>-24</span><span>-36</span><span>-48</span><span>-60</span></div>
           <div className="ml-6 h-full">
-            <MiniTrace values={spectrumBins.map((value, index) => Math.max(8, Math.min(88, value + (index % 3) * 4)))} tone="purple" filled />
+            <MiniTrace values={spectrumTrace.values} tone="purple" filled />
           </div>
           <div className="absolute bottom-1 left-8 right-2 flex justify-between font-mono text-[7px] text-dim"><span>20</span><span>50</span><span>100</span><span>200</span><span>500</span><span>1k</span><span>2k</span><span>5k</span><span>10k</span><span>20k</span></div>
         </div>

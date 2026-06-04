@@ -1,3 +1,4 @@
+import ast
 import json
 from pathlib import Path
 
@@ -20,6 +21,10 @@ from backend.telemetry.schemas import (
 )
 from backend.telemetry.session_manager import TelemetrySessionManager, default_telemetry_config
 from backend.telemetry.spl_provider import FileSPLProvider, MockSPLProvider
+from backend.telemetry.streaming_alerts import (
+    StreamingAlertEngine,
+    run_streaming_alerts_for_session,
+)
 
 
 def _manager(tmp_path, *, enabled=True):
@@ -254,5 +259,164 @@ def test_config_default_telemetry_disabled():
 def test_telemetry_modules_do_not_expose_live_write_calls():
     root = Path("backend/telemetry")
     combined = "\n".join(path.read_text(encoding="utf-8") for path in root.glob("*.py"))
-    for forbidden in ("set_fader(", "set_gain(", "route_output(", "load_snap(", "save_snap(", "send("):
+    for forbidden in (
+        "set_fader(",
+        "set_gain(",
+        "set_eq(",
+        "set_compressor(",
+        "route_output(",
+        "route_multiple_outputs(",
+        "load_snap(",
+        "save_snap(",
+        "reset(",
+        "mute(",
+        "unmute(",
+        "set_channel_input(",
+        "set_channel_alt_input(",
+        "set_insert(",
+        "set_fx_model(",
+        "set_fx_on(",
+        "set_fx_mix(",
+        "set_fx_parameter(",
+        "send(",
+    ):
         assert forbidden not in combined
+
+
+def test_telemetry_modules_do_not_import_live_mixer_transports():
+    root = Path("backend/telemetry")
+    forbidden_modules = (
+        "backend.wing_client",
+        "wing_client",
+        "backend.dlive_client",
+        "dlive_client",
+        "backend.osc",
+        "osc",
+        "pythonosc",
+        "backend.mixer_client_base",
+        "mixer_client_base",
+    )
+    violations = []
+
+    for path in root.glob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                modules = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0:
+                modules = [node.module or ""]
+            else:
+                continue
+
+            for module in modules:
+                if any(module == forbidden or module.startswith(f"{forbidden}.") for forbidden in forbidden_modules):
+                    violations.append(f"{path}: {module}")
+
+    assert violations == []
+
+
+def test_streaming_alert_engine_detects_lufs_fader_override_and_headroom(tmp_path):
+    manager = _manager(tmp_path)
+    session = manager.start_session(mode="offline_test")
+    sid = session.session_id
+
+    manager.append_event(
+        "bus_telemetry",
+        {
+            "timestamp_ms": 1000,
+            "session_id": sid,
+            "bus_name": "Main",
+            "lufs_short": -20.0,
+            "peak_dbfs": -8.0,
+        },
+    )
+    manager.append_event(
+        "bus_telemetry",
+        {
+            "timestamp_ms": 5900,
+            "session_id": sid,
+            "bus_name": "Main",
+            "lufs_short": -17.5,
+            "peak_dbfs": -2.5,
+        },
+    )
+    manager.append_event(
+        "channel_telemetry",
+        {
+            "timestamp_ms": 10000,
+            "session_id": sid,
+            "channel_id": 12,
+            "channel_name": "Lead Vocal",
+            "fader_db": -12.0,
+            "meter_peak_dbfs": -9.0,
+        },
+    )
+    manager.append_event(
+        "channel_telemetry",
+        {
+            "timestamp_ms": 10150,
+            "session_id": sid,
+            "channel_id": 12,
+            "channel_name": "Lead Vocal",
+            "fader_db": -5.5,
+            "meter_peak_dbfs": -0.05,
+        },
+    )
+    for offset in (0, 1000, 2000, 3000):
+        manager.append_event(
+            "engineer_actions",
+            EngineerAction(
+                timestamp_ms=20000 + offset,
+                session_id=sid,
+                actor="human",
+                target_type="channel",
+                target_id="12",
+                action_type="fader_move",
+                before_value=-8.0,
+                after_value=-7.5,
+                reason="manual correction",
+            ).to_dict(),
+        )
+
+    summary = run_streaming_alerts_for_session(
+        sid,
+        storage_dir=tmp_path / "sessions",
+        output_dir=tmp_path / "alerts",
+    )
+    alert_rows = [
+        json.loads(line)
+        for line in (tmp_path / "alerts" / "alerts.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    rules = {row["rule"] for row in alert_rows}
+
+    assert summary["alert_count"] == len(alert_rows)
+    assert {"lufs_drift", "headroom_low", "fader_jump", "clipping_risk", "manual_override_burst"} <= rules
+    assert (tmp_path / "alerts" / "dashboard.csv").exists()
+    dashboard = (tmp_path / "alerts" / "dashboard.csv").read_text(encoding="utf-8")
+    assert "manual_override_burst" in dashboard
+    assert summary["safety"] == {"read_only": True, "live_write": False}
+
+
+def test_streaming_alert_engine_ignores_automixer_actions_for_override_burst():
+    engine = StreamingAlertEngine()
+    events = []
+    for idx in range(5):
+        events.append(
+            {
+                "event_type": "engineer_actions",
+                "timestamp_ms": idx * 1000,
+                "payload": {
+                    "timestamp_ms": idx * 1000,
+                    "session_id": "session-1",
+                    "actor": "automixer",
+                    "target_type": "channel",
+                    "target_id": "1",
+                    "action_type": "fader_move",
+                },
+            }
+        )
+
+    alerts = engine.process(events)
+
+    assert alerts == []
+    assert len(engine.dashboard_rows) == 5

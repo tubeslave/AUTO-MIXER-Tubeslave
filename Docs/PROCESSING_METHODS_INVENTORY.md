@@ -52,6 +52,7 @@ emergency-stop proof.
 | CAIG Auto Gate | `proposal_only` | `gate` | Gate recommendations. | Direct live gate apply |
 | Auto Panner | `lab` | `pan` | Offline/proposal review. | Live pan apply |
 | Phase / Delay Alignment | `proposal_only` | `phase` | Phase/delay recommendations. | Live delay/polarity apply |
+| Phase-Aware EQ Guard | `proposal_only` | `phase` | Group phase-before-EQ guard, delay/polarity proposal records, low-frequency cancellation blocker. | Live delay/polarity/EQ apply |
 | FX / Reverb / Sends | `lab` | `fx` | Offline/lab planning. | Live send/FX apply |
 | Mix Agent Conservative Renderer | `offline_only` | `offline_render` | Conservative offline WAV/report/JSON path. | OSC or live imports |
 | Offline Agent Mix | `offline_only` | `offline_render` | Extended offline render and reference workflow. | OSC or live imports |
@@ -87,6 +88,21 @@ UI module map: `processing_pipeline_snapshot.module_status_map` is rendered in
 the frontend Settings surface as a status-only table. It lists each module's
 entrypoint, UI surface, live-write scope, blocked reason, and next step. This
 table is informational only and does not create a new apply path.
+
+Write surface inventory: `processing_pipeline_snapshot.write_surface_inventory`
+is backed by `backend/write_surface_inventory.py`. It classifies every known
+write-capable or legacy write-adjacent surface as one of:
+
+| Status | Meaning |
+| --- | --- |
+| `canonical_supervised` | The only approved live executor class: operator-approved fader/gain via Product Layer and manual gate. |
+| `proposal_only` | May analyze and propose, but cannot write to the console. |
+| `lab_only` | May run in local/offline/lab contexts only; no WING Product Layer authority. |
+| `quarantined` | Known direct-write or broad-state surface; blocked from canonical pipeline. |
+| `blocked` | Must not be invoked by automation/autoloop/cockpit. Human-only recovery or historical reference. |
+
+Current policy: only `product_layer_fader_gain_apply` may declare
+`allowed_live=true`, and its allowed live write kinds are `fader` and `gain`.
 
 The registry is declarative and must stay free of mixer-client imports. It is a
 read-only contract for agents and UI surfaces, not an execution engine.

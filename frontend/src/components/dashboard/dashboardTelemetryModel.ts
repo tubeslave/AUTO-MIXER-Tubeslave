@@ -1,7 +1,7 @@
-import type { Channel, Tone } from '../../types';
+import type { Channel, DashboardRuntime, Tone } from '../../types';
 import type { ChannelDashboardTelemetry } from '../../mock/dashboardMock';
 
-function finiteNumber(value: number): value is number {
+function finiteNumber(value: unknown): value is number {
   return Number.isFinite(value);
 }
 
@@ -19,6 +19,40 @@ function safeStateForLevel(level: number): string {
   return 'OK';
 }
 
+function tracePoint(value: number): number {
+  return Math.max(8, Math.min(88, value));
+}
+
+function fallbackSpectrum(values: number[]): number[] {
+  return values.map((value, index) => tracePoint(value + (index % 3) * 4));
+}
+
+export function dashboardSpectrumTrace(
+  runtime: Pick<DashboardRuntime, 'sourceLabel' | 'spectrumBins'>,
+  fallback: number[]
+): { values: number[]; sourceLabel: string; sourceTone: Tone; caption: string } {
+  const runtimeBins = Array.isArray(runtime.spectrumBins)
+    ? runtime.spectrumBins.filter(value => Number.isFinite(value))
+    : [];
+
+  if (runtimeBins.length >= 4) {
+    const backendSource = runtime.sourceLabel.toLowerCase().includes('backend');
+    return {
+      values: runtimeBins.map(tracePoint),
+      sourceLabel: backendSource ? 'Backend DTO' : runtime.sourceLabel,
+      sourceTone: backendSource ? 'green' : 'blue',
+      caption: 'Read-only analyzer trace from dashboard DTO'
+    };
+  }
+
+  return {
+    values: fallbackSpectrum(fallback),
+    sourceLabel: 'Display-only',
+    sourceTone: 'yellow',
+    caption: 'Display-only analyzer trace'
+  };
+}
+
 export function dashboardTelemetryForChannel(
   channel: Channel,
   fallback: ChannelDashboardTelemetry,
@@ -33,6 +67,9 @@ export function dashboardTelemetryForChannel(
     ...fallback,
     meterL: hasRuntimeLevel ? level : fallback.meterL,
     meterR: hasRuntimeLevel ? level : fallback.meterR,
+    gateLabel: channel.gateLabel || fallback.gateLabel,
+    compLabel: channel.compLabel || fallback.compLabel,
+    pan: finiteNumber(channel.pan) ? channel.pan : fallback.pan,
     muted,
     solo: options.suppressMockSolo ? false : fallback.solo,
     safeState: muted ? 'MUTE' : inactive ? 'OFF' : safeStateForLevel(level),

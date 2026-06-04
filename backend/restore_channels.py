@@ -2,6 +2,7 @@
 """
 Restore channel settings from backup file
 """
+from manual_recovery_guard import require_manual_recovery_ack
 from wing_client import WingClient
 import json
 import time
@@ -213,6 +214,8 @@ def restore_from_backup_using_client(client: "WingClient", backup_file: str, ski
 
 def restore_from_backup(backup_file: str, ip: str = "192.168.1.102", port: int = 2223):
     """Restore all channels from backup file"""
+
+    require_manual_recovery_ack("restore_channels.py")
     
     # Load backup file
     try:

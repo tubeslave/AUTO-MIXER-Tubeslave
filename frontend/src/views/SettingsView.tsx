@@ -1,6 +1,6 @@
 import { DataTable, Knob, Panel, StatusBadge } from '../components/prototype/AutomixerComponents';
 import type { OperatorViewData } from '../services/useOperatorBackend';
-import type { ModuleStatusRecord, Tone, UiActions, UiState } from '../types';
+import type { ModuleStatusRecord, TelemetryAlertsSnapshot, Tone, UiActions, UiState } from '../types';
 import { tableView, TechnicalChecklist } from './viewHelpers';
 
 const settingsSections = [
@@ -78,6 +78,26 @@ function writeScopeLabel(row: ModuleStatusRecord) {
   return row.liveWriteKinds.length ? row.liveWriteKinds.join(', ') : 'live';
 }
 
+function telemetryAlertTone(alerts: TelemetryAlertsSnapshot): Tone {
+  if (alerts.liveWrite || alerts.generatesArtifacts) return 'red';
+  if (alerts.criticalCount > 0) return 'red';
+  if (alerts.warningCount > 0) return 'yellow';
+  if (alerts.alertCount > 0) return 'blue';
+  return alerts.available ? 'green' : 'muted';
+}
+
+function telemetryAlertRows(alerts: TelemetryAlertsSnapshot) {
+  const safetyOk = alerts.readOnly && !alerts.liveWrite && !alerts.generatesArtifacts;
+  return [
+    { label: 'Artifacts', value: alerts.available ? 'Available' : 'Missing', tone: alerts.available ? 'blue' as const : 'muted' as const },
+    { label: 'Alerts', value: String(alerts.alertCount), tone: telemetryAlertTone(alerts) },
+    { label: 'Critical', value: String(alerts.criticalCount), tone: alerts.criticalCount ? 'red' as const : 'green' as const },
+    { label: 'Warning', value: String(alerts.warningCount), tone: alerts.warningCount ? 'yellow' as const : 'green' as const },
+    { label: 'Snapshot', value: safetyOk ? 'Read-only' : 'Review', tone: safetyOk ? 'green' as const : 'red' as const },
+    { label: 'Latest session', value: alerts.latestSessionId || 'none', tone: alerts.latestSessionId ? 'blue' as const : 'muted' as const }
+  ];
+}
+
 function ModuleStatusTable({
   rows,
   onFocus
@@ -102,8 +122,9 @@ function ModuleStatusTable({
         filters={[
           { label: 'All', predicate: () => true },
           { label: 'Live', predicate: row => row.canWriteLive },
+          { label: 'Write Surface', predicate: row => row.domain === 'write_surface' },
           { label: 'Review', predicate: row => row.status.includes('proposal') || !row.canWriteLive },
-          { label: 'Quarantine', predicate: row => row.status.includes('quarantined') || row.pipelineProfiles.includes('quarantine') }
+          { label: 'Blocked', predicate: row => row.status.includes('blocked') || row.status.includes('quarantined') || row.pipelineProfiles.includes('quarantine') }
         ]}
         getSearchText={row => `${row.label} ${row.moduleId} ${row.status} ${row.domain} ${row.entrypoint} ${row.uiSurface} ${row.nextStep}`}
         columns={[
@@ -132,6 +153,7 @@ function SettingsInspector({
   const backend = ui.backend;
   const connectionTone = connectionToneFor(backend.connectionState);
   const modules = moduleStatusRows(data);
+  const telemetryAlerts = data.telemetryAlerts;
   const liveModuleCount = modules.filter(row => row.canWriteLive).length;
   const reviewOnlyCount = modules.filter(row => !row.canWriteLive).length;
   const quarantinedCount = modules.filter(row => row.status.includes('quarantined') || row.pipelineProfiles.includes('quarantine')).length;
@@ -177,6 +199,8 @@ function SettingsInspector({
       { label: 'Decision log', value: data.logs.length ? 'On' : 'Empty', tone: data.logs.length ? 'green' : 'yellow' },
       { label: 'Console diff', value: 'Read-only', tone: 'blue' },
       { label: 'Task rows', value: String(data.tasks.length), tone: 'purple' },
+      { label: 'Telemetry alerts', value: String(telemetryAlerts.alertCount), tone: telemetryAlertTone(telemetryAlerts) },
+      { label: 'Alert source', value: data.readModelSources.telemetryAlerts, tone: telemetryAlerts.available ? 'blue' : 'muted' },
       { label: 'Stale snapshot', value: backend.staleSnapshot ? 'Yes' : 'No', tone: backend.staleSnapshot ? 'yellow' : 'green' }
     ],
     Transport: [
@@ -201,6 +225,26 @@ function SettingsInspector({
         <p className="text-[11px] leading-5 text-muted">{backend.message}</p>
         <div className="mt-4 h-24"><Knob label="Confidence Gate" value={data.dashboardRuntime.aiConfidencePercent} /></div>
       </Panel>
+      <Panel title="Telemetry Alerts">
+        <TechnicalChecklist rows={telemetryAlertRows(telemetryAlerts)} />
+        <div className="mt-3 space-y-2">
+          {telemetryAlerts.alerts.slice(0, 2).map(alert => (
+            <div className="rounded-[6px] border border-line bg-row p-2" key={alert.id}>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="truncate text-[10px] font-bold text-text">{alert.rule}</span>
+                <StatusBadge tone={alert.tone}>{alert.severity}</StatusBadge>
+              </div>
+              <div className="truncate text-[10px] text-muted">{alert.target} · {alert.time}</div>
+              <div className="mt-1 max-h-8 overflow-hidden text-[10px] leading-4 text-muted">{alert.message}</div>
+            </div>
+          ))}
+          {!telemetryAlerts.alerts.length && (
+            <div className="rounded-[6px] border border-line bg-row p-2 text-[10px] text-muted">
+              No generated alert artifacts are available for display.
+            </div>
+          )}
+        </div>
+      </Panel>
       <Panel title="Safety Rule">
         <TechnicalChecklist rows={[
           { label: 'OSC writes', value: 'Disabled', tone: 'red' },
@@ -220,6 +264,7 @@ export function Settings(ui: UiState, actions: UiActions, data: OperatorViewData
   const writeScope = backend.writeScope.length ? backend.writeScope.join(', ') : 'none';
   const connectionTone = connectionToneFor(backend.connectionState);
   const modules = moduleStatusRows(data);
+  const telemetryAlerts = data.telemetryAlerts;
   const approvalLabel = backend.canApplyToConsole
     ? (backend.requiresApproval ? 'Required' : 'Not required')
     : 'No apply';
@@ -293,12 +338,12 @@ export function Settings(ui: UiState, actions: UiActions, data: OperatorViewData
         </Panel>
         <ModuleStatusTable rows={modules} onFocus={() => actions.selectSettingsSection('Module Status')} />
       </div>
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-6 gap-2">
         <Panel title="Mix Defaults"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Mix Defaults')} type="button"><TechnicalChecklist rows={[{ label: 'LUFS target', value: '-14 LUFS', tone: 'blue' }, { label: 'Safety margin', value: 'High', tone: 'yellow' }]} /></button></Panel>
         <Panel title="Mode Policy"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Mode Policy')} type="button"><TechnicalChecklist rows={[{ label: 'Current mode', value: ui.mode, tone: backend.canApplyToConsole ? 'yellow' : 'blue' }, { label: 'Create proposals', value: backend.canCreateProposals ? 'Allowed' : 'Blocked', tone: backend.canCreateProposals ? 'green' : 'yellow' }]} /></button></Panel>
         <Panel title="Write Policy"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Write Policy')} type="button"><TechnicalChecklist rows={[{ label: 'Console apply', value: backend.canApplyToConsole ? 'Supervised' : 'Blocked', tone: backend.canApplyToConsole ? 'yellow' : 'red' }, { label: 'Scope', value: writeScope, tone: backend.writeScope.length ? 'yellow' : 'red' }]} /></button></Panel>
         <Panel title="Module Status"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Module Status')} type="button"><TechnicalChecklist rows={[{ label: 'Modules', value: String(modules.length), tone: 'blue' }, { label: 'Live writes', value: String(modules.filter(row => row.canWriteLive).length), tone: 'yellow' }]} /></button></Panel>
-        <Panel title="Audit"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Audit')} type="button"><TechnicalChecklist rows={[{ label: 'Decision log', value: data.logs.length ? 'On' : 'Empty', tone: data.logs.length ? 'green' : 'yellow' }, { label: 'Console diff', value: 'Read-only', tone: 'blue' }]} /></button></Panel>
+        <Panel title="Audit"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Audit')} type="button"><TechnicalChecklist rows={[{ label: 'Decision log', value: data.logs.length ? 'On' : 'Empty', tone: data.logs.length ? 'green' : 'yellow' }, { label: 'Telemetry alerts', value: String(telemetryAlerts.alertCount), tone: telemetryAlertTone(telemetryAlerts) }, { label: 'Console diff', value: 'Read-only', tone: 'blue' }]} /></button></Panel>
         <Panel title="Transport"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Transport')} type="button"><TechnicalChecklist rows={[{ label: 'Websocket', value: backend.connectionState, tone: connectionTone }, { label: 'Product Layer', value: backend.dataStateLabel, tone: backend.dataStateTone }, { label: 'OSC writes', value: 'No direct path', tone: 'red' }]} /></button></Panel>
       </div>
     </div>

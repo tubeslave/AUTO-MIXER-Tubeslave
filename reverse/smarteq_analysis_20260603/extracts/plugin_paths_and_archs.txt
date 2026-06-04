@@ -1,0 +1,22 @@
+/Library/Audio/Plug-Ins/VST3/smartEQ4.vst3/Contents/MacOS/smartEQ4:            Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit bundle x86_64] [arm64]
+/Library/Audio/Plug-Ins/VST3/smartEQ4.vst3/Contents/MacOS/smartEQ4 (for architecture x86_64):	Mach-O 64-bit bundle x86_64
+/Library/Audio/Plug-Ins/VST3/smartEQ4.vst3/Contents/MacOS/smartEQ4 (for architecture arm64):	Mach-O 64-bit bundle arm64
+/Library/Audio/Plug-Ins/VST/smartEQ4.vst/Contents/MacOS/smartEQ4:              Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit bundle x86_64] [arm64]
+/Library/Audio/Plug-Ins/VST/smartEQ4.vst/Contents/MacOS/smartEQ4 (for architecture x86_64):	Mach-O 64-bit bundle x86_64
+/Library/Audio/Plug-Ins/VST/smartEQ4.vst/Contents/MacOS/smartEQ4 (for architecture arm64):	Mach-O 64-bit bundle arm64
+/Library/Audio/Plug-Ins/Components/smartEQ4.component/Contents/MacOS/smartEQ4: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit bundle x86_64] [arm64]
+/Library/Audio/Plug-Ins/Components/smartEQ4.component/Contents/MacOS/smartEQ4 (for architecture x86_64):	Mach-O 64-bit bundle x86_64
+/Library/Audio/Plug-Ins/Components/smartEQ4.component/Contents/MacOS/smartEQ4 (for architecture arm64):	Mach-O 64-bit bundle arm64
+{
+  "CFBundleDisplayName" => "smartEQ4"
+  "CFBundleExecutable" => "smartEQ4"
+  "CFBundleIconFile" => ""
+  "CFBundleIdentifier" => "com.sonible.smarteq4"
+  "CFBundleName" => "smartEQ4"
+  "CFBundlePackageType" => "BNDL"
+  "CFBundleShortVersionString" => "1.0.2"
+  "CFBundleSignature" => "????"
+  "CFBundleVersion" => "1.0.2"
+  "NSHighResolutionCapable" => true
+  "NSHumanReadableCopyright" => ""
+}

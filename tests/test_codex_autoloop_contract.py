@@ -25,6 +25,10 @@ def test_codex_autoloop_runner_uses_repo_prompt_and_one_shot_exec():
     assert 'Another codex autoloop run is already active' in text
     assert 'Existing lock owner metadata:' in text
     assert 'Existing lock has no owner metadata.' in text
+    assert 'case "${LOCK_PID}" in' in text
+    assert '*[!0-9]*)' in text
+    assert 'Ignoring stale-lock cleanup because owner pid is invalid' in text
+    assert 'return 1' in text
     assert "printf 'pid=%s\\n' \"$$\"" in text
     assert "printf 'ppid=%s\\n' \"${PPID:-unknown}\"" in text
     assert "printf 'started_at=%s\\n' \"$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\"" in text

@@ -52,10 +52,15 @@ you want the background automation active.
   directories, latest/recent test artifacts, TODO/FIXME scan, local `.ai`
   tasks, and non-empty evidence sections for
   findings, changes, tests, remaining work, risks, and each plain-language
-  explanation subsection. The TODO/FIXME evidence must state the owned-code
-  focus and the excluded vendored/generated/reference scan-noise boundary. The
-  tests section must state an outcome such as passed, failed, skipped, blocked,
-  or not run, not only list commands, and must include a memory lint result.
+  explanation subsection. Core report sections must remain in the expected
+  order: scope, findings, short plan, changes, changed files, tests, memory
+  lint result, remaining work, and risks. The TODO/FIXME evidence must state
+  the owned-code focus and the excluded vendored/generated/reference scan-noise
+  boundary. The tests section must state an outcome such as passed, failed,
+  skipped, blocked, or not run, not only list commands, and must include a
+  memory lint result.
+  Reports must also include a dedicated non-empty `## Memory Lint Result`
+  section with the `memory_lint.py` command/result and an explicit outcome.
   The `Changed Files` section must be
   non-empty, include repo-local markdown links, and link back to the cycle
   report itself so the audit artifact is visible in the file list. Reports must
@@ -68,8 +73,9 @@ you want the background automation active.
   that external Paperclip/PiperClip ran the cycle or that neighboring project
   paths such as `/Users/dmitrijvolkov/paperclip` were analyzed, modified, or
   used.
-  Forbidden live command tokens must be listed in an explicitly negative audit
-  sentence, such as a statement that no such command was run. Non-destructive
+  Forbidden live command tokens, including input-trim/preamp aliases, must be
+  listed in an explicitly negative audit sentence, such as a statement that no
+  such command was run. Non-destructive
   action terms such as commit, push, reset, destructive cleanup, secret access,
   and user-file deletion must also appear in an explicitly negative audit
   sentence. The validator also rejects reports that include a valid no-action

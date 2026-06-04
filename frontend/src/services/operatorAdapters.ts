@@ -21,6 +21,7 @@ import type {
   SafetyEvidenceItem,
   SafetyMonitorState,
   Task,
+  TelemetryAlertsSnapshot,
   Tone,
   TrainingSessionSnapshotRow,
   TopologyLink,
@@ -217,6 +218,22 @@ function avg(values: number[], fallback: number): number {
   return usable.reduce((sum, value) => sum + value, 0) / usable.length;
 }
 
+function numericList(value: unknown, limit = 64): number[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(item => Number(item))
+    .filter(item => Number.isFinite(item))
+    .slice(0, limit);
+}
+
+function firstNumericList(...values: unknown[]): number[] | undefined {
+  for (const value of values) {
+    const rows = numericList(value);
+    if (rows.length) return rows;
+  }
+  return undefined;
+}
+
 function busTone(group: string): Tone {
   const normalized = group.toUpperCase();
   if (normalized.includes('VOCAL')) return 'purple';
@@ -237,13 +254,60 @@ function toneValue(value: unknown, fallback: Tone = 'blue'): Tone {
 
 function toneForModuleStatus(status: string, canWriteLive: boolean): Tone {
   const normalized = status.toLowerCase();
+  if (normalized === 'canonical_supervised') return canWriteLive ? 'yellow' : 'red';
+  if (normalized === 'hardware_proven_narrow') return canWriteLive ? 'yellow' : 'blue';
+  if (normalized === 'dry_run_ready') return 'blue';
   if (normalized === 'canonical' && canWriteLive) return 'green';
   if (normalized === 'canonical') return 'blue';
   if (normalized === 'proposal_only' || normalized === 'shadow_only' || normalized === 'offline_only') return 'yellow';
-  if (normalized === 'lab') return 'purple';
-  if (normalized === 'placeholder' || normalized === 'quarantined') return 'red';
+  if (normalized === 'lab' || normalized === 'lab_only') return 'purple';
+  if (normalized === 'blocked' || normalized === 'placeholder' || normalized === 'quarantined') return 'red';
   if (normalized === 'deprecated') return 'muted';
   return canWriteLive ? 'yellow' : 'blue';
+}
+
+function toneForTelemetrySeverity(severity: string): Tone {
+  const normalized = severity.toLowerCase();
+  if (normalized === 'critical') return 'red';
+  if (normalized === 'warning') return 'yellow';
+  if (normalized === 'info') return 'blue';
+  return 'muted';
+}
+
+function formatTelemetryNumber(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return str(value);
+  return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(2);
+}
+
+function channelPanPercent(value: unknown, fallback?: number): number | undefined {
+  if (value === null || value === undefined || value === '') return fallback;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  if (numeric >= 0 && numeric <= 1) return Math.round((numeric - 0.5) * 100);
+  if (numeric >= -100 && numeric <= 100) return Math.round(numeric);
+  return fallback;
+}
+
+function channelControlLabel(prefix: string, value: unknown, fallback?: string): string | undefined {
+  if (value === null || value === undefined || value === '') return fallback;
+  const raw = str(value);
+  if (!raw) return fallback;
+  if (/^[A-Z]\s/i.test(raw)) return raw;
+
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return `${prefix} ${numeric.toFixed(1)}`;
+  }
+
+  return `${prefix} ${raw}`;
+}
+
+function telemetryTimeLabel(timestampMs: unknown, fallback: unknown): string {
+  const numeric = Number(timestampMs);
+  if (Number.isFinite(numeric)) return `${Math.trunc(numeric)} ms`;
+  return timeLabel(fallback, 'n/a');
 }
 
 function busName(group: string): string {
@@ -333,6 +397,24 @@ export function adaptChannels(payload: unknown, fallback: Channel[]): Channel[] 
     const status = str(row.status, 'unknown').toLowerCase();
     const controlMute = boolish(control.mute ?? control.muted ?? row.mute ?? row.muted);
     const confidence = num(recognition.confidence, base?.confidence ?? 72);
+    const pan = channelPanPercent(control.pan ?? control.pan_percent ?? row.pan, base?.pan);
+    const gateLabel = channelControlLabel(
+      'G',
+      control.gate_label ?? row.gate_label ?? control.gate_threshold_db ?? row.gate_threshold_db,
+      base?.gateLabel
+    );
+    const compLabel = channelControlLabel(
+      'C',
+      control.comp_label
+        ?? control.compressor_label
+        ?? row.comp_label
+        ?? row.compressor_label
+        ?? control.compressor_gain_reduction_db
+        ?? row.compressor_gain_reduction_db
+        ?? control.compressor_threshold_db
+        ?? row.compressor_threshold_db,
+      base?.compLabel
+    );
     const channelStatus: Channel['status'] = controlMute === true || status === 'muted'
       ? 'MUTED'
       : status === 'active'
@@ -350,6 +432,9 @@ export function adaptChannels(payload: unknown, fallback: Channel[]): Channel[] 
       recognition: `${str(recognition.label, str(row.role, base?.type ?? 'Channel'))}${confidence ? ` (${Math.round(confidence)}%)` : ''}`,
       group: str(row.group, base?.group ?? 'CHANNELS').toUpperCase(),
       fader: num(control.fader_db, base?.fader ?? -50),
+      pan,
+      gateLabel,
+      compLabel,
       confidence
     };
   });
@@ -358,9 +443,8 @@ export function adaptChannels(payload: unknown, fallback: Channel[]): Channel[] 
 export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[] {
   const data = asRecord(payload);
   const rows = asArray(data.module_status_map);
-  if (!rows.length) return [];
 
-  return rows.map(row => {
+  const moduleRows = rows.map(row => {
     const status = str(row.status, 'unknown');
     const canWriteLive = Boolean(row.can_write_live);
     return {
@@ -383,6 +467,116 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       tone: toneForModuleStatus(status, canWriteLive)
     };
   });
+
+  const inventory = asRecord(data.write_surface_inventory);
+  const surfaces = asArray(inventory.surfaces);
+  const surfaceRows = surfaces.map(row => {
+    const surfaceId = str(row.id, 'unknown_surface');
+    const status = str(row.status, 'unknown');
+    const canWriteLive = Boolean(row.allowed_live);
+    const paths = Array.isArray(row.paths)
+      ? row.paths.map(item => String(item)).filter(Boolean)
+      : [];
+    const entrypoints = Array.isArray(row.entrypoints)
+      ? row.entrypoints.map(item => String(item)).filter(Boolean)
+      : [];
+    return {
+      moduleId: `write_surface:${surfaceId}`,
+      label: str(row.label, surfaceId),
+      domain: 'write_surface',
+      status,
+      entrypoint: entrypoints.length ? entrypoints.join(' / ') : 'none',
+      module: paths.join(', '),
+      uiSurface: str(row.gate, 'Write-surface inventory'),
+      canWriteLive,
+      liveWriteKinds: Array.isArray(row.write_kinds)
+        ? row.write_kinds.map(item => String(item)).filter(Boolean)
+        : [],
+      pipelineProfiles: [status],
+      blockedReason: canWriteLive ? '' : str(row.current_policy, 'No live authority.'),
+      nextStep: str(row.next_action, 'Keep write-surface policy explicit.'),
+      tone: toneForModuleStatus(status, canWriteLive)
+    };
+  });
+
+  const coverage = asRecord(data.safety_coverage_matrix);
+  const coverageRows = asArray(coverage.rows).map(row => {
+    const rowId = str(row.id, 'unknown_coverage');
+    const status = str(row.status, 'unknown');
+    const canWriteLive = Boolean(row.live_allowed);
+    return {
+      moduleId: `safety_coverage:${rowId}`,
+      label: str(row.label, rowId),
+      domain: 'safety_coverage',
+      status,
+      entrypoint: str(row.canonical_gate, 'none'),
+      module: str(row.action_type, 'unknown'),
+      uiSurface: 'Safety proof matrix',
+      canWriteLive,
+      liveWriteKinds: canWriteLive ? [str(row.action_type, 'unknown')] : [],
+      pipelineProfiles: [status],
+      blockedReason: canWriteLive ? str(row.current_blocker, '') : str(row.current_blocker, 'No live proof.'),
+      nextStep: str(row.next_required_evidence, 'Collect proof before promotion.'),
+      tone: toneForModuleStatus(status, canWriteLive)
+    };
+  });
+
+  return [...moduleRows, ...surfaceRows, ...coverageRows];
+}
+
+export function adaptTelemetryAlertsSnapshot(payload: unknown): TelemetryAlertsSnapshot {
+  const data = asRecord(payload);
+  const summary = asRecord(data.summary);
+  const safety = asRecord(data.safety);
+  const available = Boolean(data.available);
+  const latestSessionId = str(summary.latest_session_id);
+  const alerts = asArray(data.alerts).map((row, index) => {
+    const sessionId = str(row.session_id, latestSessionId);
+    const rule = cleanToken(row.rule, 'telemetry alert');
+    const severity = str(row.severity, 'info').toLowerCase();
+    const targetType = cleanToken(row.target_type, 'target');
+    const targetId = str(row.target_id, 'unknown');
+    return {
+      id: `${sessionId}:${rule}:${targetType}:${targetId}:${str(row.timestamp_ms, String(index))}`,
+      sessionId,
+      time: telemetryTimeLabel(row.timestamp_ms, data.generated_at),
+      rule,
+      severity,
+      target: `${targetType}:${targetId}`,
+      message: str(row.message, 'Telemetry alert requires review.'),
+      value: formatTelemetryNumber(row.value),
+      threshold: formatTelemetryNumber(row.threshold),
+      tone: toneForTelemetrySeverity(severity)
+    };
+  });
+  const sessions = asArray(data.sessions).map(row => {
+    const sessionSafety = asRecord(row.safety);
+    return {
+      sessionId: str(row.session_id, 'unknown_session'),
+      generatedAt: str(row.generated_at, 'n/a'),
+      eventCount: Math.trunc(num(row.event_count, 0)),
+      alertCount: Math.trunc(num(row.alert_count, 0)),
+      dashboardRowCount: Math.trunc(num(row.dashboard_row_count, 0)),
+      readOnly: sessionSafety.read_only !== false,
+      liveWrite: Boolean(sessionSafety.live_write)
+    };
+  });
+
+  return {
+    available,
+    generatedAt: str(data.generated_at, available ? 'runtime' : 'mock'),
+    sourceLabel: str(data.source, available ? 'telemetry_alert_artifacts' : 'mock'),
+    storageDir: str(data.storage_dir),
+    alertCount: Math.trunc(num(summary.alert_count, alerts.length)),
+    criticalCount: Math.trunc(num(summary.critical_count, alerts.filter(row => row.severity === 'critical').length)),
+    warningCount: Math.trunc(num(summary.warning_count, alerts.filter(row => row.severity === 'warning').length)),
+    latestSessionId,
+    readOnly: safety.read_only !== false,
+    liveWrite: Boolean(safety.live_write),
+    generatesArtifacts: Boolean(safety.generates_artifacts),
+    sessions,
+    alerts
+  };
 }
 
 export function adaptBusesFromChannels(channels: Channel[], fallback: BusRecord[]): BusRecord[] {
@@ -590,6 +784,7 @@ export function adaptDashboardRuntime(
 ): DashboardRuntime {
   const dash = asRecord(dashboard);
   const master = asRecord(dash.master_bus);
+  const analyzer = asRecord(dash.analyzer ?? dash.analysis ?? dash.spectrum);
   const channelSummary = asRecord(dash.channel_summary);
   const decisionSummary = asRecord(asRecord(decisionQueue).summary ?? dash.decision_summary);
   const roster = asRecord(agentRoster);
@@ -624,6 +819,13 @@ export function adaptDashboardRuntime(
   const averageConfidence = confidenceValues.length
     ? confidenceValues.reduce((sum, value) => sum + value, 0) / confidenceValues.length
     : Boolean(agentSummary.can_live_execute) ? 92 : 82;
+  const spectrumBins = firstNumericList(
+    analyzer.spectrum_bins,
+    analyzer.spectrumBins,
+    analyzer.bins,
+    dash.spectrum_bins,
+    master.spectrum_bins
+  );
 
   return {
     integratedLufs: metricNum(master.integrated_lufs, -14.2),
@@ -637,7 +839,8 @@ export function adaptDashboardRuntime(
     pendingDecisions: Math.trunc(metricNum(decisionSummary.pending_count, 0)),
     appliedDecisions: Math.trunc(metricNum(decisionSummary.applied_count, 0)),
     blockedDecisions: Math.trunc(metricNum(decisionSummary.blocked_count, 0)),
-    sourceLabel: 'Backend'
+    sourceLabel: 'Backend',
+    spectrumBins
   };
 }
 

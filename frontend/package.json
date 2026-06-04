@@ -28,7 +28,7 @@
   "scripts": {
     "start": "vite --host 0.0.0.0",
     "build": "vite build",
-    "test": "node --test src/services/__tests__/websocketCore.test.mjs src/components/__tests__/autoSoundcheckSummary.test.mjs src/services/__tests__/operatorAdaptersContract.test.mjs",
+    "test": "node --test src/services/__tests__/websocketCore.test.mjs src/components/__tests__/autoSoundcheckSummary.test.mjs src/components/__tests__/dashboardReadOnlyContract.test.mjs src/services/__tests__/operatorAdaptersContract.test.mjs",
     "test:e2e": "playwright test",
     "electron": "electron .",
     "electron:dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && electron .\"",

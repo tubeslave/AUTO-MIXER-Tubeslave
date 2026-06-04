@@ -4,6 +4,19 @@
 
 Этот документ описывает интеграцию новых компонентов (`auto_eq_processing.py`) с существующей системой (`auto_eq.py`) согласно методу из дебатов Kimi.
 
+## Граница безопасности
+
+Эта интеграция не дает AutoEQ права напрямую писать параметры WING. Новые
+компоненты должны сначала работать как audit-only, shadow-only или
+proposal-only слой: они могут рассчитывать сглаженные коррекции, приоритеты и
+mirror-EQ подсказки, но не должны вызывать OSC apply/reset без отдельного
+supervised gate.
+
+Live EQ apply остается отдельной процедурой: оператор явно утверждает действие,
+система делает pre-read, safety check, bounded delta, readback и rollback. Пока
+такой путь не доказан отдельным hardware proof, результат AutoEQ считается
+offline/shadow evidence, а не live readiness.
+
 ## Архитектура системы
 
 ### Новые компоненты
@@ -35,7 +48,7 @@ auto_eq_processing.py
 │                                         ↓                   │
 │                              [Mirror EQ]                    │
 │                                         ↓                   │
-│                              [OSC Output]                   │
+│                              [Audit / Proposal Output]      │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -297,8 +310,16 @@ for inp in inputs:
 
 ## TODO
 
-- [ ] Интегрировать DualEMA в AutoEQController
-- [ ] Добавить PriorityMatrix в MultiChannelAutoEQController
-- [ ] Реализовать MirrorEQ для разделения спектра
-- [ ] Тестирование с реальным микшером
-- [ ] Настройка параметров по жанрам
+- [ ] Интегрировать DualEMA в AutoEQController как shadow/proposal output без
+      прямого OSC apply.
+- [ ] Добавить PriorityMatrix в MultiChannelAutoEQController для read-only
+      приоритизации источников и конфликтов.
+- [ ] Реализовать MirrorEQ для разделения спектра сначала как audit-only
+      подсказки и offline fixtures.
+- [ ] Сверить AutoEQ предложения с `backend/autoeq_audit.py` и Product Layer
+      proposal metadata до любой operator-facing очереди.
+- [ ] Планировать проверку с реальным WING только отдельным supervised proof:
+      explicit operator approval, physical pre-read, bounded apply, readback,
+      rollback, cooldown и preserved artifacts.
+- [ ] Настроить параметры по жанрам на offline/replay материалах, не по live
+      console writes.

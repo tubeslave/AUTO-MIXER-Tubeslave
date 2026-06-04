@@ -1,8 +1,12 @@
 """Read-only operator cockpit state handlers."""
 
+import time
+
 from operator_product_state import (
     build_agent_communications_snapshot,
+    build_bus_main_dca_snapshot,
     build_channel_intelligence,
+    build_channel_processing_snapshot,
     build_operator_agent_roster,
     build_processing_pipeline_snapshot,
     build_channel_inventory,
@@ -11,11 +15,16 @@ from operator_product_state import (
     build_decision_queue,
     build_decision_traces,
     build_groups_buses_snapshot,
+    build_matrix_snapshot,
     build_memory_knowledge_snapshot,
     build_replay_runs,
+    build_routing_sends_snapshot,
     build_rules_library_snapshot,
     build_safety_monitor,
+    build_snapshots_scenes_snapshot,
+    build_telemetry_alerts_snapshot,
     build_training_sessions_snapshot,
+    build_user_presets_snapshot,
 )
 from operator_analysis import build_operator_analysis_report
 from processing_pipeline_preview import build_main_pipeline_preview
@@ -23,6 +32,8 @@ from processing_pipeline_preview import build_main_pipeline_preview
 
 VERIFIED_MANUAL_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
 APPLY_DELTA_LIMITS_DB = {"fader": 1.0, "gain": 0.5}
+CUMULATIVE_DELTA_LIMITS_DB = {"fader": 3.0, "gain": 1.5}
+CUMULATIVE_DELTA_WINDOW_SEC = 300.0
 
 
 def manual_write_result_verified(result):
@@ -53,6 +64,64 @@ def register_handlers(server):
             or raw.get("authored_by") == "operator"
             or raw.get("source") == "operator_authored"
         )
+
+    def operator_apply_delta_history():
+        history = getattr(server, "_operator_apply_delta_history", None)
+        if not isinstance(history, dict):
+            history = {}
+            setattr(server, "_operator_apply_delta_history", history)
+        return history
+
+    def cumulative_delta_blocker(normalized_change):
+        value_type = normalized_change.get("value_type")
+        limit = CUMULATIVE_DELTA_LIMITS_DB.get(value_type)
+        if limit is None:
+            return None
+        delta = coerce_float(normalized_change.get("delta_db"))
+        if delta is None:
+            return None
+        key = (int(normalized_change["channel"]), value_type)
+        now = time.monotonic()
+        history = operator_apply_delta_history()
+        entries = [
+            entry
+            for entry in history.get(key, [])
+            if now - float(entry.get("ts", 0.0)) <= CUMULATIVE_DELTA_WINDOW_SEC
+        ]
+        history[key] = entries
+        used = round(sum(abs(float(entry.get("delta_db", 0.0))) for entry in entries), 3)
+        requested = round(abs(float(delta)), 3)
+        if used + requested > limit:
+            return {
+                "reason": "cumulative_delta_limit_exceeded",
+                "channel": normalized_change["channel"],
+                "value_type": value_type,
+                "delta_db": normalized_change["delta_db"],
+                "cumulative_delta_db": used,
+                "requested_delta_db": requested,
+                "max_cumulative_delta_db": limit,
+                "window_sec": CUMULATIVE_DELTA_WINDOW_SEC,
+            }
+        return None
+
+    def remember_applied_delta(normalized_change, apply_result):
+        if apply_result.get("status") != "applied":
+            return
+        if not manual_write_result_verified(apply_result):
+            return
+        if not apply_result.get("rollback_available"):
+            return
+        delta = coerce_float(normalized_change.get("delta_db"))
+        if delta is None:
+            return
+        key = (int(normalized_change["channel"]), normalized_change["value_type"])
+        history = operator_apply_delta_history()
+        history.setdefault(key, []).append({
+            "ts": time.monotonic(),
+            "delta_db": delta,
+            "proposal_id": apply_result.get("proposal_id"),
+            "approval_id": apply_result.get("approval_id"),
+        })
 
     def trace_payload_for_result(
         *,
@@ -191,6 +260,9 @@ def register_handlers(server):
                 "value_type": normalized["value_type"],
                 "delta_db": normalized["delta_db"],
             }
+        cumulative_error = cumulative_delta_blocker(normalized)
+        if cumulative_error:
+            return normalized, cumulative_error
         return normalized, None
 
     async def handle_get_dashboard_snapshot(websocket, data):
@@ -201,6 +273,13 @@ def register_handlers(server):
         await server.send_to_client(
             websocket,
             build_channel_inventory(server, total_channels=total_channels),
+        )
+
+    async def handle_get_channel_processing_snapshot(websocket, data):
+        total_channels = data.get("total_channels", 24)
+        await server.send_to_client(
+            websocket,
+            build_channel_processing_snapshot(server, total_channels=total_channels),
         )
 
     async def handle_get_decision_queue(websocket, data):
@@ -303,6 +382,57 @@ def register_handlers(server):
         del data
         await server.send_to_client(websocket, build_groups_buses_snapshot(server))
 
+    async def handle_get_bus_main_dca_snapshot(websocket, data):
+        await server.send_to_client(
+            websocket,
+            build_bus_main_dca_snapshot(
+                server,
+                bus_count=data.get("bus_count", 16),
+                main_count=data.get("main_count", 4),
+                dca_count=data.get("dca_count", 16),
+            ),
+        )
+
+    async def handle_get_matrix_snapshot(websocket, data):
+        await server.send_to_client(
+            websocket,
+            build_matrix_snapshot(
+                server,
+                matrix_count=data.get("matrix_count", 8),
+            ),
+        )
+
+    async def handle_get_routing_sends_snapshot(websocket, data):
+        await server.send_to_client(
+            websocket,
+            build_routing_sends_snapshot(
+                server,
+                total_channels=data.get("total_channels", 24),
+                send_count=data.get("send_count", 16),
+                main_count=data.get("main_count", 1),
+                output_groups=data.get("output_groups", ("MOD", "CRD")),
+                output_count=data.get("output_count", 64),
+            ),
+        )
+
+    async def handle_get_snapshots_scenes_snapshot(websocket, data):
+        await server.send_to_client(
+            websocket,
+            build_snapshots_scenes_snapshot(
+                server,
+                snapshot_count=data.get("snapshot_count", 200),
+            ),
+        )
+
+    async def handle_get_user_presets_snapshot(websocket, data):
+        await server.send_to_client(
+            websocket,
+            build_user_presets_snapshot(
+                server,
+                preset_count=data.get("preset_count", 200),
+            ),
+        )
+
     async def handle_get_memory_knowledge_snapshot(websocket, data):
         del data
         await server.send_to_client(websocket, build_memory_knowledge_snapshot(server))
@@ -310,6 +440,16 @@ def register_handlers(server):
     async def handle_get_training_sessions_snapshot(websocket, data):
         del data
         await server.send_to_client(websocket, build_training_sessions_snapshot(server))
+
+    async def handle_get_telemetry_alerts_snapshot(websocket, data):
+        await server.send_to_client(
+            websocket,
+            build_telemetry_alerts_snapshot(
+                server,
+                limit=data.get("limit", 50),
+                session_limit=data.get("session_limit", 8),
+            ),
+        )
 
     async def handle_get_rules_library_snapshot(websocket, data):
         del data
@@ -593,7 +733,7 @@ def register_handlers(server):
             apply_result = await apply_manual_console_write(
                 websocket,
                 channel=change["channel"],
-                value=change["value"],
+                value=change["effective_value"],
                 value_type=change["value_type"],
                 source=f"operator_proposal_linked:{proposal.id}:{index + 1}",
                 reason=data.get("reason") or proposal.reason or proposal.title,
@@ -646,6 +786,9 @@ def register_handlers(server):
                 await server.send_to_client(websocket, {"type": "operator_proposal_apply_blocked", **result})
                 return
 
+        for change, apply_result in zip(normalized_changes, applied_results):
+            remember_applied_delta(change, apply_result)
+
         result = server.operator_proposal_queue.mark_apply_result(
             proposal,
             {
@@ -692,6 +835,31 @@ def register_handlers(server):
                 "reason": "proposal_not_found",
                 "proposal_id": proposal_id,
                 "index": index,
+            })
+            return
+
+        if proposal.is_expired():
+            result = server.operator_proposal_queue.mark_apply_result(
+                proposal,
+                {
+                    "status": "blocked",
+                    "reason": "proposal_expired",
+                    "expires_at": proposal.expires_at,
+                    "ttl_seconds": proposal.ttl_seconds,
+                },
+            )
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=(proposal.requested_change or {}),
+                idempotency_key=data.get("idempotency_key"),
+                status="blocked",
+                blocked_reason="proposal_expired",
+                metadata={"expires_at": proposal.expires_at, "ttl_seconds": proposal.ttl_seconds},
+            )
+            await server.send_to_client(websocket, {
+                "type": "operator_proposal_apply_blocked",
+                **result,
             })
             return
 
@@ -896,9 +1064,9 @@ def register_handlers(server):
 
         apply_result = await apply_manual_console_write(
             websocket,
-            channel=requested_change.get("channel"),
-            value=requested_change.get("value"),
-            value_type=value_type,
+            channel=normalized_change["channel"],
+            value=normalized_change["effective_value"],
+            value_type=normalized_change["value_type"],
             source=f"operator_proposal:{proposal.id}",
             reason=data.get("reason") or proposal.reason or proposal.title,
             approved=True,
@@ -915,11 +1083,13 @@ def register_handlers(server):
             status=apply_result.get("status", "unknown"),
             blocked_reason=apply_result.get("reason") if apply_result.get("status") != "applied" else None,
         )
+        remember_applied_delta(normalized_change, apply_result)
         await server.send_to_client(websocket, {"type": "operator_proposal_apply_result", **result})
 
     return {
         "get_dashboard_snapshot": handle_get_dashboard_snapshot,
         "get_channel_inventory": handle_get_channel_inventory,
+        "get_channel_processing_snapshot": handle_get_channel_processing_snapshot,
         "get_decision_queue": handle_get_decision_queue,
         "get_decision_traces": handle_get_decision_traces,
         "get_safety_monitor": handle_get_safety_monitor,
@@ -929,8 +1099,14 @@ def register_handlers(server):
         "get_connection_topology": handle_get_connection_topology,
         "get_operator_agent_roster": handle_get_operator_agent_roster,
         "get_groups_buses_snapshot": handle_get_groups_buses_snapshot,
+        "get_bus_main_dca_snapshot": handle_get_bus_main_dca_snapshot,
+        "get_matrix_snapshot": handle_get_matrix_snapshot,
+        "get_routing_sends_snapshot": handle_get_routing_sends_snapshot,
+        "get_snapshots_scenes_snapshot": handle_get_snapshots_scenes_snapshot,
+        "get_user_presets_snapshot": handle_get_user_presets_snapshot,
         "get_memory_knowledge_snapshot": handle_get_memory_knowledge_snapshot,
         "get_training_sessions_snapshot": handle_get_training_sessions_snapshot,
+        "get_telemetry_alerts_snapshot": handle_get_telemetry_alerts_snapshot,
         "get_rules_library_snapshot": handle_get_rules_library_snapshot,
         "get_agent_communications_snapshot": handle_get_agent_communications_snapshot,
         "get_processing_pipeline_snapshot": handle_get_processing_pipeline_snapshot,

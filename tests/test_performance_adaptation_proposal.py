@@ -1,0 +1,255 @@
+from pathlib import Path
+
+from backend.performance_adaptation_proposal import (
+    PerformanceAdaptationAnalysisInput,
+    analyze_performance_adaptation_need,
+    build_performance_adaptation_proposals,
+    normalize_target_kind,
+)
+from backend.processing_proposal_adapters import build_proposal_only_method_contracts
+from backend.processing_registry import get_pipeline_profile, get_processing_method
+from backend.project_goal_capability_matrix import get_project_goal_capability
+
+
+def test_performance_adaptation_module_is_transport_free():
+    source = Path("backend/performance_adaptation_proposal.py").read_text()
+
+    forbidden = [
+        "WingClient",
+        "EnhancedOSCClient",
+        ".send(",
+        "mixer_client",
+        "set_fader",
+        "set_gain",
+        "apply_operator_proposal",
+    ]
+    for token in forbidden:
+        assert token not in source
+
+
+def test_persistent_loud_musician_creates_proposal_only_downward_adaptation():
+    recommendation = analyze_performance_adaptation_need(
+        PerformanceAdaptationAnalysisInput(
+            target_id="ch:7",
+            target_kind="channel",
+            target_label="Lead Guitar",
+            source_role="electric_guitar",
+            arrangement_role="support",
+            baseline_level_lufs=-25.0,
+            current_level_lufs=-21.6,
+            short_term_lufs=-21.2,
+            current_fader_db=-6.0,
+            true_peak_dbfs=-7.0,
+            main_bus_headroom_db=5.0,
+            feedback_risk=0.12,
+            bleed_risk=0.2,
+            baseline_available=True,
+            current_readback_available=True,
+            rollback_available=True,
+            operator_intent="operator_adaptation_review",
+            adaptation_window="performance",
+            active_performance=True,
+            cooldown_elapsed_sec=12.0,
+            persistence_cycles=4,
+            latency_budget_ms=180.0,
+            latency_budget_met=True,
+            source_confidence=0.9,
+            trend_confidence=0.88,
+            safety_confidence=0.86,
+        )
+    )
+
+    assert recommendation.status == "proposal_only"
+    assert recommendation.action_type == "performance_adaptation_proposal"
+    assert recommendation.target_kind == "channel"
+    assert recommendation.level_drift_db > 3.0
+    assert recommendation.suggested_delta_db == -1.5
+    assert recommendation.blockers == ()
+    assert recommendation.evidence["transport_free"] is True
+    assert recommendation.evidence["rate_limited"] is True
+    assert recommendation.evidence["active_performance"] is True
+
+    proposal = recommendation.to_operator_proposal()
+    assert proposal["method_id"] == "performance_adaptation_proposal"
+    assert proposal["kind"] == "performance_adaptation"
+    assert proposal["can_import_to_queue"] is False
+    assert proposal["can_apply_live"] is False
+    assert "requested_change" not in proposal
+    assert "requested_changes" not in proposal
+    assert "unsupported_value_type:performance_adaptation" in proposal["blockers"]
+    assert proposal["proposed_action"]["suggested_delta_db"] == -1.5
+    assert proposal["evidence"]["live_write"] is False
+
+
+def test_upward_adaptation_requires_headroom_and_low_feedback_bleed():
+    recommendation = analyze_performance_adaptation_need(
+        PerformanceAdaptationAnalysisInput(
+            target_id="ch:3",
+            target_kind="channel",
+            target_label="Rack Tom",
+            source_role="tom",
+            baseline_level_lufs=-25.0,
+            current_level_lufs=-28.4,
+            short_term_lufs=-28.0,
+            current_fader_db=-2.0,
+            main_bus_headroom_db=0.6,
+            feedback_risk=0.7,
+            bleed_risk=0.75,
+            baseline_available=True,
+            current_readback_available=True,
+            rollback_available=True,
+            operator_intent="operator_adaptation_review",
+            adaptation_window="performance",
+            cooldown_elapsed_sec=12.0,
+            persistence_cycles=4,
+            latency_budget_met=True,
+            source_confidence=0.9,
+            trend_confidence=0.9,
+            safety_confidence=0.9,
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "true_peak_headroom_insufficient_for_upward_adaptation" in recommendation.blockers
+    assert "feedback_risk_high_for_upward_adaptation" in recommendation.blockers
+    assert "bleed_risk_high_for_upward_adaptation" in recommendation.blockers
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_missing_evidence_or_manual_override_blocks_adaptation():
+    recommendation = analyze_performance_adaptation_need(
+        PerformanceAdaptationAnalysisInput(
+            target_id="group:vocals",
+            target_kind="group",
+            source_role="lead_vocal",
+            baseline_level_lufs=-22.0,
+            current_level_lufs=-19.0,
+            main_bus_headroom_db=4.0,
+            baseline_available=False,
+            current_readback_available=False,
+            rollback_available=False,
+            operator_intent="",
+            manual_override_active=True,
+            cooldown_elapsed_sec=1.0,
+            persistence_cycles=1,
+            latency_budget_met=False,
+            source_confidence=0.4,
+            trend_confidence=0.4,
+            safety_confidence=0.4,
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "baseline_level_missing" in recommendation.blockers
+    assert "current_level_readback_missing" in recommendation.blockers
+    assert "rollback_state_missing" in recommendation.blockers
+    assert "operator_intent_required" in recommendation.blockers
+    assert "manual_override_active" in recommendation.blockers
+    assert "cooldown_not_elapsed" in recommendation.blockers
+    assert "trend_persistence_low" in recommendation.blockers
+    assert "latency_budget_missing" in recommendation.blockers
+
+
+def test_small_or_recent_drift_is_analysis_only():
+    recommendation = analyze_performance_adaptation_need(
+        PerformanceAdaptationAnalysisInput(
+            target_id="ch:8",
+            target_kind="ch",
+            source_role="keys",
+            baseline_level_lufs=-30.0,
+            current_level_lufs=-29.8,
+            current_fader_db=-8.0,
+            main_bus_headroom_db=4.0,
+            baseline_available=True,
+            current_readback_available=True,
+            rollback_available=True,
+            operator_intent="operator_adaptation_review",
+            cooldown_elapsed_sec=2.0,
+            persistence_cycles=1,
+            source_confidence=0.9,
+            trend_confidence=0.9,
+            safety_confidence=0.9,
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert recommendation.target_kind == "channel"
+    assert "adaptation_change_not_needed" in recommendation.blockers
+    assert "cooldown_not_elapsed" in recommendation.blockers
+    assert "trend_persistence_low" in recommendation.blockers
+
+
+def test_build_performance_adaptation_proposals_filters_to_proposal_only_items():
+    proposals = build_performance_adaptation_proposals(
+        [
+            PerformanceAdaptationAnalysisInput(
+                target_id="ch:7",
+                target_kind="channel",
+                source_role="electric_guitar",
+                baseline_level_lufs=-25.0,
+                current_level_lufs=-21.6,
+                current_fader_db=-6.0,
+                main_bus_headroom_db=5.0,
+                baseline_available=True,
+                current_readback_available=True,
+                rollback_available=True,
+                operator_intent="operator_adaptation_review",
+                cooldown_elapsed_sec=12.0,
+                persistence_cycles=4,
+                source_confidence=0.9,
+                trend_confidence=0.88,
+                safety_confidence=0.86,
+            ),
+            PerformanceAdaptationAnalysisInput(
+                target_id="ch:8",
+                target_kind="channel",
+                source_role="keys",
+                baseline_level_lufs=-30.0,
+                current_level_lufs=-29.9,
+                baseline_available=True,
+                current_readback_available=True,
+                rollback_available=True,
+                operator_intent="operator_adaptation_review",
+                cooldown_elapsed_sec=12.0,
+                persistence_cycles=4,
+                source_confidence=0.9,
+                trend_confidence=0.88,
+                safety_confidence=0.86,
+            ),
+        ]
+    )
+
+    assert len(proposals) == 1
+    assert proposals[0]["target"] == "ch:7"
+    assert proposals[0]["can_import_to_queue"] is False
+
+
+def test_performance_adaptation_helpers_normalize_target_kind():
+    assert normalize_target_kind("ch") == "channel"
+    assert normalize_target_kind("subgroup") == "group"
+    assert normalize_target_kind("mtx") == "matrix"
+
+
+def test_performance_adaptation_proposal_is_registered_as_goal_capability():
+    method = get_processing_method("performance_adaptation_proposal")
+    main = get_pipeline_profile("main_live_assist")
+    capability = get_project_goal_capability("musician_level_adaptation")
+    live = get_project_goal_capability("live_adaptation")
+    realtime = get_project_goal_capability("realtime_corrections")
+    contracts = {item["method_id"]: item for item in build_proposal_only_method_contracts()}
+
+    assert method is not None
+    assert method.status == "proposal_only"
+    assert method.domain == "adaptation"
+    assert method.can_write_live is False
+    assert main is not None
+    assert "performance_adaptation_proposal" in main.proposal_method_ids
+    assert capability is not None
+    assert capability.status == "proposal_only"
+    assert capability.autonomy_mode_ceiling == "assisted"
+    assert "performance_adaptation_proposal" in capability.method_ids
+    assert live is not None and live.status == "proposal_only"
+    assert "performance_adaptation_proposal" in live.method_ids
+    assert realtime is not None and realtime.status == "proposal_only"
+    assert "performance_adaptation_proposal" in realtime.method_ids
+    assert contracts["performance_adaptation_proposal"]["proposal_contract"]["value_type"] == "performance_adaptation"

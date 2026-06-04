@@ -9,7 +9,7 @@ from scipy.signal import butter, lfilter, savgol_filter, sosfilt
 
 
 MIN_MAG = 1e-12
-SMART_EQ_METHOD_ID = "offline_smarteq_style_spectral_eq_v1"
+SMART_EQ_METHOD_ID = "offline_smarteq_style_spectral_eq_v2"
 
 
 @dataclass(frozen=True)
@@ -29,16 +29,20 @@ class OfflineSmartEQConfig:
     fft_size: int = 8192
     hop_size: int = 4096
     band_slots: int = 24
-    max_active_bands: int = 8
-    min_move_db: float = 0.85
-    max_cut_db: float = 4.0
-    max_boost_db: float = 1.5
-    correction_scale: float = 0.48
-    boost_scale: float = 0.32
+    max_active_bands: int = 5
+    min_move_db: float = 1.15
+    max_cut_db: float = 2.0
+    max_boost_db: float = 1.0
+    correction_scale: float = 0.25
+    boost_scale: float = 0.22
     min_frequency_hz: float = 35.0
     max_frequency_hz: float = 18000.0
-    max_q: float = 3.2
-    default_q: float = 1.15
+    max_q: float = 2.2
+    default_q: float = 0.95
+    min_band_spacing_oct: float = 0.72
+    protected_fundamental_cut_cap_db: float = 0.85
+    low_support_cut_cap_db: float = 1.1
+    min_peaking_gain_db: float = 0.4
 
 
 @dataclass(frozen=True)
@@ -166,6 +170,38 @@ def _role_highpass_hz(role: str) -> float | None:
     }.get(role)
 
 
+def _role_protected_ranges(role: str) -> Tuple[Tuple[float, float, str], ...]:
+    role = _normalize_role(role)
+    ranges: Dict[str, Tuple[Tuple[float, float, str], ...]] = {
+        "kick": ((45.0, 95.0, "kick fundamental"),),
+        "bass": ((45.0, 145.0, "bass fundamental"),),
+        "tom": ((70.0, 190.0, "tom body"),),
+        "snare": ((150.0, 260.0, "snare body"),),
+        "vocal": ((130.0, 310.0, "vocal body"),),
+        "backing_vocal": ((140.0, 330.0, "backing vocal body"),),
+        "guitar": ((120.0, 270.0, "guitar body"),),
+        "accordion": ((180.0, 460.0, "accordion body"),),
+        "keyboard": ((110.0, 320.0, "keyboard body"),),
+        "playback": ((45.0, 160.0, "playback low support"),),
+    }
+    return ranges.get(role, ())
+
+
+def _protected_range_label(role: str, frequency_hz: float) -> str | None:
+    for lo_hz, hi_hz, label in _role_protected_ranges(role):
+        if lo_hz <= float(frequency_hz) <= hi_hz:
+            return label
+    return None
+
+
+def _is_low_support_role(role: str) -> bool:
+    return _normalize_role(role) in {"kick", "bass", "tom", "playback"}
+
+
+def _octaves_apart(a_hz: float, b_hz: float) -> float:
+    return abs(math.log2(max(float(a_hz), 1.0) / max(float(b_hz), 1.0)))
+
+
 def _smart_weights(role: str) -> Tuple[Dict[str, Any], ...]:
     role = _normalize_role(role)
     if role in {"vocal", "backing_vocal"}:
@@ -265,18 +301,33 @@ def design_offline_smarteq_eq(
         move = float(move)
         if abs(move) < config.min_move_db:
             continue
+        if highpass and float(center) <= float(highpass) * 1.35:
+            continue
         scale = config.boost_scale if move > 0.0 else config.correction_scale
         gain = move * scale
         gain = float(np.clip(gain, -config.max_cut_db, config.max_boost_db))
-        if abs(gain) < 0.35:
+        protected_label = _protected_range_label(role, float(center))
+        reason = "spectral target boost" if gain > 0 else "spectral imbalance cut"
+        if gain < 0.0 and protected_label:
+            gain = max(gain, -abs(float(config.protected_fundamental_cut_cap_db)))
+            reason = f"protected fundamental soft cut: {protected_label}"
+        elif gain < 0.0 and _is_low_support_role(role) and float(center) < 180.0:
+            gain = max(gain, -abs(float(config.low_support_cut_cap_db)))
+            reason = "low support soft cut"
+        if abs(gain) < config.min_peaking_gain_db:
             continue
         q = float(np.clip(config.default_q + 0.12 * min(abs(gain), 4.0), 0.55, config.max_q))
-        reason = "spectral target boost" if gain > 0 else "spectral imbalance cut"
         candidate_bands.append(EQBand("peaking", float(center), gain, q, reason))
 
     candidate_bands.sort(key=lambda band: abs(band.gain_db), reverse=True)
     remaining = max(0, int(config.max_active_bands) - len(active))
-    active.extend(sorted(candidate_bands[:remaining], key=lambda band: band.frequency_hz))
+    selected_bands: List[EQBand] = []
+    for band in candidate_bands:
+        if all(_octaves_apart(band.frequency_hz, existing.frequency_hz) >= config.min_band_spacing_oct for existing in selected_bands):
+            selected_bands.append(band)
+        if len(selected_bands) >= remaining:
+            break
+    active.extend(sorted(selected_bands, key=lambda band: band.frequency_hz))
 
     peak_freq = float(freqs[int(np.argmax(observed_db))]) if freqs.size else 0.0
     report = OfflineSmartEQReport(
@@ -292,6 +343,14 @@ def design_offline_smarteq_eq(
             "peak_frequency_hz": round(peak_freq, 3),
             "median_observed_db": round(float(np.median(observed_db)), 3),
             "max_requested_move_db": round(float(np.max(np.abs(moves))) if moves.size else 0.0, 3),
+            "max_cut_db": float(config.max_cut_db),
+            "max_boost_db": float(config.max_boost_db),
+            "min_band_spacing_oct": float(config.min_band_spacing_oct),
+            "protected_ranges": [
+                {"low_hz": lo_hz, "high_hz": hi_hz, "label": label}
+                for lo_hz, hi_hz, label in _role_protected_ranges(role)
+            ],
+            "candidate_band_count": len(candidate_bands),
             "active_band_count": len(active),
         },
     )

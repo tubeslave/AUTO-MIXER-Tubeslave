@@ -94,6 +94,41 @@ def test_unsafe_dynamic_eq_values_are_blocked():
     } >= {"eq_gain_limit_exceeded", "eq_q_limit_exceeded", "ratio_out_of_range", "makeup_gain_limit_exceeded"}
 
 
+def test_dynamic_eq_validation_enforces_buffer_timing_guards():
+    payload = _valid_diff_deq_payload(sample_rate=48000)
+    payload["bands"][0]["attack_ms"] = 5.0
+    payload["bands"][1]["release_ms"] = 15.0
+    payload["bands"][2]["parameter_ramp_ms"] = 40.0
+    prediction = parse_dynamic_eq_prediction(payload)
+
+    result = validate_dynamic_eq_prediction(prediction, config=DynamicEQSafetyConfig(buffer_size_samples=512))
+
+    assert result.passed is False
+    assert result.metadata["buffer_size_samples"] == 512
+    assert result.metadata["buffer_ms"] > 10.0
+    assert {issue.code for issue in result.issues} >= {
+        "attack_too_fast_for_buffer",
+        "release_too_fast_for_buffer",
+        "parameter_ramp_too_fast_for_buffer",
+    }
+
+
+def test_dynamic_eq_validation_fails_closed_for_invalid_buffer_guard_config():
+    prediction = parse_dynamic_eq_prediction(_valid_diff_deq_payload(sample_rate=48000))
+
+    result = validate_dynamic_eq_prediction(
+        prediction,
+        config=DynamicEQSafetyConfig(buffer_size_samples=0, min_parameter_ramp_buffers=0),
+    )
+
+    assert result.passed is False
+    assert result.metadata["buffer_ms"] is None
+    assert {issue.code for issue in result.issues} >= {
+        "invalid_buffer_size",
+        "invalid_parameter_ramp_guard",
+    }
+
+
 def test_dynamic_eq_playbook_summarizes_multiple_predictions():
     valid = _valid_diff_deq_payload(channel_id=1)
     unsafe = _valid_diff_deq_payload(channel_id=2)

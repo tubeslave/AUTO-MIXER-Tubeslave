@@ -1,0 +1,9 @@
+
+Gain
+Global Enabled
+Global Low Freq Focus
+Group
+Group Enable Mode
+Group Gain
+Master Bypass
+Weight

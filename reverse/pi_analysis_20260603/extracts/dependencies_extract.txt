@@ -1,0 +1,26 @@
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:2:	/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate (compatibility version 1.0.0, current version 4.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:3:	/System/Library/Frameworks/AudioToolbox.framework/Versions/A/AudioToolbox (compatibility version 1.0.0, current version 1000.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:6:	/System/Library/Frameworks/CoreAudio.framework/Versions/A/CoreAudio (compatibility version 1.0.0, current version 1.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:7:	/System/Library/Frameworks/CoreAudioKit.framework/Versions/A/CoreAudioKit (compatibility version 1.0.0, current version 1.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:8:	/System/Library/Frameworks/CoreMIDI.framework/Versions/A/CoreMIDI (compatibility version 1.0.0, current version 69.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:12:	/System/Library/Frameworks/OpenGL.framework/Versions/A/OpenGL (compatibility version 1.0.0, current version 1.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:14:	/System/Library/Frameworks/WebKit.framework/Versions/A/WebKit (compatibility version 1.0.0, current version 613.1.17)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:15:	/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 1300.23.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:16:	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1311.100.3)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:27:	/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate (compatibility version 1.0.0, current version 4.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:28:	/System/Library/Frameworks/AudioToolbox.framework/Versions/A/AudioToolbox (compatibility version 1.0.0, current version 1000.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:31:	/System/Library/Frameworks/CoreAudio.framework/Versions/A/CoreAudio (compatibility version 1.0.0, current version 1.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:32:	/System/Library/Frameworks/CoreAudioKit.framework/Versions/A/CoreAudioKit (compatibility version 1.0.0, current version 1.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:33:	/System/Library/Frameworks/CoreMIDI.framework/Versions/A/CoreMIDI (compatibility version 1.0.0, current version 69.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:37:	/System/Library/Frameworks/OpenGL.framework/Versions/A/OpenGL (compatibility version 1.0.0, current version 1.0.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:39:	/System/Library/Frameworks/WebKit.framework/Versions/A/WebKit (compatibility version 1.0.0, current version 613.1.17)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:40:	/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 1300.23.0)
+reverse/pi_analysis_20260603/logs/otool_L_vst3.log:41:	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1311.100.3)
+reverse/pi_analysis_20260603/logs/bundle_files_vst3.log:3:/Library/Audio/Plug-Ins/VST3/Pi.vst3/Contents/PlugIns/__Pace_Eden/libWrapHelper.dylib
+reverse/pi_analysis_20260603/logs/bundle_files_vst3.log:5:/Library/Audio/Plug-Ins/VST3/Pi.vst3/Contents/Resources/__Pace_Eden/Experience/langs/en-us.xml
+reverse/pi_analysis_20260603/logs/bundle_files_vst3.log:6:/Library/Audio/Plug-Ins/VST3/Pi.vst3/Contents/Resources/__Pace_Eden/Experience/langs/common.xml
+reverse/pi_analysis_20260603/logs/bundle_files_vst3.log:7:/Library/Audio/Plug-Ins/VST3/Pi.vst3/Contents/Resources/__Pace_Eden/Wrapper/wraptool.winfo
+reverse/pi_analysis_20260603/logs/bundle_files_vst3.log:9:/Library/Audio/Plug-Ins/VST3/Pi.vst3/Contents/__Pace_Eden.bundle/Contents/_CodeSignature/CodeResources
+reverse/pi_analysis_20260603/logs/bundle_files_vst3.log:10:/Library/Audio/Plug-Ins/VST3/Pi.vst3/Contents/__Pace_Eden.bundle/Contents/MacOS/__Pace_Eden
+reverse/pi_analysis_20260603/logs/bundle_files_vst3.log:11:/Library/Audio/Plug-Ins/VST3/Pi.vst3/Contents/__Pace_Eden.bundle/Contents/Resources/Signatures/codesign.dsig
+reverse/pi_analysis_20260603/logs/bundle_files_vst3.log:12:/Library/Audio/Plug-Ins/VST3/Pi.vst3/Contents/__Pace_Eden.bundle/Contents/Info.plist

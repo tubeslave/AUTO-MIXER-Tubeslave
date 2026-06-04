@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tubeslave.automixer.chatgpt-pulse-review</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/chatgpt_pulse_review/run_pulse_review_cycle.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>9</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>KeepAlive</key>
+  <false/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/dmitrijvolkov/.nvm/versions/node/v24.15.0/bin</string>
+    <key>PULSE_REVIEW_EXPECTED_PROJECT_ROOT</key>
+    <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main</string>
+    <key>PULSE_REVIEW_BROWSER</key>
+    <string>chrome</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/logs/chatgpt_pulse_review/launchd.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/logs/chatgpt_pulse_review/launchd.err.log</string>
+</dict>
+</plist>

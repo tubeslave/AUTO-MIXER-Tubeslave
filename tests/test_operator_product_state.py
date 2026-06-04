@@ -1,5 +1,7 @@
 import importlib
+import json
 import sys
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -10,18 +12,25 @@ from backend.operator_analysis import build_operator_analysis_report
 from backend.shadow_gain_rides import build_shadow_gain_ride_candidates, shadow_gain_ride_trace
 from backend.operator_product_state import (
     build_agent_communications_snapshot,
+    build_bus_main_dca_snapshot,
     build_channel_intelligence,
     build_channel_inventory,
+    build_channel_processing_snapshot,
     build_decision_queue,
     build_decision_traces,
     build_groups_buses_snapshot,
+    build_matrix_snapshot,
     build_memory_knowledge_snapshot,
     build_operator_agent_roster,
     build_processing_pipeline_snapshot,
     build_replay_runs,
+    build_routing_sends_snapshot,
     build_rules_library_snapshot,
     build_safety_monitor,
+    build_snapshots_scenes_snapshot,
+    build_telemetry_alerts_snapshot,
     build_training_sessions_snapshot,
+    build_user_presets_snapshot,
 )
 from backend.processing_pipeline_preview import build_main_pipeline_preview
 from backend.operator_recommendation_bridge import (
@@ -48,10 +57,21 @@ class CachedMixer:
             "/ch/2/fdr": -8.0,
             "/ch/2/in/set/trim": 1.0,
         }
+        self.send = MagicMock()
         self.get_all_channel_names = MagicMock(return_value={1: "Should Not Scan"})
 
     def get_state(self):
         return {"connected": True}
+
+    @staticmethod
+    def _parse_dca_assignments(tags):
+        if not tags:
+            return []
+        assignments = []
+        for token in str(tags).replace(",", " ").split():
+            if token.upper().startswith("#D") and token[2:].isdigit():
+                assignments.append(int(token[2:]))
+        return sorted(set(assignments))
 
 
 class FakeAudioCapture:
@@ -169,11 +189,550 @@ def test_channel_inventory_uses_cached_runtime_state_without_scanning(server):
     assert inventory["connection"]["connected"] is True
     assert inventory["summary"]["total_channels"] == 4
     assert inventory["summary"]["active_channels"] == 3
+    assert inventory["summary"]["read_coverage_status"] == "partial"
+    assert inventory["read_coverage"]["read_only"] is True
+    assert inventory["read_coverage"]["mutates_console_state"] is False
+    assert inventory["read_coverage"]["section_status_counts"]["metering"]["complete"] == 4
     assert inventory["channels"][0]["name"] == "Kick In"
     assert inventory["channels"][0]["group"] == "DRUMS"
     assert inventory["channels"][1]["name"] == "Lead Vocal"
     assert inventory["channels"][1]["group"] == "VOCALS"
     assert inventory["channels"][1]["control_state"]["fader_db"] == -8.0
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_channel_inventory_publishes_cached_channel_detail_readback_only(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/ch/2/mute": 0,
+        "/ch/2/pan": 0.25,
+        "/ch/2/gate/on": 1,
+        "/ch/2/gate/thr": -47.5,
+        "/ch/2/dyn/on": 1,
+        "/ch/2/dyn/thr26": -18.0,
+        "/ch/2/dyn/gr": 2.4,
+    })
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+    server.audio_capture = None
+
+    inventory = build_channel_inventory(server, total_channels=2)
+    channel_2 = inventory["channels"][1]
+    control = channel_2["control_state"]
+
+    assert control["pan"] == 0.25
+    assert control["mute"] == 0
+    assert control["gate_enabled"] == 1
+    assert control["gate_threshold_db"] == -47.5
+    assert control["gate_label"] == "G -47.5"
+    assert control["compressor_enabled"] == 1
+    assert control["compressor_threshold_db"] == -18.0
+    assert control["compressor_gain_reduction_db"] == 2.4
+    assert control["comp_label"] == "C 2.4 GR"
+    coverage = channel_2["read_coverage"]
+    assert coverage["read_only"] is True
+    assert coverage["live_write"] is False
+    assert coverage["mutates_console_state"] is False
+    assert coverage["status"] == "partial"
+    assert coverage["sections"]["basic_controls"]["status"] == "complete"
+    assert coverage["sections"]["basic_controls"]["source"] == "mixer_state_cache"
+    assert coverage["sections"]["processing"]["status"] == "complete"
+    assert coverage["sections"]["processing"]["source"] == "mixer_state_cache"
+    assert coverage["sections"]["metering"]["status"] == "missing"
+    assert "metering" in coverage["missing_sections"]
+    assert inventory["read_coverage"]["channels_with_complete_basic_controls"] == 1
+    assert inventory["read_coverage"]["channels_with_complete_processing"] == 1
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_channel_inventory_marks_missing_cached_read_sections_without_writes(server):
+    mixer = CachedMixer()
+    mixer.state = {}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+    server.audio_capture = None
+
+    inventory = build_channel_inventory(server, total_channels=1)
+    channel = inventory["channels"][0]
+    coverage = channel["read_coverage"]
+
+    assert channel["name"] == "Ch 1"
+    assert channel["control_state"]["fader_db"] is None
+    assert coverage["read_only"] is True
+    assert coverage["mutates_console_state"] is False
+    assert coverage["sections"]["basic_controls"]["status"] == "missing"
+    assert coverage["sections"]["basic_controls"]["source"] == "unavailable"
+    assert coverage["sections"]["processing"]["status"] == "missing"
+    assert coverage["sections"]["metering"]["status"] == "missing"
+    assert "mixer_state_cache" not in coverage["source_kinds"]
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_channel_processing_snapshot_publishes_cached_processing_readback_only(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/ch/2/flt/lc": 1,
+        "/ch/2/flt/lcf": 120.0,
+        "/ch/2/eq/on": 1,
+        "/ch/2/dyn/on": 1,
+        "/ch/2/dyn/mdl": "COMP",
+        "/ch/2/dyn/thr26": -18.0,
+        "/ch/2/dyn/ratio": "3.0",
+        "/ch/2/dyn/att": 12.0,
+        "/ch/2/dyn/rel": 180.0,
+        "/ch/2/dyn/gain": 2.0,
+        "/ch/2/dyn/mix": 80.0,
+        "/ch/2/dyn/det": "PEAK",
+        "/ch/2/dyn/gr": 2.4,
+        "/ch/2/gate/on": 1,
+        "/ch/2/gate/mdl": "GATE",
+        "/ch/2/gate/thr": -47.5,
+        "/ch/2/gate/range": 18.0,
+        "/ch/2/gate/att": 4.0,
+        "/ch/2/gate/hld": 80.0,
+        "/ch/2/gate/rel": 240.0,
+        "/ch/2/gate/acc": 3.0,
+        "/ch/2/gate/ratio": "4.0",
+    })
+    for band in range(1, 5):
+        mixer.state[f"/ch/2/eq/{band}f"] = 100.0 * band
+        mixer.state[f"/ch/2/eq/{band}g"] = -1.0 * band
+        mixer.state[f"/ch/2/eq/{band}q"] = 0.7 + band / 10
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+    server.audio_capture = None
+
+    snapshot = build_channel_processing_snapshot(server, total_channels=2)
+    channel_2 = snapshot["channels"][1]
+
+    assert snapshot["type"] == "channel_processing_snapshot"
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "full_autonomous_ready": False,
+    }
+    assert snapshot["summary"]["read_coverage_status"] == "partial"
+    assert snapshot["summary"]["channels_with_complete_processing_cache"] == 1
+    assert channel_2["name"] == "Lead Vocal"
+    assert channel_2["hpf"]["enabled"] == 1
+    assert channel_2["hpf"]["frequency_hz"] == 120.0
+    assert channel_2["eq"]["enabled"] == 1
+    assert channel_2["eq"]["bands"][3]["frequency_hz"] == 400.0
+    assert channel_2["eq"]["bands"][3]["gain_db"] == -4.0
+    assert channel_2["compressor"]["model"] == "COMP"
+    assert channel_2["compressor"]["threshold_db"] == -18.0
+    assert channel_2["compressor"]["gain_reduction_db"] == 2.4
+    assert channel_2["gate"]["threshold_db"] == -47.5
+    assert channel_2["read_coverage"]["status"] == "complete"
+    assert channel_2["read_coverage"]["sections"]["hpf"]["status"] == "complete"
+    assert channel_2["read_coverage"]["sections"]["eq"]["status"] == "complete"
+    assert channel_2["read_coverage"]["sections"]["compressor"]["status"] == "complete"
+    assert channel_2["read_coverage"]["sections"]["gate"]["status"] == "complete"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_channel_processing_snapshot_marks_missing_cache_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state = {}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+    server.audio_capture = None
+
+    snapshot = build_channel_processing_snapshot(server, total_channels=1)
+    channel = snapshot["channels"][0]
+
+    assert snapshot["summary"]["read_coverage_status"] == "missing"
+    assert snapshot["summary"]["channels_with_any_processing_cache"] == 0
+    assert channel["hpf"]["enabled"] is None
+    assert channel["eq"]["bands"][0]["read_coverage"]["status"] == "missing"
+    assert channel["read_coverage"]["status"] == "missing"
+    assert channel["read_coverage"]["missing_sections"] == ["hpf", "eq", "compressor", "gate"]
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_bus_main_dca_snapshot_publishes_cached_console_surfaces_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/bus/1/$name": "Vocal Bus",
+        "/bus/1/mute": 0,
+        "/bus/1/fdr": -4.0,
+        "/bus/1/pan": 0.0,
+        "/bus/1/wid": 100.0,
+        "/bus/1/busmono": 0,
+        "/bus/1/eq/on": 1,
+        "/bus/1/dyn/on": 1,
+        "/bus/1/dyn/mdl": "BUSCOMP",
+        "/bus/1/dyn/thr37": -20.0,
+        "/bus/1/dyn/ratio": "2.0",
+        "/bus/1/dyn/knee": 3.0,
+        "/bus/1/dyn/det": "RMS",
+        "/bus/1/dyn/att": 20.0,
+        "/bus/1/dyn/rel": 250.0,
+        "/bus/1/dyn/gain": 1.5,
+        "/bus/1/dyn/mix": 75.0,
+        "/bus/1/main/1/on": 1,
+        "/bus/1/main/1/lvl": -2.0,
+        "/bus/1/main/1/pre": 0,
+        "/bus/1/tags": "#D1",
+        "/main/1/fdr": -2.5,
+        "/main/1/mute": 0,
+        "/main/1/pan": 0.0,
+        "/main/1/eq/on": 1,
+        "/dca/1/name": "Vocals",
+        "/dca/1/mute": 0,
+        "/dca/1/fdr": -3.0,
+        "/dca/1/col": "purple",
+        "/dca/1/icon": "mic",
+        "/dca/1/mon": 0,
+    })
+    for band in range(1, 9):
+        mixer.state[f"/bus/1/eq/{band}f"] = 125.0 * band
+        mixer.state[f"/bus/1/eq/{band}g"] = -0.5 * band
+        mixer.state[f"/bus/1/eq/{band}q"] = 0.8 + band / 10
+        mixer.state[f"/main/1/eq/{band}f"] = 100.0 * band
+        mixer.state[f"/main/1/eq/{band}g"] = -0.25 * band
+        mixer.state[f"/main/1/eq/{band}q"] = 0.7 + band / 10
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_bus_main_dca_snapshot(server, bus_count=1, main_count=1, dca_count=1)
+    bus = snapshot["buses"][0]
+    main = snapshot["mains"][0]
+    dca = snapshot["dcas"][0]
+
+    assert snapshot["type"] == "bus_main_dca_snapshot"
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "full_autonomous_ready": False,
+    }
+    assert snapshot["summary"]["read_coverage_status"] == "complete"
+    assert bus["name"] == "Vocal Bus"
+    assert bus["fader_db"] == -4.0
+    assert bus["eq"]["bands"][7]["frequency_hz"] == 1000.0
+    assert bus["dynamics"]["threshold_db"] == -20.0
+    assert bus["main_send"]["level_db"] == -2.0
+    assert bus["dca_assignments"] == [1]
+    assert bus["read_coverage"]["status"] == "complete"
+    assert main["fader_db"] == -2.5
+    assert main["read_coverage"]["status"] == "complete"
+    assert dca["name"] == "Vocals"
+    assert dca["read_coverage"]["status"] == "complete"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_bus_main_dca_snapshot_marks_missing_cache_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state = {}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_bus_main_dca_snapshot(server, bus_count=1, main_count=1, dca_count=1)
+
+    assert snapshot["summary"]["read_coverage_status"] == "missing"
+    assert snapshot["read_coverage"]["surface_status_counts"]["buses"]["missing"] == 1
+    assert snapshot["read_coverage"]["surface_status_counts"]["mains"]["missing"] == 1
+    assert snapshot["read_coverage"]["surface_status_counts"]["dcas"]["missing"] == 1
+    assert snapshot["buses"][0]["read_coverage"]["missing_sections"] == [
+        "identity",
+        "basic_controls",
+        "eq",
+        "dynamics",
+        "main_send",
+        "assignments",
+    ]
+    assert snapshot["mains"][0]["read_coverage"]["status"] == "missing"
+    assert snapshot["dcas"][0]["read_coverage"]["status"] == "missing"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_matrix_snapshot_publishes_cached_console_state_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/mtx/1/fdr": -5.0,
+        "/mtx/1/mute": 0,
+        "/mtx/1/pan": 0.0,
+        "/mtx/1/eq/on": 1,
+        "/mtx/1/preins/on": 1,
+        "/mtx/1/preins/ins": "FX1",
+        "/mtx/1/preins/$stat": "OK",
+        "/mtx/1/postins/on": 1,
+        "/mtx/1/postins/ins": "FX2",
+        "/mtx/1/postins/$stat": "OK",
+        "/mtx/1/postins/mode": "insert",
+        "/mtx/1/postins/w": 100.0,
+    })
+    for band in range(1, 9):
+        mixer.state[f"/mtx/1/eq/{band}f"] = 160.0 * band
+        mixer.state[f"/mtx/1/eq/{band}g"] = -0.25 * band
+        mixer.state[f"/mtx/1/eq/{band}q"] = 0.7 + band / 10
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_matrix_snapshot(server, matrix_count=1)
+    matrix = snapshot["matrices"][0]
+
+    assert snapshot["type"] == "matrix_snapshot"
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "full_autonomous_ready": False,
+    }
+    assert snapshot["summary"]["read_coverage_status"] == "complete"
+    assert matrix["fader_db"] == -5.0
+    assert matrix["eq"]["bands"][7]["frequency_hz"] == 1280.0
+    assert matrix["inserts"]["pre_insert"]["slot"] == "FX1"
+    assert matrix["inserts"]["post_insert"]["mode"] == "insert"
+    assert matrix["read_coverage"]["status"] == "complete"
+    assert matrix["read_coverage"]["sections"]["basic_controls"]["status"] == "complete"
+    assert matrix["read_coverage"]["sections"]["eq"]["status"] == "complete"
+    assert matrix["read_coverage"]["sections"]["inserts"]["status"] == "complete"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_matrix_snapshot_marks_missing_cache_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state = {}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_matrix_snapshot(server, matrix_count=1)
+    matrix = snapshot["matrices"][0]
+
+    assert snapshot["summary"]["read_coverage_status"] == "missing"
+    assert snapshot["read_coverage"]["surface_status_counts"]["matrices"]["missing"] == 1
+    assert matrix["read_coverage"]["missing_sections"] == ["basic_controls", "eq", "inserts"]
+    assert matrix["inserts"]["pre_insert"]["read_coverage"]["status"] == "missing"
+    assert matrix["inserts"]["post_insert"]["read_coverage"]["status"] == "missing"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_routing_sends_snapshot_publishes_static_and_cached_state_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/ch/2/send/1/on": 1,
+        "/ch/2/send/1/lvl": -12.0,
+        "/ch/2/send/1/pon": 1,
+        "/ch/2/send/1/mode": "PRE",
+        "/ch/2/send/1/plink": 0,
+        "/ch/2/send/1/pan": 0.0,
+        "/ch/2/main/1/on": 1,
+        "/ch/2/main/1/lvl": -3.0,
+        "/ch/2/main/1/pre": 0,
+        "/io/out/MOD/1/grp": "CH",
+        "/io/out/MOD/1/in": 2,
+    })
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_routing_sends_snapshot(
+        server,
+        total_channels=2,
+        send_count=1,
+        main_count=1,
+        output_groups=["MOD"],
+        output_count=1,
+    )
+
+    assert snapshot["type"] == "routing_sends_snapshot"
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "full_autonomous_ready": False,
+    }
+    assert snapshot["summary"]["read_coverage_status"] == "partial"
+    assert snapshot["summary"]["active_bus_send_count"] == 1
+    assert snapshot["summary"]["active_main_send_count"] == 1
+    assert snapshot["static_dante_routes"][0]["read_coverage"]["source"] == "static_config"
+    send = next(row for row in snapshot["channel_bus_sends"] if row["channel"] == 2)
+    main_send = next(row for row in snapshot["channel_main_sends"] if row["channel"] == 2)
+    route = snapshot["output_routes"][0]
+    assert send["active"] is True
+    assert send["read_coverage"]["status"] == "complete"
+    assert main_send["active"] is True
+    assert main_send["read_coverage"]["status"] == "complete"
+    assert route["source_group"] == "CH"
+    assert route["source_channel"] == 2
+    assert route["read_coverage"]["status"] == "complete"
+    assert route["destructive_change_marker"] == "output_routing_write_would_repatch_console"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_routing_sends_snapshot_marks_missing_cache_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state = {}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_routing_sends_snapshot(
+        server,
+        total_channels=1,
+        send_count=1,
+        main_count=1,
+        output_groups=["MOD"],
+        output_count=1,
+    )
+
+    assert snapshot["summary"]["read_coverage_status"] == "partial"
+    assert snapshot["read_coverage"]["surface_status_counts"]["static_dante_routes"]["complete"] >= 1
+    assert snapshot["read_coverage"]["surface_status_counts"]["channel_bus_sends"]["missing"] == 1
+    assert snapshot["read_coverage"]["surface_status_counts"]["channel_main_sends"]["missing"] == 1
+    assert snapshot["read_coverage"]["surface_status_counts"]["output_routes"]["missing"] == 1
+    assert snapshot["channel_bus_sends"][0]["read_coverage"]["status"] == "missing"
+    assert snapshot["channel_main_sends"][0]["read_coverage"]["status"] == "missing"
+    assert snapshot["output_routes"][0]["read_coverage"]["status"] == "missing"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_snapshots_scenes_snapshot_publishes_cached_catalog_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "snapshots": {
+            1: {"name": "Pre-show baseline"},
+            "2": "Band A live start",
+        },
+        "/$ctl/lib/$actidx": 2,
+        "/$ctl/lib/$active": "Band A live start",
+        "/$ctl/lib/$actshow": "Sunday Show",
+    })
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_snapshots_scenes_snapshot(server, snapshot_count=3)
+    active = snapshot["snapshots"][1]
+
+    assert snapshot["type"] == "snapshots_scenes_snapshot"
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "full_autonomous_ready": False,
+        "scene_load_allowed": False,
+        "scene_save_allowed": False,
+    }
+    assert snapshot["summary"]["snapshot_count"] == 3
+    assert snapshot["summary"]["named_snapshot_count"] == 2
+    assert snapshot["summary"]["active_snapshot_index"] == 2
+    assert snapshot["summary"]["active_snapshot_name"] == "Band A live start"
+    assert snapshot["summary"]["current_show"] == "Sunday Show"
+    assert snapshot["summary"]["read_coverage_status"] == "partial"
+    assert snapshot["summary"]["live_apply_allowed"] is False
+    assert snapshot["active_scene"]["read_coverage"]["status"] == "complete"
+    assert active["snapshot_index"] == 2
+    assert active["snapshot_name"] == "Band A live start"
+    assert active["active"] is True
+    assert active["scene_load_policy"] == "blocked_manual_only"
+    assert active["scene_save_policy"] == "blocked_manual_only"
+    assert active["destructive_change_marker"] == "scene_recall_would_overwrite_console_state"
+    assert snapshot["snapshots"][2]["read_coverage"]["status"] == "partial"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_snapshots_scenes_snapshot_marks_missing_cache_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state = {}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_snapshots_scenes_snapshot(server, snapshot_count=2)
+
+    assert snapshot["summary"]["read_coverage_status"] == "missing"
+    assert snapshot["summary"]["named_snapshot_count"] == 0
+    assert snapshot["summary"]["active_snapshot_index"] is None
+    assert snapshot["active_scene"]["read_coverage"]["status"] == "missing"
+    assert snapshot["read_coverage"]["surface_status_counts"]["snapshot_slots"]["missing"] == 2
+    assert snapshot["snapshots"][0]["snapshot_name"] is None
+    assert snapshot["snapshots"][0]["read_coverage"]["status"] == "missing"
+    assert snapshot["snapshots"][0]["scene_load_policy"] == "blocked_manual_only"
+    assert snapshot["snapshots"][0]["scene_save_policy"] == "blocked_manual_only"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_user_presets_snapshot_publishes_cached_catalog_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "user_presets": {
+            1: {
+                "name": "Lead Vocal Strip",
+                "scope": "channel_strip",
+                "target_type": "channel",
+                "target": "CH 2",
+            },
+            "2": "Drum Bus Glue",
+        },
+    })
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_user_presets_snapshot(server, preset_count=3)
+    preset = snapshot["presets"][0]
+
+    assert snapshot["type"] == "user_presets_snapshot"
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "full_autonomous_ready": False,
+        "preset_recall_allowed": False,
+        "preset_store_allowed": False,
+    }
+    assert snapshot["summary"]["preset_count"] == 3
+    assert snapshot["summary"]["named_preset_count"] == 2
+    assert snapshot["summary"]["read_coverage_status"] == "partial"
+    assert snapshot["summary"]["live_apply_allowed"] is False
+    assert preset["preset_index"] == 1
+    assert preset["preset_name"] == "Lead Vocal Strip"
+    assert preset["preset_scope"] == "channel_strip"
+    assert preset["target_type"] == "channel"
+    assert preset["target_label"] == "CH 2"
+    assert preset["preset_recall_policy"] == "blocked_manual_only"
+    assert preset["preset_store_policy"] == "blocked_manual_only"
+    assert preset["destructive_recall_marker"] == "preset_recall_would_change_console_parameters"
+    assert preset["read_coverage"]["status"] == "complete"
+    assert snapshot["presets"][1]["read_coverage"]["status"] == "partial"
+    assert snapshot["presets"][2]["read_coverage"]["status"] == "missing"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_user_presets_snapshot_marks_missing_cache_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state = {}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_user_presets_snapshot(server, preset_count=2)
+
+    assert snapshot["summary"]["read_coverage_status"] == "missing"
+    assert snapshot["summary"]["named_preset_count"] == 0
+    assert snapshot["read_coverage"]["surface_status_counts"]["user_preset_slots"]["missing"] == 2
+    assert snapshot["presets"][0]["preset_name"] is None
+    assert snapshot["presets"][0]["read_coverage"]["status"] == "missing"
+    assert snapshot["presets"][0]["preset_recall_policy"] == "blocked_manual_only"
+    assert snapshot["presets"][0]["preset_store_policy"] == "blocked_manual_only"
+    mixer.send.assert_not_called()
     mixer.get_all_channel_names.assert_not_called()
 
 
@@ -277,6 +836,18 @@ def test_frontend_read_model_snapshots_are_display_only(server):
     server.audio_capture = FakeAudioCapture()
 
     snapshots = [
+        build_channel_processing_snapshot(server, total_channels=4),
+        build_bus_main_dca_snapshot(server, bus_count=2, main_count=1, dca_count=2),
+        build_matrix_snapshot(server, matrix_count=2),
+        build_routing_sends_snapshot(
+            server,
+            total_channels=2,
+            send_count=1,
+            output_groups=["MOD"],
+            output_count=1,
+        ),
+        build_snapshots_scenes_snapshot(server, snapshot_count=2),
+        build_user_presets_snapshot(server, preset_count=2),
         build_groups_buses_snapshot(server),
         build_memory_knowledge_snapshot(server),
         build_training_sessions_snapshot(server),
@@ -285,17 +856,31 @@ def test_frontend_read_model_snapshots_are_display_only(server):
     ]
 
     assert [snapshot["type"] for snapshot in snapshots] == [
+        "channel_processing_snapshot",
+        "bus_main_dca_snapshot",
+        "matrix_snapshot",
+        "routing_sends_snapshot",
+        "snapshots_scenes_snapshot",
+        "user_presets_snapshot",
         "groups_buses_snapshot",
         "memory_knowledge_snapshot",
         "training_sessions_snapshot",
         "rules_library_snapshot",
         "agent_communications_snapshot",
     ]
-    assert snapshots[0]["buses"]
-    assert snapshots[1]["memories"]
-    assert snapshots[2]["sessions"]
-    assert snapshots[3]["rules"]
-    assert snapshots[4]["communications"]
+    assert snapshots[0]["safety"]["live_write"] is False
+    assert snapshots[1]["safety"]["queries_console"] is False
+    assert snapshots[2]["safety"]["queries_console"] is False
+    assert snapshots[3]["safety"]["queries_console"] is False
+    assert snapshots[4]["safety"]["queries_console"] is False
+    assert snapshots[4]["safety"]["scene_load_allowed"] is False
+    assert snapshots[5]["safety"]["queries_console"] is False
+    assert snapshots[5]["safety"]["preset_recall_allowed"] is False
+    assert snapshots[6]["buses"]
+    assert snapshots[7]["memories"]
+    assert snapshots[8]["sessions"]
+    assert snapshots[9]["rules"]
+    assert snapshots[10]["communications"]
 
     forbidden_keys = {
         "action",
@@ -537,6 +1122,14 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
     assert payload["runtime"]["main_pipeline_id"] == "main_live_assist"
     assert payload["summary"]["live_executor_method_ids"] == ["supervised_manual_fader_gain"]
     assert payload["summary"]["live_allowed_write_kinds"] == ["fader", "gain"]
+    goal_matrix = payload["project_goal_capability_matrix"]
+    assert goal_matrix["type"] == "project_goal_capability_matrix"
+    assert goal_matrix["safety"]["live_write"] is False
+    assert goal_matrix["safety"]["live_widening_allowed"] is False
+    assert "mode_full_autonomous" in goal_matrix["summary"]["blocked_live_capability_ids"]
+    assert "console_fader_control" in goal_matrix["summary"][
+        "currently_live_writable_capability_ids"
+    ]
     assert any(profile["id"] == "quarantine" for profile in payload["pipeline_profiles"])
     assert any(method["status"] == "placeholder" for method in payload["methods"])
     assert all(
@@ -553,6 +1146,197 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
     assert module_map["auto_eq"]["next_step"].startswith("proposal_adapter") or "ADR" in module_map["auto_eq"]["next_step"]
     assert module_map["automixer_production_mix_v1"]["entrypoint"] == "none in this checkout"
     assert module_map["ai_mixing_pipeline_legacy"]["status"] == "deprecated"
+
+
+def test_telemetry_alerts_snapshot_reads_existing_artifacts_without_generating(server, tmp_path):
+    storage_dir = tmp_path / "sessions"
+    alerts_dir = storage_dir / "session-a" / "alerts"
+    alerts_dir.mkdir(parents=True)
+    (alerts_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "session_id": "session-a",
+                "generated_at": "2026-06-01T10:00:00Z",
+                "event_count": 4,
+                "alert_count": 2,
+                "dashboard_row_count": 4,
+                "dashboard_path": str(alerts_dir / "dashboard.csv"),
+                "safety": {"read_only": True, "live_write": False},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (alerts_dir / "alerts.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "timestamp_ms": 1000,
+                        "session_id": "session-a",
+                        "rule": "headroom_low",
+                        "severity": "warning",
+                        "target_type": "bus",
+                        "target_id": "Main",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "timestamp_ms": 2000,
+                        "session_id": "session-a",
+                        "rule": "clipping_risk",
+                        "severity": "critical",
+                        "target_type": "channel",
+                        "target_id": "2",
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    server.config["telemetry"] = {"storage_dir": str(storage_dir)}
+
+    payload = build_telemetry_alerts_snapshot(server, limit=1)
+
+    assert payload["type"] == "telemetry_alerts_snapshot"
+    assert payload["available"] is True
+    assert payload["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "generates_artifacts": False,
+    }
+    assert payload["summary"]["artifact_session_count"] == 1
+    assert payload["summary"]["alert_count"] == 2
+    assert payload["summary"]["critical_count"] == 1
+    assert payload["summary"]["warning_count"] == 1
+    assert payload["sessions"][0]["session_id"] == "session-a"
+    assert len(payload["alerts"]) == 1
+    assert payload["alerts"][0]["rule"] == "clipping_risk"
+
+
+def test_telemetry_alerts_snapshot_handles_malformed_limits(server, tmp_path):
+    storage_dir = tmp_path / "sessions"
+    alerts_dir = storage_dir / "session-a" / "alerts"
+    alerts_dir.mkdir(parents=True)
+    (alerts_dir / "summary.json").write_text(
+        json.dumps({"session_id": "session-a", "alert_count": 1}),
+        encoding="utf-8",
+    )
+    (alerts_dir / "alerts.jsonl").write_text(
+        json.dumps(
+            {
+                "timestamp_ms": 1000,
+                "rule": "headroom_low",
+                "severity": "warning",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    server.config["telemetry"] = {"storage_dir": str(storage_dir)}
+
+    payload = build_telemetry_alerts_snapshot(
+        server,
+        limit="not-a-number",
+        session_limit="also-not-a-number",
+    )
+
+    assert payload["type"] == "telemetry_alerts_snapshot"
+    assert payload["available"] is True
+    assert payload["safety"]["live_write"] is False
+    assert payload["summary"]["artifact_session_count"] == 1
+    assert payload["alerts"][0]["rule"] == "headroom_low"
+
+
+def test_telemetry_alerts_snapshot_normalizes_untrusted_summary_safety(server, tmp_path):
+    storage_dir = tmp_path / "sessions"
+    alerts_dir = storage_dir / "session-a" / "alerts"
+    alerts_dir.mkdir(parents=True)
+    (alerts_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "session_id": "session-a",
+                "alert_count": 1,
+                "dashboard_path": "/tmp/not-automixer/dashboard.csv",
+                "safety": {"read_only": False, "live_write": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (alerts_dir / "alerts.jsonl").write_text(
+        json.dumps(
+            {
+                "timestamp_ms": 1000,
+                "rule": "clipping_risk",
+                "severity": "critical",
+                "set_gain": {"channel": 12, "value": 3.0},
+                "context": {
+                    "peak_dbfs": -0.05,
+                    "route_output": "main",
+                    "action_type": "fader_move",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    server.config["telemetry"] = {"storage_dir": str(storage_dir)}
+
+    payload = build_telemetry_alerts_snapshot(server)
+
+    assert payload["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "generates_artifacts": False,
+    }
+    assert payload["sessions"][0]["dashboard_path"] == str(alerts_dir / "dashboard.csv")
+    assert payload["sessions"][0]["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "generates_artifacts": False,
+        "source_live_write": True,
+        "source_safety_normalized": True,
+    }
+    assert payload["alerts"][0]["context"] == {
+        "action_type": "fader_move",
+        "peak_dbfs": -0.05,
+    }
+    assert "set_gain" not in set(_walk_keys(payload))
+    assert "route_output" not in set(_walk_keys(payload))
+
+
+def test_telemetry_alerts_snapshot_marks_storage_without_alert_artifacts_unavailable(server, tmp_path):
+    storage_dir = tmp_path / "sessions"
+    session_dir = storage_dir / "session-without-alerts"
+    session_dir.mkdir(parents=True)
+    (session_dir / "channel_telemetry.jsonl").write_text(
+        json.dumps(
+            {
+                "timestamp_ms": 1000,
+                "session_id": "session-without-alerts",
+                "channel_id": 1,
+                "meter_peak_dbfs": -12.0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    server.config["telemetry"] = {"storage_dir": str(storage_dir)}
+
+    payload = build_telemetry_alerts_snapshot(server)
+
+    assert payload["type"] == "telemetry_alerts_snapshot"
+    assert payload["available"] is False
+    assert payload["summary"]["session_count"] == 1
+    assert payload["summary"]["artifact_session_count"] == 0
+    assert payload["summary"]["alert_count"] == 0
+    assert payload["sessions"] == []
+    assert payload["alerts"] == []
+    assert payload["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "generates_artifacts": False,
+    }
 
 
 def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
@@ -676,6 +1460,7 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
     server.send_to_client = AsyncMock()
 
     await server._dispatch["get_channel_inventory"](object(), {"total_channels": 2})
+    await server._dispatch["get_channel_processing_snapshot"](object(), {"total_channels": 2})
     await server._dispatch["get_decision_queue"](object(), {"limit": 5})
     await server._dispatch["get_decision_traces"](object(), {"limit": 5})
     await server._dispatch["get_safety_monitor"](object(), {})
@@ -684,8 +1469,20 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
     await server._dispatch["get_operator_agent_roster"](object(), {})
     await server._dispatch["get_connection_topology"](object(), {})
     await server._dispatch["get_groups_buses_snapshot"](object(), {})
+    await server._dispatch["get_bus_main_dca_snapshot"](
+        object(),
+        {"bus_count": 1, "main_count": 1, "dca_count": 1},
+    )
+    await server._dispatch["get_matrix_snapshot"](object(), {"matrix_count": 1})
+    await server._dispatch["get_routing_sends_snapshot"](
+        object(),
+        {"total_channels": 1, "send_count": 1, "output_groups": ["MOD"], "output_count": 1},
+    )
+    await server._dispatch["get_snapshots_scenes_snapshot"](object(), {"snapshot_count": 2})
+    await server._dispatch["get_user_presets_snapshot"](object(), {"preset_count": 2})
     await server._dispatch["get_memory_knowledge_snapshot"](object(), {})
     await server._dispatch["get_training_sessions_snapshot"](object(), {})
+    await server._dispatch["get_telemetry_alerts_snapshot"](object(), {"limit": 2})
     await server._dispatch["get_rules_library_snapshot"](object(), {})
     await server._dispatch["get_agent_communications_snapshot"](object(), {})
     await server._dispatch["get_processing_pipeline_snapshot"](object(), {"include_methods": False})
@@ -694,6 +1491,7 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
     payloads = [call.args[1] for call in server.send_to_client.await_args_list]
     assert [payload["type"] for payload in payloads] == [
         "channel_inventory",
+        "channel_processing_snapshot",
         "decision_queue",
         "decision_traces",
         "safety_monitor",
@@ -702,31 +1500,50 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
         "operator_agent_roster",
         "connection_topology",
         "groups_buses_snapshot",
+        "bus_main_dca_snapshot",
+        "matrix_snapshot",
+        "routing_sends_snapshot",
+        "snapshots_scenes_snapshot",
+        "user_presets_snapshot",
         "memory_knowledge_snapshot",
         "training_sessions_snapshot",
+        "telemetry_alerts_snapshot",
         "rules_library_snapshot",
         "agent_communications_snapshot",
         "processing_pipeline_snapshot",
         "main_pipeline_preview",
     ]
-    assert payloads[0]["channels"][1]["name"] == "Lead Vocal"
-    assert payloads[1]["reason"] == "mixing_agent_runtime_not_initialized"
-    assert payloads[1]["proposal_queue_available"] is True
-    assert payloads[2]["summary"]["trace_count"] == 0
-    assert payloads[3]["live_write_policy"]["direct_writes_allowed"] is False
-    assert payloads[4]["summary"]["offline_only"] is True
-    assert payloads[5]["summary"]["shadow_only"] is True
-    assert payloads[6]["summary"]["agent_count"] >= 8
-    assert payloads[7]["connection"]["connected"] is True
-    assert payloads[8]["buses"]
-    assert payloads[9]["memories"]
-    assert payloads[10]["sessions"]
-    assert payloads[11]["rules"]
-    assert payloads[12]["communications"]
-    assert payloads[13]["methods"] == []
-    assert payloads[13]["summary"]["live_apply_policy"] == "supervised_fader_gain_only"
-    assert payloads[14]["executor_policy"]["preview_only"] is True
-    assert payloads[14]["summary"]["queue_mutation"] is False
+    by_type = {payload["type"]: payload for payload in payloads}
+    assert by_type["channel_inventory"]["channels"][1]["name"] == "Lead Vocal"
+    assert by_type["channel_processing_snapshot"]["safety"]["queries_console"] is False
+    assert by_type["bus_main_dca_snapshot"]["safety"]["queries_console"] is False
+    assert by_type["bus_main_dca_snapshot"]["safety"]["live_write"] is False
+    assert by_type["matrix_snapshot"]["safety"]["queries_console"] is False
+    assert by_type["matrix_snapshot"]["safety"]["live_write"] is False
+    assert by_type["routing_sends_snapshot"]["safety"]["queries_console"] is False
+    assert by_type["routing_sends_snapshot"]["safety"]["live_write"] is False
+    assert by_type["snapshots_scenes_snapshot"]["safety"]["queries_console"] is False
+    assert by_type["snapshots_scenes_snapshot"]["safety"]["scene_load_allowed"] is False
+    assert by_type["user_presets_snapshot"]["safety"]["queries_console"] is False
+    assert by_type["user_presets_snapshot"]["safety"]["preset_recall_allowed"] is False
+    assert by_type["decision_queue"]["reason"] == "mixing_agent_runtime_not_initialized"
+    assert by_type["decision_queue"]["proposal_queue_available"] is True
+    assert by_type["decision_traces"]["summary"]["trace_count"] == 0
+    assert by_type["safety_monitor"]["live_write_policy"]["direct_writes_allowed"] is False
+    assert by_type["replay_runs"]["summary"]["offline_only"] is True
+    assert by_type["channel_intelligence"]["summary"]["shadow_only"] is True
+    assert by_type["operator_agent_roster"]["summary"]["agent_count"] >= 8
+    assert by_type["connection_topology"]["connection"]["connected"] is True
+    assert by_type["groups_buses_snapshot"]["buses"]
+    assert by_type["memory_knowledge_snapshot"]["memories"]
+    assert by_type["training_sessions_snapshot"]["sessions"]
+    assert by_type["telemetry_alerts_snapshot"]["safety"]["live_write"] is False
+    assert by_type["rules_library_snapshot"]["rules"]
+    assert by_type["agent_communications_snapshot"]["communications"]
+    assert by_type["processing_pipeline_snapshot"]["methods"] == []
+    assert by_type["processing_pipeline_snapshot"]["summary"]["live_apply_policy"] == "supervised_fader_gain_only"
+    assert by_type["main_pipeline_preview"]["executor_policy"]["preview_only"] is True
+    assert by_type["main_pipeline_preview"]["summary"]["queue_mutation"] is False
 
 
 @pytest.mark.asyncio
@@ -1201,6 +2018,78 @@ async def test_supervised_apply_blocks_duplicate_idempotency_key(server):
 
 
 @pytest.mark.asyncio
+async def test_supervised_apply_blocks_expired_proposal_before_idempotency_reservation(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "expired-proposal",
+            "title": "Lead Vocal: stale fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.0,
+            "reason": "unit",
+            "ttl_seconds": 5,
+        },
+    )
+    proposal = server.operator_proposal_queue.find(proposal_id="expired-proposal")
+    proposal.expires_at = "2000-01-01T00:00:00Z"
+
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {"proposal_id": "expired-proposal", "approved": True, "idempotency_key": "expired-key"},
+    )
+
+    server._apply_manual_console_write.assert_not_called()
+    assert "expired-key" not in server._operator_apply_idempotency_keys
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_blocked"
+    assert payload["apply_result"]["reason"] == "proposal_expired"
+    assert payload["proposal"]["expired"] is True
+
+
+@pytest.mark.asyncio
+async def test_supervised_apply_blocks_cumulative_delta_before_manual_gate(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server._operator_apply_delta_history = {
+        (2, "fader"): [{"ts": time.monotonic(), "delta_db": -2.4}]
+    }
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "title": "Lead Vocal: cumulative fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.2,
+            "reason": "unit",
+        },
+    )
+    proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "cumulative-limit"},
+    )
+
+    server._apply_manual_console_write.assert_not_called()
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_blocked"
+    assert payload["apply_result"]["reason"] == "cumulative_delta_limit_exceeded"
+    assert payload["apply_result"]["max_cumulative_delta_db"] == 3.0
+
+
+@pytest.mark.asyncio
 async def test_supervised_apply_blocks_large_delta_before_manual_gate(server):
     server.operator_mode = "supervised"
     server.mixer_client = MagicMock()
@@ -1230,6 +2119,43 @@ async def test_supervised_apply_blocks_large_delta_before_manual_gate(server):
     assert payload["type"] == "operator_proposal_apply_blocked"
     assert payload["apply_result"]["reason"] == "delta_limit_exceeded"
     assert payload["apply_result"]["max_delta_db"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_supervised_apply_uses_normalized_clamped_value_after_validation(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/in/set/trim": 18.0}
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "gain",
+        "effective_value": 18.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "title": "Lead Vocal: clamped gain",
+            "channel": 2,
+            "value_type": "gain",
+            "value": 22.0,
+            "reason": "unit",
+        },
+    )
+    proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "clamped-gain"},
+    )
+
+    server._apply_manual_console_write.assert_awaited_once()
+    call = server._apply_manual_console_write.await_args
+    assert call.kwargs["channel"] == 2
+    assert call.kwargs["value_type"] == "gain"
+    assert call.kwargs["value"] == 18.0
 
 
 @pytest.mark.asyncio

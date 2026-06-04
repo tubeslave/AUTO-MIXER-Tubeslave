@@ -38,17 +38,42 @@ if [ "${GIT_ROOT}" != "${EXPECTED_PROJECT_ROOT}" ]; then
   exit 78
 fi
 
-if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
-  echo "Another codex autoloop run is already active: ${LOCK_DIR}"
-  if [ -r "${LOCK_OWNER}" ]; then
-    echo "Existing lock owner metadata:"
-    while IFS= read -r line; do
-      printf '  %s\n' "${line}"
-    done < "${LOCK_OWNER}"
-  else
-    echo "Existing lock has no owner metadata."
+cleanup_stale_lock() {
+  if [ ! -r "${LOCK_OWNER}" ]; then
+    return 1
   fi
-  exit 0
+  LOCK_PID="$(awk -F= '/^pid=/{print $2; exit}' "${LOCK_OWNER}" 2>/dev/null || true)"
+  if [ -z "${LOCK_PID}" ]; then
+    return 1
+  fi
+  case "${LOCK_PID}" in
+    *[!0-9]*)
+      echo "Ignoring stale-lock cleanup because owner pid is invalid: ${LOCK_PID}."
+      return 1
+      ;;
+  esac
+  if kill -0 "${LOCK_PID}" 2>/dev/null; then
+    return 1
+  fi
+  echo "Removing stale automation lock owned by dead pid=${LOCK_PID}."
+  rm -f "${LOCK_OWNER}" 2>/dev/null || true
+  rmdir "${LOCK_DIR}" 2>/dev/null || true
+}
+
+if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
+  cleanup_stale_lock || true
+  if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
+    echo "Another codex autoloop run is already active: ${LOCK_DIR}"
+    if [ -r "${LOCK_OWNER}" ]; then
+      echo "Existing lock owner metadata:"
+      while IFS= read -r line; do
+        printf '  %s\n' "${line}"
+      done < "${LOCK_OWNER}"
+    else
+      echo "Existing lock has no owner metadata."
+    fi
+    exit 0
+  fi
 fi
 
 cleanup() {

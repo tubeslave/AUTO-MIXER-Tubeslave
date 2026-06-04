@@ -335,6 +335,14 @@ class WebSocketService extends BaseWebSocketTransport {
     });
   }
 
+  getTelemetryAlertsSnapshot(limit = 50, sessionLimit = 8) {
+    this.send({
+      type: 'get_telemetry_alerts_snapshot',
+      limit,
+      session_limit: sessionLimit
+    });
+  }
+
   runOperatorAnalysis(totalChannels = 24, createProposals = true) {
     this.send({
       type: 'run_operator_analysis',

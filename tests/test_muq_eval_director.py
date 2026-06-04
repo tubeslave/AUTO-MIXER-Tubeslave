@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
+import src.experiments.muq_eval_director as muq_director
 from src.experiments.muq_eval_director import (
     CandidateResult,
     ChannelState,
@@ -128,6 +129,21 @@ def test_default_director_paths_split_audio_and_logs():
 
     assert "Ai LOGS" in Path(config.output_root).parts
     assert "Ai MIXING" in Path(config.audio_output_root).parts
+
+
+def test_custom_output_root_does_not_create_default_desktop_dirs(tmp_path, monkeypatch):
+    def fail_if_default_dirs_are_created():
+        raise AssertionError("custom output_root must not touch Desktop output dirs")
+
+    monkeypatch.setattr(muq_director, "ensure_ai_output_dirs", fail_if_default_dirs_are_created)
+
+    director = MuqEvalDirectorOfflineTest(
+        _config(tmp_path),
+        muq_service=FakeMuQService(status="unavailable"),
+    )
+
+    assert director.output_dir.is_relative_to(tmp_path / "outputs")
+    assert director.audio_dir == director.output_dir
 
 
 def test_muq_unavailable_graceful_failure(tmp_path):

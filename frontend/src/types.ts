@@ -115,6 +115,45 @@ export interface ModuleStatusRecord {
   tone: Tone;
 }
 
+export interface TelemetryAlertRecord {
+  id: string;
+  sessionId: string;
+  time: string;
+  rule: string;
+  severity: string;
+  target: string;
+  message: string;
+  value: string;
+  threshold: string;
+  tone: Tone;
+}
+
+export interface TelemetryAlertSessionRecord {
+  sessionId: string;
+  generatedAt: string;
+  eventCount: number;
+  alertCount: number;
+  dashboardRowCount: number;
+  readOnly: boolean;
+  liveWrite: boolean;
+}
+
+export interface TelemetryAlertsSnapshot {
+  available: boolean;
+  generatedAt: string;
+  sourceLabel: string;
+  storageDir: string;
+  alertCount: number;
+  criticalCount: number;
+  warningCount: number;
+  latestSessionId: string;
+  readOnly: boolean;
+  liveWrite: boolean;
+  generatesArtifacts: boolean;
+  sessions: TelemetryAlertSessionRecord[];
+  alerts: TelemetryAlertRecord[];
+}
+
 export interface ToastState {
   message: string;
   tone: Tone;
@@ -172,6 +211,9 @@ export interface Channel {
   recognition: string;
   group: string;
   fader: number;
+  pan?: number;
+  gateLabel?: string;
+  compLabel?: string;
   confidence: number;
 }
 
@@ -402,6 +444,7 @@ export interface DashboardRuntime {
   appliedDecisions: number;
   blockedDecisions: number;
   sourceLabel: string;
+  spectrumBins?: number[];
 }
 
 export interface RuntimeStatusItem {

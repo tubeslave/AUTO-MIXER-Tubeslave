@@ -1,0 +1,74 @@
+/Library/Audio/Plug-Ins/VST3/Pi.vst3/Contents/MacOS/Pi:            Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit bundle x86_64] [arm64]
+/Library/Audio/Plug-Ins/VST3/Pi.vst3/Contents/MacOS/Pi (for architecture x86_64):	Mach-O 64-bit bundle x86_64
+/Library/Audio/Plug-Ins/VST3/Pi.vst3/Contents/MacOS/Pi (for architecture arm64):	Mach-O 64-bit bundle arm64
+/Library/Audio/Plug-Ins/VST/Pi.vst/Contents/MacOS/Pi:              Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit bundle x86_64] [arm64]
+/Library/Audio/Plug-Ins/VST/Pi.vst/Contents/MacOS/Pi (for architecture x86_64):	Mach-O 64-bit bundle x86_64
+/Library/Audio/Plug-Ins/VST/Pi.vst/Contents/MacOS/Pi (for architecture arm64):	Mach-O 64-bit bundle arm64
+/Library/Audio/Plug-Ins/Components/Pi.component/Contents/MacOS/Pi: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit bundle x86_64] [arm64]
+/Library/Audio/Plug-Ins/Components/Pi.component/Contents/MacOS/Pi (for architecture x86_64):	Mach-O 64-bit bundle x86_64
+/Library/Audio/Plug-Ins/Components/Pi.component/Contents/MacOS/Pi (for architecture arm64):	Mach-O 64-bit bundle arm64
+{
+  "BuildMachineOSBuild" => "21G83"
+  "CFBundleDisplayName" => "Pi"
+  "CFBundleExecutable" => "Pi"
+  "CFBundleIdentifier" => "com.SoundRadix.Pi"
+  "CFBundleName" => "Pi"
+  "CFBundlePackageType" => "BNDL"
+  "CFBundleShortVersionString" => "1.1.3"
+  "CFBundleSignature" => "????"
+  "CFBundleSupportedPlatforms" => [
+    0 => "MacOSX"
+  ]
+  "CFBundleVersion" => "1.1.3"
+  "DTCompiler" => "com.apple.compilers.llvm.clang.1_0"
+  "DTPlatformBuild" => "13F100"
+  "DTPlatformName" => "macosx"
+  "DTPlatformVersion" => "12.3"
+  "DTSDKBuild" => "21E226"
+  "DTSDKName" => "macosx12.3"
+  "DTXcode" => "1341"
+  "DTXcodeBuild" => "13F100"
+  "LSMinimumSystemVersion" => "10.9"
+  "NSHighResolutionCapable" => true
+  "NSHumanReadableCopyright" => ""
+}
+{
+  "AudioComponents" => [
+    0 => {
+      "description" => "Pi"
+      "factoryFunction" => "SoundRadix_PiFactory"
+      "manufacturer" => "Srdx"
+      "name" => "Sound Radix: Pi"
+      "resourceUsage" => {
+        "network.client" => true
+        "temporary-exception.files.all.read-write" => true
+      }
+      "subtype" => "kase"
+      "type" => "aufx"
+      "version" => 65795
+    }
+  ]
+  "BuildMachineOSBuild" => "21G83"
+  "CFBundleDisplayName" => "Pi"
+  "CFBundleExecutable" => "Pi"
+  "CFBundleIdentifier" => "com.SoundRadix.Pi"
+  "CFBundleName" => "Pi"
+  "CFBundlePackageType" => "BNDL"
+  "CFBundleShortVersionString" => "1.1.3"
+  "CFBundleSignature" => "????"
+  "CFBundleSupportedPlatforms" => [
+    0 => "MacOSX"
+  ]
+  "CFBundleVersion" => "1.1.3"
+  "DTCompiler" => "com.apple.compilers.llvm.clang.1_0"
+  "DTPlatformBuild" => "13F100"
+  "DTPlatformName" => "macosx"
+  "DTPlatformVersion" => "12.3"
+  "DTSDKBuild" => "21E226"
+  "DTSDKName" => "macosx12.3"
+  "DTXcode" => "1341"
+  "DTXcodeBuild" => "13F100"
+  "LSMinimumSystemVersion" => "10.9"
+  "NSHighResolutionCapable" => true
+  "NSHumanReadableCopyright" => ""
+}

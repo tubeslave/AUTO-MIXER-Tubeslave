@@ -1,8 +1,18 @@
+import importlib.util
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PROMPT_PATH = PROJECT_ROOT / "tools" / "codex_autoloop" / "codex_cycle_prompt.md"
+VALIDATOR_PATH = PROJECT_ROOT / "tools" / "codex_autoloop" / "validate_cycle_report.py"
+
+
+def load_validator_module():
+    spec = importlib.util.spec_from_file_location("validate_cycle_report", VALIDATOR_PATH)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_codex_cycle_prompt_keeps_cycles_bounded_to_automixer_repo():
@@ -22,6 +32,11 @@ def test_codex_cycle_prompt_forbids_live_writes_and_destructive_actions():
     forbidden_command_tokens = [
         "set_fader",
         "set_gain",
+        "set_trim",
+        "set_input_trim",
+        "set_channel_trim",
+        "set_preamp_trim",
+        "set_preamp_gain",
         "set_eq",
         "set_compressor",
         "route_output",
@@ -29,6 +44,12 @@ def test_codex_cycle_prompt_forbids_live_writes_and_destructive_actions():
         "save_snap",
         "reset",
         "mute",
+        "unmute",
+        "set_insert",
+        "set_fx_model",
+        "set_fx_on",
+        "set_fx_mix",
+        "set_fx_parameter",
     ]
 
     assert "Не выполняй live OSC/WING writes." in text
@@ -39,11 +60,20 @@ def test_codex_cycle_prompt_forbids_live_writes_and_destructive_actions():
         assert f"`{command_token}`" in text
 
 
+def test_codex_cycle_prompt_forbidden_commands_match_report_validator():
+    text = PROMPT_PATH.read_text(encoding="utf-8")
+    validator = load_validator_module()
+
+    for command_token in validator.FORBIDDEN_LIVE_COMMANDS:
+        assert f"`{command_token}`" in text
+
+
 def test_codex_cycle_prompt_requires_complete_human_report_sections():
     text = PROMPT_PATH.read_text(encoding="utf-8")
 
     assert "`automixer_codex_cycle_YYYYMMDDTHHMMSSZ.md`" in text
     assert "статус live safety: обязательно укажи, что live OSC/WING writes не выполнялись." in text
+    assert "результат memory lint в отдельном разделе `## Memory Lint Result`" in text
     assert "`python3 tools/memory/memory_lint.py`" in text
     assert "результат memory lint" in text
     assert "`## Объяснение простым языком`" in text

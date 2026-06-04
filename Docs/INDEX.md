@@ -28,6 +28,9 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_OFFLINE_NO_WING_EXECUTION_20260522.md` | No-WING execution slice: safety audit refresh, fake gain proof, full checks, and package smoke. |
 | `Docs/reports/AUTOMIXER_AUTOMATION_FOUNDATION_LAYER_20260527.md` | Automation foundation layer: decision traces, safety monitor, replay DTOs, idempotent supervised apply, and current validation evidence. |
 | `Docs/adr/automation-foundation-layer-20260527.md` | ADR for the safe agentic-mixing foundation layer and its live-write boundary. |
+| `Docs/reports/AUTOMIXER_WRITE_SURFACE_HARDENING_20260601.md` | Current write-surface inventory: canonical supervised fader/gain path, proposal-only surfaces, quarantined paths, and blocked mutation scripts. |
+| `Docs/reports/AUTOMIXER_SAFETY_COVERAGE_MATRIX_20260601.md` | Safety proof matrix for live-capable action families and explicit hardware-proof gaps before any live scope expansion. |
+| `Docs/reports/AUTOMIXER_STREAMING_ALERTS_20260601.md` | Read-only streaming telemetry alert artifacts for dashboards, QA, and future learning labels. |
 | `Docs/STRUCTURING_COMPLETION_20260518.md` | What was moved, what remains, and the next work boundary. |
 | `Docs/PROJECT_CLEANUP_BACKLOG.md` | Remaining cleanup backlog and rules. |
 
@@ -37,6 +40,8 @@ paths, Product Layer, or cleanup policy.
 | --- | --- |
 | Runtime hygiene | `Docs/RUNTIME_HYGIENE.md` |
 | Live readiness and safety reports | `Docs/reports/tub/` |
+| Write-surface and proof-gap reports | `Docs/reports/AUTOMIXER_WRITE_SURFACE_HARDENING_20260601.md`, `Docs/reports/AUTOMIXER_SAFETY_COVERAGE_MATRIX_20260601.md` |
+| Read-only telemetry alert reports | `Docs/reports/AUTOMIXER_STREAMING_ALERTS_20260601.md`, `Docs/telemetry_learning_data.md` |
 | WING manuals and protocol PDFs | `Docs/manuals/wing/` |
 | Secret rotation | `Docs/secrets-rotation.md` |
 
@@ -60,6 +65,8 @@ paths, Product Layer, or cleanup policy.
 | Paperclip/GPT workflow | `Docs/PAPERCLIP_DIRECTOR_WORKFLOW.md` |
 | Markdown memory pipeline | `Docs/memory_pipeline.md`, `.ai/agent-core/`, `.ai/project-layer/`, `.ai/pipeline/` |
 | Operational memory | `Docs/OPERATIONAL_MEMORY.md` |
+| Safety coverage and write surfaces | `Docs/reports/AUTOMIXER_SAFETY_COVERAGE_MATRIX_20260601.md`, `Docs/reports/AUTOMIXER_WRITE_SURFACE_HARDENING_20260601.md` |
+| Telemetry learning and alerts | `Docs/telemetry_learning_data.md`, `Docs/reports/AUTOMIXER_STREAMING_ALERTS_20260601.md` |
 | Tooling overview | `Docs/TOOLS.md` |
 | Local Paperclip-readable reports | `.paperclip/reports/` |
 

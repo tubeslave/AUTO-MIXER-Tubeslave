@@ -182,7 +182,13 @@ test('adaptChannels treats control_state mute as read-only channel status', asyn
         level_db: -18,
         lufs: -22,
         dynamic_range_db: 6,
-        control_state: { fader_db: -10, mute: 1 },
+        control_state: {
+          fader_db: -10,
+          mute: 1,
+          pan: 0.3,
+          gate_label: 'G -48',
+          compressor_gain_reduction_db: 2.6,
+        },
         ai_recognition: { label: 'Lead Vocal', confidence: 96 },
       }],
     },
@@ -191,6 +197,9 @@ test('adaptChannels treats control_state mute as read-only channel status', asyn
 
   assert.equal(muted.status, 'MUTED');
   assert.equal(muted.fader, -10);
+  assert.equal(muted.pan, -20);
+  assert.equal(muted.gateLabel, 'G -48');
+  assert.equal(muted.compLabel, 'C 2.6');
 
   const [unmuted] = adaptChannels(
     {
@@ -211,6 +220,298 @@ test('adaptChannels treats control_state mute as read-only channel status', asyn
   );
 
   assert.equal(unmuted.status, 'ACTIVE');
+});
+
+test('adaptChannels maps cached pan gate and compressor details from read-only inventory', async () => {
+  const { adaptChannels } = await importTypeScript('services/operatorAdapters.ts');
+
+  const fallback = [
+    {
+      id: 2,
+      name: 'Fallback Vocal',
+      type: 'Fallback',
+      source: 'In 02',
+      level: -40,
+      lufs: -50,
+      dynamic: 1,
+      status: 'INACTIVE',
+      recognition: 'Fallback',
+      group: 'CHANNELS',
+      fader: -40,
+      pan: 0,
+      gateLabel: 'G mock',
+      compLabel: 'C mock',
+      confidence: 10,
+    },
+    {
+      id: 3,
+      name: 'Fallback Snare',
+      type: 'Fallback',
+      source: 'In 03',
+      level: -40,
+      lufs: -50,
+      dynamic: 1,
+      status: 'INACTIVE',
+      recognition: 'Fallback',
+      group: 'CHANNELS',
+      fader: -40,
+      pan: 0,
+      gateLabel: 'G mock',
+      compLabel: 'C mock',
+      confidence: 10,
+    },
+  ];
+
+  const [vocal, snare] = adaptChannels(
+    {
+      type: 'channel_inventory',
+      channels: [
+        {
+          id: 2,
+          name: 'Lead Vocal',
+          role: 'Vocal',
+          group: 'Vocals',
+          status: 'active',
+          level_db: -16.2,
+          lufs: -22.5,
+          dynamic_range_db: 5.5,
+          control_state: {
+            fader_db: -8.0,
+            mute: 0,
+            pan: 0.25,
+            gate_enabled: 1,
+            gate_threshold_db: -47.5,
+            gate_label: 'G -47.5',
+            compressor_enabled: 1,
+            compressor_threshold_db: -18.0,
+            compressor_gain_reduction_db: 2.4,
+            comp_label: 'C 2.4 GR',
+          },
+          ai_recognition: { label: 'Vocal', confidence: 99 },
+        },
+        {
+          id: 3,
+          name: 'Snare',
+          role: 'Snare',
+          group: 'Drums',
+          status: 'active',
+          level_db: -14.4,
+          control_state: {
+            fader_db: -7.0,
+            mute: 0,
+            pan: -12,
+            gate_threshold_db: -42.0,
+            compressor_threshold_db: -20.5,
+          },
+          ai_recognition: { label: 'Snare', confidence: 92 },
+        },
+      ],
+    },
+    fallback,
+  );
+
+  assert.equal(vocal.pan, -25);
+  assert.equal(vocal.gateLabel, 'G -47.5');
+  assert.equal(vocal.compLabel, 'C 2.4 GR');
+  assert.equal(vocal.status, 'ACTIVE');
+
+  assert.equal(snare.pan, -12);
+  assert.equal(snare.gateLabel, 'G -42.0');
+  assert.equal(snare.compLabel, 'C -20.5');
+  assert.equal(snare.status, 'ACTIVE');
+});
+
+test('adaptModuleStatusRecords appends read-only write surface inventory rows', async () => {
+  const { adaptModuleStatusRecords } = await importTypeScript('services/operatorAdapters.ts');
+
+  const rows = adaptModuleStatusRecords({
+    module_status_map: [
+      {
+        module_id: 'processing_registry',
+        label: 'Processing Registry',
+        domain: 'product_layer',
+        status: 'canonical',
+        entrypoint: 'get_processing_pipeline_snapshot',
+        module: 'backend/processing_registry.py',
+        ui_surface: 'Settings',
+        can_write_live: false,
+        live_write_kinds: [],
+        pipeline_profiles: ['main_live_assist'],
+        next_step: 'Keep the registry read-only.',
+      },
+    ],
+    write_surface_inventory: {
+      surfaces: [
+        {
+          id: 'product_layer_fader_gain_apply',
+          label: 'Product Layer supervised fader/gain apply',
+          status: 'canonical_supervised',
+          paths: ['backend/operator_proposal_queue.py'],
+          entrypoints: ['apply_operator_proposal', 'manual_write_supervision'],
+          write_kinds: ['fader', 'gain'],
+          allowed_live: true,
+          gate: 'apply_operator_proposal -> supervised manual write gate',
+          current_policy: 'Only operator-approved fader/gain proposals may reach the WING executor.',
+          next_action: 'Keep as the only live executor.',
+        },
+        {
+          id: 'legacy_ws_to_osc_router',
+          label: 'Legacy websocket to OSC router',
+          status: 'blocked',
+          paths: ['backend/routing.py'],
+          entrypoints: ['command_to_osc'],
+          write_kinds: ['fader', 'mute', 'pan'],
+          allowed_live: false,
+          gate: 'Blocked from canonical runtime.',
+          current_policy: 'Do not route frontend commands directly to OSC.',
+          next_action: 'Keep only as historical reference or remove after dependency scan.',
+        },
+      ],
+    },
+    safety_coverage_matrix: {
+      rows: [
+        {
+          id: 'gain_supervised',
+          label: 'Supervised input gain/trim',
+          action_type: 'gain',
+          status: 'dry_run_ready',
+          live_allowed: false,
+          canonical_gate: 'apply_operator_proposal -> supervised manual gate',
+          current_blocker: 'Physical WING gain proof is not complete.',
+          next_required_evidence: 'Run one small supervised gain proof.',
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(
+    rows.map(row => row.moduleId),
+    [
+      'processing_registry',
+      'write_surface:product_layer_fader_gain_apply',
+      'write_surface:legacy_ws_to_osc_router',
+      'safety_coverage:gain_supervised',
+    ],
+  );
+
+  const liveSurface = rows[1];
+  assert.equal(liveSurface.domain, 'write_surface');
+  assert.equal(liveSurface.canWriteLive, true);
+  assert.deepEqual(liveSurface.liveWriteKinds, ['fader', 'gain']);
+  assert.equal(liveSurface.entrypoint, 'apply_operator_proposal / manual_write_supervision');
+  assert.equal(liveSurface.tone, 'yellow');
+
+  const blockedSurface = rows[2];
+  assert.equal(blockedSurface.canWriteLive, false);
+  assert.equal(blockedSurface.status, 'blocked');
+  assert.equal(blockedSurface.blockedReason, 'Do not route frontend commands directly to OSC.');
+  assert.equal(blockedSurface.tone, 'red');
+
+  const gainCoverage = rows[3];
+  assert.equal(gainCoverage.domain, 'safety_coverage');
+  assert.equal(gainCoverage.status, 'dry_run_ready');
+  assert.equal(gainCoverage.canWriteLive, false);
+  assert.equal(gainCoverage.blockedReason, 'Physical WING gain proof is not complete.');
+  assert.equal(gainCoverage.tone, 'blue');
+});
+
+test('adaptTelemetryAlertsSnapshot maps generated alert artifacts as read-only evidence', async () => {
+  const { adaptTelemetryAlertsSnapshot } = await importTypeScript('services/operatorAdapters.ts');
+
+  const snapshot = adaptTelemetryAlertsSnapshot({
+    type: 'telemetry_alerts_snapshot',
+    generated_at: '2026-06-01T18:30:00Z',
+    source: 'telemetry_alert_artifacts',
+    available: true,
+    storage_dir: 'data/telemetry/sessions',
+    safety: {
+      read_only: true,
+      live_write: false,
+      generates_artifacts: false,
+    },
+    summary: {
+      session_count: 3,
+      artifact_session_count: 1,
+      alert_count: 2,
+      critical_count: 1,
+      warning_count: 1,
+      latest_session_id: 'session-1',
+    },
+    sessions: [
+      {
+        session_id: 'session-1',
+        generated_at: '2026-06-01T18:29:59Z',
+        event_count: 12,
+        alert_count: 2,
+        dashboard_row_count: 12,
+        safety: {
+          read_only: true,
+          live_write: false,
+        },
+      },
+    ],
+    alerts: [
+      {
+        timestamp_ms: 2000,
+        session_id: 'session-1',
+        rule: 'clipping_risk',
+        severity: 'critical',
+        target_type: 'channel',
+        target_id: '12',
+        message: 'Peak -0.05 dBFS is at or above clipping guard.',
+        value: -0.05,
+        threshold: -0.1,
+      },
+      {
+        timestamp_ms: 1000,
+        session_id: 'session-1',
+        rule: 'headroom_low',
+        severity: 'warning',
+        target_type: 'bus',
+        target_id: 'main',
+        message: 'Peak leaves limited headroom.',
+        value: -2.5,
+        threshold: -3,
+      },
+    ],
+  });
+
+  assert.equal(snapshot.available, true);
+  assert.equal(snapshot.alertCount, 2);
+  assert.equal(snapshot.criticalCount, 1);
+  assert.equal(snapshot.warningCount, 1);
+  assert.equal(snapshot.readOnly, true);
+  assert.equal(snapshot.liveWrite, false);
+  assert.equal(snapshot.generatesArtifacts, false);
+  assert.equal(snapshot.sessions[0].readOnly, true);
+  assert.equal(snapshot.sessions[0].liveWrite, false);
+  assert.deepEqual(
+    snapshot.alerts.map(row => [row.rule, row.target, row.tone]),
+    [
+      ['clipping risk', 'channel:12', 'red'],
+      ['headroom low', 'bus:main', 'yellow'],
+    ],
+  );
+  assert.equal(snapshot.alerts[0].time, '2000 ms');
+  assert.equal(snapshot.alerts[0].value, '-0.05');
+  assert.equal(snapshot.alerts[0].threshold, '-0.10');
+});
+
+test('Settings bottom section grid has one column per read-only section card', async () => {
+  const source = await fs.readFile(path.join(srcRoot, 'views/SettingsView.tsx'), 'utf8');
+  const sectionTitles = [
+    'Mix Defaults',
+    'Mode Policy',
+    'Write Policy',
+    'Module Status',
+    'Audit',
+    'Transport',
+  ];
+
+  assert.match(source, /className="grid grid-cols-6 gap-2"/);
+  for (const title of sectionTitles) {
+    assert.match(source, new RegExp(`<Panel title="${title}"`));
+  }
 });
 
 test('directorDecisionRows preserves backend task status instead of forcing applied', async () => {
@@ -671,6 +972,9 @@ test('dashboardTelemetryForChannel derives read-only strip state from channel sn
       recognition: 'Lead Vocal',
       group: 'VOCALS',
       fader: -10,
+      pan: -18,
+      gateLabel: 'G -46',
+      compLabel: 'C 3.2',
       confidence: 98,
     },
     fallback,
@@ -679,6 +983,9 @@ test('dashboardTelemetryForChannel derives read-only strip state from channel sn
   assert.equal(active.safeState, 'OK');
   assert.equal(active.muted, false);
   assert.equal(active.accent, 'purple');
+  assert.equal(active.pan, -18);
+  assert.equal(active.gateLabel, 'G -46');
+  assert.equal(active.compLabel, 'C 3.2');
 
   const hot = dashboardTelemetryForChannel(
     {

@@ -250,15 +250,13 @@ class MuqEvalDirectorOfflineTest:
             raise ValueError("MUQ_EVAL_DIRECTOR_OFFLINE_TEST applies offline renders; shadow_mode must be false")
 
         self.session_id = f"muq_director_{int(time.time())}"
-        if output_dir is None and (
-            Path(self.config.output_root).expanduser() == DEFAULT_MUQ_DIRECTOR_LOG_ROOT
-            or Path(self.config.audio_output_root).expanduser() == DEFAULT_MUQ_DIRECTOR_AUDIO_ROOT
-        ):
+        uses_default_log_root = Path(self.config.output_root).expanduser() == DEFAULT_MUQ_DIRECTOR_LOG_ROOT
+        uses_default_audio_root = Path(self.config.audio_output_root).expanduser() == DEFAULT_MUQ_DIRECTOR_AUDIO_ROOT
+        if output_dir is None and uses_default_log_root and uses_default_audio_root:
             ensure_ai_output_dirs()
         self.output_dir = Path(output_dir).expanduser() if output_dir is not None else Path(self.config.output_root).expanduser() / self.session_id
         if output_dir is not None or (
-            Path(self.config.output_root).expanduser() != DEFAULT_MUQ_DIRECTOR_LOG_ROOT
-            and Path(self.config.audio_output_root).expanduser() == DEFAULT_MUQ_DIRECTOR_AUDIO_ROOT
+            not uses_default_log_root and uses_default_audio_root
         ):
             self.audio_dir = self.output_dir
         else:

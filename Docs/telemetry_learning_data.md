@@ -41,6 +41,12 @@ Telemetry Learning Data - это безопасный журнал концер�
 - `manifest.json` - список файлов, счетчики, версия схемы и safety mode;
 - `summary_report.md` - отчет, если запущен exporter.
 
+Производные артефакты streaming alerts:
+
+- `alerts/alerts.jsonl` - найденные тревоги по telemetry;
+- `alerts/dashboard.csv` - компактная таблица для frontend/аналитики;
+- `alerts/summary.json` - счетчики и пути к артефактам.
+
 ## Как запустить тестовую сессию
 
 ```bash
@@ -99,6 +105,47 @@ PYTHONPATH=. python3 -m backend.telemetry.learning_export \
   --session-id <session_id>
 ```
 
+## Streaming alerts
+
+После записи telemetry можно построить read-only тревоги:
+
+```bash
+PYTHONPATH=. python3 -m backend.telemetry.streaming_alerts \
+  --storage-dir data/telemetry/sessions \
+  --session-id <session_id>
+```
+
+Сейчас детектируются:
+
+- резкий `lufs_drift` по bus/master `lufs_short`;
+- `fader_jump` - резкий скачок фейдера канала;
+- `manual_override_burst` - много ручных правок за короткое окно;
+- `clipping_risk` - peak около клиппинга;
+- `headroom_low` - мало запаса до 0 dBFS.
+
+Этот слой ничего не применяет к пульту. Он только превращает записанную
+telemetry в алерты и dashboard-файл для фронтенда, обучения и QA.
+
+Product Layer read-only DTO:
+
+```json
+{"type": "get_telemetry_alerts_snapshot", "limit": 50}
+```
+
+Ответ `telemetry_alerts_snapshot` читает уже созданные `alerts/summary.json` и
+`alerts/alerts.jsonl` из `telemetry.storage_dir`. Он не запускает генератор
+алертов, не создает новые файлы и всегда публикует safety-факты
+`read_only=true`, `live_write=false`, `generates_artifacts=false`.
+Даже если сохраненный `summary.json` содержит ошибочные safety/path поля,
+snapshot нормализует session safety как read-only/no-live-write и показывает
+пути к локальным `alerts/` артефактам, которые реально прочитал.
+
+Frontend Control Center уже может показать этот snapshot в Settings/Audit:
+карточка Telemetry Alerts отображает количество alert-артефактов, critical /
+warning счетчики, latest session и первые alert rows. Это только display
+surface: UI не запускает alert generator, не создает telemetry files и не
+добавляет live write controls.
+
 ## Как это поможет AI-агентам
 
 Будущие агенты смогут использовать эти данные так:
@@ -110,6 +157,8 @@ PYTHONPATH=. python3 -m backend.telemetry.learning_export \
 - Safety Supervisor: проверять, какие решения были безопасны, заблокированы или
   подтверждены;
 - Offline Evaluator: сравнивать сессии, метки качества, SPL и master metrics.
+- Frontend Cockpit: показывать тревоги по каналам, мастеру и ручным
+  вмешательствам без live write controls.
 
 ## Что пока не реализовано
 
@@ -117,4 +166,6 @@ PYTHONPATH=. python3 -m backend.telemetry.learning_export \
 - Parquet export.
 - Настоящая SPL-интеграция с измерителем.
 - Автоматическая разметка accepted/rejected решений инженера.
+- Полная отдельная страница/панель telemetry history за пределами краткого
+  Settings/Audit виджета.
 - Live WING write integration. Это намеренно не добавлено.

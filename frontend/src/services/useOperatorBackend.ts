@@ -23,6 +23,7 @@ import {
   adaptRuntimeMemories,
   adaptRoutingSegments,
   adaptSafetyMonitor,
+  adaptTelemetryAlertsSnapshot,
   adaptTrainingSnapshot,
   adaptTasks,
   adaptTopologyLinks,
@@ -69,6 +70,7 @@ import type {
   RoutingSegment,
   SafetyMonitorState,
   Task,
+  TelemetryAlertsSnapshot,
   TrainingSessionSnapshotRow,
   TopologyLink,
   TopologyNode
@@ -92,6 +94,7 @@ type ProductLayerPayloads = {
   communications?: unknown;
   processing?: unknown;
   pipelinePreview?: unknown;
+  telemetryAlerts?: unknown;
 };
 
 export interface OperatorViewData {
@@ -107,6 +110,7 @@ export interface OperatorViewData {
   devices: DeviceRecord[];
   logs: LogRecord[];
   moduleStatuses: ModuleStatusRecord[];
+  telemetryAlerts: TelemetryAlertsSnapshot;
   communications: Communication[];
   memories: MemoryRecord[];
   trainingSessions: TrainingSessionSnapshotRow[];
@@ -123,6 +127,7 @@ export interface OperatorViewData {
     performance: string;
     training: string;
     rules: string;
+    telemetryAlerts: string;
     communications: string;
   };
 }
@@ -145,7 +150,8 @@ const EXPECTED_RUNTIME_PAYLOADS: (keyof ProductLayerPayloads)[] = [
   'rules',
   'communications',
   'processing',
-  'pipelinePreview'
+  'pipelinePreview',
+  'telemetryAlerts'
 ];
 
 function startsOnMockDashboard() {
@@ -364,6 +370,7 @@ export function useOperatorBackend() {
     websocketService.getAgentCommunicationsSnapshot();
     websocketService.getProcessingPipelineSnapshot(false);
     websocketService.getMainPipelinePreview(48, false);
+    websocketService.getTelemetryAlertsSnapshot(50, 8);
   }, []);
 
   const refreshBackend = useCallback(() => {
@@ -501,6 +508,10 @@ export function useOperatorBackend() {
       setPayloads(current => ({ ...current, pipelinePreview: payload }));
       setLogs(current => appendBackendLog(current, 'main_pipeline_preview', 'Main pipeline preview received. No proposals were queued.', 'SUCCESS'));
     };
+    const handleTelemetryAlerts = (payload: unknown) => {
+      setPayloads(current => ({ ...current, telemetryAlerts: payload }));
+      setLogs(current => appendBackendLog(current, 'telemetry_alerts_snapshot', 'Telemetry alerts snapshot received. Read-only display only.', 'SUCCESS'));
+    };
     const handleMode = (payload: unknown) => {
       setPayloads(current => ({ ...current, mode: payload }));
       setModeFromBackend(toUiMode((payload as { mode?: unknown })?.mode));
@@ -564,6 +575,7 @@ export function useOperatorBackend() {
     websocketService.on('agent_communications_snapshot', handleCommunications);
     websocketService.on('processing_pipeline_snapshot', handleProcessing);
     websocketService.on('main_pipeline_preview', handleMainPipelinePreview);
+    websocketService.on('telemetry_alerts_snapshot', handleTelemetryAlerts);
     websocketService.on('operator_mode_status', handleMode);
     websocketService.on('manual_write_supervision_status', handleManualWriteSupervision);
     websocketService.on('manual_write_emergency_reset_result', handleEmergencyResetResult);
@@ -608,6 +620,7 @@ export function useOperatorBackend() {
       websocketService.off('agent_communications_snapshot', handleCommunications);
       websocketService.off('processing_pipeline_snapshot', handleProcessing);
       websocketService.off('main_pipeline_preview', handleMainPipelinePreview);
+      websocketService.off('telemetry_alerts_snapshot', handleTelemetryAlerts);
       websocketService.off('operator_mode_status', handleMode);
       websocketService.off('manual_write_supervision_status', handleManualWriteSupervision);
       websocketService.off('manual_write_emergency_reset_result', handleEmergencyResetResult);
@@ -641,7 +654,7 @@ export function useOperatorBackend() {
       statusTone: dataState === 'partial' || dataState === 'stale' ? 'yellow' : base.statusTone,
       proposalApplyResult
     };
-  }, [connectionState, payloads.agents, payloads.channelIntelligence, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisionTraces, payloads.decisions, payloads.groups, payloads.memory, payloads.mode, payloads.pipelinePreview, payloads.processing, payloads.replayRuns, payloads.rules, payloads.safetyMonitor, payloads.topology, payloads.training, proposalApplyResult]);
+  }, [connectionState, payloads.agents, payloads.channelIntelligence, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisionTraces, payloads.decisions, payloads.groups, payloads.memory, payloads.mode, payloads.pipelinePreview, payloads.processing, payloads.replayRuns, payloads.rules, payloads.safetyMonitor, payloads.telemetryAlerts, payloads.topology, payloads.training, proposalApplyResult]);
 
   const viewData: OperatorViewData = useMemo(() => {
     const channels = adaptChannels(payloads.channels, mockChannels);
@@ -664,6 +677,7 @@ export function useOperatorBackend() {
     const safetyMonitor = adaptSafetyMonitor(payloads.safetyMonitor, backend);
     const performanceRecords = adaptPerformanceRecords(payloads.agents, payloads.decisions, mockPerformance);
     const moduleStatuses = adaptModuleStatusRecords(payloads.processing);
+    const telemetryAlerts = adaptTelemetryAlertsSnapshot(payloads.telemetryAlerts);
     const runtimeCommunications = adaptRuntimeCommunications(logs, agents, tasks, mockCommunications);
     const communications = adaptCommunicationsSnapshot(payloads.communications, runtimeCommunications);
     const hasRuntimePayloads = Boolean(payloads.channels || payloads.agents || payloads.decisions || payloads.dashboard || payloads.topology);
@@ -686,6 +700,7 @@ export function useOperatorBackend() {
       devices,
       logs,
       moduleStatuses,
+      telemetryAlerts,
       communications,
       memories,
       trainingSessions,
@@ -702,10 +717,11 @@ export function useOperatorBackend() {
         performance: payloadSource(payloads.agents, payloads.agents ? 'runtime_derived' : 'mock'),
         training: payloadSource(payloads.training, hasRuntimePayloads ? 'runtime_derived' : 'mock'),
         rules: payloadSource(payloads.rules, hasRuntimePayloads ? 'runtime_derived' : 'mock'),
+        telemetryAlerts: payloadSource(payloads.telemetryAlerts, hasRuntimePayloads ? 'telemetry_alert_artifacts' : 'mock'),
         communications: payloadSource(payloads.communications, payloads.dashboard ? 'runtime_derived' : 'mock')
       }
     };
-  }, [backend, logs, payloads.agents, payloads.channelIntelligence, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisionTraces, payloads.decisions, payloads.groups, payloads.memory, payloads.pipelinePreview, payloads.processing, payloads.replayRuns, payloads.rules, payloads.safetyMonitor, payloads.topology, payloads.training]);
+  }, [backend, logs, payloads.agents, payloads.channelIntelligence, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisionTraces, payloads.decisions, payloads.groups, payloads.memory, payloads.pipelinePreview, payloads.processing, payloads.replayRuns, payloads.rules, payloads.safetyMonitor, payloads.telemetryAlerts, payloads.topology, payloads.training]);
 
   const backendActions = useMemo(() => ({
     refreshBackend,

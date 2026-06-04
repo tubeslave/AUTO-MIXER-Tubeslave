@@ -125,6 +125,11 @@ async def test_dry_run_plans_without_creating_or_applying_proposal(
     summary = read_summary(tmp_path)
     assert summary["status"] == "planned"
     assert summary["reason"] == "dry_run_only_add_execute_to_write"
+    assert summary["proof_artifact_schema"] == "wing_operator_proposal_validation.v2"
+    assert summary["proof_runner"] == "wing_operator_proposal_validation_runner"
+    assert summary["proof_mode"] == "dry_run"
+    assert summary["physical_wing"] is False
+    assert summary["physical_proof_requires_execute"] is True
     assert summary["address"] == "/ch/7/fdr"
     assert summary["old_value"] == -10.0
     assert summary["target_value"] == -10.25
@@ -275,6 +280,11 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
     summary = read_summary(tmp_path)
     assert summary["status"] == "passed"
     assert summary["reason"] == "proposal_apply_readback_rollback_complete"
+    assert summary["proof_artifact_schema"] == "wing_operator_proposal_validation.v2"
+    assert summary["proof_runner"] == "wing_operator_proposal_validation_runner"
+    assert summary["proof_mode"] == "physical"
+    assert summary["physical_wing"] is True
+    assert summary["physical_proof_requires_execute"] is True
     assert summary["write_policy"] == "apply_operator_proposal_only"
     assert summary["apply_result"]["type"] == "operator_proposal_apply_result"
     assert summary["rollback_result"]["type"] == "manual_write_rollback_applied"

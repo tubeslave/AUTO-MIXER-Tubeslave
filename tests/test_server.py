@@ -901,6 +901,7 @@ class DummyWingLike:
         self.set_compressor_threshold = MagicMock(return_value=True)
         self.get_compressor_gain = MagicMock(return_value=0.0)
         self.set_compressor_gain = MagicMock(return_value=True)
+        self.set_channel_mute = MagicMock(return_value=True)
         self.set_channel_phase_invert = MagicMock(return_value=True)
         self.set_channel_delay = MagicMock(return_value=True)
         self.get_write_gate_status = MagicMock(return_value={"state": "unconfigured"})
@@ -1573,6 +1574,34 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_delay.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_restore_snapshot_quarantine_blocks_restore_helper_even_with_valid_snapshot(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        snapshot_path = tmp_path / "unit_snapshot.json"
+        snapshot_path.write_text(
+            json.dumps({"channels": {"1": {"channel": 1, "fader": -9.0}}}),
+            encoding="utf-8",
+        )
+
+        with patch(
+            "server.restore_from_backup_using_client",
+            side_effect=AssertionError("restore helper must stay behind quarantine"),
+        ) as restore_helper:
+            await server.restore_snapshot(websocket, str(snapshot_path))
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "restore_result"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "deployment_write_surface_quarantined"
+        assert payload["surface"] == "restore_snapshot"
+        restore_helper.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_realtime_gain_correction_is_quarantined_for_wing_boundary(self, dummy_wing_server):
         server = dummy_wing_server
         server.broadcast = AsyncMock()
@@ -1595,13 +1624,16 @@ class TestWingDeploymentWriteBoundary:
             ({"type": "set_fader", "channel": 1, "value": -6.0}, "set_channel_fader"),
             ({"type": "set_gain", "channel": 1, "value": 2.0}, "set_channel_gain"),
             ({"type": "load_snap", "snap_name": "SHOW_A"}, "load_snap"),
+            ({"type": "mute_channel", "channel": 1, "muted": True}, "set_channel_mute"),
             ({"type": "volume_up", "channel": 1, "db": 1}, "set_channel_fader"),
             ({"type": "volume_down", "channel": 1, "db": 1}, "set_channel_fader"),
             ({"type": "eq_on", "channel": 1, "on": 1}, "set_eq_on"),
+            ({"type": "eq_band_up", "channel": 1, "band": "2", "db": 1}, "set_eq_band_gain"),
             ({"type": "eq_band_down", "channel": 1, "band": "2", "db": 1}, "set_eq_band_gain"),
             ({"type": "compressor_on", "channel": 1, "on": 1}, "set_compressor_on"),
             ({"type": "compressor_threshold", "channel": 1, "threshold": -18.0}, "set_compressor_threshold"),
             ({"type": "compressor_gain_up", "channel": 1, "db": 1}, "set_compressor_gain"),
+            ({"type": "compressor_gain_down", "channel": 1, "db": 1}, "set_compressor_gain"),
         ],
     )
     async def test_voice_write_commands_are_quarantined_for_wing_boundary(

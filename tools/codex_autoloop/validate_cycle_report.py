@@ -32,10 +32,12 @@ REQUIRED_PHRASES = (
     "External Paperclip/PiperClip was not used as an agent runner",
     "No neighboring repositories or external local projects were analyzed, modified, or used.",
     "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.",
+    "No `.env`, tokens, credentials, API keys, or local secrets were accessed or modified.",
     "## Три обязательных вопроса",
     "1. Что нового проект научился делать?",
     "2. Что сейчас является самым слабым местом?",
     "3. Что даст наибольший прогресс в следующем цикле?",
+    "## Memory Lint Result",
     "## Объяснение простым языком",
     "### Что было сделано",
     "### Зачем это нужно проекту",
@@ -59,8 +61,15 @@ REQUIRED_NONEMPTY_SECTIONS = (
     "## What Was Done",
     "## Changed Files",
     "## Tests And Checks",
+    "## Memory Lint Result",
     "## What Remains",
     "## Risks",
+)
+
+REQUIRED_MID_SECTION_ORDER = (
+    "## Tests And Checks",
+    "## Memory Lint Result",
+    "## What Remains",
 )
 
 REQUIRED_DISCOVERY_EVIDENCE = (
@@ -96,6 +105,7 @@ REQUIRED_SCOPE_PHRASES = (
     "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.",
     "Live safety status:",
     "no live OSC/WING writes were executed",
+    "No `.env`, tokens, credentials, API keys, or local secrets were accessed or modified.",
 )
 
 PROJECT_BOUNDARY_AUDIT_TERMS = (
@@ -149,6 +159,49 @@ PROJECT_BOUNDARY_AUDIT_VERBS = (
     "were invoked",
 )
 
+SECRET_BOUNDARY_AUDIT_TERMS = (
+    ".env",
+    "api key",
+    "api keys",
+    "credentials",
+    "local secret",
+    "local secrets",
+    "secret file",
+    "secret files",
+    "secrets",
+)
+SECRET_BOUNDARY_AUDIT_VERBS = (
+    "accessed",
+    "modified",
+    "read",
+    "opened",
+    "inspected",
+    "checked",
+    "touched",
+    "used",
+    "was accessed",
+    "were accessed",
+    "was modified",
+    "were modified",
+    "was read",
+    "were read",
+    "was opened",
+    "were opened",
+    "was inspected",
+    "were inspected",
+    "was checked",
+    "were checked",
+    "was touched",
+    "were touched",
+    "was used",
+    "were used",
+)
+SECRET_BOUNDARY_REQUIRED_SENTENCE_PATTERN = re.compile(
+    r"No\s+`?\.env`?,\s+tokens,\s+credentials,\s+API\s+keys,\s+or\s+"
+    r"local\s+secrets\s+were\s+accessed\s+or\s+modified\.?",
+    re.IGNORECASE,
+)
+
 TODO_SCAN_FOCUS_PHRASES = (
     "owned-code",
     "owned code",
@@ -173,6 +226,18 @@ PLAN_SECTION_HEADINGS = (
 )
 MAX_PLAN_ITEMS = 3
 
+REQUIRED_CORE_SECTION_ORDER = (
+    ("## Scope", ("## Scope",)),
+    ("## What Was Found", ("## What Was Found",)),
+    ("## Short Plan or ## Plan Selected", PLAN_SECTION_HEADINGS),
+    ("## What Was Done", ("## What Was Done",)),
+    ("## Changed Files", ("## Changed Files",)),
+    ("## Tests And Checks", ("## Tests And Checks",)),
+    ("## Memory Lint Result", ("## Memory Lint Result",)),
+    ("## What Remains", ("## What Remains",)),
+    ("## Risks", ("## Risks",)),
+)
+
 TEST_RESULT_EVIDENCE_PATTERN = re.compile(
     r"\b(pass(?:ed)?|fail(?:ed)?|skipped|blocked|not run)\b"
     r"|не запуск|не удалось|прош|ошиб",
@@ -183,6 +248,8 @@ MEMORY_LINT_EVIDENCE_TERMS = (
     "memory_lint.py",
     "tools/memory/memory_lint.py",
 )
+MEMORY_LINT_REQUIRED_COMMAND = "python3 tools/memory/memory_lint.py"
+MEMORY_LINT_STATUS_PATTERN = re.compile(r"\b(?:PASS|FAIL)\b", re.IGNORECASE)
 
 MANDATORY_QUESTIONS_HEADING = "## Три обязательных вопроса"
 MANDATORY_QUESTIONS = (
@@ -193,6 +260,17 @@ MANDATORY_QUESTIONS = (
 
 REQUIRED_LIVE_SAFETY_PHRASES = (
     "No real console was contacted",
+)
+REAL_CONSOLE_CONTACT_AUDIT_TERMS = (
+    "real console",
+)
+REAL_CONSOLE_CONTACT_AUDIT_VERBS = (
+    "was contacted",
+    "were contacted",
+    "contacted",
+    "connected to",
+    "was connected",
+    "were connected",
 )
 
 LIVE_WRITE_AUDIT_TERMS = (
@@ -229,6 +307,11 @@ NON_DESTRUCTIVE_ACTION_AUDIT_VERBS = (
 FORBIDDEN_LIVE_COMMANDS = (
     "set_fader",
     "set_gain",
+    "set_trim",
+    "set_input_trim",
+    "set_channel_trim",
+    "set_preamp_trim",
+    "set_preamp_gain",
     "set_eq",
     "set_compressor",
     "route_output",
@@ -236,7 +319,14 @@ FORBIDDEN_LIVE_COMMANDS = (
     "save_snap",
     "reset",
     "mute",
+    "unmute",
+    "set_insert",
+    "set_fx_model",
+    "set_fx_on",
+    "set_fx_mix",
+    "set_fx_parameter",
 )
+FORBIDDEN_LIVE_COMMAND_CONTRADICTION_TERMS = FORBIDDEN_LIVE_COMMANDS
 NEGATED_COMMAND_AUDIT_VERBS = (
     "command was run",
     "commands were run",
@@ -252,6 +342,9 @@ NEGATED_COMMAND_AUDIT_VERBS = (
     "were applied",
     "не выполня",
     "не отправ",
+)
+COMMAND_AUDIT_CONTEXT_PATTERN = re.compile(
+    r"\b(?:commands?|run|runs|ran|send|sent|execute|executed|apply|applied)\b"
 )
 
 NEXT_STEPS_HEADING = "### Что нужно сделать дальше"
@@ -280,6 +373,7 @@ REQUIRED_PLAIN_EXPLANATION_SUBSECTIONS = (
 )
 
 PROJECT_STATE_EXPLANATION_HEADING = "### В каком состоянии проект сейчас"
+READINESS_EXPLANATION_HEADING = "### Общая готовность направления"
 REQUIRED_PROJECT_STATE_EVIDENCE = (
     ("what already works", ("уже работает", "работает", "already works", "works")),
     ("what works partially", ("частично", "partially")),
@@ -301,7 +395,7 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
 
 def _validate_readiness_scores(text: str) -> list[str]:
     errors: list[str] = []
-    section_body = _extract_heading_section(text, "### Общая готовность направления")
+    section_body = _extract_heading_section(text, READINESS_EXPLANATION_HEADING)
 
     for label in REQUIRED_READINESS_SCORES:
         pattern = re.compile(
@@ -448,6 +542,76 @@ def _validate_project_boundary_contradictions(text: str) -> list[str]:
     ]
 
 
+def _validate_scope_project_boundary_contradictions(text: str) -> list[str]:
+    scope_body = _extract_heading_section(text, "## Scope")
+    if not scope_body:
+        return []
+
+    normalized_scope = _collapse_whitespace(scope_body).lower()
+    contradicted_terms = [
+        term
+        for term in PROJECT_BOUNDARY_AUDIT_TERMS
+        if term in normalized_scope
+        and _has_affirmed_action_audit(
+            normalized_scope,
+            term,
+            PROJECT_BOUNDARY_AUDIT_VERBS,
+        )
+    ]
+    if not contradicted_terms:
+        return []
+
+    return [
+        "Scope contradicts repo-local project boundary evidence: "
+        + ", ".join(contradicted_terms)
+    ]
+
+
+def _find_secret_boundary_contradictions(section_text: str) -> list[str]:
+    section_without_required_audit = SECRET_BOUNDARY_REQUIRED_SENTENCE_PATTERN.sub(
+        "",
+        section_text,
+    )
+    normalized_section = _collapse_whitespace(section_without_required_audit).lower()
+    if not normalized_section:
+        return []
+
+    return [
+        term
+        for term in SECRET_BOUNDARY_AUDIT_TERMS
+        if term in normalized_section
+        and _has_affirmed_action_audit(
+            normalized_section,
+            term,
+            SECRET_BOUNDARY_AUDIT_VERBS,
+        )
+    ]
+
+
+def _validate_secret_boundary_contradictions(text: str) -> list[str]:
+    errors: list[str] = []
+
+    scope_terms = _find_secret_boundary_contradictions(
+        _extract_heading_section(text, "## Scope")
+    )
+    if scope_terms:
+        errors.append(
+            "Scope contradicts secret boundary evidence: "
+            + ", ".join(scope_terms)
+        )
+
+    body_terms = _find_secret_boundary_contradictions(
+        _remove_heading_section(text, "## Scope")
+    )
+    if body_terms:
+        errors.append(
+            "report body contradicts secret boundary evidence: "
+            + ", ".join(body_terms)
+        )
+
+    return errors
+
+
 def _validate_discovery_evidence(text: str) -> list[str]:
     section_body = _extract_heading_section(text, "## What Was Found")
     if not section_body:
@@ -550,6 +714,34 @@ def _validate_memory_lint_evidence(text: str) -> list[str]:
     ]
 
 
+def _validate_memory_lint_result_section(text: str) -> list[str]:
+    section_body = _extract_heading_section(text, "## Memory Lint Result")
+    if not section_body:
+        return []
+
+    errors: list[str] = []
+    normalized_section = _collapse_whitespace(section_body).lower()
+    if not any(term in normalized_section for term in MEMORY_LINT_EVIDENCE_TERMS):
+        errors.append("Memory Lint Result must mention memory lint or memory_lint.py")
+
+    if not _contains_required_phrase(section_body, MEMORY_LINT_REQUIRED_COMMAND):
+        errors.append(
+            "Memory Lint Result must include exact command: "
+            f"{MEMORY_LINT_REQUIRED_COMMAND}"
+        )
+
+    if not TEST_RESULT_EVIDENCE_PATTERN.search(section_body):
+        errors.append(
+            "Memory Lint Result must include outcome evidence: passed, failed, "
+            "skipped, blocked, or not run"
+        )
+
+    if not MEMORY_LINT_STATUS_PATTERN.search(section_body):
+        errors.append("Memory Lint Result must include explicit PASS or FAIL status")
+
+    return errors
+
+
 def _validate_ordered_end_sections(text: str) -> list[str]:
     errors: list[str] = []
     previous_phrase = ""
@@ -567,6 +759,55 @@ def _validate_ordered_end_sections(text: str) -> list[str]:
             continue
         previous_phrase = phrase
         search_start = current_index + len(phrase)
+
+    return errors
+
+
+def _validate_ordered_mid_sections(text: str) -> list[str]:
+    errors: list[str] = []
+    previous_heading = ""
+    search_start = 0
+
+    for heading in REQUIRED_MID_SECTION_ORDER:
+        current_index = text.find(heading, search_start)
+        if current_index == -1:
+            if heading in text and previous_heading:
+                errors.append(
+                    "required middle sections are out of order: "
+                    f"{previous_heading} must appear before {heading}"
+                )
+                break
+            continue
+        previous_heading = heading
+        search_start = current_index + len(heading)
+
+    return errors
+
+
+def _validate_ordered_core_sections(text: str) -> list[str]:
+    errors: list[str] = []
+    previous_label = ""
+    previous_index = -1
+
+    for label, heading_options in REQUIRED_CORE_SECTION_ORDER:
+        heading_indexes = [
+            heading_index
+            for heading in heading_options
+            if (heading_index := _heading_index(text, heading)) != -1
+        ]
+        if not heading_indexes:
+            continue
+
+        current_index = min(heading_indexes)
+        if current_index < previous_index:
+            errors.append(
+                "required core sections are out of order: "
+                f"{previous_label} must appear before {label}"
+            )
+            break
+
+        previous_label = label
+        previous_index = current_index
 
     return errors
 
@@ -679,6 +920,11 @@ def _extract_heading_section(text: str, heading: str) -> str:
     return text[heading_match.end():section_end].strip()
 
 
+def _heading_index(text: str, heading: str) -> int:
+    heading_match = re.search(rf"^{re.escape(heading)}\s*$", text, re.MULTILINE)
+    return heading_match.start() if heading_match else -1
+
+
 def _validate_next_steps_limit(text: str) -> list[str]:
     section_body = _extract_heading_section(text, NEXT_STEPS_HEADING)
     if not section_body:
@@ -689,6 +935,12 @@ def _validate_next_steps_limit(text: str) -> list[str]:
         for line in section_body.splitlines()
         if re.match(r"^\s*(?:[-*+]\s+|\d+[\.)]\s+)", line)
     ]
+    if not step_items:
+        return [
+            f"{NEXT_STEPS_HEADING} must contain between 1 and "
+            f"{MAX_NEXT_STEP_ITEMS} list items"
+        ]
+
     if len(step_items) > MAX_NEXT_STEP_ITEMS:
         return [
             f"{NEXT_STEPS_HEADING} must contain no more than "
@@ -715,6 +967,29 @@ def _validate_plain_explanation_is_final_major_section(text: str) -> list[str]:
     if later_top_level_heading:
         return [
             f"{PLAIN_EXPLANATION_HEADING} must be the final top-level report section"
+        ]
+
+    return []
+
+
+def _validate_readiness_is_final_plain_subsection(text: str) -> list[str]:
+    heading_pattern = re.compile(
+        rf"^{re.escape(READINESS_EXPLANATION_HEADING)}\s*$",
+        re.MULTILINE,
+    )
+    heading_match = heading_pattern.search(text)
+    if not heading_match:
+        return []
+
+    later_plain_subsection = re.search(
+        r"^###\s+",
+        text[heading_match.end():],
+        re.MULTILINE,
+    )
+    if later_plain_subsection:
+        return [
+            f"{READINESS_EXPLANATION_HEADING} must be the final "
+            "plain-language subsection"
         ]
 
     return []
@@ -790,6 +1065,22 @@ def _validate_live_safety_evidence(text: str) -> list[str]:
         if phrase.lower() not in normalized_lower_text:
             errors.append(f"missing required live-safety evidence: {phrase}")
 
+    contradicted_real_console_contact_terms = [
+        term
+        for term in REAL_CONSOLE_CONTACT_AUDIT_TERMS
+        if term in normalized_lower_text
+        and _has_affirmed_action_audit(
+            normalized_lower_text,
+            term,
+            REAL_CONSOLE_CONTACT_AUDIT_VERBS,
+        )
+    ]
+    if contradicted_real_console_contact_terms:
+        errors.append(
+            "real-console audit contradicts no-contact safety evidence: "
+            + ", ".join(contradicted_real_console_contact_terms)
+        )
+
     contradicted_live_write_terms = [
         term
         for term in LIVE_WRITE_AUDIT_TERMS
@@ -810,6 +1101,7 @@ def _validate_live_safety_evidence(text: str) -> list[str]:
         command
         for command in FORBIDDEN_LIVE_COMMANDS
         if command.lower() not in lower_text
+        or not _has_command_audit_context(normalized_lower_text, command)
     ]
     if missing_commands:
         errors.append(
@@ -831,7 +1123,7 @@ def _validate_live_safety_evidence(text: str) -> list[str]:
 
     contradicted_commands = [
         command
-        for command in FORBIDDEN_LIVE_COMMANDS
+        for command in FORBIDDEN_LIVE_COMMAND_CONTRADICTION_TERMS
         if command.lower() in lower_text
         and _has_affirmed_command_audit(normalized_lower_text, command)
     ]
@@ -904,9 +1196,25 @@ def _validate_live_safety_evidence(text: str) -> list[str]:
             + ", ".join(body_contradicted_live_write_terms)
         )
 
+    body_contradicted_real_console_contact_terms = [
+        term
+        for term in REAL_CONSOLE_CONTACT_AUDIT_TERMS
+        if term in normalized_report_body
+        and _has_affirmed_action_audit(
+            normalized_report_body,
+            term,
+            REAL_CONSOLE_CONTACT_AUDIT_VERBS,
+        )
+    ]
+    if body_contradicted_real_console_contact_terms:
+        errors.append(
+            "report body contradicts no-contact safety evidence: "
+            + ", ".join(body_contradicted_real_console_contact_terms)
+        )
+
     body_contradicted_commands = [
         command
-        for command in FORBIDDEN_LIVE_COMMANDS
+        for command in FORBIDDEN_LIVE_COMMAND_CONTRADICTION_TERMS
         if command.lower() in lower_report_body
         and _has_affirmed_command_audit(normalized_report_body, command)
     ]
@@ -941,6 +1249,38 @@ def _has_negated_command_audit(normalized_lower_text: str, command: str) -> bool
         command,
         NEGATED_COMMAND_AUDIT_VERBS,
     )
+
+
+def _has_command_audit_context(normalized_lower_text: str, command: str) -> bool:
+    action_lower = command.lower()
+    for match in re.finditer(re.escape(action_lower), normalized_lower_text):
+        sentence_start = max(
+            normalized_lower_text.rfind(".", 0, match.start()),
+            normalized_lower_text.rfind("!", 0, match.start()),
+            normalized_lower_text.rfind("?", 0, match.start()),
+        ) + 1
+        sentence_end_candidates = [
+            index
+            for index in (
+                normalized_lower_text.find(".", match.end()),
+                normalized_lower_text.find("!", match.end()),
+                normalized_lower_text.find("?", match.end()),
+            )
+            if index != -1
+        ]
+        sentence_end = (
+            min(sentence_end_candidates)
+            if sentence_end_candidates
+            else len(normalized_lower_text)
+        )
+        sentence = normalized_lower_text[sentence_start:sentence_end].strip()
+        action_offset = match.start() - sentence_start
+        clause_start, clause_end = _action_clause_bounds(sentence, action_offset)
+        clause = sentence[clause_start:clause_end].strip()
+        if COMMAND_AUDIT_CONTEXT_PATTERN.search(clause):
+            return True
+
+    return False
 
 
 def _has_affirmed_command_audit(normalized_lower_text: str, command: str) -> bool:
@@ -985,10 +1325,10 @@ def _has_negated_action_audit(
         negated_before = re.search(r"\bno\b", before_action) is not None
         negated_russian = "не " in clause
         negated_execution = re.search(
-            r"\b(?:was|were)\s+not\s+(?:run|sent|executed|performed|applied)\b"
+            r"\b(?:was|were)\s+not\s+(?:run|sent|executed|performed|applied|used)\b"
             r"|\bcommands?\s+(?:was|were)\s+not\s+(?:run|sent|executed|applied)\b"
-            r"|\b(?:did|do|does)\s+not\s+(?:run|send|execute|perform|apply)\b"
-            r"|\bnever\s+(?:run|sent|executed|performed|applied)\b",
+            r"|\b(?:did|do|does)\s+not\s+(?:run|send|execute|perform|apply|use)\b"
+            r"|\bnever\s+(?:run|sent|executed|performed|applied|used)\b",
             clause,
         ) is not None
         has_execution_verb = (
@@ -1036,10 +1376,15 @@ def _has_affirmed_action_audit(
             re.search(r"\bno\b", before_action) is not None
             or "не " in clause
             or re.search(
-                r"\b(?:was|were)\s+not\s+(?:run|sent|executed|performed|applied)\b"
+                r"\b(?:was|were)\s+not\s+(?:run|sent|executed|performed|applied|used)\b"
                 r"|\bcommands?\s+(?:was|were)\s+not\s+(?:run|sent|executed|applied)\b"
-                r"|\b(?:did|do|does)\s+not\s+(?:run|send|execute|perform|apply)\b"
-                r"|\bnever\s+(?:run|sent|executed|performed|applied)\b",
+                r"|\b(?:did|do|does)\s+not\s+(?:run|send|execute|perform|apply|use)\b"
+                r"|\b(?:was|were)\s+not\s+"
+                r"(?:accessed|modified|read|opened|inspected|checked|touched)\b"
+                r"|\b(?:did|do|does)\s+not\s+"
+                r"(?:access|modify|read|open|inspect|check|touch)\b"
+                r"|\bnever\s+"
+                r"(?:run|sent|executed|performed|applied|used|accessed|modified|read|opened|inspected|checked|touched)\b",
                 clause,
             )
             is not None
@@ -1115,17 +1460,23 @@ def validate_report(
     errors.extend(_validate_plan_item_limit(text))
     errors.extend(_validate_required_sections_have_content(text))
     errors.extend(_validate_scope_evidence(text))
+    errors.extend(_validate_scope_project_boundary_contradictions(text))
     errors.extend(_validate_project_boundary_contradictions(text))
+    errors.extend(_validate_secret_boundary_contradictions(text))
     errors.extend(_validate_discovery_evidence(text))
     errors.extend(_validate_recent_discovery_evidence(text))
     errors.extend(_validate_todo_scan_boundary_evidence(text))
     errors.extend(_validate_tests_and_checks_evidence(text))
     errors.extend(_validate_memory_lint_evidence(text))
+    errors.extend(_validate_memory_lint_result_section(text))
     errors.extend(_validate_readiness_scores(text))
+    errors.extend(_validate_ordered_core_sections(text))
+    errors.extend(_validate_ordered_mid_sections(text))
     errors.extend(_validate_ordered_end_sections(text))
     errors.extend(_validate_changed_file_links(text, resolved_report, root))
     errors.extend(_validate_next_steps_limit(text))
     errors.extend(_validate_plain_explanation_is_final_major_section(text))
+    errors.extend(_validate_readiness_is_final_plain_subsection(text))
     errors.extend(_validate_plain_explanation_subsections_have_content(text))
     errors.extend(_validate_project_state_explanation_evidence(text))
     errors.extend(_validate_mandatory_question_answers(text))

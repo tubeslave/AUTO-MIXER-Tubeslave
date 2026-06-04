@@ -51,11 +51,18 @@ def _pick(mapping: Mapping[str, Any], *names: str, default: Any = None) -> Any:
     return default
 
 
+def _buffer_duration_ms(sample_rate: int, buffer_size_samples: int) -> Optional[float]:
+    if sample_rate <= 0 or buffer_size_samples <= 0:
+        return None
+    return (buffer_size_samples / sample_rate) * 1000.0
+
+
 @dataclass(frozen=True)
 class DynamicEQSafetyConfig:
     """Safe bounds for shadow dynamic-EQ predictions."""
 
     expected_band_count: int = DEFAULT_EXPECTED_BAND_COUNT
+    buffer_size_samples: int = 256
     max_abs_eq_gain_db: float = 6.0
     max_q: float = 10.0
     max_dynamic_gain_range_db: float = 8.0
@@ -68,6 +75,7 @@ class DynamicEQSafetyConfig:
     max_attack_ms: float = 250.0
     min_release_ms: float = 5.0
     max_release_ms: float = 4000.0
+    min_parameter_ramp_buffers: float = 5.0
     confidence_threshold: float = 0.65
     live_write_allowed: bool = False
     dry_run: bool = True
@@ -100,6 +108,7 @@ class DynamicEQBandPrediction:
     ratio: Optional[float] = None
     attack_ms: Optional[float] = None
     release_ms: Optional[float] = None
+    parameter_ramp_ms: Optional[float] = None
     dynamic_gain_range_db: Optional[float] = None
     makeup_gain_db: float = 0.0
     label: str = ""
@@ -192,6 +201,9 @@ def parse_dynamic_eq_prediction(payload: Mapping[str, Any]) -> DynamicEQPredicti
                 ratio=_safe_float(_pick(raw_band, "ratio", "drc_ratio")),
                 attack_ms=_safe_float(_pick(raw_band, "attack_ms", "drc_attack_ms")),
                 release_ms=_safe_float(_pick(raw_band, "release_ms", "drc_release_ms")),
+                parameter_ramp_ms=_safe_float(
+                    _pick(raw_band, "parameter_ramp_ms", "ramp_ms", "smoothing_ms", "transition_ms")
+                ),
                 dynamic_gain_range_db=_safe_float(_pick(raw_band, "dynamic_gain_range_db", "range_db", "drc_range_db")),
                 makeup_gain_db=float(_safe_float(_pick(raw_band, "makeup_gain_db", "drc_makeup_gain_db", default=0.0)) or 0.0),
                 label=str(_pick(raw_band, "label", "name", default=f"band_{band_index}")),
@@ -256,10 +268,33 @@ def validate_dynamic_eq_prediction(
                 details={"confidence": prediction.confidence, "threshold": config.confidence_threshold},
             )
         )
+    if config.buffer_size_samples <= 0:
+        issues.append(
+            DynamicEQIssue(
+                code="invalid_buffer_size",
+                severity="error",
+                message="Dynamic EQ buffer timing guard requires a positive buffer size.",
+                details={"buffer_size_samples": config.buffer_size_samples},
+            )
+        )
+    if config.min_parameter_ramp_buffers <= 0:
+        issues.append(
+            DynamicEQIssue(
+                code="invalid_parameter_ramp_guard",
+                severity="error",
+                message="Dynamic EQ parameter ramp guard requires a positive buffer multiplier.",
+                details={"min_parameter_ramp_buffers": config.min_parameter_ramp_buffers},
+            )
+        )
 
     peq_result = audit_peq_bands([band.to_peq_band() for band in prediction.bands], config=config.as_autoeq_config())
     for issue in peq_result.issues:
         issues.append(DynamicEQIssue(issue.code, issue.severity, issue.message, issue.details))
+
+    buffer_ms = _buffer_duration_ms(prediction.sample_rate, config.buffer_size_samples)
+    min_attack_buffer_ms = buffer_ms
+    min_release_buffer_ms = buffer_ms * 2.0 if buffer_ms is not None else None
+    min_parameter_ramp_ms = buffer_ms * config.min_parameter_ramp_buffers if buffer_ms is not None else None
 
     for band in prediction.bands:
         label = band.label or f"band_{band.band_index}"
@@ -312,6 +347,21 @@ def validate_dynamic_eq_prediction(
                     details={"label": label, "attack_ms": band.attack_ms, "allowed": [config.min_attack_ms, config.max_attack_ms]},
                 )
             )
+        if min_attack_buffer_ms is not None and band.attack_ms is not None and band.attack_ms < min_attack_buffer_ms:
+            issues.append(
+                DynamicEQIssue(
+                    code="attack_too_fast_for_buffer",
+                    severity="error",
+                    message="DRC attack is shorter than one configured audio buffer.",
+                    details={
+                        "label": label,
+                        "attack_ms": band.attack_ms,
+                        "min_attack_ms": round(min_attack_buffer_ms, 3),
+                        "buffer_size_samples": config.buffer_size_samples,
+                        "sample_rate": prediction.sample_rate,
+                    },
+                )
+            )
         if band.release_ms is not None and not (config.min_release_ms <= band.release_ms <= config.max_release_ms):
             issues.append(
                 DynamicEQIssue(
@@ -319,6 +369,41 @@ def validate_dynamic_eq_prediction(
                     severity="error",
                     message="DRC release is outside the allowed range.",
                     details={"label": label, "release_ms": band.release_ms, "allowed": [config.min_release_ms, config.max_release_ms]},
+                )
+            )
+        if min_release_buffer_ms is not None and band.release_ms is not None and band.release_ms < min_release_buffer_ms:
+            issues.append(
+                DynamicEQIssue(
+                    code="release_too_fast_for_buffer",
+                    severity="error",
+                    message="DRC release is shorter than two configured audio buffers.",
+                    details={
+                        "label": label,
+                        "release_ms": band.release_ms,
+                        "min_release_ms": round(min_release_buffer_ms, 3),
+                        "buffer_size_samples": config.buffer_size_samples,
+                        "sample_rate": prediction.sample_rate,
+                    },
+                )
+            )
+        if (
+            min_parameter_ramp_ms is not None
+            and band.parameter_ramp_ms is not None
+            and band.parameter_ramp_ms < min_parameter_ramp_ms
+        ):
+            issues.append(
+                DynamicEQIssue(
+                    code="parameter_ramp_too_fast_for_buffer",
+                    severity="error",
+                    message="Dynamic EQ parameter ramp is shorter than the configured buffer guard.",
+                    details={
+                        "label": label,
+                        "parameter_ramp_ms": band.parameter_ramp_ms,
+                        "min_parameter_ramp_ms": round(min_parameter_ramp_ms, 3),
+                        "min_parameter_ramp_buffers": config.min_parameter_ramp_buffers,
+                        "buffer_size_samples": config.buffer_size_samples,
+                        "sample_rate": prediction.sample_rate,
+                    },
                 )
             )
 
@@ -332,6 +417,9 @@ def validate_dynamic_eq_prediction(
             "band_count": len(prediction.bands),
             "dry_run": config.dry_run,
             "live_write_allowed": config.live_write_allowed,
+            "buffer_size_samples": config.buffer_size_samples,
+            "buffer_ms": round(buffer_ms, 3) if buffer_ms is not None else None,
+            "min_parameter_ramp_buffers": config.min_parameter_ramp_buffers,
         },
     )
 

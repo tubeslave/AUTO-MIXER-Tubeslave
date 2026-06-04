@@ -23,6 +23,7 @@ bands. Each band may contain:
 - DRC ratio;
 - attack;
 - release;
+- optional parameter ramp/smoothing time;
 - dynamic gain range;
 - makeup gain.
 
@@ -33,7 +34,26 @@ The bridge then checks:
 - model confidence is high enough for review;
 - PEQ gain and Q stay within safety limits;
 - DRC threshold, ratio, attack and release stay inside sane ranges;
+- attack, release and optional parameter ramps are not faster than configured
+  audio-buffer guards;
 - dynamic gain range and makeup gain do not exceed the configured budget.
+
+## Buffer Timing Guard
+
+The default safety config assumes a `256` sample buffer and uses the
+prediction sample rate to derive timing floors:
+
+- attack must be at least one buffer;
+- release must be at least two buffers;
+- optional parameter ramps must be at least five buffers.
+
+Invalid buffer guard config fails closed: a non-positive buffer size or ramp
+multiplier blocks the playbook entry instead of silently disabling the timing
+check.
+
+This is intentionally a shadow/offline validation rule. Failing it blocks the
+playbook entry from being treated as usable research evidence, but it does not
+create any live EQ or dynamics write path.
 
 ## Safety Boundary
 
@@ -63,6 +83,7 @@ external model. It only validates already-produced predictions.
       "ratio": 2.0,
       "attack_ms": 12,
       "release_ms": 120,
+      "parameter_ramp_ms": 60,
       "dynamic_gain_range_db": 3,
       "makeup_gain_db": 0.5
     }

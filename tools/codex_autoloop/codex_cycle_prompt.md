@@ -29,7 +29,7 @@ Automixer.
 ## Жесткие ограничения безопасности
 
 - Не выполняй live OSC/WING writes.
-- Не подключайся к реальному пульту и не отправляй команды `set_fader`, `set_gain`, `set_eq`, `set_compressor`, `route_output`, `load_snap`, `save_snap`, `reset`, `mute`, если это не явно dry-run/audit и не доказано тестом.
+- Не подключайся к реальному пульту и не отправляй команды `set_fader`, `set_gain`, `set_trim`, `set_input_trim`, `set_channel_trim`, `set_preamp_trim`, `set_preamp_gain`, `set_eq`, `set_compressor`, `route_output`, `load_snap`, `save_snap`, `reset`, `mute`, `unmute`, `set_insert`, `set_fx_model`, `set_fx_on`, `set_fx_mix`, `set_fx_parameter`, если это не явно dry-run/audit и не доказано тестом.
 - Не делай `git commit`, `git push`, `git reset --hard`, destructive cleanup или удаление пользовательских файлов.
 - Не трогай `.env`, токены, credentials, API keys и локальные секреты.
 - Все опасные действия только dry-run/audit.
@@ -121,7 +121,7 @@ Automixer.
 - краткий план выбранных безопасных задач;
 - что было сделано;
 - какие тесты запущены;
-- результат memory lint;
+- результат memory lint в отдельном разделе `## Memory Lint Result` с результатом `python3 tools/memory/memory_lint.py`;
 - что осталось;
 - какие риски есть;
 - ссылки на измененные файлы;

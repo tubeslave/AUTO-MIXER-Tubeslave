@@ -325,6 +325,10 @@ async def run(args: argparse.Namespace) -> int:
         "run_id": run_id,
         "status": "started",
         "execute": bool(args.execute),
+        "proof_artifact_schema": "wing_operator_proposal_validation.v2",
+        "proof_runner": "wing_operator_proposal_validation_runner",
+        "proof_mode": "physical" if args.execute else "dry_run",
+        "physical_wing": bool(args.execute),
         "url": args.url,
         "channel": args.channel,
         "value_type": args.value_type,
@@ -334,6 +338,7 @@ async def run(args: argparse.Namespace) -> int:
         "prove_emergency_stop": bool(args.prove_emergency_stop),
         "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "write_policy": "apply_operator_proposal_only",
+        "physical_proof_requires_execute": True,
         "forbidden_messages": ["set_fader", "set_gain", "route_output", "load_snap", "save_snap"],
     }
 

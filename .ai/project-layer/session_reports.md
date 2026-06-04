@@ -15,6 +15,49 @@ Session reports summarize what happened in one safe work cycle.
 
 ## Records
 
+### 2026-06-02 - Repo-local Codex cycle state audit
+
+Agent: Codex.app
+
+Mode: audit-only documentation and report-pipeline validation
+
+Summary:
+Ran one bounded repo-local cycle against the current dirty Automixer checkout.
+Preserved existing modified and untracked work, documented the active safety
+boundary, verified the cycle-report validator with `python3`, and recorded that
+the standard `python` executable is not present in this shell while `python3`
+works.
+
+Files:
+.ai/project-layer/session_reports.md; .paperclip/reports/automixer_codex_cycle_20260602T193957Z.md
+
+Tests:
+python3 tools/memory/memory_lint.py: PASS; PYTHONPATH=backend python -m pytest
+tests/test_codex_cycle_report_validator.py -q: blocked because `python` was not
+found; PYTHONPATH=backend python3 -m pytest tests/test_codex_cycle_report_validator.py
+-q: 81 passed; PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q:
+1429 passed, 1 skipped, 1 warning
+
+Memory Lint:
+PASS
+
+Safety:
+No live OSC/WING writes. No real console was contacted. No set_fader, set_gain,
+set_eq, set_compressor, route_output, load_snap, save_snap, reset, or mute
+command was run. No commit, push, reset, destructive cleanup, secret access, or
+user-file deletion was performed.
+
+Risks:
+The working tree remains heavily dirty, so this cycle intentionally avoided
+production mixer logic and did not claim live readiness from offline/report
+evidence.
+
+Next:
+Use focused follow-up slices to validate or stage the existing dirty work by
+topic before any broader release check.
+
+---
+
 ### 2026-05-29 - Memory pipeline setup
 
 Agent: Codex.app
@@ -126,3 +169,40 @@ Static prompt tests protect report requirements but do not prove live readiness 
 
 Next:
 Run Playwright e2e in a local-server-capable environment or calibrate SafeGain ensemble thresholds on replayed/real captures.
+
+---
+
+### 2026-06-02 - Codex cycle reset command-audit hardening
+
+Agent: Codex.app
+
+Mode: audit-only and test-only tooling
+
+Summary:
+Hardened the Codex cycle report validator so the forbidden WING `reset` command
+must be evidenced in a command/run/send/execute/apply audit context, not only
+through the separate git `reset` non-destructive action audit. Added a focused
+regression test for that ambiguity.
+
+Files:
+tools/codex_autoloop/validate_cycle_report.py; tests/test_codex_cycle_report_validator.py; .paperclip/reports/automixer_codex_cycle_20260602T200720Z.md
+
+Tests:
+PYTHONPATH=backend python3 -m pytest tests/test_codex_cycle_report_validator.py -q: 82 passed; python3 tools/memory/memory_lint.py: PASS; PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q: blocked because python was not found; PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q: 1430 passed, 1 skipped, 1 warning
+
+Memory Lint:
+PASS
+
+Safety:
+No live OSC/WING writes. No real console was contacted. No set_fader, set_gain,
+set_eq, set_compressor, route_output, load_snap, save_snap, reset, mute, Dante,
+gain, trim, fader, routing, snapshot, EQ, dynamics, FX, or runtime mixer changes.
+
+Risks:
+The worktree remains broadly dirty from pre-existing backend/frontend/docs/tools
+changes, so this cycle's useful evidence is limited to report/tooling safety and
+test results.
+
+Next:
+Continue splitting the dirty worktree into focused safety/report/backend/frontend
+slices before any release decision.

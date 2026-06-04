@@ -6,6 +6,7 @@
 - Выключает все модули (EQ, PreEQ, Compressor, Gate, Filters, Inserts)
 - Устанавливает все фейдеры на 0дБ
 """
+from manual_recovery_guard import require_manual_recovery_ack
 from wing_client import WingClient
 import time
 import logging
@@ -56,8 +57,10 @@ def disable_channel_modules_and_set_fader(client: WingClient, channel: int):
     time.sleep(0.01)
 
 
-def disable_all_modules_and_set_faders(auto_confirm=False):
+def disable_all_modules_and_set_faders():
     """Выключить все модули и установить фейдеры на 0дБ для всех 40 каналов"""
+
+    require_manual_recovery_ack("disable_modules_set_faders.py")
     
     # Попытка загрузить IP из конфига
     default_ip = "192.168.1.102"
@@ -76,20 +79,13 @@ def disable_all_modules_and_set_faders(auto_confirm=False):
         logger.debug(f"Не удалось загрузить конфиг: {e}")
     
     # Подключение к Wing - разрешить аргументы командной строки
-    # Если auto_confirm=True, используем значения по умолчанию без запроса
     if len(sys.argv) >= 2 and not sys.argv[1].startswith('--'):
         ip = sys.argv[1]
-    elif auto_confirm:
-        ip = default_ip
-        logger.info(f"Используется IP адрес из конфига: {ip}")
     else:
         ip = input(f"Введите IP адрес Wing [{default_ip}]: ").strip() or default_ip
     
     if len(sys.argv) >= 3 and not sys.argv[2].startswith('--'):
         port = int(sys.argv[2])
-    elif auto_confirm:
-        port = default_port
-        logger.info(f"Используется порт из конфига: {port}")
     else:
         port = int(input(f"Введите OSC порт [{default_port}]: ").strip() or default_port)
     
@@ -103,19 +99,17 @@ def disable_all_modules_and_set_faders(auto_confirm=False):
     logger.info("Подключено! Ожидание начального сканирования...")
     time.sleep(3)  # Ожидание начального сканирования
     
-    # Подтверждение перед выполнением (если не auto_confirm)
-    if not auto_confirm:
-        print("\n" + "="*60)
-        print("ВНИМАНИЕ: Это выключит все модули и установит фейдеры на 0дБ на ВСЕХ 40 каналах!")
-        print("  - Все модули ВЫКЛЮЧЕНЫ (EQ, PreEQ, Gate, Dynamics, Filters, Inserts)")
-        print("  - Все фейдеры = 0дБ")
-        print("="*60)
-        confirm = input("\nВведите 'ДА' для продолжения: ").strip()
-        
-        if confirm != 'ДА':
-            logger.info("Операция отменена")
-            client.disconnect()
-            return
+    print("\n" + "="*60)
+    print("ВНИМАНИЕ: Это выключит все модули и установит фейдеры на 0дБ на ВСЕХ 40 каналах!")
+    print("  - Все модули ВЫКЛЮЧЕНЫ (EQ, PreEQ, Gate, Dynamics, Filters, Inserts)")
+    print("  - Все фейдеры = 0дБ")
+    print("="*60)
+    confirm = input("\nВведите 'ДА' для продолжения: ").strip()
+
+    if confirm != 'ДА':
+        logger.info("Операция отменена")
+        client.disconnect()
+        return
     
     logger.info("\nНачало обработки всех 40 каналов...")
     logger.info("Это может занять некоторое время...\n")
@@ -142,7 +136,4 @@ def disable_all_modules_and_set_faders(auto_confirm=False):
 
 
 if __name__ == "__main__":
-    import sys
-    # Разрешить автоматическое подтверждение с флагом --yes
-    auto_confirm = '--yes' in sys.argv or '-y' in sys.argv
-    disable_all_modules_and_set_faders(auto_confirm=auto_confirm)
+    disable_all_modules_and_set_faders()

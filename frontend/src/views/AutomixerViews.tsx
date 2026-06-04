@@ -95,6 +95,21 @@ function fallbackViewData(): OperatorViewData {
     devices,
     logs,
     moduleStatuses: [],
+    telemetryAlerts: {
+      available: false,
+      generatedAt: 'mock',
+      sourceLabel: 'mock',
+      storageDir: '',
+      alertCount: 0,
+      criticalCount: 0,
+      warningCount: 0,
+      latestSessionId: '',
+      readOnly: true,
+      liveWrite: false,
+      generatesArtifacts: false,
+      sessions: [],
+      alerts: []
+    },
     communications,
     memories,
     trainingSessions: mockTrainingSessions,
@@ -111,6 +126,7 @@ function fallbackViewData(): OperatorViewData {
       performance: 'mock',
       training: 'mock',
       rules: 'mock',
+      telemetryAlerts: 'mock',
       communications: 'mock'
     }
   };

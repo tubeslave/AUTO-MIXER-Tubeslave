@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -35,26 +36,62 @@ FORBIDDEN_COMMAND_TOKENS = (
     "set_main_fader",
     "set_bus_fader",
     "set_dca_fader",
+    "set_dca_level",
+    "set_group_fader",
+    "set_matrix_fader",
     "set_gain",
     "set_channel_gain",
+    "set_trim",
+    "set_input_trim",
+    "set_channel_trim",
+    "set_preamp_trim",
+    "set_preamp_gain",
     "set_eq",
     "set_eq_band",
     "set_bus_eq_band",
+    "set_bus_eq_on",
+    "set_main_eq_band",
+    "set_main_eq_on",
+    "set_matrix_eq_band",
+    "set_matrix_eq_on",
     "set_compressor",
     "set_compressor_gain",
     "set_bus_compressor",
+    "set_bus_compressor_gain",
     "set_gate",
     "set_gate_on",
     "set_hpf",
+    "set_bus_pan",
+    "set_main_pan",
     "set_delay",
     "set_polarity",
+    "set_mute",
+    "set_channel_mute",
+    "set_bus_mute",
+    "set_dca_mute",
+    "set_group_mute",
+    "set_main_mute",
+    "set_matrix_mute",
     "route_output",
     "route_multiple_outputs",
     "load_snap",
     "save_snap",
+    "recall_snap",
+    "store_snap",
+    "restore_snapshot",
+    "load_scene",
+    "save_scene",
+    "recall_scene",
+    "restore_scene",
     "reset",
+    "reset_channel_eq",
+    "reset_channel_hpf",
+    "reset_channel_dynamics",
     "reset_channel_processing",
     "reset_phase_delay",
+    "mute_channel",
+    "unmute_channel",
+    "unmute",
     "mute",
     "set_channel_input",
     "set_channel_alt_input",
@@ -63,12 +100,17 @@ FORBIDDEN_COMMAND_TOKENS = (
     "set_fx_on",
     "set_fx_mix",
     "set_fx_parameter",
+    "set_fx_return_level",
     "set_send_level",
     "set_channel_send",
+    "set_channel_main_send",
+    "set_reverb_send",
     "connect_wing",
     "mixer_discovery",
     "WingClient",
 )
+
+FORBIDDEN_COMMAND_TOKEN_BOUNDARY = re.compile(r"[A-Za-z0-9]")
 
 
 def utc_now() -> str:
@@ -116,7 +158,21 @@ def build_checks(
     command_timeout_sec: float | None = DEFAULT_COMMAND_TIMEOUT_SEC,
 ) -> list[CommandCheck]:
     offline_artifact_root = (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "offline_validation"
+    proof_report_path = (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "supervised_proof_artifact_report.json"
     checks = [
+        CommandCheck(
+            name="write_surface_static_scan",
+            command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "tests/test_write_surface_inventory_static_scan.py",
+                "-q",
+                "--tb=short",
+            ),
+            cwd=str(repo_root),
+            env={"PYTHONPATH": "backend"},
+        ),
         CommandCheck(
             name="backend_pytest",
             command=(
@@ -139,6 +195,25 @@ def build_checks(
                 "--artifact-root",
                 str(offline_artifact_root),
             ),
+            cwd=str(repo_root),
+        ),
+        CommandCheck(
+            name="supervised_proof_artifact_report",
+            command=(
+                sys.executable,
+                "tools/evaluate_supervised_proof_artifacts.py",
+                "--artifact-root",
+                str(offline_artifact_root),
+                "--output",
+                str(proof_report_path),
+                "--quiet",
+            ),
+            cwd=str(repo_root),
+            env={"PYTHONPATH": "backend"},
+        ),
+        CommandCheck(
+            name="memory_lint",
+            command=(sys.executable, "tools/memory/memory_lint.py"),
             cwd=str(repo_root),
         ),
     ]
@@ -192,13 +267,33 @@ def build_checks(
 def validate_no_live_commands(checks: Iterable[CommandCheck]) -> None:
     violations: list[str] = []
     for check in checks:
-        command_text = check.shell_display()
+        command_text = " ".join((check.name, check.shell_display())).lower()
         for token in FORBIDDEN_COMMAND_TOKENS:
-            if token in command_text:
+            if _contains_forbidden_command_token(command_text, token):
                 violations.append(f"{check.name}:{token}")
     if violations:
         joined = ", ".join(sorted(violations))
         raise ValueError(f"no-WING release checks include forbidden live command tokens: {joined}")
+
+
+def _contains_forbidden_command_token(command_text: str, token: str) -> bool:
+    normalized_token = token.lower()
+    start = 0
+    while True:
+        index = command_text.find(normalized_token, start)
+        if index == -1:
+            return False
+
+        before = command_text[index - 1] if index > 0 else ""
+        after_index = index + len(normalized_token)
+        after = command_text[after_index] if after_index < len(command_text) else ""
+        before_is_word = bool(before and FORBIDDEN_COMMAND_TOKEN_BOUNDARY.match(before))
+        after_is_word = bool(after and FORBIDDEN_COMMAND_TOKEN_BOUNDARY.match(after))
+
+        if not before_is_word and not after_is_word:
+            return True
+
+        start = index + 1
 
 
 def check_port_free(port: int = DEFAULT_BACKEND_PORT, host: str = "127.0.0.1") -> CheckResult:

@@ -8,7 +8,7 @@ the server's supervised manual write gate.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
@@ -20,10 +20,36 @@ except ImportError:  # pragma: no cover - package import compatibility
 
 FINAL_STATUSES = {"accepted", "dismissed", "applied", "apply_blocked", "apply_error"}
 APPLYABLE_VALUE_TYPES = set(LIVE_ALLOWED_WRITE_KINDS)
+DEFAULT_PROPOSAL_TTL_SECONDS = 120
+MIN_PROPOSAL_TTL_SECONDS = 5
+MAX_PROPOSAL_TTL_SECONDS = 300
+
+
+def _utc_datetime_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _format_utc(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return _format_utc(_utc_datetime_now())
+
+
+def _parse_utc_timestamp(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        raw = str(value).strip()
+        if raw.endswith("Z"):
+            raw = f"{raw[:-1]}+00:00"
+        parsed = datetime.fromisoformat(raw)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _coerce_int(value: Any) -> Optional[int]:
@@ -38,6 +64,13 @@ def _coerce_float(value: Any) -> Optional[float]:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _coerce_ttl_seconds(value: Any, default: int = DEFAULT_PROPOSAL_TTL_SECONDS) -> int:
+    ttl = _coerce_int(value)
+    if ttl is None:
+        ttl = default
+    return max(MIN_PROPOSAL_TTL_SECONDS, min(MAX_PROPOSAL_TTL_SECONDS, ttl))
 
 
 def _is_applyable_change(change: Optional[Dict[str, Any]]) -> bool:
@@ -88,11 +121,22 @@ class OperatorProposal:
     reason: str = ""
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
+    ttl_seconds: int = DEFAULT_PROPOSAL_TTL_SECONDS
+    expires_at: Optional[str] = None
     requested_change: Optional[Dict[str, Any]] = None
     requested_changes: List[Dict[str, Any]] = field(default_factory=list)
     mode_at_creation: Optional[str] = None
     raw: Dict[str, Any] = field(default_factory=dict)
     result: Optional[Dict[str, Any]] = None
+
+    def is_expired(self, now: Optional[datetime] = None) -> bool:
+        if self.status != "pending":
+            return False
+        expires = _parse_utc_timestamp(self.expires_at)
+        if expires is None:
+            return False
+        current = now.astimezone(timezone.utc) if now else _utc_datetime_now()
+        return current >= expires
 
     def to_dict(self) -> Dict[str, Any]:
         apply_blockers = (
@@ -100,6 +144,9 @@ class OperatorProposal:
             if self.requested_changes
             else _apply_blockers_for_change(self.requested_change)
         )
+        expired = self.is_expired()
+        if expired and "proposal_expired" not in apply_blockers:
+            apply_blockers = [*apply_blockers, "proposal_expired"]
         can_apply = not apply_blockers
         return {
             "id": self.id,
@@ -113,6 +160,9 @@ class OperatorProposal:
             "reason": self.reason,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "ttl_seconds": self.ttl_seconds,
+            "expires_at": self.expires_at,
+            "expired": expired,
             "requested_change": dict(self.requested_change) if self.requested_change else None,
             "requested_changes": [dict(change) for change in self.requested_changes] if self.requested_changes else None,
             "linked_change_count": len(self.requested_changes),
@@ -220,6 +270,15 @@ class OperatorProposalQueue:
                 "operator_mode": operator_mode,
             }
 
+        created_at = utc_now()
+        ttl_seconds = _coerce_ttl_seconds(payload.get("ttl_seconds"))
+        explicit_expires_at = _parse_utc_timestamp(payload.get("expires_at"))
+        created_dt = _parse_utc_timestamp(created_at) or _utc_datetime_now()
+        expires_at = (
+            _format_utc(explicit_expires_at)
+            if explicit_expires_at is not None
+            else _format_utc(created_dt + timedelta(seconds=ttl_seconds))
+        )
         proposal = OperatorProposal(
             id=proposal_id,
             title=str(title),
@@ -233,6 +292,10 @@ class OperatorProposalQueue:
             confidence=_coerce_float(payload.get("confidence")),
             source=str(payload.get("source") or "operator_proposal_queue"),
             reason=str(payload.get("reason") or payload.get("rationale") or ""),
+            created_at=created_at,
+            updated_at=created_at,
+            ttl_seconds=ttl_seconds,
+            expires_at=expires_at,
             requested_change=requested_change,
             requested_changes=requested_changes,
             mode_at_creation=operator_mode.get("mode"),

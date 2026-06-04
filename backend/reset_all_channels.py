@@ -7,6 +7,7 @@ Test script: Reset all 40 channels to default settings
 - Reset all module parameters to defaults
 - Turn off inserts
 """
+from manual_recovery_guard import require_manual_recovery_ack
 from wing_client import WingClient
 import time
 import logging
@@ -166,9 +167,11 @@ def reset_fx_module(client: WingClient, fx_slot: str):
     time.sleep(0.05)
 
 
-def reset_all_channels(auto_confirm=False):
+def reset_all_channels():
     """Reset all 40 channels"""
     import sys
+
+    require_manual_recovery_ack("reset_all_channels.py")
     
     # Connect to Wing - allow command line args
     if len(sys.argv) >= 2:
@@ -191,23 +194,21 @@ def reset_all_channels(auto_confirm=False):
     logger.info("Connected! Waiting for initial scan...")
     time.sleep(5)  # Wait for initial scan and channel scan
     
-    # Confirm before proceeding (unless auto_confirm)
-    if not auto_confirm:
-        print("\n" + "="*60)
-        print("WARNING: This will reset ALL settings on ALL 40 channels!")
-        print("  - Trim = 0 dB")
-        print("  - Fader = 0 dB")
-        print("  - All modules OFF (EQ, Compressor, Gate)")
-        print("  - All module parameters reset to defaults")
-        print("  - All inserts OFF")
-        print("  - FX module parameters reset")
-        print("="*60)
-        confirm = input("\nType 'YES' to continue: ").strip()
-        
-        if confirm != 'YES':
-            logger.info("Operation cancelled")
-            client.disconnect()
-            return
+    print("\n" + "="*60)
+    print("WARNING: This will reset ALL settings on ALL 40 channels!")
+    print("  - Trim = 0 dB")
+    print("  - Fader = 0 dB")
+    print("  - All modules OFF (EQ, Compressor, Gate)")
+    print("  - All module parameters reset to defaults")
+    print("  - All inserts OFF")
+    print("  - FX module parameters reset")
+    print("="*60)
+    confirm = input("\nType 'YES' to continue: ").strip()
+
+    if confirm != 'YES':
+        logger.info("Operation cancelled")
+        client.disconnect()
+        return
     
     logger.info("\nStarting reset of all 40 channels...")
     logger.info("This may take a minute...\n")
@@ -234,7 +235,4 @@ def reset_all_channels(auto_confirm=False):
 
 
 if __name__ == "__main__":
-    import sys
-    # Allow auto-confirm with --yes flag
-    auto_confirm = '--yes' in sys.argv or '-y' in sys.argv
-    reset_all_channels(auto_confirm=auto_confirm)
+    reset_all_channels()
