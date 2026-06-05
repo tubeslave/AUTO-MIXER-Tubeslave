@@ -1168,6 +1168,29 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const artifactReviewQueueTargetInconsistentSurfaces = stringList(artifactReviewQueue.target_inconsistent_surface_ids);
     const artifactReviewQueueMethodIds = stringList(artifactReviewQueue.queue_item_method_ids);
     const artifactReviewQueueBlockedBy = stringList(artifactReviewQueue.blocked_by);
+    const fixtureClosurePlan = asRecord(proofQuality.read_surface_physical_readback_fixture_closure_plan);
+    const fixtureClosurePlanAvailable = Boolean(fixtureClosurePlan.available);
+    const fixtureClosurePlanStatus = str(fixtureClosurePlan.plan_status, str(fixtureClosurePlan.status, 'missing'));
+    const fixtureClosurePlanReviewCandidateCount = Math.trunc(num(fixtureClosurePlan.review_candidate_count, 0));
+    const fixtureClosurePlanAcceptanceRecordCount = Math.trunc(num(fixtureClosurePlan.acceptance_record_count, 0));
+    const fixtureClosurePlanAcceptedRecordCount = Math.trunc(num(fixtureClosurePlan.accepted_record_count, 0));
+    const fixtureClosurePlanRejectedRecordCount = Math.trunc(num(fixtureClosurePlan.rejected_record_count, 0));
+    const fixtureClosurePlanInvalidRecordCount = Math.trunc(num(fixtureClosurePlan.invalid_record_count, 0));
+    const fixtureClosurePlanUnreviewedCount = Math.trunc(num(fixtureClosurePlan.unreviewed_candidate_count, 0));
+    const fixtureClosurePlanCandidateCount = Math.trunc(num(fixtureClosurePlan.closure_candidate_count, 0));
+    const fixtureClosurePlanCandidateAvailable = fixtureClosurePlan.manual_fixture_closure_candidate_available === true;
+    const fixtureClosurePlanManualRequired = fixtureClosurePlan.manual_fixture_closure_required === true;
+    const fixtureClosurePlanOperatorReview = fixtureClosurePlan.operator_review_required === true;
+    const fixtureClosurePlanGapRemains = fixtureClosurePlan.physical_fixture_gap_remains === true;
+    const fixtureClosurePlanUpdateAllowed = fixtureClosurePlan.fixture_update_allowed_by_plan === true;
+    const fixtureClosurePlanClosureAllowed = fixtureClosurePlan.fixture_closure_allowed_by_plan === true;
+    const fixtureClosurePlanLiveAuthority = fixtureClosurePlan.live_authority_granted === true;
+    const fixtureClosurePlanFullAuto = fixtureClosurePlan.full_autonomous_ready === true;
+    const fixtureClosurePlanCandidateSurfaces = stringList(fixtureClosurePlan.closure_candidate_surface_ids);
+    const fixtureClosurePlanRejectedSurfaces = stringList(fixtureClosurePlan.rejected_surface_ids);
+    const fixtureClosurePlanInvalidRecordIds = stringList(fixtureClosurePlan.invalid_record_ids);
+    const fixtureClosurePlanUnreviewedSurfaces = stringList(fixtureClosurePlan.unreviewed_candidate_surface_ids);
+    const fixtureClosurePlanBlockedBy = stringList(fixtureClosurePlan.blocked_by);
     const freshnessText = available
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
@@ -1177,6 +1200,9 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const artifactReviewQueueText = proofQualityAvailable
       ? `artifact_queue:${artifactReviewQueueStatus || 'missing'}; artifact_queue_surfaces:${artifactReviewQueueSurfaceCount}; artifact_queue_available_intakes:${artifactReviewQueueAvailableIntakeCount}; artifact_queue_artifacts:${artifactReviewQueueArtifactCount}; artifact_queue_valid:${artifactReviewQueueValidCount}; artifact_queue_invalid:${artifactReviewQueueInvalidCount}; artifact_queue_review_candidates:${artifactReviewQueueReviewCandidateCount}; artifact_queue_missing:${artifactReviewQueueMissingCount}; artifact_queue_unsafe:${artifactReviewQueueUnsafeCount}; artifact_queue_target_inconsistent:${artifactReviewQueueTargetInconsistentCount}; artifact_queue_review_available:${artifactReviewQueueReviewAvailable}; artifact_queue_operator_review:${artifactReviewQueueOperatorReview}; artifact_queue_gap:${artifactReviewQueueGapRemains}; artifact_queue_closure:${artifactReviewQueueClosureAllowed}; artifact_queue_live_authority:${artifactReviewQueueLiveAuthority}; artifact_queue_full_auto:${artifactReviewQueueFullAuto}`
       : 'artifact_queue:missing';
+    const fixtureClosurePlanText = proofQualityAvailable
+      ? `fixture_closure_plan:${fixtureClosurePlanStatus || 'missing'}; fixture_closure_candidates:${fixtureClosurePlanCandidateCount}; fixture_closure_accepted:${fixtureClosurePlanAcceptedRecordCount}; fixture_closure_rejected:${fixtureClosurePlanRejectedRecordCount}; fixture_closure_invalid:${fixtureClosurePlanInvalidRecordCount}; fixture_closure_unreviewed:${fixtureClosurePlanUnreviewedCount}; fixture_closure_candidate_available:${fixtureClosurePlanCandidateAvailable}; fixture_update_allowed:${fixtureClosurePlanUpdateAllowed}; fixture_closure_allowed:${fixtureClosurePlanClosureAllowed}; fixture_closure_gap:${fixtureClosurePlanGapRemains}; fixture_closure_live_authority:${fixtureClosurePlanLiveAuthority}; fixture_closure_full_auto:${fixtureClosurePlanFullAuto}`
+      : 'fixture_closure_plan:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
       : 'no_current_evidence';
@@ -1409,6 +1435,21 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `artifact_queue_closure_allowed:${artifactReviewQueueClosureAllowed}`,
         `artifact_queue_live_authority:${artifactReviewQueueLiveAuthority}`,
         `artifact_queue_full_auto:${artifactReviewQueueFullAuto}`,
+        `fixture_closure_plan_available:${fixtureClosurePlanAvailable}`,
+        `fixture_closure_plan_status:${fixtureClosurePlanStatus}`,
+        `fixture_closure_plan_review_candidates:${fixtureClosurePlanReviewCandidateCount}`,
+        `fixture_closure_plan_acceptance_records:${fixtureClosurePlanAcceptanceRecordCount}`,
+        `fixture_closure_plan_accepted:${fixtureClosurePlanAcceptedRecordCount}`,
+        `fixture_closure_plan_rejected:${fixtureClosurePlanRejectedRecordCount}`,
+        `fixture_closure_plan_invalid:${fixtureClosurePlanInvalidRecordCount}`,
+        `fixture_closure_plan_unreviewed:${fixtureClosurePlanUnreviewedCount}`,
+        `fixture_closure_plan_candidates:${fixtureClosurePlanCandidateCount}`,
+        `fixture_closure_plan_candidate_available:${fixtureClosurePlanCandidateAvailable}`,
+        `fixture_update_allowed:${fixtureClosurePlanUpdateAllowed}`,
+        `fixture_closure_allowed:${fixtureClosurePlanClosureAllowed}`,
+        `fixture_closure_plan_gap:${fixtureClosurePlanGapRemains}`,
+        `fixture_closure_plan_live_authority:${fixtureClosurePlanLiveAuthority}`,
+        `fixture_closure_plan_full_auto:${fixtureClosurePlanFullAuto}`,
       ],
       blockedReason: available
         ? stale
@@ -1416,7 +1457,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
           : 'Read-only artifact source; safety is normalized before cockpit display.'
         : 'No supervised proof report artifact found.',
       nextStep: available
-        ? `Latest report status: ${str(proofSummary.latest_report_status, 'unknown')}; overlay: ${overlayStatus}; artifacts: ${artifactCount}; invalid: ${invalidCount}; ${freshnessText}; ${proofQualityText}; ${artifactReviewQueueText}.`
+        ? `Latest report status: ${str(proofSummary.latest_report_status, 'unknown')}; overlay: ${overlayStatus}; artifacts: ${artifactCount}; invalid: ${invalidCount}; ${freshnessText}; ${proofQualityText}; ${artifactReviewQueueText}; ${fixtureClosurePlanText}.`
         : 'Run no-WING supervised proof checks or point Product Layer at an existing report artifact.',
       tone: invalidCount > 0 ? 'red' : stale || !available ? 'yellow' : 'blue'
     }];
@@ -2595,6 +2636,70 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         : artifactReviewQueueReviewCandidateCount > 0 || artifactReviewQueueMissingCount > 0
           ? 'yellow'
           : 'green'
+    });
+    rows.push({
+      moduleId: 'read_surface_physical_readback_fixture_closure_plan',
+      label: 'Readback fixture closure plan',
+      domain: 'read_surface_fixture_closure_plan',
+      status: fixtureClosurePlanAvailable ? fixtureClosurePlanStatus || 'closure_plan_available' : 'closure_plan_missing',
+      entrypoint: 'build_read_surface_physical_readback_fixture_closure_plan',
+      module: fixtureClosurePlanBlockedBy[0] || 'manual_fixture_closure_plan',
+      uiSurface: 'Read-surface physical fixture closure plan',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${fixtureClosurePlanAvailable}`,
+        `status:${fixtureClosurePlanStatus}`,
+        `review_candidates:${fixtureClosurePlanReviewCandidateCount}`,
+        `acceptance_records:${fixtureClosurePlanAcceptanceRecordCount}`,
+        `accepted:${fixtureClosurePlanAcceptedRecordCount}`,
+        `rejected:${fixtureClosurePlanRejectedRecordCount}`,
+        `invalid:${fixtureClosurePlanInvalidRecordCount}`,
+        `unreviewed:${fixtureClosurePlanUnreviewedCount}`,
+        `closure_candidates:${fixtureClosurePlanCandidateCount}`,
+        `manual_candidate_available:${fixtureClosurePlanCandidateAvailable}`,
+        `manual_closure_required:${fixtureClosurePlanManualRequired}`,
+        `operator_review:${fixtureClosurePlanOperatorReview}`,
+        `physical_gap_remains:${fixtureClosurePlanGapRemains}`,
+        `fixture_update_allowed:${fixtureClosurePlanUpdateAllowed}`,
+        `fixture_closure_allowed:${fixtureClosurePlanClosureAllowed}`,
+        `live_authority:${fixtureClosurePlanLiveAuthority}`,
+        `full_autonomous_ready:${fixtureClosurePlanFullAuto}`,
+        fixtureClosurePlanCandidateSurfaces.length ? `candidate_surfaces:${fixtureClosurePlanCandidateSurfaces.join('|')}` : '',
+        fixtureClosurePlanRejectedSurfaces.length ? `rejected_surfaces:${fixtureClosurePlanRejectedSurfaces.join('|')}` : '',
+        fixtureClosurePlanInvalidRecordIds.length ? `invalid_records:${fixtureClosurePlanInvalidRecordIds.join('|')}` : '',
+        fixtureClosurePlanUnreviewedSurfaces.length ? `unreviewed_surfaces:${fixtureClosurePlanUnreviewedSurfaces.join('|')}` : '',
+      ].filter(Boolean),
+      blockedReason: fixtureClosurePlanAvailable
+        ? fixtureClosurePlanBlockedBy.length
+          ? fixtureClosurePlanBlockedBy.join(', ')
+          : 'Fixture closure plan is present; manual fixture baseline update still gates gap closure.'
+        : 'Read-surface fixture closure plan is missing from proof summary.',
+      nextStep: fixtureClosurePlanAvailable
+        ? [
+            `plan:${fixtureClosurePlanStatus}`,
+            `accepted:${fixtureClosurePlanAcceptedRecordCount}`,
+            `rejected:${fixtureClosurePlanRejectedRecordCount}`,
+            `invalid:${fixtureClosurePlanInvalidRecordCount}`,
+            `unreviewed:${fixtureClosurePlanUnreviewedCount}`,
+            `closure_candidates:${fixtureClosurePlanCandidateCount}`,
+            `manual_candidate_available:${fixtureClosurePlanCandidateAvailable}`,
+            `manual_closure_required:${fixtureClosurePlanManualRequired}`,
+            `operator_review:${fixtureClosurePlanOperatorReview}`,
+            `physical_gap_remains:${fixtureClosurePlanGapRemains}`,
+            `fixture_update_allowed:${fixtureClosurePlanUpdateAllowed}`,
+            `fixture_closure_allowed:${fixtureClosurePlanClosureAllowed}`,
+            `live_authority:${fixtureClosurePlanLiveAuthority}`,
+            `full_autonomous_ready:${fixtureClosurePlanFullAuto}`,
+            fixtureClosurePlanCandidateSurfaces.length ? `candidate_surfaces:${fixtureClosurePlanCandidateSurfaces.join(',')}` : '',
+            fixtureClosurePlanUnreviewedSurfaces.length ? `unreviewed_surfaces:${fixtureClosurePlanUnreviewedSurfaces.join(',')}` : '',
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with read-surface fixture closure-plan validation.',
+      tone: !fixtureClosurePlanAvailable || fixtureClosurePlanInvalidRecordCount > 0 || fixtureClosurePlanUnreviewedCount > 0 || fixtureClosurePlanUpdateAllowed || fixtureClosurePlanClosureAllowed || fixtureClosurePlanLiveAuthority || fixtureClosurePlanFullAuto
+        ? 'yellow'
+        : fixtureClosurePlanCandidateCount > 0
+          ? 'yellow'
+          : 'yellow'
     });
     return rows;
   })() : [];

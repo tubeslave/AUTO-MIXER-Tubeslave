@@ -1335,6 +1335,40 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             blocked_by: ['operator_must_capture_missing_physical_readback_artifacts'],
             violations: [],
           },
+          read_surface_physical_readback_fixture_closure_plan: {
+            available: true,
+            status: 'passed',
+            plan_status: 'fixture_closure_not_ready',
+            read_only: true,
+            live_write: false,
+            mutates_console_state: false,
+            queries_console: false,
+            executes_tests: false,
+            operator_required: true,
+            execution_allowed_by_plan: false,
+            fixture_update_allowed_by_plan: false,
+            fixture_closure_allowed_by_plan: false,
+            live_widening_allowed: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            review_candidate_count: 0,
+            acceptance_record_count: 0,
+            accepted_record_count: 0,
+            rejected_record_count: 0,
+            invalid_record_count: 0,
+            unreviewed_candidate_count: 0,
+            closure_candidate_count: 0,
+            manual_fixture_closure_candidate_available: false,
+            manual_fixture_closure_required: true,
+            operator_review_required: true,
+            physical_fixture_gap_remains: true,
+            closure_candidate_surface_ids: [],
+            rejected_surface_ids: [],
+            invalid_record_ids: [],
+            unreviewed_candidate_surface_ids: [],
+            blocked_by: ['accepted_physical_readback_candidate_required_before_fixture_closure'],
+            violations: [],
+          },
         },
       },
     },
@@ -1438,6 +1472,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'dlive_state_physical_readback_contract',
       'dlive_state_physical_readback_artifact_intake',
       'read_surface_physical_readback_artifact_review_queue',
+      'read_surface_physical_readback_fixture_closure_plan',
       'read_surface_remediation_plan',
       'autonomy_evidence:fader_supervised_promotion',
       'autonomy_evidence:gain_trim_supervised_promotion',
@@ -1732,6 +1767,21 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'artifact_queue_closure_allowed:false',
     'artifact_queue_live_authority:false',
     'artifact_queue_full_auto:false',
+    'fixture_closure_plan_available:true',
+    'fixture_closure_plan_status:fixture_closure_not_ready',
+    'fixture_closure_plan_review_candidates:0',
+    'fixture_closure_plan_acceptance_records:0',
+    'fixture_closure_plan_accepted:0',
+    'fixture_closure_plan_rejected:0',
+    'fixture_closure_plan_invalid:0',
+    'fixture_closure_plan_unreviewed:0',
+    'fixture_closure_plan_candidates:0',
+    'fixture_closure_plan_candidate_available:false',
+    'fixture_update_allowed:false',
+    'fixture_closure_allowed:false',
+    'fixture_closure_plan_gap:true',
+    'fixture_closure_plan_live_authority:false',
+    'fixture_closure_plan_full_auto:false',
   ]);
   assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
   assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
@@ -1838,6 +1888,13 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /artifact_queue_closure:false/);
   assert.match(proofEvidence.nextStep, /artifact_queue_live_authority:false/);
   assert.match(proofEvidence.nextStep, /artifact_queue_full_auto:false/);
+  assert.match(proofEvidence.nextStep, /fixture_closure_plan:fixture_closure_not_ready/);
+  assert.match(proofEvidence.nextStep, /fixture_closure_candidates:0/);
+  assert.match(proofEvidence.nextStep, /fixture_update_allowed:false/);
+  assert.match(proofEvidence.nextStep, /fixture_closure_allowed:false/);
+  assert.match(proofEvidence.nextStep, /fixture_closure_gap:true/);
+  assert.match(proofEvidence.nextStep, /fixture_closure_live_authority:false/);
+  assert.match(proofEvidence.nextStep, /fixture_closure_full_auto:false/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
 
   const capturePlan = rows.find(row => row.moduleId === 'read_surface_physical_readback_capture_plan');
@@ -2639,6 +2696,43 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(artifactReviewQueue.nextStep, /live_authority:false/);
   assert.match(artifactReviewQueue.nextStep, /full_autonomous_ready:false/);
 
+  const fixtureClosurePlan = rows.find(row => row.moduleId === 'read_surface_physical_readback_fixture_closure_plan');
+  assert.equal(fixtureClosurePlan.domain, 'read_surface_fixture_closure_plan');
+  assert.equal(fixtureClosurePlan.canWriteLive, false);
+  assert.deepEqual(fixtureClosurePlan.liveWriteKinds, []);
+  assert.equal(fixtureClosurePlan.status, 'fixture_closure_not_ready');
+  assert.equal(fixtureClosurePlan.entrypoint, 'build_read_surface_physical_readback_fixture_closure_plan');
+  assert.equal(fixtureClosurePlan.module, 'accepted_physical_readback_candidate_required_before_fixture_closure');
+  assert.equal(fixtureClosurePlan.tone, 'yellow');
+  assert.deepEqual(fixtureClosurePlan.pipelineProfiles, [
+    'available:true',
+    'status:fixture_closure_not_ready',
+    'review_candidates:0',
+    'acceptance_records:0',
+    'accepted:0',
+    'rejected:0',
+    'invalid:0',
+    'unreviewed:0',
+    'closure_candidates:0',
+    'manual_candidate_available:false',
+    'manual_closure_required:true',
+    'operator_review:true',
+    'physical_gap_remains:true',
+    'fixture_update_allowed:false',
+    'fixture_closure_allowed:false',
+    'live_authority:false',
+    'full_autonomous_ready:false',
+  ]);
+  assert.match(fixtureClosurePlan.blockedReason, /accepted_physical_readback_candidate_required_before_fixture_closure/);
+  assert.match(fixtureClosurePlan.nextStep, /plan:fixture_closure_not_ready/);
+  assert.match(fixtureClosurePlan.nextStep, /closure_candidates:0/);
+  assert.match(fixtureClosurePlan.nextStep, /manual_closure_required:true/);
+  assert.match(fixtureClosurePlan.nextStep, /physical_gap_remains:true/);
+  assert.match(fixtureClosurePlan.nextStep, /fixture_update_allowed:false/);
+  assert.match(fixtureClosurePlan.nextStep, /fixture_closure_allowed:false/);
+  assert.match(fixtureClosurePlan.nextStep, /live_authority:false/);
+  assert.match(fixtureClosurePlan.nextStep, /full_autonomous_ready:false/);
+
   const readRemediation = rows.find(row => row.moduleId === 'read_surface_remediation_plan');
   assert.equal(readRemediation.domain, 'read_surface_remediation');
   assert.equal(readRemediation.canWriteLive, false);
@@ -2802,7 +2896,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 23);
+  assert.equal(rows.length, 24);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -3029,6 +3123,21 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'artifact_queue_closure_allowed:false',
     'artifact_queue_live_authority:false',
     'artifact_queue_full_auto:false',
+    'fixture_closure_plan_available:false',
+    'fixture_closure_plan_status:missing',
+    'fixture_closure_plan_review_candidates:0',
+    'fixture_closure_plan_acceptance_records:0',
+    'fixture_closure_plan_accepted:0',
+    'fixture_closure_plan_rejected:0',
+    'fixture_closure_plan_invalid:0',
+    'fixture_closure_plan_unreviewed:0',
+    'fixture_closure_plan_candidates:0',
+    'fixture_closure_plan_candidate_available:false',
+    'fixture_update_allowed:false',
+    'fixture_closure_allowed:false',
+    'fixture_closure_plan_gap:false',
+    'fixture_closure_plan_live_authority:false',
+    'fixture_closure_plan_full_auto:false',
   ]);
 
   assert.equal(rows[1].moduleId, 'read_surface_physical_readback_capture_plan');
@@ -3185,6 +3294,13 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.equal(rows[22].canWriteLive, false);
   assert.deepEqual(rows[22].liveWriteKinds, []);
   assert.match(rows[22].blockedReason, /review queue is missing/);
+
+  assert.equal(rows[23].moduleId, 'read_surface_physical_readback_fixture_closure_plan');
+  assert.equal(rows[23].domain, 'read_surface_fixture_closure_plan');
+  assert.equal(rows[23].status, 'closure_plan_missing');
+  assert.equal(rows[23].canWriteLive, false);
+  assert.deepEqual(rows[23].liveWriteKinds, []);
+  assert.match(rows[23].blockedReason, /closure plan is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

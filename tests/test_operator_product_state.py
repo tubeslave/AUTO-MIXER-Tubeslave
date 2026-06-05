@@ -2975,6 +2975,39 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     "intake_violations": [],
                     "violations": [],
                 },
+                "read_surface_physical_readback_fixture_closure_plan": {
+                    "status": "passed",
+                    "plan_status": "manual_fixture_closure_candidate_available",
+                    "ledger_status": "operator_acceptance_records_available",
+                    "review_candidate_count": 2,
+                    "acceptance_record_count": 2,
+                    "accepted_record_count": 1,
+                    "rejected_record_count": 1,
+                    "invalid_record_count": 0,
+                    "unreviewed_candidate_count": 0,
+                    "closure_candidate_count": 1,
+                    "closure_candidate_surface_ids": ["raw_mixer_state_cache"],
+                    "rejected_surface_ids": ["dlive_state"],
+                    "invalid_record_ids": [],
+                    "unreviewed_candidate_surface_ids": [],
+                    "manual_fixture_closure_candidate_available": True,
+                    "manual_fixture_closure_required": True,
+                    "operator_review_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "fixture_update_allowed_by_plan": False,
+                    "fixture_closure_allowed_by_plan": False,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "execution_allowed_by_plan": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "blocked_by": [
+                        "manual_fixture_baseline_update_required_before_gap_closure",
+                    ],
+                    "violations": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -4300,6 +4333,39 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["dlive_contract_claimed_live_authority"],
                 },
+                "read_surface_physical_readback_fixture_closure_plan": {
+                    "status": "passed",
+                    "plan_status": "manual_fixture_closure_candidate_available",
+                    "ledger_status": "operator_acceptance_records_available",
+                    "review_candidate_count": 2,
+                    "acceptance_record_count": 2,
+                    "accepted_record_count": 1,
+                    "rejected_record_count": 1,
+                    "invalid_record_count": 0,
+                    "unreviewed_candidate_count": 0,
+                    "closure_candidate_count": 1,
+                    "closure_candidate_surface_ids": ["raw_mixer_state_cache"],
+                    "rejected_surface_ids": ["dlive_state"],
+                    "invalid_record_ids": [],
+                    "unreviewed_candidate_surface_ids": [],
+                    "manual_fixture_closure_candidate_available": True,
+                    "manual_fixture_closure_required": True,
+                    "operator_review_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "fixture_update_allowed_by_plan": True,
+                    "fixture_closure_allowed_by_plan": True,
+                    "live_write": True,
+                    "mutates_console_state": True,
+                    "queries_console": True,
+                    "executes_tests": True,
+                    "execution_allowed_by_plan": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "blocked_by": [
+                        "manual_fixture_baseline_update_required_before_gap_closure",
+                    ],
+                    "violations": ["claimed_closure_authority"],
+                },
             }
         ),
         encoding="utf-8",
@@ -4783,6 +4849,51 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert dlive_contract["required_false_safety_flags"] == ["live_write"]
     assert dlive_contract["minimum_channel_count"] == 0
     assert "dlive_contract_claimed_live_authority" in dlive_contract["violations"]
+    fixture_closure_plan = payload["summary"]["read_surface_proof_quality"][
+        "read_surface_physical_readback_fixture_closure_plan"
+    ]
+    assert fixture_closure_plan["available"] is True
+    assert fixture_closure_plan["status"] == "passed"
+    assert fixture_closure_plan["plan_status"] == "manual_fixture_closure_candidate_available"
+    assert fixture_closure_plan["ledger_status"] == "operator_acceptance_records_available"
+    assert fixture_closure_plan["review_candidate_count"] == 2
+    assert fixture_closure_plan["acceptance_record_count"] == 2
+    assert fixture_closure_plan["accepted_record_count"] == 1
+    assert fixture_closure_plan["rejected_record_count"] == 1
+    assert fixture_closure_plan["invalid_record_count"] == 0
+    assert fixture_closure_plan["unreviewed_candidate_count"] == 0
+    assert fixture_closure_plan["closure_candidate_count"] == 1
+    assert fixture_closure_plan["closure_candidate_surface_ids"] == [
+        "raw_mixer_state_cache"
+    ]
+    assert fixture_closure_plan["rejected_surface_ids"] == ["dlive_state"]
+    assert fixture_closure_plan["manual_fixture_closure_candidate_available"] is True
+    assert fixture_closure_plan["manual_fixture_closure_required"] is True
+    assert fixture_closure_plan["operator_review_required"] is True
+    assert fixture_closure_plan["physical_fixture_gap_remains"] is True
+    assert fixture_closure_plan["fixture_update_allowed_by_plan"] is False
+    assert fixture_closure_plan["fixture_closure_allowed_by_plan"] is False
+    assert fixture_closure_plan["read_only"] is True
+    assert fixture_closure_plan["live_write"] is False
+    assert fixture_closure_plan["mutates_console_state"] is False
+    assert fixture_closure_plan["queries_console"] is False
+    assert fixture_closure_plan["executes_tests"] is False
+    assert fixture_closure_plan["execution_allowed_by_plan"] is False
+    assert fixture_closure_plan["live_authority_granted"] is False
+    assert fixture_closure_plan["full_autonomous_ready"] is False
+    assert fixture_closure_plan["source_fixture_update_allowed_by_plan_claimed"] is True
+    assert fixture_closure_plan["source_fixture_closure_allowed_by_plan_claimed"] is True
+    assert fixture_closure_plan["source_live_write_claimed"] is True
+    assert fixture_closure_plan["source_mutates_console_state_claimed"] is True
+    assert fixture_closure_plan["source_queries_console_claimed"] is True
+    assert fixture_closure_plan["source_executes_tests_claimed"] is True
+    assert fixture_closure_plan["source_execution_allowed_by_plan_claimed"] is True
+    assert fixture_closure_plan["source_live_authority_granted_claimed"] is True
+    assert fixture_closure_plan["source_full_autonomous_ready_claimed"] is True
+    assert fixture_closure_plan["blocked_by"] == [
+        "manual_fixture_baseline_update_required_before_gap_closure"
+    ]
+    assert "claimed_closure_authority" in fixture_closure_plan["violations"]
     assert "set_gain" not in set(_walk_keys(payload))
 
 

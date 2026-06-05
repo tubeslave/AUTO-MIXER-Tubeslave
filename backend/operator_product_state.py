@@ -5742,6 +5742,92 @@ def _read_surface_artifact_review_queue_quality_from_summary(
     }
 
 
+def _read_surface_fixture_closure_plan_quality_from_summary(
+    summary: Dict[str, Any],
+) -> Dict[str, Any]:
+    plan = (
+        summary.get("read_surface_physical_readback_fixture_closure_plan")
+        if isinstance(summary.get("read_surface_physical_readback_fixture_closure_plan"), dict)
+        else {}
+    )
+    available = bool(plan)
+    source_fixture_update_claimed = plan.get("fixture_update_allowed_by_plan") is True
+    source_fixture_closure_claimed = plan.get("fixture_closure_allowed_by_plan") is True
+    source_live_write_claimed = plan.get("live_write") is True
+    source_mutation_claimed = plan.get("mutates_console_state") is True
+    source_query_claimed = plan.get("queries_console") is True
+    source_executes_tests_claimed = plan.get("executes_tests") is True
+    source_execution_claimed = plan.get("execution_allowed_by_plan") is True
+    source_live_authority_claimed = plan.get("live_authority_granted") is True
+    source_full_autonomous_ready_claimed = plan.get("full_autonomous_ready") is True
+    review_candidate_count = _safe_int_value(plan.get("review_candidate_count"))
+    acceptance_record_count = _safe_int_value(plan.get("acceptance_record_count"))
+    accepted_record_count = _safe_int_value(plan.get("accepted_record_count"))
+    rejected_record_count = _safe_int_value(plan.get("rejected_record_count"))
+    invalid_record_count = _safe_int_value(plan.get("invalid_record_count"))
+    unreviewed_candidate_count = _safe_int_value(plan.get("unreviewed_candidate_count"))
+    closure_candidate_count = _safe_int_value(plan.get("closure_candidate_count"))
+    manual_candidate_available = (
+        available
+        and plan.get("manual_fixture_closure_candidate_available") is True
+        and closure_candidate_count > 0
+    )
+    return {
+        "available": available,
+        "status": str(plan.get("status") or "missing"),
+        "plan_status": plan.get("plan_status"),
+        "ledger_status": plan.get("ledger_status"),
+        "review_candidate_count": review_candidate_count,
+        "acceptance_record_count": acceptance_record_count,
+        "accepted_record_count": accepted_record_count,
+        "rejected_record_count": rejected_record_count,
+        "invalid_record_count": invalid_record_count,
+        "unreviewed_candidate_count": unreviewed_candidate_count,
+        "closure_candidate_count": closure_candidate_count,
+        "closure_candidate_surface_ids": _string_list_value(
+            plan.get("closure_candidate_surface_ids")
+        ),
+        "rejected_surface_ids": _string_list_value(plan.get("rejected_surface_ids")),
+        "invalid_record_ids": _string_list_value(plan.get("invalid_record_ids")),
+        "unreviewed_candidate_surface_ids": _string_list_value(
+            plan.get("unreviewed_candidate_surface_ids")
+        ),
+        "manual_fixture_closure_candidate_available": manual_candidate_available,
+        "manual_fixture_closure_required": (
+            available and plan.get("manual_fixture_closure_required") is True
+        ),
+        "operator_review_required": (
+            available and plan.get("operator_review_required") is True
+        ),
+        "physical_fixture_gap_remains": (
+            available and plan.get("physical_fixture_gap_remains") is True
+        ),
+        "fixture_update_allowed_by_plan": False,
+        "fixture_closure_allowed_by_plan": False,
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "operator_required": True,
+        "execution_allowed_by_plan": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "source_fixture_update_allowed_by_plan_claimed": source_fixture_update_claimed,
+        "source_fixture_closure_allowed_by_plan_claimed": source_fixture_closure_claimed,
+        "source_execution_allowed_by_plan_claimed": source_execution_claimed,
+        "source_live_write_claimed": source_live_write_claimed,
+        "source_mutates_console_state_claimed": source_mutation_claimed,
+        "source_queries_console_claimed": source_query_claimed,
+        "source_executes_tests_claimed": source_executes_tests_claimed,
+        "source_live_authority_granted_claimed": source_live_authority_claimed,
+        "source_full_autonomous_ready_claimed": source_full_autonomous_ready_claimed,
+        "blocked_by": _string_list_value(plan.get("blocked_by")),
+        "violations": _string_list_value(plan.get("violations")),
+    }
+
+
 def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any]:
     summary_path = report_path.parent / "summary.json"
     summary = _read_json_file(summary_path)
@@ -5841,6 +5927,9 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
     artifact_review_queue = _read_surface_artifact_review_queue_quality_from_summary(
         summary
     )
+    fixture_closure_plan = _read_surface_fixture_closure_plan_quality_from_summary(
+        summary
+    )
     source_full_autonomous_ready = read_surface.get("full_autonomous_ready") is True
     return {
         "available": available,
@@ -5885,6 +5974,7 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
         "dlive_state_physical_readback_contract": dlive_state_contract,
         "dlive_state_physical_readback_artifact_intake": dlive_state_intake,
         "read_surface_physical_readback_artifact_review_queue": artifact_review_queue,
+        "read_surface_physical_readback_fixture_closure_plan": fixture_closure_plan,
         "violations": _string_list_value(read_surface.get("violations")),
     }
 
