@@ -292,6 +292,11 @@ from backend.read_surface_physical_readback_artifact_review_queue import (  # no
     READ_SURFACE_PHYSICAL_READBACK_ARTIFACT_REVIEW_QUEUE_STATUSES,
     build_read_surface_physical_readback_artifact_review_queue,
 )
+from backend.read_surface_physical_readback_fixture_acceptance_ledger import (  # noqa: E402
+    READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_METHOD_ID,
+    READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_STATUSES,
+    build_read_surface_physical_readback_fixture_acceptance_ledger,
+)
 from backend.read_surface_remediation_plan import build_read_surface_remediation_plan  # noqa: E402
 
 DEFAULT_ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "no_wing_release_check"
@@ -5402,6 +5407,145 @@ def validate_read_surface_physical_readback_artifact_review_queue_snapshot() -> 
     )
 
 
+def validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "physical_readback_fixture_acceptance_ledger_is_read_only_operator_gate",
+    }
+    violations: list[str] = []
+
+    try:
+        ledger = build_read_surface_physical_readback_fixture_acceptance_ledger()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        ledger = {}
+        violations.append(f"fixture_acceptance_ledger_build_error:{type(exc).__name__}")
+
+    safety = ledger.get("safety") if isinstance(ledger.get("safety"), Mapping) else {}
+    summary = ledger.get("summary") if isinstance(ledger.get("summary"), Mapping) else {}
+    records = ledger.get("records") if isinstance(ledger.get("records"), list) else []
+
+    if ledger.get("type") != "read_surface_physical_readback_fixture_acceptance_ledger":
+        violations.append("fixture_acceptance_ledger_type_mismatch")
+    if (
+        ledger.get("method_id")
+        != READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_METHOD_ID
+    ):
+        violations.append("fixture_acceptance_ledger_method_id_mismatch")
+    if ledger.get("status") not in READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_STATUSES:
+        violations.append("fixture_acceptance_ledger_status_unknown")
+
+    for key in ("read_only", "operator_required"):
+        if safety.get(key) is not True:
+            violations.append(f"fixture_acceptance_ledger_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_acceptance",
+        "fixture_closure_allowed_by_acceptance",
+        "live_widening_allowed",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"fixture_acceptance_ledger_{key}_not_false")
+
+    review_candidate_count = summary.get("review_candidate_count")
+    acceptance_record_count = summary.get("acceptance_record_count")
+    accepted_record_count = summary.get("accepted_record_count")
+    rejected_record_count = summary.get("rejected_record_count")
+    invalid_record_count = summary.get("invalid_record_count")
+    unreviewed_candidate_count = summary.get("unreviewed_candidate_count")
+    if not isinstance(review_candidate_count, int):
+        violations.append("fixture_acceptance_ledger_review_candidate_count_missing")
+        review_candidate_count = 0
+    if not isinstance(acceptance_record_count, int) or acceptance_record_count != len(records):
+        violations.append("fixture_acceptance_ledger_record_count_mismatch")
+        acceptance_record_count = len(records)
+    if not isinstance(accepted_record_count, int):
+        violations.append("fixture_acceptance_ledger_accepted_count_missing")
+        accepted_record_count = 0
+    if not isinstance(rejected_record_count, int):
+        violations.append("fixture_acceptance_ledger_rejected_count_missing")
+        rejected_record_count = 0
+    if not isinstance(invalid_record_count, int):
+        violations.append("fixture_acceptance_ledger_invalid_count_missing")
+        invalid_record_count = 0
+    if not isinstance(unreviewed_candidate_count, int):
+        violations.append("fixture_acceptance_ledger_unreviewed_count_missing")
+        unreviewed_candidate_count = 0
+    if invalid_record_count:
+        violations.append("fixture_acceptance_ledger_invalid_record_present")
+
+    if summary.get("operator_review_required") is not True:
+        violations.append("fixture_acceptance_ledger_operator_review_not_true")
+    if summary.get("physical_fixture_gap_remains") is not True:
+        violations.append("fixture_acceptance_ledger_physical_gap_not_true")
+    if summary.get("fixture_closure_allowed_by_acceptance") is not False:
+        violations.append("fixture_acceptance_ledger_fixture_closure_not_false")
+    if summary.get("live_authority_granted") is not False:
+        violations.append("fixture_acceptance_ledger_live_authority_not_false")
+    if summary.get("full_autonomous_ready") is not False:
+        violations.append("fixture_acceptance_ledger_full_autonomous_not_false")
+
+    for index, record in enumerate(records):
+        if not isinstance(record, Mapping):
+            violations.append(f"fixture_acceptance_ledger_record_{index}_not_object")
+            continue
+        if record.get("fixture_closure_allowed_by_acceptance") is not False:
+            violations.append(f"fixture_acceptance_ledger_record_{index}_closure_not_false")
+        if record.get("live_authority_granted") is not False:
+            violations.append(f"fixture_acceptance_ledger_record_{index}_live_authority_not_false")
+        if record.get("full_autonomous_ready") is not False:
+            violations.append(f"fixture_acceptance_ledger_record_{index}_full_auto_not_false")
+
+    accepted_surface_ids = summary.get("accepted_surface_ids")
+    rejected_surface_ids = summary.get("rejected_surface_ids")
+    invalid_record_ids = summary.get("invalid_record_ids")
+    unreviewed_surface_ids = summary.get("unreviewed_candidate_surface_ids")
+    blocked_by = summary.get("blocked_by")
+    detail["ledger_status"] = ledger.get("status")
+    detail["queue_status"] = summary.get("queue_status")
+    detail["review_candidate_count"] = review_candidate_count
+    detail["acceptance_record_count"] = acceptance_record_count
+    detail["accepted_record_count"] = accepted_record_count
+    detail["rejected_record_count"] = rejected_record_count
+    detail["invalid_record_count"] = invalid_record_count
+    detail["unreviewed_candidate_count"] = unreviewed_candidate_count
+    detail["accepted_surface_ids"] = (
+        list(accepted_surface_ids) if isinstance(accepted_surface_ids, list) else []
+    )
+    detail["rejected_surface_ids"] = (
+        list(rejected_surface_ids) if isinstance(rejected_surface_ids, list) else []
+    )
+    detail["invalid_record_ids"] = (
+        list(invalid_record_ids) if isinstance(invalid_record_ids, list) else []
+    )
+    detail["unreviewed_candidate_surface_ids"] = (
+        list(unreviewed_surface_ids) if isinstance(unreviewed_surface_ids, list) else []
+    )
+    detail["operator_acceptance_required"] = summary.get("operator_acceptance_required")
+    detail["operator_review_required"] = summary.get("operator_review_required")
+    detail["physical_fixture_gap_remains"] = summary.get("physical_fixture_gap_remains")
+    detail["fixture_closure_allowed_by_acceptance"] = summary.get(
+        "fixture_closure_allowed_by_acceptance"
+    )
+    detail["live_authority_granted"] = summary.get("live_authority_granted")
+    detail["full_autonomous_ready"] = summary.get("full_autonomous_ready")
+    detail["blocked_by"] = list(blocked_by) if isinstance(blocked_by, list) else []
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="read_surface_physical_readback_fixture_acceptance_ledger_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_supervised_proof_report_gain_dry_run(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -7813,6 +7957,71 @@ def read_surface_physical_readback_artifact_review_queue_summary(
     return None
 
 
+def read_surface_physical_readback_fixture_acceptance_ledger_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "read_surface_physical_readback_fixture_acceptance_ledger_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        blocked_by = detail.get("blocked_by")
+        accepted_surface_ids = detail.get("accepted_surface_ids")
+        rejected_surface_ids = detail.get("rejected_surface_ids")
+        invalid_record_ids = detail.get("invalid_record_ids")
+        unreviewed_surface_ids = detail.get("unreviewed_candidate_surface_ids")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_acceptance": False,
+            "fixture_closure_allowed_by_acceptance": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "ledger_status": detail.get("ledger_status"),
+            "queue_status": detail.get("queue_status"),
+            "review_candidate_count": int(detail.get("review_candidate_count") or 0),
+            "acceptance_record_count": int(detail.get("acceptance_record_count") or 0),
+            "accepted_record_count": int(detail.get("accepted_record_count") or 0),
+            "rejected_record_count": int(detail.get("rejected_record_count") or 0),
+            "invalid_record_count": int(detail.get("invalid_record_count") or 0),
+            "unreviewed_candidate_count": int(
+                detail.get("unreviewed_candidate_count") or 0
+            ),
+            "accepted_surface_ids": (
+                list(accepted_surface_ids)
+                if isinstance(accepted_surface_ids, list)
+                else []
+            ),
+            "rejected_surface_ids": (
+                list(rejected_surface_ids)
+                if isinstance(rejected_surface_ids, list)
+                else []
+            ),
+            "invalid_record_ids": (
+                list(invalid_record_ids) if isinstance(invalid_record_ids, list) else []
+            ),
+            "unreviewed_candidate_surface_ids": (
+                list(unreviewed_surface_ids)
+                if isinstance(unreviewed_surface_ids, list)
+                else []
+            ),
+            "operator_acceptance_required": (
+                detail.get("operator_acceptance_required") is True
+            ),
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "next_wing_proof_plan_schema":
@@ -7869,6 +8078,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     dlive_state_intake = dlive_state_readback_artifact_intake_summary(results)
     artifact_review_queue = read_surface_physical_readback_artifact_review_queue_summary(
         results
+    )
+    fixture_acceptance_ledger = (
+        read_surface_physical_readback_fixture_acceptance_ledger_summary(results)
     )
     next_plan = next_wing_proof_plan_summary(results)
     summary = {
@@ -7943,6 +8155,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     if artifact_review_queue is not None:
         summary["read_surface_physical_readback_artifact_review_queue"] = (
             artifact_review_queue
+        )
+    if fixture_acceptance_ledger is not None:
+        summary["read_surface_physical_readback_fixture_acceptance_ledger"] = (
+            fixture_acceptance_ledger
         )
     if next_plan is not None:
         summary["next_wing_proof_plan"] = next_plan
@@ -9318,6 +9534,65 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(artifact_review_queue['violations'])}`",
             ]
         )
+    if fixture_acceptance_ledger is not None:
+        lines.extend(
+            [
+                "",
+                "## Read Surface Physical Readback Fixture Acceptance Ledger",
+                "",
+                f"- schema_check: `{fixture_acceptance_ledger['status']}`",
+                f"- read_only: `{str(fixture_acceptance_ledger['read_only']).lower()}`",
+                f"- live_write: `{str(fixture_acceptance_ledger['live_write']).lower()}`",
+                "- mutates_console_state: "
+                f"`{str(fixture_acceptance_ledger['mutates_console_state']).lower()}`",
+                "- queries_console: "
+                f"`{str(fixture_acceptance_ledger['queries_console']).lower()}`",
+                "- executes_tests: "
+                f"`{str(fixture_acceptance_ledger['executes_tests']).lower()}`",
+                "- operator_required: "
+                f"`{str(fixture_acceptance_ledger['operator_required']).lower()}`",
+                "- execution_allowed_by_acceptance: "
+                f"`{str(fixture_acceptance_ledger['execution_allowed_by_acceptance']).lower()}`",
+                "- fixture_closure_allowed_by_acceptance: "
+                f"`{str(fixture_acceptance_ledger['fixture_closure_allowed_by_acceptance']).lower()}`",
+                "- live_widening_allowed: "
+                f"`{str(fixture_acceptance_ledger['live_widening_allowed']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(fixture_acceptance_ledger['live_authority_granted']).lower()}`",
+                "- full_autonomous_ready: "
+                f"`{str(fixture_acceptance_ledger['full_autonomous_ready']).lower()}`",
+                f"- ledger_status: `{fixture_acceptance_ledger['ledger_status']}`",
+                f"- queue_status: `{fixture_acceptance_ledger['queue_status']}`",
+                "- review_candidate_count: "
+                f"`{fixture_acceptance_ledger['review_candidate_count']}`",
+                "- acceptance_record_count: "
+                f"`{fixture_acceptance_ledger['acceptance_record_count']}`",
+                "- accepted_record_count: "
+                f"`{fixture_acceptance_ledger['accepted_record_count']}`",
+                "- rejected_record_count: "
+                f"`{fixture_acceptance_ledger['rejected_record_count']}`",
+                "- invalid_record_count: "
+                f"`{fixture_acceptance_ledger['invalid_record_count']}`",
+                "- unreviewed_candidate_count: "
+                f"`{fixture_acceptance_ledger['unreviewed_candidate_count']}`",
+                "- operator_acceptance_required: "
+                f"`{str(fixture_acceptance_ledger['operator_acceptance_required']).lower()}`",
+                "- operator_review_required: "
+                f"`{str(fixture_acceptance_ledger['operator_review_required']).lower()}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(fixture_acceptance_ledger['physical_fixture_gap_remains']).lower()}`",
+                "- accepted_surface_ids: "
+                f"`{json.dumps(fixture_acceptance_ledger['accepted_surface_ids'])}`",
+                "- rejected_surface_ids: "
+                f"`{json.dumps(fixture_acceptance_ledger['rejected_surface_ids'])}`",
+                "- invalid_record_ids: "
+                f"`{json.dumps(fixture_acceptance_ledger['invalid_record_ids'])}`",
+                "- unreviewed_candidate_surface_ids: "
+                f"`{json.dumps(fixture_acceptance_ledger['unreviewed_candidate_surface_ids'])}`",
+                f"- blocked_by: `{json.dumps(fixture_acceptance_ledger['blocked_by'])}`",
+                f"- violations: `{json.dumps(fixture_acceptance_ledger['violations'])}`",
+            ]
+        )
     if next_plan is not None:
         lines.extend(
             [
@@ -9563,6 +9838,15 @@ def run_release_checks(
             results.append(artifact_review_queue_result)
             if (
                 artifact_review_queue_result.status != "passed"
+                and not continue_on_failure
+            ):
+                break
+            fixture_acceptance_ledger_result = (
+                validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot()
+            )
+            results.append(fixture_acceptance_ledger_result)
+            if (
+                fixture_acceptance_ledger_result.status != "passed"
                 and not continue_on_failure
             ):
                 break

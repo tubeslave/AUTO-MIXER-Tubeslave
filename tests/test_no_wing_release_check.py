@@ -31,6 +31,7 @@ from tools.no_wing_release_check import (
     raw_mixer_readback_artifact_intake_summary,
     raw_mixer_readback_contract_summary,
     read_surface_physical_readback_artifact_review_queue_summary,
+    read_surface_physical_readback_fixture_acceptance_ledger_summary,
     read_surface_physical_readback_capture_plan_summary,
     read_surface_fixture_evidence_summary,
     read_surface_remediation_plan_summary,
@@ -57,6 +58,7 @@ from tools.no_wing_release_check import (
     validate_matrix_state_physical_readback_artifact_intake_snapshot,
     validate_matrix_state_physical_readback_contract_snapshot,
     validate_read_surface_physical_readback_artifact_review_queue_snapshot,
+    validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
     validate_read_surface_physical_readback_capture_plan_snapshot,
     validate_raw_mixer_state_physical_readback_artifact_intake_snapshot,
@@ -1909,6 +1911,30 @@ def test_no_wing_release_check_validates_artifact_review_queue_snapshot():
     ]
     assert result.detail["violations"] == []
 
+
+def test_no_wing_release_check_validates_fixture_acceptance_ledger_snapshot():
+    result = validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot()
+
+    assert result.status == "passed"
+    assert (
+        result.detail["policy"]
+        == "physical_readback_fixture_acceptance_ledger_is_read_only_operator_gate"
+    )
+    assert result.detail["ledger_status"] == "operator_acceptance_required"
+    assert result.detail["queue_status"] == "operator_artifact_capture_required"
+    assert result.detail["acceptance_record_count"] == 0
+    assert result.detail["accepted_record_count"] == 0
+    assert result.detail["rejected_record_count"] == 0
+    assert result.detail["invalid_record_count"] == 0
+    assert result.detail["operator_acceptance_required"] is True
+    assert result.detail["operator_review_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["fixture_closure_allowed_by_acceptance"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["violations"] == []
+
+
 def test_no_wing_release_check_validates_dlive_state_readback_contract_snapshot():
     result = validate_dlive_state_physical_readback_contract_snapshot()
 
@@ -2652,6 +2678,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "dlive_state_physical_readback_contract_schema" in result_names
     assert "dlive_state_physical_readback_artifact_intake_schema" in result_names
     assert "read_surface_physical_readback_artifact_review_queue_schema" in result_names
+    assert "read_surface_physical_readback_fixture_acceptance_ledger_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
@@ -2732,6 +2759,11 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     )
     assert result_names.index(
         "read_surface_physical_readback_artifact_review_queue_schema"
+    ) < result_names.index(
+        "read_surface_physical_readback_fixture_acceptance_ledger_schema"
+    )
+    assert result_names.index(
+        "read_surface_physical_readback_fixture_acceptance_ledger_schema"
     ) < result_names.index(
         "backend_pytest"
     )
@@ -5577,6 +5609,76 @@ def test_no_wing_release_check_summary_embeds_artifact_review_queue(tmp_path):
     assert "review_candidate_count: `1`" in markdown_summary
     assert "review_candidates_available: `true`" in markdown_summary
     assert "full_autonomous_ready: `false`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_fixture_acceptance_ledger(tmp_path):
+    result = CheckResult(
+        name="read_surface_physical_readback_fixture_acceptance_ledger_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "ledger_status": "operator_acceptance_required",
+            "queue_status": "operator_review_candidates_available",
+            "review_candidate_count": 2,
+            "acceptance_record_count": 1,
+            "accepted_record_count": 1,
+            "rejected_record_count": 0,
+            "invalid_record_count": 0,
+            "unreviewed_candidate_count": 1,
+            "accepted_surface_ids": ["raw_mixer_state_cache"],
+            "rejected_surface_ids": [],
+            "invalid_record_ids": [],
+            "unreviewed_candidate_surface_ids": ["dlive_state"],
+            "operator_acceptance_required": True,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_closure_allowed_by_acceptance": True,
+            "live_authority_granted": True,
+            "full_autonomous_ready": True,
+            "blocked_by": [
+                "operator_must_accept_or_reject_all_review_candidates",
+            ],
+            "violations": ["claimed_acceptance_authority"],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert read_surface_physical_readback_fixture_acceptance_ledger_summary([result]) == summary[
+        "read_surface_physical_readback_fixture_acceptance_ledger"
+    ]
+    ledger = json_summary["read_surface_physical_readback_fixture_acceptance_ledger"]
+    assert ledger["read_only"] is True
+    assert ledger["live_write"] is False
+    assert ledger["mutates_console_state"] is False
+    assert ledger["queries_console"] is False
+    assert ledger["executes_tests"] is False
+    assert ledger["execution_allowed_by_acceptance"] is False
+    assert ledger["fixture_closure_allowed_by_acceptance"] is False
+    assert ledger["live_widening_allowed"] is False
+    assert ledger["live_authority_granted"] is False
+    assert ledger["full_autonomous_ready"] is False
+    assert ledger["ledger_status"] == "operator_acceptance_required"
+    assert ledger["queue_status"] == "operator_review_candidates_available"
+    assert ledger["review_candidate_count"] == 2
+    assert ledger["acceptance_record_count"] == 1
+    assert ledger["accepted_record_count"] == 1
+    assert ledger["unreviewed_candidate_count"] == 1
+    assert ledger["operator_acceptance_required"] is True
+    assert ledger["operator_review_required"] is True
+    assert ledger["physical_fixture_gap_remains"] is True
+    assert ledger["accepted_surface_ids"] == ["raw_mixer_state_cache"]
+    assert ledger["unreviewed_candidate_surface_ids"] == ["dlive_state"]
+    assert ledger["violations"] == ["claimed_acceptance_authority"]
+    assert "## Read Surface Physical Readback Fixture Acceptance Ledger" in markdown_summary
+    assert "fixture_closure_allowed_by_acceptance: `false`" in markdown_summary
+    assert "live_authority_granted: `false`" in markdown_summary
+    assert "full_autonomous_ready: `false`" in markdown_summary
+    assert "accepted_record_count: `1`" in markdown_summary
 
 
 def test_no_wing_release_check_dlive_state_intake_summary_normalizes_authority_claims():

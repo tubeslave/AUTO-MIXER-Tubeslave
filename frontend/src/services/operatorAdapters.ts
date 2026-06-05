@@ -1143,12 +1143,40 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const dliveStateIntakePromotionFamilies = stringList(dliveStateIntake.promotion_families_requiring_surface);
     const dliveStateIntakeBlockedBy = stringList(dliveStateIntake.blocked_by);
     const dliveStateIntakeSources = stringList(dliveStateIntake.artifact_source_ids);
+    const artifactReviewQueue = asRecord(proofQuality.read_surface_physical_readback_artifact_review_queue);
+    const artifactReviewQueueAvailable = Boolean(artifactReviewQueue.available);
+    const artifactReviewQueueStatus = str(artifactReviewQueue.queue_status, str(artifactReviewQueue.status, 'missing'));
+    const artifactReviewQueueSurfaceCount = Math.trunc(num(artifactReviewQueue.intake_surface_count, 0));
+    const artifactReviewQueueAvailableIntakeCount = Math.trunc(num(artifactReviewQueue.available_intake_count, 0));
+    const artifactReviewQueueArtifactCount = Math.trunc(num(artifactReviewQueue.artifact_count, 0));
+    const artifactReviewQueueValidCount = Math.trunc(num(artifactReviewQueue.valid_candidate_count, 0));
+    const artifactReviewQueueInvalidCount = Math.trunc(num(artifactReviewQueue.invalid_candidate_count, 0));
+    const artifactReviewQueueReviewCandidateCount = Math.trunc(num(artifactReviewQueue.review_candidate_count, 0));
+    const artifactReviewQueueMissingCount = Math.trunc(num(artifactReviewQueue.missing_artifact_surface_count, 0));
+    const artifactReviewQueueUnsafeCount = Math.trunc(num(artifactReviewQueue.unsafe_authority_claim_count, 0));
+    const artifactReviewQueueTargetInconsistentCount = Math.trunc(num(artifactReviewQueue.target_inconsistent_surface_count, 0));
+    const artifactReviewQueueReviewAvailable = artifactReviewQueue.review_candidates_available === true;
+    const artifactReviewQueueOperatorReview = artifactReviewQueue.operator_review_required === true;
+    const artifactReviewQueueGapRemains = artifactReviewQueue.physical_fixture_gap_remains === true;
+    const artifactReviewQueueClosureAllowed = artifactReviewQueue.fixture_closure_allowed_by_queue === true;
+    const artifactReviewQueueLiveAuthority = artifactReviewQueue.live_authority_granted === true;
+    const artifactReviewQueueFullAuto = artifactReviewQueue.full_autonomous_ready === true;
+    const artifactReviewQueueMissingSurfaces = stringList(artifactReviewQueue.missing_artifact_surface_ids);
+    const artifactReviewQueueCandidateSurfaces = stringList(artifactReviewQueue.review_candidate_surface_ids);
+    const artifactReviewQueueInvalidSurfaces = stringList(artifactReviewQueue.invalid_surface_ids);
+    const artifactReviewQueueUnsafeSurfaces = stringList(artifactReviewQueue.unsafe_authority_surface_ids);
+    const artifactReviewQueueTargetInconsistentSurfaces = stringList(artifactReviewQueue.target_inconsistent_surface_ids);
+    const artifactReviewQueueMethodIds = stringList(artifactReviewQueue.queue_item_method_ids);
+    const artifactReviewQueueBlockedBy = stringList(artifactReviewQueue.blocked_by);
     const freshnessText = available
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
       ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; capture_plan:${readSurfaceCapturePlanStatus || 'missing'}; capture_steps:${readSurfaceCapturePlanStepCount}; capture_execution:${readSurfaceCapturePlanExecutionAllowed}; capture_target_gate:${readSurfaceCapturePlanTargetConsistency}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; raw_intake:${rawMixerIntakeStatus || 'missing'}; raw_intake_artifacts:${rawMixerIntakeArtifactCount}; raw_intake_valid:${rawMixerIntakeValidCount}; raw_intake_invalid:${rawMixerIntakeInvalidCount}; raw_intake_candidate:${rawMixerIntakeCandidate}; raw_intake_closure:${rawMixerIntakeClosureAllowed}; raw_intake_target_gate:${rawMixerIntakeTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; channel_intake:${channelBasicIntakeStatus || 'missing'}; channel_intake_artifacts:${channelBasicIntakeArtifactCount}; channel_intake_valid:${channelBasicIntakeValidCount}; channel_intake_invalid:${channelBasicIntakeInvalidCount}; channel_intake_valid_channels:${channelBasicIntakeValidChannelCount}; channel_intake_candidate:${channelBasicIntakeCandidate}; channel_intake_gap:${channelBasicIntakeGapRemains}; channel_intake_closure:${channelBasicIntakeClosureAllowed}; channel_intake_live_authority:${channelBasicIntakeLiveAuthority}; channel_intake_target_gate:${channelBasicIntakeTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; processing_intake:${channelProcessingIntakeStatus || 'missing'}; processing_intake_artifacts:${channelProcessingIntakeArtifactCount}; processing_intake_valid:${channelProcessingIntakeValidCount}; processing_intake_invalid:${channelProcessingIntakeInvalidCount}; processing_intake_valid_channels:${channelProcessingIntakeValidChannelCount}; processing_intake_candidate:${channelProcessingIntakeCandidate}; processing_intake_gap:${channelProcessingIntakeGapRemains}; processing_intake_closure:${channelProcessingIntakeClosureAllowed}; processing_intake_live_authority:${channelProcessingIntakeLiveAuthority}; processing_intake_target_gate:${channelProcessingIntakeTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; bus_intake:${busMainDcaIntakeStatus || 'missing'}; bus_intake_artifacts:${busMainDcaIntakeArtifactCount}; bus_intake_valid:${busMainDcaIntakeValidCount}; bus_intake_invalid:${busMainDcaIntakeInvalidCount}; bus_intake_valid_buses:${busMainDcaIntakeValidBusCount}; bus_intake_valid_mains:${busMainDcaIntakeValidMainCount}; bus_intake_valid_dcas:${busMainDcaIntakeValidDcaCount}; bus_intake_candidate:${busMainDcaIntakeCandidate}; bus_intake_gap:${busMainDcaIntakeGapRemains}; bus_intake_closure:${busMainDcaIntakeClosureAllowed}; bus_intake_live_authority:${busMainDcaIntakeLiveAuthority}; bus_intake_target_gate:${busMainDcaIntakeTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; matrix_intake:${matrixStateIntakeStatus || 'missing'}; matrix_intake_valid_matrices:${matrixStateIntakeValidMatrixCount}; matrix_intake_gap:${matrixStateIntakeGapRemains}; matrix_intake_live_authority:${matrixStateIntakeLiveAuthority}; matrix_intake_target_gate:${matrixStateIntakeTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; fx_intake:${fxSlotsInsertsIntakeStatus || 'missing'}; fx_intake_valid_slots:${fxSlotsInsertsIntakeValidFxSlotCount}; fx_intake_valid_inserts:${fxSlotsInsertsIntakeValidInsertCount}; fx_intake_gap:${fxSlotsInsertsIntakeGapRemains}; fx_intake_live_authority:${fxSlotsInsertsIntakeLiveAuthority}; fx_intake_target_gate:${fxSlotsInsertsIntakeTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}; scenes_contract:${snapshotsScenesContractStatus || 'missing'}; scenes_contract_gap:${snapshotsScenesContractGapRemains}; scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}; scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}; presets_contract:${userPresetsContractStatus || 'missing'}; presets_contract_gap:${userPresetsContractGapRemains}; presets_contract_live_authority:${userPresetsContractLiveAuthority}; presets_contract_target_gate:${userPresetsContractTargetConsistency}; presets_intake:${userPresetsIntakeStatus || 'missing'}; presets_intake_artifacts:${userPresetsIntakeArtifactCount}; presets_intake_valid:${userPresetsIntakeValidCount}; presets_intake_invalid:${userPresetsIntakeInvalidCount}; presets_intake_valid_presets:${userPresetsIntakeValidPresetCount}; presets_intake_candidate:${userPresetsIntakeCandidate}; presets_intake_gap:${userPresetsIntakeGapRemains}; presets_intake_closure:${userPresetsIntakeClosureAllowed}; presets_intake_preset_recall:${userPresetsIntakePresetRecallAllowed}; presets_intake_preset_store:${userPresetsIntakePresetStoreAllowed}; presets_intake_live_authority:${userPresetsIntakeLiveAuthority}; presets_intake_target_gate:${userPresetsIntakeTargetConsistency}; dlive_contract:${dliveStateContractStatus || 'missing'}; dlive_contract_gap:${dliveStateContractGapRemains}; dlive_contract_live_authority:${dliveStateContractLiveAuthority}; dlive_contract_target_gate:${dliveStateContractTargetConsistency}; dlive_intake:${dliveStateIntakeStatus || 'missing'}; dlive_intake_artifacts:${dliveStateIntakeArtifactCount}; dlive_intake_valid:${dliveStateIntakeValidCount}; dlive_intake_invalid:${dliveStateIntakeInvalidCount}; dlive_intake_valid_channels:${dliveStateIntakeValidChannelCount}; dlive_intake_candidate:${dliveStateIntakeCandidate}; dlive_intake_gap:${dliveStateIntakeGapRemains}; dlive_intake_closure:${dliveStateIntakeClosureAllowed}; dlive_intake_midi_send:${dliveStateIntakeMidiSendAllowed}; dlive_intake_tcp_send:${dliveStateIntakeTcpSendAllowed}; dlive_intake_dlive_write:${dliveStateIntakeDliveWriteAllowed}; dlive_intake_dlive_apply:${dliveStateIntakeDliveApplyAllowed}; dlive_intake_live_authority:${dliveStateIntakeLiveAuthority}; dlive_intake_target_gate:${dliveStateIntakeTargetConsistency}`
       : 'read_surface_quality:missing';
+    const artifactReviewQueueText = proofQualityAvailable
+      ? `artifact_queue:${artifactReviewQueueStatus || 'missing'}; artifact_queue_surfaces:${artifactReviewQueueSurfaceCount}; artifact_queue_available_intakes:${artifactReviewQueueAvailableIntakeCount}; artifact_queue_artifacts:${artifactReviewQueueArtifactCount}; artifact_queue_valid:${artifactReviewQueueValidCount}; artifact_queue_invalid:${artifactReviewQueueInvalidCount}; artifact_queue_review_candidates:${artifactReviewQueueReviewCandidateCount}; artifact_queue_missing:${artifactReviewQueueMissingCount}; artifact_queue_unsafe:${artifactReviewQueueUnsafeCount}; artifact_queue_target_inconsistent:${artifactReviewQueueTargetInconsistentCount}; artifact_queue_review_available:${artifactReviewQueueReviewAvailable}; artifact_queue_operator_review:${artifactReviewQueueOperatorReview}; artifact_queue_gap:${artifactReviewQueueGapRemains}; artifact_queue_closure:${artifactReviewQueueClosureAllowed}; artifact_queue_live_authority:${artifactReviewQueueLiveAuthority}; artifact_queue_full_auto:${artifactReviewQueueFullAuto}`
+      : 'artifact_queue:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
       : 'no_current_evidence';
@@ -1366,6 +1394,21 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `dlive_intake_dlive_apply_allowed:${dliveStateIntakeDliveApplyAllowed}`,
         `dlive_intake_live_authority:${dliveStateIntakeLiveAuthority}`,
         `dlive_intake_target_gate:${dliveStateIntakeTargetConsistency}`,
+        `artifact_queue_available:${artifactReviewQueueAvailable}`,
+        `artifact_queue_status:${artifactReviewQueueStatus}`,
+        `artifact_queue_surfaces:${artifactReviewQueueSurfaceCount}`,
+        `artifact_queue_available_intakes:${artifactReviewQueueAvailableIntakeCount}`,
+        `artifact_queue_artifacts:${artifactReviewQueueArtifactCount}`,
+        `artifact_queue_valid:${artifactReviewQueueValidCount}`,
+        `artifact_queue_invalid:${artifactReviewQueueInvalidCount}`,
+        `artifact_queue_review_candidates:${artifactReviewQueueReviewCandidateCount}`,
+        `artifact_queue_missing:${artifactReviewQueueMissingCount}`,
+        `artifact_queue_unsafe:${artifactReviewQueueUnsafeCount}`,
+        `artifact_queue_target_inconsistent:${artifactReviewQueueTargetInconsistentCount}`,
+        `artifact_queue_review_available:${artifactReviewQueueReviewAvailable}`,
+        `artifact_queue_closure_allowed:${artifactReviewQueueClosureAllowed}`,
+        `artifact_queue_live_authority:${artifactReviewQueueLiveAuthority}`,
+        `artifact_queue_full_auto:${artifactReviewQueueFullAuto}`,
       ],
       blockedReason: available
         ? stale
@@ -1373,7 +1416,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
           : 'Read-only artifact source; safety is normalized before cockpit display.'
         : 'No supervised proof report artifact found.',
       nextStep: available
-        ? `Latest report status: ${str(proofSummary.latest_report_status, 'unknown')}; overlay: ${overlayStatus}; artifacts: ${artifactCount}; invalid: ${invalidCount}; ${freshnessText}; ${proofQualityText}.`
+        ? `Latest report status: ${str(proofSummary.latest_report_status, 'unknown')}; overlay: ${overlayStatus}; artifacts: ${artifactCount}; invalid: ${invalidCount}; ${freshnessText}; ${proofQualityText}; ${artifactReviewQueueText}.`
         : 'Run no-WING supervised proof checks or point Product Layer at an existing report artifact.',
       tone: invalidCount > 0 ? 'red' : stale || !available ? 'yellow' : 'blue'
     }];
@@ -2485,6 +2528,73 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         : dliveStateIntakeCandidate
           ? 'yellow'
           : 'yellow'
+    });
+    rows.push({
+      moduleId: 'read_surface_physical_readback_artifact_review_queue',
+      label: 'Readback artifact review queue',
+      domain: 'read_surface_artifact_review_queue',
+      status: artifactReviewQueueAvailable ? artifactReviewQueueStatus || 'queue_available' : 'queue_missing',
+      entrypoint: 'build_read_surface_physical_readback_artifact_review_queue',
+      module: artifactReviewQueueBlockedBy[0] || 'operator_artifact_review_queue',
+      uiSurface: 'Read-surface physical artifact review queue',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${artifactReviewQueueAvailable}`,
+        `status:${artifactReviewQueueStatus}`,
+        `surfaces:${artifactReviewQueueSurfaceCount}`,
+        `available_intakes:${artifactReviewQueueAvailableIntakeCount}`,
+        `artifacts:${artifactReviewQueueArtifactCount}`,
+        `valid:${artifactReviewQueueValidCount}`,
+        `invalid:${artifactReviewQueueInvalidCount}`,
+        `review_candidates:${artifactReviewQueueReviewCandidateCount}`,
+        `missing:${artifactReviewQueueMissingCount}`,
+        `unsafe_authority:${artifactReviewQueueUnsafeCount}`,
+        `target_inconsistent:${artifactReviewQueueTargetInconsistentCount}`,
+        `review_available:${artifactReviewQueueReviewAvailable}`,
+        `operator_review:${artifactReviewQueueOperatorReview}`,
+        `physical_gap_remains:${artifactReviewQueueGapRemains}`,
+        `fixture_closure_allowed:${artifactReviewQueueClosureAllowed}`,
+        `live_authority:${artifactReviewQueueLiveAuthority}`,
+        `full_autonomous_ready:${artifactReviewQueueFullAuto}`,
+        artifactReviewQueueCandidateSurfaces.length ? `candidate_surfaces:${artifactReviewQueueCandidateSurfaces.join('|')}` : '',
+        artifactReviewQueueInvalidSurfaces.length ? `invalid_surfaces:${artifactReviewQueueInvalidSurfaces.join('|')}` : '',
+        artifactReviewQueueMissingSurfaces.length ? `missing_surfaces:${artifactReviewQueueMissingSurfaces.join('|')}` : '',
+        artifactReviewQueueUnsafeSurfaces.length ? `unsafe_surfaces:${artifactReviewQueueUnsafeSurfaces.join('|')}` : '',
+        artifactReviewQueueTargetInconsistentSurfaces.length ? `target_inconsistent_surfaces:${artifactReviewQueueTargetInconsistentSurfaces.join('|')}` : '',
+        artifactReviewQueueMethodIds.length ? `methods:${artifactReviewQueueMethodIds.join('|')}` : '',
+      ].filter(Boolean),
+      blockedReason: artifactReviewQueueAvailable
+        ? artifactReviewQueueBlockedBy.length
+          ? artifactReviewQueueBlockedBy.join(', ')
+          : 'Artifact review queue is present; manual review still gates fixture closure.'
+        : 'Read-surface artifact review queue is missing from proof summary.',
+      nextStep: artifactReviewQueueAvailable
+        ? [
+            `queue:${artifactReviewQueueStatus}`,
+            `surfaces:${artifactReviewQueueSurfaceCount}`,
+            `available_intakes:${artifactReviewQueueAvailableIntakeCount}`,
+            `artifacts:${artifactReviewQueueArtifactCount}`,
+            `valid:${artifactReviewQueueValidCount}`,
+            `invalid:${artifactReviewQueueInvalidCount}`,
+            `review_candidates:${artifactReviewQueueReviewCandidateCount}`,
+            `missing:${artifactReviewQueueMissingCount}`,
+            `unsafe_authority:${artifactReviewQueueUnsafeCount}`,
+            `target_inconsistent:${artifactReviewQueueTargetInconsistentCount}`,
+            `review_available:${artifactReviewQueueReviewAvailable}`,
+            `operator_review:${artifactReviewQueueOperatorReview}`,
+            `fixture_closure_allowed:${artifactReviewQueueClosureAllowed}`,
+            `live_authority:${artifactReviewQueueLiveAuthority}`,
+            `full_autonomous_ready:${artifactReviewQueueFullAuto}`,
+            artifactReviewQueueMissingSurfaces.length ? `missing_surfaces:${artifactReviewQueueMissingSurfaces.join(',')}` : '',
+            artifactReviewQueueCandidateSurfaces.length ? `candidate_surfaces:${artifactReviewQueueCandidateSurfaces.join(',')}` : '',
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with read-surface artifact review queue validation.',
+      tone: !artifactReviewQueueAvailable || artifactReviewQueueInvalidCount > 0 || artifactReviewQueueUnsafeCount > 0 || artifactReviewQueueTargetInconsistentCount > 0 || artifactReviewQueueClosureAllowed || artifactReviewQueueLiveAuthority || artifactReviewQueueFullAuto
+        ? 'yellow'
+        : artifactReviewQueueReviewCandidateCount > 0 || artifactReviewQueueMissingCount > 0
+          ? 'yellow'
+          : 'green'
     });
     return rows;
   })() : [];

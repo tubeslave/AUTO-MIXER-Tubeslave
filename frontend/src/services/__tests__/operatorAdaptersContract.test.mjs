@@ -1291,6 +1291,50 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             intake_violations: [],
             violations: [],
           },
+          read_surface_physical_readback_artifact_review_queue: {
+            available: true,
+            status: 'passed',
+            queue_status: 'operator_artifact_capture_required',
+            read_only: true,
+            live_write: false,
+            mutates_console_state: false,
+            queries_console: false,
+            executes_tests: false,
+            operator_required: true,
+            execution_allowed_by_queue: false,
+            fixture_closure_allowed_by_queue: false,
+            live_widening_allowed: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            intake_surface_count: 10,
+            available_intake_count: 10,
+            artifact_count: 0,
+            valid_candidate_count: 0,
+            invalid_candidate_count: 0,
+            review_candidate_count: 0,
+            missing_artifact_surface_count: 10,
+            unsafe_authority_claim_count: 0,
+            target_inconsistent_surface_count: 0,
+            review_candidates_available: false,
+            operator_review_required: true,
+            physical_fixture_gap_remains: true,
+            review_candidate_surface_ids: [],
+            invalid_surface_ids: [],
+            missing_artifact_surface_ids: [
+              'raw_mixer_state_cache',
+              'channel_identity_and_basic_controls',
+              'dlive_state',
+            ],
+            unsafe_authority_surface_ids: [],
+            target_inconsistent_surface_ids: [],
+            queue_item_method_ids: [
+              'raw_mixer_state_physical_readback_artifact_intake',
+              'channel_basic_controls_physical_readback_artifact_intake',
+              'dlive_state_physical_readback_artifact_intake',
+            ],
+            blocked_by: ['operator_must_capture_missing_physical_readback_artifacts'],
+            violations: [],
+          },
         },
       },
     },
@@ -1393,6 +1437,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'user_presets_physical_readback_artifact_intake',
       'dlive_state_physical_readback_contract',
       'dlive_state_physical_readback_artifact_intake',
+      'read_surface_physical_readback_artifact_review_queue',
       'read_surface_remediation_plan',
       'autonomy_evidence:fader_supervised_promotion',
       'autonomy_evidence:gain_trim_supervised_promotion',
@@ -1672,6 +1717,21 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'dlive_intake_dlive_apply_allowed:false',
     'dlive_intake_live_authority:false',
     'dlive_intake_target_gate:true',
+    'artifact_queue_available:true',
+    'artifact_queue_status:operator_artifact_capture_required',
+    'artifact_queue_surfaces:10',
+    'artifact_queue_available_intakes:10',
+    'artifact_queue_artifacts:0',
+    'artifact_queue_valid:0',
+    'artifact_queue_invalid:0',
+    'artifact_queue_review_candidates:0',
+    'artifact_queue_missing:10',
+    'artifact_queue_unsafe:0',
+    'artifact_queue_target_inconsistent:0',
+    'artifact_queue_review_available:false',
+    'artifact_queue_closure_allowed:false',
+    'artifact_queue_live_authority:false',
+    'artifact_queue_full_auto:false',
   ]);
   assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
   assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
@@ -1772,6 +1832,12 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /dlive_intake_dlive_apply:false/);
   assert.match(proofEvidence.nextStep, /dlive_intake_live_authority:false/);
   assert.match(proofEvidence.nextStep, /dlive_intake_target_gate:true/);
+  assert.match(proofEvidence.nextStep, /artifact_queue:operator_artifact_capture_required/);
+  assert.match(proofEvidence.nextStep, /artifact_queue_surfaces:10/);
+  assert.match(proofEvidence.nextStep, /artifact_queue_available_intakes:10/);
+  assert.match(proofEvidence.nextStep, /artifact_queue_closure:false/);
+  assert.match(proofEvidence.nextStep, /artifact_queue_live_authority:false/);
+  assert.match(proofEvidence.nextStep, /artifact_queue_full_auto:false/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
 
   const capturePlan = rows.find(row => row.moduleId === 'read_surface_physical_readback_capture_plan');
@@ -2536,6 +2602,43 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(dliveStateIntake.nextStep, /dlive_apply_allowed:false/);
   assert.match(dliveStateIntake.nextStep, /live_authority:false/);
 
+  const artifactReviewQueue = rows.find(row => row.moduleId === 'read_surface_physical_readback_artifact_review_queue');
+  assert.equal(artifactReviewQueue.domain, 'read_surface_artifact_review_queue');
+  assert.equal(artifactReviewQueue.canWriteLive, false);
+  assert.deepEqual(artifactReviewQueue.liveWriteKinds, []);
+  assert.equal(artifactReviewQueue.status, 'operator_artifact_capture_required');
+  assert.equal(artifactReviewQueue.entrypoint, 'build_read_surface_physical_readback_artifact_review_queue');
+  assert.equal(artifactReviewQueue.module, 'operator_must_capture_missing_physical_readback_artifacts');
+  assert.equal(artifactReviewQueue.tone, 'yellow');
+  assert.deepEqual(artifactReviewQueue.pipelineProfiles, [
+    'available:true',
+    'status:operator_artifact_capture_required',
+    'surfaces:10',
+    'available_intakes:10',
+    'artifacts:0',
+    'valid:0',
+    'invalid:0',
+    'review_candidates:0',
+    'missing:10',
+    'unsafe_authority:0',
+    'target_inconsistent:0',
+    'review_available:false',
+    'operator_review:true',
+    'physical_gap_remains:true',
+    'fixture_closure_allowed:false',
+    'live_authority:false',
+    'full_autonomous_ready:false',
+    'missing_surfaces:raw_mixer_state_cache|channel_identity_and_basic_controls|dlive_state',
+    'methods:raw_mixer_state_physical_readback_artifact_intake|channel_basic_controls_physical_readback_artifact_intake|dlive_state_physical_readback_artifact_intake',
+  ]);
+  assert.match(artifactReviewQueue.blockedReason, /operator_must_capture_missing_physical_readback_artifacts/);
+  assert.match(artifactReviewQueue.nextStep, /queue:operator_artifact_capture_required/);
+  assert.match(artifactReviewQueue.nextStep, /surfaces:10/);
+  assert.match(artifactReviewQueue.nextStep, /available_intakes:10/);
+  assert.match(artifactReviewQueue.nextStep, /fixture_closure_allowed:false/);
+  assert.match(artifactReviewQueue.nextStep, /live_authority:false/);
+  assert.match(artifactReviewQueue.nextStep, /full_autonomous_ready:false/);
+
   const readRemediation = rows.find(row => row.moduleId === 'read_surface_remediation_plan');
   assert.equal(readRemediation.domain, 'read_surface_remediation');
   assert.equal(readRemediation.canWriteLive, false);
@@ -2699,7 +2802,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 22);
+  assert.equal(rows.length, 23);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -2911,6 +3014,21 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'dlive_intake_dlive_apply_allowed:false',
     'dlive_intake_live_authority:false',
     'dlive_intake_target_gate:false',
+    'artifact_queue_available:false',
+    'artifact_queue_status:missing',
+    'artifact_queue_surfaces:0',
+    'artifact_queue_available_intakes:0',
+    'artifact_queue_artifacts:0',
+    'artifact_queue_valid:0',
+    'artifact_queue_invalid:0',
+    'artifact_queue_review_candidates:0',
+    'artifact_queue_missing:0',
+    'artifact_queue_unsafe:0',
+    'artifact_queue_target_inconsistent:0',
+    'artifact_queue_review_available:false',
+    'artifact_queue_closure_allowed:false',
+    'artifact_queue_live_authority:false',
+    'artifact_queue_full_auto:false',
   ]);
 
   assert.equal(rows[1].moduleId, 'read_surface_physical_readback_capture_plan');
@@ -3060,6 +3178,13 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.equal(rows[21].canWriteLive, false);
   assert.deepEqual(rows[21].liveWriteKinds, []);
   assert.match(rows[21].blockedReason, /artifact intake is missing/);
+
+  assert.equal(rows[22].moduleId, 'read_surface_physical_readback_artifact_review_queue');
+  assert.equal(rows[22].domain, 'read_surface_artifact_review_queue');
+  assert.equal(rows[22].status, 'queue_missing');
+  assert.equal(rows[22].canWriteLive, false);
+  assert.deepEqual(rows[22].liveWriteKinds, []);
+  assert.match(rows[22].blockedReason, /review queue is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

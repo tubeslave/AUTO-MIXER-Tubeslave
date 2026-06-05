@@ -66,6 +66,9 @@ try:
     from read_surface_physical_readback_artifact_review_queue import (
         build_read_surface_physical_readback_artifact_review_queue,
     )
+    from read_surface_physical_readback_fixture_acceptance_ledger import (
+        build_read_surface_physical_readback_fixture_acceptance_ledger,
+    )
     from routing_sends_physical_readback_contract import (
         build_routing_sends_physical_readback_contract,
     )
@@ -140,6 +143,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.read_surface_physical_readback_artifact_review_queue import (
         build_read_surface_physical_readback_artifact_review_queue,
+    )
+    from backend.read_surface_physical_readback_fixture_acceptance_ledger import (
+        build_read_surface_physical_readback_fixture_acceptance_ledger,
     )
     from backend.routing_sends_physical_readback_contract import (
         build_routing_sends_physical_readback_contract,
@@ -1035,6 +1041,31 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "no_live_writes",
             "does_not_query_console",
             "fixture_closure_allowed_by_queue_false",
+        ),
+    ),
+    ProcessingMethod(
+        id="read_surface_physical_readback_fixture_acceptance_ledger",
+        label="Read Surface Physical Readback Fixture Acceptance Ledger",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Read-only ledger for operator accept/reject records tied to "
+            "physical readback artifact review candidates."
+        ),
+        module="backend/read_surface_physical_readback_fixture_acceptance_ledger.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="acceptance_ledger_only_fixture_closure_still_manual",
+        promotion_next=(
+            "operator records acceptance or rejection of valid candidates; "
+            "fixture closure remains a separate manual decision"
+        ),
+        notes=(
+            "transport_free",
+            "operator_acceptance_ledger_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "fixture_closure_allowed_by_acceptance_false",
         ),
     ),
     ProcessingMethod(
@@ -2068,6 +2099,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, physical artifact review queue",
         "next_step": "Use only to aggregate artifact-intake review work; do not close fixtures or grant live authority.",
     },
+    "read_surface_physical_readback_fixture_acceptance_ledger": {
+        "entrypoint": "build_read_surface_physical_readback_fixture_acceptance_ledger",
+        "ui_surface": "Processing registry, physical artifact acceptance ledger",
+        "next_step": "Use only to record operator review decisions; do not close fixtures or grant live authority.",
+    },
     "auto_fader_v1": {
         "entrypoint": "main_pipeline_preview proposal adapter",
         "ui_surface": "Task Queue preview/proposal rows",
@@ -2346,6 +2382,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "read_surface_physical_readback_artifact_review_queue": (
             build_read_surface_physical_readback_artifact_review_queue()
+        ),
+        "read_surface_physical_readback_fixture_acceptance_ledger": (
+            build_read_surface_physical_readback_fixture_acceptance_ledger()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),
