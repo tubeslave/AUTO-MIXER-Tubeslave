@@ -12,6 +12,7 @@ from tools.no_wing_release_check import (
     autonomy_evidence_overlay_summary,
     autonomy_gap_rollup_summary,
     build_checks,
+    channel_basic_controls_readback_contract_summary,
     current_supervised_live_write_kinds,
     gain_proof_artifact_root_for_run,
     next_wing_proof_plan_summary,
@@ -24,6 +25,7 @@ from tools.no_wing_release_check import (
     supervised_gain_dry_run_summary,
     validate_repo_local_commands,
     validate_no_live_commands,
+    validate_channel_basic_controls_physical_readback_contract_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
     validate_raw_mixer_state_physical_readback_contract_snapshot,
     validate_read_surface_remediation_plan_snapshot,
@@ -431,6 +433,90 @@ def test_no_wing_release_check_rejects_raw_mixer_contract_drift(monkeypatch):
     assert "raw_mixer_readback_contract_live_authority_not_false" in result.detail["violations"]
 
 
+def test_no_wing_release_check_validates_channel_basic_controls_readback_contract_snapshot():
+    result = validate_channel_basic_controls_physical_readback_contract_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert result.detail["schema_id"] == "channel_basic_controls_physical_readback.v1"
+    assert result.detail["surface_id"] == "channel_identity_and_basic_controls"
+    assert result.detail["remediation_action_id"] == "remediate_channel_identity_and_basic_controls"
+    assert result.detail["physical_readback_surface_id"] == "channel_identity_and_basic_controls"
+    assert result.detail["physical_readback_action_id"] == "remediate_channel_identity_and_basic_controls"
+    assert result.detail["fixture_physical_gap_declared"] is True
+    assert result.detail["remediation_physical_gap_declared"] is True
+    assert result.detail["artifact_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert "physical_readback" in result.detail["allowed_sources"]
+    assert "mixer_state_cache" not in result.detail["allowed_sources"]
+    assert "verified_from_physical_readback" in result.detail["accepted_channel_statuses"]
+    assert "manual_write_events" in result.detail["forbidden_mutation_evidence_fields"]
+    assert result.detail["required_control_fields"] == ["fader_db", "trim_db", "mute", "pan"]
+    assert "cache_matches_physical_readback" in result.detail["required_coverage_flags"]
+    assert result.detail["promotion_families_requiring_surface"] == [
+        "fader",
+        "gain",
+        "mute",
+        "pan_phase_delay",
+    ]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_channel_basic_controls_contract_drift(monkeypatch):
+    contract = release_check.build_channel_basic_controls_physical_readback_contract()
+    corrupted = json.loads(json.dumps(contract))
+    corrupted["schema_id"] = "channel_basic_controls_physical_readback.v0"
+    corrupted["surface_id"] = "raw_mixer_state_cache"
+    corrupted["safety"]["live_write"] = True
+    corrupted["artifact_contract"]["required_top_level_fields"] = ["type"]
+    corrupted["artifact_contract"]["required_control_fields"] = ["fader_db"]
+    corrupted["artifact_contract"]["required_coverage_flags"] = []
+    corrupted["artifact_contract"]["allowed_sources"].append("mixer_state_cache")
+    corrupted["artifact_contract"]["accepted_channel_statuses"] = ["verified_from_cache"]
+    corrupted["artifact_contract"]["forbidden_mutation_evidence_fields"] = []
+    corrupted["summary"]["physical_readback_surface_id"] = "dlive_state"
+    corrupted["summary"]["live_authority_granted"] = True
+    corrupted["summary"]["promotion_families_requiring_surface"] = ["fader"]
+
+    monkeypatch.setattr(
+        release_check,
+        "build_channel_basic_controls_physical_readback_contract",
+        lambda: corrupted,
+    )
+
+    result = validate_channel_basic_controls_physical_readback_contract_snapshot()
+
+    assert result.status == "failed"
+    assert "channel_basic_controls_readback_contract_schema_id_mismatch" in result.detail["violations"]
+    assert "channel_basic_controls_readback_contract_surface_id_mismatch" in result.detail["violations"]
+    assert "channel_basic_controls_readback_contract_live_write_not_false" in result.detail["violations"]
+    assert (
+        "channel_basic_controls_readback_required_top_level_fields_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "channel_basic_controls_readback_required_control_fields_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "channel_basic_controls_readback_required_coverage_flags_mismatch"
+        in result.detail["violations"]
+    )
+    assert "channel_basic_controls_readback_allowed_sources_mismatch" in result.detail["violations"]
+    assert "channel_basic_controls_readback_allows_cached_source" in result.detail["violations"]
+    assert "channel_basic_controls_readback_accepted_statuses_mismatch" in result.detail["violations"]
+    assert (
+        "channel_basic_controls_readback_forbidden_mutation_fields_mismatch"
+        in result.detail["violations"]
+    )
+    assert "channel_basic_controls_contract_surface_summary_mismatch" in result.detail["violations"]
+    assert "channel_basic_controls_contract_live_authority_not_false" in result.detail["violations"]
+    assert "channel_basic_controls_promotion_family_missing:gain" in result.detail["violations"]
+    assert "channel_basic_controls_promotion_family_missing:mute" in result.detail["violations"]
+
+
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_frontend=False, quick=True)
 
@@ -463,6 +549,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     fixture_check = next(check for check in checks if check.name == "read_surface_fixture_evidence")
     assert "tests/test_read_surface_fixture_evidence.py" in fixture_check.command
     assert "tests/test_raw_mixer_state_physical_readback_contract.py" in fixture_check.command
+    assert "tests/test_channel_basic_controls_physical_readback_contract.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command
@@ -929,6 +1016,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "read_surface_fixture_evidence_schema" in result_names
     assert "read_surface_remediation_plan_schema" in result_names
     assert "raw_mixer_state_physical_readback_contract_schema" in result_names
+    assert "channel_basic_controls_physical_readback_contract_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
@@ -943,6 +1031,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "raw_mixer_state_physical_readback_contract_schema"
     )
     assert result_names.index("raw_mixer_state_physical_readback_contract_schema") < result_names.index(
+        "channel_basic_controls_physical_readback_contract_schema"
+    )
+    assert result_names.index("channel_basic_controls_physical_readback_contract_schema") < result_names.index(
         "backend_pytest"
     )
     assert result_names.index("supervised_proof_artifact_report") < result_names.index(
@@ -1767,6 +1858,89 @@ def test_no_wing_release_check_summary_embeds_raw_mixer_readback_contract(tmp_pa
     assert "## Raw Mixer State Physical Readback Contract" in markdown_summary
     assert "physical_fixture_gap_remains: `true`" in markdown_summary
     assert "live_authority_granted: `false`" in markdown_summary
+    assert "target_consistency: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_channel_basic_controls_readback_contract(tmp_path):
+    result = CheckResult(
+        name="channel_basic_controls_physical_readback_contract_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "contract_status": "contract_ready_physical_fixture_missing",
+            "schema_id": "channel_basic_controls_physical_readback.v1",
+            "surface_id": "channel_identity_and_basic_controls",
+            "remediation_action_id": "remediate_channel_identity_and_basic_controls",
+            "physical_readback_surface_id": "channel_identity_and_basic_controls",
+            "physical_readback_action_id": "remediate_channel_identity_and_basic_controls",
+            "fixture_physical_gap_declared": True,
+            "remediation_physical_gap_declared": True,
+            "artifact_required": True,
+            "physical_fixture_gap_remains": True,
+            "accepted_as_physical_fixture_candidate": False,
+            "live_authority_granted": False,
+            "promotion_families_requiring_surface": [
+                "fader",
+                "gain",
+                "mute",
+                "pan_phase_delay",
+            ],
+            "required_top_level_field_count": 10,
+            "required_channel_field_count": 8,
+            "required_identity_fields": ["source_name", "source_role", "input_source"],
+            "required_control_fields": ["fader_db", "trim_db", "mute", "pan"],
+            "required_coverage_flags": [
+                "identity",
+                "basic_controls",
+                "cache_matches_physical_readback",
+            ],
+            "required_false_safety_flags": [
+                "live_write",
+                "mutates_console_state",
+                "live_widening_allowed",
+                "full_autonomous_ready",
+            ],
+            "allowed_sources": ["physical_readback", "wing_physical_readback"],
+            "accepted_channel_statuses": ["verified_from_physical_readback"],
+            "forbidden_mutation_evidence_fields": ["manual_write_events", "mute_write_events"],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert channel_basic_controls_readback_contract_summary([result]) == summary[
+        "channel_basic_controls_physical_readback_contract"
+    ]
+    contract = json_summary["channel_basic_controls_physical_readback_contract"]
+    assert contract["read_only"] is True
+    assert contract["live_write"] is False
+    assert contract["mutates_console_state"] is False
+    assert contract["queries_console"] is False
+    assert contract["executes_tests"] is False
+    assert contract["full_autonomous_ready"] is False
+    assert contract["artifact_required"] is True
+    assert contract["physical_fixture_gap_remains"] is True
+    assert contract["accepted_as_physical_fixture_candidate"] is False
+    assert contract["live_authority_granted"] is False
+    assert contract["target_consistency"] is True
+    assert contract["surface_id"] == "channel_identity_and_basic_controls"
+    assert contract["remediation_action_id"] == "remediate_channel_identity_and_basic_controls"
+    assert contract["promotion_families_requiring_surface"] == [
+        "fader",
+        "gain",
+        "mute",
+        "pan_phase_delay",
+    ]
+    assert contract["required_control_fields"] == ["fader_db", "trim_db", "mute", "pan"]
+    assert "## Channel Basic Controls Physical Readback Contract" in markdown_summary
+    assert "physical_fixture_gap_remains: `true`" in markdown_summary
+    assert "live_authority_granted: `false`" in markdown_summary
+    assert "promotion_families_requiring_surface" in markdown_summary
     assert "target_consistency: `true`" in markdown_summary
 
 

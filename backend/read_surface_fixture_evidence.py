@@ -70,17 +70,24 @@ FIXTURE_EVIDENCE_BY_SURFACE: Dict[str, Dict[str, Tuple[str, ...]]] = {
         ),
     },
     "channel_identity_and_basic_controls": {
-        "fixture_paths": ("tests/test_operator_product_state.py",),
+        "fixture_paths": (
+            "tests/test_operator_product_state.py",
+            "tests/test_channel_basic_controls_physical_readback_contract.py",
+        ),
         "test_names": (
             "test_channel_inventory_publishes_cached_source_patch_readback_only",
             "test_channel_inventory_publishes_cached_channel_detail_readback_only",
             "test_channel_inventory_marks_missing_cached_read_sections_without_writes",
+            "test_channel_basic_controls_contract_describes_future_physical_artifact",
+            "test_channel_basic_controls_contract_validates_minimal_physical_artifact",
+            "test_channel_basic_controls_contract_rejects_live_or_cached_claims",
         ),
         "covered_contracts": (
             "cached_channel_identity",
             "cached_source_patch",
             "basic_control_cache",
             "cache_freshness",
+            "physical_readback_artifact_contract",
             "no_console_query",
         ),
     },

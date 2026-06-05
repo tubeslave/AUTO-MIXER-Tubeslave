@@ -1974,6 +1974,48 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     "forbidden_mutation_evidence_fields": ["manual_write_events"],
                     "violations": [],
                 },
+                "channel_basic_controls_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "channel_basic_controls_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "channel_identity_and_basic_controls",
+                    "remediation_action_id": "remediate_channel_identity_and_basic_controls",
+                    "physical_readback_surface_id": "channel_identity_and_basic_controls",
+                    "physical_readback_action_id": "remediate_channel_identity_and_basic_controls",
+                    "fixture_physical_gap_declared": True,
+                    "remediation_physical_gap_declared": True,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "fader",
+                        "gain",
+                        "mute",
+                        "pan_phase_delay",
+                    ],
+                    "required_control_fields": ["fader_db", "trim_db", "mute", "pan"],
+                    "required_coverage_flags": [
+                        "identity",
+                        "basic_controls",
+                        "cache_matches_physical_readback",
+                    ],
+                    "allowed_sources": ["physical_readback", "wing_physical_readback"],
+                    "accepted_channel_statuses": ["verified_from_physical_readback"],
+                    "forbidden_mutation_evidence_fields": [
+                        "manual_write_events",
+                        "mute_write_events",
+                    ],
+                    "violations": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -2035,6 +2077,31 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert raw_contract["next_physical_readback_action_id"] == "remediate_raw_mixer_state_cache"
     assert "physical_readback" in raw_contract["allowed_sources"]
     assert "manual_write_events" in raw_contract["forbidden_mutation_evidence_fields"]
+    channel_contract = proof_quality["channel_basic_controls_physical_readback_contract"]
+    assert channel_contract["available"] is True
+    assert channel_contract["status"] == "passed"
+    assert channel_contract["schema_id"] == "channel_basic_controls_physical_readback.v1"
+    assert channel_contract["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert channel_contract["surface_id"] == "channel_identity_and_basic_controls"
+    assert channel_contract["remediation_action_id"] == "remediate_channel_identity_and_basic_controls"
+    assert channel_contract["artifact_required"] is True
+    assert channel_contract["physical_fixture_gap_remains"] is True
+    assert channel_contract["accepted_as_physical_fixture_candidate"] is False
+    assert channel_contract["live_authority_granted"] is False
+    assert channel_contract["full_autonomous_ready"] is False
+    assert channel_contract["fixture_physical_gap_declared"] is True
+    assert channel_contract["remediation_physical_gap_declared"] is True
+    assert channel_contract["target_consistency"] is True
+    assert channel_contract["promotion_families_requiring_surface"] == [
+        "fader",
+        "gain",
+        "mute",
+        "pan_phase_delay",
+    ]
+    assert channel_contract["required_control_fields"] == ["fader_db", "trim_db", "mute", "pan"]
+    assert "cache_matches_physical_readback" in channel_contract["required_coverage_flags"]
+    assert "physical_readback" in channel_contract["allowed_sources"]
+    assert "mute_write_events" in channel_contract["forbidden_mutation_evidence_fields"]
     overlay = payload["autonomy_evidence_overlay"]
     assert overlay["source_report_available"] is True
     assert overlay["source_report_path"] == str(latest_report)
@@ -2107,6 +2174,32 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["source_claimed_live_authority"],
                 },
+                "channel_basic_controls_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "channel_basic_controls_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "physical_readback_surface_id": "dlive_state",
+                    "physical_readback_action_id": "remediate_dlive_state",
+                    "fixture_physical_gap_declared": False,
+                    "remediation_physical_gap_declared": False,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "target_consistency": False,
+                    "promotion_families_requiring_surface": ["fader"],
+                    "required_control_fields": ["fader_db"],
+                    "required_coverage_flags": [],
+                    "allowed_sources": ["physical_readback", "mixer_state_cache"],
+                    "accepted_channel_statuses": ["verified_from_cache"],
+                    "forbidden_mutation_evidence_fields": [],
+                    "violations": ["channel_contract_claimed_live_authority"],
+                },
             }
         ),
         encoding="utf-8",
@@ -2134,6 +2227,24 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert raw_contract["source_live_authority_granted_claimed"] is True
     assert raw_contract["source_full_autonomous_ready_claimed"] is True
     assert "source_claimed_live_authority" in raw_contract["violations"]
+    channel_contract = payload["summary"]["read_surface_proof_quality"][
+        "channel_basic_controls_physical_readback_contract"
+    ]
+    assert channel_contract["available"] is True
+    assert channel_contract["surface_id"] == "dlive_state"
+    assert channel_contract["physical_readback_surface_id"] == "dlive_state"
+    assert channel_contract["target_consistency"] is False
+    assert channel_contract["accepted_as_physical_fixture_candidate"] is False
+    assert channel_contract["read_only"] is True
+    assert channel_contract["live_write"] is False
+    assert channel_contract["live_authority_granted"] is False
+    assert channel_contract["full_autonomous_ready"] is False
+    assert channel_contract["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert channel_contract["source_live_write_claimed"] is True
+    assert channel_contract["source_live_authority_granted_claimed"] is True
+    assert channel_contract["source_full_autonomous_ready_claimed"] is True
+    assert channel_contract["promotion_families_requiring_surface"] == ["fader"]
+    assert "channel_contract_claimed_live_authority" in channel_contract["violations"]
     assert "set_gain" not in set(_walk_keys(payload))
 
 

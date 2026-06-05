@@ -578,6 +578,33 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             forbidden_mutation_evidence_fields: ['manual_write_events'],
             violations: [],
           },
+          channel_basic_controls_physical_readback_contract: {
+            available: true,
+            status: 'passed',
+            schema_id: 'channel_basic_controls_physical_readback.v1',
+            contract_status: 'contract_ready_physical_fixture_missing',
+            surface_id: 'channel_identity_and_basic_controls',
+            remediation_action_id: 'remediate_channel_identity_and_basic_controls',
+            artifact_required: true,
+            physical_fixture_gap_remains: true,
+            accepted_as_physical_fixture_candidate: false,
+            read_only: true,
+            live_write: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            target_consistency: true,
+            physical_readback_surface_id: 'channel_identity_and_basic_controls',
+            physical_readback_action_id: 'remediate_channel_identity_and_basic_controls',
+            fixture_physical_gap_declared: true,
+            remediation_physical_gap_declared: true,
+            promotion_families_requiring_surface: ['fader', 'gain', 'mute', 'pan_phase_delay'],
+            required_control_fields: ['fader_db', 'trim_db', 'mute', 'pan'],
+            required_coverage_flags: ['identity', 'basic_controls', 'cache_matches_physical_readback'],
+            allowed_sources: ['physical_readback', 'wing_physical_readback'],
+            accepted_channel_statuses: ['verified_from_physical_readback'],
+            forbidden_mutation_evidence_fields: ['manual_write_events', 'mute_write_events'],
+            violations: [],
+          },
         },
       },
     },
@@ -660,6 +687,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'promotion_readiness:scene_preset_supervised_promotion',
       'supervised_proof_evidence',
       'raw_mixer_state_physical_readback_contract',
+      'channel_basic_controls_physical_readback_contract',
       'read_surface_remediation_plan',
       'autonomy_evidence:fader_supervised_promotion',
       'autonomy_evidence:gain_trim_supervised_promotion',
@@ -755,6 +783,12 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'raw_contract_gap:true',
     'raw_contract_live_authority:false',
     'raw_contract_target_gate:true',
+    'channel_contract_available:true',
+    'channel_contract_status:contract_ready_physical_fixture_missing',
+    'channel_contract_schema:channel_basic_controls_physical_readback.v1',
+    'channel_contract_gap:true',
+    'channel_contract_live_authority:false',
+    'channel_contract_target_gate:true',
   ]);
   assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
   assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
@@ -771,6 +805,10 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /raw_contract_gap:true/);
   assert.match(proofEvidence.nextStep, /raw_contract_live_authority:false/);
   assert.match(proofEvidence.nextStep, /raw_contract_target_gate:true/);
+  assert.match(proofEvidence.nextStep, /channel_contract:contract_ready_physical_fixture_missing/);
+  assert.match(proofEvidence.nextStep, /channel_contract_gap:true/);
+  assert.match(proofEvidence.nextStep, /channel_contract_live_authority:false/);
+  assert.match(proofEvidence.nextStep, /channel_contract_target_gate:true/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
 
   const rawMixerContract = rows.find(row => row.moduleId === 'raw_mixer_state_physical_readback_contract');
@@ -796,6 +834,34 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(rawMixerContract.nextStep, /next_action:remediate_raw_mixer_state_cache/);
   assert.match(rawMixerContract.nextStep, /live_authority:false/);
   assert.match(rawMixerContract.nextStep, /target_consistency:true/);
+
+  const channelBasicContract = rows.find(row => row.moduleId === 'channel_basic_controls_physical_readback_contract');
+  assert.equal(channelBasicContract.domain, 'read_surface_contract');
+  assert.equal(channelBasicContract.canWriteLive, false);
+  assert.deepEqual(channelBasicContract.liveWriteKinds, []);
+  assert.equal(channelBasicContract.status, 'contract_ready_physical_fixture_missing');
+  assert.equal(channelBasicContract.entrypoint, 'channel_basic_controls_physical_readback_contract');
+  assert.equal(channelBasicContract.module, 'remediate_channel_identity_and_basic_controls');
+  assert.equal(channelBasicContract.tone, 'yellow');
+  assert.deepEqual(channelBasicContract.pipelineProfiles, [
+    'available:true',
+    'schema:channel_basic_controls_physical_readback.v1',
+    'surface:channel_identity_and_basic_controls',
+    'physical_readback:channel_identity_and_basic_controls',
+    'physical_action:remediate_channel_identity_and_basic_controls',
+    'physical_gap_remains:true',
+    'live_authority:false',
+    'target_consistency:true',
+    'promotion_families:fader|gain|mute|pan_phase_delay',
+    'controls:fader_db|trim_db|mute|pan',
+  ]);
+  assert.match(channelBasicContract.blockedReason, /physical readback fixture evidence is still missing/);
+  assert.match(channelBasicContract.nextStep, /physical_readback:channel_identity_and_basic_controls/);
+  assert.match(channelBasicContract.nextStep, /physical_action:remediate_channel_identity_and_basic_controls/);
+  assert.match(channelBasicContract.nextStep, /families:fader,gain,mute,pan_phase_delay/);
+  assert.match(channelBasicContract.nextStep, /controls:fader_db,trim_db,mute,pan/);
+  assert.match(channelBasicContract.nextStep, /live_authority:false/);
+  assert.match(channelBasicContract.nextStep, /target_consistency:true/);
 
   const readRemediation = rows.find(row => row.moduleId === 'read_surface_remediation_plan');
   assert.equal(readRemediation.domain, 'read_surface_remediation');
@@ -960,7 +1026,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 2);
+  assert.equal(rows.length, 3);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -988,6 +1054,12 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'raw_contract_gap:false',
     'raw_contract_live_authority:false',
     'raw_contract_target_gate:false',
+    'channel_contract_available:false',
+    'channel_contract_status:missing',
+    'channel_contract_schema:',
+    'channel_contract_gap:false',
+    'channel_contract_live_authority:false',
+    'channel_contract_target_gate:false',
   ]);
 
   assert.equal(rows[1].moduleId, 'raw_mixer_state_physical_readback_contract');
@@ -996,6 +1068,13 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.equal(rows[1].canWriteLive, false);
   assert.deepEqual(rows[1].liveWriteKinds, []);
   assert.match(rows[1].blockedReason, /contract is missing/);
+
+  assert.equal(rows[2].moduleId, 'channel_basic_controls_physical_readback_contract');
+  assert.equal(rows[2].domain, 'read_surface_contract');
+  assert.equal(rows[2].status, 'contract_missing');
+  assert.equal(rows[2].canWriteLive, false);
+  assert.deepEqual(rows[2].liveWriteKinds, []);
+  assert.match(rows[2].blockedReason, /contract is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

@@ -69,6 +69,17 @@ def test_plan_creates_actions_for_current_partial_and_missing_read_surfaces():
     assert channel_processing["next_physical_readback_target"] is False
     assert channel_processing["mutates_console_state"] is False
 
+    channel_basic = actions["channel_identity_and_basic_controls"]
+    assert channel_basic["action_type"] == "complete_read_dto"
+    assert channel_basic["physical_readback_gap"] is True
+    assert channel_basic["next_physical_readback_target"] is False
+    assert "physical_readback_fixture" in channel_basic["missing_contracts"]
+    assert any(
+        "channel_basic_controls_physical_readback_contract" in artifact
+        for artifact in channel_basic["expected_artifacts"]
+    )
+    assert channel_basic["mutates_console_state"] is False
+
     presets = actions["user_presets"]
     assert presets["action_type"] == "complete_read_dto"
     assert "enumeration_contract" in presets["missing_contracts"]

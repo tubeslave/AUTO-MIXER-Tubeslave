@@ -75,6 +75,7 @@
 - Bus/group/matrix and mute promotion targets should have explicit fail-closed safety coverage rows instead of generic missing-row blockers; these contracts name the proof gates while preserving no bus/DCA/matrix/mute live authority.
 - Promotion readiness should serialize bus/group/matrix and mute `evidence_requirement_ids` as read-only proof planning metadata, so gap summaries can name required freshness, readback, headroom, intent, physical fixture, rollback, and emergency proof without widening live authority.
 - no-WING release autonomy gap rollups should preserve family-level evidence maps from promotion readiness (`evidence_requirement_ids_by_action_family` and `next_required_evidence_by_action_family`) so summary artifacts do not collapse bus/group/matrix and mute proof gates back into bucket counts.
+- Channel identity/basic-control physical readback needs its own schema contract before fader, gain, mute, or pan proof artifacts are trusted; contract visibility must preserve `physical_fixture_gap_remains=true` and normalize live-authority claims to false.
 
 ## Memory Pipeline Lessons
 

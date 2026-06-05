@@ -12,6 +12,10 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Mapping, Tuple
 
 try:
+    from channel_basic_controls_physical_readback_contract import (
+        CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        CHANNEL_BASIC_CONTROLS_SURFACE_ID,
+    )
     from read_surface_inventory import ReadSurface, iter_read_surfaces
     from read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
     from raw_mixer_state_physical_readback_contract import (
@@ -19,6 +23,10 @@ try:
         RAW_MIXER_STATE_SURFACE_ID,
     )
 except ImportError:  # pragma: no cover - package import compatibility
+    from backend.channel_basic_controls_physical_readback_contract import (
+        CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        CHANNEL_BASIC_CONTROLS_SURFACE_ID,
+    )
     from backend.read_surface_inventory import ReadSurface, iter_read_surfaces
     from backend.read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
     from backend.raw_mixer_state_physical_readback_contract import (
@@ -167,6 +175,11 @@ def _expected_artifacts(surface: ReadSurface, *, physical_readback_gap: bool) ->
             artifacts.append(
                 "Raw mixer-state physical readback artifact validated by "
                 f"{RAW_MIXER_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
+            )
+        if surface.id == CHANNEL_BASIC_CONTROLS_SURFACE_ID:
+            artifacts.append(
+                "Channel identity/basic-control physical readback artifact validated by "
+                f"{CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
             )
     return tuple(artifacts)
 

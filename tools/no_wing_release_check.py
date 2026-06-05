@@ -28,6 +28,23 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_status  # noqa: E402
+from backend.channel_basic_controls_physical_readback_contract import (  # noqa: E402
+    CHANNEL_BASIC_CONTROLS_FORBIDDEN_MUTATION_EVIDENCE_FIELDS,
+    CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_ARTIFACT_TYPE,
+    CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+    CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_SCHEMA_ID,
+    CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_SOURCES,
+    CHANNEL_BASIC_CONTROLS_REMEDIATION_ACTION_ID,
+    CHANNEL_BASIC_CONTROLS_REQUIRED_CHANNEL_FIELDS,
+    CHANNEL_BASIC_CONTROLS_REQUIRED_CONTROL_FIELDS,
+    CHANNEL_BASIC_CONTROLS_REQUIRED_COVERAGE_FLAGS,
+    CHANNEL_BASIC_CONTROLS_REQUIRED_FALSE_SAFETY_FLAGS,
+    CHANNEL_BASIC_CONTROLS_REQUIRED_IDENTITY_FIELDS,
+    CHANNEL_BASIC_CONTROLS_REQUIRED_TOP_LEVEL_FIELDS,
+    CHANNEL_BASIC_CONTROLS_SURFACE_ID,
+    CHANNEL_BASIC_CONTROLS_VERIFIED_PHYSICAL_STATUSES,
+    build_channel_basic_controls_physical_readback_contract,
+)
 from backend.read_surface_fixture_evidence import (  # noqa: E402
     FIXTURE_EVIDENCE_STATUSES,
     build_read_surface_fixture_evidence_snapshot,
@@ -231,6 +248,7 @@ def build_checks(
                 "pytest",
                 "tests/test_read_surface_fixture_evidence.py",
                 "tests/test_raw_mixer_state_physical_readback_contract.py",
+                "tests/test_channel_basic_controls_physical_readback_contract.py",
                 "-q",
                 "--tb=short",
             ),
@@ -1201,6 +1219,226 @@ def validate_raw_mixer_state_physical_readback_contract_snapshot() -> CheckResul
     )
 
 
+def validate_channel_basic_controls_physical_readback_contract_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "channel_basic_controls_readback_contract_is_schema_only_no_live_authority",
+    }
+    violations: list[str] = []
+
+    try:
+        fixture_snapshot = build_read_surface_fixture_evidence_snapshot()
+        remediation_plan = build_read_surface_remediation_plan(
+            fixture_evidence_snapshot=fixture_snapshot
+        )
+        contract = build_channel_basic_controls_physical_readback_contract()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        fixture_snapshot = {}
+        remediation_plan = {}
+        contract = {}
+        violations.append(f"channel_basic_controls_readback_contract_build_error:{type(exc).__name__}")
+
+    fixture_summary = (
+        fixture_snapshot.get("summary")
+        if isinstance(fixture_snapshot.get("summary"), Mapping)
+        else {}
+    )
+    remediation_actions = (
+        remediation_plan.get("actions")
+        if isinstance(remediation_plan.get("actions"), list)
+        else []
+    )
+    safety = contract.get("safety") if isinstance(contract.get("safety"), Mapping) else {}
+    contract_summary = (
+        contract.get("summary") if isinstance(contract.get("summary"), Mapping) else {}
+    )
+    artifact_contract = (
+        contract.get("artifact_contract")
+        if isinstance(contract.get("artifact_contract"), Mapping)
+        else {}
+    )
+
+    if contract.get("type") != "channel_basic_controls_physical_readback_contract":
+        violations.append("channel_basic_controls_readback_contract_type_mismatch")
+    if contract.get("method_id") != CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_CONTRACT_METHOD_ID:
+        violations.append("channel_basic_controls_readback_contract_method_id_mismatch")
+    if contract.get("schema_id") != CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("channel_basic_controls_readback_contract_schema_id_mismatch")
+    if contract.get("status") != "contract_ready_physical_fixture_missing":
+        violations.append("channel_basic_controls_readback_contract_status_mismatch")
+    if contract.get("surface_id") != CHANNEL_BASIC_CONTROLS_SURFACE_ID:
+        violations.append("channel_basic_controls_readback_contract_surface_id_mismatch")
+    if contract.get("remediation_action_id") != CHANNEL_BASIC_CONTROLS_REMEDIATION_ACTION_ID:
+        violations.append("channel_basic_controls_readback_contract_action_id_mismatch")
+
+    if safety.get("read_only") is not True:
+        violations.append("channel_basic_controls_readback_contract_read_only_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"channel_basic_controls_readback_contract_{key}_not_false")
+
+    if artifact_contract.get("type") != CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_ARTIFACT_TYPE:
+        violations.append("channel_basic_controls_readback_artifact_type_mismatch")
+    if artifact_contract.get("schema_id") != CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("channel_basic_controls_readback_artifact_schema_id_mismatch")
+    if artifact_contract.get("minimum_channel_count") != 1:
+        violations.append("channel_basic_controls_readback_artifact_minimum_channel_count_mismatch")
+
+    required_top_level = artifact_contract.get("required_top_level_fields")
+    if (
+        not isinstance(required_top_level, list)
+        or required_top_level != list(CHANNEL_BASIC_CONTROLS_REQUIRED_TOP_LEVEL_FIELDS)
+    ):
+        violations.append("channel_basic_controls_readback_required_top_level_fields_mismatch")
+        required_top_level = []
+    required_channel_fields = artifact_contract.get("required_channel_fields")
+    if (
+        not isinstance(required_channel_fields, list)
+        or required_channel_fields != list(CHANNEL_BASIC_CONTROLS_REQUIRED_CHANNEL_FIELDS)
+    ):
+        violations.append("channel_basic_controls_readback_required_channel_fields_mismatch")
+        required_channel_fields = []
+    required_identity_fields = artifact_contract.get("required_identity_fields")
+    if (
+        not isinstance(required_identity_fields, list)
+        or required_identity_fields != list(CHANNEL_BASIC_CONTROLS_REQUIRED_IDENTITY_FIELDS)
+    ):
+        violations.append("channel_basic_controls_readback_required_identity_fields_mismatch")
+        required_identity_fields = []
+    required_control_fields = artifact_contract.get("required_control_fields")
+    if (
+        not isinstance(required_control_fields, list)
+        or required_control_fields != list(CHANNEL_BASIC_CONTROLS_REQUIRED_CONTROL_FIELDS)
+    ):
+        violations.append("channel_basic_controls_readback_required_control_fields_mismatch")
+        required_control_fields = []
+    required_coverage_flags = artifact_contract.get("required_coverage_flags")
+    if (
+        not isinstance(required_coverage_flags, list)
+        or required_coverage_flags != list(CHANNEL_BASIC_CONTROLS_REQUIRED_COVERAGE_FLAGS)
+    ):
+        violations.append("channel_basic_controls_readback_required_coverage_flags_mismatch")
+        required_coverage_flags = []
+    required_false_flags = artifact_contract.get("required_false_safety_flags")
+    if (
+        not isinstance(required_false_flags, list)
+        or required_false_flags != list(CHANNEL_BASIC_CONTROLS_REQUIRED_FALSE_SAFETY_FLAGS)
+    ):
+        violations.append("channel_basic_controls_readback_required_false_safety_flags_mismatch")
+        required_false_flags = []
+
+    allowed_sources = artifact_contract.get("allowed_sources")
+    if not isinstance(allowed_sources, list):
+        allowed_sources = []
+        violations.append("channel_basic_controls_readback_allowed_sources_missing")
+    elif list(allowed_sources) != list(CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_SOURCES):
+        violations.append("channel_basic_controls_readback_allowed_sources_mismatch")
+    if "mixer_state_cache" in allowed_sources or "cache" in allowed_sources:
+        violations.append("channel_basic_controls_readback_allows_cached_source")
+
+    accepted_statuses = artifact_contract.get("accepted_channel_statuses")
+    if (
+        not isinstance(accepted_statuses, list)
+        or accepted_statuses != list(CHANNEL_BASIC_CONTROLS_VERIFIED_PHYSICAL_STATUSES)
+    ):
+        violations.append("channel_basic_controls_readback_accepted_statuses_mismatch")
+        accepted_statuses = []
+    forbidden_mutation_fields = artifact_contract.get("forbidden_mutation_evidence_fields")
+    if (
+        not isinstance(forbidden_mutation_fields, list)
+        or forbidden_mutation_fields
+        != list(CHANNEL_BASIC_CONTROLS_FORBIDDEN_MUTATION_EVIDENCE_FIELDS)
+    ):
+        violations.append("channel_basic_controls_readback_forbidden_mutation_fields_mismatch")
+        forbidden_mutation_fields = []
+
+    physical_gap_ids = fixture_summary.get("physical_fixture_missing_surface_ids")
+    if not isinstance(physical_gap_ids, list):
+        physical_gap_ids = []
+        violations.append("channel_basic_controls_fixture_physical_gap_ids_missing")
+    if CHANNEL_BASIC_CONTROLS_SURFACE_ID not in physical_gap_ids:
+        violations.append("channel_basic_controls_fixture_gap_not_declared")
+
+    remediation_action = {}
+    for action in remediation_actions:
+        if (
+            isinstance(action, Mapping)
+            and action.get("surface_id") == CHANNEL_BASIC_CONTROLS_SURFACE_ID
+        ):
+            remediation_action = dict(action)
+            break
+    if not remediation_action:
+        violations.append("channel_basic_controls_remediation_action_missing")
+    elif remediation_action.get("id") != CHANNEL_BASIC_CONTROLS_REMEDIATION_ACTION_ID:
+        violations.append("channel_basic_controls_remediation_action_id_mismatch")
+    if remediation_action and remediation_action.get("physical_readback_gap") is not True:
+        violations.append("channel_basic_controls_remediation_physical_gap_not_true")
+
+    if contract_summary.get("physical_readback_surface_id") != CHANNEL_BASIC_CONTROLS_SURFACE_ID:
+        violations.append("channel_basic_controls_contract_surface_summary_mismatch")
+    if contract_summary.get("physical_readback_action_id") != CHANNEL_BASIC_CONTROLS_REMEDIATION_ACTION_ID:
+        violations.append("channel_basic_controls_contract_action_summary_mismatch")
+    if contract_summary.get("artifact_required") is not True:
+        violations.append("channel_basic_controls_contract_artifact_required_not_true")
+    if contract_summary.get("physical_fixture_gap_remains") is not True:
+        violations.append("channel_basic_controls_contract_physical_gap_not_true")
+    if contract_summary.get("accepted_as_physical_fixture_candidate") is not False:
+        violations.append("channel_basic_controls_contract_candidate_not_false")
+    if contract_summary.get("live_authority_granted") is not False:
+        violations.append("channel_basic_controls_contract_live_authority_not_false")
+    promotion_families = contract_summary.get("promotion_families_requiring_surface")
+    if not isinstance(promotion_families, list):
+        promotion_families = []
+        violations.append("channel_basic_controls_promotion_families_missing")
+    for family in ("fader", "gain", "mute", "pan_phase_delay"):
+        if family not in promotion_families:
+            violations.append(f"channel_basic_controls_promotion_family_missing:{family}")
+
+    detail["contract_status"] = contract.get("status")
+    detail["schema_id"] = contract.get("schema_id")
+    detail["surface_id"] = contract.get("surface_id")
+    detail["remediation_action_id"] = contract.get("remediation_action_id")
+    detail["physical_readback_surface_id"] = contract_summary.get("physical_readback_surface_id")
+    detail["physical_readback_action_id"] = contract_summary.get("physical_readback_action_id")
+    detail["fixture_physical_gap_declared"] = CHANNEL_BASIC_CONTROLS_SURFACE_ID in physical_gap_ids
+    detail["remediation_physical_gap_declared"] = bool(
+        remediation_action and remediation_action.get("physical_readback_gap") is True
+    )
+    detail["artifact_required"] = contract_summary.get("artifact_required")
+    detail["physical_fixture_gap_remains"] = contract_summary.get("physical_fixture_gap_remains")
+    detail["accepted_as_physical_fixture_candidate"] = contract_summary.get(
+        "accepted_as_physical_fixture_candidate"
+    )
+    detail["live_authority_granted"] = contract_summary.get("live_authority_granted")
+    detail["promotion_families_requiring_surface"] = list(promotion_families)
+    detail["required_top_level_field_count"] = len(required_top_level)
+    detail["required_channel_field_count"] = len(required_channel_fields)
+    detail["required_identity_fields"] = list(required_identity_fields)
+    detail["required_control_fields"] = list(required_control_fields)
+    detail["required_coverage_flags"] = list(required_coverage_flags)
+    detail["required_false_safety_flags"] = list(required_false_flags)
+    detail["allowed_sources"] = list(allowed_sources)
+    detail["accepted_channel_statuses"] = list(accepted_statuses)
+    detail["forbidden_mutation_evidence_fields"] = list(forbidden_mutation_fields)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="channel_basic_controls_physical_readback_contract_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_supervised_proof_report_gain_dry_run(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -1761,6 +1999,85 @@ def raw_mixer_readback_contract_summary(results: Sequence[CheckResult]) -> dict[
     return None
 
 
+def channel_basic_controls_readback_contract_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "channel_basic_controls_physical_readback_contract_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        allowed_sources = detail.get("allowed_sources")
+        accepted_statuses = detail.get("accepted_channel_statuses")
+        forbidden_mutation_fields = detail.get("forbidden_mutation_evidence_fields")
+        required_false_flags = detail.get("required_false_safety_flags")
+        promotion_families = detail.get("promotion_families_requiring_surface")
+        required_identity_fields = detail.get("required_identity_fields")
+        required_control_fields = detail.get("required_control_fields")
+        required_coverage_flags = detail.get("required_coverage_flags")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "live_widening_allowed": False,
+            "full_autonomous_ready": False,
+            "schema_id": detail.get("schema_id"),
+            "contract_status": detail.get("contract_status"),
+            "surface_id": detail.get("surface_id"),
+            "remediation_action_id": detail.get("remediation_action_id"),
+            "physical_readback_surface_id": detail.get("physical_readback_surface_id"),
+            "physical_readback_action_id": detail.get("physical_readback_action_id"),
+            "fixture_physical_gap_declared": detail.get("fixture_physical_gap_declared") is True,
+            "remediation_physical_gap_declared": (
+                detail.get("remediation_physical_gap_declared") is True
+            ),
+            "artifact_required": detail.get("artifact_required") is True,
+            "physical_fixture_gap_remains": detail.get("physical_fixture_gap_remains") is True,
+            "accepted_as_physical_fixture_candidate": (
+                detail.get("accepted_as_physical_fixture_candidate") is True
+            ),
+            "live_authority_granted": detail.get("live_authority_granted") is True,
+            "promotion_families_requiring_surface": (
+                list(promotion_families) if isinstance(promotion_families, list) else []
+            ),
+            "required_top_level_field_count": int(detail.get("required_top_level_field_count") or 0),
+            "required_channel_field_count": int(detail.get("required_channel_field_count") or 0),
+            "required_identity_fields": (
+                list(required_identity_fields) if isinstance(required_identity_fields, list) else []
+            ),
+            "required_control_fields": (
+                list(required_control_fields) if isinstance(required_control_fields, list) else []
+            ),
+            "required_coverage_flags": (
+                list(required_coverage_flags) if isinstance(required_coverage_flags, list) else []
+            ),
+            "required_false_safety_flags": (
+                list(required_false_flags) if isinstance(required_false_flags, list) else []
+            ),
+            "allowed_sources": list(allowed_sources) if isinstance(allowed_sources, list) else [],
+            "accepted_channel_statuses": (
+                list(accepted_statuses) if isinstance(accepted_statuses, list) else []
+            ),
+            "forbidden_mutation_evidence_fields": (
+                list(forbidden_mutation_fields)
+                if isinstance(forbidden_mutation_fields, list)
+                else []
+            ),
+            "target_consistency": (
+                detail.get("physical_readback_surface_id") == detail.get("surface_id")
+                and detail.get("physical_readback_action_id")
+                == detail.get("remediation_action_id")
+                and detail.get("fixture_physical_gap_declared") is True
+                and detail.get("remediation_physical_gap_declared") is True
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "next_wing_proof_plan_schema":
@@ -1795,6 +2112,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     read_fixture = read_surface_fixture_evidence_summary(results)
     read_remediation = read_surface_remediation_plan_summary(results)
     raw_mixer_contract = raw_mixer_readback_contract_summary(results)
+    channel_basic_contract = channel_basic_controls_readback_contract_summary(results)
     next_plan = next_wing_proof_plan_summary(results)
     summary = {
         "type": "no_wing_release_check",
@@ -1817,6 +2135,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["read_surface_remediation_plan"] = read_remediation
     if raw_mixer_contract is not None:
         summary["raw_mixer_state_physical_readback_contract"] = raw_mixer_contract
+    if channel_basic_contract is not None:
+        summary["channel_basic_controls_physical_readback_contract"] = channel_basic_contract
     if next_plan is not None:
         summary["next_wing_proof_plan"] = next_plan
     summary_path = run_dir / "summary.json"
@@ -1997,6 +2317,61 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(raw_mixer_contract['violations'])}`",
             ]
         )
+    if channel_basic_contract is not None:
+        lines.extend(
+            [
+                "",
+                "## Channel Basic Controls Physical Readback Contract",
+                "",
+                f"- schema_check: `{channel_basic_contract['status']}`",
+                f"- read_only: `{str(channel_basic_contract['read_only']).lower()}`",
+                f"- live_write: `{str(channel_basic_contract['live_write']).lower()}`",
+                f"- mutates_console_state: `{str(channel_basic_contract['mutates_console_state']).lower()}`",
+                f"- queries_console: `{str(channel_basic_contract['queries_console']).lower()}`",
+                f"- executes_tests: `{str(channel_basic_contract['executes_tests']).lower()}`",
+                f"- live_widening_allowed: `{str(channel_basic_contract['live_widening_allowed']).lower()}`",
+                f"- full_autonomous_ready: `{str(channel_basic_contract['full_autonomous_ready']).lower()}`",
+                f"- schema_id: `{channel_basic_contract['schema_id']}`",
+                f"- contract_status: `{channel_basic_contract['contract_status']}`",
+                f"- surface_id: `{channel_basic_contract['surface_id']}`",
+                f"- remediation_action_id: `{channel_basic_contract['remediation_action_id']}`",
+                "- physical_readback_surface_id: "
+                f"`{channel_basic_contract['physical_readback_surface_id']}`",
+                "- physical_readback_action_id: "
+                f"`{channel_basic_contract['physical_readback_action_id']}`",
+                "- fixture_physical_gap_declared: "
+                f"`{str(channel_basic_contract['fixture_physical_gap_declared']).lower()}`",
+                "- remediation_physical_gap_declared: "
+                f"`{str(channel_basic_contract['remediation_physical_gap_declared']).lower()}`",
+                f"- artifact_required: `{str(channel_basic_contract['artifact_required']).lower()}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(channel_basic_contract['physical_fixture_gap_remains']).lower()}`",
+                "- accepted_as_physical_fixture_candidate: "
+                f"`{str(channel_basic_contract['accepted_as_physical_fixture_candidate']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(channel_basic_contract['live_authority_granted']).lower()}`",
+                "- promotion_families_requiring_surface: "
+                f"`{json.dumps(channel_basic_contract['promotion_families_requiring_surface'])}`",
+                "- required_top_level_field_count: "
+                f"`{channel_basic_contract['required_top_level_field_count']}`",
+                "- required_channel_field_count: "
+                f"`{channel_basic_contract['required_channel_field_count']}`",
+                "- required_identity_fields: "
+                f"`{json.dumps(channel_basic_contract['required_identity_fields'])}`",
+                "- required_control_fields: "
+                f"`{json.dumps(channel_basic_contract['required_control_fields'])}`",
+                "- required_coverage_flags: "
+                f"`{json.dumps(channel_basic_contract['required_coverage_flags'])}`",
+                "- allowed_sources: "
+                f"`{json.dumps(channel_basic_contract['allowed_sources'])}`",
+                "- accepted_channel_statuses: "
+                f"`{json.dumps(channel_basic_contract['accepted_channel_statuses'])}`",
+                "- forbidden_mutation_evidence_fields: "
+                f"`{json.dumps(channel_basic_contract['forbidden_mutation_evidence_fields'])}`",
+                f"- target_consistency: `{str(channel_basic_contract['target_consistency']).lower()}`",
+                f"- violations: `{json.dumps(channel_basic_contract['violations'])}`",
+            ]
+        )
     if next_plan is not None:
         lines.extend(
             [
@@ -2073,6 +2448,12 @@ def run_release_checks(
             raw_mixer_contract_result = validate_raw_mixer_state_physical_readback_contract_snapshot()
             results.append(raw_mixer_contract_result)
             if raw_mixer_contract_result.status != "passed" and not continue_on_failure:
+                break
+            channel_basic_contract_result = (
+                validate_channel_basic_controls_physical_readback_contract_snapshot()
+            )
+            results.append(channel_basic_contract_result)
+            if channel_basic_contract_result.status != "passed" and not continue_on_failure:
                 break
         if check.name == "supervised_proof_artifact_report" and result.status == "passed":
             gain_dry_run_result = validate_supervised_proof_report_gain_dry_run(proof_report_path)
