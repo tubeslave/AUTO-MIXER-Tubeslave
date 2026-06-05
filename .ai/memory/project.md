@@ -86,6 +86,7 @@
 - dLive-state physical readback needs its own schema contract before dLive/WING parity, fader, gain, mute, routing, scene/preset, mix-balance, or performance-adaptation proof artifacts are trusted; contract visibility must preserve `physical_fixture_gap_remains=true`, `midi_send_allowed=false`, `tcp_send_allowed=false`, `dlive_write_allowed=false`, and normalize live-authority claims to false.
 - Read-surface physical readback capture planning is operator-required and non-executing: it may name the next hardware proof target and expected artifact contracts, but must preserve `execution_allowed_by_plan=false`, `live_write=false`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
 - Raw mixer-state physical readback artifact intake may accept a valid operator-captured JSON artifact as a review candidate, but it must keep `fixture_closure_allowed_by_intake=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
+- Channel identity/basic-control physical readback artifact intake may accept operator-captured channel fader/trim/mute/pan evidence only as a manual-review candidate; it must keep `fixture_closure_allowed_by_intake=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
 
 ## Memory Pipeline Lessons
 

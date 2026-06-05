@@ -70,6 +70,11 @@ from backend.channel_basic_controls_physical_readback_contract import (  # noqa:
     CHANNEL_BASIC_CONTROLS_VERIFIED_PHYSICAL_STATUSES,
     build_channel_basic_controls_physical_readback_contract,
 )
+from backend.channel_basic_controls_physical_readback_artifact_intake import (  # noqa: E402
+    CHANNEL_BASIC_CONTROLS_INTAKE_STATUSES,
+    CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_ARTIFACT_INTAKE_METHOD_ID,
+    build_channel_basic_controls_physical_readback_artifact_intake,
+)
 from backend.channel_processing_physical_readback_contract import (  # noqa: E402
     CHANNEL_PROCESSING_FORBIDDEN_MUTATION_EVIDENCE_FIELDS,
     CHANNEL_PROCESSING_PHYSICAL_READBACK_ARTIFACT_TYPE,
@@ -427,7 +432,9 @@ def build_checks(
                 "pytest",
                 "tests/test_read_surface_fixture_evidence.py",
                 "tests/test_raw_mixer_state_physical_readback_contract.py",
+                "tests/test_raw_mixer_state_physical_readback_artifact_intake.py",
                 "tests/test_channel_basic_controls_physical_readback_contract.py",
+                "tests/test_channel_basic_controls_physical_readback_artifact_intake.py",
                 "tests/test_channel_processing_physical_readback_contract.py",
                 "tests/test_bus_group_main_dca_physical_readback_contract.py",
                 "tests/test_matrix_state_physical_readback_contract.py",
@@ -1925,6 +1932,150 @@ def validate_channel_basic_controls_physical_readback_contract_snapshot() -> Che
     finished = datetime.now(timezone.utc)
     return CheckResult(
         name="channel_basic_controls_physical_readback_contract_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def validate_channel_basic_controls_physical_readback_artifact_intake_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "channel_basic_controls_artifact_intake_is_read_only_operator_review_gate",
+    }
+    violations: list[str] = []
+
+    try:
+        intake = build_channel_basic_controls_physical_readback_artifact_intake()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        intake = {}
+        violations.append(f"channel_basic_artifact_intake_build_error:{type(exc).__name__}")
+
+    safety = intake.get("safety") if isinstance(intake.get("safety"), Mapping) else {}
+    summary = intake.get("summary") if isinstance(intake.get("summary"), Mapping) else {}
+    artifacts = intake.get("artifacts") if isinstance(intake.get("artifacts"), list) else []
+
+    if intake.get("type") != "channel_basic_controls_physical_readback_artifact_intake":
+        violations.append("channel_basic_artifact_intake_type_mismatch")
+    if intake.get("method_id") != CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_ARTIFACT_INTAKE_METHOD_ID:
+        violations.append("channel_basic_artifact_intake_method_id_mismatch")
+    if intake.get("required_contract_method_id") != CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_CONTRACT_METHOD_ID:
+        violations.append("channel_basic_artifact_intake_required_contract_mismatch")
+    if intake.get("schema_id") != CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("channel_basic_artifact_intake_schema_id_mismatch")
+    if intake.get("status") not in CHANNEL_BASIC_CONTROLS_INTAKE_STATUSES:
+        violations.append("channel_basic_artifact_intake_status_unknown")
+    if intake.get("surface_id") != CHANNEL_BASIC_CONTROLS_SURFACE_ID:
+        violations.append("channel_basic_artifact_intake_surface_id_mismatch")
+    if intake.get("remediation_action_id") != CHANNEL_BASIC_CONTROLS_REMEDIATION_ACTION_ID:
+        violations.append("channel_basic_artifact_intake_action_id_mismatch")
+
+    for key in ("read_only", "operator_required"):
+        if safety.get(key) is not True:
+            violations.append(f"channel_basic_artifact_intake_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_intake",
+        "fixture_closure_allowed_by_intake",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"channel_basic_artifact_intake_{key}_not_false")
+
+    artifact_count = summary.get("artifact_count")
+    valid_count = summary.get("valid_candidate_count")
+    invalid_count = summary.get("invalid_candidate_count")
+    valid_channel_count = summary.get("valid_channel_count")
+    if not isinstance(artifact_count, int) or artifact_count != len(artifacts):
+        violations.append("channel_basic_artifact_intake_artifact_count_mismatch")
+        artifact_count = len(artifacts)
+    if not isinstance(valid_count, int):
+        violations.append("channel_basic_artifact_intake_valid_count_missing")
+        valid_count = 0
+    if not isinstance(invalid_count, int):
+        violations.append("channel_basic_artifact_intake_invalid_count_missing")
+        invalid_count = 0
+    if not isinstance(valid_channel_count, int):
+        violations.append("channel_basic_artifact_intake_valid_channel_count_missing")
+        valid_channel_count = 0
+    if valid_count + invalid_count != artifact_count:
+        violations.append("channel_basic_artifact_intake_candidate_count_mismatch")
+    if invalid_count:
+        violations.append("channel_basic_artifact_intake_invalid_candidate_present")
+
+    if summary.get("operator_review_required") is not True:
+        violations.append("channel_basic_artifact_intake_operator_review_not_true")
+    if summary.get("physical_fixture_gap_remains") is not True:
+        violations.append("channel_basic_artifact_intake_physical_gap_not_true")
+    if summary.get("fixture_closure_allowed_by_intake") is not False:
+        violations.append("channel_basic_artifact_intake_fixture_closure_not_false")
+    if summary.get("live_authority_granted") is not False:
+        violations.append("channel_basic_artifact_intake_live_authority_not_false")
+    if summary.get("full_autonomous_ready") is not False:
+        violations.append("channel_basic_artifact_intake_full_autonomous_not_false")
+    if summary.get("accepted_as_physical_fixture_candidate") is not bool(valid_count):
+        violations.append("channel_basic_artifact_intake_candidate_flag_mismatch")
+
+    promotion_families = summary.get("promotion_families_requiring_surface")
+    if not isinstance(promotion_families, list):
+        promotion_families = []
+        violations.append("channel_basic_artifact_intake_promotion_families_missing")
+    for family in ("fader", "gain", "mute", "pan_phase_delay"):
+        if family not in promotion_families:
+            violations.append(f"channel_basic_artifact_intake_promotion_family_missing:{family}")
+
+    intake_violations = (
+        list(summary.get("violations")) if isinstance(summary.get("violations"), list) else []
+    )
+    artifact_source_ids = [
+        row.get("source_id")
+        for row in artifacts
+        if isinstance(row, Mapping) and isinstance(row.get("source_id"), str)
+    ]
+    detail["intake_status"] = intake.get("status")
+    detail["schema_id"] = intake.get("schema_id")
+    detail["surface_id"] = intake.get("surface_id")
+    detail["remediation_action_id"] = intake.get("remediation_action_id")
+    detail["required_contract_method_id"] = intake.get("required_contract_method_id")
+    detail["artifact_search_roots"] = (
+        list(summary.get("artifact_search_roots"))
+        if isinstance(summary.get("artifact_search_roots"), list)
+        else []
+    )
+    detail["artifact_count"] = artifact_count
+    detail["valid_candidate_count"] = valid_count
+    detail["invalid_candidate_count"] = invalid_count
+    detail["valid_channel_count"] = valid_channel_count
+    detail["accepted_as_physical_fixture_candidate"] = summary.get(
+        "accepted_as_physical_fixture_candidate"
+    )
+    detail["operator_review_required"] = summary.get("operator_review_required")
+    detail["physical_fixture_gap_remains"] = summary.get("physical_fixture_gap_remains")
+    detail["fixture_closure_allowed_by_intake"] = summary.get(
+        "fixture_closure_allowed_by_intake"
+    )
+    detail["live_authority_granted"] = summary.get("live_authority_granted")
+    detail["full_autonomous_ready"] = summary.get("full_autonomous_ready")
+    detail["promotion_families_requiring_surface"] = list(promotion_families)
+    detail["latest_valid_candidate_source_id"] = summary.get("latest_valid_candidate_source_id")
+    detail["latest_valid_candidate_captured_at"] = summary.get(
+        "latest_valid_candidate_captured_at"
+    )
+    detail["blocked_by"] = (
+        list(summary.get("blocked_by")) if isinstance(summary.get("blocked_by"), list) else []
+    )
+    detail["artifact_source_ids"] = artifact_source_ids
+    detail["intake_violations"] = intake_violations
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="channel_basic_controls_physical_readback_artifact_intake_schema",
         status="passed" if not violations else "failed",
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -4433,6 +4584,66 @@ def raw_mixer_readback_artifact_intake_summary(
     return None
 
 
+def channel_basic_controls_readback_artifact_intake_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "channel_basic_controls_physical_readback_artifact_intake_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        artifact_search_roots = detail.get("artifact_search_roots")
+        blocked_by = detail.get("blocked_by")
+        artifact_source_ids = detail.get("artifact_source_ids")
+        intake_violations = detail.get("intake_violations")
+        promotion_families = detail.get("promotion_families_requiring_surface")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_intake": False,
+            "fixture_closure_allowed_by_intake": False,
+            "live_widening_allowed": False,
+            "full_autonomous_ready": False,
+            "schema_id": detail.get("schema_id"),
+            "intake_status": detail.get("intake_status"),
+            "surface_id": detail.get("surface_id"),
+            "remediation_action_id": detail.get("remediation_action_id"),
+            "required_contract_method_id": detail.get("required_contract_method_id"),
+            "artifact_search_roots": (
+                list(artifact_search_roots) if isinstance(artifact_search_roots, list) else []
+            ),
+            "artifact_count": int(detail.get("artifact_count") or 0),
+            "valid_candidate_count": int(detail.get("valid_candidate_count") or 0),
+            "invalid_candidate_count": int(detail.get("invalid_candidate_count") or 0),
+            "valid_channel_count": int(detail.get("valid_channel_count") or 0),
+            "accepted_as_physical_fixture_candidate": (
+                detail.get("accepted_as_physical_fixture_candidate") is True
+            ),
+            "operator_review_required": detail.get("operator_review_required") is True,
+            "physical_fixture_gap_remains": detail.get("physical_fixture_gap_remains") is True,
+            "live_authority_granted": detail.get("live_authority_granted") is True,
+            "promotion_families_requiring_surface": (
+                list(promotion_families) if isinstance(promotion_families, list) else []
+            ),
+            "latest_valid_candidate_source_id": detail.get("latest_valid_candidate_source_id"),
+            "latest_valid_candidate_captured_at": detail.get("latest_valid_candidate_captured_at"),
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "artifact_source_ids": (
+                list(artifact_source_ids) if isinstance(artifact_source_ids, list) else []
+            ),
+            "intake_violations": (
+                list(intake_violations) if isinstance(intake_violations, list) else []
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def channel_basic_controls_readback_contract_summary(
     results: Sequence[CheckResult],
 ) -> dict[str, object] | None:
@@ -5399,6 +5610,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     raw_mixer_contract = raw_mixer_readback_contract_summary(results)
     raw_mixer_intake = raw_mixer_readback_artifact_intake_summary(results)
     channel_basic_contract = channel_basic_controls_readback_contract_summary(results)
+    channel_basic_intake = channel_basic_controls_readback_artifact_intake_summary(results)
     channel_processing_contract = channel_processing_readback_contract_summary(results)
     bus_group_main_dca_contract = bus_group_main_dca_readback_contract_summary(results)
     matrix_state_contract = matrix_state_readback_contract_summary(results)
@@ -5435,6 +5647,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["raw_mixer_state_physical_readback_artifact_intake"] = raw_mixer_intake
     if channel_basic_contract is not None:
         summary["channel_basic_controls_physical_readback_contract"] = channel_basic_contract
+    if channel_basic_intake is not None:
+        summary["channel_basic_controls_physical_readback_artifact_intake"] = channel_basic_intake
     if channel_processing_contract is not None:
         summary["channel_processing_physical_readback_contract"] = channel_processing_contract
     if bus_group_main_dca_contract is not None:
@@ -5767,6 +5981,56 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(channel_basic_contract['forbidden_mutation_evidence_fields'])}`",
                 f"- target_consistency: `{str(channel_basic_contract['target_consistency']).lower()}`",
                 f"- violations: `{json.dumps(channel_basic_contract['violations'])}`",
+            ]
+        )
+    if channel_basic_intake is not None:
+        lines.extend(
+            [
+                "",
+                "## Channel Basic Controls Physical Readback Artifact Intake",
+                "",
+                f"- schema_check: `{channel_basic_intake['status']}`",
+                f"- read_only: `{str(channel_basic_intake['read_only']).lower()}`",
+                f"- live_write: `{str(channel_basic_intake['live_write']).lower()}`",
+                f"- mutates_console_state: `{str(channel_basic_intake['mutates_console_state']).lower()}`",
+                f"- queries_console: `{str(channel_basic_intake['queries_console']).lower()}`",
+                f"- executes_tests: `{str(channel_basic_intake['executes_tests']).lower()}`",
+                f"- operator_required: `{str(channel_basic_intake['operator_required']).lower()}`",
+                "- execution_allowed_by_intake: "
+                f"`{str(channel_basic_intake['execution_allowed_by_intake']).lower()}`",
+                "- fixture_closure_allowed_by_intake: "
+                f"`{str(channel_basic_intake['fixture_closure_allowed_by_intake']).lower()}`",
+                "- live_widening_allowed: "
+                f"`{str(channel_basic_intake['live_widening_allowed']).lower()}`",
+                f"- full_autonomous_ready: `{str(channel_basic_intake['full_autonomous_ready']).lower()}`",
+                f"- intake_status: `{channel_basic_intake['intake_status']}`",
+                f"- schema_id: `{channel_basic_intake['schema_id']}`",
+                f"- surface_id: `{channel_basic_intake['surface_id']}`",
+                f"- remediation_action_id: `{channel_basic_intake['remediation_action_id']}`",
+                "- required_contract_method_id: "
+                f"`{channel_basic_intake['required_contract_method_id']}`",
+                f"- artifact_count: `{channel_basic_intake['artifact_count']}`",
+                f"- valid_candidate_count: `{channel_basic_intake['valid_candidate_count']}`",
+                f"- invalid_candidate_count: `{channel_basic_intake['invalid_candidate_count']}`",
+                f"- valid_channel_count: `{channel_basic_intake['valid_channel_count']}`",
+                "- accepted_as_physical_fixture_candidate: "
+                f"`{str(channel_basic_intake['accepted_as_physical_fixture_candidate']).lower()}`",
+                "- operator_review_required: "
+                f"`{str(channel_basic_intake['operator_review_required']).lower()}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(channel_basic_intake['physical_fixture_gap_remains']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(channel_basic_intake['live_authority_granted']).lower()}`",
+                "- promotion_families_requiring_surface: "
+                f"`{json.dumps(channel_basic_intake['promotion_families_requiring_surface'])}`",
+                "- artifact_search_roots: "
+                f"`{json.dumps(channel_basic_intake['artifact_search_roots'])}`",
+                "- artifact_source_ids: "
+                f"`{json.dumps(channel_basic_intake['artifact_source_ids'])}`",
+                f"- blocked_by: `{json.dumps(channel_basic_intake['blocked_by'])}`",
+                "- intake_violations: "
+                f"`{json.dumps(channel_basic_intake['intake_violations'])}`",
+                f"- violations: `{json.dumps(channel_basic_intake['violations'])}`",
             ]
         )
     if channel_processing_contract is not None:
@@ -6359,6 +6623,12 @@ def run_release_checks(
             )
             results.append(channel_basic_contract_result)
             if channel_basic_contract_result.status != "passed" and not continue_on_failure:
+                break
+            channel_basic_intake_result = (
+                validate_channel_basic_controls_physical_readback_artifact_intake_snapshot()
+            )
+            results.append(channel_basic_intake_result)
+            if channel_basic_intake_result.status != "passed" and not continue_on_failure:
                 break
             channel_processing_contract_result = (
                 validate_channel_processing_physical_readback_contract_snapshot()
