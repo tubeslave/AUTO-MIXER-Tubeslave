@@ -87,6 +87,7 @@
 - Read-surface physical readback capture planning is operator-required and non-executing: it may name the next hardware proof target and expected artifact contracts, but must preserve `execution_allowed_by_plan=false`, `live_write=false`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
 - Raw mixer-state physical readback artifact intake may accept a valid operator-captured JSON artifact as a review candidate, but it must keep `fixture_closure_allowed_by_intake=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
 - Channel identity/basic-control physical readback artifact intake may accept operator-captured channel fader/trim/mute/pan evidence only as a manual-review candidate; it must keep `fixture_closure_allowed_by_intake=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
+- Channel EQ/dynamics/gate physical readback artifact intake may accept operator-captured HPF/EQ/compressor/gate evidence only as a manual-review candidate; it must keep `fixture_closure_allowed_by_intake=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
 
 ## Memory Pipeline Lessons
 

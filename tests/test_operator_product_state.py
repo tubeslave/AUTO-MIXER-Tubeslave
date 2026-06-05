@@ -2177,6 +2177,50 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "channel_processing_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "channel_processing_physical_readback.v1",
+                    "intake_status": "operator_artifact_missing",
+                    "surface_id": "channel_eq_dynamics_gate",
+                    "remediation_action_id": "remediate_channel_eq_dynamics_gate",
+                    "required_contract_method_id": "channel_processing_physical_readback_contract",
+                    "artifact_search_roots": [
+                        "artifacts/read_surface_physical_readback/channel_processing",
+                    ],
+                    "artifact_count": 0,
+                    "valid_candidate_count": 0,
+                    "invalid_candidate_count": 0,
+                    "valid_channel_count": 0,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "operator_review_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "fixture_closure_allowed_by_intake": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "operator_required": True,
+                    "execution_allowed_by_intake": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "eq",
+                        "compressor",
+                        "gate",
+                        "deessing",
+                        "frequency_separation",
+                        "cross_channel_unmasking",
+                    ],
+                    "blocked_by": [
+                        "operator_must_capture_channel_processing_physical_readback_artifact",
+                    ],
+                    "artifact_source_ids": [],
+                    "intake_violations": [],
+                    "violations": [],
+                },
                 "bus_group_main_dca_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "bus_group_main_dca_physical_readback.v1",
@@ -2815,6 +2859,40 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert "cache_matches_physical_readback" in processing_contract["required_coverage_flags"]
     assert "physical_readback" in processing_contract["allowed_sources"]
     assert "eq_write_events" in processing_contract["forbidden_mutation_evidence_fields"]
+    processing_intake = proof_quality["channel_processing_physical_readback_artifact_intake"]
+    assert processing_intake["available"] is True
+    assert processing_intake["status"] == "passed"
+    assert processing_intake["schema_id"] == "channel_processing_physical_readback.v1"
+    assert processing_intake["intake_status"] == "operator_artifact_missing"
+    assert processing_intake["surface_id"] == "channel_eq_dynamics_gate"
+    assert processing_intake["remediation_action_id"] == "remediate_channel_eq_dynamics_gate"
+    assert (
+        processing_intake["required_contract_method_id"]
+        == "channel_processing_physical_readback_contract"
+    )
+    assert processing_intake["artifact_count"] == 0
+    assert processing_intake["valid_candidate_count"] == 0
+    assert processing_intake["invalid_candidate_count"] == 0
+    assert processing_intake["valid_channel_count"] == 0
+    assert processing_intake["accepted_as_physical_fixture_candidate"] is False
+    assert processing_intake["operator_review_required"] is True
+    assert processing_intake["physical_fixture_gap_remains"] is True
+    assert processing_intake["fixture_closure_allowed_by_intake"] is False
+    assert processing_intake["live_authority_granted"] is False
+    assert processing_intake["full_autonomous_ready"] is False
+    assert processing_intake["target_consistency"] is True
+    assert processing_intake["promotion_families_requiring_surface"] == [
+        "eq",
+        "compressor",
+        "gate",
+        "deessing",
+        "frequency_separation",
+        "cross_channel_unmasking",
+    ]
+    assert (
+        "operator_must_capture_channel_processing_physical_readback_artifact"
+        in processing_intake["blocked_by"]
+    )
     bus_contract = proof_quality["bus_group_main_dca_physical_readback_contract"]
     assert bus_contract["available"] is True
     assert bus_contract["status"] == "passed"
@@ -3278,6 +3356,41 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["processing_contract_claimed_live_authority"],
                 },
+                "channel_processing_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "channel_processing_physical_readback.v1",
+                    "intake_status": "valid_operator_artifact_available",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "required_contract_method_id": "channel_processing_physical_readback_contract",
+                    "artifact_search_roots": [
+                        "artifacts/read_surface_physical_readback/channel_processing",
+                    ],
+                    "artifact_count": 1,
+                    "valid_candidate_count": 1,
+                    "invalid_candidate_count": 0,
+                    "valid_channel_count": 24,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "operator_review_required": False,
+                    "physical_fixture_gap_remains": False,
+                    "fixture_closure_allowed_by_intake": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "mutates_console_state": True,
+                    "queries_console": True,
+                    "executes_tests": True,
+                    "operator_required": False,
+                    "execution_allowed_by_intake": True,
+                    "live_widening_allowed": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "target_consistency": False,
+                    "promotion_families_requiring_surface": ["eq"],
+                    "blocked_by": [],
+                    "artifact_source_ids": ["unsafe-processing.json"],
+                    "intake_violations": [],
+                    "violations": ["processing_intake_claimed_live_authority"],
+                },
                 "bus_group_main_dca_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "bus_group_main_dca_physical_readback.v1",
@@ -3628,6 +3741,35 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert processing_contract["promotion_families_requiring_surface"] == ["eq"]
     assert processing_contract["minimum_eq_band_count"] == 2
     assert "processing_contract_claimed_live_authority" in processing_contract["violations"]
+    processing_intake = payload["summary"]["read_surface_proof_quality"][
+        "channel_processing_physical_readback_artifact_intake"
+    ]
+    assert processing_intake["available"] is True
+    assert processing_intake["surface_id"] == "channel_eq_dynamics_gate"
+    assert processing_intake["source_surface_id"] == "dlive_state"
+    assert processing_intake["remediation_action_id"] == "remediate_channel_eq_dynamics_gate"
+    assert processing_intake["source_remediation_action_id"] == "remediate_dlive_state"
+    assert processing_intake["target_consistency"] is False
+    assert processing_intake["artifact_count"] == 1
+    assert processing_intake["valid_candidate_count"] == 1
+    assert processing_intake["invalid_candidate_count"] == 0
+    assert processing_intake["valid_channel_count"] == 24
+    assert processing_intake["accepted_as_physical_fixture_candidate"] is False
+    assert processing_intake["operator_review_required"] is True
+    assert processing_intake["physical_fixture_gap_remains"] is True
+    assert processing_intake["fixture_closure_allowed_by_intake"] is False
+    assert processing_intake["live_authority_granted"] is False
+    assert processing_intake["full_autonomous_ready"] is False
+    assert processing_intake["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert processing_intake["source_operator_review_required_claimed"] is False
+    assert processing_intake["source_physical_fixture_gap_remains_claimed"] is False
+    assert processing_intake["source_fixture_closure_allowed_by_intake_claimed"] is True
+    assert processing_intake["source_execution_allowed_by_intake_claimed"] is True
+    assert processing_intake["source_live_write_claimed"] is True
+    assert processing_intake["source_live_authority_granted_claimed"] is True
+    assert processing_intake["source_full_autonomous_ready_claimed"] is True
+    assert processing_intake["promotion_families_requiring_surface"] == ["eq"]
+    assert "processing_intake_claimed_live_authority" in processing_intake["violations"]
     bus_contract = payload["summary"]["read_surface_proof_quality"][
         "bus_group_main_dca_physical_readback_contract"
     ]

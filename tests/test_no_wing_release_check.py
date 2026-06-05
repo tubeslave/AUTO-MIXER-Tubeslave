@@ -15,6 +15,7 @@ from tools.no_wing_release_check import (
     build_checks,
     channel_basic_controls_readback_artifact_intake_summary,
     channel_basic_controls_readback_contract_summary,
+    channel_processing_readback_artifact_intake_summary,
     channel_processing_readback_contract_summary,
     current_supervised_live_write_kinds,
     dlive_state_readback_contract_summary,
@@ -38,6 +39,7 @@ from tools.no_wing_release_check import (
     validate_bus_group_main_dca_physical_readback_contract_snapshot,
     validate_channel_basic_controls_physical_readback_artifact_intake_snapshot,
     validate_channel_basic_controls_physical_readback_contract_snapshot,
+    validate_channel_processing_physical_readback_artifact_intake_snapshot,
     validate_channel_processing_physical_readback_contract_snapshot,
     validate_dlive_state_physical_readback_contract_snapshot,
     validate_fx_slots_inserts_physical_readback_contract_snapshot,
@@ -809,6 +811,84 @@ def test_no_wing_release_check_rejects_channel_processing_contract_drift(monkeyp
     assert "channel_processing_promotion_family_missing:deessing" in result.detail["violations"]
 
 
+def test_no_wing_release_check_validates_channel_processing_artifact_intake_snapshot():
+    result = validate_channel_processing_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["intake_status"] == "operator_artifact_missing"
+    assert result.detail["schema_id"] == "channel_processing_physical_readback.v1"
+    assert result.detail["surface_id"] == "channel_eq_dynamics_gate"
+    assert result.detail["remediation_action_id"] == "remediate_channel_eq_dynamics_gate"
+    assert (
+        result.detail["required_contract_method_id"]
+        == "channel_processing_physical_readback_contract"
+    )
+    assert result.detail["artifact_count"] == 0
+    assert result.detail["valid_candidate_count"] == 0
+    assert result.detail["invalid_candidate_count"] == 0
+    assert result.detail["valid_channel_count"] == 0
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["operator_review_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["fixture_closure_allowed_by_intake"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["promotion_families_requiring_surface"] == [
+        "eq",
+        "compressor",
+        "gate",
+        "deessing",
+        "frequency_separation",
+        "cross_channel_unmasking",
+    ]
+    assert (
+        "operator_must_capture_channel_processing_physical_readback_artifact"
+        in result.detail["blocked_by"]
+    )
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_channel_processing_artifact_intake_authority(
+    monkeypatch,
+):
+    intake = release_check.build_channel_processing_physical_readback_artifact_intake()
+    corrupted = json.loads(json.dumps(intake))
+    corrupted["safety"]["live_write"] = True
+    corrupted["safety"]["fixture_closure_allowed_by_intake"] = True
+    corrupted["summary"]["physical_fixture_gap_remains"] = False
+    corrupted["summary"]["fixture_closure_allowed_by_intake"] = True
+    corrupted["summary"]["live_authority_granted"] = True
+    corrupted["summary"]["full_autonomous_ready"] = True
+
+    monkeypatch.setattr(
+        release_check,
+        "build_channel_processing_physical_readback_artifact_intake",
+        lambda: corrupted,
+    )
+
+    result = validate_channel_processing_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "failed"
+    assert "channel_processing_artifact_intake_live_write_not_false" in result.detail["violations"]
+    assert (
+        "channel_processing_artifact_intake_fixture_closure_allowed_by_intake_not_false"
+        in result.detail["violations"]
+    )
+    assert "channel_processing_artifact_intake_physical_gap_not_true" in result.detail["violations"]
+    assert (
+        "channel_processing_artifact_intake_fixture_closure_not_false"
+        in result.detail["violations"]
+    )
+    assert (
+        "channel_processing_artifact_intake_live_authority_not_false"
+        in result.detail["violations"]
+    )
+    assert (
+        "channel_processing_artifact_intake_full_autonomous_not_false"
+        in result.detail["violations"]
+    )
+
+
 def test_no_wing_release_check_validates_bus_group_main_dca_readback_contract_snapshot():
     result = validate_bus_group_main_dca_physical_readback_contract_snapshot()
 
@@ -1346,6 +1426,10 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         in fixture_check.command
     )
     assert "tests/test_channel_processing_physical_readback_contract.py" in fixture_check.command
+    assert (
+        "tests/test_channel_processing_physical_readback_artifact_intake.py"
+        in fixture_check.command
+    )
     assert "tests/test_bus_group_main_dca_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_matrix_state_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_fx_slots_inserts_physical_readback_contract.py" in fixture_check.command
@@ -1824,6 +1908,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "channel_basic_controls_physical_readback_contract_schema" in result_names
     assert "channel_basic_controls_physical_readback_artifact_intake_schema" in result_names
     assert "channel_processing_physical_readback_contract_schema" in result_names
+    assert "channel_processing_physical_readback_artifact_intake_schema" in result_names
     assert "bus_group_main_dca_physical_readback_contract_schema" in result_names
     assert "matrix_state_physical_readback_contract_schema" in result_names
     assert "fx_slots_inserts_physical_readback_contract_schema" in result_names
@@ -1862,6 +1947,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "channel_processing_physical_readback_contract_schema"
     )
     assert result_names.index("channel_processing_physical_readback_contract_schema") < result_names.index(
+        "channel_processing_physical_readback_artifact_intake_schema"
+    )
+    assert result_names.index("channel_processing_physical_readback_artifact_intake_schema") < result_names.index(
         "bus_group_main_dca_physical_readback_contract_schema"
     )
     assert result_names.index("bus_group_main_dca_physical_readback_contract_schema") < result_names.index(
@@ -3082,6 +3170,133 @@ def test_no_wing_release_check_summary_embeds_channel_processing_readback_contra
     assert "live_authority_granted: `false`" in markdown_summary
     assert "minimum_eq_band_count: `4`" in markdown_summary
     assert "target_consistency: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_channel_processing_artifact_intake(tmp_path):
+    result = CheckResult(
+        name="channel_processing_physical_readback_artifact_intake_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "intake_status": "operator_artifact_missing",
+            "schema_id": "channel_processing_physical_readback.v1",
+            "surface_id": "channel_eq_dynamics_gate",
+            "remediation_action_id": "remediate_channel_eq_dynamics_gate",
+            "required_contract_method_id": "channel_processing_physical_readback_contract",
+            "artifact_search_roots": [
+                "artifacts/read_surface_physical_readback/channel_processing",
+            ],
+            "artifact_count": 0,
+            "valid_candidate_count": 0,
+            "invalid_candidate_count": 0,
+            "valid_channel_count": 0,
+            "accepted_as_physical_fixture_candidate": False,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_closure_allowed_by_intake": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "promotion_families_requiring_surface": [
+                "eq",
+                "compressor",
+                "gate",
+                "deessing",
+                "frequency_separation",
+                "cross_channel_unmasking",
+            ],
+            "latest_valid_candidate_source_id": None,
+            "latest_valid_candidate_captured_at": None,
+            "blocked_by": [
+                "operator_must_capture_channel_processing_physical_readback_artifact",
+            ],
+            "artifact_source_ids": [],
+            "intake_violations": [],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert channel_processing_readback_artifact_intake_summary([result]) == summary[
+        "channel_processing_physical_readback_artifact_intake"
+    ]
+    intake = json_summary["channel_processing_physical_readback_artifact_intake"]
+    assert intake["read_only"] is True
+    assert intake["live_write"] is False
+    assert intake["mutates_console_state"] is False
+    assert intake["queries_console"] is False
+    assert intake["executes_tests"] is False
+    assert intake["operator_required"] is True
+    assert intake["execution_allowed_by_intake"] is False
+    assert intake["fixture_closure_allowed_by_intake"] is False
+    assert intake["full_autonomous_ready"] is False
+    assert intake["intake_status"] == "operator_artifact_missing"
+    assert intake["artifact_count"] == 0
+    assert intake["valid_channel_count"] == 0
+    assert intake["accepted_as_physical_fixture_candidate"] is False
+    assert intake["operator_review_required"] is True
+    assert intake["physical_fixture_gap_remains"] is True
+    assert intake["live_authority_granted"] is False
+    assert intake["promotion_families_requiring_surface"] == [
+        "eq",
+        "compressor",
+        "gate",
+        "deessing",
+        "frequency_separation",
+        "cross_channel_unmasking",
+    ]
+    assert "## Channel Processing Physical Readback Artifact Intake" in markdown_summary
+    assert "fixture_closure_allowed_by_intake: `false`" in markdown_summary
+    assert "operator_review_required: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_processing_intake_summary_normalizes_authority_claims():
+    result = CheckResult(
+        name="channel_processing_physical_readback_artifact_intake_schema",
+        status="failed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "intake_status": "valid_operator_artifact_available",
+            "schema_id": "channel_processing_physical_readback.v1",
+            "surface_id": "channel_eq_dynamics_gate",
+            "remediation_action_id": "remediate_channel_eq_dynamics_gate",
+            "required_contract_method_id": "channel_processing_physical_readback_contract",
+            "artifact_count": 1,
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "valid_channel_count": 24,
+            "accepted_as_physical_fixture_candidate": True,
+            "operator_review_required": False,
+            "physical_fixture_gap_remains": False,
+            "fixture_closure_allowed_by_intake": True,
+            "live_authority_granted": True,
+            "full_autonomous_ready": True,
+            "promotion_families_requiring_surface": ["eq"],
+            "blocked_by": [],
+            "artifact_source_ids": ["unsafe-processing.json"],
+            "intake_violations": [],
+            "violations": ["channel_processing_artifact_intake_live_authority_not_false"],
+        },
+    )
+
+    summary = channel_processing_readback_artifact_intake_summary([result])
+
+    assert summary["status"] == "failed"
+    assert summary["accepted_as_physical_fixture_candidate"] is False
+    assert summary["operator_review_required"] is True
+    assert summary["physical_fixture_gap_remains"] is True
+    assert summary["fixture_closure_allowed_by_intake"] is False
+    assert summary["live_authority_granted"] is False
+    assert summary["full_autonomous_ready"] is False
+    assert summary["violations"] == [
+        "channel_processing_artifact_intake_live_authority_not_false"
+    ]
 
 
 def test_no_wing_release_check_summary_embeds_bus_group_main_dca_readback_contract(tmp_path):
