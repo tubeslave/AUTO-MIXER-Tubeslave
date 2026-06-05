@@ -2619,6 +2619,54 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "routing_sends_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "routing_sends_physical_readback.v1",
+                    "intake_status": "operator_artifact_missing",
+                    "surface_id": "routing_and_sends",
+                    "remediation_action_id": "remediate_routing_and_sends",
+                    "required_contract_method_id": "routing_sends_physical_readback_contract",
+                    "artifact_search_roots": [
+                        "artifacts/read_surface_physical_readback/routing_and_sends",
+                    ],
+                    "artifact_count": 0,
+                    "valid_candidate_count": 0,
+                    "invalid_candidate_count": 0,
+                    "valid_static_dante_route_count": 0,
+                    "valid_channel_bus_send_count": 0,
+                    "valid_channel_main_send_count": 0,
+                    "valid_channel_matrix_send_count": 0,
+                    "valid_output_route_count": 0,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "operator_review_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "fixture_closure_allowed_by_intake": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "operator_required": True,
+                    "execution_allowed_by_intake": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "routing",
+                        "fx_send_insert",
+                        "bus_group_matrix",
+                        "scene_preset",
+                        "mix_balance",
+                        "performance_adaptation",
+                    ],
+                    "blocked_by": [
+                        "operator_must_capture_routing_sends_physical_readback_artifact",
+                    ],
+                    "artifact_source_ids": [],
+                    "intake_violations": [],
+                    "violations": [],
+                },
                 "snapshots_scenes_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "snapshots_scenes_physical_readback.v1",
@@ -3270,6 +3318,40 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert "routing_write_events" in routing_contract[
         "forbidden_mutation_evidence_fields"
     ]
+    routing_intake = proof_quality["routing_sends_physical_readback_artifact_intake"]
+    assert routing_intake["available"] is True
+    assert routing_intake["status"] == "passed"
+    assert routing_intake["schema_id"] == "routing_sends_physical_readback.v1"
+    assert routing_intake["intake_status"] == "operator_artifact_missing"
+    assert routing_intake["surface_id"] == "routing_and_sends"
+    assert routing_intake["remediation_action_id"] == "remediate_routing_and_sends"
+    assert routing_intake["required_contract_method_id"] == "routing_sends_physical_readback_contract"
+    assert routing_intake["artifact_count"] == 0
+    assert routing_intake["valid_candidate_count"] == 0
+    assert routing_intake["invalid_candidate_count"] == 0
+    assert routing_intake["valid_static_dante_route_count"] == 0
+    assert routing_intake["valid_channel_bus_send_count"] == 0
+    assert routing_intake["valid_channel_main_send_count"] == 0
+    assert routing_intake["valid_channel_matrix_send_count"] == 0
+    assert routing_intake["valid_output_route_count"] == 0
+    assert routing_intake["accepted_as_physical_fixture_candidate"] is False
+    assert routing_intake["operator_review_required"] is True
+    assert routing_intake["physical_fixture_gap_remains"] is True
+    assert routing_intake["fixture_closure_allowed_by_intake"] is False
+    assert routing_intake["live_authority_granted"] is False
+    assert routing_intake["full_autonomous_ready"] is False
+    assert routing_intake["target_consistency"] is True
+    assert routing_intake["promotion_families_requiring_surface"] == [
+        "routing",
+        "fx_send_insert",
+        "bus_group_matrix",
+        "scene_preset",
+        "mix_balance",
+        "performance_adaptation",
+    ]
+    assert "operator_must_capture_routing_sends_physical_readback_artifact" in routing_intake[
+        "blocked_by"
+    ]
     scenes_contract = proof_quality["snapshots_scenes_physical_readback_contract"]
     assert scenes_contract["available"] is True
     assert scenes_contract["status"] == "passed"
@@ -3868,6 +3950,45 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["routing_contract_claimed_live_authority"],
                 },
+                "routing_sends_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "routing_sends_physical_readback.v1",
+                    "intake_status": "valid_operator_artifact_available",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "required_contract_method_id": "routing_sends_physical_readback_contract",
+                    "artifact_search_roots": [
+                        "artifacts/read_surface_physical_readback/routing_and_sends",
+                    ],
+                    "artifact_count": 1,
+                    "valid_candidate_count": 1,
+                    "invalid_candidate_count": 0,
+                    "valid_static_dante_route_count": 2,
+                    "valid_channel_bus_send_count": 3,
+                    "valid_channel_main_send_count": 4,
+                    "valid_channel_matrix_send_count": 5,
+                    "valid_output_route_count": 6,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "operator_review_required": False,
+                    "physical_fixture_gap_remains": False,
+                    "fixture_closure_allowed_by_intake": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "mutates_console_state": True,
+                    "queries_console": True,
+                    "executes_tests": True,
+                    "operator_required": False,
+                    "execution_allowed_by_intake": True,
+                    "live_widening_allowed": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "target_consistency": False,
+                    "promotion_families_requiring_surface": ["routing"],
+                    "blocked_by": [],
+                    "artifact_source_ids": ["unsafe-routing.json"],
+                    "intake_violations": [],
+                    "violations": ["routing_intake_claimed_live_authority"],
+                },
                 "user_presets_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "user_presets_physical_readback.v1",
@@ -4287,6 +4408,43 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert routing_contract["minimum_channel_matrix_send_count"] == 0
     assert routing_contract["minimum_output_route_count"] == 0
     assert "routing_contract_claimed_live_authority" in routing_contract["violations"]
+    routing_intake = payload["summary"]["read_surface_proof_quality"][
+        "routing_sends_physical_readback_artifact_intake"
+    ]
+    assert routing_intake["available"] is True
+    assert routing_intake["surface_id"] == "routing_and_sends"
+    assert routing_intake["source_surface_id"] == "dlive_state"
+    assert routing_intake["remediation_action_id"] == "remediate_routing_and_sends"
+    assert routing_intake["source_remediation_action_id"] == "remediate_dlive_state"
+    assert routing_intake["target_consistency"] is False
+    assert routing_intake["artifact_count"] == 1
+    assert routing_intake["valid_candidate_count"] == 1
+    assert routing_intake["invalid_candidate_count"] == 0
+    assert routing_intake["valid_static_dante_route_count"] == 2
+    assert routing_intake["valid_channel_bus_send_count"] == 3
+    assert routing_intake["valid_channel_main_send_count"] == 4
+    assert routing_intake["valid_channel_matrix_send_count"] == 5
+    assert routing_intake["valid_output_route_count"] == 6
+    assert routing_intake["accepted_as_physical_fixture_candidate"] is False
+    assert routing_intake["operator_review_required"] is True
+    assert routing_intake["physical_fixture_gap_remains"] is True
+    assert routing_intake["fixture_closure_allowed_by_intake"] is False
+    assert routing_intake["read_only"] is True
+    assert routing_intake["live_write"] is False
+    assert routing_intake["live_authority_granted"] is False
+    assert routing_intake["full_autonomous_ready"] is False
+    assert routing_intake["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert routing_intake["source_operator_review_required_claimed"] is False
+    assert routing_intake["source_physical_fixture_gap_remains_claimed"] is False
+    assert routing_intake["source_fixture_closure_allowed_by_intake_claimed"] is True
+    assert routing_intake["source_execution_allowed_by_intake_claimed"] is True
+    assert routing_intake["source_live_write_claimed"] is True
+    assert routing_intake["source_queries_console_claimed"] is True
+    assert routing_intake["source_live_authority_granted_claimed"] is True
+    assert routing_intake["source_full_autonomous_ready_claimed"] is True
+    assert routing_intake["promotion_families_requiring_surface"] == ["routing"]
+    assert routing_intake["artifact_source_ids"] == ["unsafe-routing.json"]
+    assert "routing_intake_claimed_live_authority" in routing_intake["violations"]
     presets_contract = payload["summary"]["read_surface_proof_quality"][
         "user_presets_physical_readback_contract"
     ]

@@ -4854,6 +4854,125 @@ def _routing_sends_readback_contract_quality_from_summary(
     }
 
 
+def _routing_sends_readback_artifact_intake_quality_from_summary(
+    summary: Dict[str, Any],
+) -> Dict[str, Any]:
+    intake = (
+        summary.get("routing_sends_physical_readback_artifact_intake")
+        if isinstance(summary.get("routing_sends_physical_readback_artifact_intake"), dict)
+        else {}
+    )
+    available = bool(intake)
+    expected_surface_id = "routing_and_sends"
+    expected_action_id = "remediate_routing_and_sends"
+    source_surface_id = intake.get("surface_id") if isinstance(intake.get("surface_id"), str) else None
+    source_action_id = (
+        intake.get("remediation_action_id")
+        if isinstance(intake.get("remediation_action_id"), str)
+        else None
+    )
+    target_consistent = (
+        available
+        and source_surface_id == expected_surface_id
+        and source_action_id == expected_action_id
+    )
+    source_candidate_claimed = intake.get("accepted_as_physical_fixture_candidate") is True
+    source_live_write_claimed = intake.get("live_write") is True
+    source_mutation_claimed = intake.get("mutates_console_state") is True
+    source_query_claimed = intake.get("queries_console") is True
+    source_executes_tests_claimed = intake.get("executes_tests") is True
+    source_live_authority_claimed = intake.get("live_authority_granted") is True
+    source_full_autonomous_ready_claimed = intake.get("full_autonomous_ready") is True
+    source_fixture_closure_claimed = intake.get("fixture_closure_allowed_by_intake") is True
+    source_execution_claimed = intake.get("execution_allowed_by_intake") is True
+    source_operator_review_claimed = intake.get("operator_review_required") is True
+    source_physical_gap_claimed = intake.get("physical_fixture_gap_remains") is True
+    source_valid_candidate_count = _safe_int_value(intake.get("valid_candidate_count"))
+    source_invalid_candidate_count = _safe_int_value(intake.get("invalid_candidate_count"))
+    unsafe_claimed = (
+        source_live_write_claimed
+        or source_mutation_claimed
+        or source_query_claimed
+        or source_executes_tests_claimed
+        or source_live_authority_claimed
+        or source_full_autonomous_ready_claimed
+        or source_fixture_closure_claimed
+        or source_execution_claimed
+    )
+    candidate_accepted = (
+        source_candidate_claimed
+        and target_consistent
+        and source_valid_candidate_count > 0
+        and source_invalid_candidate_count == 0
+        and source_operator_review_claimed
+        and source_physical_gap_claimed
+        and not unsafe_claimed
+    )
+    return {
+        "available": available,
+        "status": str(intake.get("status") or "missing"),
+        "schema_id": intake.get("schema_id"),
+        "intake_status": intake.get("intake_status"),
+        "surface_id": source_surface_id if target_consistent else expected_surface_id,
+        "source_surface_id": source_surface_id,
+        "remediation_action_id": source_action_id if target_consistent else expected_action_id,
+        "source_remediation_action_id": source_action_id,
+        "required_contract_method_id": intake.get("required_contract_method_id"),
+        "artifact_count": _safe_int_value(intake.get("artifact_count")),
+        "valid_candidate_count": source_valid_candidate_count,
+        "invalid_candidate_count": source_invalid_candidate_count,
+        "valid_static_dante_route_count": _safe_int_value(
+            intake.get("valid_static_dante_route_count")
+        ),
+        "valid_channel_bus_send_count": _safe_int_value(
+            intake.get("valid_channel_bus_send_count")
+        ),
+        "valid_channel_main_send_count": _safe_int_value(
+            intake.get("valid_channel_main_send_count")
+        ),
+        "valid_channel_matrix_send_count": _safe_int_value(
+            intake.get("valid_channel_matrix_send_count")
+        ),
+        "valid_output_route_count": _safe_int_value(
+            intake.get("valid_output_route_count")
+        ),
+        "accepted_as_physical_fixture_candidate": candidate_accepted,
+        "operator_review_required": True,
+        "physical_fixture_gap_remains": True,
+        "fixture_closure_allowed_by_intake": False,
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "operator_required": True,
+        "execution_allowed_by_intake": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "source_accepted_as_physical_fixture_candidate_claimed": source_candidate_claimed,
+        "source_operator_review_required_claimed": source_operator_review_claimed,
+        "source_physical_fixture_gap_remains_claimed": source_physical_gap_claimed,
+        "source_fixture_closure_allowed_by_intake_claimed": source_fixture_closure_claimed,
+        "source_execution_allowed_by_intake_claimed": source_execution_claimed,
+        "source_live_write_claimed": source_live_write_claimed,
+        "source_mutates_console_state_claimed": source_mutation_claimed,
+        "source_queries_console_claimed": source_query_claimed,
+        "source_executes_tests_claimed": source_executes_tests_claimed,
+        "source_live_authority_granted_claimed": source_live_authority_claimed,
+        "source_full_autonomous_ready_claimed": source_full_autonomous_ready_claimed,
+        "target_consistency": target_consistent,
+        "promotion_families_requiring_surface": _string_list_value(
+            intake.get("promotion_families_requiring_surface")
+        ),
+        "artifact_search_roots": _string_list_value(intake.get("artifact_search_roots")),
+        "artifact_source_ids": _string_list_value(intake.get("artifact_source_ids")),
+        "blocked_by": _string_list_value(intake.get("blocked_by")),
+        "intake_violations": _string_list_value(intake.get("intake_violations")),
+        "violations": _string_list_value(intake.get("violations")),
+    }
+
+
 def _snapshots_scenes_readback_contract_quality_from_summary(
     summary: Dict[str, Any],
 ) -> Dict[str, Any]:
@@ -5232,6 +5351,9 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
     routing_sends_contract = _routing_sends_readback_contract_quality_from_summary(
         summary
     )
+    routing_sends_intake = (
+        _routing_sends_readback_artifact_intake_quality_from_summary(summary)
+    )
     snapshots_scenes_contract = _snapshots_scenes_readback_contract_quality_from_summary(
         summary
     )
@@ -5277,6 +5399,7 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
         "fx_slots_inserts_physical_readback_contract": fx_slots_inserts_contract,
         "fx_slots_inserts_physical_readback_artifact_intake": fx_slots_inserts_intake,
         "routing_sends_physical_readback_contract": routing_sends_contract,
+        "routing_sends_physical_readback_artifact_intake": routing_sends_intake,
         "snapshots_scenes_physical_readback_contract": snapshots_scenes_contract,
         "user_presets_physical_readback_contract": user_presets_contract,
         "dlive_state_physical_readback_contract": dlive_state_contract,

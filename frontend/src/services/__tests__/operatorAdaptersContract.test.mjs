@@ -1007,6 +1007,43 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             minimum_output_route_count: 1,
             violations: [],
           },
+          routing_sends_physical_readback_artifact_intake: {
+            available: true,
+            status: 'passed',
+            schema_id: 'routing_sends_physical_readback.v1',
+            intake_status: 'operator_artifact_missing',
+            surface_id: 'routing_and_sends',
+            remediation_action_id: 'remediate_routing_and_sends',
+            required_contract_method_id: 'routing_sends_physical_readback_contract',
+            artifact_count: 0,
+            valid_candidate_count: 0,
+            invalid_candidate_count: 0,
+            valid_static_dante_route_count: 0,
+            valid_channel_bus_send_count: 0,
+            valid_channel_main_send_count: 0,
+            valid_channel_matrix_send_count: 0,
+            valid_output_route_count: 0,
+            accepted_as_physical_fixture_candidate: false,
+            operator_review_required: true,
+            physical_fixture_gap_remains: true,
+            fixture_closure_allowed_by_intake: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            target_consistency: true,
+            promotion_families_requiring_surface: [
+              'routing',
+              'fx_send_insert',
+              'bus_group_matrix',
+              'scene_preset',
+              'mix_balance',
+              'performance_adaptation',
+            ],
+            artifact_search_roots: ['artifacts/read_surface_physical_readback/routing_and_sends'],
+            artifact_source_ids: [],
+            blocked_by: ['operator_must_capture_routing_sends_physical_readback_artifact'],
+            intake_violations: [],
+            violations: [],
+          },
           snapshots_scenes_physical_readback_contract: {
             available: true,
             status: 'passed',
@@ -1244,6 +1281,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'fx_slots_inserts_physical_readback_contract',
       'fx_slots_inserts_physical_readback_artifact_intake',
       'routing_sends_physical_readback_contract',
+      'routing_sends_physical_readback_artifact_intake',
       'snapshots_scenes_physical_readback_contract',
       'user_presets_physical_readback_contract',
       'dlive_state_physical_readback_contract',
@@ -1452,6 +1490,21 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'routing_contract_gap:true',
     'routing_contract_live_authority:false',
     'routing_contract_target_gate:true',
+    'routing_intake_available:true',
+    'routing_intake_status:operator_artifact_missing',
+    'routing_intake_artifacts:0',
+    'routing_intake_valid:0',
+    'routing_intake_invalid:0',
+    'routing_intake_valid_static_routes:0',
+    'routing_intake_valid_bus_sends:0',
+    'routing_intake_valid_main_sends:0',
+    'routing_intake_valid_matrix_sends:0',
+    'routing_intake_valid_output_routes:0',
+    'routing_intake_candidate:false',
+    'routing_intake_gap:true',
+    'routing_intake_closure_allowed:false',
+    'routing_intake_live_authority:false',
+    'routing_intake_target_gate:true',
     'scenes_contract_available:true',
     'scenes_contract_status:contract_ready_physical_fixture_missing',
     'scenes_contract_schema:snapshots_scenes_physical_readback.v1',
@@ -2045,6 +2098,46 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(routingSendsContract.nextStep, /live_authority:false/);
   assert.match(routingSendsContract.nextStep, /target_consistency:true/);
 
+  const routingSendsIntake = rows.find(row => row.moduleId === 'routing_sends_physical_readback_artifact_intake');
+  assert.equal(routingSendsIntake.domain, 'read_surface_artifact_intake');
+  assert.equal(routingSendsIntake.canWriteLive, false);
+  assert.deepEqual(routingSendsIntake.liveWriteKinds, []);
+  assert.equal(routingSendsIntake.status, 'operator_artifact_missing');
+  assert.equal(routingSendsIntake.entrypoint, 'build_routing_sends_physical_readback_artifact_intake');
+  assert.equal(routingSendsIntake.module, 'remediate_routing_and_sends');
+  assert.equal(routingSendsIntake.tone, 'yellow');
+  assert.deepEqual(routingSendsIntake.pipelineProfiles, [
+    'available:true',
+    'schema:routing_sends_physical_readback.v1',
+    'surface:routing_and_sends',
+    'action:remediate_routing_and_sends',
+    'artifacts:0',
+    'valid:0',
+    'invalid:0',
+    'valid_static_routes:0',
+    'valid_bus_sends:0',
+    'valid_main_sends:0',
+    'valid_matrix_sends:0',
+    'valid_output_routes:0',
+    'candidate:false',
+    'operator_review:true',
+    'physical_gap_remains:true',
+    'fixture_closure_allowed:false',
+    'live_authority:false',
+    'target_consistency:true',
+    'promotion_families:routing|fx_send_insert|bus_group_matrix|scene_preset|mix_balance|performance_adaptation',
+  ]);
+  assert.match(routingSendsIntake.blockedReason, /operator_must_capture_routing_sends_physical_readback_artifact/);
+  assert.match(routingSendsIntake.nextStep, /surface:routing_and_sends/);
+  assert.match(routingSendsIntake.nextStep, /action:remediate_routing_and_sends/);
+  assert.match(routingSendsIntake.nextStep, /artifacts:0/);
+  assert.match(routingSendsIntake.nextStep, /valid_static_routes:0/);
+  assert.match(routingSendsIntake.nextStep, /valid_bus_sends:0/);
+  assert.match(routingSendsIntake.nextStep, /valid_output_routes:0/);
+  assert.match(routingSendsIntake.nextStep, /operator_review:true/);
+  assert.match(routingSendsIntake.nextStep, /fixture_closure_allowed:false/);
+  assert.match(routingSendsIntake.nextStep, /live_authority:false/);
+
   const snapshotsScenesContract = rows.find(row => row.moduleId === 'snapshots_scenes_physical_readback_contract');
   assert.equal(snapshotsScenesContract.domain, 'read_surface_contract');
   assert.equal(snapshotsScenesContract.canWriteLive, false);
@@ -2323,7 +2416,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 18);
+  assert.equal(rows.length, 19);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -2461,6 +2554,21 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'routing_contract_gap:false',
     'routing_contract_live_authority:false',
     'routing_contract_target_gate:false',
+    'routing_intake_available:false',
+    'routing_intake_status:missing',
+    'routing_intake_artifacts:0',
+    'routing_intake_valid:0',
+    'routing_intake_invalid:0',
+    'routing_intake_valid_static_routes:0',
+    'routing_intake_valid_bus_sends:0',
+    'routing_intake_valid_main_sends:0',
+    'routing_intake_valid_matrix_sends:0',
+    'routing_intake_valid_output_routes:0',
+    'routing_intake_candidate:false',
+    'routing_intake_gap:false',
+    'routing_intake_closure_allowed:false',
+    'routing_intake_live_authority:false',
+    'routing_intake_target_gate:false',
     'scenes_contract_available:false',
     'scenes_contract_status:missing',
     'scenes_contract_schema:',
@@ -2580,26 +2688,33 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.deepEqual(rows[14].liveWriteKinds, []);
   assert.match(rows[14].blockedReason, /contract is missing/);
 
-  assert.equal(rows[15].moduleId, 'snapshots_scenes_physical_readback_contract');
-  assert.equal(rows[15].domain, 'read_surface_contract');
-  assert.equal(rows[15].status, 'contract_missing');
+  assert.equal(rows[15].moduleId, 'routing_sends_physical_readback_artifact_intake');
+  assert.equal(rows[15].domain, 'read_surface_artifact_intake');
+  assert.equal(rows[15].status, 'intake_missing');
   assert.equal(rows[15].canWriteLive, false);
   assert.deepEqual(rows[15].liveWriteKinds, []);
-  assert.match(rows[15].blockedReason, /contract is missing/);
+  assert.match(rows[15].blockedReason, /artifact intake is missing/);
 
-  assert.equal(rows[16].moduleId, 'user_presets_physical_readback_contract');
+  assert.equal(rows[16].moduleId, 'snapshots_scenes_physical_readback_contract');
   assert.equal(rows[16].domain, 'read_surface_contract');
   assert.equal(rows[16].status, 'contract_missing');
   assert.equal(rows[16].canWriteLive, false);
   assert.deepEqual(rows[16].liveWriteKinds, []);
   assert.match(rows[16].blockedReason, /contract is missing/);
 
-  assert.equal(rows[17].moduleId, 'dlive_state_physical_readback_contract');
+  assert.equal(rows[17].moduleId, 'user_presets_physical_readback_contract');
   assert.equal(rows[17].domain, 'read_surface_contract');
   assert.equal(rows[17].status, 'contract_missing');
   assert.equal(rows[17].canWriteLive, false);
   assert.deepEqual(rows[17].liveWriteKinds, []);
   assert.match(rows[17].blockedReason, /contract is missing/);
+
+  assert.equal(rows[18].moduleId, 'dlive_state_physical_readback_contract');
+  assert.equal(rows[18].domain, 'read_surface_contract');
+  assert.equal(rows[18].status, 'contract_missing');
+  assert.equal(rows[18].canWriteLive, false);
+  assert.deepEqual(rows[18].liveWriteKinds, []);
+  assert.match(rows[18].blockedReason, /contract is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

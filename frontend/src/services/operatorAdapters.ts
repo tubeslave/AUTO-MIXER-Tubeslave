@@ -999,6 +999,29 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const routingSendsContractSendCoverage = stringList(routingSendsContract.required_send_coverage_flags);
     const routingSendsContractOutputCoverage = stringList(routingSendsContract.required_output_route_coverage_flags);
     const routingSendsContractFalseSafetyFlags = stringList(routingSendsContract.required_false_safety_flags);
+    const routingSendsIntake = asRecord(proofQuality.routing_sends_physical_readback_artifact_intake);
+    const routingSendsIntakeAvailable = Boolean(routingSendsIntake.available);
+    const routingSendsIntakeStatus = str(routingSendsIntake.intake_status, str(routingSendsIntake.status, 'missing'));
+    const routingSendsIntakeSchemaId = str(routingSendsIntake.schema_id, '');
+    const routingSendsIntakeSurfaceId = str(routingSendsIntake.surface_id, '');
+    const routingSendsIntakeActionId = str(routingSendsIntake.remediation_action_id, '');
+    const routingSendsIntakeArtifactCount = Math.trunc(num(routingSendsIntake.artifact_count, 0));
+    const routingSendsIntakeValidCount = Math.trunc(num(routingSendsIntake.valid_candidate_count, 0));
+    const routingSendsIntakeInvalidCount = Math.trunc(num(routingSendsIntake.invalid_candidate_count, 0));
+    const routingSendsIntakeValidStaticRouteCount = Math.trunc(num(routingSendsIntake.valid_static_dante_route_count, 0));
+    const routingSendsIntakeValidBusSendCount = Math.trunc(num(routingSendsIntake.valid_channel_bus_send_count, 0));
+    const routingSendsIntakeValidMainSendCount = Math.trunc(num(routingSendsIntake.valid_channel_main_send_count, 0));
+    const routingSendsIntakeValidMatrixSendCount = Math.trunc(num(routingSendsIntake.valid_channel_matrix_send_count, 0));
+    const routingSendsIntakeValidOutputRouteCount = Math.trunc(num(routingSendsIntake.valid_output_route_count, 0));
+    const routingSendsIntakeCandidate = routingSendsIntake.accepted_as_physical_fixture_candidate === true;
+    const routingSendsIntakeOperatorReview = routingSendsIntake.operator_review_required === true;
+    const routingSendsIntakeGapRemains = routingSendsIntake.physical_fixture_gap_remains === true;
+    const routingSendsIntakeClosureAllowed = routingSendsIntake.fixture_closure_allowed_by_intake === true;
+    const routingSendsIntakeLiveAuthority = routingSendsIntake.live_authority_granted === true;
+    const routingSendsIntakeTargetConsistency = routingSendsIntake.target_consistency === true;
+    const routingSendsIntakePromotionFamilies = stringList(routingSendsIntake.promotion_families_requiring_surface);
+    const routingSendsIntakeBlockedBy = stringList(routingSendsIntake.blocked_by);
+    const routingSendsIntakeSources = stringList(routingSendsIntake.artifact_source_ids);
     const snapshotsScenesContract = asRecord(proofQuality.snapshots_scenes_physical_readback_contract);
     const snapshotsScenesContractAvailable = Boolean(snapshotsScenesContract.available);
     const snapshotsScenesContractStatus = str(snapshotsScenesContract.contract_status, str(snapshotsScenesContract.status, 'missing'));
@@ -1204,6 +1227,21 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `routing_contract_gap:${routingSendsContractGapRemains}`,
         `routing_contract_live_authority:${routingSendsContractLiveAuthority}`,
         `routing_contract_target_gate:${routingSendsContractTargetConsistency}`,
+        `routing_intake_available:${routingSendsIntakeAvailable}`,
+        `routing_intake_status:${routingSendsIntakeStatus}`,
+        `routing_intake_artifacts:${routingSendsIntakeArtifactCount}`,
+        `routing_intake_valid:${routingSendsIntakeValidCount}`,
+        `routing_intake_invalid:${routingSendsIntakeInvalidCount}`,
+        `routing_intake_valid_static_routes:${routingSendsIntakeValidStaticRouteCount}`,
+        `routing_intake_valid_bus_sends:${routingSendsIntakeValidBusSendCount}`,
+        `routing_intake_valid_main_sends:${routingSendsIntakeValidMainSendCount}`,
+        `routing_intake_valid_matrix_sends:${routingSendsIntakeValidMatrixSendCount}`,
+        `routing_intake_valid_output_routes:${routingSendsIntakeValidOutputRouteCount}`,
+        `routing_intake_candidate:${routingSendsIntakeCandidate}`,
+        `routing_intake_gap:${routingSendsIntakeGapRemains}`,
+        `routing_intake_closure_allowed:${routingSendsIntakeClosureAllowed}`,
+        `routing_intake_live_authority:${routingSendsIntakeLiveAuthority}`,
+        `routing_intake_target_gate:${routingSendsIntakeTargetConsistency}`,
         `scenes_contract_available:${snapshotsScenesContractAvailable}`,
         `scenes_contract_status:${snapshotsScenesContractStatus}`,
         `scenes_contract_schema:${snapshotsScenesContractSchemaId}`,
@@ -1939,6 +1977,67 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         : routingSendsContractGapRemains
           ? 'yellow'
           : 'green'
+    });
+    rows.push({
+      moduleId: 'routing_sends_physical_readback_artifact_intake',
+      label: 'Routing/sends readback artifact intake',
+      domain: 'read_surface_artifact_intake',
+      status: routingSendsIntakeAvailable ? routingSendsIntakeStatus || 'intake_available' : 'intake_missing',
+      entrypoint: 'build_routing_sends_physical_readback_artifact_intake',
+      module: routingSendsIntakeActionId || 'no_intake_action',
+      uiSurface: 'Read-surface physical artifact intake',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${routingSendsIntakeAvailable}`,
+        `schema:${routingSendsIntakeSchemaId}`,
+        `surface:${routingSendsIntakeSurfaceId}`,
+        `action:${routingSendsIntakeActionId}`,
+        `artifacts:${routingSendsIntakeArtifactCount}`,
+        `valid:${routingSendsIntakeValidCount}`,
+        `invalid:${routingSendsIntakeInvalidCount}`,
+        `valid_static_routes:${routingSendsIntakeValidStaticRouteCount}`,
+        `valid_bus_sends:${routingSendsIntakeValidBusSendCount}`,
+        `valid_main_sends:${routingSendsIntakeValidMainSendCount}`,
+        `valid_matrix_sends:${routingSendsIntakeValidMatrixSendCount}`,
+        `valid_output_routes:${routingSendsIntakeValidOutputRouteCount}`,
+        `candidate:${routingSendsIntakeCandidate}`,
+        `operator_review:${routingSendsIntakeOperatorReview}`,
+        `physical_gap_remains:${routingSendsIntakeGapRemains}`,
+        `fixture_closure_allowed:${routingSendsIntakeClosureAllowed}`,
+        `live_authority:${routingSendsIntakeLiveAuthority}`,
+        `target_consistency:${routingSendsIntakeTargetConsistency}`,
+        routingSendsIntakePromotionFamilies.length ? `promotion_families:${routingSendsIntakePromotionFamilies.join('|')}` : '',
+        routingSendsIntakeSources.length ? `sources:${routingSendsIntakeSources.join(',')}` : '',
+      ].filter(Boolean),
+      blockedReason: routingSendsIntakeAvailable
+        ? routingSendsIntakeBlockedBy.length
+          ? routingSendsIntakeBlockedBy.join(', ')
+          : 'Routing/sends artifact intake is present; manual review still gates fixture closure.'
+        : 'Routing/sends physical artifact intake is missing from proof summary.',
+      nextStep: routingSendsIntakeAvailable
+        ? [
+            routingSendsIntakeSurfaceId ? `surface:${routingSendsIntakeSurfaceId}` : '',
+            routingSendsIntakeActionId ? `action:${routingSendsIntakeActionId}` : '',
+            `artifacts:${routingSendsIntakeArtifactCount}`,
+            `valid:${routingSendsIntakeValidCount}`,
+            `invalid:${routingSendsIntakeInvalidCount}`,
+            `valid_static_routes:${routingSendsIntakeValidStaticRouteCount}`,
+            `valid_bus_sends:${routingSendsIntakeValidBusSendCount}`,
+            `valid_main_sends:${routingSendsIntakeValidMainSendCount}`,
+            `valid_matrix_sends:${routingSendsIntakeValidMatrixSendCount}`,
+            `valid_output_routes:${routingSendsIntakeValidOutputRouteCount}`,
+            `candidate:${routingSendsIntakeCandidate}`,
+            `operator_review:${routingSendsIntakeOperatorReview}`,
+            `fixture_closure_allowed:${routingSendsIntakeClosureAllowed}`,
+            `live_authority:${routingSendsIntakeLiveAuthority}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with routing/sends artifact-intake validation.',
+      tone: !routingSendsIntakeAvailable || routingSendsIntakeInvalidCount > 0 || routingSendsIntakeClosureAllowed || routingSendsIntakeLiveAuthority || !routingSendsIntakeTargetConsistency
+        ? 'yellow'
+        : routingSendsIntakeCandidate
+          ? 'yellow'
+          : 'yellow'
     });
     rows.push({
       moduleId: 'snapshots_scenes_physical_readback_contract',
