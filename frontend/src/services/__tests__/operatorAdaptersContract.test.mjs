@@ -392,15 +392,35 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             autonomy_mode: 1,
             read_surface: 1,
             write_surface: 1,
-            evidence_requirement: 3,
+            evidence_requirement: 15,
             proof: 0,
           },
           blocked_target_ids_by_bucket: {
             autonomy_mode: ['scene_preset_supervised_promotion'],
             read_surface: ['scene_preset_supervised_promotion'],
             write_surface: ['scene_preset_supervised_promotion'],
+            evidence_requirement: [
+              'bus_group_matrix_supervised_promotion',
+              'mute_supervised_promotion',
+            ],
           },
           evidence_requirement_ids_by_action_family: {
+            bus_group_matrix: [
+              'bus_group_assignment_cache_freshness',
+              'bus_group_fader_readback',
+              'matrix_send_readback',
+              'main_bus_true_peak_headroom',
+              'bus_group_physical_fixture',
+              'hardware_readback_and_rollback_proof',
+            ],
+            mute: [
+              'current_mute_cache_freshness',
+              'mute_owner_intent_evidence',
+              'signal_return_or_idle_window_evidence',
+              'manual_mute_authority_review',
+              'mute_physical_fixture',
+              'hardware_readback_rollback_and_emergency_proof',
+            ],
             scene_preset: [
               'current_scene_preset_cache_freshness',
               'read_only_scoped_diff_evidence',
@@ -827,7 +847,14 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
 
   const evidenceGap = rows.find(row => row.moduleId === 'promotion_gap:evidence_requirement');
   assert.equal(evidenceGap.canWriteLive, false);
-  assert.equal(evidenceGap.module, 'all_promotion_targets');
+  assert.equal(
+    evidenceGap.module,
+    'bus_group_matrix_supervised_promotion, mute_supervised_promotion',
+  );
+  assert.match(evidenceGap.nextStep, /bus_group_assignment_cache_freshness/);
+  assert.match(evidenceGap.nextStep, /main_bus_true_peak_headroom/);
+  assert.match(evidenceGap.nextStep, /mute_owner_intent_evidence/);
+  assert.match(evidenceGap.nextStep, /hardware_readback_rollback_and_emergency_proof/);
   assert.match(evidenceGap.nextStep, /read_only_scoped_diff_evidence/);
   assert.match(evidenceGap.nextStep, /Keep scene apply blocked/);
 });

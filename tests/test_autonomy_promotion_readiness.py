@@ -120,6 +120,14 @@ def test_broad_console_surfaces_are_blocked_by_missing_proof_or_manual_only_poli
     assert bus.supervised_live_allowed is False
     assert bus.safety_row_id == "bus_group_matrix"
     assert bus.safety_status == "quarantined"
+    assert bus.evidence_requirement_ids == (
+        "bus_group_assignment_cache_freshness",
+        "bus_group_fader_readback",
+        "matrix_send_readback",
+        "main_bus_true_peak_headroom",
+        "bus_group_physical_fixture",
+        "hardware_readback_and_rollback_proof",
+    )
     assert "safety_coverage_row_missing" not in bus.blockers
     assert "safety_status_quarantined" in bus.blockers
     assert "real_wing_proof_missing" in bus.blockers
@@ -132,6 +140,14 @@ def test_broad_console_surfaces_are_blocked_by_missing_proof_or_manual_only_poli
     assert mute.autonomous_ready is False
     assert mute.safety_row_id == "mute_supervised"
     assert mute.safety_status == "quarantined"
+    assert mute.evidence_requirement_ids == (
+        "current_mute_cache_freshness",
+        "mute_owner_intent_evidence",
+        "signal_return_or_idle_window_evidence",
+        "manual_mute_authority_review",
+        "mute_physical_fixture",
+        "hardware_readback_rollback_and_emergency_proof",
+    )
     assert "safety_coverage_row_missing" not in mute.blockers
     assert "safety_status_quarantined" in mute.blockers
     assert "read_surface_channel_identity_and_basic_controls_partial" in mute.blockers
@@ -150,8 +166,30 @@ def test_no_readiness_row_widens_live_write_authority():
 def test_readiness_snapshot_serializes_evidence_requirement_ids():
     snapshot = build_autonomy_promotion_readiness_snapshot()
     rows = {row["id"]: row for row in snapshot["rows"]}
+    bus = rows["bus_group_matrix_supervised_promotion"]
+    mute = rows["mute_supervised_promotion"]
     scene_preset = rows["scene_preset_supervised_promotion"]
 
+    assert bus["supervised_live_allowed"] is False
+    assert bus["autonomous_ready"] is False
+    assert bus["evidence_requirement_ids"] == [
+        "bus_group_assignment_cache_freshness",
+        "bus_group_fader_readback",
+        "matrix_send_readback",
+        "main_bus_true_peak_headroom",
+        "bus_group_physical_fixture",
+        "hardware_readback_and_rollback_proof",
+    ]
+    assert mute["supervised_live_allowed"] is False
+    assert mute["autonomous_ready"] is False
+    assert mute["evidence_requirement_ids"] == [
+        "current_mute_cache_freshness",
+        "mute_owner_intent_evidence",
+        "signal_return_or_idle_window_evidence",
+        "manual_mute_authority_review",
+        "mute_physical_fixture",
+        "hardware_readback_rollback_and_emergency_proof",
+    ]
     assert scene_preset["supervised_live_allowed"] is False
     assert scene_preset["autonomous_ready"] is False
     assert scene_preset["evidence_requirement_ids"] == [
@@ -176,15 +214,33 @@ def test_readiness_snapshot_groups_autonomy_gaps_without_granting_authority():
     assert gap_summary["gap_bucket_counts"]["proof"] > 0
     assert gap_summary["gap_bucket_counts"]["read_surface"] > 0
     assert gap_summary["gap_bucket_counts"]["write_surface"] > 0
-    assert gap_summary["gap_bucket_counts"]["evidence_requirement"] >= 12
+    assert gap_summary["gap_bucket_counts"]["evidence_requirement"] >= 24
 
     blocked_by_bucket = gap_summary["blocked_target_ids_by_bucket"]
     assert "fader_supervised_promotion" in blocked_by_bucket["autonomy_mode"]
     assert "scene_preset_supervised_promotion" in blocked_by_bucket["read_surface"]
     assert "scene_preset_supervised_promotion" in blocked_by_bucket["write_surface"]
+    assert "bus_group_matrix_supervised_promotion" in blocked_by_bucket["evidence_requirement"]
+    assert "mute_supervised_promotion" in blocked_by_bucket["evidence_requirement"]
     assert "routing_supervised_promotion" in blocked_by_bucket["safety"]
 
     evidence_by_family = gap_summary["evidence_requirement_ids_by_action_family"]
+    assert evidence_by_family["bus_group_matrix"] == [
+        "bus_group_assignment_cache_freshness",
+        "bus_group_fader_readback",
+        "matrix_send_readback",
+        "main_bus_true_peak_headroom",
+        "bus_group_physical_fixture",
+        "hardware_readback_and_rollback_proof",
+    ]
+    assert evidence_by_family["mute"] == [
+        "current_mute_cache_freshness",
+        "mute_owner_intent_evidence",
+        "signal_return_or_idle_window_evidence",
+        "manual_mute_authority_review",
+        "mute_physical_fixture",
+        "hardware_readback_rollback_and_emergency_proof",
+    ]
     assert evidence_by_family["routing"] == [
         "current_route_cache_freshness",
         "route_diff_evidence",

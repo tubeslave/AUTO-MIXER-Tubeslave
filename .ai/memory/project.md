@@ -73,6 +73,7 @@
 - no-WING release summaries should validate the raw mixer-state physical readback contract as its own schema gate; contract readiness is release evidence, not a physical fixture or live-read permission.
 - Product Layer and cockpit proof-evidence views should show raw mixer-state readback contract status as read-only planning metadata, while preserving `physical_fixture_gap_remains=true` and no live authority.
 - Bus/group/matrix and mute promotion targets should have explicit fail-closed safety coverage rows instead of generic missing-row blockers; these contracts name the proof gates while preserving no bus/DCA/matrix/mute live authority.
+- Promotion readiness should serialize bus/group/matrix and mute `evidence_requirement_ids` as read-only proof planning metadata, so gap summaries can name required freshness, readback, headroom, intent, physical fixture, rollback, and emergency proof without widening live authority.
 
 ## Memory Pipeline Lessons
 

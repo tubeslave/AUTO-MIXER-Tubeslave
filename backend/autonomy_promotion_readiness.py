@@ -183,6 +183,14 @@ PROMOTION_TARGETS: Tuple[PromotionTarget, ...] = (
         safety_row_id="bus_group_matrix",
         write_surface_ids=("mixer_transport_clients",),
         read_surface_ids=("bus_group_main_dca_state", "matrix_state"),
+        evidence_requirement_ids=(
+            "bus_group_assignment_cache_freshness",
+            "bus_group_fader_readback",
+            "matrix_send_readback",
+            "main_bus_true_peak_headroom",
+            "bus_group_physical_fixture",
+            "hardware_readback_and_rollback_proof",
+        ),
     ),
     PromotionTarget(
         id="mute_supervised_promotion",
@@ -192,6 +200,14 @@ PROMOTION_TARGETS: Tuple[PromotionTarget, ...] = (
         safety_row_id="mute_supervised",
         write_surface_ids=("mixer_transport_clients", "voice_ai_direct_commands"),
         read_surface_ids=("channel_identity_and_basic_controls",),
+        evidence_requirement_ids=(
+            "current_mute_cache_freshness",
+            "mute_owner_intent_evidence",
+            "signal_return_or_idle_window_evidence",
+            "manual_mute_authority_review",
+            "mute_physical_fixture",
+            "hardware_readback_rollback_and_emergency_proof",
+        ),
     ),
     PromotionTarget(
         id="routing_supervised_promotion",
