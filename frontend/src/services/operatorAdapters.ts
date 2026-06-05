@@ -849,11 +849,31 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const fxSlotsInsertsContractInsertFields = stringList(fxSlotsInsertsContract.required_insert_fields);
     const fxSlotsInsertsContractInsertCoverage = stringList(fxSlotsInsertsContract.required_insert_coverage_flags);
     const fxSlotsInsertsContractFalseSafetyFlags = stringList(fxSlotsInsertsContract.required_false_safety_flags);
+    const routingSendsContract = asRecord(proofQuality.routing_sends_physical_readback_contract);
+    const routingSendsContractAvailable = Boolean(routingSendsContract.available);
+    const routingSendsContractStatus = str(routingSendsContract.contract_status, str(routingSendsContract.status, 'missing'));
+    const routingSendsContractSchemaId = str(routingSendsContract.schema_id, '');
+    const routingSendsContractSurfaceId = str(routingSendsContract.surface_id, '');
+    const routingSendsContractActionId = str(routingSendsContract.remediation_action_id, '');
+    const routingSendsContractPhysicalSurfaceId = str(routingSendsContract.physical_readback_surface_id, '');
+    const routingSendsContractPhysicalActionId = str(routingSendsContract.physical_readback_action_id, '');
+    const routingSendsContractGapRemains = routingSendsContract.physical_fixture_gap_remains === true;
+    const routingSendsContractLiveAuthority = routingSendsContract.live_authority_granted === true;
+    const routingSendsContractTargetConsistency = routingSendsContract.target_consistency === true;
+    const routingSendsContractPromotionFamilies = stringList(routingSendsContract.promotion_families_requiring_surface);
+    const routingSendsContractStaticFields = stringList(routingSendsContract.required_static_route_fields);
+    const routingSendsContractBusSendFields = stringList(routingSendsContract.required_bus_send_fields);
+    const routingSendsContractMainSendFields = stringList(routingSendsContract.required_main_send_fields);
+    const routingSendsContractMatrixSendFields = stringList(routingSendsContract.required_matrix_send_fields);
+    const routingSendsContractOutputRouteFields = stringList(routingSendsContract.required_output_route_fields);
+    const routingSendsContractSendCoverage = stringList(routingSendsContract.required_send_coverage_flags);
+    const routingSendsContractOutputCoverage = stringList(routingSendsContract.required_output_route_coverage_flags);
+    const routingSendsContractFalseSafetyFlags = stringList(routingSendsContract.required_false_safety_flags);
     const freshnessText = available
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
@@ -918,6 +938,12 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `fx_contract_gap:${fxSlotsInsertsContractGapRemains}`,
         `fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}`,
         `fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}`,
+        `routing_contract_available:${routingSendsContractAvailable}`,
+        `routing_contract_status:${routingSendsContractStatus}`,
+        `routing_contract_schema:${routingSendsContractSchemaId}`,
+        `routing_contract_gap:${routingSendsContractGapRemains}`,
+        `routing_contract_live_authority:${routingSendsContractLiveAuthority}`,
+        `routing_contract_target_gate:${routingSendsContractTargetConsistency}`,
       ],
       blockedReason: available
         ? stale
@@ -1214,6 +1240,62 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       tone: !fxSlotsInsertsContractAvailable || fxSlotsInsertsContractLiveAuthority || !fxSlotsInsertsContractTargetConsistency
         ? 'yellow'
         : fxSlotsInsertsContractGapRemains
+          ? 'yellow'
+          : 'green'
+    });
+    rows.push({
+      moduleId: 'routing_sends_physical_readback_contract',
+      label: 'Routing/sends readback contract',
+      domain: 'read_surface_contract',
+      status: routingSendsContractAvailable ? routingSendsContractStatus || 'contract_available' : 'contract_missing',
+      entrypoint: 'routing_sends_physical_readback_contract',
+      module: routingSendsContractActionId || 'no_contract_action',
+      uiSurface: 'Read-surface proof contract',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${routingSendsContractAvailable}`,
+        `schema:${routingSendsContractSchemaId}`,
+        `surface:${routingSendsContractSurfaceId}`,
+        `physical_readback:${routingSendsContractPhysicalSurfaceId}`,
+        `physical_action:${routingSendsContractPhysicalActionId}`,
+        `physical_gap_remains:${routingSendsContractGapRemains}`,
+        `live_authority:${routingSendsContractLiveAuthority}`,
+        `target_consistency:${routingSendsContractTargetConsistency}`,
+        `promotion_families:${routingSendsContractPromotionFamilies.join('|')}`,
+        `static_routes:${routingSendsContractStaticFields.join('|')}`,
+        `bus_sends:${routingSendsContractBusSendFields.join('|')}`,
+        `main_sends:${routingSendsContractMainSendFields.join('|')}`,
+        `matrix_sends:${routingSendsContractMatrixSendFields.join('|')}`,
+        `output_routes:${routingSendsContractOutputRouteFields.join('|')}`,
+        `send_coverage:${routingSendsContractSendCoverage.join('|')}`,
+        `output_coverage:${routingSendsContractOutputCoverage.join('|')}`,
+        `false_safety:${routingSendsContractFalseSafetyFlags.join('|')}`,
+      ],
+      blockedReason: routingSendsContractAvailable
+        ? routingSendsContractGapRemains
+          ? 'Routing/sends contract is present, but physical readback fixture evidence is still missing.'
+          : 'Routing/sends contract is present; physical gap state must still be reviewed before promotion.'
+        : 'Routing/sends physical readback contract is missing from proof summary.',
+      nextStep: routingSendsContractAvailable
+        ? [
+            routingSendsContractPhysicalSurfaceId ? `physical_readback:${routingSendsContractPhysicalSurfaceId}` : '',
+            routingSendsContractPhysicalActionId ? `physical_action:${routingSendsContractPhysicalActionId}` : '',
+            routingSendsContractPromotionFamilies.length ? `families:${routingSendsContractPromotionFamilies.join(',')}` : '',
+            routingSendsContractStaticFields.length ? `static_routes:${routingSendsContractStaticFields.join(',')}` : '',
+            routingSendsContractBusSendFields.length ? `bus_sends:${routingSendsContractBusSendFields.join(',')}` : '',
+            routingSendsContractMainSendFields.length ? `main_sends:${routingSendsContractMainSendFields.join(',')}` : '',
+            routingSendsContractMatrixSendFields.length ? `matrix_sends:${routingSendsContractMatrixSendFields.join(',')}` : '',
+            routingSendsContractOutputRouteFields.length ? `output_routes:${routingSendsContractOutputRouteFields.join(',')}` : '',
+            routingSendsContractFalseSafetyFlags.length ? `false_safety:${routingSendsContractFalseSafetyFlags.join(',')}` : '',
+            `physical_gap_remains:${routingSendsContractGapRemains}`,
+            `live_authority:${routingSendsContractLiveAuthority}`,
+            `target_consistency:${routingSendsContractTargetConsistency}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with routing/sends readback contract schema validation.',
+      tone: !routingSendsContractAvailable || routingSendsContractLiveAuthority || !routingSendsContractTargetConsistency
+        ? 'yellow'
+        : routingSendsContractGapRemains
           ? 'yellow'
           : 'green'
     });

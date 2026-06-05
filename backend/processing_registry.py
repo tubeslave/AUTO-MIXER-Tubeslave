@@ -36,6 +36,9 @@ try:
     from raw_mixer_state_physical_readback_contract import (
         build_raw_mixer_state_physical_readback_contract,
     )
+    from routing_sends_physical_readback_contract import (
+        build_routing_sends_physical_readback_contract,
+    )
     from safety_coverage_matrix import build_safety_coverage_matrix_snapshot
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
@@ -62,6 +65,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.read_surface_remediation_plan import build_read_surface_remediation_plan
     from backend.raw_mixer_state_physical_readback_contract import (
         build_raw_mixer_state_physical_readback_contract,
+    )
+    from backend.routing_sends_physical_readback_contract import (
+        build_routing_sends_physical_readback_contract,
     )
     from backend.safety_coverage_matrix import build_safety_coverage_matrix_snapshot
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
@@ -530,6 +536,30 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         promotion_next=(
             "capture an operator-run FX slots/inserts physical readback artifact "
             "before closing the FX slots and insert assignment fixture gap"
+        ),
+        notes=(
+            "transport_free",
+            "readback_contract_only",
+            "no_live_writes",
+            "does_not_query_console",
+        ),
+    ),
+    ProcessingMethod(
+        id="routing_sends_physical_readback_contract",
+        label="Routing / Sends Physical Readback Contract",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Transport-free schema contract for static routing, bus/main/matrix "
+            "send, and output-route physical readback artifacts."
+        ),
+        module="backend/routing_sends_physical_readback_contract.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="contract_only_routing_sends_physical_readback_artifact_missing",
+        promotion_next=(
+            "capture an operator-run routing/sends physical readback artifact "
+            "before closing the routing and send fixture gap"
         ),
         notes=(
             "transport_free",
@@ -1477,6 +1507,14 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, read-surface remediation artifact contract",
         "next_step": "Use only to validate separately captured FX slots/inserts readback; do not infer live authority.",
     },
+    "routing_sends_physical_readback_contract": {
+        "entrypoint": (
+            "build_routing_sends_physical_readback_contract / "
+            "validate_routing_sends_physical_readback_artifact"
+        ),
+        "ui_surface": "Processing registry, read-surface remediation artifact contract",
+        "next_step": "Use only to validate separately captured routing/sends readback; do not infer live authority.",
+    },
     "auto_fader_v1": {
         "entrypoint": "main_pipeline_preview proposal adapter",
         "ui_surface": "Task Queue preview/proposal rows",
@@ -1707,6 +1745,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "fx_slots_inserts_physical_readback_contract": (
             build_fx_slots_inserts_physical_readback_contract()
+        ),
+        "routing_sends_physical_readback_contract": (
+            build_routing_sends_physical_readback_contract()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),

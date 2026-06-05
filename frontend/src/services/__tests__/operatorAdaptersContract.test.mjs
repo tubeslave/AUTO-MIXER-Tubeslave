@@ -530,8 +530,8 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
           snapshot_status: 'fixture_evidence_incomplete',
           surface_count: 10,
           surface_with_fixture_count: 10,
-          declared_fixture_path_count: 12,
-          declared_test_name_count: 31,
+          declared_fixture_path_count: 13,
+          declared_test_name_count: 34,
           physical_gap_surface_count: 10,
           summary_recomputed_from_rows: true,
           fixture_declaration_validation: true,
@@ -737,6 +737,56 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             minimum_insert_count: 1,
             violations: [],
           },
+          routing_sends_physical_readback_contract: {
+            available: true,
+            status: 'passed',
+            schema_id: 'routing_sends_physical_readback.v1',
+            contract_status: 'contract_ready_physical_fixture_missing',
+            surface_id: 'routing_and_sends',
+            remediation_action_id: 'remediate_routing_and_sends',
+            artifact_required: true,
+            physical_fixture_gap_remains: true,
+            accepted_as_physical_fixture_candidate: false,
+            read_only: true,
+            live_write: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            target_consistency: true,
+            physical_readback_surface_id: 'routing_and_sends',
+            physical_readback_action_id: 'remediate_routing_and_sends',
+            fixture_physical_gap_declared: true,
+            remediation_physical_gap_declared: true,
+            promotion_families_requiring_surface: [
+              'routing',
+              'fx_send_insert',
+              'bus_group_matrix',
+              'scene_preset',
+              'mix_balance',
+              'performance_adaptation',
+            ],
+            required_static_route_fields: ['start', 'end', 'role', 'wing_routing_hint'],
+            required_bus_send_fields: ['channel', 'send', 'level_db', 'pre_on'],
+            required_main_send_fields: ['channel', 'main', 'level_db', 'pre'],
+            required_matrix_send_fields: ['channel', 'send', 'target_matrix'],
+            required_output_route_fields: ['output_group', 'output_number', 'source_channel'],
+            required_send_coverage_flags: ['assignment', 'level', 'scoped_diff_marker'],
+            required_output_route_coverage_flags: ['assignment', 'source', 'scoped_diff_marker'],
+            required_false_safety_flags: [
+              'live_write',
+              'mutates_console_state',
+              'live_widening_allowed',
+              'full_autonomous_ready',
+            ],
+            allowed_sources: ['physical_readback', 'wing_physical_readback', 'dlive_physical_readback'],
+            accepted_row_statuses: ['verified_from_physical_readback'],
+            forbidden_mutation_evidence_fields: ['manual_write_events', 'routing_write_events'],
+            minimum_static_dante_route_count: 1,
+            minimum_channel_bus_send_count: 1,
+            minimum_channel_main_send_count: 1,
+            minimum_channel_matrix_send_count: 1,
+            minimum_output_route_count: 1,
+            violations: [],
+          },
         },
       },
     },
@@ -824,6 +874,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'bus_group_main_dca_physical_readback_contract',
       'matrix_state_physical_readback_contract',
       'fx_slots_inserts_physical_readback_contract',
+      'routing_sends_physical_readback_contract',
       'read_surface_remediation_plan',
       'autonomy_evidence:fader_supervised_promotion',
       'autonomy_evidence:gain_trim_supervised_promotion',
@@ -911,7 +962,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'next_readback_target:raw_mixer_state_cache',
     'source_next_readback_target:raw_mixer_state_cache',
     'next_readback_gate:true',
-    'fixture_tests:31',
+    'fixture_tests:34',
     'contract_gap:true',
     'raw_contract_available:true',
     'raw_contract_status:contract_ready_physical_fixture_missing',
@@ -949,13 +1000,19 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'fx_contract_gap:true',
     'fx_contract_live_authority:false',
     'fx_contract_target_gate:true',
+    'routing_contract_available:true',
+    'routing_contract_status:contract_ready_physical_fixture_missing',
+    'routing_contract_schema:routing_sends_physical_readback.v1',
+    'routing_contract_gap:true',
+    'routing_contract_live_authority:false',
+    'routing_contract_target_gate:true',
   ]);
   assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
   assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
   assert.match(proofEvidence.nextStep, /age:120s stale_after:86400s stale:false/);
   assert.match(proofEvidence.nextStep, /read_surface_gaps:10/);
-  assert.match(proofEvidence.nextStep, /fixture_paths:12/);
-  assert.match(proofEvidence.nextStep, /test_names:31/);
+  assert.match(proofEvidence.nextStep, /fixture_paths:13/);
+  assert.match(proofEvidence.nextStep, /test_names:34/);
   assert.match(proofEvidence.nextStep, /contract_gap:true/);
   assert.match(proofEvidence.nextStep, /gap_surfaces:raw_mixer_state_cache/);
   assert.match(proofEvidence.nextStep, /next_readback:raw_mixer_state_cache/);
@@ -985,6 +1042,10 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /fx_contract_gap:true/);
   assert.match(proofEvidence.nextStep, /fx_contract_live_authority:false/);
   assert.match(proofEvidence.nextStep, /fx_contract_target_gate:true/);
+  assert.match(proofEvidence.nextStep, /routing_contract:contract_ready_physical_fixture_missing/);
+  assert.match(proofEvidence.nextStep, /routing_contract_gap:true/);
+  assert.match(proofEvidence.nextStep, /routing_contract_live_authority:false/);
+  assert.match(proofEvidence.nextStep, /routing_contract_target_gate:true/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
 
   const rawMixerContract = rows.find(row => row.moduleId === 'raw_mixer_state_physical_readback_contract');
@@ -1182,6 +1243,52 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(fxSlotsInsertsContract.nextStep, /live_authority:false/);
   assert.match(fxSlotsInsertsContract.nextStep, /target_consistency:true/);
 
+  const routingSendsContract = rows.find(row => row.moduleId === 'routing_sends_physical_readback_contract');
+  assert.equal(routingSendsContract.domain, 'read_surface_contract');
+  assert.equal(routingSendsContract.canWriteLive, false);
+  assert.deepEqual(routingSendsContract.liveWriteKinds, []);
+  assert.equal(routingSendsContract.status, 'contract_ready_physical_fixture_missing');
+  assert.equal(routingSendsContract.entrypoint, 'routing_sends_physical_readback_contract');
+  assert.equal(routingSendsContract.module, 'remediate_routing_and_sends');
+  assert.equal(routingSendsContract.tone, 'yellow');
+  assert.deepEqual(routingSendsContract.pipelineProfiles, [
+    'available:true',
+    'schema:routing_sends_physical_readback.v1',
+    'surface:routing_and_sends',
+    'physical_readback:routing_and_sends',
+    'physical_action:remediate_routing_and_sends',
+    'physical_gap_remains:true',
+    'live_authority:false',
+    'target_consistency:true',
+    'promotion_families:routing|fx_send_insert|bus_group_matrix|scene_preset|mix_balance|performance_adaptation',
+    'static_routes:start|end|role|wing_routing_hint',
+    'bus_sends:channel|send|level_db|pre_on',
+    'main_sends:channel|main|level_db|pre',
+    'matrix_sends:channel|send|target_matrix',
+    'output_routes:output_group|output_number|source_channel',
+    'send_coverage:assignment|level|scoped_diff_marker',
+    'output_coverage:assignment|source|scoped_diff_marker',
+    'false_safety:live_write|mutates_console_state|live_widening_allowed|full_autonomous_ready',
+  ]);
+  assert.match(routingSendsContract.blockedReason, /physical readback fixture evidence is still missing/);
+  assert.match(routingSendsContract.nextStep, /physical_readback:routing_and_sends/);
+  assert.match(routingSendsContract.nextStep, /physical_action:remediate_routing_and_sends/);
+  assert.match(
+    routingSendsContract.nextStep,
+    /families:routing,fx_send_insert,bus_group_matrix,scene_preset,mix_balance,performance_adaptation/,
+  );
+  assert.match(routingSendsContract.nextStep, /static_routes:start,end,role,wing_routing_hint/);
+  assert.match(routingSendsContract.nextStep, /bus_sends:channel,send,level_db,pre_on/);
+  assert.match(routingSendsContract.nextStep, /main_sends:channel,main,level_db,pre/);
+  assert.match(routingSendsContract.nextStep, /matrix_sends:channel,send,target_matrix/);
+  assert.match(routingSendsContract.nextStep, /output_routes:output_group,output_number,source_channel/);
+  assert.match(
+    routingSendsContract.nextStep,
+    /false_safety:live_write,mutates_console_state,live_widening_allowed,full_autonomous_ready/,
+  );
+  assert.match(routingSendsContract.nextStep, /live_authority:false/);
+  assert.match(routingSendsContract.nextStep, /target_consistency:true/);
+
   const readRemediation = rows.find(row => row.moduleId === 'read_surface_remediation_plan');
   assert.equal(readRemediation.domain, 'read_surface_remediation');
   assert.equal(readRemediation.canWriteLive, false);
@@ -1345,7 +1452,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 7);
+  assert.equal(rows.length, 8);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -1403,6 +1510,12 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'fx_contract_gap:false',
     'fx_contract_live_authority:false',
     'fx_contract_target_gate:false',
+    'routing_contract_available:false',
+    'routing_contract_status:missing',
+    'routing_contract_schema:',
+    'routing_contract_gap:false',
+    'routing_contract_live_authority:false',
+    'routing_contract_target_gate:false',
   ]);
 
   assert.equal(rows[1].moduleId, 'raw_mixer_state_physical_readback_contract');
@@ -1446,6 +1559,13 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.equal(rows[6].canWriteLive, false);
   assert.deepEqual(rows[6].liveWriteKinds, []);
   assert.match(rows[6].blockedReason, /contract is missing/);
+
+  assert.equal(rows[7].moduleId, 'routing_sends_physical_readback_contract');
+  assert.equal(rows[7].domain, 'read_surface_contract');
+  assert.equal(rows[7].status, 'contract_missing');
+  assert.equal(rows[7].canWriteLive, false);
+  assert.deepEqual(rows[7].liveWriteKinds, []);
+  assert.match(rows[7].blockedReason, /contract is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

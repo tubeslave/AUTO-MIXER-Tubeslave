@@ -4034,6 +4034,128 @@ def _fx_slots_inserts_readback_contract_quality_from_summary(
     }
 
 
+def _routing_sends_readback_contract_quality_from_summary(
+    summary: Dict[str, Any],
+) -> Dict[str, Any]:
+    contract = (
+        summary.get("routing_sends_physical_readback_contract")
+        if isinstance(summary.get("routing_sends_physical_readback_contract"), dict)
+        else {}
+    )
+    available = bool(contract)
+    surface_id = contract.get("surface_id") if isinstance(contract.get("surface_id"), str) else None
+    action_id = (
+        contract.get("remediation_action_id")
+        if isinstance(contract.get("remediation_action_id"), str)
+        else None
+    )
+    physical_surface_id = (
+        contract.get("physical_readback_surface_id")
+        if isinstance(contract.get("physical_readback_surface_id"), str)
+        else None
+    )
+    physical_action_id = (
+        contract.get("physical_readback_action_id")
+        if isinstance(contract.get("physical_readback_action_id"), str)
+        else None
+    )
+    target_consistent = (
+        available
+        and surface_id == "routing_and_sends"
+        and action_id == "remediate_routing_and_sends"
+        and physical_surface_id == surface_id
+        and physical_action_id == action_id
+        and contract.get("fixture_physical_gap_declared") is True
+        and contract.get("remediation_physical_gap_declared") is True
+        and contract.get("target_consistency") is True
+    )
+    source_live_write_claimed = contract.get("live_write") is True
+    source_candidate_claimed = contract.get("accepted_as_physical_fixture_candidate") is True
+    source_live_authority_claimed = contract.get("live_authority_granted") is True
+    source_full_autonomous_ready_claimed = contract.get("full_autonomous_ready") is True
+    return {
+        "available": available,
+        "status": str(contract.get("status") or "missing"),
+        "schema_id": contract.get("schema_id"),
+        "contract_status": contract.get("contract_status"),
+        "surface_id": surface_id,
+        "remediation_action_id": action_id,
+        "physical_readback_surface_id": physical_surface_id,
+        "physical_readback_action_id": physical_action_id,
+        "artifact_required": contract.get("artifact_required") is True,
+        "physical_fixture_gap_remains": contract.get("physical_fixture_gap_remains") is True,
+        "accepted_as_physical_fixture_candidate": False,
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "source_accepted_as_physical_fixture_candidate_claimed": source_candidate_claimed,
+        "source_live_write_claimed": source_live_write_claimed,
+        "source_live_authority_granted_claimed": source_live_authority_claimed,
+        "source_full_autonomous_ready_claimed": source_full_autonomous_ready_claimed,
+        "fixture_physical_gap_declared": contract.get("fixture_physical_gap_declared") is True,
+        "remediation_physical_gap_declared": (
+            contract.get("remediation_physical_gap_declared") is True
+        ),
+        "target_consistency": target_consistent,
+        "promotion_families_requiring_surface": _string_list_value(
+            contract.get("promotion_families_requiring_surface")
+        ),
+        "required_static_route_fields": _string_list_value(
+            contract.get("required_static_route_fields")
+        ),
+        "required_bus_send_fields": _string_list_value(
+            contract.get("required_bus_send_fields")
+        ),
+        "required_main_send_fields": _string_list_value(
+            contract.get("required_main_send_fields")
+        ),
+        "required_matrix_send_fields": _string_list_value(
+            contract.get("required_matrix_send_fields")
+        ),
+        "required_output_route_fields": _string_list_value(
+            contract.get("required_output_route_fields")
+        ),
+        "required_static_route_coverage_flags": _string_list_value(
+            contract.get("required_static_route_coverage_flags")
+        ),
+        "required_send_coverage_flags": _string_list_value(
+            contract.get("required_send_coverage_flags")
+        ),
+        "required_output_route_coverage_flags": _string_list_value(
+            contract.get("required_output_route_coverage_flags")
+        ),
+        "required_false_safety_flags": _string_list_value(
+            contract.get("required_false_safety_flags")
+        ),
+        "allowed_sources": _string_list_value(contract.get("allowed_sources")),
+        "accepted_row_statuses": _string_list_value(contract.get("accepted_row_statuses")),
+        "forbidden_mutation_evidence_fields": _string_list_value(
+            contract.get("forbidden_mutation_evidence_fields")
+        ),
+        "minimum_static_dante_route_count": _safe_int_value(
+            contract.get("minimum_static_dante_route_count")
+        ),
+        "minimum_channel_bus_send_count": _safe_int_value(
+            contract.get("minimum_channel_bus_send_count")
+        ),
+        "minimum_channel_main_send_count": _safe_int_value(
+            contract.get("minimum_channel_main_send_count")
+        ),
+        "minimum_channel_matrix_send_count": _safe_int_value(
+            contract.get("minimum_channel_matrix_send_count")
+        ),
+        "minimum_output_route_count": _safe_int_value(
+            contract.get("minimum_output_route_count")
+        ),
+        "violations": _string_list_value(contract.get("violations")),
+    }
+
+
 def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any]:
     summary_path = report_path.parent / "summary.json"
     summary = _read_json_file(summary_path)
@@ -4081,6 +4203,9 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
     fx_slots_inserts_contract = _fx_slots_inserts_readback_contract_quality_from_summary(
         summary
     )
+    routing_sends_contract = _routing_sends_readback_contract_quality_from_summary(
+        summary
+    )
     source_full_autonomous_ready = read_surface.get("full_autonomous_ready") is True
     return {
         "available": available,
@@ -4109,6 +4234,7 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
         "bus_group_main_dca_physical_readback_contract": bus_group_main_dca_contract,
         "matrix_state_physical_readback_contract": matrix_state_contract,
         "fx_slots_inserts_physical_readback_contract": fx_slots_inserts_contract,
+        "routing_sends_physical_readback_contract": routing_sends_contract,
         "violations": _string_list_value(read_surface.get("violations")),
     }
 

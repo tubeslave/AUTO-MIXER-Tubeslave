@@ -1933,8 +1933,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     "snapshot_status": "fixture_evidence_incomplete",
                     "surface_count": 10,
                     "surface_with_fixture_count": 10,
-                    "declared_fixture_path_count": 12,
-                    "declared_test_name_count": 31,
+                    "declared_fixture_path_count": 13,
+                    "declared_test_name_count": 34,
                     "physical_gap_surface_count": 10,
                     "summary_recomputed_from_rows": True,
                     "fixture_declaration_validation": True,
@@ -2245,6 +2245,92 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "routing_sends_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "routing_sends_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "routing_and_sends",
+                    "remediation_action_id": "remediate_routing_and_sends",
+                    "physical_readback_surface_id": "routing_and_sends",
+                    "physical_readback_action_id": "remediate_routing_and_sends",
+                    "fixture_physical_gap_declared": True,
+                    "remediation_physical_gap_declared": True,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "routing",
+                        "fx_send_insert",
+                        "bus_group_matrix",
+                        "scene_preset",
+                        "mix_balance",
+                        "performance_adaptation",
+                    ],
+                    "required_static_route_fields": [
+                        "start",
+                        "end",
+                        "role",
+                        "wing_routing_hint",
+                    ],
+                    "required_bus_send_fields": ["channel", "send", "level_db", "pre_on"],
+                    "required_main_send_fields": ["channel", "main", "level_db", "pre"],
+                    "required_matrix_send_fields": ["channel", "send", "target_matrix"],
+                    "required_output_route_fields": [
+                        "output_group",
+                        "output_number",
+                        "source_channel",
+                    ],
+                    "required_static_route_coverage_flags": [
+                        "identity",
+                        "static_config_match",
+                        "physical_route_mapping",
+                        "scoped_diff_marker",
+                    ],
+                    "required_send_coverage_flags": [
+                        "assignment",
+                        "level",
+                        "mode",
+                        "scoped_diff_marker",
+                        "cache_matches_physical_readback",
+                    ],
+                    "required_output_route_coverage_flags": [
+                        "assignment",
+                        "source",
+                        "scoped_diff_marker",
+                        "cache_matches_physical_readback",
+                    ],
+                    "required_false_safety_flags": [
+                        "live_write",
+                        "mutates_console_state",
+                        "live_widening_allowed",
+                        "full_autonomous_ready",
+                    ],
+                    "minimum_static_dante_route_count": 1,
+                    "minimum_channel_bus_send_count": 1,
+                    "minimum_channel_main_send_count": 1,
+                    "minimum_channel_matrix_send_count": 1,
+                    "minimum_output_route_count": 1,
+                    "allowed_sources": [
+                        "physical_readback",
+                        "wing_physical_readback",
+                        "dlive_physical_readback",
+                    ],
+                    "accepted_row_statuses": ["verified_from_physical_readback"],
+                    "forbidden_mutation_evidence_fields": [
+                        "manual_write_events",
+                        "routing_write_events",
+                    ],
+                    "violations": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -2274,8 +2360,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     proof_quality = payload["summary"]["read_surface_proof_quality"]
     assert proof_quality["available"] is True
     assert proof_quality["summary_path"] == str(latest_dir / "summary.json")
-    assert proof_quality["declared_fixture_path_count"] == 12
-    assert proof_quality["declared_test_name_count"] == 31
+    assert proof_quality["declared_fixture_path_count"] == 13
+    assert proof_quality["declared_test_name_count"] == 34
     assert proof_quality["physical_gap_surface_count"] == 10
     assert proof_quality["summary_recomputed_from_rows"] is True
     assert proof_quality["fixture_declaration_validation"] is True
@@ -2459,6 +2545,55 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert fx_contract["minimum_insert_count"] == 1
     assert "physical_readback" in fx_contract["allowed_sources"]
     assert "fx_parameter_write_events" in fx_contract[
+        "forbidden_mutation_evidence_fields"
+    ]
+    routing_contract = proof_quality["routing_sends_physical_readback_contract"]
+    assert routing_contract["available"] is True
+    assert routing_contract["status"] == "passed"
+    assert routing_contract["schema_id"] == "routing_sends_physical_readback.v1"
+    assert routing_contract["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert routing_contract["surface_id"] == "routing_and_sends"
+    assert routing_contract["remediation_action_id"] == "remediate_routing_and_sends"
+    assert routing_contract["artifact_required"] is True
+    assert routing_contract["physical_fixture_gap_remains"] is True
+    assert routing_contract["accepted_as_physical_fixture_candidate"] is False
+    assert routing_contract["live_authority_granted"] is False
+    assert routing_contract["full_autonomous_ready"] is False
+    assert routing_contract["fixture_physical_gap_declared"] is True
+    assert routing_contract["remediation_physical_gap_declared"] is True
+    assert routing_contract["target_consistency"] is True
+    assert routing_contract["promotion_families_requiring_surface"] == [
+        "routing",
+        "fx_send_insert",
+        "bus_group_matrix",
+        "scene_preset",
+        "mix_balance",
+        "performance_adaptation",
+    ]
+    assert "wing_routing_hint" in routing_contract["required_static_route_fields"]
+    assert "pre_on" in routing_contract["required_bus_send_fields"]
+    assert "main" in routing_contract["required_main_send_fields"]
+    assert "target_matrix" in routing_contract["required_matrix_send_fields"]
+    assert "source_channel" in routing_contract["required_output_route_fields"]
+    assert "cache_matches_physical_readback" in routing_contract[
+        "required_send_coverage_flags"
+    ]
+    assert "cache_matches_physical_readback" in routing_contract[
+        "required_output_route_coverage_flags"
+    ]
+    assert routing_contract["required_false_safety_flags"] == [
+        "live_write",
+        "mutates_console_state",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+    ]
+    assert routing_contract["minimum_static_dante_route_count"] == 1
+    assert routing_contract["minimum_channel_bus_send_count"] == 1
+    assert routing_contract["minimum_channel_main_send_count"] == 1
+    assert routing_contract["minimum_channel_matrix_send_count"] == 1
+    assert routing_contract["minimum_output_route_count"] == 1
+    assert "physical_readback" in routing_contract["allowed_sources"]
+    assert "routing_write_events" in routing_contract[
         "forbidden_mutation_evidence_fields"
     ]
     overlay = payload["autonomy_evidence_overlay"]
@@ -2695,6 +2830,44 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["fx_contract_claimed_live_authority"],
                 },
+                "routing_sends_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "routing_sends_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "physical_readback_surface_id": "dlive_state",
+                    "physical_readback_action_id": "remediate_dlive_state",
+                    "fixture_physical_gap_declared": False,
+                    "remediation_physical_gap_declared": False,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "target_consistency": False,
+                    "promotion_families_requiring_surface": ["routing"],
+                    "required_static_route_fields": ["start"],
+                    "required_bus_send_fields": ["channel"],
+                    "required_main_send_fields": ["channel"],
+                    "required_matrix_send_fields": ["channel"],
+                    "required_output_route_fields": ["output_group"],
+                    "required_static_route_coverage_flags": [],
+                    "required_send_coverage_flags": [],
+                    "required_output_route_coverage_flags": [],
+                    "required_false_safety_flags": ["live_write"],
+                    "minimum_static_dante_route_count": 0,
+                    "minimum_channel_bus_send_count": 0,
+                    "minimum_channel_main_send_count": 0,
+                    "minimum_channel_matrix_send_count": 0,
+                    "minimum_output_route_count": 0,
+                    "allowed_sources": ["physical_readback", "mixer_state_cache"],
+                    "accepted_row_statuses": ["verified_from_cache"],
+                    "forbidden_mutation_evidence_fields": [],
+                    "violations": ["routing_contract_claimed_live_authority"],
+                },
             }
         ),
         encoding="utf-8",
@@ -2822,6 +2995,30 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert fx_contract["minimum_fx_parameter_count"] == 0
     assert fx_contract["minimum_insert_count"] == 0
     assert "fx_contract_claimed_live_authority" in fx_contract["violations"]
+    routing_contract = payload["summary"]["read_surface_proof_quality"][
+        "routing_sends_physical_readback_contract"
+    ]
+    assert routing_contract["available"] is True
+    assert routing_contract["surface_id"] == "dlive_state"
+    assert routing_contract["physical_readback_surface_id"] == "dlive_state"
+    assert routing_contract["target_consistency"] is False
+    assert routing_contract["accepted_as_physical_fixture_candidate"] is False
+    assert routing_contract["read_only"] is True
+    assert routing_contract["live_write"] is False
+    assert routing_contract["live_authority_granted"] is False
+    assert routing_contract["full_autonomous_ready"] is False
+    assert routing_contract["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert routing_contract["source_live_write_claimed"] is True
+    assert routing_contract["source_live_authority_granted_claimed"] is True
+    assert routing_contract["source_full_autonomous_ready_claimed"] is True
+    assert routing_contract["promotion_families_requiring_surface"] == ["routing"]
+    assert routing_contract["required_false_safety_flags"] == ["live_write"]
+    assert routing_contract["minimum_static_dante_route_count"] == 0
+    assert routing_contract["minimum_channel_bus_send_count"] == 0
+    assert routing_contract["minimum_channel_main_send_count"] == 0
+    assert routing_contract["minimum_channel_matrix_send_count"] == 0
+    assert routing_contract["minimum_output_route_count"] == 0
+    assert "routing_contract_claimed_live_authority" in routing_contract["violations"]
     assert "set_gain" not in set(_walk_keys(payload))
 
 

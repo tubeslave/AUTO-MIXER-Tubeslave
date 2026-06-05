@@ -180,10 +180,16 @@ FIXTURE_EVIDENCE_BY_SURFACE: Dict[str, Dict[str, Tuple[str, ...]]] = {
         ),
     },
     "routing_and_sends": {
-        "fixture_paths": ("tests/test_operator_product_state.py",),
+        "fixture_paths": (
+            "tests/test_operator_product_state.py",
+            "tests/test_routing_sends_physical_readback_contract.py",
+        ),
         "test_names": (
             "test_routing_sends_snapshot_publishes_static_and_cached_state_without_queries",
             "test_routing_sends_snapshot_marks_missing_cache_without_queries",
+            "test_routing_sends_contract_describes_future_physical_artifact",
+            "test_routing_sends_contract_validates_minimal_physical_artifact",
+            "test_routing_sends_contract_rejects_live_or_cached_claims",
         ),
         "covered_contracts": (
             "static_routing_roles",
@@ -191,6 +197,7 @@ FIXTURE_EVIDENCE_BY_SURFACE: Dict[str, Dict[str, Tuple[str, ...]]] = {
             "cached_matrix_send_state",
             "send_cache_freshness",
             "stale_cache_detection",
+            "physical_readback_artifact_contract",
             "destructive_route_marker",
             "no_console_query",
         ),

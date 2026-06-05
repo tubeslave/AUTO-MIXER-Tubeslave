@@ -117,6 +117,18 @@ def test_plan_creates_actions_for_current_partial_and_missing_read_surfaces():
     )
     assert fx_slots_inserts["mutates_console_state"] is False
 
+    routing_sends = actions["routing_and_sends"]
+    assert routing_sends["action_type"] == "complete_read_dto"
+    assert routing_sends["physical_readback_gap"] is True
+    assert routing_sends["next_physical_readback_target"] is False
+    assert "destructive_change_diff_marker" in routing_sends["missing_contracts"]
+    assert "physical_readback_fixture" in routing_sends["missing_contracts"]
+    assert any(
+        "routing_sends_physical_readback_contract" in artifact
+        for artifact in routing_sends["expected_artifacts"]
+    )
+    assert routing_sends["mutates_console_state"] is False
+
     presets = actions["user_presets"]
     assert presets["action_type"] == "complete_read_dto"
     assert "enumeration_contract" in presets["missing_contracts"]

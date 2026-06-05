@@ -156,6 +156,32 @@ from backend.raw_mixer_state_physical_readback_contract import (  # noqa: E402
     VERIFIED_PHYSICAL_ROW_STATUSES,
     build_raw_mixer_state_physical_readback_contract,
 )
+from backend.routing_sends_physical_readback_contract import (  # noqa: E402
+    MINIMUM_CHANNEL_BUS_SEND_COUNT,
+    MINIMUM_CHANNEL_MAIN_SEND_COUNT,
+    MINIMUM_CHANNEL_MATRIX_SEND_COUNT,
+    MINIMUM_OUTPUT_ROUTE_COUNT,
+    MINIMUM_STATIC_DANTE_ROUTE_COUNT,
+    ROUTING_SENDS_FORBIDDEN_MUTATION_EVIDENCE_FIELDS,
+    ROUTING_SENDS_PHYSICAL_READBACK_ARTIFACT_TYPE,
+    ROUTING_SENDS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+    ROUTING_SENDS_PHYSICAL_READBACK_SCHEMA_ID,
+    ROUTING_SENDS_PHYSICAL_READBACK_SOURCES,
+    ROUTING_SENDS_REMEDIATION_ACTION_ID,
+    ROUTING_SENDS_REQUIRED_BUS_SEND_FIELDS,
+    ROUTING_SENDS_REQUIRED_FALSE_SAFETY_FLAGS,
+    ROUTING_SENDS_REQUIRED_MAIN_SEND_FIELDS,
+    ROUTING_SENDS_REQUIRED_MATRIX_SEND_FIELDS,
+    ROUTING_SENDS_REQUIRED_OUTPUT_ROUTE_COVERAGE_FLAGS,
+    ROUTING_SENDS_REQUIRED_OUTPUT_ROUTE_FIELDS,
+    ROUTING_SENDS_REQUIRED_SEND_COVERAGE_FLAGS,
+    ROUTING_SENDS_REQUIRED_STATIC_ROUTE_COVERAGE_FLAGS,
+    ROUTING_SENDS_REQUIRED_STATIC_ROUTE_FIELDS,
+    ROUTING_SENDS_REQUIRED_TOP_LEVEL_FIELDS,
+    ROUTING_SENDS_SURFACE_ID,
+    ROUTING_SENDS_VERIFIED_PHYSICAL_STATUSES,
+    build_routing_sends_physical_readback_contract,
+)
 from backend.read_surface_remediation_plan import build_read_surface_remediation_plan  # noqa: E402
 
 DEFAULT_ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "no_wing_release_check"
@@ -346,6 +372,7 @@ def build_checks(
                 "tests/test_bus_group_main_dca_physical_readback_contract.py",
                 "tests/test_matrix_state_physical_readback_contract.py",
                 "tests/test_fx_slots_inserts_physical_readback_contract.py",
+                "tests/test_routing_sends_physical_readback_contract.py",
                 "-q",
                 "--tb=short",
             ),
@@ -2518,6 +2545,243 @@ def validate_fx_slots_inserts_physical_readback_contract_snapshot() -> CheckResu
     )
 
 
+def validate_routing_sends_physical_readback_contract_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "routing_sends_readback_contract_is_schema_only_no_live_authority",
+    }
+    violations: list[str] = []
+
+    try:
+        fixture_snapshot = build_read_surface_fixture_evidence_snapshot()
+        remediation_plan = build_read_surface_remediation_plan(
+            fixture_evidence_snapshot=fixture_snapshot
+        )
+        contract = build_routing_sends_physical_readback_contract()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        fixture_snapshot = {}
+        remediation_plan = {}
+        contract = {}
+        violations.append(f"routing_sends_readback_contract_build_error:{type(exc).__name__}")
+
+    fixture_summary = (
+        fixture_snapshot.get("summary")
+        if isinstance(fixture_snapshot.get("summary"), Mapping)
+        else {}
+    )
+    remediation_actions = (
+        remediation_plan.get("actions")
+        if isinstance(remediation_plan.get("actions"), list)
+        else []
+    )
+    safety = contract.get("safety") if isinstance(contract.get("safety"), Mapping) else {}
+    contract_summary = (
+        contract.get("summary") if isinstance(contract.get("summary"), Mapping) else {}
+    )
+    artifact_contract = (
+        contract.get("artifact_contract")
+        if isinstance(contract.get("artifact_contract"), Mapping)
+        else {}
+    )
+
+    if contract.get("type") != "routing_sends_physical_readback_contract":
+        violations.append("routing_sends_readback_contract_type_mismatch")
+    if contract.get("method_id") != ROUTING_SENDS_PHYSICAL_READBACK_CONTRACT_METHOD_ID:
+        violations.append("routing_sends_readback_contract_method_id_mismatch")
+    if contract.get("schema_id") != ROUTING_SENDS_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("routing_sends_readback_contract_schema_id_mismatch")
+    if contract.get("status") != "contract_ready_physical_fixture_missing":
+        violations.append("routing_sends_readback_contract_status_mismatch")
+    if contract.get("surface_id") != ROUTING_SENDS_SURFACE_ID:
+        violations.append("routing_sends_readback_contract_surface_id_mismatch")
+    if contract.get("remediation_action_id") != ROUTING_SENDS_REMEDIATION_ACTION_ID:
+        violations.append("routing_sends_readback_contract_action_id_mismatch")
+
+    if safety.get("read_only") is not True:
+        violations.append("routing_sends_readback_contract_read_only_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"routing_sends_readback_contract_{key}_not_false")
+
+    if artifact_contract.get("type") != ROUTING_SENDS_PHYSICAL_READBACK_ARTIFACT_TYPE:
+        violations.append("routing_sends_readback_artifact_type_mismatch")
+    if artifact_contract.get("schema_id") != ROUTING_SENDS_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("routing_sends_readback_artifact_schema_id_mismatch")
+
+    minimums = {
+        "minimum_static_dante_route_count": MINIMUM_STATIC_DANTE_ROUTE_COUNT,
+        "minimum_channel_bus_send_count": MINIMUM_CHANNEL_BUS_SEND_COUNT,
+        "minimum_channel_main_send_count": MINIMUM_CHANNEL_MAIN_SEND_COUNT,
+        "minimum_channel_matrix_send_count": MINIMUM_CHANNEL_MATRIX_SEND_COUNT,
+        "minimum_output_route_count": MINIMUM_OUTPUT_ROUTE_COUNT,
+    }
+    for key, expected in minimums.items():
+        if artifact_contract.get(key) != expected:
+            violations.append(f"routing_sends_readback_artifact_{key}_mismatch")
+
+    expected_lists = {
+        "required_top_level_fields": ROUTING_SENDS_REQUIRED_TOP_LEVEL_FIELDS,
+        "required_static_route_fields": ROUTING_SENDS_REQUIRED_STATIC_ROUTE_FIELDS,
+        "required_bus_send_fields": ROUTING_SENDS_REQUIRED_BUS_SEND_FIELDS,
+        "required_main_send_fields": ROUTING_SENDS_REQUIRED_MAIN_SEND_FIELDS,
+        "required_matrix_send_fields": ROUTING_SENDS_REQUIRED_MATRIX_SEND_FIELDS,
+        "required_output_route_fields": ROUTING_SENDS_REQUIRED_OUTPUT_ROUTE_FIELDS,
+        "required_static_route_coverage_flags": (
+            ROUTING_SENDS_REQUIRED_STATIC_ROUTE_COVERAGE_FLAGS
+        ),
+        "required_send_coverage_flags": ROUTING_SENDS_REQUIRED_SEND_COVERAGE_FLAGS,
+        "required_output_route_coverage_flags": (
+            ROUTING_SENDS_REQUIRED_OUTPUT_ROUTE_COVERAGE_FLAGS
+        ),
+        "required_false_safety_flags": ROUTING_SENDS_REQUIRED_FALSE_SAFETY_FLAGS,
+    }
+    list_details: dict[str, list[object]] = {}
+    for key, expected in expected_lists.items():
+        value = artifact_contract.get(key)
+        if not isinstance(value, list) or value != list(expected):
+            violations.append(f"routing_sends_readback_{key}_mismatch")
+            list_details[key] = []
+        else:
+            list_details[key] = list(value)
+
+    allowed_sources = artifact_contract.get("allowed_sources")
+    if not isinstance(allowed_sources, list):
+        allowed_sources = []
+        violations.append("routing_sends_readback_allowed_sources_missing")
+    elif list(allowed_sources) != list(ROUTING_SENDS_PHYSICAL_READBACK_SOURCES):
+        violations.append("routing_sends_readback_allowed_sources_mismatch")
+    if "mixer_state_cache" in allowed_sources or "cache" in allowed_sources:
+        violations.append("routing_sends_readback_allows_cached_source")
+
+    accepted_statuses = artifact_contract.get("accepted_row_statuses")
+    if (
+        not isinstance(accepted_statuses, list)
+        or accepted_statuses != list(ROUTING_SENDS_VERIFIED_PHYSICAL_STATUSES)
+    ):
+        violations.append("routing_sends_readback_accepted_statuses_mismatch")
+        accepted_statuses = []
+    forbidden_mutation_fields = artifact_contract.get("forbidden_mutation_evidence_fields")
+    if (
+        not isinstance(forbidden_mutation_fields, list)
+        or forbidden_mutation_fields
+        != list(ROUTING_SENDS_FORBIDDEN_MUTATION_EVIDENCE_FIELDS)
+    ):
+        violations.append("routing_sends_readback_forbidden_mutation_fields_mismatch")
+        forbidden_mutation_fields = []
+
+    physical_gap_ids = fixture_summary.get("physical_fixture_missing_surface_ids")
+    if not isinstance(physical_gap_ids, list):
+        physical_gap_ids = []
+        violations.append("routing_sends_fixture_physical_gap_ids_missing")
+    if ROUTING_SENDS_SURFACE_ID not in physical_gap_ids:
+        violations.append("routing_sends_fixture_gap_not_declared")
+
+    remediation_action = {}
+    for action in remediation_actions:
+        if isinstance(action, Mapping) and action.get("surface_id") == ROUTING_SENDS_SURFACE_ID:
+            remediation_action = dict(action)
+            break
+    if not remediation_action:
+        violations.append("routing_sends_remediation_action_missing")
+    elif remediation_action.get("id") != ROUTING_SENDS_REMEDIATION_ACTION_ID:
+        violations.append("routing_sends_remediation_action_id_mismatch")
+    if remediation_action and remediation_action.get("physical_readback_gap") is not True:
+        violations.append("routing_sends_remediation_physical_gap_not_true")
+
+    if contract_summary.get("physical_readback_surface_id") != ROUTING_SENDS_SURFACE_ID:
+        violations.append("routing_sends_contract_surface_summary_mismatch")
+    if contract_summary.get("physical_readback_action_id") != ROUTING_SENDS_REMEDIATION_ACTION_ID:
+        violations.append("routing_sends_contract_action_summary_mismatch")
+    if contract_summary.get("artifact_required") is not True:
+        violations.append("routing_sends_contract_artifact_required_not_true")
+    if contract_summary.get("physical_fixture_gap_remains") is not True:
+        violations.append("routing_sends_contract_physical_gap_not_true")
+    if contract_summary.get("accepted_as_physical_fixture_candidate") is not False:
+        violations.append("routing_sends_contract_candidate_not_false")
+    if contract_summary.get("live_authority_granted") is not False:
+        violations.append("routing_sends_contract_live_authority_not_false")
+    promotion_families = contract_summary.get("promotion_families_requiring_surface")
+    if not isinstance(promotion_families, list):
+        promotion_families = []
+        violations.append("routing_sends_promotion_families_missing")
+    for family in ("routing", "fx_send_insert", "scene_preset"):
+        if family not in promotion_families:
+            violations.append(f"routing_sends_promotion_family_missing:{family}")
+
+    detail["contract_status"] = contract.get("status")
+    detail["schema_id"] = contract.get("schema_id")
+    detail["surface_id"] = contract.get("surface_id")
+    detail["remediation_action_id"] = contract.get("remediation_action_id")
+    detail["physical_readback_surface_id"] = contract_summary.get("physical_readback_surface_id")
+    detail["physical_readback_action_id"] = contract_summary.get("physical_readback_action_id")
+    detail["fixture_physical_gap_declared"] = ROUTING_SENDS_SURFACE_ID in physical_gap_ids
+    detail["remediation_physical_gap_declared"] = bool(
+        remediation_action and remediation_action.get("physical_readback_gap") is True
+    )
+    detail["artifact_required"] = contract_summary.get("artifact_required")
+    detail["physical_fixture_gap_remains"] = contract_summary.get("physical_fixture_gap_remains")
+    detail["accepted_as_physical_fixture_candidate"] = contract_summary.get(
+        "accepted_as_physical_fixture_candidate"
+    )
+    detail["live_authority_granted"] = contract_summary.get("live_authority_granted")
+    detail["promotion_families_requiring_surface"] = list(promotion_families)
+    detail["required_top_level_field_count"] = len(
+        list_details.get("required_top_level_fields", [])
+    )
+    detail["required_static_route_field_count"] = len(
+        list_details.get("required_static_route_fields", [])
+    )
+    detail["required_static_route_fields"] = list(
+        list_details.get("required_static_route_fields", [])
+    )
+    detail["required_bus_send_fields"] = list(
+        list_details.get("required_bus_send_fields", [])
+    )
+    detail["required_main_send_fields"] = list(
+        list_details.get("required_main_send_fields", [])
+    )
+    detail["required_matrix_send_fields"] = list(
+        list_details.get("required_matrix_send_fields", [])
+    )
+    detail["required_output_route_fields"] = list(
+        list_details.get("required_output_route_fields", [])
+    )
+    detail["required_static_route_coverage_flags"] = list(
+        list_details.get("required_static_route_coverage_flags", [])
+    )
+    detail["required_send_coverage_flags"] = list(
+        list_details.get("required_send_coverage_flags", [])
+    )
+    detail["required_output_route_coverage_flags"] = list(
+        list_details.get("required_output_route_coverage_flags", [])
+    )
+    detail["required_false_safety_flags"] = list(
+        list_details.get("required_false_safety_flags", [])
+    )
+    for key in minimums:
+        detail[key] = int(artifact_contract.get(key) or 0)
+    detail["allowed_sources"] = list(allowed_sources)
+    detail["accepted_row_statuses"] = list(accepted_statuses)
+    detail["forbidden_mutation_evidence_fields"] = list(forbidden_mutation_fields)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="routing_sends_physical_readback_contract_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_supervised_proof_report_gain_dry_run(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -3610,6 +3874,142 @@ def fx_slots_inserts_readback_contract_summary(
     return None
 
 
+def routing_sends_readback_contract_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "routing_sends_physical_readback_contract_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        allowed_sources = detail.get("allowed_sources")
+        accepted_statuses = detail.get("accepted_row_statuses")
+        forbidden_mutation_fields = detail.get("forbidden_mutation_evidence_fields")
+        required_false_flags = detail.get("required_false_safety_flags")
+        promotion_families = detail.get("promotion_families_requiring_surface")
+        required_static_route_fields = detail.get("required_static_route_fields")
+        required_bus_send_fields = detail.get("required_bus_send_fields")
+        required_main_send_fields = detail.get("required_main_send_fields")
+        required_matrix_send_fields = detail.get("required_matrix_send_fields")
+        required_output_route_fields = detail.get("required_output_route_fields")
+        required_static_route_coverage_flags = detail.get(
+            "required_static_route_coverage_flags"
+        )
+        required_send_coverage_flags = detail.get("required_send_coverage_flags")
+        required_output_route_coverage_flags = detail.get(
+            "required_output_route_coverage_flags"
+        )
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "live_widening_allowed": False,
+            "full_autonomous_ready": False,
+            "schema_id": detail.get("schema_id"),
+            "contract_status": detail.get("contract_status"),
+            "surface_id": detail.get("surface_id"),
+            "remediation_action_id": detail.get("remediation_action_id"),
+            "physical_readback_surface_id": detail.get("physical_readback_surface_id"),
+            "physical_readback_action_id": detail.get("physical_readback_action_id"),
+            "fixture_physical_gap_declared": detail.get("fixture_physical_gap_declared") is True,
+            "remediation_physical_gap_declared": (
+                detail.get("remediation_physical_gap_declared") is True
+            ),
+            "artifact_required": detail.get("artifact_required") is True,
+            "physical_fixture_gap_remains": detail.get("physical_fixture_gap_remains") is True,
+            "accepted_as_physical_fixture_candidate": (
+                detail.get("accepted_as_physical_fixture_candidate") is True
+            ),
+            "live_authority_granted": detail.get("live_authority_granted") is True,
+            "promotion_families_requiring_surface": (
+                list(promotion_families) if isinstance(promotion_families, list) else []
+            ),
+            "required_top_level_field_count": int(detail.get("required_top_level_field_count") or 0),
+            "required_static_route_field_count": int(
+                detail.get("required_static_route_field_count") or 0
+            ),
+            "required_static_route_fields": (
+                list(required_static_route_fields)
+                if isinstance(required_static_route_fields, list)
+                else []
+            ),
+            "required_bus_send_fields": (
+                list(required_bus_send_fields)
+                if isinstance(required_bus_send_fields, list)
+                else []
+            ),
+            "required_main_send_fields": (
+                list(required_main_send_fields)
+                if isinstance(required_main_send_fields, list)
+                else []
+            ),
+            "required_matrix_send_fields": (
+                list(required_matrix_send_fields)
+                if isinstance(required_matrix_send_fields, list)
+                else []
+            ),
+            "required_output_route_fields": (
+                list(required_output_route_fields)
+                if isinstance(required_output_route_fields, list)
+                else []
+            ),
+            "required_static_route_coverage_flags": (
+                list(required_static_route_coverage_flags)
+                if isinstance(required_static_route_coverage_flags, list)
+                else []
+            ),
+            "required_send_coverage_flags": (
+                list(required_send_coverage_flags)
+                if isinstance(required_send_coverage_flags, list)
+                else []
+            ),
+            "required_output_route_coverage_flags": (
+                list(required_output_route_coverage_flags)
+                if isinstance(required_output_route_coverage_flags, list)
+                else []
+            ),
+            "required_false_safety_flags": (
+                list(required_false_flags) if isinstance(required_false_flags, list) else []
+            ),
+            "minimum_static_dante_route_count": int(
+                detail.get("minimum_static_dante_route_count") or 0
+            ),
+            "minimum_channel_bus_send_count": int(
+                detail.get("minimum_channel_bus_send_count") or 0
+            ),
+            "minimum_channel_main_send_count": int(
+                detail.get("minimum_channel_main_send_count") or 0
+            ),
+            "minimum_channel_matrix_send_count": int(
+                detail.get("minimum_channel_matrix_send_count") or 0
+            ),
+            "minimum_output_route_count": int(
+                detail.get("minimum_output_route_count") or 0
+            ),
+            "allowed_sources": list(allowed_sources) if isinstance(allowed_sources, list) else [],
+            "accepted_row_statuses": (
+                list(accepted_statuses) if isinstance(accepted_statuses, list) else []
+            ),
+            "forbidden_mutation_evidence_fields": (
+                list(forbidden_mutation_fields)
+                if isinstance(forbidden_mutation_fields, list)
+                else []
+            ),
+            "target_consistency": (
+                detail.get("physical_readback_surface_id") == detail.get("surface_id")
+                and detail.get("physical_readback_action_id")
+                == detail.get("remediation_action_id")
+                and detail.get("fixture_physical_gap_declared") is True
+                and detail.get("remediation_physical_gap_declared") is True
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "next_wing_proof_plan_schema":
@@ -3649,6 +4049,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     bus_group_main_dca_contract = bus_group_main_dca_readback_contract_summary(results)
     matrix_state_contract = matrix_state_readback_contract_summary(results)
     fx_slots_inserts_contract = fx_slots_inserts_readback_contract_summary(results)
+    routing_sends_contract = routing_sends_readback_contract_summary(results)
     next_plan = next_wing_proof_plan_summary(results)
     summary = {
         "type": "no_wing_release_check",
@@ -3681,6 +4082,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["matrix_state_physical_readback_contract"] = matrix_state_contract
     if fx_slots_inserts_contract is not None:
         summary["fx_slots_inserts_physical_readback_contract"] = fx_slots_inserts_contract
+    if routing_sends_contract is not None:
+        summary["routing_sends_physical_readback_contract"] = routing_sends_contract
     if next_plan is not None:
         summary["next_wing_proof_plan"] = next_plan
     summary_path = run_dir / "summary.json"
@@ -4196,6 +4599,87 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(fx_slots_inserts_contract['violations'])}`",
             ]
         )
+    if routing_sends_contract is not None:
+        lines.extend(
+            [
+                "",
+                "## Routing Sends Physical Readback Contract",
+                "",
+                f"- schema_check: `{routing_sends_contract['status']}`",
+                f"- read_only: `{str(routing_sends_contract['read_only']).lower()}`",
+                f"- live_write: `{str(routing_sends_contract['live_write']).lower()}`",
+                "- mutates_console_state: "
+                f"`{str(routing_sends_contract['mutates_console_state']).lower()}`",
+                f"- queries_console: `{str(routing_sends_contract['queries_console']).lower()}`",
+                f"- executes_tests: `{str(routing_sends_contract['executes_tests']).lower()}`",
+                "- live_widening_allowed: "
+                f"`{str(routing_sends_contract['live_widening_allowed']).lower()}`",
+                "- full_autonomous_ready: "
+                f"`{str(routing_sends_contract['full_autonomous_ready']).lower()}`",
+                f"- schema_id: `{routing_sends_contract['schema_id']}`",
+                f"- contract_status: `{routing_sends_contract['contract_status']}`",
+                f"- surface_id: `{routing_sends_contract['surface_id']}`",
+                f"- remediation_action_id: `{routing_sends_contract['remediation_action_id']}`",
+                "- physical_readback_surface_id: "
+                f"`{routing_sends_contract['physical_readback_surface_id']}`",
+                "- physical_readback_action_id: "
+                f"`{routing_sends_contract['physical_readback_action_id']}`",
+                "- fixture_physical_gap_declared: "
+                f"`{str(routing_sends_contract['fixture_physical_gap_declared']).lower()}`",
+                "- remediation_physical_gap_declared: "
+                f"`{str(routing_sends_contract['remediation_physical_gap_declared']).lower()}`",
+                "- artifact_required: "
+                f"`{str(routing_sends_contract['artifact_required']).lower()}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(routing_sends_contract['physical_fixture_gap_remains']).lower()}`",
+                "- accepted_as_physical_fixture_candidate: "
+                f"`{str(routing_sends_contract['accepted_as_physical_fixture_candidate']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(routing_sends_contract['live_authority_granted']).lower()}`",
+                "- promotion_families_requiring_surface: "
+                f"`{json.dumps(routing_sends_contract['promotion_families_requiring_surface'])}`",
+                "- required_top_level_field_count: "
+                f"`{routing_sends_contract['required_top_level_field_count']}`",
+                "- required_static_route_field_count: "
+                f"`{routing_sends_contract['required_static_route_field_count']}`",
+                "- required_static_route_fields: "
+                f"`{json.dumps(routing_sends_contract['required_static_route_fields'])}`",
+                "- required_bus_send_fields: "
+                f"`{json.dumps(routing_sends_contract['required_bus_send_fields'])}`",
+                "- required_main_send_fields: "
+                f"`{json.dumps(routing_sends_contract['required_main_send_fields'])}`",
+                "- required_matrix_send_fields: "
+                f"`{json.dumps(routing_sends_contract['required_matrix_send_fields'])}`",
+                "- required_output_route_fields: "
+                f"`{json.dumps(routing_sends_contract['required_output_route_fields'])}`",
+                "- required_static_route_coverage_flags: "
+                f"`{json.dumps(routing_sends_contract['required_static_route_coverage_flags'])}`",
+                "- required_send_coverage_flags: "
+                f"`{json.dumps(routing_sends_contract['required_send_coverage_flags'])}`",
+                "- required_output_route_coverage_flags: "
+                f"`{json.dumps(routing_sends_contract['required_output_route_coverage_flags'])}`",
+                "- required_false_safety_flags: "
+                f"`{json.dumps(routing_sends_contract['required_false_safety_flags'])}`",
+                "- minimum_static_dante_route_count: "
+                f"`{routing_sends_contract['minimum_static_dante_route_count']}`",
+                "- minimum_channel_bus_send_count: "
+                f"`{routing_sends_contract['minimum_channel_bus_send_count']}`",
+                "- minimum_channel_main_send_count: "
+                f"`{routing_sends_contract['minimum_channel_main_send_count']}`",
+                "- minimum_channel_matrix_send_count: "
+                f"`{routing_sends_contract['minimum_channel_matrix_send_count']}`",
+                f"- minimum_output_route_count: `{routing_sends_contract['minimum_output_route_count']}`",
+                "- allowed_sources: "
+                f"`{json.dumps(routing_sends_contract['allowed_sources'])}`",
+                "- accepted_row_statuses: "
+                f"`{json.dumps(routing_sends_contract['accepted_row_statuses'])}`",
+                "- forbidden_mutation_evidence_fields: "
+                f"`{json.dumps(routing_sends_contract['forbidden_mutation_evidence_fields'])}`",
+                "- target_consistency: "
+                f"`{str(routing_sends_contract['target_consistency']).lower()}`",
+                f"- violations: `{json.dumps(routing_sends_contract['violations'])}`",
+            ]
+        )
     if next_plan is not None:
         lines.extend(
             [
@@ -4309,6 +4793,15 @@ def run_release_checks(
             results.append(fx_slots_inserts_contract_result)
             if (
                 fx_slots_inserts_contract_result.status != "passed"
+                and not continue_on_failure
+            ):
+                break
+            routing_sends_contract_result = (
+                validate_routing_sends_physical_readback_contract_snapshot()
+            )
+            results.append(routing_sends_contract_result)
+            if (
+                routing_sends_contract_result.status != "passed"
                 and not continue_on_failure
             ):
                 break

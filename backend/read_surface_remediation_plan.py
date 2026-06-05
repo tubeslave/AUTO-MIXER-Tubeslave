@@ -38,6 +38,10 @@ try:
         RAW_MIXER_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         RAW_MIXER_STATE_SURFACE_ID,
     )
+    from routing_sends_physical_readback_contract import (
+        ROUTING_SENDS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        ROUTING_SENDS_SURFACE_ID,
+    )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.bus_group_main_dca_physical_readback_contract import (
         BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
@@ -64,6 +68,10 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.raw_mixer_state_physical_readback_contract import (
         RAW_MIXER_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         RAW_MIXER_STATE_SURFACE_ID,
+    )
+    from backend.routing_sends_physical_readback_contract import (
+        ROUTING_SENDS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        ROUTING_SENDS_SURFACE_ID,
     )
 
 
@@ -232,6 +240,11 @@ def _expected_artifacts(surface: ReadSurface, *, physical_readback_gap: bool) ->
             artifacts.append(
                 "FX slots/inserts physical readback artifact validated by "
                 f"{FX_SLOTS_INSERTS_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
+            )
+        if surface.id == ROUTING_SENDS_SURFACE_ID:
+            artifacts.append(
+                "Routing/sends physical readback artifact validated by "
+                f"{ROUTING_SENDS_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
             )
     return tuple(artifacts)
 
