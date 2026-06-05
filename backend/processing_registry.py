@@ -63,6 +63,9 @@ try:
     from raw_mixer_state_physical_readback_artifact_intake import (
         build_raw_mixer_state_physical_readback_artifact_intake,
     )
+    from read_surface_physical_readback_artifact_review_queue import (
+        build_read_surface_physical_readback_artifact_review_queue,
+    )
     from routing_sends_physical_readback_contract import (
         build_routing_sends_physical_readback_contract,
     )
@@ -134,6 +137,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.raw_mixer_state_physical_readback_artifact_intake import (
         build_raw_mixer_state_physical_readback_artifact_intake,
+    )
+    from backend.read_surface_physical_readback_artifact_review_queue import (
+        build_read_surface_physical_readback_artifact_review_queue,
     )
     from backend.routing_sends_physical_readback_contract import (
         build_routing_sends_physical_readback_contract,
@@ -1004,6 +1010,31 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "midi_tcp_writes_blocked",
             "dlive_writes_blocked",
             "fixture_closure_allowed_by_intake_false",
+        ),
+    ),
+    ProcessingMethod(
+        id="read_surface_physical_readback_artifact_review_queue",
+        label="Read Surface Physical Readback Artifact Review Queue",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Read-only aggregate queue for operator review of all physical "
+            "readback artifact-intake candidates."
+        ),
+        module="backend/read_surface_physical_readback_artifact_review_queue.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="artifact_review_queue_only_operator_review_required",
+        promotion_next=(
+            "operator reviews valid artifact candidates and replaces invalid "
+            "ones before any physical fixture gap can be closed"
+        ),
+        notes=(
+            "transport_free",
+            "artifact_review_queue_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "fixture_closure_allowed_by_queue_false",
         ),
     ),
     ProcessingMethod(
@@ -2032,6 +2063,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, dLive-state physical artifact intake",
         "next_step": "Use only to surface operator-captured dLive-state candidates; manual review still gates fixture closure.",
     },
+    "read_surface_physical_readback_artifact_review_queue": {
+        "entrypoint": "build_read_surface_physical_readback_artifact_review_queue",
+        "ui_surface": "Processing registry, physical artifact review queue",
+        "next_step": "Use only to aggregate artifact-intake review work; do not close fixtures or grant live authority.",
+    },
     "auto_fader_v1": {
         "entrypoint": "main_pipeline_preview proposal adapter",
         "ui_surface": "Task Queue preview/proposal rows",
@@ -2307,6 +2343,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "dlive_state_physical_readback_artifact_intake": (
             build_dlive_state_physical_readback_artifact_intake()
+        ),
+        "read_surface_physical_readback_artifact_review_queue": (
+            build_read_surface_physical_readback_artifact_review_queue()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),

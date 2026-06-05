@@ -502,6 +502,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "user_presets_physical_readback_artifact_intake",
             "dlive_state_physical_readback_contract",
             "dlive_state_physical_readback_artifact_intake",
+            "read_surface_physical_readback_artifact_review_queue",
         ),
         support_paths=(
             "backend/read_surface_inventory.py",
@@ -528,6 +529,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/user_presets_physical_readback_artifact_intake.py",
             "backend/dlive_state_physical_readback_contract.py",
             "backend/dlive_state_physical_readback_artifact_intake.py",
+            "backend/read_surface_physical_readback_artifact_review_queue.py",
             "backend/wing_client.py",
             "backend/dlive_client.py",
         ),

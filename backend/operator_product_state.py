@@ -5637,6 +5637,111 @@ def _dlive_state_readback_artifact_intake_quality_from_summary(
     }
 
 
+def _read_surface_artifact_review_queue_quality_from_summary(
+    summary: Dict[str, Any],
+) -> Dict[str, Any]:
+    queue = (
+        summary.get("read_surface_physical_readback_artifact_review_queue")
+        if isinstance(summary.get("read_surface_physical_readback_artifact_review_queue"), dict)
+        else {}
+    )
+    available = bool(queue)
+    source_fixture_closure_claimed = queue.get("fixture_closure_allowed_by_queue") is True
+    source_live_write_claimed = queue.get("live_write") is True
+    source_mutation_claimed = queue.get("mutates_console_state") is True
+    source_query_claimed = queue.get("queries_console") is True
+    source_executes_tests_claimed = queue.get("executes_tests") is True
+    source_execution_claimed = queue.get("execution_allowed_by_queue") is True
+    source_live_authority_claimed = queue.get("live_authority_granted") is True
+    source_full_autonomous_ready_claimed = queue.get("full_autonomous_ready") is True
+    unsafe_claimed = (
+        source_fixture_closure_claimed
+        or source_live_write_claimed
+        or source_mutation_claimed
+        or source_query_claimed
+        or source_executes_tests_claimed
+        or source_execution_claimed
+        or source_live_authority_claimed
+        or source_full_autonomous_ready_claimed
+    )
+    invalid_candidate_count = _safe_int_value(queue.get("invalid_candidate_count"))
+    unsafe_authority_claim_count = _safe_int_value(queue.get("unsafe_authority_claim_count"))
+    target_inconsistent_surface_count = _safe_int_value(
+        queue.get("target_inconsistent_surface_count")
+    )
+    review_candidate_count = _safe_int_value(queue.get("review_candidate_count"))
+    review_candidates_available = (
+        available
+        and queue.get("status") == "passed"
+        and review_candidate_count > 0
+        and invalid_candidate_count == 0
+        and unsafe_authority_claim_count == 0
+        and target_inconsistent_surface_count == 0
+        and queue.get("operator_review_required") is True
+        and queue.get("physical_fixture_gap_remains") is True
+        and not unsafe_claimed
+    )
+    return {
+        "available": available,
+        "status": str(queue.get("status") or "missing"),
+        "queue_status": queue.get("queue_status"),
+        "intake_surface_count": _safe_int_value(queue.get("intake_surface_count")),
+        "available_intake_count": _safe_int_value(queue.get("available_intake_count")),
+        "artifact_count": _safe_int_value(queue.get("artifact_count")),
+        "valid_candidate_count": _safe_int_value(queue.get("valid_candidate_count")),
+        "invalid_candidate_count": invalid_candidate_count,
+        "review_candidate_count": review_candidate_count,
+        "review_candidates_available": review_candidates_available,
+        "missing_artifact_surface_count": _safe_int_value(
+            queue.get("missing_artifact_surface_count")
+        ),
+        "unsafe_authority_claim_count": unsafe_authority_claim_count,
+        "target_inconsistent_surface_count": target_inconsistent_surface_count,
+        "review_candidate_surface_ids": _string_list_value(
+            queue.get("review_candidate_surface_ids")
+        ),
+        "invalid_surface_ids": _string_list_value(queue.get("invalid_surface_ids")),
+        "missing_artifact_surface_ids": _string_list_value(
+            queue.get("missing_artifact_surface_ids")
+        ),
+        "unsafe_authority_surface_ids": _string_list_value(
+            queue.get("unsafe_authority_surface_ids")
+        ),
+        "target_inconsistent_surface_ids": _string_list_value(
+            queue.get("target_inconsistent_surface_ids")
+        ),
+        "promotion_families_requiring_surface": _string_list_value(
+            queue.get("promotion_families_requiring_surface")
+        ),
+        "queue_item_method_ids": _string_list_value(queue.get("queue_item_method_ids")),
+        "operator_review_required": True,
+        "physical_fixture_gap_remains": True,
+        "fixture_closure_allowed_by_queue": False,
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "operator_required": True,
+        "execution_allowed_by_queue": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "source_fixture_closure_allowed_by_queue_claimed": (
+            source_fixture_closure_claimed
+        ),
+        "source_execution_allowed_by_queue_claimed": source_execution_claimed,
+        "source_live_write_claimed": source_live_write_claimed,
+        "source_mutates_console_state_claimed": source_mutation_claimed,
+        "source_queries_console_claimed": source_query_claimed,
+        "source_executes_tests_claimed": source_executes_tests_claimed,
+        "source_live_authority_granted_claimed": source_live_authority_claimed,
+        "source_full_autonomous_ready_claimed": source_full_autonomous_ready_claimed,
+        "blocked_by": _string_list_value(queue.get("blocked_by")),
+        "violations": _string_list_value(queue.get("violations")),
+    }
+
+
 def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any]:
     summary_path = report_path.parent / "summary.json"
     summary = _read_json_file(summary_path)
@@ -5733,6 +5838,9 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
     dlive_state_intake = _dlive_state_readback_artifact_intake_quality_from_summary(
         summary
     )
+    artifact_review_queue = _read_surface_artifact_review_queue_quality_from_summary(
+        summary
+    )
     source_full_autonomous_ready = read_surface.get("full_autonomous_ready") is True
     return {
         "available": available,
@@ -5776,6 +5884,7 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
         "user_presets_physical_readback_artifact_intake": user_presets_intake,
         "dlive_state_physical_readback_contract": dlive_state_contract,
         "dlive_state_physical_readback_artifact_intake": dlive_state_intake,
+        "read_surface_physical_readback_artifact_review_queue": artifact_review_queue,
         "violations": _string_list_value(read_surface.get("violations")),
     }
 

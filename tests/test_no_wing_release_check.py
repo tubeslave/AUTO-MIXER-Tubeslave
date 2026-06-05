@@ -30,6 +30,7 @@ from tools.no_wing_release_check import (
     proof_report_path_for_run,
     raw_mixer_readback_artifact_intake_summary,
     raw_mixer_readback_contract_summary,
+    read_surface_physical_readback_artifact_review_queue_summary,
     read_surface_physical_readback_capture_plan_summary,
     read_surface_fixture_evidence_summary,
     read_surface_remediation_plan_summary,
@@ -40,6 +41,7 @@ from tools.no_wing_release_check import (
     snapshots_scenes_readback_artifact_intake_summary,
     supervised_gain_dry_run_summary,
     user_presets_readback_contract_summary,
+    user_presets_readback_artifact_intake_summary,
     validate_repo_local_commands,
     validate_no_live_commands,
     validate_bus_group_main_dca_physical_readback_artifact_intake_snapshot,
@@ -54,6 +56,7 @@ from tools.no_wing_release_check import (
     validate_fx_slots_inserts_physical_readback_contract_snapshot,
     validate_matrix_state_physical_readback_artifact_intake_snapshot,
     validate_matrix_state_physical_readback_contract_snapshot,
+    validate_read_surface_physical_readback_artifact_review_queue_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
     validate_read_surface_physical_readback_capture_plan_snapshot,
     validate_raw_mixer_state_physical_readback_artifact_intake_snapshot,
@@ -63,6 +66,7 @@ from tools.no_wing_release_check import (
     validate_routing_sends_physical_readback_artifact_intake_snapshot,
     validate_snapshots_scenes_physical_readback_artifact_intake_snapshot,
     validate_snapshots_scenes_physical_readback_contract_snapshot,
+    validate_user_presets_physical_readback_artifact_intake_snapshot,
     validate_user_presets_physical_readback_contract_snapshot,
     validate_supervised_proof_report_autonomy_overlay,
     validate_supervised_proof_report_next_wing_plan,
@@ -1837,6 +1841,74 @@ def test_no_wing_release_check_validates_user_presets_readback_contract_snapshot
     assert result.detail["violations"] == []
 
 
+def test_no_wing_release_check_validates_user_presets_artifact_intake_snapshot():
+    result = validate_user_presets_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["policy"] == "user_presets_artifact_intake_is_read_only_operator_review_gate"
+    assert result.detail["intake_status"] == "operator_artifact_missing"
+    assert result.detail["schema_id"] == "user_presets_physical_readback.v1"
+    assert result.detail["surface_id"] == "user_presets"
+    assert result.detail["remediation_action_id"] == "remediate_user_presets"
+    assert result.detail["required_contract_method_id"] == "user_presets_physical_readback_contract"
+    assert result.detail["artifact_count"] == 0
+    assert result.detail["valid_candidate_count"] == 0
+    assert result.detail["invalid_candidate_count"] == 0
+    assert result.detail["valid_preset_count"] == 0
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["operator_review_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["fixture_closure_allowed_by_intake"] is False
+    assert result.detail["preset_recall_allowed"] is False
+    assert result.detail["preset_store_allowed"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert "scene_preset" in result.detail["promotion_families_requiring_surface"]
+    assert "operator_must_capture_user_presets_physical_readback_artifact" in result.detail[
+        "blocked_by"
+    ]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_validates_artifact_review_queue_snapshot():
+    result = validate_read_surface_physical_readback_artifact_review_queue_snapshot()
+
+    assert result.status == "passed"
+    assert (
+        result.detail["policy"]
+        == "physical_readback_artifact_review_queue_is_read_only_operator_gate"
+    )
+    assert result.detail["queue_status"] == "operator_artifact_capture_required"
+    assert result.detail["intake_surface_count"] == 10
+    assert result.detail["available_intake_count"] == result.detail["intake_surface_count"]
+    assert result.detail["artifact_count"] == 0
+    assert result.detail["valid_candidate_count"] == 0
+    assert result.detail["invalid_candidate_count"] == 0
+    assert result.detail["review_candidate_count"] == 0
+    assert result.detail["missing_artifact_surface_count"] == result.detail[
+        "intake_surface_count"
+    ]
+    assert result.detail["unsafe_authority_claim_count"] == 0
+    assert result.detail["target_inconsistent_surface_count"] == 0
+    assert result.detail["operator_review_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["fixture_closure_allowed_by_queue"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert "raw_mixer_state_cache" in result.detail["missing_artifact_surface_ids"]
+    assert "user_presets" in result.detail["missing_artifact_surface_ids"]
+    assert "dlive_state" in result.detail["missing_artifact_surface_ids"]
+    assert "raw_mixer_state_physical_readback_artifact_intake" in result.detail[
+        "queue_item_method_ids"
+    ]
+    assert "dlive_state_physical_readback_artifact_intake" in result.detail[
+        "queue_item_method_ids"
+    ]
+    assert "operator_must_capture_missing_physical_readback_artifacts" in result.detail[
+        "blocked_by"
+    ]
+    assert result.detail["violations"] == []
+
 def test_no_wing_release_check_validates_dlive_state_readback_contract_snapshot():
     result = validate_dlive_state_physical_readback_contract_snapshot()
 
@@ -2576,8 +2648,10 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "snapshots_scenes_physical_readback_contract_schema" in result_names
     assert "snapshots_scenes_physical_readback_artifact_intake_schema" in result_names
     assert "user_presets_physical_readback_contract_schema" in result_names
+    assert "user_presets_physical_readback_artifact_intake_schema" in result_names
     assert "dlive_state_physical_readback_contract_schema" in result_names
     assert "dlive_state_physical_readback_artifact_intake_schema" in result_names
+    assert "read_surface_physical_readback_artifact_review_queue_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
@@ -2645,12 +2719,20 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "user_presets_physical_readback_contract_schema"
     )
     assert result_names.index("user_presets_physical_readback_contract_schema") < result_names.index(
+        "user_presets_physical_readback_artifact_intake_schema"
+    )
+    assert result_names.index("user_presets_physical_readback_artifact_intake_schema") < result_names.index(
         "dlive_state_physical_readback_contract_schema"
     )
     assert result_names.index("dlive_state_physical_readback_contract_schema") < result_names.index(
         "dlive_state_physical_readback_artifact_intake_schema"
     )
     assert result_names.index("dlive_state_physical_readback_artifact_intake_schema") < result_names.index(
+        "read_surface_physical_readback_artifact_review_queue_schema"
+    )
+    assert result_names.index(
+        "read_surface_physical_readback_artifact_review_queue_schema"
+    ) < result_names.index(
         "backend_pytest"
     )
     assert result_names.index("supervised_proof_artifact_report") < result_names.index(
@@ -5143,6 +5225,90 @@ def test_no_wing_release_check_summary_embeds_user_presets_readback_contract(tmp
     assert "target_consistency: `true`" in markdown_summary
 
 
+def test_no_wing_release_check_summary_embeds_user_presets_artifact_intake(tmp_path):
+    result = CheckResult(
+        name="user_presets_physical_readback_artifact_intake_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "intake_status": "valid_operator_artifact_available",
+            "schema_id": "user_presets_physical_readback.v1",
+            "surface_id": "user_presets",
+            "remediation_action_id": "remediate_user_presets",
+            "required_contract_method_id": "user_presets_physical_readback_contract",
+            "artifact_search_roots": [
+                "artifacts/read_surface_physical_readback/user_presets",
+            ],
+            "artifact_count": 1,
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "valid_preset_count": 3,
+            "accepted_as_physical_fixture_candidate": True,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_closure_allowed_by_intake": False,
+            "preset_recall_allowed": False,
+            "preset_store_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "promotion_families_requiring_surface": [
+                "scene_preset",
+                "routing",
+                "mix_balance",
+                "performance_adaptation",
+            ],
+            "latest_valid_candidate_source_id": "inline_payload_0",
+            "latest_valid_candidate_captured_at": "2026-06-05T00:00:00Z",
+            "blocked_by": [
+                "operator_must_review_valid_user_presets_candidate_before_fixture_closure",
+            ],
+            "artifact_source_ids": ["inline_payload_0"],
+            "intake_violations": [],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert user_presets_readback_artifact_intake_summary([result]) == summary[
+        "user_presets_physical_readback_artifact_intake"
+    ]
+    intake = json_summary["user_presets_physical_readback_artifact_intake"]
+    assert intake["read_only"] is True
+    assert intake["live_write"] is False
+    assert intake["mutates_console_state"] is False
+    assert intake["queries_console"] is False
+    assert intake["executes_tests"] is False
+    assert intake["execution_allowed_by_intake"] is False
+    assert intake["fixture_closure_allowed_by_intake"] is False
+    assert intake["preset_recall_allowed"] is False
+    assert intake["preset_store_allowed"] is False
+    assert intake["live_widening_allowed"] is False
+    assert intake["full_autonomous_ready"] is False
+    assert intake["intake_status"] == "valid_operator_artifact_available"
+    assert intake["artifact_count"] == 1
+    assert intake["valid_candidate_count"] == 1
+    assert intake["invalid_candidate_count"] == 0
+    assert intake["valid_preset_count"] == 3
+    assert intake["accepted_as_physical_fixture_candidate"] is True
+    assert intake["operator_review_required"] is True
+    assert intake["physical_fixture_gap_remains"] is True
+    assert intake["live_authority_granted"] is False
+    assert intake["target_consistency"] is True
+    assert intake["artifact_source_ids"] == ["inline_payload_0"]
+    assert "## User Presets Physical Readback Artifact Intake" in markdown_summary
+    assert "artifact_count: `1`" in markdown_summary
+    assert "valid_preset_count: `3`" in markdown_summary
+    assert "fixture_closure_allowed_by_intake: `false`" in markdown_summary
+    assert "preset_recall_allowed: `false`" in markdown_summary
+    assert "preset_store_allowed: `false`" in markdown_summary
+    assert "target_consistency: `true`" in markdown_summary
+
+
 def test_no_wing_release_check_summary_embeds_dlive_state_readback_contract(tmp_path):
     result = CheckResult(
         name="dlive_state_physical_readback_contract_schema",
@@ -5334,6 +5500,85 @@ def test_no_wing_release_check_summary_embeds_dlive_state_artifact_intake(tmp_pa
     assert "dlive_apply_allowed: `false`" in markdown_summary
 
 
+def test_no_wing_release_check_summary_embeds_artifact_review_queue(tmp_path):
+    result = CheckResult(
+        name="read_surface_physical_readback_artifact_review_queue_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "queue_status": "operator_review_candidates_available",
+            "intake_surface_count": 10,
+            "available_intake_count": 10,
+            "artifact_count": 1,
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "review_candidate_count": 1,
+            "missing_artifact_surface_count": 9,
+            "unsafe_authority_claim_count": 0,
+            "target_inconsistent_surface_count": 0,
+            "review_candidate_surface_ids": ["raw_mixer_state_cache"],
+            "invalid_surface_ids": [],
+            "missing_artifact_surface_ids": ["user_presets"],
+            "unsafe_authority_surface_ids": [],
+            "target_inconsistent_surface_ids": [],
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_closure_allowed_by_queue": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "promotion_families_requiring_surface": ["fader", "gain"],
+            "queue_item_method_ids": [
+                "raw_mixer_state_physical_readback_artifact_intake",
+                "user_presets_physical_readback_artifact_intake",
+            ],
+            "blocked_by": [
+                "operator_must_review_valid_candidates_before_fixture_closure",
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert read_surface_physical_readback_artifact_review_queue_summary([result]) == summary[
+        "read_surface_physical_readback_artifact_review_queue"
+    ]
+    queue = json_summary["read_surface_physical_readback_artifact_review_queue"]
+    assert queue["read_only"] is True
+    assert queue["live_write"] is False
+    assert queue["mutates_console_state"] is False
+    assert queue["queries_console"] is False
+    assert queue["executes_tests"] is False
+    assert queue["execution_allowed_by_queue"] is False
+    assert queue["fixture_closure_allowed_by_queue"] is False
+    assert queue["live_widening_allowed"] is False
+    assert queue["full_autonomous_ready"] is False
+    assert queue["queue_status"] == "operator_review_candidates_available"
+    assert queue["intake_surface_count"] == 10
+    assert queue["artifact_count"] == 1
+    assert queue["valid_candidate_count"] == 1
+    assert queue["invalid_candidate_count"] == 0
+    assert queue["review_candidate_count"] == 1
+    assert queue["review_candidates_available"] is True
+    assert queue["missing_artifact_surface_count"] == 9
+    assert queue["unsafe_authority_claim_count"] == 0
+    assert queue["target_inconsistent_surface_count"] == 0
+    assert queue["operator_review_required"] is True
+    assert queue["physical_fixture_gap_remains"] is True
+    assert queue["live_authority_granted"] is False
+    assert queue["review_candidate_surface_ids"] == ["raw_mixer_state_cache"]
+    assert "## Read Surface Physical Readback Artifact Review Queue" in markdown_summary
+    assert "queue_status: `operator_review_candidates_available`" in markdown_summary
+    assert "fixture_closure_allowed_by_queue: `false`" in markdown_summary
+    assert "review_candidate_count: `1`" in markdown_summary
+    assert "review_candidates_available: `true`" in markdown_summary
+    assert "full_autonomous_ready: `false`" in markdown_summary
+
+
 def test_no_wing_release_check_dlive_state_intake_summary_normalizes_authority_claims():
     result = CheckResult(
         name="dlive_state_physical_readback_artifact_intake_schema",
@@ -5378,6 +5623,114 @@ def test_no_wing_release_check_dlive_state_intake_summary_normalizes_authority_c
     assert summary["live_authority_granted"] is False
     assert summary["full_autonomous_ready"] is False
     assert summary["violations"] == ["claimed_dlive_authority"]
+
+
+def test_no_wing_release_check_summary_embeds_artifact_review_queue(tmp_path):
+    result = CheckResult(
+        name="read_surface_physical_readback_artifact_review_queue_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "queue_status": "operator_review_candidates_available",
+            "intake_surface_count": 10,
+            "available_intake_count": 10,
+            "artifact_count": 2,
+            "valid_candidate_count": 2,
+            "invalid_candidate_count": 0,
+            "review_candidate_count": 2,
+            "missing_artifact_surface_count": 8,
+            "unsafe_authority_claim_count": 0,
+            "target_inconsistent_surface_count": 0,
+            "review_candidate_surface_ids": ["raw_mixer_state_cache", "dlive_state"],
+            "invalid_surface_ids": [],
+            "missing_artifact_surface_ids": ["user_presets"],
+            "unsafe_authority_surface_ids": [],
+            "target_inconsistent_surface_ids": [],
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_closure_allowed_by_queue": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "promotion_families_requiring_surface": ["fader", "gain"],
+            "queue_item_method_ids": [
+                "raw_mixer_state_physical_readback_artifact_intake",
+                "dlive_state_physical_readback_artifact_intake",
+            ],
+            "blocked_by": [
+                "operator_must_review_valid_candidates_before_fixture_closure",
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert read_surface_physical_readback_artifact_review_queue_summary([result]) == summary[
+        "read_surface_physical_readback_artifact_review_queue"
+    ]
+    queue = json_summary["read_surface_physical_readback_artifact_review_queue"]
+    assert queue["read_only"] is True
+    assert queue["live_write"] is False
+    assert queue["mutates_console_state"] is False
+    assert queue["queries_console"] is False
+    assert queue["executes_tests"] is False
+    assert queue["execution_allowed_by_queue"] is False
+    assert queue["fixture_closure_allowed_by_queue"] is False
+    assert queue["live_widening_allowed"] is False
+    assert queue["full_autonomous_ready"] is False
+    assert queue["queue_status"] == "operator_review_candidates_available"
+    assert queue["review_candidate_count"] == 2
+    assert queue["review_candidates_available"] is True
+    assert queue["missing_artifact_surface_count"] == 8
+    assert queue["operator_review_required"] is True
+    assert queue["physical_fixture_gap_remains"] is True
+    assert queue["live_authority_granted"] is False
+    assert queue["review_candidate_surface_ids"] == ["raw_mixer_state_cache", "dlive_state"]
+    assert "## Read Surface Physical Readback Artifact Review Queue" in markdown_summary
+    assert "review_candidate_count: `2`" in markdown_summary
+    assert "review_candidates_available: `true`" in markdown_summary
+    assert "fixture_closure_allowed_by_queue: `false`" in markdown_summary
+    assert "live_authority_granted: `false`" in markdown_summary
+
+
+def test_no_wing_release_check_artifact_review_queue_summary_normalizes_authority_claims():
+    result = CheckResult(
+        name="read_surface_physical_readback_artifact_review_queue_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "queue_status": "operator_review_candidates_available",
+            "intake_surface_count": 10,
+            "available_intake_count": 10,
+            "artifact_count": 1,
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "review_candidate_count": 1,
+            "unsafe_authority_claim_count": 0,
+            "target_inconsistent_surface_count": 0,
+            "fixture_closure_allowed_by_queue": True,
+            "live_authority_granted": True,
+            "full_autonomous_ready": True,
+            "review_candidate_surface_ids": ["raw_mixer_state_cache"],
+            "blocked_by": ["unsafe_claim"],
+            "violations": ["claimed_queue_authority"],
+        },
+    )
+
+    summary = read_surface_physical_readback_artifact_review_queue_summary([result])
+
+    assert summary is not None
+    assert summary["review_candidates_available"] is False
+    assert summary["fixture_closure_allowed_by_queue"] is False
+    assert summary["live_authority_granted"] is False
+    assert summary["full_autonomous_ready"] is False
+    assert summary["violations"] == ["claimed_queue_authority"]
 
 
 def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
