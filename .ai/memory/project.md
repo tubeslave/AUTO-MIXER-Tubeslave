@@ -71,6 +71,7 @@
 - no-WING read-surface remediation summaries should fail if multiple actions are flagged as the next physical readback target; the next target is planning evidence, not a queue.
 - Raw mixer-state physical readback needs a schema contract before hardware proof artifacts are trusted: the contract may validate a future physical artifact, but it does not close `physical_readback_fixture_missing` or grant live authority.
 - no-WING release summaries should validate the raw mixer-state physical readback contract as its own schema gate; contract readiness is release evidence, not a physical fixture or live-read permission.
+- Product Layer and cockpit proof-evidence views should show raw mixer-state readback contract status as read-only planning metadata, while preserving `physical_fixture_gap_remains=true` and no live authority.
 
 ## Memory Pipeline Lessons
 

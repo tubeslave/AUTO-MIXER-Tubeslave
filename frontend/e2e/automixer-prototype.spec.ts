@@ -1074,7 +1074,27 @@ test.describe('Automixer backend Product Layer adapter', () => {
                 ],
                 next_physical_readback_surface_id: 'raw_mixer_state_cache',
                 source_next_physical_readback_surface_id: 'raw_mixer_state_cache',
-                next_physical_readback_target_consistent: true
+                next_physical_readback_target_consistent: true,
+                raw_mixer_state_physical_readback_contract: {
+                  available: true,
+                  status: 'passed',
+                  schema_id: 'raw_mixer_state_physical_readback.v1',
+                  contract_status: 'contract_ready_physical_fixture_missing',
+                  surface_id: 'raw_mixer_state_cache',
+                  remediation_action_id: 'remediate_raw_mixer_state_cache',
+                  artifact_required: true,
+                  physical_fixture_gap_remains: true,
+                  accepted_as_physical_fixture_candidate: false,
+                  live_authority_granted: false,
+                  full_autonomous_ready: false,
+                  next_physical_readback_surface_id: 'raw_mixer_state_cache',
+                  next_physical_readback_action_id: 'remediate_raw_mixer_state_cache',
+                  target_consistency: true,
+                  allowed_sources: ['physical_readback', 'wing_physical_readback'],
+                  accepted_row_statuses: ['verified_from_physical_readback'],
+                  forbidden_mutation_evidence_fields: ['manual_write_events'],
+                  violations: []
+                }
               }
             }
           },
@@ -1382,6 +1402,12 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('next_readback:raw_mixer_state_cache').first()).toBeVisible();
     await expect(page.getByText('source_next_readback:raw_mixer_state_cache').first()).toBeVisible();
     await expect(page.getByText('next_readback_gate:true').first()).toBeVisible();
+    await expect(page.getByText('raw_contract:contract_ready_physical_fixture_missing').first()).toBeVisible();
+    await expect(page.getByText('raw_contract_live_authority:false').first()).toBeVisible();
+    await expect(page.getByText('raw_contract_target_gate:true').first()).toBeVisible();
+    await expect(page.getByText('Raw mixer readback contract').first()).toBeVisible();
+    await expect(page.getByText('physical_gap_remains:true').first()).toBeVisible();
+    await expect(page.getByText('live_authority:false').first()).toBeVisible();
     await expect(page.getByText('Read surface remediation plan').first()).toBeVisible();
     await expect(page.getByText('read_remediation_required').first()).toBeVisible();
     await expect(page.getByText('next_physical_readback:raw_mixer_state_cache').first()).toBeVisible();
@@ -1407,6 +1433,13 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('25 declared tests').first()).toBeVisible();
     await expect(page.getByText('Contract/gap gate').first()).toBeVisible();
     await expect(page.getByText('Enforced').first()).toBeVisible();
+    await expect(page.getByText('Raw mixer contract').first()).toBeVisible();
+    await expect(page.getByText('Contract Ready Physical Fixture Missing').first()).toBeVisible();
+    await expect(page.getByText('Contract gap').first()).toBeVisible();
+    await expect(page.getByText('Physical proof missing').first()).toBeVisible();
+    await expect(page.getByText('Contract authority').first()).toBeVisible();
+    await expect(page.getByText('No live authority').first()).toBeVisible();
+    await expect(page.getByText('Contract target').first()).toBeVisible();
 
     await page.goto('/#/groups');
     await expect(page.getByText('Backend DTO Drums').first()).toBeVisible();

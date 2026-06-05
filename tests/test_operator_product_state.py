@@ -1949,6 +1949,31 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     "next_physical_readback_surface_id": "raw_mixer_state_cache",
                     "violations": [],
                 },
+                "raw_mixer_state_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "raw_mixer_state_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "raw_mixer_state_cache",
+                    "remediation_action_id": "remediate_raw_mixer_state_cache",
+                    "next_physical_readback_surface_id": "raw_mixer_state_cache",
+                    "next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "allowed_sources": ["physical_readback", "wing_physical_readback"],
+                    "accepted_row_statuses": ["verified_from_physical_readback"],
+                    "forbidden_mutation_evidence_fields": ["manual_write_events"],
+                    "violations": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -1993,6 +2018,23 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert proof_quality["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
     assert proof_quality["source_next_physical_readback_surface_id"] == "raw_mixer_state_cache"
     assert proof_quality["next_physical_readback_target_consistent"] is True
+    raw_contract = proof_quality["raw_mixer_state_physical_readback_contract"]
+    assert raw_contract["available"] is True
+    assert raw_contract["status"] == "passed"
+    assert raw_contract["schema_id"] == "raw_mixer_state_physical_readback.v1"
+    assert raw_contract["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert raw_contract["surface_id"] == "raw_mixer_state_cache"
+    assert raw_contract["remediation_action_id"] == "remediate_raw_mixer_state_cache"
+    assert raw_contract["artifact_required"] is True
+    assert raw_contract["physical_fixture_gap_remains"] is True
+    assert raw_contract["accepted_as_physical_fixture_candidate"] is False
+    assert raw_contract["live_authority_granted"] is False
+    assert raw_contract["full_autonomous_ready"] is False
+    assert raw_contract["target_consistency"] is True
+    assert raw_contract["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert raw_contract["next_physical_readback_action_id"] == "remediate_raw_mixer_state_cache"
+    assert "physical_readback" in raw_contract["allowed_sources"]
+    assert "manual_write_events" in raw_contract["forbidden_mutation_evidence_fields"]
     overlay = payload["autonomy_evidence_overlay"]
     assert overlay["source_report_available"] is True
     assert overlay["source_report_path"] == str(latest_report)
@@ -2012,6 +2054,86 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert "source_autonomous_ready_normalized_false" in rows["gain"]["blockers"]
     assert rows["gain"]["dry_run_ready_proof_ids"] == ["gain-proof-dry-run"]
     assert rows["fader"]["status"] == "no_current_evidence"
+    assert "set_gain" not in set(_walk_keys(payload))
+
+
+def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
+    server, tmp_path
+):
+    latest_dir = tmp_path / "latest"
+    latest_dir.mkdir()
+    latest_report = latest_dir / "supervised_proof_artifact_report.json"
+    latest_report.write_text(json.dumps(proof_report_with_autonomy_overlay("ok")), encoding="utf-8")
+    (latest_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "type": "no_wing_release_check",
+                "status": "passed",
+                "read_surface_fixture_evidence": {
+                    "status": "passed",
+                    "snapshot_status": "fixture_evidence_incomplete",
+                    "physical_gap_surface_count": 2,
+                    "summary_recomputed_from_rows": True,
+                    "fixture_declaration_validation": True,
+                    "contract_gap_consistency_enforced": True,
+                    "read_only": True,
+                    "live_write": False,
+                    "full_autonomous_ready": False,
+                    "physical_fixture_missing_surface_ids": [
+                        "raw_mixer_state_cache",
+                        "channel_identity_and_basic_controls",
+                    ],
+                    "next_physical_readback_surface_id": "raw_mixer_state_cache",
+                    "violations": [],
+                },
+                "raw_mixer_state_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "raw_mixer_state_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "raw_mixer_state_cache",
+                    "remediation_action_id": "remediate_raw_mixer_state_cache",
+                    "next_physical_readback_surface_id": "dlive_state",
+                    "next_physical_readback_action_id": "remediate_dlive_state",
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "target_consistency": False,
+                    "allowed_sources": ["physical_readback", "mixer_state_cache"],
+                    "accepted_row_statuses": ["verified_from_cache"],
+                    "forbidden_mutation_evidence_fields": [],
+                    "violations": ["source_claimed_live_authority"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    server.config["supervised_proof_evidence"] = {"artifact_root": str(tmp_path)}
+
+    payload = build_supervised_proof_evidence_snapshot(server)
+
+    raw_contract = payload["summary"]["read_surface_proof_quality"][
+        "raw_mixer_state_physical_readback_contract"
+    ]
+    assert raw_contract["available"] is True
+    assert raw_contract["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert raw_contract["source_next_physical_readback_surface_id"] == "dlive_state"
+    assert raw_contract["next_physical_readback_action_id"] == "remediate_raw_mixer_state_cache"
+    assert raw_contract["source_next_physical_readback_action_id"] == "remediate_dlive_state"
+    assert raw_contract["target_consistency"] is False
+    assert raw_contract["accepted_as_physical_fixture_candidate"] is False
+    assert raw_contract["read_only"] is True
+    assert raw_contract["live_write"] is False
+    assert raw_contract["live_authority_granted"] is False
+    assert raw_contract["full_autonomous_ready"] is False
+    assert raw_contract["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert raw_contract["source_live_write_claimed"] is True
+    assert raw_contract["source_live_authority_granted_claimed"] is True
+    assert raw_contract["source_full_autonomous_ready_claimed"] is True
+    assert "source_claimed_live_authority" in raw_contract["violations"]
     assert "set_gain" not in set(_walk_keys(payload))
 
 

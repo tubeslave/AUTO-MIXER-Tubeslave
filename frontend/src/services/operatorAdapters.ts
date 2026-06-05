@@ -757,16 +757,27 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     );
     const sourceNextPhysicalReadbackSurfaceId = str(proofQuality.source_next_physical_readback_surface_id, '');
     const nextPhysicalReadbackTargetConsistent = proofQuality.next_physical_readback_target_consistent === true;
+    const rawMixerContract = asRecord(proofQuality.raw_mixer_state_physical_readback_contract);
+    const rawMixerContractAvailable = Boolean(rawMixerContract.available);
+    const rawMixerContractStatus = str(rawMixerContract.contract_status, str(rawMixerContract.status, 'missing'));
+    const rawMixerContractSchemaId = str(rawMixerContract.schema_id, '');
+    const rawMixerContractSurfaceId = str(rawMixerContract.surface_id, '');
+    const rawMixerContractActionId = str(rawMixerContract.remediation_action_id, '');
+    const rawMixerContractNextSurfaceId = str(rawMixerContract.next_physical_readback_surface_id, '');
+    const rawMixerContractNextActionId = str(rawMixerContract.next_physical_readback_action_id, '');
+    const rawMixerContractGapRemains = rawMixerContract.physical_fixture_gap_remains === true;
+    const rawMixerContractLiveAuthority = rawMixerContract.live_authority_granted === true;
+    const rawMixerContractTargetConsistency = rawMixerContract.target_consistency === true;
     const freshnessText = available
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
       : 'no_current_evidence';
-    return [{
+    const rows: ModuleStatusRecord[] = [{
       moduleId: 'supervised_proof_evidence',
       label: 'Supervised proof evidence',
       domain: 'supervised_proof_evidence',
@@ -790,6 +801,12 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `next_readback_gate:${nextPhysicalReadbackTargetConsistent}`,
         `fixture_tests:${declaredTestNameCount}`,
         `contract_gap:${contractGapConsistency}`,
+        `raw_contract_available:${rawMixerContractAvailable}`,
+        `raw_contract_status:${rawMixerContractStatus}`,
+        `raw_contract_schema:${rawMixerContractSchemaId}`,
+        `raw_contract_gap:${rawMixerContractGapRemains}`,
+        `raw_contract_live_authority:${rawMixerContractLiveAuthority}`,
+        `raw_contract_target_gate:${rawMixerContractTargetConsistency}`,
       ],
       blockedReason: available
         ? stale
@@ -801,6 +818,47 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         : 'Run no-WING supervised proof checks or point Product Layer at an existing report artifact.',
       tone: invalidCount > 0 ? 'red' : stale || !available ? 'yellow' : 'blue'
     }];
+    rows.push({
+      moduleId: 'raw_mixer_state_physical_readback_contract',
+      label: 'Raw mixer readback contract',
+      domain: 'read_surface_contract',
+      status: rawMixerContractAvailable ? rawMixerContractStatus || 'contract_available' : 'contract_missing',
+      entrypoint: 'raw_mixer_state_physical_readback_contract',
+      module: rawMixerContractActionId || 'no_contract_action',
+      uiSurface: 'Read-surface proof contract',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${rawMixerContractAvailable}`,
+        `schema:${rawMixerContractSchemaId}`,
+        `surface:${rawMixerContractSurfaceId}`,
+        `next_readback:${rawMixerContractNextSurfaceId}`,
+        `next_action:${rawMixerContractNextActionId}`,
+        `physical_gap_remains:${rawMixerContractGapRemains}`,
+        `live_authority:${rawMixerContractLiveAuthority}`,
+        `target_consistency:${rawMixerContractTargetConsistency}`,
+      ],
+      blockedReason: rawMixerContractAvailable
+        ? rawMixerContractGapRemains
+          ? 'Contract is present, but physical readback fixture evidence is still missing.'
+          : 'Contract is present; physical gap state must still be reviewed before promotion.'
+        : 'Raw mixer-state physical readback contract is missing from proof summary.',
+      nextStep: rawMixerContractAvailable
+        ? [
+            rawMixerContractNextSurfaceId ? `next_readback:${rawMixerContractNextSurfaceId}` : '',
+            rawMixerContractNextActionId ? `next_action:${rawMixerContractNextActionId}` : '',
+            `physical_gap_remains:${rawMixerContractGapRemains}`,
+            `live_authority:${rawMixerContractLiveAuthority}`,
+            `target_consistency:${rawMixerContractTargetConsistency}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with raw mixer readback contract schema validation.',
+      tone: !rawMixerContractAvailable || rawMixerContractLiveAuthority || !rawMixerContractTargetConsistency
+        ? 'yellow'
+        : rawMixerContractGapRemains
+          ? 'yellow'
+          : 'green'
+    });
+    return rows;
   })() : [];
 
   const readSurfaceRemediation = asRecord(data.read_surface_remediation_plan);

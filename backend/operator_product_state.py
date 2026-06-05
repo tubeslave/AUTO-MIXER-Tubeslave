@@ -3484,6 +3484,80 @@ def _proof_report_freshness(
     }
 
 
+def _raw_mixer_readback_contract_quality_from_summary(
+    summary: Dict[str, Any],
+    *,
+    expected_next_physical_readback_surface_id: Optional[str],
+    expected_next_physical_readback_action_id: Optional[str],
+) -> Dict[str, Any]:
+    contract = (
+        summary.get("raw_mixer_state_physical_readback_contract")
+        if isinstance(summary.get("raw_mixer_state_physical_readback_contract"), dict)
+        else {}
+    )
+    available = bool(contract)
+    source_next_surface = contract.get("next_physical_readback_surface_id")
+    source_next_physical_readback_surface_id = (
+        source_next_surface if isinstance(source_next_surface, str) and source_next_surface else None
+    )
+    source_next_action = contract.get("next_physical_readback_action_id")
+    source_next_physical_readback_action_id = (
+        source_next_action if isinstance(source_next_action, str) and source_next_action else None
+    )
+    target_consistent = (
+        available
+        and source_next_physical_readback_surface_id == expected_next_physical_readback_surface_id
+        and source_next_physical_readback_action_id == expected_next_physical_readback_action_id
+        and contract.get("target_consistency") is True
+    )
+    source_live_write_claimed = contract.get("live_write") is True
+    source_candidate_claimed = contract.get("accepted_as_physical_fixture_candidate") is True
+    source_live_authority_claimed = contract.get("live_authority_granted") is True
+    source_full_autonomous_ready_claimed = contract.get("full_autonomous_ready") is True
+    return {
+        "available": available,
+        "status": str(contract.get("status") or "missing"),
+        "schema_id": contract.get("schema_id"),
+        "contract_status": contract.get("contract_status"),
+        "surface_id": contract.get("surface_id"),
+        "remediation_action_id": contract.get("remediation_action_id"),
+        "artifact_required": contract.get("artifact_required") is True,
+        "physical_fixture_gap_remains": contract.get("physical_fixture_gap_remains") is True,
+        "accepted_as_physical_fixture_candidate": False,
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "source_accepted_as_physical_fixture_candidate_claimed": source_candidate_claimed,
+        "source_live_write_claimed": source_live_write_claimed,
+        "source_live_authority_granted_claimed": source_live_authority_claimed,
+        "source_full_autonomous_ready_claimed": source_full_autonomous_ready_claimed,
+        "next_physical_readback_surface_id": (
+            source_next_physical_readback_surface_id
+            if target_consistent
+            else expected_next_physical_readback_surface_id
+        ),
+        "source_next_physical_readback_surface_id": source_next_physical_readback_surface_id,
+        "next_physical_readback_action_id": (
+            source_next_physical_readback_action_id
+            if target_consistent
+            else expected_next_physical_readback_action_id
+        ),
+        "source_next_physical_readback_action_id": source_next_physical_readback_action_id,
+        "target_consistency": target_consistent,
+        "allowed_sources": _string_list_value(contract.get("allowed_sources")),
+        "accepted_row_statuses": _string_list_value(contract.get("accepted_row_statuses")),
+        "forbidden_mutation_evidence_fields": _string_list_value(
+            contract.get("forbidden_mutation_evidence_fields")
+        ),
+        "violations": _string_list_value(contract.get("violations")),
+    }
+
+
 def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any]:
     summary_path = report_path.parent / "summary.json"
     summary = _read_json_file(summary_path)
@@ -3508,6 +3582,16 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
         if next_physical_readback_target_consistent
         else expected_next_physical_readback_surface_id
     )
+    expected_next_physical_readback_action_id = (
+        f"remediate_{next_physical_readback_surface_id}"
+        if next_physical_readback_surface_id
+        else None
+    )
+    raw_mixer_contract = _raw_mixer_readback_contract_quality_from_summary(
+        summary,
+        expected_next_physical_readback_surface_id=next_physical_readback_surface_id,
+        expected_next_physical_readback_action_id=expected_next_physical_readback_action_id,
+    )
     source_full_autonomous_ready = read_surface.get("full_autonomous_ready") is True
     return {
         "available": available,
@@ -3530,6 +3614,7 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
         "next_physical_readback_surface_id": next_physical_readback_surface_id,
         "source_next_physical_readback_surface_id": source_next_physical_readback_surface_id,
         "next_physical_readback_target_consistent": next_physical_readback_target_consistent,
+        "raw_mixer_state_physical_readback_contract": raw_mixer_contract,
         "violations": _string_list_value(read_surface.get("violations")),
     }
 

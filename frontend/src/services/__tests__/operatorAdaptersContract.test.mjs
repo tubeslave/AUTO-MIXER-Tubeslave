@@ -534,6 +534,30 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
           next_physical_readback_surface_id: 'raw_mixer_state_cache',
           source_next_physical_readback_surface_id: 'raw_mixer_state_cache',
           next_physical_readback_target_consistent: true,
+          raw_mixer_state_physical_readback_contract: {
+            available: true,
+            status: 'passed',
+            schema_id: 'raw_mixer_state_physical_readback.v1',
+            contract_status: 'contract_ready_physical_fixture_missing',
+            surface_id: 'raw_mixer_state_cache',
+            remediation_action_id: 'remediate_raw_mixer_state_cache',
+            artifact_required: true,
+            physical_fixture_gap_remains: true,
+            accepted_as_physical_fixture_candidate: false,
+            read_only: true,
+            live_write: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            target_consistency: true,
+            next_physical_readback_surface_id: 'raw_mixer_state_cache',
+            source_next_physical_readback_surface_id: 'raw_mixer_state_cache',
+            next_physical_readback_action_id: 'remediate_raw_mixer_state_cache',
+            source_next_physical_readback_action_id: 'remediate_raw_mixer_state_cache',
+            allowed_sources: ['physical_readback', 'wing_physical_readback'],
+            accepted_row_statuses: ['verified_from_physical_readback'],
+            forbidden_mutation_evidence_fields: ['manual_write_events'],
+            violations: [],
+          },
         },
       },
     },
@@ -615,6 +639,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'mode_gate:auto',
       'promotion_readiness:scene_preset_supervised_promotion',
       'supervised_proof_evidence',
+      'raw_mixer_state_physical_readback_contract',
       'read_surface_remediation_plan',
       'autonomy_evidence:fader_supervised_promotion',
       'autonomy_evidence:gain_trim_supervised_promotion',
@@ -704,6 +729,12 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'next_readback_gate:true',
     'fixture_tests:25',
     'contract_gap:true',
+    'raw_contract_available:true',
+    'raw_contract_status:contract_ready_physical_fixture_missing',
+    'raw_contract_schema:raw_mixer_state_physical_readback.v1',
+    'raw_contract_gap:true',
+    'raw_contract_live_authority:false',
+    'raw_contract_target_gate:true',
   ]);
   assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
   assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
@@ -716,7 +747,35 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /next_readback:raw_mixer_state_cache/);
   assert.match(proofEvidence.nextStep, /source_next_readback:raw_mixer_state_cache/);
   assert.match(proofEvidence.nextStep, /next_readback_gate:true/);
+  assert.match(proofEvidence.nextStep, /raw_contract:contract_ready_physical_fixture_missing/);
+  assert.match(proofEvidence.nextStep, /raw_contract_gap:true/);
+  assert.match(proofEvidence.nextStep, /raw_contract_live_authority:false/);
+  assert.match(proofEvidence.nextStep, /raw_contract_target_gate:true/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
+
+  const rawMixerContract = rows.find(row => row.moduleId === 'raw_mixer_state_physical_readback_contract');
+  assert.equal(rawMixerContract.domain, 'read_surface_contract');
+  assert.equal(rawMixerContract.canWriteLive, false);
+  assert.deepEqual(rawMixerContract.liveWriteKinds, []);
+  assert.equal(rawMixerContract.status, 'contract_ready_physical_fixture_missing');
+  assert.equal(rawMixerContract.entrypoint, 'raw_mixer_state_physical_readback_contract');
+  assert.equal(rawMixerContract.module, 'remediate_raw_mixer_state_cache');
+  assert.equal(rawMixerContract.tone, 'yellow');
+  assert.deepEqual(rawMixerContract.pipelineProfiles, [
+    'available:true',
+    'schema:raw_mixer_state_physical_readback.v1',
+    'surface:raw_mixer_state_cache',
+    'next_readback:raw_mixer_state_cache',
+    'next_action:remediate_raw_mixer_state_cache',
+    'physical_gap_remains:true',
+    'live_authority:false',
+    'target_consistency:true',
+  ]);
+  assert.match(rawMixerContract.blockedReason, /physical readback fixture evidence is still missing/);
+  assert.match(rawMixerContract.nextStep, /next_readback:raw_mixer_state_cache/);
+  assert.match(rawMixerContract.nextStep, /next_action:remediate_raw_mixer_state_cache/);
+  assert.match(rawMixerContract.nextStep, /live_authority:false/);
+  assert.match(rawMixerContract.nextStep, /target_consistency:true/);
 
   const readRemediation = rows.find(row => row.moduleId === 'read_surface_remediation_plan');
   assert.equal(readRemediation.domain, 'read_surface_remediation');
@@ -874,7 +933,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 1);
+  assert.equal(rows.length, 2);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -896,7 +955,20 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'next_readback_gate:false',
     'fixture_tests:0',
     'contract_gap:false',
+    'raw_contract_available:false',
+    'raw_contract_status:missing',
+    'raw_contract_schema:',
+    'raw_contract_gap:false',
+    'raw_contract_live_authority:false',
+    'raw_contract_target_gate:false',
   ]);
+
+  assert.equal(rows[1].moduleId, 'raw_mixer_state_physical_readback_contract');
+  assert.equal(rows[1].domain, 'read_surface_contract');
+  assert.equal(rows[1].status, 'contract_missing');
+  assert.equal(rows[1].canWriteLive, false);
+  assert.deepEqual(rows[1].liveWriteKinds, []);
+  assert.match(rows[1].blockedReason, /contract is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

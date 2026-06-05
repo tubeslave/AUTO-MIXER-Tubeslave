@@ -157,7 +157,11 @@ function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
       { label: 'Read-surface proof', value: 'Missing', tone: 'muted' as const },
       { label: 'Gap surfaces', value: 'None listed', tone: 'muted' as const },
       { label: 'Next read proof', value: 'No target', tone: 'muted' as const },
-      { label: 'Read target gate', value: 'Missing', tone: 'muted' as const }
+      { label: 'Read target gate', value: 'Missing', tone: 'muted' as const },
+      { label: 'Raw mixer contract', value: 'Missing', tone: 'muted' as const },
+      { label: 'Contract gap', value: 'Unknown', tone: 'muted' as const },
+      { label: 'Contract authority', value: 'Unknown', tone: 'muted' as const },
+      { label: 'Contract target', value: 'Missing', tone: 'muted' as const }
     ];
   }
   const stale = profileValue(proof, 'stale:') === 'true';
@@ -177,6 +181,11 @@ function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
   const nextReadbackTarget = profileValue(proof, 'next_readback_target:');
   const nextReadbackGateValue = profileValue(proof, 'next_readback_gate:');
   const nextReadbackTargetConsistent = nextReadbackGateValue === 'true';
+  const rawContractAvailable = profileValue(proof, 'raw_contract_available:') === 'true';
+  const rawContractStatus = profileValue(proof, 'raw_contract_status:') || 'missing';
+  const rawContractGapRemains = profileValue(proof, 'raw_contract_gap:') === 'true';
+  const rawContractLiveAuthority = profileValue(proof, 'raw_contract_live_authority:') === 'true';
+  const rawContractTargetConsistent = profileValue(proof, 'raw_contract_target_gate:') === 'true';
   const readSurfaceGapValue = hasReadSurfaceGapCount
     ? `${readSurfaceGapCount} physical gaps`
     : 'Unknown';
@@ -200,7 +209,11 @@ function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
     { label: 'Next read proof', value: nextReadbackTarget || 'No target', tone: nextReadbackTarget ? 'yellow' as const : 'muted' as const },
     { label: 'Read target gate', value: nextReadbackTargetConsistent ? 'Consistent' : 'Mismatch', tone: readSurfaceQualityAvailable ? nextReadbackTargetConsistent ? 'green' as const : 'yellow' as const : 'muted' as const },
     { label: 'Fixture tests', value: hasFixtureTestCount ? `${fixtureTestCount} declared tests` : 'Unknown', tone: readSurfaceQualityAvailable ? 'blue' as const : 'muted' as const },
-    { label: 'Contract/gap gate', value: contractGapEnforced ? 'Enforced' : 'Missing', tone: contractGapEnforced ? 'green' as const : 'yellow' as const }
+    { label: 'Contract/gap gate', value: contractGapEnforced ? 'Enforced' : 'Missing', tone: contractGapEnforced ? 'green' as const : 'yellow' as const },
+    { label: 'Raw mixer contract', value: rawContractAvailable ? readableStatus(rawContractStatus) : 'Missing', tone: rawContractAvailable ? 'blue' as const : 'muted' as const },
+    { label: 'Contract gap', value: rawContractGapRemains ? 'Physical proof missing' : 'No gap reported', tone: rawContractGapRemains ? 'yellow' as const : 'green' as const },
+    { label: 'Contract authority', value: rawContractLiveAuthority ? 'Live authority claimed' : 'No live authority', tone: rawContractLiveAuthority ? 'red' as const : 'green' as const },
+    { label: 'Contract target', value: rawContractTargetConsistent ? 'Consistent' : 'Mismatch', tone: rawContractAvailable ? rawContractTargetConsistent ? 'green' as const : 'yellow' as const : 'muted' as const }
   ];
 }
 
@@ -229,7 +242,7 @@ function ModuleStatusTable({
           { label: 'All', predicate: () => true },
           { label: 'Live', predicate: row => row.canWriteLive },
           { label: 'Write Surface', predicate: row => row.domain === 'write_surface' },
-          { label: 'Proof', predicate: row => row.domain === 'supervised_proof_evidence' || row.domain === 'autonomy_evidence_overlay' },
+          { label: 'Proof', predicate: row => row.domain === 'supervised_proof_evidence' || row.domain === 'autonomy_evidence_overlay' || row.domain === 'read_surface_contract' },
           { label: 'Review', predicate: row => row.status.includes('proposal') || !row.canWriteLive },
           { label: 'Blocked', predicate: row => row.status.includes('blocked') || row.status.includes('quarantined') || row.pipelineProfiles.includes('quarantine') }
         ]}
