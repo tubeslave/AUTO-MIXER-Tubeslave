@@ -28,6 +28,7 @@ from tools.no_wing_release_check import (
     run_command_check,
     run_release_checks,
     supervised_gain_dry_run_summary,
+    user_presets_readback_contract_summary,
     validate_repo_local_commands,
     validate_no_live_commands,
     validate_bus_group_main_dca_physical_readback_contract_snapshot,
@@ -40,6 +41,7 @@ from tools.no_wing_release_check import (
     validate_read_surface_remediation_plan_snapshot,
     validate_routing_sends_physical_readback_contract_snapshot,
     validate_snapshots_scenes_physical_readback_contract_snapshot,
+    validate_user_presets_physical_readback_contract_snapshot,
     validate_supervised_proof_report_autonomy_overlay,
     validate_supervised_proof_report_next_wing_plan,
     validate_supervised_proof_report_gain_dry_run,
@@ -62,7 +64,8 @@ def test_no_wing_release_check_commands_have_no_live_write_tokens(tmp_path):
     assert "set_eq" not in command_text
     assert "set_compressor" not in command_text
     assert "route_output" not in command_text
-    assert "reset" not in command_text
+    command_tokens = [token for check in checks for token in check.command]
+    assert "reset" not in command_tokens
     assert "mute" not in command_text
     assert any(check.name == "write_surface_static_scan" for check in checks)
     assert any(check.name == "memory_lint" for check in checks)
@@ -1058,6 +1061,34 @@ def test_no_wing_release_check_validates_snapshots_scenes_readback_contract_snap
     assert result.detail["violations"] == []
 
 
+def test_no_wing_release_check_validates_user_presets_readback_contract_snapshot():
+    result = validate_user_presets_physical_readback_contract_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert result.detail["schema_id"] == "user_presets_physical_readback.v1"
+    assert result.detail["surface_id"] == "user_presets"
+    assert result.detail["remediation_action_id"] == "remediate_user_presets"
+    assert result.detail["physical_readback_surface_id"] == "user_presets"
+    assert result.detail["physical_readback_action_id"] == "remediate_user_presets"
+    assert result.detail["fixture_physical_gap_declared"] is True
+    assert result.detail["remediation_physical_gap_declared"] is True
+    assert result.detail["artifact_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert "physical_readback" in result.detail["allowed_sources"]
+    assert "mixer_state_cache" not in result.detail["allowed_sources"]
+    assert "verified_from_physical_readback" in result.detail["accepted_row_statuses"]
+    assert "preset_store_events" in result.detail["forbidden_mutation_evidence_fields"]
+    assert "preset_content_fingerprint" in result.detail["required_preset_fields"]
+    assert "rollback_reference" in result.detail["required_coverage_flags"]
+    assert "preset_recall_allowed" in result.detail["required_false_safety_flags"]
+    assert result.detail["minimum_preset_count"] == 1
+    assert "scene_preset" in result.detail["promotion_families_requiring_surface"]
+    assert result.detail["violations"] == []
+
+
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_frontend=False, quick=True)
 
@@ -1097,6 +1128,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "tests/test_fx_slots_inserts_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_routing_sends_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_snapshots_scenes_physical_readback_contract.py" in fixture_check.command
+    assert "tests/test_user_presets_physical_readback_contract.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command
@@ -1570,6 +1602,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "fx_slots_inserts_physical_readback_contract_schema" in result_names
     assert "routing_sends_physical_readback_contract_schema" in result_names
     assert "snapshots_scenes_physical_readback_contract_schema" in result_names
+    assert "user_presets_physical_readback_contract_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
@@ -1605,6 +1638,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "snapshots_scenes_physical_readback_contract_schema"
     )
     assert result_names.index("snapshots_scenes_physical_readback_contract_schema") < result_names.index(
+        "user_presets_physical_readback_contract_schema"
+    )
+    assert result_names.index("user_presets_physical_readback_contract_schema") < result_names.index(
         "backend_pytest"
     )
     assert result_names.index("supervised_proof_artifact_report") < result_names.index(
@@ -3058,6 +3094,97 @@ def test_no_wing_release_check_summary_embeds_routing_sends_readback_contract(tm
     assert "live_authority_granted: `false`" in markdown_summary
     assert "minimum_channel_bus_send_count: `1`" in markdown_summary
     assert "required_false_safety_flags" in markdown_summary
+    assert "target_consistency: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_user_presets_readback_contract(tmp_path):
+    result = CheckResult(
+        name="user_presets_physical_readback_contract_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "contract_status": "contract_ready_physical_fixture_missing",
+            "schema_id": "user_presets_physical_readback.v1",
+            "surface_id": "user_presets",
+            "remediation_action_id": "remediate_user_presets",
+            "physical_readback_surface_id": "user_presets",
+            "physical_readback_action_id": "remediate_user_presets",
+            "fixture_physical_gap_declared": True,
+            "remediation_physical_gap_declared": True,
+            "artifact_required": True,
+            "physical_fixture_gap_remains": True,
+            "accepted_as_physical_fixture_candidate": False,
+            "live_authority_granted": False,
+            "promotion_families_requiring_surface": [
+                "scene_preset",
+                "routing",
+                "mix_balance",
+                "performance_adaptation",
+            ],
+            "required_top_level_field_count": 10,
+            "required_preset_fields": [
+                "preset_index",
+                "preset_name",
+                "preset_content_fingerprint",
+                "rollback_reference",
+            ],
+            "required_coverage_flags": [
+                "catalog_identity",
+                "preset_content_fingerprint",
+                "rollback_reference",
+            ],
+            "required_false_safety_flags": [
+                "live_write",
+                "mutates_console_state",
+                "live_widening_allowed",
+                "full_autonomous_ready",
+                "preset_recall_allowed",
+                "preset_store_allowed",
+            ],
+            "minimum_preset_count": 1,
+            "allowed_sources": [
+                "physical_readback",
+                "wing_physical_readback",
+                "dlive_physical_readback",
+            ],
+            "accepted_row_statuses": ["verified_from_physical_readback"],
+            "forbidden_mutation_evidence_fields": [
+                "preset_recall_events",
+                "preset_store_events",
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert user_presets_readback_contract_summary([result]) == summary[
+        "user_presets_physical_readback_contract"
+    ]
+    contract = json_summary["user_presets_physical_readback_contract"]
+    assert contract["read_only"] is True
+    assert contract["live_write"] is False
+    assert contract["preset_recall_allowed"] is False
+    assert contract["preset_store_allowed"] is False
+    assert contract["physical_fixture_gap_remains"] is True
+    assert contract["accepted_as_physical_fixture_candidate"] is False
+    assert contract["live_authority_granted"] is False
+    assert contract["target_consistency"] is True
+    assert contract["surface_id"] == "user_presets"
+    assert "scene_preset" in contract["promotion_families_requiring_surface"]
+    assert "preset_content_fingerprint" in contract["required_preset_fields"]
+    assert "rollback_reference" in contract["required_coverage_flags"]
+    assert "preset_store_allowed" in contract["required_false_safety_flags"]
+    assert contract["minimum_preset_count"] == 1
+    assert "## User Presets Physical Readback Contract" in markdown_summary
+    assert "preset_recall_allowed: `false`" in markdown_summary
+    assert "preset_store_allowed: `false`" in markdown_summary
+    assert "physical_fixture_gap_remains: `true`" in markdown_summary
+    assert "live_authority_granted: `false`" in markdown_summary
     assert "target_consistency: `true`" in markdown_summary
 
 

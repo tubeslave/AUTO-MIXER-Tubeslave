@@ -145,9 +145,19 @@ def test_plan_creates_actions_for_current_partial_and_missing_read_surfaces():
 
     presets = actions["user_presets"]
     assert presets["action_type"] == "complete_read_dto"
+    assert presets["physical_readback_gap"] is True
+    assert presets["next_physical_readback_target"] is False
     assert "enumeration_contract" in presets["missing_contracts"]
     assert "destructive_change_diff_marker" in presets["missing_contracts"]
+    assert "physical_readback_fixture" in presets["missing_contracts"]
+    assert "scoped_diff_fixture_missing" in presets["missing_contracts"]
+    assert "rollback_diff_fixture_missing" in presets["missing_contracts"]
+    assert any(
+        "user_presets_physical_readback_contract" in artifact
+        for artifact in presets["expected_artifacts"]
+    )
     assert presets["requires_connection"] is False
+    assert presets["mutates_console_state"] is False
 
 
 def test_complete_surfaces_return_complete_status_without_actions():

@@ -530,8 +530,8 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
           snapshot_status: 'fixture_evidence_incomplete',
           surface_count: 10,
           surface_with_fixture_count: 10,
-          declared_fixture_path_count: 14,
-          declared_test_name_count: 37,
+          declared_fixture_path_count: 15,
+          declared_test_name_count: 40,
           physical_gap_surface_count: 10,
           summary_recomputed_from_rows: true,
           fixture_declaration_validation: true,
@@ -829,6 +829,50 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             minimum_snapshot_count: 1,
             violations: [],
           },
+          user_presets_physical_readback_contract: {
+            available: true,
+            status: 'passed',
+            schema_id: 'user_presets_physical_readback.v1',
+            contract_status: 'contract_ready_physical_fixture_missing',
+            surface_id: 'user_presets',
+            remediation_action_id: 'remediate_user_presets',
+            physical_readback_surface_id: 'user_presets',
+            physical_readback_action_id: 'remediate_user_presets',
+            artifact_required: true,
+            physical_fixture_gap_remains: true,
+            accepted_as_physical_fixture_candidate: false,
+            read_only: true,
+            live_write: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            preset_recall_allowed: false,
+            preset_store_allowed: false,
+            target_consistency: true,
+            fixture_physical_gap_declared: true,
+            remediation_physical_gap_declared: true,
+            promotion_families_requiring_surface: ['scene_preset', 'routing', 'mix_balance'],
+            required_preset_fields: [
+              'preset_index',
+              'preset_name',
+              'preset_scope',
+              'target_type',
+              'target_label',
+              'preset_content_fingerprint',
+              'rollback_reference',
+            ],
+            required_coverage_flags: ['catalog_identity', 'scope', 'target', 'rollback_reference'],
+            required_false_safety_flags: [
+              'live_write',
+              'mutates_console_state',
+              'preset_recall_allowed',
+              'preset_store_allowed',
+            ],
+            allowed_sources: ['physical_readback', 'wing_physical_readback'],
+            accepted_row_statuses: ['verified_from_physical_readback'],
+            forbidden_mutation_evidence_fields: ['preset_recall_events', 'preset_store_events'],
+            minimum_preset_count: 1,
+            violations: [],
+          },
         },
       },
     },
@@ -918,6 +962,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'fx_slots_inserts_physical_readback_contract',
       'routing_sends_physical_readback_contract',
       'snapshots_scenes_physical_readback_contract',
+      'user_presets_physical_readback_contract',
       'read_surface_remediation_plan',
       'autonomy_evidence:fader_supervised_promotion',
       'autonomy_evidence:gain_trim_supervised_promotion',
@@ -1005,7 +1050,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'next_readback_target:raw_mixer_state_cache',
     'source_next_readback_target:raw_mixer_state_cache',
     'next_readback_gate:true',
-    'fixture_tests:37',
+    'fixture_tests:40',
     'contract_gap:true',
     'raw_contract_available:true',
     'raw_contract_status:contract_ready_physical_fixture_missing',
@@ -1055,13 +1100,19 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'scenes_contract_gap:true',
     'scenes_contract_live_authority:false',
     'scenes_contract_target_gate:true',
+    'presets_contract_available:true',
+    'presets_contract_status:contract_ready_physical_fixture_missing',
+    'presets_contract_schema:user_presets_physical_readback.v1',
+    'presets_contract_gap:true',
+    'presets_contract_live_authority:false',
+    'presets_contract_target_gate:true',
   ]);
   assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
   assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
   assert.match(proofEvidence.nextStep, /age:120s stale_after:86400s stale:false/);
   assert.match(proofEvidence.nextStep, /read_surface_gaps:10/);
-  assert.match(proofEvidence.nextStep, /fixture_paths:14/);
-  assert.match(proofEvidence.nextStep, /test_names:37/);
+  assert.match(proofEvidence.nextStep, /fixture_paths:15/);
+  assert.match(proofEvidence.nextStep, /test_names:40/);
   assert.match(proofEvidence.nextStep, /contract_gap:true/);
   assert.match(proofEvidence.nextStep, /gap_surfaces:raw_mixer_state_cache/);
   assert.match(proofEvidence.nextStep, /next_readback:raw_mixer_state_cache/);
@@ -1099,6 +1150,10 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /scenes_contract_gap:true/);
   assert.match(proofEvidence.nextStep, /scenes_contract_live_authority:false/);
   assert.match(proofEvidence.nextStep, /scenes_contract_target_gate:true/);
+  assert.match(proofEvidence.nextStep, /presets_contract:contract_ready_physical_fixture_missing/);
+  assert.match(proofEvidence.nextStep, /presets_contract_gap:true/);
+  assert.match(proofEvidence.nextStep, /presets_contract_live_authority:false/);
+  assert.match(proofEvidence.nextStep, /presets_contract_target_gate:true/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
 
   const rawMixerContract = rows.find(row => row.moduleId === 'raw_mixer_state_physical_readback_contract');
@@ -1379,6 +1434,41 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(snapshotsScenesContract.nextStep, /live_authority:false/);
   assert.match(snapshotsScenesContract.nextStep, /target_consistency:true/);
 
+  const userPresetsContract = rows.find(row => row.moduleId === 'user_presets_physical_readback_contract');
+  assert.equal(userPresetsContract.domain, 'read_surface_contract');
+  assert.equal(userPresetsContract.canWriteLive, false);
+  assert.deepEqual(userPresetsContract.liveWriteKinds, []);
+  assert.equal(userPresetsContract.status, 'contract_ready_physical_fixture_missing');
+  assert.equal(userPresetsContract.entrypoint, 'user_presets_physical_readback_contract');
+  assert.equal(userPresetsContract.module, 'remediate_user_presets');
+  assert.equal(userPresetsContract.tone, 'yellow');
+  assert.deepEqual(userPresetsContract.pipelineProfiles, [
+    'available:true',
+    'schema:user_presets_physical_readback.v1',
+    'surface:user_presets',
+    'physical_readback:user_presets',
+    'physical_action:remediate_user_presets',
+    'physical_gap_remains:true',
+    'live_authority:false',
+    'target_consistency:true',
+    'preset_recall_allowed:false',
+    'preset_store_allowed:false',
+    'promotion_families:scene_preset|routing|mix_balance',
+    'presets:preset_index|preset_name|preset_scope|target_type|target_label|preset_content_fingerprint|rollback_reference',
+    'coverage:catalog_identity|scope|target|rollback_reference',
+    'false_safety:live_write|mutates_console_state|preset_recall_allowed|preset_store_allowed',
+  ]);
+  assert.match(userPresetsContract.blockedReason, /physical readback fixture evidence is still missing/);
+  assert.match(userPresetsContract.nextStep, /physical_readback:user_presets/);
+  assert.match(userPresetsContract.nextStep, /physical_action:remediate_user_presets/);
+  assert.match(userPresetsContract.nextStep, /families:scene_preset,routing,mix_balance/);
+  assert.match(userPresetsContract.nextStep, /presets:preset_index,preset_name,preset_scope,target_type,target_label,preset_content_fingerprint,rollback_reference/);
+  assert.match(userPresetsContract.nextStep, /coverage:catalog_identity,scope,target,rollback_reference/);
+  assert.match(userPresetsContract.nextStep, /preset_recall_allowed:false/);
+  assert.match(userPresetsContract.nextStep, /preset_store_allowed:false/);
+  assert.match(userPresetsContract.nextStep, /live_authority:false/);
+  assert.match(userPresetsContract.nextStep, /target_consistency:true/);
+
   const readRemediation = rows.find(row => row.moduleId === 'read_surface_remediation_plan');
   assert.equal(readRemediation.domain, 'read_surface_remediation');
   assert.equal(readRemediation.canWriteLive, false);
@@ -1542,7 +1632,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 9);
+  assert.equal(rows.length, 10);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -1612,6 +1702,12 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'scenes_contract_gap:false',
     'scenes_contract_live_authority:false',
     'scenes_contract_target_gate:false',
+    'presets_contract_available:false',
+    'presets_contract_status:missing',
+    'presets_contract_schema:',
+    'presets_contract_gap:false',
+    'presets_contract_live_authority:false',
+    'presets_contract_target_gate:false',
   ]);
 
   assert.equal(rows[1].moduleId, 'raw_mixer_state_physical_readback_contract');
@@ -1669,6 +1765,13 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.equal(rows[8].canWriteLive, false);
   assert.deepEqual(rows[8].liveWriteKinds, []);
   assert.match(rows[8].blockedReason, /contract is missing/);
+
+  assert.equal(rows[9].moduleId, 'user_presets_physical_readback_contract');
+  assert.equal(rows[9].domain, 'read_surface_contract');
+  assert.equal(rows[9].status, 'contract_missing');
+  assert.equal(rows[9].canWriteLive, false);
+  assert.deepEqual(rows[9].liveWriteKinds, []);
+  assert.match(rows[9].blockedReason, /contract is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

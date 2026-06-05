@@ -226,17 +226,24 @@ FIXTURE_EVIDENCE_BY_SURFACE: Dict[str, Dict[str, Tuple[str, ...]]] = {
         ),
     },
     "user_presets": {
-        "fixture_paths": ("tests/test_operator_product_state.py",),
+        "fixture_paths": (
+            "tests/test_operator_product_state.py",
+            "tests/test_user_presets_physical_readback_contract.py",
+        ),
         "test_names": (
             "test_user_presets_snapshot_publishes_cached_catalog_without_queries",
             "test_user_presets_snapshot_marks_stale_cache_timestamps_without_queries",
             "test_user_presets_snapshot_marks_missing_cache_without_queries",
+            "test_user_presets_contract_describes_future_physical_artifact",
+            "test_user_presets_contract_validates_minimal_physical_artifact",
+            "test_user_presets_contract_rejects_live_or_cached_claims",
         ),
         "covered_contracts": (
             "cached_preset_catalog",
             "user_preset_cache_freshness",
             "stale_cache_detection",
             "destructive_preset_marker",
+            "physical_readback_artifact_contract",
             "no_preset_recall",
             "no_console_query",
         ),

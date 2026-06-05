@@ -1933,8 +1933,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     "snapshot_status": "fixture_evidence_incomplete",
                     "surface_count": 10,
                     "surface_with_fixture_count": 10,
-                    "declared_fixture_path_count": 14,
-                    "declared_test_name_count": 37,
+                    "declared_fixture_path_count": 15,
+                    "declared_test_name_count": 40,
                     "physical_gap_surface_count": 10,
                     "summary_recomputed_from_rows": True,
                     "fixture_declaration_validation": True,
@@ -2392,6 +2392,67 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "user_presets_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "user_presets_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "user_presets",
+                    "remediation_action_id": "remediate_user_presets",
+                    "physical_readback_surface_id": "user_presets",
+                    "physical_readback_action_id": "remediate_user_presets",
+                    "fixture_physical_gap_declared": True,
+                    "remediation_physical_gap_declared": True,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "preset_recall_allowed": False,
+                    "preset_store_allowed": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "scene_preset",
+                        "routing",
+                        "mix_balance",
+                        "performance_adaptation",
+                    ],
+                    "required_preset_fields": [
+                        "preset_index",
+                        "preset_name",
+                        "preset_scope",
+                        "target_type",
+                        "target_label",
+                        "preset_content_fingerprint",
+                        "rollback_reference",
+                    ],
+                    "required_coverage_flags": [
+                        "catalog_identity",
+                        "scope",
+                        "target",
+                        "rollback_reference",
+                    ],
+                    "required_false_safety_flags": [
+                        "live_write",
+                        "mutates_console_state",
+                        "preset_recall_allowed",
+                        "preset_store_allowed",
+                    ],
+                    "minimum_preset_count": 1,
+                    "allowed_sources": ["physical_readback", "wing_physical_readback"],
+                    "accepted_row_statuses": ["verified_from_physical_readback"],
+                    "forbidden_mutation_evidence_fields": [
+                        "manual_write_events",
+                        "preset_recall_events",
+                        "preset_store_events",
+                    ],
+                    "violations": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -2421,8 +2482,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     proof_quality = payload["summary"]["read_surface_proof_quality"]
     assert proof_quality["available"] is True
     assert proof_quality["summary_path"] == str(latest_dir / "summary.json")
-    assert proof_quality["declared_fixture_path_count"] == 14
-    assert proof_quality["declared_test_name_count"] == 37
+    assert proof_quality["declared_fixture_path_count"] == 15
+    assert proof_quality["declared_test_name_count"] == 40
     assert proof_quality["physical_gap_surface_count"] == 10
     assert proof_quality["summary_recomputed_from_rows"] is True
     assert proof_quality["fixture_declaration_validation"] is True
@@ -2682,6 +2743,33 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert scenes_contract["minimum_snapshot_count"] == 1
     assert "physical_readback" in scenes_contract["allowed_sources"]
     assert "scene_recall_events" in scenes_contract[
+        "forbidden_mutation_evidence_fields"
+    ]
+    presets_contract = proof_quality["user_presets_physical_readback_contract"]
+    assert presets_contract["available"] is True
+    assert presets_contract["status"] == "passed"
+    assert presets_contract["schema_id"] == "user_presets_physical_readback.v1"
+    assert presets_contract["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert presets_contract["surface_id"] == "user_presets"
+    assert presets_contract["remediation_action_id"] == "remediate_user_presets"
+    assert presets_contract["artifact_required"] is True
+    assert presets_contract["physical_fixture_gap_remains"] is True
+    assert presets_contract["accepted_as_physical_fixture_candidate"] is False
+    assert presets_contract["live_authority_granted"] is False
+    assert presets_contract["full_autonomous_ready"] is False
+    assert presets_contract["preset_recall_allowed"] is False
+    assert presets_contract["preset_store_allowed"] is False
+    assert presets_contract["fixture_physical_gap_declared"] is True
+    assert presets_contract["remediation_physical_gap_declared"] is True
+    assert presets_contract["target_consistency"] is True
+    assert "scene_preset" in presets_contract["promotion_families_requiring_surface"]
+    assert "preset_content_fingerprint" in presets_contract["required_preset_fields"]
+    assert "rollback_reference" in presets_contract["required_coverage_flags"]
+    assert "preset_recall_allowed" in presets_contract["required_false_safety_flags"]
+    assert "preset_store_allowed" in presets_contract["required_false_safety_flags"]
+    assert presets_contract["minimum_preset_count"] == 1
+    assert "physical_readback" in presets_contract["allowed_sources"]
+    assert "preset_store_events" in presets_contract[
         "forbidden_mutation_evidence_fields"
     ]
     overlay = payload["autonomy_evidence_overlay"]
@@ -2956,6 +3044,36 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["routing_contract_claimed_live_authority"],
                 },
+                "user_presets_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "user_presets_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "physical_readback_surface_id": "dlive_state",
+                    "physical_readback_action_id": "remediate_dlive_state",
+                    "fixture_physical_gap_declared": False,
+                    "remediation_physical_gap_declared": False,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "preset_recall_allowed": True,
+                    "preset_store_allowed": True,
+                    "target_consistency": False,
+                    "promotion_families_requiring_surface": ["scene_preset"],
+                    "required_preset_fields": ["preset_index"],
+                    "required_coverage_flags": [],
+                    "required_false_safety_flags": ["live_write"],
+                    "minimum_preset_count": 0,
+                    "allowed_sources": ["physical_readback", "mixer_state_cache"],
+                    "accepted_row_statuses": ["verified_from_cache"],
+                    "forbidden_mutation_evidence_fields": [],
+                    "violations": ["preset_contract_claimed_live_authority"],
+                },
             }
         ),
         encoding="utf-8",
@@ -3107,6 +3225,30 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert routing_contract["minimum_channel_matrix_send_count"] == 0
     assert routing_contract["minimum_output_route_count"] == 0
     assert "routing_contract_claimed_live_authority" in routing_contract["violations"]
+    presets_contract = payload["summary"]["read_surface_proof_quality"][
+        "user_presets_physical_readback_contract"
+    ]
+    assert presets_contract["available"] is True
+    assert presets_contract["surface_id"] == "dlive_state"
+    assert presets_contract["physical_readback_surface_id"] == "dlive_state"
+    assert presets_contract["target_consistency"] is False
+    assert presets_contract["accepted_as_physical_fixture_candidate"] is False
+    assert presets_contract["read_only"] is True
+    assert presets_contract["live_write"] is False
+    assert presets_contract["live_authority_granted"] is False
+    assert presets_contract["full_autonomous_ready"] is False
+    assert presets_contract["preset_recall_allowed"] is False
+    assert presets_contract["preset_store_allowed"] is False
+    assert presets_contract["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert presets_contract["source_live_write_claimed"] is True
+    assert presets_contract["source_live_authority_granted_claimed"] is True
+    assert presets_contract["source_full_autonomous_ready_claimed"] is True
+    assert presets_contract["source_preset_recall_allowed_claimed"] is True
+    assert presets_contract["source_preset_store_allowed_claimed"] is True
+    assert presets_contract["promotion_families_requiring_surface"] == ["scene_preset"]
+    assert presets_contract["required_false_safety_flags"] == ["live_write"]
+    assert presets_contract["minimum_preset_count"] == 0
+    assert "preset_contract_claimed_live_authority" in presets_contract["violations"]
     assert "set_gain" not in set(_walk_keys(payload))
 
 

@@ -46,6 +46,10 @@ try:
         SNAPSHOTS_SCENES_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         SNAPSHOTS_SCENES_SURFACE_ID,
     )
+    from user_presets_physical_readback_contract import (
+        USER_PRESETS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        USER_PRESETS_SURFACE_ID,
+    )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.bus_group_main_dca_physical_readback_contract import (
         BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
@@ -80,6 +84,10 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.snapshots_scenes_physical_readback_contract import (
         SNAPSHOTS_SCENES_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         SNAPSHOTS_SCENES_SURFACE_ID,
+    )
+    from backend.user_presets_physical_readback_contract import (
+        USER_PRESETS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        USER_PRESETS_SURFACE_ID,
     )
 
 
@@ -258,6 +266,11 @@ def _expected_artifacts(surface: ReadSurface, *, physical_readback_gap: bool) ->
             artifacts.append(
                 "Snapshots/scenes physical readback artifact validated by "
                 f"{SNAPSHOTS_SCENES_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
+            )
+        if surface.id == USER_PRESETS_SURFACE_ID:
+            artifacts.append(
+                "User presets physical readback artifact validated by "
+                f"{USER_PRESETS_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
             )
     return tuple(artifacts)
 
