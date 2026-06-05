@@ -59,9 +59,11 @@ def test_partial_and_missing_surfaces_block_full_readiness_claim():
     assert snapshot["summary"]["status_counts"]["partial"] >= 6
     assert remediation["status"] == "read_remediation_required"
     assert remediation["safety"]["live_write"] is False
-    assert set(snapshot["summary"]["partial_or_missing_surface_ids"]) == set(
+    assert set(snapshot["summary"]["partial_or_missing_surface_ids"]) <= set(
         remediation["summary"]["incomplete_surface_ids"]
     )
+    assert "raw_mixer_state_cache" in remediation["summary"]["physical_fixture_missing_surface_ids"]
+    assert remediation["summary"]["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
 
 
 def test_fx_and_snapshot_read_surfaces_are_not_write_authority():

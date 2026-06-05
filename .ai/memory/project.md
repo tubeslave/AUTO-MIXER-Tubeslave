@@ -65,6 +65,7 @@
 - Codex autoloop reports should keep `## Три обязательных вопроса` directly adjacent to `## Объяснение простым языком`; extra top-level evidence belongs earlier so the operator-facing ending stays predictable.
 - no-WING read-surface summaries should include `next_physical_readback_surface_id` and fail validation if it drifts from the first `physical_fixture_missing_surface_ids` entry.
 - Product Layer should expose read-surface next-target consistency separately from the target label so malformed no-WING proof artifacts stay visible without granting live authority.
+- Read-surface remediation actions should include physical fixture gaps even for cached/queryable inventory rows, so the next readback proof target is actionable without reclassifying cache coverage or granting live authority.
 
 ## Memory Pipeline Lessons
 

@@ -13,8 +13,10 @@ from typing import Any, Dict, Iterable, Mapping, Tuple
 
 try:
     from read_surface_inventory import ReadSurface, iter_read_surfaces
+    from read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.read_surface_inventory import ReadSurface, iter_read_surfaces
+    from backend.read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
 
 
 READ_SURFACE_REMEDIATION_METHOD_ID = "read_surface_remediation_plan"
@@ -27,6 +29,8 @@ ACTION_TYPE_BY_STATUS = {
     "planned": "implement_read_surface",
     "missing": "define_read_surface_contract",
 }
+PHYSICAL_READBACK_ACTION_TYPE = "add_physical_readback_fixture"
+REMEDIATION_ACTION_TYPES = set(ACTION_TYPE_BY_STATUS.values()) | {PHYSICAL_READBACK_ACTION_TYPE}
 
 
 @dataclass(frozen=True)
@@ -46,12 +50,18 @@ class ReadSurfaceRemediationAction:
     rationale: str
     expected_artifacts: Tuple[str, ...]
     blockers: Tuple[str, ...]
+    fixture_evidence_status: str = ""
+    physical_readback_gap: bool = False
+    next_physical_readback_target: bool = False
+    fixture_remaining_gaps: Tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.mutates_console_state:
             raise ValueError("Read remediation actions must not mutate console state")
-        if self.status not in ACTION_TYPE_BY_STATUS:
-            raise ValueError(f"{self.surface_id} is not an incomplete read surface")
+        if self.action_type not in REMEDIATION_ACTION_TYPES:
+            raise ValueError(f"Unknown read remediation action type: {self.action_type}")
+        if self.status not in ACTION_TYPE_BY_STATUS and not self.physical_readback_gap:
+            raise ValueError(f"{self.surface_id} is not an incomplete read surface or physical gap")
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
@@ -62,6 +72,7 @@ class ReadSurfaceRemediationAction:
             "entrypoints",
             "expected_artifacts",
             "blockers",
+            "fixture_remaining_gaps",
         ):
             payload[key] = list(payload[key])
         return payload
@@ -71,13 +82,54 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _missing_contracts(surface: ReadSurface) -> Tuple[str, ...]:
-    contracts = [
-        "product_layer_read_dto",
-        "coverage_completeness_flags",
-        "stale_cache_or_query_source_metadata",
-        "fixture_or_snapshot_test",
-    ]
+def _string_tuple(value: Any) -> Tuple[str, ...]:
+    if not isinstance(value, (list, tuple)):
+        return ()
+    return tuple(item for item in value if isinstance(item, str) and item)
+
+
+def _fixture_rows_by_surface(snapshot: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
+    rows = snapshot.get("surfaces")
+    if not isinstance(rows, list):
+        return {}
+    return {
+        row["surface_id"]: row
+        for row in rows
+        if isinstance(row, Mapping) and isinstance(row.get("surface_id"), str)
+    }
+
+
+def _physical_gap_surface_ids(
+    fixture_snapshot: Mapping[str, Any],
+    fixture_rows: Mapping[str, Mapping[str, Any]],
+) -> Tuple[str, ...]:
+    summary = fixture_snapshot.get("summary") if isinstance(fixture_snapshot.get("summary"), Mapping) else {}
+    declared = _string_tuple(summary.get("physical_fixture_missing_surface_ids"))
+    if declared:
+        return declared
+    return tuple(
+        surface_id
+        for surface_id, row in fixture_rows.items()
+        if "physical_readback_fixture_missing" in _string_tuple(row.get("remaining_gaps"))
+    )
+
+
+def _missing_contracts(
+    surface: ReadSurface,
+    *,
+    physical_readback_gap: bool,
+    fixture_remaining_gaps: Tuple[str, ...],
+) -> Tuple[str, ...]:
+    contracts = []
+    if surface.status in ACTION_TYPE_BY_STATUS:
+        contracts.extend(
+            [
+                "product_layer_read_dto",
+                "coverage_completeness_flags",
+                "stale_cache_or_query_source_metadata",
+                "fixture_or_snapshot_test",
+            ]
+        )
     if surface.read_mode == "osc_read_query":
         contracts.append("physical_query_readback_fixture")
     if surface.target_console_surface in {"routing_sends", "snapshots_scenes", "presets"}:
@@ -86,35 +138,66 @@ def _missing_contracts(surface: ReadSurface) -> Tuple[str, ...]:
         contracts.append("enumeration_contract")
     if surface.target_console_surface == "dlive":
         contracts.append("dlive_wing_parity_mapping")
-    return tuple(contracts)
+    if physical_readback_gap:
+        contracts.append("physical_readback_fixture")
+        contracts.extend(fixture_remaining_gaps)
+    return tuple(dict.fromkeys(contracts))
 
 
-def _expected_artifacts(surface: ReadSurface) -> Tuple[str, ...]:
-    return (
+def _expected_artifacts(surface: ReadSurface, *, physical_readback_gap: bool) -> Tuple[str, ...]:
+    artifacts = [
         f"Read DTO for {surface.target_console_surface} with explicit coverage flags.",
         f"Fixture test proving {surface.id} does not mutate console state.",
         "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
         "Updated read surface inventory row with remaining blockers.",
-    )
+    ]
+    if physical_readback_gap:
+        artifacts.append(
+            f"Physical readback fixture for {surface.id} proving cached or queryable evidence matches console state."
+        )
+    return tuple(artifacts)
 
 
-def _action_for_surface(surface: ReadSurface) -> ReadSurfaceRemediationAction:
+def _action_type_for_surface(surface: ReadSurface, *, physical_readback_gap: bool) -> str:
+    if surface.status in ACTION_TYPE_BY_STATUS:
+        return ACTION_TYPE_BY_STATUS[surface.status]
+    if physical_readback_gap:
+        return PHYSICAL_READBACK_ACTION_TYPE
+    raise ValueError(f"{surface.id} has no read remediation action")
+
+
+def _action_for_surface(
+    surface: ReadSurface,
+    *,
+    fixture_row: Mapping[str, Any],
+    physical_readback_gap: bool,
+    next_physical_readback_target: bool,
+) -> ReadSurfaceRemediationAction:
+    fixture_remaining_gaps = _string_tuple(fixture_row.get("remaining_gaps"))
     return ReadSurfaceRemediationAction(
         id=f"remediate_{surface.id}",
         surface_id=surface.id,
         target_console_surface=surface.target_console_surface,
         status=surface.status,
-        action_type=ACTION_TYPE_BY_STATUS[surface.status],
+        action_type=_action_type_for_surface(surface, physical_readback_gap=physical_readback_gap),
         read_mode=surface.read_mode,
         requires_connection=bool(surface.requires_connection),
         mutates_console_state=False,
         current_fields=surface.read_fields,
-        missing_contracts=_missing_contracts(surface),
+        missing_contracts=_missing_contracts(
+            surface,
+            physical_readback_gap=physical_readback_gap,
+            fixture_remaining_gaps=fixture_remaining_gaps,
+        ),
         source_paths=surface.paths,
         entrypoints=surface.entrypoints,
         rationale=surface.blocker or surface.next_action or "Read coverage is incomplete.",
-        expected_artifacts=_expected_artifacts(surface),
+        expected_artifacts=_expected_artifacts(surface, physical_readback_gap=physical_readback_gap),
         blockers=tuple(item for item in (surface.blocker, surface.next_action) if item),
+        fixture_evidence_status=str(fixture_row.get("status") or ""),
+        physical_readback_gap=physical_readback_gap,
+        next_physical_readback_target=next_physical_readback_target,
+        fixture_remaining_gaps=fixture_remaining_gaps,
     )
 
 
@@ -127,12 +210,48 @@ def _status_counts(surfaces: Iterable[ReadSurface]) -> Dict[str, int]:
 
 def build_read_surface_remediation_plan(
     surfaces: Iterable[ReadSurface] | None = None,
+    fixture_evidence_snapshot: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Build a non-executing plan for incomplete console read coverage."""
 
     all_surfaces = tuple(surfaces if surfaces is not None else iter_read_surfaces())
-    incomplete = tuple(surface for surface in all_surfaces if surface.status in ACTION_TYPE_BY_STATUS)
-    actions = tuple(_action_for_surface(surface) for surface in incomplete)
+    fixture_snapshot = (
+        fixture_evidence_snapshot
+        if fixture_evidence_snapshot is not None
+        else build_read_surface_fixture_evidence_snapshot(all_surfaces)
+    )
+    fixture_rows = _fixture_rows_by_surface(fixture_snapshot)
+    physical_gap_ids = _physical_gap_surface_ids(fixture_snapshot, fixture_rows)
+    physical_gap_id_set = set(physical_gap_ids)
+    summary = fixture_snapshot.get("summary") if isinstance(fixture_snapshot.get("summary"), Mapping) else {}
+    source_next_target = summary.get("next_physical_readback_surface_id")
+    next_physical_readback_surface_id = (
+        source_next_target
+        if isinstance(source_next_target, str) and source_next_target in physical_gap_id_set
+        else physical_gap_ids[0]
+        if physical_gap_ids
+        else None
+    )
+    incomplete = tuple(
+        surface
+        for surface in all_surfaces
+        if surface.status in ACTION_TYPE_BY_STATUS or surface.id in physical_gap_id_set
+    )
+    actions = tuple(
+        _action_for_surface(
+            surface,
+            fixture_row=fixture_rows.get(surface.id, {}),
+            physical_readback_gap=surface.id in physical_gap_id_set,
+            next_physical_readback_target=surface.id == next_physical_readback_surface_id,
+        )
+        for surface in incomplete
+    )
+    next_action_id = (
+        f"remediate_{next_physical_readback_surface_id}"
+        if next_physical_readback_surface_id
+        and any(action.surface_id == next_physical_readback_surface_id for action in actions)
+        else None
+    )
     status = "read_coverage_complete" if not actions else "read_remediation_required"
 
     return {
@@ -152,8 +271,12 @@ def build_read_surface_remediation_plan(
             "action_count": len(actions),
             "status_counts": _status_counts(all_surfaces),
             "incomplete_surface_ids": [surface.id for surface in incomplete],
+            "physical_fixture_missing_surface_ids": list(physical_gap_ids),
+            "next_physical_readback_surface_id": next_physical_readback_surface_id,
+            "next_physical_readback_action_id": next_action_id,
             "global_blockers": [
                 "full_console_read_coverage_incomplete",
+                "physical_readback_fixtures_incomplete",
                 "read_surface_remediation_does_not_contact_mixer",
                 "full_autonomous_requires_complete_read_dtos",
             ]

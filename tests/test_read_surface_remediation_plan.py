@@ -39,14 +39,30 @@ def test_plan_creates_actions_for_current_partial_and_missing_read_surfaces():
     assert plan["summary"]["incomplete_surface_count"] == len(plan["actions"])
     assert "channel_eq_dynamics_gate" in plan["summary"]["incomplete_surface_ids"]
     assert "user_presets" in plan["summary"]["incomplete_surface_ids"]
+    assert "raw_mixer_state_cache" in plan["summary"]["incomplete_surface_ids"]
+    assert plan["summary"]["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert plan["summary"]["next_physical_readback_action_id"] == "remediate_raw_mixer_state_cache"
+    assert plan["summary"]["physical_fixture_missing_surface_ids"][0] == "raw_mixer_state_cache"
     assert plan["summary"]["status_counts"]["partial"] >= 5
     assert plan["summary"]["status_counts"]["missing"] == 0
     assert "full_console_read_coverage_incomplete" in plan["summary"]["global_blockers"]
+    assert "physical_readback_fixtures_incomplete" in plan["summary"]["global_blockers"]
 
     actions = {action["surface_id"]: action for action in plan["actions"]}
+    raw_cache = actions["raw_mixer_state_cache"]
+    assert raw_cache["action_type"] == "add_physical_readback_fixture"
+    assert raw_cache["status"] == "cached"
+    assert raw_cache["physical_readback_gap"] is True
+    assert raw_cache["next_physical_readback_target"] is True
+    assert "physical_readback_fixture" in raw_cache["missing_contracts"]
+    assert "physical_readback_fixture_missing" in raw_cache["fixture_remaining_gaps"]
+    assert raw_cache["mutates_console_state"] is False
+
     channel_processing = actions["channel_eq_dynamics_gate"]
     assert channel_processing["action_type"] == "complete_read_dto"
     assert "physical_query_readback_fixture" in channel_processing["missing_contracts"]
+    assert channel_processing["physical_readback_gap"] is True
+    assert channel_processing["next_physical_readback_target"] is False
     assert channel_processing["mutates_console_state"] is False
 
     presets = actions["user_presets"]
@@ -69,9 +85,27 @@ def test_complete_surfaces_return_complete_status_without_actions():
         current_coverage="Complete fixture row.",
     )
 
-    plan = build_read_surface_remediation_plan([surface])
+    plan = build_read_surface_remediation_plan(
+        [surface],
+        fixture_evidence_snapshot={
+            "summary": {
+                "physical_fixture_missing_surface_ids": [],
+                "next_physical_readback_surface_id": None,
+            },
+            "surfaces": [
+                {
+                    "surface_id": "complete_fx",
+                    "status": "fixture_evidence_present",
+                    "remaining_gaps": [],
+                }
+            ],
+        },
+    )
 
     assert plan["status"] == "read_coverage_complete"
     assert plan["summary"]["incomplete_surface_count"] == 0
+    assert plan["summary"]["physical_fixture_missing_surface_ids"] == []
+    assert plan["summary"]["next_physical_readback_surface_id"] is None
+    assert plan["summary"]["next_physical_readback_action_id"] is None
     assert plan["summary"]["global_blockers"] == []
     assert plan["actions"] == []
