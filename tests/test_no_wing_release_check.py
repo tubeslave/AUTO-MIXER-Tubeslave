@@ -17,12 +17,14 @@ from tools.no_wing_release_check import (
     next_wing_proof_plan_summary,
     proof_report_path_for_run,
     read_surface_fixture_evidence_summary,
+    read_surface_remediation_plan_summary,
     run_command_check,
     run_release_checks,
     supervised_gain_dry_run_summary,
     validate_repo_local_commands,
     validate_no_live_commands,
     validate_read_surface_fixture_evidence_snapshot,
+    validate_read_surface_remediation_plan_snapshot,
     validate_supervised_proof_report_autonomy_overlay,
     validate_supervised_proof_report_next_wing_plan,
     validate_supervised_proof_report_gain_dry_run,
@@ -289,6 +291,86 @@ def test_no_wing_release_check_rejects_read_surface_contract_gap_inconsistency(m
     assert "read_surface_fixture_row_matrix_state_present_status_has_physical_gap" in result.detail["violations"]
     assert "read_surface_fixture_row_matrix_state_present_status_has_hardware_gap" in result.detail["violations"]
     assert "read_surface_fixture_row_dlive_state_missing_status_has_covered_contracts" in result.detail["violations"]
+
+
+def test_no_wing_release_check_validates_read_surface_remediation_plan_alignment():
+    result = validate_read_surface_remediation_plan_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["plan_status"] == "read_remediation_required"
+    assert result.detail["physical_fixture_missing_surface_ids"]
+    assert (
+        result.detail["next_physical_readback_surface_id"]
+        == result.detail["expected_next_physical_readback_surface_id"]
+    )
+    assert (
+        result.detail["next_physical_readback_action_id"]
+        == result.detail["expected_next_physical_readback_action_id"]
+    )
+    assert result.detail["next_physical_readback_target_action_ids"] == [
+        result.detail["expected_next_physical_readback_action_id"]
+    ]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_read_surface_remediation_target_drift(monkeypatch):
+    fixture_snapshot = release_check.build_read_surface_fixture_evidence_snapshot()
+    plan = release_check.build_read_surface_remediation_plan(
+        fixture_evidence_snapshot=fixture_snapshot
+    )
+    corrupted = json.loads(json.dumps(plan))
+    corrupted["summary"]["next_physical_readback_surface_id"] = "dlive_state"
+    corrupted["summary"]["next_physical_readback_action_id"] = "remediate_dlive_state"
+    next_action = next(
+        action
+        for action in corrupted["actions"]
+        if action["id"] == "remediate_raw_mixer_state_cache"
+    )
+    next_action["next_physical_readback_target"] = False
+    next_action["missing_contracts"] = []
+
+    monkeypatch.setattr(
+        release_check,
+        "build_read_surface_remediation_plan",
+        lambda **_: corrupted,
+    )
+
+    result = validate_read_surface_remediation_plan_snapshot()
+
+    assert result.status == "failed"
+    assert "read_surface_remediation_next_target_mismatch" in result.detail["violations"]
+    assert "read_surface_remediation_next_action_id_mismatch" in result.detail["violations"]
+    assert "read_surface_remediation_next_action_surface_mismatch" in result.detail["violations"]
+    assert "read_surface_remediation_next_action_target_flag_missing" in result.detail["violations"]
+
+
+def test_no_wing_release_check_rejects_multiple_remediation_next_target_flags(monkeypatch):
+    fixture_snapshot = release_check.build_read_surface_fixture_evidence_snapshot()
+    plan = release_check.build_read_surface_remediation_plan(
+        fixture_evidence_snapshot=fixture_snapshot
+    )
+    corrupted = json.loads(json.dumps(plan))
+    expected_next_action_id = corrupted["summary"]["next_physical_readback_action_id"]
+    extra_action = next(
+        action
+        for action in corrupted["actions"]
+        if action["id"] != expected_next_action_id
+    )
+    extra_action["next_physical_readback_target"] = True
+
+    monkeypatch.setattr(
+        release_check,
+        "build_read_surface_remediation_plan",
+        lambda **_: corrupted,
+    )
+
+    result = validate_read_surface_remediation_plan_snapshot()
+
+    assert result.status == "failed"
+    assert (
+        "read_surface_remediation_next_target_action_flags_mismatch"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
@@ -738,6 +820,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     result_names = [result["name"] for result in summary["results"]]
     assert summary["status"] == "passed"
     assert "read_surface_fixture_evidence_schema" in result_names
+    assert "read_surface_remediation_plan_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
@@ -746,6 +829,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "read_surface_fixture_evidence_schema"
     )
     assert result_names.index("read_surface_fixture_evidence_schema") < result_names.index(
+        "read_surface_remediation_plan_schema"
+    )
+    assert result_names.index("read_surface_remediation_plan_schema") < result_names.index(
         "backend_pytest"
     )
     assert result_names.index("supervised_proof_artifact_report") < result_names.index(
@@ -1430,6 +1516,53 @@ def test_no_wing_release_check_summary_embeds_read_surface_fixture_evidence(tmp_
     assert "contract_gap_consistency_enforced: `true`" in markdown_summary
     assert "physical_fixture_missing_surface_ids" in markdown_summary
     assert "next_physical_readback_surface_id" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_read_surface_remediation_plan(tmp_path):
+    result = CheckResult(
+        name="read_surface_remediation_plan_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "plan_status": "read_remediation_required",
+            "action_count": 10,
+            "incomplete_surface_count": 10,
+            "physical_fixture_missing_surface_ids": ["raw_mixer_state_cache"],
+            "next_physical_readback_surface_id": "raw_mixer_state_cache",
+            "next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
+            "next_physical_readback_target_action_ids": [
+                "remediate_raw_mixer_state_cache"
+            ],
+            "expected_next_physical_readback_surface_id": "raw_mixer_state_cache",
+            "expected_next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert read_surface_remediation_plan_summary([result]) == summary["read_surface_remediation_plan"]
+    assert json_summary["read_surface_remediation_plan"]["read_only"] is True
+    assert json_summary["read_surface_remediation_plan"]["live_write"] is False
+    assert json_summary["read_surface_remediation_plan"]["mutates_console_state"] is False
+    assert json_summary["read_surface_remediation_plan"]["full_autonomous_ready"] is False
+    assert json_summary["read_surface_remediation_plan"]["physical_gap_surface_count"] == 1
+    assert (
+        json_summary["read_surface_remediation_plan"]["next_physical_readback_action_id"]
+        == "remediate_raw_mixer_state_cache"
+    )
+    assert json_summary["read_surface_remediation_plan"][
+        "next_physical_readback_target_action_ids"
+    ] == ["remediate_raw_mixer_state_cache"]
+    assert json_summary["read_surface_remediation_plan"]["target_action_consistency"] is True
+    assert "## Read Surface Remediation Plan" in markdown_summary
+    assert "next_physical_readback_action_id" in markdown_summary
+    assert "next_physical_readback_target_action_ids" in markdown_summary
+    assert "target_action_consistency: `true`" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):

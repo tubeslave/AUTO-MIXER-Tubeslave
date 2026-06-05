@@ -67,6 +67,8 @@
 - Product Layer should expose read-surface next-target consistency separately from the target label so malformed no-WING proof artifacts stay visible without granting live authority.
 - Read-surface remediation actions should include physical fixture gaps even for cached/queryable inventory rows, so the next readback proof target is actionable without reclassifying cache coverage or granting live authority.
 - Cockpit Module Status should render the read-surface remediation plan separately from supervised proof evidence, exposing next physical readback action IDs as read-only planning evidence.
+- no-WING release summaries should validate read-surface remediation target/action consistency against fixture evidence so next physical readback actions cannot drift silently.
+- no-WING read-surface remediation summaries should fail if multiple actions are flagged as the next physical readback target; the next target is planning evidence, not a queue.
 
 ## Memory Pipeline Lessons
 

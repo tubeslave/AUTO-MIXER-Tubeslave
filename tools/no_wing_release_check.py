@@ -32,6 +32,7 @@ from backend.read_surface_fixture_evidence import (  # noqa: E402
     FIXTURE_EVIDENCE_STATUSES,
     build_read_surface_fixture_evidence_snapshot,
 )
+from backend.read_surface_remediation_plan import build_read_surface_remediation_plan  # noqa: E402
 
 DEFAULT_ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "no_wing_release_check"
 DEFAULT_BACKEND_PORT = 8765
@@ -865,6 +866,127 @@ def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
     )
 
 
+def validate_read_surface_remediation_plan_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "read_surface_remediation_plan_must_track_fixture_next_target_without_live_authority",
+    }
+    violations: list[str] = []
+
+    try:
+        fixture_snapshot = build_read_surface_fixture_evidence_snapshot()
+        plan = build_read_surface_remediation_plan(fixture_evidence_snapshot=fixture_snapshot)
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        fixture_snapshot = {}
+        plan = {}
+        violations.append(f"read_surface_remediation_plan_build_error:{type(exc).__name__}")
+
+    fixture_summary = (
+        fixture_snapshot.get("summary")
+        if isinstance(fixture_snapshot.get("summary"), Mapping)
+        else {}
+    )
+    plan_summary = plan.get("summary") if isinstance(plan.get("summary"), Mapping) else {}
+    safety = plan.get("safety") if isinstance(plan.get("safety"), Mapping) else {}
+    actions = plan.get("actions") if isinstance(plan.get("actions"), list) else []
+    if not isinstance(plan.get("actions"), list):
+        violations.append("read_surface_remediation_actions_missing")
+
+    expected_physical_ids = fixture_summary.get("physical_fixture_missing_surface_ids")
+    if not isinstance(expected_physical_ids, list):
+        expected_physical_ids = []
+        violations.append("read_surface_remediation_fixture_physical_ids_missing")
+    expected_physical_ids = [item for item in expected_physical_ids if isinstance(item, str) and item]
+    expected_next_target = fixture_summary.get("next_physical_readback_surface_id")
+    if not isinstance(expected_next_target, str):
+        expected_next_target = expected_physical_ids[0] if expected_physical_ids else None
+    expected_next_action_id = f"remediate_{expected_next_target}" if expected_next_target else None
+
+    physical_ids = plan_summary.get("physical_fixture_missing_surface_ids")
+    if not isinstance(physical_ids, list):
+        physical_ids = []
+        violations.append("read_surface_remediation_physical_ids_missing")
+    physical_ids = [item for item in physical_ids if isinstance(item, str) and item]
+    if physical_ids != expected_physical_ids:
+        violations.append("read_surface_remediation_physical_ids_mismatch")
+
+    next_target = plan_summary.get("next_physical_readback_surface_id")
+    if next_target != expected_next_target:
+        violations.append("read_surface_remediation_next_target_mismatch")
+    next_action_id = plan_summary.get("next_physical_readback_action_id")
+    if next_action_id != expected_next_action_id:
+        violations.append("read_surface_remediation_next_action_id_mismatch")
+
+    action_by_id = {
+        row.get("id"): row
+        for row in actions
+        if isinstance(row, Mapping) and isinstance(row.get("id"), str)
+    }
+    next_action = action_by_id.get(next_action_id) if isinstance(next_action_id, str) else None
+    target_action_ids = [
+        row.get("id")
+        for row in actions
+        if isinstance(row, Mapping)
+        and isinstance(row.get("id"), str)
+        and row.get("next_physical_readback_target") is True
+    ]
+    expected_target_action_ids = [expected_next_action_id] if expected_next_action_id else []
+    if target_action_ids != expected_target_action_ids:
+        violations.append("read_surface_remediation_next_target_action_flags_mismatch")
+    if expected_next_action_id and not isinstance(next_action, Mapping):
+        violations.append("read_surface_remediation_next_action_missing")
+    elif isinstance(next_action, Mapping):
+        if next_action.get("surface_id") != expected_next_target:
+            violations.append("read_surface_remediation_next_action_surface_mismatch")
+        if next_action.get("physical_readback_gap") is not True:
+            violations.append("read_surface_remediation_next_action_not_physical_gap")
+        if next_action.get("next_physical_readback_target") is not True:
+            violations.append("read_surface_remediation_next_action_target_flag_missing")
+        missing_contracts = next_action.get("missing_contracts")
+        if not isinstance(missing_contracts, list) or "physical_readback_fixture" not in missing_contracts:
+            violations.append("read_surface_remediation_next_action_missing_physical_contract")
+
+    expected_true = ("read_only",)
+    for key in expected_true:
+        if safety.get(key) is not True:
+            violations.append(f"read_surface_remediation_{key}_not_true")
+    expected_false = (
+        "live_write",
+        "mutates_console_state",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+    )
+    for key in expected_false:
+        if safety.get(key) is not False:
+            violations.append(f"read_surface_remediation_{key}_not_false")
+    if plan.get("type") != "read_surface_remediation_plan":
+        violations.append("read_surface_remediation_type_mismatch")
+    if plan.get("status") == "read_coverage_complete" and physical_ids:
+        violations.append("read_surface_remediation_complete_but_physical_gaps_remain")
+    if expected_physical_ids and not actions:
+        violations.append("read_surface_remediation_actions_empty_with_physical_gaps")
+
+    detail["plan_status"] = plan.get("status")
+    detail["action_count"] = int(plan_summary.get("action_count") or len(actions))
+    detail["incomplete_surface_count"] = int(plan_summary.get("incomplete_surface_count") or 0)
+    detail["physical_fixture_missing_surface_ids"] = list(physical_ids)
+    detail["next_physical_readback_surface_id"] = next_target
+    detail["next_physical_readback_action_id"] = next_action_id
+    detail["next_physical_readback_target_action_ids"] = list(target_action_ids)
+    detail["expected_next_physical_readback_surface_id"] = expected_next_target
+    detail["expected_next_physical_readback_action_id"] = expected_next_action_id
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="read_surface_remediation_plan_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_supervised_proof_report_gain_dry_run(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -1311,6 +1433,46 @@ def read_surface_fixture_evidence_summary(results: Sequence[CheckResult]) -> dic
     return None
 
 
+def read_surface_remediation_plan_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "read_surface_remediation_plan_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        physical_missing = detail.get("physical_fixture_missing_surface_ids")
+        violations = detail.get("violations")
+        physical_missing_ids = list(physical_missing) if isinstance(physical_missing, list) else []
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "live_widening_allowed": False,
+            "full_autonomous_ready": False,
+            "plan_status": detail.get("plan_status"),
+            "action_count": int(detail.get("action_count") or 0),
+            "incomplete_surface_count": int(detail.get("incomplete_surface_count") or 0),
+            "physical_gap_surface_count": len(physical_missing_ids),
+            "physical_fixture_missing_surface_ids": physical_missing_ids,
+            "next_physical_readback_surface_id": detail.get("next_physical_readback_surface_id"),
+            "next_physical_readback_action_id": detail.get("next_physical_readback_action_id"),
+            "next_physical_readback_target_action_ids": (
+                list(detail.get("next_physical_readback_target_action_ids"))
+                if isinstance(detail.get("next_physical_readback_target_action_ids"), list)
+                else []
+            ),
+            "target_action_consistency": (
+                detail.get("next_physical_readback_surface_id")
+                == detail.get("expected_next_physical_readback_surface_id")
+                and detail.get("next_physical_readback_action_id")
+                == detail.get("expected_next_physical_readback_action_id")
+                and detail.get("next_physical_readback_target_action_ids")
+                == [detail.get("expected_next_physical_readback_action_id")]
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "next_wing_proof_plan_schema":
@@ -1343,6 +1505,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     autonomy_overlay = autonomy_evidence_overlay_summary(results)
     gain_dry_run = supervised_gain_dry_run_summary(results)
     read_fixture = read_surface_fixture_evidence_summary(results)
+    read_remediation = read_surface_remediation_plan_summary(results)
     next_plan = next_wing_proof_plan_summary(results)
     summary = {
         "type": "no_wing_release_check",
@@ -1361,6 +1524,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["supervised_gain_dry_run"] = gain_dry_run
     if read_fixture is not None:
         summary["read_surface_fixture_evidence"] = read_fixture
+    if read_remediation is not None:
+        summary["read_surface_remediation_plan"] = read_remediation
     if next_plan is not None:
         summary["next_wing_proof_plan"] = next_plan
     summary_path = run_dir / "summary.json"
@@ -1467,6 +1632,34 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(read_fixture['violations'])}`",
             ]
         )
+    if read_remediation is not None:
+        lines.extend(
+            [
+                "",
+                "## Read Surface Remediation Plan",
+                "",
+                f"- schema_check: `{read_remediation['status']}`",
+                f"- read_only: `{str(read_remediation['read_only']).lower()}`",
+                f"- live_write: `{str(read_remediation['live_write']).lower()}`",
+                f"- mutates_console_state: `{str(read_remediation['mutates_console_state']).lower()}`",
+                f"- live_widening_allowed: `{str(read_remediation['live_widening_allowed']).lower()}`",
+                f"- full_autonomous_ready: `{str(read_remediation['full_autonomous_ready']).lower()}`",
+                f"- plan_status: `{read_remediation['plan_status']}`",
+                f"- action_count: `{read_remediation['action_count']}`",
+                f"- incomplete_surface_count: `{read_remediation['incomplete_surface_count']}`",
+                f"- physical_gap_surface_count: `{read_remediation['physical_gap_surface_count']}`",
+                "- physical_fixture_missing_surface_ids: "
+                f"`{json.dumps(read_remediation['physical_fixture_missing_surface_ids'])}`",
+                "- next_physical_readback_surface_id: "
+                f"`{read_remediation['next_physical_readback_surface_id']}`",
+                "- next_physical_readback_action_id: "
+                f"`{read_remediation['next_physical_readback_action_id']}`",
+                "- next_physical_readback_target_action_ids: "
+                f"`{json.dumps(read_remediation['next_physical_readback_target_action_ids'])}`",
+                f"- target_action_consistency: `{str(read_remediation['target_action_consistency']).lower()}`",
+                f"- violations: `{json.dumps(read_remediation['violations'])}`",
+            ]
+        )
     if next_plan is not None:
         lines.extend(
             [
@@ -1535,6 +1728,10 @@ def run_release_checks(
             read_fixture_result = validate_read_surface_fixture_evidence_snapshot()
             results.append(read_fixture_result)
             if read_fixture_result.status != "passed" and not continue_on_failure:
+                break
+            read_remediation_result = validate_read_surface_remediation_plan_snapshot()
+            results.append(read_remediation_result)
+            if read_remediation_result.status != "passed" and not continue_on_failure:
                 break
         if check.name == "supervised_proof_artifact_report" and result.status == "passed":
             gain_dry_run_result = validate_supervised_proof_report_gain_dry_run(proof_report_path)
