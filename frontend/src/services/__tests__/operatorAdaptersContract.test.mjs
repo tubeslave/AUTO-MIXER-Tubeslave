@@ -1086,6 +1086,39 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             minimum_snapshot_count: 1,
             violations: [],
           },
+          snapshots_scenes_physical_readback_artifact_intake: {
+            available: true,
+            status: 'passed',
+            intake_status: 'operator_artifact_missing',
+            schema_id: 'snapshots_scenes_physical_readback.v1',
+            surface_id: 'snapshots_scenes',
+            remediation_action_id: 'remediate_snapshots_scenes',
+            required_contract_method_id: 'snapshots_scenes_physical_readback_contract',
+            artifact_count: 0,
+            valid_candidate_count: 0,
+            invalid_candidate_count: 0,
+            valid_snapshot_count: 0,
+            accepted_as_physical_fixture_candidate: false,
+            operator_review_required: true,
+            physical_fixture_gap_remains: true,
+            fixture_closure_allowed_by_intake: false,
+            scene_load_allowed: false,
+            scene_save_allowed: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            target_consistency: true,
+            promotion_families_requiring_surface: [
+              'scene_preset',
+              'routing',
+              'mix_balance',
+              'performance_adaptation',
+            ],
+            artifact_search_roots: ['artifacts/read_surface_physical_readback/snapshots_scenes'],
+            artifact_source_ids: [],
+            blocked_by: ['operator_must_capture_snapshots_scenes_physical_readback_artifact'],
+            intake_violations: [],
+            violations: [],
+          },
           user_presets_physical_readback_contract: {
             available: true,
             status: 'passed',
@@ -1283,6 +1316,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'routing_sends_physical_readback_contract',
       'routing_sends_physical_readback_artifact_intake',
       'snapshots_scenes_physical_readback_contract',
+      'snapshots_scenes_physical_readback_artifact_intake',
       'user_presets_physical_readback_contract',
       'dlive_state_physical_readback_contract',
       'read_surface_remediation_plan',
@@ -1511,6 +1545,19 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'scenes_contract_gap:true',
     'scenes_contract_live_authority:false',
     'scenes_contract_target_gate:true',
+    'scenes_intake_available:true',
+    'scenes_intake_status:operator_artifact_missing',
+    'scenes_intake_artifacts:0',
+    'scenes_intake_valid:0',
+    'scenes_intake_invalid:0',
+    'scenes_intake_valid_snapshots:0',
+    'scenes_intake_candidate:false',
+    'scenes_intake_gap:true',
+    'scenes_intake_closure_allowed:false',
+    'scenes_intake_scene_load_allowed:false',
+    'scenes_intake_scene_save_allowed:false',
+    'scenes_intake_live_authority:false',
+    'scenes_intake_target_gate:true',
     'presets_contract_available:true',
     'presets_contract_status:contract_ready_physical_fixture_missing',
     'presets_contract_schema:user_presets_physical_readback.v1',
@@ -2175,6 +2222,44 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(snapshotsScenesContract.nextStep, /live_authority:false/);
   assert.match(snapshotsScenesContract.nextStep, /target_consistency:true/);
 
+  const snapshotsScenesIntake = rows.find(row => row.moduleId === 'snapshots_scenes_physical_readback_artifact_intake');
+  assert.equal(snapshotsScenesIntake.domain, 'read_surface_artifact_intake');
+  assert.equal(snapshotsScenesIntake.canWriteLive, false);
+  assert.deepEqual(snapshotsScenesIntake.liveWriteKinds, []);
+  assert.equal(snapshotsScenesIntake.status, 'operator_artifact_missing');
+  assert.equal(snapshotsScenesIntake.entrypoint, 'build_snapshots_scenes_physical_readback_artifact_intake');
+  assert.equal(snapshotsScenesIntake.module, 'remediate_snapshots_scenes');
+  assert.equal(snapshotsScenesIntake.tone, 'yellow');
+  assert.deepEqual(snapshotsScenesIntake.pipelineProfiles, [
+    'available:true',
+    'schema:snapshots_scenes_physical_readback.v1',
+    'surface:snapshots_scenes',
+    'action:remediate_snapshots_scenes',
+    'artifacts:0',
+    'valid:0',
+    'invalid:0',
+    'valid_snapshots:0',
+    'candidate:false',
+    'operator_review:true',
+    'physical_gap_remains:true',
+    'fixture_closure_allowed:false',
+    'scene_load_allowed:false',
+    'scene_save_allowed:false',
+    'live_authority:false',
+    'target_consistency:true',
+    'promotion_families:scene_preset|routing|mix_balance|performance_adaptation',
+  ]);
+  assert.match(snapshotsScenesIntake.blockedReason, /operator_must_capture_snapshots_scenes_physical_readback_artifact/);
+  assert.match(snapshotsScenesIntake.nextStep, /surface:snapshots_scenes/);
+  assert.match(snapshotsScenesIntake.nextStep, /action:remediate_snapshots_scenes/);
+  assert.match(snapshotsScenesIntake.nextStep, /artifacts:0/);
+  assert.match(snapshotsScenesIntake.nextStep, /valid_snapshots:0/);
+  assert.match(snapshotsScenesIntake.nextStep, /operator_review:true/);
+  assert.match(snapshotsScenesIntake.nextStep, /fixture_closure_allowed:false/);
+  assert.match(snapshotsScenesIntake.nextStep, /scene_load_allowed:false/);
+  assert.match(snapshotsScenesIntake.nextStep, /scene_save_allowed:false/);
+  assert.match(snapshotsScenesIntake.nextStep, /live_authority:false/);
+
   const userPresetsContract = rows.find(row => row.moduleId === 'user_presets_physical_readback_contract');
   assert.equal(userPresetsContract.domain, 'read_surface_contract');
   assert.equal(userPresetsContract.canWriteLive, false);
@@ -2416,7 +2501,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 19);
+  assert.equal(rows.length, 20);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -2575,6 +2660,19 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'scenes_contract_gap:false',
     'scenes_contract_live_authority:false',
     'scenes_contract_target_gate:false',
+    'scenes_intake_available:false',
+    'scenes_intake_status:missing',
+    'scenes_intake_artifacts:0',
+    'scenes_intake_valid:0',
+    'scenes_intake_invalid:0',
+    'scenes_intake_valid_snapshots:0',
+    'scenes_intake_candidate:false',
+    'scenes_intake_gap:false',
+    'scenes_intake_closure_allowed:false',
+    'scenes_intake_scene_load_allowed:false',
+    'scenes_intake_scene_save_allowed:false',
+    'scenes_intake_live_authority:false',
+    'scenes_intake_target_gate:false',
     'presets_contract_available:false',
     'presets_contract_status:missing',
     'presets_contract_schema:',
@@ -2702,19 +2800,26 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.deepEqual(rows[16].liveWriteKinds, []);
   assert.match(rows[16].blockedReason, /contract is missing/);
 
-  assert.equal(rows[17].moduleId, 'user_presets_physical_readback_contract');
-  assert.equal(rows[17].domain, 'read_surface_contract');
-  assert.equal(rows[17].status, 'contract_missing');
+  assert.equal(rows[17].moduleId, 'snapshots_scenes_physical_readback_artifact_intake');
+  assert.equal(rows[17].domain, 'read_surface_artifact_intake');
+  assert.equal(rows[17].status, 'intake_missing');
   assert.equal(rows[17].canWriteLive, false);
   assert.deepEqual(rows[17].liveWriteKinds, []);
-  assert.match(rows[17].blockedReason, /contract is missing/);
+  assert.match(rows[17].blockedReason, /artifact intake is missing/);
 
-  assert.equal(rows[18].moduleId, 'dlive_state_physical_readback_contract');
+  assert.equal(rows[18].moduleId, 'user_presets_physical_readback_contract');
   assert.equal(rows[18].domain, 'read_surface_contract');
   assert.equal(rows[18].status, 'contract_missing');
   assert.equal(rows[18].canWriteLive, false);
   assert.deepEqual(rows[18].liveWriteKinds, []);
   assert.match(rows[18].blockedReason, /contract is missing/);
+
+  assert.equal(rows[19].moduleId, 'dlive_state_physical_readback_contract');
+  assert.equal(rows[19].domain, 'read_surface_contract');
+  assert.equal(rows[19].status, 'contract_missing');
+  assert.equal(rows[19].canWriteLive, false);
+  assert.deepEqual(rows[19].liveWriteKinds, []);
+  assert.match(rows[19].blockedReason, /contract is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

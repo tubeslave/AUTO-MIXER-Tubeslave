@@ -451,6 +451,34 @@ def test_registry_snapshot_can_hide_full_method_inventory():
         is True
     )
     assert (
+        snapshot["snapshots_scenes_physical_readback_artifact_intake"]["type"]
+        == "snapshots_scenes_physical_readback_artifact_intake"
+    )
+    assert (
+        snapshot["snapshots_scenes_physical_readback_artifact_intake"]["safety"][
+            "live_write"
+        ]
+        is False
+    )
+    assert (
+        snapshot["snapshots_scenes_physical_readback_artifact_intake"]["safety"][
+            "scene_load_allowed"
+        ]
+        is False
+    )
+    assert (
+        snapshot["snapshots_scenes_physical_readback_artifact_intake"]["safety"][
+            "scene_save_allowed"
+        ]
+        is False
+    )
+    assert (
+        snapshot["snapshots_scenes_physical_readback_artifact_intake"]["summary"][
+            "physical_fixture_gap_remains"
+        ]
+        is True
+    )
+    assert (
         snapshot["user_presets_physical_readback_contract"]["type"]
         == "user_presets_physical_readback_contract"
     )

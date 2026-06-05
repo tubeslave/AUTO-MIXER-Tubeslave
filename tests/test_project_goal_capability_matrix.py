@@ -94,7 +94,12 @@ def test_console_read_parameters_tracks_physical_readback_capture_plan():
     assert "read_surface_remediation_plan" in row.method_ids
     assert "read_surface_physical_readback_capture_plan" in row.method_ids
     assert "read_surface_fixture_evidence" in row.method_ids
+    assert "snapshots_scenes_physical_readback_artifact_intake" in row.method_ids
     assert "backend/read_surface_physical_readback_capture_plan.py" in row.support_paths
+    assert (
+        "backend/snapshots_scenes_physical_readback_artifact_intake.py"
+        in row.support_paths
+    )
     assert "physical fixtures" in row.next_step
     assert row.current_live_write_kinds == ()
 

@@ -252,6 +252,11 @@ from backend.snapshots_scenes_physical_readback_contract import (  # noqa: E402
     SNAPSHOTS_SCENES_VERIFIED_PHYSICAL_STATUSES,
     build_snapshots_scenes_physical_readback_contract,
 )
+from backend.snapshots_scenes_physical_readback_artifact_intake import (  # noqa: E402
+    SNAPSHOTS_SCENES_INTAKE_STATUSES,
+    SNAPSHOTS_SCENES_PHYSICAL_READBACK_ARTIFACT_INTAKE_METHOD_ID,
+    build_snapshots_scenes_physical_readback_artifact_intake,
+)
 from backend.user_presets_physical_readback_contract import (  # noqa: E402
     MINIMUM_USER_PRESET_COUNT,
     USER_PRESETS_FORBIDDEN_MUTATION_EVIDENCE_FIELDS,
@@ -267,6 +272,11 @@ from backend.user_presets_physical_readback_contract import (  # noqa: E402
     USER_PRESETS_SURFACE_ID,
     USER_PRESETS_VERIFIED_PHYSICAL_STATUSES,
     build_user_presets_physical_readback_contract,
+)
+from backend.user_presets_physical_readback_artifact_intake import (  # noqa: E402
+    USER_PRESETS_INTAKE_STATUSES,
+    USER_PRESETS_PHYSICAL_READBACK_ARTIFACT_INTAKE_METHOD_ID,
+    build_user_presets_physical_readback_artifact_intake,
 )
 from backend.read_surface_physical_readback_capture_plan import (  # noqa: E402
     READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PLAN_METHOD_ID,
@@ -471,7 +481,9 @@ def build_checks(
                 "tests/test_routing_sends_physical_readback_contract.py",
                 "tests/test_routing_sends_physical_readback_artifact_intake.py",
                 "tests/test_snapshots_scenes_physical_readback_contract.py",
+                "tests/test_snapshots_scenes_physical_readback_artifact_intake.py",
                 "tests/test_user_presets_physical_readback_contract.py",
+                "tests/test_user_presets_physical_readback_artifact_intake.py",
                 "tests/test_dlive_state_physical_readback_contract.py",
                 "-q",
                 "--tb=short",
@@ -4327,6 +4339,169 @@ def validate_snapshots_scenes_physical_readback_contract_snapshot() -> CheckResu
     )
 
 
+def validate_snapshots_scenes_physical_readback_artifact_intake_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "snapshots_scenes_artifact_intake_is_read_only_operator_review_gate",
+    }
+    violations: list[str] = []
+
+    try:
+        intake = build_snapshots_scenes_physical_readback_artifact_intake()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        intake = {}
+        violations.append(
+            f"snapshots_scenes_artifact_intake_build_error:{type(exc).__name__}"
+        )
+
+    safety = intake.get("safety") if isinstance(intake.get("safety"), Mapping) else {}
+    summary = intake.get("summary") if isinstance(intake.get("summary"), Mapping) else {}
+    artifacts = intake.get("artifacts") if isinstance(intake.get("artifacts"), list) else []
+
+    if intake.get("type") != "snapshots_scenes_physical_readback_artifact_intake":
+        violations.append("snapshots_scenes_artifact_intake_type_mismatch")
+    if (
+        intake.get("method_id")
+        != SNAPSHOTS_SCENES_PHYSICAL_READBACK_ARTIFACT_INTAKE_METHOD_ID
+    ):
+        violations.append("snapshots_scenes_artifact_intake_method_id_mismatch")
+    if (
+        intake.get("required_contract_method_id")
+        != SNAPSHOTS_SCENES_PHYSICAL_READBACK_CONTRACT_METHOD_ID
+    ):
+        violations.append("snapshots_scenes_artifact_intake_required_contract_mismatch")
+    if intake.get("schema_id") != SNAPSHOTS_SCENES_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("snapshots_scenes_artifact_intake_schema_id_mismatch")
+    if intake.get("status") not in SNAPSHOTS_SCENES_INTAKE_STATUSES:
+        violations.append("snapshots_scenes_artifact_intake_status_unknown")
+    if intake.get("surface_id") != SNAPSHOTS_SCENES_SURFACE_ID:
+        violations.append("snapshots_scenes_artifact_intake_surface_id_mismatch")
+    if intake.get("remediation_action_id") != SNAPSHOTS_SCENES_REMEDIATION_ACTION_ID:
+        violations.append("snapshots_scenes_artifact_intake_action_id_mismatch")
+
+    for key in ("read_only", "operator_required"):
+        if safety.get(key) is not True:
+            violations.append(f"snapshots_scenes_artifact_intake_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_intake",
+        "fixture_closure_allowed_by_intake",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+        "scene_load_allowed",
+        "scene_save_allowed",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"snapshots_scenes_artifact_intake_{key}_not_false")
+
+    artifact_count = summary.get("artifact_count")
+    valid_count = summary.get("valid_candidate_count")
+    invalid_count = summary.get("invalid_candidate_count")
+    valid_snapshot_count = summary.get("valid_snapshot_count")
+    if not isinstance(artifact_count, int) or artifact_count != len(artifacts):
+        violations.append("snapshots_scenes_artifact_intake_artifact_count_mismatch")
+        artifact_count = len(artifacts)
+    if not isinstance(valid_count, int):
+        violations.append("snapshots_scenes_artifact_intake_valid_count_missing")
+        valid_count = 0
+    if not isinstance(invalid_count, int):
+        violations.append("snapshots_scenes_artifact_intake_invalid_count_missing")
+        invalid_count = 0
+    if not isinstance(valid_snapshot_count, int):
+        violations.append("snapshots_scenes_artifact_intake_valid_snapshot_count_missing")
+        valid_snapshot_count = 0
+    if valid_count + invalid_count != artifact_count:
+        violations.append("snapshots_scenes_artifact_intake_candidate_count_mismatch")
+    if invalid_count:
+        violations.append("snapshots_scenes_artifact_intake_invalid_candidate_present")
+
+    if summary.get("operator_review_required") is not True:
+        violations.append("snapshots_scenes_artifact_intake_operator_review_not_true")
+    if summary.get("physical_fixture_gap_remains") is not True:
+        violations.append("snapshots_scenes_artifact_intake_physical_gap_not_true")
+    if summary.get("fixture_closure_allowed_by_intake") is not False:
+        violations.append("snapshots_scenes_artifact_intake_fixture_closure_not_false")
+    if summary.get("scene_load_allowed") is not False:
+        violations.append("snapshots_scenes_artifact_intake_scene_load_not_false")
+    if summary.get("scene_save_allowed") is not False:
+        violations.append("snapshots_scenes_artifact_intake_scene_save_not_false")
+    if summary.get("live_authority_granted") is not False:
+        violations.append("snapshots_scenes_artifact_intake_live_authority_not_false")
+    if summary.get("full_autonomous_ready") is not False:
+        violations.append("snapshots_scenes_artifact_intake_full_autonomous_not_false")
+    expected_candidate_accepted = bool(valid_count) and invalid_count == 0
+    if summary.get("accepted_as_physical_fixture_candidate") is not expected_candidate_accepted:
+        violations.append("snapshots_scenes_artifact_intake_candidate_flag_mismatch")
+
+    promotion_families = summary.get("promotion_families_requiring_surface")
+    if not isinstance(promotion_families, list):
+        promotion_families = []
+        violations.append("snapshots_scenes_artifact_intake_promotion_families_missing")
+    for family in ("scene_preset", "routing", "mix_balance", "performance_adaptation"):
+        if family not in promotion_families:
+            violations.append(
+                f"snapshots_scenes_artifact_intake_promotion_family_missing:{family}"
+            )
+
+    intake_violations = (
+        list(summary.get("violations")) if isinstance(summary.get("violations"), list) else []
+    )
+    artifact_source_ids = [
+        row.get("source_id")
+        for row in artifacts
+        if isinstance(row, Mapping) and isinstance(row.get("source_id"), str)
+    ]
+    detail["intake_status"] = intake.get("status")
+    detail["schema_id"] = intake.get("schema_id")
+    detail["surface_id"] = intake.get("surface_id")
+    detail["remediation_action_id"] = intake.get("remediation_action_id")
+    detail["required_contract_method_id"] = intake.get("required_contract_method_id")
+    detail["artifact_search_roots"] = (
+        list(summary.get("artifact_search_roots"))
+        if isinstance(summary.get("artifact_search_roots"), list)
+        else []
+    )
+    detail["artifact_count"] = artifact_count
+    detail["valid_candidate_count"] = valid_count
+    detail["invalid_candidate_count"] = invalid_count
+    detail["valid_snapshot_count"] = valid_snapshot_count
+    detail["accepted_as_physical_fixture_candidate"] = summary.get(
+        "accepted_as_physical_fixture_candidate"
+    )
+    detail["operator_review_required"] = summary.get("operator_review_required")
+    detail["physical_fixture_gap_remains"] = summary.get("physical_fixture_gap_remains")
+    detail["fixture_closure_allowed_by_intake"] = summary.get(
+        "fixture_closure_allowed_by_intake"
+    )
+    detail["scene_load_allowed"] = summary.get("scene_load_allowed")
+    detail["scene_save_allowed"] = summary.get("scene_save_allowed")
+    detail["live_authority_granted"] = summary.get("live_authority_granted")
+    detail["full_autonomous_ready"] = summary.get("full_autonomous_ready")
+    detail["promotion_families_requiring_surface"] = list(promotion_families)
+    detail["latest_valid_candidate_source_id"] = summary.get("latest_valid_candidate_source_id")
+    detail["latest_valid_candidate_captured_at"] = summary.get(
+        "latest_valid_candidate_captured_at"
+    )
+    detail["blocked_by"] = (
+        list(summary.get("blocked_by")) if isinstance(summary.get("blocked_by"), list) else []
+    )
+    detail["artifact_source_ids"] = artifact_source_ids
+    detail["intake_violations"] = intake_violations
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="snapshots_scenes_physical_readback_artifact_intake_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_user_presets_physical_readback_contract_snapshot() -> CheckResult:
     started = datetime.now(timezone.utc)
     detail: dict[str, object] = {
@@ -4519,6 +4694,162 @@ def validate_user_presets_physical_readback_contract_snapshot() -> CheckResult:
     finished = datetime.now(timezone.utc)
     return CheckResult(
         name="user_presets_physical_readback_contract_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def validate_user_presets_physical_readback_artifact_intake_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "user_presets_artifact_intake_is_read_only_operator_review_gate",
+    }
+    violations: list[str] = []
+
+    try:
+        intake = build_user_presets_physical_readback_artifact_intake()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        intake = {}
+        violations.append(f"user_presets_artifact_intake_build_error:{type(exc).__name__}")
+
+    safety = intake.get("safety") if isinstance(intake.get("safety"), Mapping) else {}
+    summary = intake.get("summary") if isinstance(intake.get("summary"), Mapping) else {}
+    artifacts = intake.get("artifacts") if isinstance(intake.get("artifacts"), list) else []
+
+    if intake.get("type") != "user_presets_physical_readback_artifact_intake":
+        violations.append("user_presets_artifact_intake_type_mismatch")
+    if intake.get("method_id") != USER_PRESETS_PHYSICAL_READBACK_ARTIFACT_INTAKE_METHOD_ID:
+        violations.append("user_presets_artifact_intake_method_id_mismatch")
+    if (
+        intake.get("required_contract_method_id")
+        != USER_PRESETS_PHYSICAL_READBACK_CONTRACT_METHOD_ID
+    ):
+        violations.append("user_presets_artifact_intake_required_contract_mismatch")
+    if intake.get("schema_id") != USER_PRESETS_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("user_presets_artifact_intake_schema_id_mismatch")
+    if intake.get("status") not in USER_PRESETS_INTAKE_STATUSES:
+        violations.append("user_presets_artifact_intake_status_unknown")
+    if intake.get("surface_id") != USER_PRESETS_SURFACE_ID:
+        violations.append("user_presets_artifact_intake_surface_id_mismatch")
+    if intake.get("remediation_action_id") != USER_PRESETS_REMEDIATION_ACTION_ID:
+        violations.append("user_presets_artifact_intake_action_id_mismatch")
+
+    for key in ("read_only", "operator_required"):
+        if safety.get(key) is not True:
+            violations.append(f"user_presets_artifact_intake_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_intake",
+        "fixture_closure_allowed_by_intake",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+        "preset_recall_allowed",
+        "preset_store_allowed",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"user_presets_artifact_intake_{key}_not_false")
+
+    artifact_count = summary.get("artifact_count")
+    valid_count = summary.get("valid_candidate_count")
+    invalid_count = summary.get("invalid_candidate_count")
+    valid_preset_count = summary.get("valid_preset_count")
+    if not isinstance(artifact_count, int) or artifact_count != len(artifacts):
+        violations.append("user_presets_artifact_intake_artifact_count_mismatch")
+        artifact_count = len(artifacts)
+    if not isinstance(valid_count, int):
+        violations.append("user_presets_artifact_intake_valid_count_missing")
+        valid_count = 0
+    if not isinstance(invalid_count, int):
+        violations.append("user_presets_artifact_intake_invalid_count_missing")
+        invalid_count = 0
+    if not isinstance(valid_preset_count, int):
+        violations.append("user_presets_artifact_intake_valid_preset_count_missing")
+        valid_preset_count = 0
+    if valid_count + invalid_count != artifact_count:
+        violations.append("user_presets_artifact_intake_candidate_count_mismatch")
+    if invalid_count:
+        violations.append("user_presets_artifact_intake_invalid_candidate_present")
+
+    if summary.get("operator_review_required") is not True:
+        violations.append("user_presets_artifact_intake_operator_review_not_true")
+    if summary.get("physical_fixture_gap_remains") is not True:
+        violations.append("user_presets_artifact_intake_physical_gap_not_true")
+    if summary.get("fixture_closure_allowed_by_intake") is not False:
+        violations.append("user_presets_artifact_intake_fixture_closure_not_false")
+    if summary.get("preset_recall_allowed") is not False:
+        violations.append("user_presets_artifact_intake_preset_recall_not_false")
+    if summary.get("preset_store_allowed") is not False:
+        violations.append("user_presets_artifact_intake_preset_store_not_false")
+    if summary.get("live_authority_granted") is not False:
+        violations.append("user_presets_artifact_intake_live_authority_not_false")
+    if summary.get("full_autonomous_ready") is not False:
+        violations.append("user_presets_artifact_intake_full_autonomous_not_false")
+    expected_candidate_accepted = bool(valid_count) and invalid_count == 0
+    if summary.get("accepted_as_physical_fixture_candidate") is not expected_candidate_accepted:
+        violations.append("user_presets_artifact_intake_candidate_flag_mismatch")
+
+    promotion_families = summary.get("promotion_families_requiring_surface")
+    if not isinstance(promotion_families, list):
+        promotion_families = []
+        violations.append("user_presets_artifact_intake_promotion_families_missing")
+    for family in ("scene_preset", "routing", "mix_balance", "performance_adaptation"):
+        if family not in promotion_families:
+            violations.append(f"user_presets_artifact_intake_promotion_family_missing:{family}")
+
+    intake_violations = (
+        list(summary.get("violations")) if isinstance(summary.get("violations"), list) else []
+    )
+    artifact_source_ids = [
+        row.get("source_id")
+        for row in artifacts
+        if isinstance(row, Mapping) and isinstance(row.get("source_id"), str)
+    ]
+    detail["intake_status"] = intake.get("status")
+    detail["schema_id"] = intake.get("schema_id")
+    detail["surface_id"] = intake.get("surface_id")
+    detail["remediation_action_id"] = intake.get("remediation_action_id")
+    detail["required_contract_method_id"] = intake.get("required_contract_method_id")
+    detail["artifact_search_roots"] = (
+        list(summary.get("artifact_search_roots"))
+        if isinstance(summary.get("artifact_search_roots"), list)
+        else []
+    )
+    detail["artifact_count"] = artifact_count
+    detail["valid_candidate_count"] = valid_count
+    detail["invalid_candidate_count"] = invalid_count
+    detail["valid_preset_count"] = valid_preset_count
+    detail["accepted_as_physical_fixture_candidate"] = summary.get(
+        "accepted_as_physical_fixture_candidate"
+    )
+    detail["operator_review_required"] = summary.get("operator_review_required")
+    detail["physical_fixture_gap_remains"] = summary.get("physical_fixture_gap_remains")
+    detail["fixture_closure_allowed_by_intake"] = summary.get(
+        "fixture_closure_allowed_by_intake"
+    )
+    detail["preset_recall_allowed"] = summary.get("preset_recall_allowed")
+    detail["preset_store_allowed"] = summary.get("preset_store_allowed")
+    detail["live_authority_granted"] = summary.get("live_authority_granted")
+    detail["full_autonomous_ready"] = summary.get("full_autonomous_ready")
+    detail["promotion_families_requiring_surface"] = list(promotion_families)
+    detail["latest_valid_candidate_source_id"] = summary.get("latest_valid_candidate_source_id")
+    detail["latest_valid_candidate_captured_at"] = summary.get(
+        "latest_valid_candidate_captured_at"
+    )
+    detail["blocked_by"] = (
+        list(summary.get("blocked_by")) if isinstance(summary.get("blocked_by"), list) else []
+    )
+    detail["artifact_source_ids"] = artifact_source_ids
+    detail["intake_violations"] = intake_violations
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="user_presets_physical_readback_artifact_intake_schema",
         status="passed" if not violations else "failed",
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -6610,6 +6941,94 @@ def snapshots_scenes_readback_contract_summary(
     return None
 
 
+def snapshots_scenes_readback_artifact_intake_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "snapshots_scenes_physical_readback_artifact_intake_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        artifact_search_roots = detail.get("artifact_search_roots")
+        blocked_by = detail.get("blocked_by")
+        artifact_source_ids = detail.get("artifact_source_ids")
+        intake_violations = detail.get("intake_violations")
+        promotion_families = detail.get("promotion_families_requiring_surface")
+        violations = detail.get("violations")
+        source_candidate_claimed = detail.get("accepted_as_physical_fixture_candidate") is True
+        operator_review_required = detail.get("operator_review_required") is True
+        physical_fixture_gap_remains = detail.get("physical_fixture_gap_remains") is True
+        unsafe_claimed = (
+            detail.get("fixture_closure_allowed_by_intake") is True
+            or detail.get("scene_load_allowed") is True
+            or detail.get("scene_save_allowed") is True
+            or detail.get("live_authority_granted") is True
+            or detail.get("full_autonomous_ready") is True
+        )
+        candidate_accepted = (
+            result.status == "passed"
+            and source_candidate_claimed
+            and operator_review_required
+            and physical_fixture_gap_remains
+            and not unsafe_claimed
+        )
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_intake": False,
+            "fixture_closure_allowed_by_intake": False,
+            "scene_load_allowed": False,
+            "scene_save_allowed": False,
+            "live_widening_allowed": False,
+            "full_autonomous_ready": False,
+            "schema_id": detail.get("schema_id"),
+            "intake_status": detail.get("intake_status"),
+            "surface_id": detail.get("surface_id"),
+            "remediation_action_id": detail.get("remediation_action_id"),
+            "required_contract_method_id": detail.get("required_contract_method_id"),
+            "artifact_search_roots": (
+                list(artifact_search_roots) if isinstance(artifact_search_roots, list) else []
+            ),
+            "artifact_count": int(detail.get("artifact_count") or 0),
+            "valid_candidate_count": int(detail.get("valid_candidate_count") or 0),
+            "invalid_candidate_count": int(detail.get("invalid_candidate_count") or 0),
+            "valid_snapshot_count": int(detail.get("valid_snapshot_count") or 0),
+            "accepted_as_physical_fixture_candidate": candidate_accepted,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "live_authority_granted": False,
+            "promotion_families_requiring_surface": (
+                list(promotion_families) if isinstance(promotion_families, list) else []
+            ),
+            "latest_valid_candidate_source_id": detail.get(
+                "latest_valid_candidate_source_id"
+            ),
+            "latest_valid_candidate_captured_at": detail.get(
+                "latest_valid_candidate_captured_at"
+            ),
+            "artifact_source_ids": (
+                list(artifact_source_ids) if isinstance(artifact_source_ids, list) else []
+            ),
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "intake_violations": (
+                list(intake_violations) if isinstance(intake_violations, list) else []
+            ),
+            "target_consistency": (
+                detail.get("surface_id") == SNAPSHOTS_SCENES_SURFACE_ID
+                and detail.get("remediation_action_id")
+                == SNAPSHOTS_SCENES_REMEDIATION_ACTION_ID
+                and detail.get("required_contract_method_id")
+                == SNAPSHOTS_SCENES_PHYSICAL_READBACK_CONTRACT_METHOD_ID
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def user_presets_readback_contract_summary(
     results: Sequence[CheckResult],
 ) -> dict[str, object] | None:
@@ -6685,6 +7104,94 @@ def user_presets_readback_contract_summary(
                 == detail.get("remediation_action_id")
                 and detail.get("fixture_physical_gap_declared") is True
                 and detail.get("remediation_physical_gap_declared") is True
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
+def user_presets_readback_artifact_intake_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "user_presets_physical_readback_artifact_intake_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        artifact_search_roots = detail.get("artifact_search_roots")
+        blocked_by = detail.get("blocked_by")
+        artifact_source_ids = detail.get("artifact_source_ids")
+        intake_violations = detail.get("intake_violations")
+        promotion_families = detail.get("promotion_families_requiring_surface")
+        violations = detail.get("violations")
+        source_candidate_claimed = detail.get("accepted_as_physical_fixture_candidate") is True
+        operator_review_required = detail.get("operator_review_required") is True
+        physical_fixture_gap_remains = detail.get("physical_fixture_gap_remains") is True
+        unsafe_claimed = (
+            detail.get("fixture_closure_allowed_by_intake") is True
+            or detail.get("preset_recall_allowed") is True
+            or detail.get("preset_store_allowed") is True
+            or detail.get("live_authority_granted") is True
+            or detail.get("full_autonomous_ready") is True
+        )
+        candidate_accepted = (
+            result.status == "passed"
+            and source_candidate_claimed
+            and operator_review_required
+            and physical_fixture_gap_remains
+            and not unsafe_claimed
+        )
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_intake": False,
+            "fixture_closure_allowed_by_intake": False,
+            "preset_recall_allowed": False,
+            "preset_store_allowed": False,
+            "live_widening_allowed": False,
+            "full_autonomous_ready": False,
+            "schema_id": detail.get("schema_id"),
+            "intake_status": detail.get("intake_status"),
+            "surface_id": detail.get("surface_id"),
+            "remediation_action_id": detail.get("remediation_action_id"),
+            "required_contract_method_id": detail.get("required_contract_method_id"),
+            "artifact_search_roots": (
+                list(artifact_search_roots) if isinstance(artifact_search_roots, list) else []
+            ),
+            "artifact_count": int(detail.get("artifact_count") or 0),
+            "valid_candidate_count": int(detail.get("valid_candidate_count") or 0),
+            "invalid_candidate_count": int(detail.get("invalid_candidate_count") or 0),
+            "valid_preset_count": int(detail.get("valid_preset_count") or 0),
+            "accepted_as_physical_fixture_candidate": candidate_accepted,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "live_authority_granted": False,
+            "promotion_families_requiring_surface": (
+                list(promotion_families) if isinstance(promotion_families, list) else []
+            ),
+            "latest_valid_candidate_source_id": detail.get(
+                "latest_valid_candidate_source_id"
+            ),
+            "latest_valid_candidate_captured_at": detail.get(
+                "latest_valid_candidate_captured_at"
+            ),
+            "artifact_source_ids": (
+                list(artifact_source_ids) if isinstance(artifact_source_ids, list) else []
+            ),
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "intake_violations": (
+                list(intake_violations) if isinstance(intake_violations, list) else []
+            ),
+            "target_consistency": (
+                detail.get("surface_id") == USER_PRESETS_SURFACE_ID
+                and detail.get("remediation_action_id")
+                == USER_PRESETS_REMEDIATION_ACTION_ID
+                and detail.get("required_contract_method_id")
+                == USER_PRESETS_PHYSICAL_READBACK_CONTRACT_METHOD_ID
             ),
             "violations": list(violations) if isinstance(violations, list) else [],
         }
@@ -6835,7 +7342,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     routing_sends_contract = routing_sends_readback_contract_summary(results)
     routing_sends_intake = routing_sends_readback_artifact_intake_summary(results)
     snapshots_scenes_contract = snapshots_scenes_readback_contract_summary(results)
+    snapshots_scenes_intake = snapshots_scenes_readback_artifact_intake_summary(results)
     user_presets_contract = user_presets_readback_contract_summary(results)
+    user_presets_intake = user_presets_readback_artifact_intake_summary(results)
     dlive_state_contract = dlive_state_readback_contract_summary(results)
     next_plan = next_wing_proof_plan_summary(results)
     summary = {
@@ -6895,8 +7404,14 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["routing_sends_physical_readback_artifact_intake"] = routing_sends_intake
     if snapshots_scenes_contract is not None:
         summary["snapshots_scenes_physical_readback_contract"] = snapshots_scenes_contract
+    if snapshots_scenes_intake is not None:
+        summary["snapshots_scenes_physical_readback_artifact_intake"] = (
+            snapshots_scenes_intake
+        )
     if user_presets_contract is not None:
         summary["user_presets_physical_readback_contract"] = user_presets_contract
+    if user_presets_intake is not None:
+        summary["user_presets_physical_readback_artifact_intake"] = user_presets_intake
     if dlive_state_contract is not None:
         summary["dlive_state_physical_readback_contract"] = dlive_state_contract
     if next_plan is not None:
@@ -7940,6 +8455,66 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(snapshots_scenes_contract['violations'])}`",
             ]
         )
+    if snapshots_scenes_intake is not None:
+        lines.extend(
+            [
+                "",
+                "## Snapshots Scenes Physical Readback Artifact Intake",
+                "",
+                f"- schema_check: `{snapshots_scenes_intake['status']}`",
+                f"- read_only: `{str(snapshots_scenes_intake['read_only']).lower()}`",
+                f"- live_write: `{str(snapshots_scenes_intake['live_write']).lower()}`",
+                "- mutates_console_state: "
+                f"`{str(snapshots_scenes_intake['mutates_console_state']).lower()}`",
+                f"- queries_console: `{str(snapshots_scenes_intake['queries_console']).lower()}`",
+                f"- executes_tests: `{str(snapshots_scenes_intake['executes_tests']).lower()}`",
+                "- operator_required: "
+                f"`{str(snapshots_scenes_intake['operator_required']).lower()}`",
+                "- execution_allowed_by_intake: "
+                f"`{str(snapshots_scenes_intake['execution_allowed_by_intake']).lower()}`",
+                "- fixture_closure_allowed_by_intake: "
+                f"`{str(snapshots_scenes_intake['fixture_closure_allowed_by_intake']).lower()}`",
+                "- scene_load_allowed: "
+                f"`{str(snapshots_scenes_intake['scene_load_allowed']).lower()}`",
+                "- scene_save_allowed: "
+                f"`{str(snapshots_scenes_intake['scene_save_allowed']).lower()}`",
+                "- live_widening_allowed: "
+                f"`{str(snapshots_scenes_intake['live_widening_allowed']).lower()}`",
+                "- full_autonomous_ready: "
+                f"`{str(snapshots_scenes_intake['full_autonomous_ready']).lower()}`",
+                f"- intake_status: `{snapshots_scenes_intake['intake_status']}`",
+                f"- schema_id: `{snapshots_scenes_intake['schema_id']}`",
+                f"- surface_id: `{snapshots_scenes_intake['surface_id']}`",
+                "- remediation_action_id: "
+                f"`{snapshots_scenes_intake['remediation_action_id']}`",
+                "- required_contract_method_id: "
+                f"`{snapshots_scenes_intake['required_contract_method_id']}`",
+                f"- artifact_count: `{snapshots_scenes_intake['artifact_count']}`",
+                f"- valid_candidate_count: `{snapshots_scenes_intake['valid_candidate_count']}`",
+                f"- invalid_candidate_count: `{snapshots_scenes_intake['invalid_candidate_count']}`",
+                f"- valid_snapshot_count: `{snapshots_scenes_intake['valid_snapshot_count']}`",
+                "- accepted_as_physical_fixture_candidate: "
+                f"`{str(snapshots_scenes_intake['accepted_as_physical_fixture_candidate']).lower()}`",
+                "- operator_review_required: "
+                f"`{str(snapshots_scenes_intake['operator_review_required']).lower()}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(snapshots_scenes_intake['physical_fixture_gap_remains']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(snapshots_scenes_intake['live_authority_granted']).lower()}`",
+                "- promotion_families_requiring_surface: "
+                f"`{json.dumps(snapshots_scenes_intake['promotion_families_requiring_surface'])}`",
+                "- artifact_search_roots: "
+                f"`{json.dumps(snapshots_scenes_intake['artifact_search_roots'])}`",
+                "- artifact_source_ids: "
+                f"`{json.dumps(snapshots_scenes_intake['artifact_source_ids'])}`",
+                f"- blocked_by: `{json.dumps(snapshots_scenes_intake['blocked_by'])}`",
+                "- intake_violations: "
+                f"`{json.dumps(snapshots_scenes_intake['intake_violations'])}`",
+                "- target_consistency: "
+                f"`{str(snapshots_scenes_intake['target_consistency']).lower()}`",
+                f"- violations: `{json.dumps(snapshots_scenes_intake['violations'])}`",
+            ]
+        )
     if user_presets_contract is not None:
         lines.extend(
             [
@@ -8223,6 +8798,15 @@ def run_release_checks(
             results.append(snapshots_scenes_contract_result)
             if (
                 snapshots_scenes_contract_result.status != "passed"
+                and not continue_on_failure
+            ):
+                break
+            snapshots_scenes_intake_result = (
+                validate_snapshots_scenes_physical_readback_artifact_intake_snapshot()
+            )
+            results.append(snapshots_scenes_intake_result)
+            if (
+                snapshots_scenes_intake_result.status != "passed"
                 and not continue_on_failure
             ):
                 break

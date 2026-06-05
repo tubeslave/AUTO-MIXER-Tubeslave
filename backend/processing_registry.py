@@ -69,8 +69,14 @@ try:
     from snapshots_scenes_physical_readback_contract import (
         build_snapshots_scenes_physical_readback_contract,
     )
+    from snapshots_scenes_physical_readback_artifact_intake import (
+        build_snapshots_scenes_physical_readback_artifact_intake,
+    )
     from user_presets_physical_readback_contract import (
         build_user_presets_physical_readback_contract,
+    )
+    from user_presets_physical_readback_artifact_intake import (
+        build_user_presets_physical_readback_artifact_intake,
     )
     from safety_coverage_matrix import build_safety_coverage_matrix_snapshot
     from write_surface_inventory import build_write_surface_inventory_snapshot
@@ -132,8 +138,14 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.snapshots_scenes_physical_readback_contract import (
         build_snapshots_scenes_physical_readback_contract,
     )
+    from backend.snapshots_scenes_physical_readback_artifact_intake import (
+        build_snapshots_scenes_physical_readback_artifact_intake,
+    )
     from backend.user_presets_physical_readback_contract import (
         build_user_presets_physical_readback_contract,
+    )
+    from backend.user_presets_physical_readback_artifact_intake import (
+        build_user_presets_physical_readback_artifact_intake,
     )
     from backend.safety_coverage_matrix import build_safety_coverage_matrix_snapshot
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
@@ -860,6 +872,32 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         ),
     ),
     ProcessingMethod(
+        id="snapshots_scenes_physical_readback_artifact_intake",
+        label="Snapshots / Scenes Physical Readback Artifact Intake",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Read-only intake snapshot for separately captured scene catalog, "
+            "active-scene, scene diff, and rollback physical readback artifacts."
+        ),
+        module="backend/snapshots_scenes_physical_readback_artifact_intake.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="artifact_intake_only_snapshots_scenes_operator_review_required",
+        promotion_next=(
+            "operator reviews any valid snapshots/scenes candidate before "
+            "closing the physical fixture gap"
+        ),
+        notes=(
+            "transport_free",
+            "artifact_intake_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "does_not_load_or_save_scenes",
+            "fixture_closure_allowed_by_intake_false",
+        ),
+    ),
+    ProcessingMethod(
         id="user_presets_physical_readback_contract",
         label="User Presets Physical Readback Contract",
         domain="evaluation",
@@ -882,6 +920,32 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "no_live_writes",
             "does_not_query_console",
             "does_not_recall_or_store_presets",
+        ),
+    ),
+    ProcessingMethod(
+        id="user_presets_physical_readback_artifact_intake",
+        label="User Presets Physical Readback Artifact Intake",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Read-only intake snapshot for separately captured user-preset "
+            "catalog, scope, content, scoped diff, and rollback physical readback artifacts."
+        ),
+        module="backend/user_presets_physical_readback_artifact_intake.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="artifact_intake_only_user_presets_operator_review_required",
+        promotion_next=(
+            "operator reviews any valid user-preset candidate before closing "
+            "the physical fixture gap"
+        ),
+        notes=(
+            "transport_free",
+            "artifact_intake_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "does_not_recall_or_store_presets",
+            "fixture_closure_allowed_by_intake_false",
         ),
     ),
     ProcessingMethod(
@@ -1904,6 +1968,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, read-surface remediation artifact contract",
         "next_step": "Use only to validate separately captured scene/snapshot readback; do not infer live authority.",
     },
+    "snapshots_scenes_physical_readback_artifact_intake": {
+        "entrypoint": "build_snapshots_scenes_physical_readback_artifact_intake",
+        "ui_surface": "Processing registry, snapshots/scenes physical artifact intake",
+        "next_step": "Use only to surface operator-captured snapshots/scenes candidates; manual review still gates fixture closure.",
+    },
     "user_presets_physical_readback_contract": {
         "entrypoint": (
             "build_user_presets_physical_readback_contract / "
@@ -1911,6 +1980,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         ),
         "ui_surface": "Processing registry, read-surface remediation artifact contract",
         "next_step": "Use only to validate separately captured user-preset readback; do not infer live authority.",
+    },
+    "user_presets_physical_readback_artifact_intake": {
+        "entrypoint": "build_user_presets_physical_readback_artifact_intake",
+        "ui_surface": "Processing registry, user-presets physical artifact intake",
+        "next_step": "Use only to surface operator-captured user-preset candidates; manual review still gates fixture closure.",
     },
     "dlive_state_physical_readback_contract": {
         "entrypoint": (
@@ -2181,8 +2255,14 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         "snapshots_scenes_physical_readback_contract": (
             build_snapshots_scenes_physical_readback_contract()
         ),
+        "snapshots_scenes_physical_readback_artifact_intake": (
+            build_snapshots_scenes_physical_readback_artifact_intake()
+        ),
         "user_presets_physical_readback_contract": (
             build_user_presets_physical_readback_contract()
+        ),
+        "user_presets_physical_readback_artifact_intake": (
+            build_user_presets_physical_readback_artifact_intake()
         ),
         "dlive_state_physical_readback_contract": (
             build_dlive_state_physical_readback_contract()

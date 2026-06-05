@@ -36,6 +36,7 @@ from tools.no_wing_release_check import (
     routing_sends_readback_artifact_intake_summary,
     run_command_check,
     run_release_checks,
+    snapshots_scenes_readback_artifact_intake_summary,
     supervised_gain_dry_run_summary,
     user_presets_readback_contract_summary,
     validate_repo_local_commands,
@@ -58,6 +59,7 @@ from tools.no_wing_release_check import (
     validate_read_surface_remediation_plan_snapshot,
     validate_routing_sends_physical_readback_contract_snapshot,
     validate_routing_sends_physical_readback_artifact_intake_snapshot,
+    validate_snapshots_scenes_physical_readback_artifact_intake_snapshot,
     validate_snapshots_scenes_physical_readback_contract_snapshot,
     validate_user_presets_physical_readback_contract_snapshot,
     validate_supervised_proof_report_autonomy_overlay,
@@ -1677,6 +1679,134 @@ def test_no_wing_release_check_validates_snapshots_scenes_readback_contract_snap
     assert result.detail["violations"] == []
 
 
+def test_no_wing_release_check_validates_snapshots_scenes_artifact_intake_snapshot():
+    result = validate_snapshots_scenes_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["intake_status"] == "operator_artifact_missing"
+    assert result.detail["schema_id"] == "snapshots_scenes_physical_readback.v1"
+    assert result.detail["surface_id"] == "snapshots_scenes"
+    assert result.detail["remediation_action_id"] == "remediate_snapshots_scenes"
+    assert (
+        result.detail["required_contract_method_id"]
+        == "snapshots_scenes_physical_readback_contract"
+    )
+    assert result.detail["artifact_count"] == 0
+    assert result.detail["valid_candidate_count"] == 0
+    assert result.detail["invalid_candidate_count"] == 0
+    assert result.detail["valid_snapshot_count"] == 0
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["operator_review_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["fixture_closure_allowed_by_intake"] is False
+    assert result.detail["scene_load_allowed"] is False
+    assert result.detail["scene_save_allowed"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert "scene_preset" in result.detail["promotion_families_requiring_surface"]
+    assert "routing" in result.detail["promotion_families_requiring_surface"]
+    assert (
+        "operator_must_capture_snapshots_scenes_physical_readback_artifact"
+        in result.detail["blocked_by"]
+    )
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_snapshots_scenes_artifact_intake_authority(
+    monkeypatch,
+):
+    intake = release_check.build_snapshots_scenes_physical_readback_artifact_intake()
+    corrupted = json.loads(json.dumps(intake))
+    corrupted["safety"]["live_write"] = True
+    corrupted["safety"]["fixture_closure_allowed_by_intake"] = True
+    corrupted["safety"]["scene_load_allowed"] = True
+    corrupted["safety"]["scene_save_allowed"] = True
+    corrupted["summary"]["physical_fixture_gap_remains"] = False
+    corrupted["summary"]["fixture_closure_allowed_by_intake"] = True
+    corrupted["summary"]["scene_load_allowed"] = True
+    corrupted["summary"]["scene_save_allowed"] = True
+    corrupted["summary"]["live_authority_granted"] = True
+    corrupted["summary"]["full_autonomous_ready"] = True
+
+    monkeypatch.setattr(
+        release_check,
+        "build_snapshots_scenes_physical_readback_artifact_intake",
+        lambda: corrupted,
+    )
+
+    result = validate_snapshots_scenes_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "failed"
+    assert "snapshots_scenes_artifact_intake_live_write_not_false" in result.detail[
+        "violations"
+    ]
+    assert (
+        "snapshots_scenes_artifact_intake_fixture_closure_allowed_by_intake_not_false"
+        in result.detail["violations"]
+    )
+    assert "snapshots_scenes_artifact_intake_scene_load_allowed_not_false" in result.detail[
+        "violations"
+    ]
+    assert "snapshots_scenes_artifact_intake_scene_save_allowed_not_false" in result.detail[
+        "violations"
+    ]
+    assert "snapshots_scenes_artifact_intake_physical_gap_not_true" in result.detail[
+        "violations"
+    ]
+    assert "snapshots_scenes_artifact_intake_fixture_closure_not_false" in result.detail[
+        "violations"
+    ]
+    assert "snapshots_scenes_artifact_intake_scene_load_not_false" in result.detail[
+        "violations"
+    ]
+    assert "snapshots_scenes_artifact_intake_scene_save_not_false" in result.detail[
+        "violations"
+    ]
+    assert "snapshots_scenes_artifact_intake_live_authority_not_false" in result.detail[
+        "violations"
+    ]
+    assert "snapshots_scenes_artifact_intake_full_autonomous_not_false" in result.detail[
+        "violations"
+    ]
+
+
+def test_no_wing_release_check_rejects_snapshots_scenes_artifact_intake_mixed_candidates(
+    monkeypatch,
+):
+    intake = release_check.build_snapshots_scenes_physical_readback_artifact_intake()
+    mixed = json.loads(json.dumps(intake))
+    mixed["status"] = "invalid_operator_artifact_present"
+    mixed["summary"]["artifact_count"] = 2
+    mixed["summary"]["valid_candidate_count"] = 1
+    mixed["summary"]["invalid_candidate_count"] = 1
+    mixed["summary"]["valid_snapshot_count"] = 1
+    mixed["summary"]["accepted_as_physical_fixture_candidate"] = False
+    mixed["summary"]["blocked_by"] = [
+        "operator_must_replace_invalid_snapshots_scenes_physical_readback_artifact"
+    ]
+    mixed["artifacts"] = [
+        {"source_id": "valid_scene_candidate.json"},
+        {"source_id": "invalid_scene_candidate.json"},
+    ]
+
+    monkeypatch.setattr(
+        release_check,
+        "build_snapshots_scenes_physical_readback_artifact_intake",
+        lambda: mixed,
+    )
+
+    result = validate_snapshots_scenes_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "failed"
+    assert "snapshots_scenes_artifact_intake_invalid_candidate_present" in result.detail[
+        "violations"
+    ]
+    assert "snapshots_scenes_artifact_intake_candidate_flag_mismatch" not in result.detail[
+        "violations"
+    ]
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+
+
 def test_no_wing_release_check_validates_user_presets_readback_contract_snapshot():
     result = validate_user_presets_physical_readback_contract_snapshot()
 
@@ -1801,6 +1931,10 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         in fixture_check.command
     )
     assert "tests/test_snapshots_scenes_physical_readback_contract.py" in fixture_check.command
+    assert (
+        "tests/test_snapshots_scenes_physical_readback_artifact_intake.py"
+        in fixture_check.command
+    )
     assert "tests/test_user_presets_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_dlive_state_physical_readback_contract.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
@@ -2284,6 +2418,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "routing_sends_physical_readback_contract_schema" in result_names
     assert "routing_sends_physical_readback_artifact_intake_schema" in result_names
     assert "snapshots_scenes_physical_readback_contract_schema" in result_names
+    assert "snapshots_scenes_physical_readback_artifact_intake_schema" in result_names
     assert "user_presets_physical_readback_contract_schema" in result_names
     assert "dlive_state_physical_readback_contract_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
@@ -2347,6 +2482,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "snapshots_scenes_physical_readback_contract_schema"
     )
     assert result_names.index("snapshots_scenes_physical_readback_contract_schema") < result_names.index(
+        "snapshots_scenes_physical_readback_artifact_intake_schema"
+    )
+    assert result_names.index("snapshots_scenes_physical_readback_artifact_intake_schema") < result_names.index(
         "user_presets_physical_readback_contract_schema"
     )
     assert result_names.index("user_presets_physical_readback_contract_schema") < result_names.index(
@@ -4628,6 +4766,130 @@ def test_no_wing_release_check_routing_sends_intake_summary_normalizes_authority
     assert summary["live_authority_granted"] is False
     assert summary["full_autonomous_ready"] is False
     assert summary["violations"] == ["claimed_live_authority"]
+
+
+def test_no_wing_release_check_summary_embeds_snapshots_scenes_artifact_intake(tmp_path):
+    result = CheckResult(
+        name="snapshots_scenes_physical_readback_artifact_intake_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "intake_status": "valid_operator_artifact_available",
+            "schema_id": "snapshots_scenes_physical_readback.v1",
+            "surface_id": "snapshots_scenes",
+            "remediation_action_id": "remediate_snapshots_scenes",
+            "required_contract_method_id": "snapshots_scenes_physical_readback_contract",
+            "artifact_search_roots": [
+                "artifacts/read_surface_physical_readback/snapshots_scenes",
+            ],
+            "artifact_count": 1,
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "valid_snapshot_count": 2,
+            "accepted_as_physical_fixture_candidate": True,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_closure_allowed_by_intake": False,
+            "scene_load_allowed": False,
+            "scene_save_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "promotion_families_requiring_surface": [
+                "scene_preset",
+                "routing",
+                "mix_balance",
+                "performance_adaptation",
+            ],
+            "latest_valid_candidate_source_id": "inline_payload_0",
+            "latest_valid_candidate_captured_at": "2026-06-05T00:00:00Z",
+            "blocked_by": [
+                "operator_must_review_valid_snapshots_scenes_candidate_before_fixture_closure",
+            ],
+            "artifact_source_ids": ["inline_payload_0"],
+            "intake_violations": [],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert snapshots_scenes_readback_artifact_intake_summary([result]) == summary[
+        "snapshots_scenes_physical_readback_artifact_intake"
+    ]
+    intake = json_summary["snapshots_scenes_physical_readback_artifact_intake"]
+    assert intake["read_only"] is True
+    assert intake["live_write"] is False
+    assert intake["mutates_console_state"] is False
+    assert intake["queries_console"] is False
+    assert intake["executes_tests"] is False
+    assert intake["execution_allowed_by_intake"] is False
+    assert intake["fixture_closure_allowed_by_intake"] is False
+    assert intake["scene_load_allowed"] is False
+    assert intake["scene_save_allowed"] is False
+    assert intake["live_widening_allowed"] is False
+    assert intake["full_autonomous_ready"] is False
+    assert intake["intake_status"] == "valid_operator_artifact_available"
+    assert intake["artifact_count"] == 1
+    assert intake["valid_candidate_count"] == 1
+    assert intake["invalid_candidate_count"] == 0
+    assert intake["valid_snapshot_count"] == 2
+    assert intake["accepted_as_physical_fixture_candidate"] is True
+    assert intake["operator_review_required"] is True
+    assert intake["physical_fixture_gap_remains"] is True
+    assert intake["live_authority_granted"] is False
+    assert intake["artifact_source_ids"] == ["inline_payload_0"]
+    assert "## Snapshots Scenes Physical Readback Artifact Intake" in markdown_summary
+    assert "artifact_count: `1`" in markdown_summary
+    assert "valid_snapshot_count: `2`" in markdown_summary
+    assert "fixture_closure_allowed_by_intake: `false`" in markdown_summary
+    assert "scene_load_allowed: `false`" in markdown_summary
+    assert "scene_save_allowed: `false`" in markdown_summary
+
+
+def test_no_wing_release_check_snapshots_scenes_intake_summary_normalizes_authority_claims():
+    result = CheckResult(
+        name="snapshots_scenes_physical_readback_artifact_intake_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "intake_status": "valid_operator_artifact_available",
+            "schema_id": "snapshots_scenes_physical_readback.v1",
+            "surface_id": "snapshots_scenes",
+            "remediation_action_id": "remediate_snapshots_scenes",
+            "required_contract_method_id": "snapshots_scenes_physical_readback_contract",
+            "artifact_count": 1,
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "valid_snapshot_count": 2,
+            "accepted_as_physical_fixture_candidate": True,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_closure_allowed_by_intake": True,
+            "scene_load_allowed": True,
+            "scene_save_allowed": True,
+            "live_authority_granted": True,
+            "full_autonomous_ready": True,
+            "promotion_families_requiring_surface": ["scene_preset"],
+            "violations": ["claimed_scene_authority"],
+        },
+    )
+
+    summary = snapshots_scenes_readback_artifact_intake_summary([result])
+
+    assert summary is not None
+    assert summary["accepted_as_physical_fixture_candidate"] is False
+    assert summary["fixture_closure_allowed_by_intake"] is False
+    assert summary["scene_load_allowed"] is False
+    assert summary["scene_save_allowed"] is False
+    assert summary["live_authority_granted"] is False
+    assert summary["full_autonomous_ready"] is False
+    assert summary["violations"] == ["claimed_scene_authority"]
 
 
 def test_no_wing_release_check_summary_embeds_user_presets_readback_contract(tmp_path):

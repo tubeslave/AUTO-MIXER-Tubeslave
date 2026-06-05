@@ -1040,6 +1040,27 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const snapshotsScenesContractSnapshotFields = stringList(snapshotsScenesContract.required_snapshot_fields);
     const snapshotsScenesContractCoverage = stringList(snapshotsScenesContract.required_coverage_flags);
     const snapshotsScenesContractFalseSafetyFlags = stringList(snapshotsScenesContract.required_false_safety_flags);
+    const snapshotsScenesIntake = asRecord(proofQuality.snapshots_scenes_physical_readback_artifact_intake);
+    const snapshotsScenesIntakeAvailable = Boolean(snapshotsScenesIntake.available);
+    const snapshotsScenesIntakeStatus = str(snapshotsScenesIntake.intake_status, str(snapshotsScenesIntake.status, 'missing'));
+    const snapshotsScenesIntakeSchemaId = str(snapshotsScenesIntake.schema_id, '');
+    const snapshotsScenesIntakeSurfaceId = str(snapshotsScenesIntake.surface_id, '');
+    const snapshotsScenesIntakeActionId = str(snapshotsScenesIntake.remediation_action_id, '');
+    const snapshotsScenesIntakeArtifactCount = Math.trunc(num(snapshotsScenesIntake.artifact_count, 0));
+    const snapshotsScenesIntakeValidCount = Math.trunc(num(snapshotsScenesIntake.valid_candidate_count, 0));
+    const snapshotsScenesIntakeInvalidCount = Math.trunc(num(snapshotsScenesIntake.invalid_candidate_count, 0));
+    const snapshotsScenesIntakeValidSnapshotCount = Math.trunc(num(snapshotsScenesIntake.valid_snapshot_count, 0));
+    const snapshotsScenesIntakeCandidate = snapshotsScenesIntake.accepted_as_physical_fixture_candidate === true;
+    const snapshotsScenesIntakeOperatorReview = snapshotsScenesIntake.operator_review_required === true;
+    const snapshotsScenesIntakeGapRemains = snapshotsScenesIntake.physical_fixture_gap_remains === true;
+    const snapshotsScenesIntakeClosureAllowed = snapshotsScenesIntake.fixture_closure_allowed_by_intake === true;
+    const snapshotsScenesIntakeSceneLoadAllowed = snapshotsScenesIntake.scene_load_allowed === true;
+    const snapshotsScenesIntakeSceneSaveAllowed = snapshotsScenesIntake.scene_save_allowed === true;
+    const snapshotsScenesIntakeLiveAuthority = snapshotsScenesIntake.live_authority_granted === true;
+    const snapshotsScenesIntakeTargetConsistency = snapshotsScenesIntake.target_consistency === true;
+    const snapshotsScenesIntakePromotionFamilies = stringList(snapshotsScenesIntake.promotion_families_requiring_surface);
+    const snapshotsScenesIntakeBlockedBy = stringList(snapshotsScenesIntake.blocked_by);
+    const snapshotsScenesIntakeSources = stringList(snapshotsScenesIntake.artifact_source_ids);
     const userPresetsContract = asRecord(proofQuality.user_presets_physical_readback_contract);
     const userPresetsContractAvailable = Boolean(userPresetsContract.available);
     const userPresetsContractStatus = str(userPresetsContract.contract_status, str(userPresetsContract.status, 'missing'));
@@ -1248,6 +1269,19 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `scenes_contract_gap:${snapshotsScenesContractGapRemains}`,
         `scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}`,
         `scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}`,
+        `scenes_intake_available:${snapshotsScenesIntakeAvailable}`,
+        `scenes_intake_status:${snapshotsScenesIntakeStatus}`,
+        `scenes_intake_artifacts:${snapshotsScenesIntakeArtifactCount}`,
+        `scenes_intake_valid:${snapshotsScenesIntakeValidCount}`,
+        `scenes_intake_invalid:${snapshotsScenesIntakeInvalidCount}`,
+        `scenes_intake_valid_snapshots:${snapshotsScenesIntakeValidSnapshotCount}`,
+        `scenes_intake_candidate:${snapshotsScenesIntakeCandidate}`,
+        `scenes_intake_gap:${snapshotsScenesIntakeGapRemains}`,
+        `scenes_intake_closure_allowed:${snapshotsScenesIntakeClosureAllowed}`,
+        `scenes_intake_scene_load_allowed:${snapshotsScenesIntakeSceneLoadAllowed}`,
+        `scenes_intake_scene_save_allowed:${snapshotsScenesIntakeSceneSaveAllowed}`,
+        `scenes_intake_live_authority:${snapshotsScenesIntakeLiveAuthority}`,
+        `scenes_intake_target_gate:${snapshotsScenesIntakeTargetConsistency}`,
         `presets_contract_available:${userPresetsContractAvailable}`,
         `presets_contract_status:${userPresetsContractStatus}`,
         `presets_contract_schema:${userPresetsContractSchemaId}`,
@@ -2092,6 +2126,63 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         : snapshotsScenesContractGapRemains
           ? 'yellow'
           : 'green'
+    });
+    rows.push({
+      moduleId: 'snapshots_scenes_physical_readback_artifact_intake',
+      label: 'Snapshots/scenes readback artifact intake',
+      domain: 'read_surface_artifact_intake',
+      status: snapshotsScenesIntakeAvailable ? snapshotsScenesIntakeStatus || 'intake_available' : 'intake_missing',
+      entrypoint: 'build_snapshots_scenes_physical_readback_artifact_intake',
+      module: snapshotsScenesIntakeActionId || 'no_intake_action',
+      uiSurface: 'Read-surface physical artifact intake',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${snapshotsScenesIntakeAvailable}`,
+        `schema:${snapshotsScenesIntakeSchemaId}`,
+        `surface:${snapshotsScenesIntakeSurfaceId}`,
+        `action:${snapshotsScenesIntakeActionId}`,
+        `artifacts:${snapshotsScenesIntakeArtifactCount}`,
+        `valid:${snapshotsScenesIntakeValidCount}`,
+        `invalid:${snapshotsScenesIntakeInvalidCount}`,
+        `valid_snapshots:${snapshotsScenesIntakeValidSnapshotCount}`,
+        `candidate:${snapshotsScenesIntakeCandidate}`,
+        `operator_review:${snapshotsScenesIntakeOperatorReview}`,
+        `physical_gap_remains:${snapshotsScenesIntakeGapRemains}`,
+        `fixture_closure_allowed:${snapshotsScenesIntakeClosureAllowed}`,
+        `scene_load_allowed:${snapshotsScenesIntakeSceneLoadAllowed}`,
+        `scene_save_allowed:${snapshotsScenesIntakeSceneSaveAllowed}`,
+        `live_authority:${snapshotsScenesIntakeLiveAuthority}`,
+        `target_consistency:${snapshotsScenesIntakeTargetConsistency}`,
+        snapshotsScenesIntakePromotionFamilies.length ? `promotion_families:${snapshotsScenesIntakePromotionFamilies.join('|')}` : '',
+        snapshotsScenesIntakeSources.length ? `sources:${snapshotsScenesIntakeSources.join(',')}` : '',
+      ].filter(Boolean),
+      blockedReason: snapshotsScenesIntakeAvailable
+        ? snapshotsScenesIntakeBlockedBy.length
+          ? snapshotsScenesIntakeBlockedBy.join(', ')
+          : 'Snapshots/scenes artifact intake is present; manual review still gates fixture closure.'
+        : 'Snapshots/scenes physical artifact intake is missing from proof summary.',
+      nextStep: snapshotsScenesIntakeAvailable
+        ? [
+            snapshotsScenesIntakeSurfaceId ? `surface:${snapshotsScenesIntakeSurfaceId}` : '',
+            snapshotsScenesIntakeActionId ? `action:${snapshotsScenesIntakeActionId}` : '',
+            `artifacts:${snapshotsScenesIntakeArtifactCount}`,
+            `valid:${snapshotsScenesIntakeValidCount}`,
+            `invalid:${snapshotsScenesIntakeInvalidCount}`,
+            `valid_snapshots:${snapshotsScenesIntakeValidSnapshotCount}`,
+            `candidate:${snapshotsScenesIntakeCandidate}`,
+            `operator_review:${snapshotsScenesIntakeOperatorReview}`,
+            `fixture_closure_allowed:${snapshotsScenesIntakeClosureAllowed}`,
+            `scene_load_allowed:${snapshotsScenesIntakeSceneLoadAllowed}`,
+            `scene_save_allowed:${snapshotsScenesIntakeSceneSaveAllowed}`,
+            `live_authority:${snapshotsScenesIntakeLiveAuthority}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with snapshots/scenes artifact-intake validation.',
+      tone: !snapshotsScenesIntakeAvailable || snapshotsScenesIntakeInvalidCount > 0 || snapshotsScenesIntakeClosureAllowed || snapshotsScenesIntakeSceneLoadAllowed || snapshotsScenesIntakeSceneSaveAllowed || snapshotsScenesIntakeLiveAuthority || !snapshotsScenesIntakeTargetConsistency
+        ? 'yellow'
+        : snapshotsScenesIntakeCandidate
+          ? 'yellow'
+          : 'yellow'
     });
     rows.push({
       moduleId: 'user_presets_physical_readback_contract',

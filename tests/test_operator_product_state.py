@@ -2728,6 +2728,50 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "snapshots_scenes_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "snapshots_scenes_physical_readback.v1",
+                    "intake_status": "operator_artifact_missing",
+                    "surface_id": "snapshots_scenes",
+                    "remediation_action_id": "remediate_snapshots_scenes",
+                    "required_contract_method_id": "snapshots_scenes_physical_readback_contract",
+                    "artifact_search_roots": [
+                        "artifacts/read_surface_physical_readback/snapshots_scenes",
+                    ],
+                    "artifact_count": 0,
+                    "valid_candidate_count": 0,
+                    "invalid_candidate_count": 0,
+                    "valid_snapshot_count": 0,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "operator_review_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "fixture_closure_allowed_by_intake": False,
+                    "scene_load_allowed": False,
+                    "scene_save_allowed": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "operator_required": True,
+                    "execution_allowed_by_intake": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "scene_preset",
+                        "routing",
+                        "mix_balance",
+                        "performance_adaptation",
+                    ],
+                    "blocked_by": [
+                        "operator_must_capture_snapshots_scenes_physical_readback_artifact",
+                    ],
+                    "artifact_source_ids": [],
+                    "intake_violations": [],
+                    "violations": [],
+                },
                 "user_presets_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "user_presets_physical_readback.v1",
@@ -3379,6 +3423,38 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert "scene_recall_events" in scenes_contract[
         "forbidden_mutation_evidence_fields"
     ]
+    scenes_intake = proof_quality["snapshots_scenes_physical_readback_artifact_intake"]
+    assert scenes_intake["available"] is True
+    assert scenes_intake["status"] == "passed"
+    assert scenes_intake["schema_id"] == "snapshots_scenes_physical_readback.v1"
+    assert scenes_intake["intake_status"] == "operator_artifact_missing"
+    assert scenes_intake["surface_id"] == "snapshots_scenes"
+    assert scenes_intake["remediation_action_id"] == "remediate_snapshots_scenes"
+    assert scenes_intake["required_contract_method_id"] == (
+        "snapshots_scenes_physical_readback_contract"
+    )
+    assert scenes_intake["artifact_count"] == 0
+    assert scenes_intake["valid_candidate_count"] == 0
+    assert scenes_intake["invalid_candidate_count"] == 0
+    assert scenes_intake["valid_snapshot_count"] == 0
+    assert scenes_intake["accepted_as_physical_fixture_candidate"] is False
+    assert scenes_intake["operator_review_required"] is True
+    assert scenes_intake["physical_fixture_gap_remains"] is True
+    assert scenes_intake["fixture_closure_allowed_by_intake"] is False
+    assert scenes_intake["scene_load_allowed"] is False
+    assert scenes_intake["scene_save_allowed"] is False
+    assert scenes_intake["live_authority_granted"] is False
+    assert scenes_intake["full_autonomous_ready"] is False
+    assert scenes_intake["target_consistency"] is True
+    assert scenes_intake["promotion_families_requiring_surface"] == [
+        "scene_preset",
+        "routing",
+        "mix_balance",
+        "performance_adaptation",
+    ]
+    assert "operator_must_capture_snapshots_scenes_physical_readback_artifact" in scenes_intake[
+        "blocked_by"
+    ]
     presets_contract = proof_quality["user_presets_physical_readback_contract"]
     assert presets_contract["available"] is True
     assert presets_contract["status"] == "passed"
@@ -3989,6 +4065,43 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "intake_violations": [],
                     "violations": ["routing_intake_claimed_live_authority"],
                 },
+                "snapshots_scenes_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "snapshots_scenes_physical_readback.v1",
+                    "intake_status": "valid_operator_artifact_available",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "required_contract_method_id": "snapshots_scenes_physical_readback_contract",
+                    "artifact_search_roots": [
+                        "artifacts/read_surface_physical_readback/snapshots_scenes",
+                    ],
+                    "artifact_count": 1,
+                    "valid_candidate_count": 1,
+                    "invalid_candidate_count": 0,
+                    "valid_snapshot_count": 2,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "operator_review_required": False,
+                    "physical_fixture_gap_remains": False,
+                    "fixture_closure_allowed_by_intake": True,
+                    "scene_load_allowed": True,
+                    "scene_save_allowed": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "mutates_console_state": True,
+                    "queries_console": True,
+                    "executes_tests": True,
+                    "operator_required": False,
+                    "execution_allowed_by_intake": True,
+                    "live_widening_allowed": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "target_consistency": False,
+                    "promotion_families_requiring_surface": ["scene_preset"],
+                    "blocked_by": [],
+                    "artifact_source_ids": ["unsafe-scenes.json"],
+                    "intake_violations": [],
+                    "violations": ["scenes_intake_claimed_live_authority"],
+                },
                 "user_presets_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "user_presets_physical_readback.v1",
@@ -4445,6 +4558,43 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert routing_intake["promotion_families_requiring_surface"] == ["routing"]
     assert routing_intake["artifact_source_ids"] == ["unsafe-routing.json"]
     assert "routing_intake_claimed_live_authority" in routing_intake["violations"]
+    scenes_intake = payload["summary"]["read_surface_proof_quality"][
+        "snapshots_scenes_physical_readback_artifact_intake"
+    ]
+    assert scenes_intake["available"] is True
+    assert scenes_intake["surface_id"] == "snapshots_scenes"
+    assert scenes_intake["source_surface_id"] == "dlive_state"
+    assert scenes_intake["remediation_action_id"] == "remediate_snapshots_scenes"
+    assert scenes_intake["source_remediation_action_id"] == "remediate_dlive_state"
+    assert scenes_intake["target_consistency"] is False
+    assert scenes_intake["artifact_count"] == 1
+    assert scenes_intake["valid_candidate_count"] == 1
+    assert scenes_intake["invalid_candidate_count"] == 0
+    assert scenes_intake["valid_snapshot_count"] == 2
+    assert scenes_intake["accepted_as_physical_fixture_candidate"] is False
+    assert scenes_intake["operator_review_required"] is True
+    assert scenes_intake["physical_fixture_gap_remains"] is True
+    assert scenes_intake["fixture_closure_allowed_by_intake"] is False
+    assert scenes_intake["scene_load_allowed"] is False
+    assert scenes_intake["scene_save_allowed"] is False
+    assert scenes_intake["read_only"] is True
+    assert scenes_intake["live_write"] is False
+    assert scenes_intake["live_authority_granted"] is False
+    assert scenes_intake["full_autonomous_ready"] is False
+    assert scenes_intake["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert scenes_intake["source_operator_review_required_claimed"] is False
+    assert scenes_intake["source_physical_fixture_gap_remains_claimed"] is False
+    assert scenes_intake["source_fixture_closure_allowed_by_intake_claimed"] is True
+    assert scenes_intake["source_execution_allowed_by_intake_claimed"] is True
+    assert scenes_intake["source_scene_load_allowed_claimed"] is True
+    assert scenes_intake["source_scene_save_allowed_claimed"] is True
+    assert scenes_intake["source_live_write_claimed"] is True
+    assert scenes_intake["source_queries_console_claimed"] is True
+    assert scenes_intake["source_live_authority_granted_claimed"] is True
+    assert scenes_intake["source_full_autonomous_ready_claimed"] is True
+    assert scenes_intake["promotion_families_requiring_surface"] == ["scene_preset"]
+    assert scenes_intake["artifact_source_ids"] == ["unsafe-scenes.json"]
+    assert "scenes_intake_claimed_live_authority" in scenes_intake["violations"]
     presets_contract = payload["summary"]["read_surface_proof_quality"][
         "user_presets_physical_readback_contract"
     ]
