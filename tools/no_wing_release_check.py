@@ -39,6 +39,7 @@ DEFAULT_COMMAND_TIMEOUT_SEC = 900
 AUTONOMY_GAP_ROLLUP_SOURCE = "autonomy_mode_transition_gate.rows[mode=auto]"
 DEFAULT_HOMEBREW_GIT = Path("/opt/homebrew/bin/git")
 GAIN_DRY_RUN_REASON = "no_wing_release_gain_dry_run"
+REPO_LOCAL_COMMAND_OUTPUT_FLAGS = {"--artifact-root", "--output"}
 
 FORBIDDEN_COMMAND_TOKENS = (
     "wing_operator_proposal_validation_runner.py",
@@ -373,6 +374,75 @@ def _contains_forbidden_command_token(command_text: str, token: str) -> bool:
             return True
 
         start = index + 1
+
+
+def validate_repo_local_commands(
+    checks: Iterable[CommandCheck],
+    *,
+    repo_root: Path = REPO_ROOT,
+) -> None:
+    """Fail the no-WING plan if local command paths leave this checkout."""
+
+    try:
+        resolved_repo_root = repo_root.resolve()
+    except OSError as exc:
+        raise ValueError(f"no-WING release check repo root is not resolvable: {repo_root}") from exc
+
+    violations: list[str] = []
+    for check in checks:
+        cwd_path = _resolve_repo_scoped_path(check.cwd, resolved_repo_root)
+        if not _is_path_inside(cwd_path, resolved_repo_root):
+            violations.append(f"{check.name}:cwd:{check.cwd}")
+
+        skip_next_path_token = False
+        for token in check.command[1:]:
+            if skip_next_path_token:
+                skip_next_path_token = False
+                continue
+            if token in REPO_LOCAL_COMMAND_OUTPUT_FLAGS:
+                skip_next_path_token = True
+                continue
+            if not _looks_like_local_path_token(token):
+                continue
+            token_path = _resolve_repo_scoped_path(token, resolved_repo_root)
+            if not _is_path_inside(token_path, resolved_repo_root):
+                violations.append(f"{check.name}:command_path:{token}")
+
+        for key, value in (check.env or {}).items():
+            if not _looks_like_local_path_token(value):
+                continue
+            value_path = _resolve_repo_scoped_path(value, resolved_repo_root)
+            if not _is_path_inside(value_path, resolved_repo_root):
+                violations.append(f"{check.name}:env_path:{key}")
+
+    if violations:
+        joined = ", ".join(sorted(violations))
+        raise ValueError(f"no-WING release checks leave the Automixer repo boundary: {joined}")
+
+
+def _resolve_repo_scoped_path(value: str | os.PathLike[str], repo_root: Path) -> Path:
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = repo_root / path
+    try:
+        return path.resolve()
+    except OSError:
+        return path.absolute()
+
+
+def _is_path_inside(path: Path, root: Path) -> bool:
+    return path == root or root in path.parents
+
+
+def _looks_like_local_path_token(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text:
+        return False
+    if text in {".", ".."} or text.startswith(("~", "./", "../", "/")):
+        return True
+    return "/" in text or "\\" in text
 
 
 def check_port_free(port: int = DEFAULT_BACKEND_PORT, host: str = "127.0.0.1") -> CheckResult:
@@ -1206,6 +1276,7 @@ def read_surface_fixture_evidence_summary(results: Sequence[CheckResult]) -> dic
         status_counts = detail.get("status_counts")
         physical_missing = detail.get("physical_fixture_missing_surface_ids")
         violations = detail.get("violations")
+        physical_missing_ids = list(physical_missing) if isinstance(physical_missing, list) else []
         return {
             "status": result.status,
             "read_only": True,
@@ -1214,10 +1285,14 @@ def read_surface_fixture_evidence_summary(results: Sequence[CheckResult]) -> dic
             "snapshot_status": detail.get("snapshot_status"),
             "surface_count": int(detail.get("surface_count") or 0),
             "surface_with_fixture_count": int(detail.get("surface_with_fixture_count") or 0),
+            "declared_fixture_path_count": int(detail.get("declared_fixture_path_count") or 0),
+            "declared_test_name_count": int(detail.get("declared_test_name_count") or 0),
+            "physical_gap_surface_count": len(physical_missing_ids),
+            "summary_recomputed_from_rows": True,
+            "fixture_declaration_validation": True,
+            "contract_gap_consistency_enforced": True,
             "status_counts": dict(status_counts) if isinstance(status_counts, Mapping) else {},
-            "physical_fixture_missing_surface_ids": list(physical_missing)
-            if isinstance(physical_missing, list)
-            else [],
+            "physical_fixture_missing_surface_ids": physical_missing_ids,
             "violations": list(violations) if isinstance(violations, list) else [],
         }
     return None
@@ -1364,6 +1439,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- snapshot_status: `{read_fixture['snapshot_status']}`",
                 f"- surface_count: `{read_fixture['surface_count']}`",
                 f"- surface_with_fixture_count: `{read_fixture['surface_with_fixture_count']}`",
+                f"- declared_fixture_path_count: `{read_fixture['declared_fixture_path_count']}`",
+                f"- declared_test_name_count: `{read_fixture['declared_test_name_count']}`",
+                f"- physical_gap_surface_count: `{read_fixture['physical_gap_surface_count']}`",
+                f"- summary_recomputed_from_rows: `{str(read_fixture['summary_recomputed_from_rows']).lower()}`",
+                f"- fixture_declaration_validation: `{str(read_fixture['fixture_declaration_validation']).lower()}`",
+                f"- contract_gap_consistency_enforced: `{str(read_fixture['contract_gap_consistency_enforced']).lower()}`",
                 "- status_counts: "
                 f"`{json.dumps(read_fixture['status_counts'], sort_keys=True)}`",
                 "- physical_fixture_missing_surface_ids: "
@@ -1420,6 +1501,7 @@ def run_release_checks(
         quick=quick,
         command_timeout_sec=command_timeout_sec,
     )
+    validate_repo_local_commands(checks)
     validate_no_live_commands(checks)
 
     results: list[CheckResult] = [check_port_free(backend_port)]

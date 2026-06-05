@@ -20,6 +20,7 @@ from tools.no_wing_release_check import (
     run_command_check,
     run_release_checks,
     supervised_gain_dry_run_summary,
+    validate_repo_local_commands,
     validate_no_live_commands,
     validate_read_surface_fixture_evidence_snapshot,
     validate_supervised_proof_report_autonomy_overlay,
@@ -93,6 +94,52 @@ def test_no_wing_release_check_allows_configured_git_binary(tmp_path, monkeypatc
     diff_check = next(check for check in checks if check.name == "diff_check")
 
     assert diff_check.command == ("/custom/git", "diff", "--check")
+
+
+def test_no_wing_release_check_repo_local_command_plan_passes(tmp_path):
+    checks = build_checks(run_dir=tmp_path, include_frontend=True, include_package=True)
+
+    validate_repo_local_commands(checks)
+
+
+def test_no_wing_release_check_rejects_external_project_command_paths(tmp_path):
+    repo_root = tmp_path / "AUTO-MIXER-Tubeslave-main"
+    external_project = tmp_path / "paperclip"
+    repo_root.mkdir()
+    external_project.mkdir()
+    checks = [
+        CommandCheck(
+            name="bad_cwd",
+            command=("python3", "tools/offline_check.py"),
+            cwd=str(external_project),
+        ),
+        CommandCheck(
+            name="bad_absolute_script",
+            command=("python3", str(external_project / "runner.py")),
+            cwd=str(repo_root),
+        ),
+        CommandCheck(
+            name="bad_relative_script",
+            command=("python3", "../paperclip/runner.py"),
+            cwd=str(repo_root),
+        ),
+        CommandCheck(
+            name="bad_env_path",
+            command=("python3", "tools/offline_check.py"),
+            cwd=str(repo_root),
+            env={"PYTHONPATH": "../paperclip"},
+        ),
+    ]
+
+    with pytest.raises(ValueError) as excinfo:
+        validate_repo_local_commands(checks, repo_root=repo_root)
+
+    message = str(excinfo.value)
+    assert "repo boundary" in message
+    assert "bad_cwd:cwd:" in message
+    assert "bad_absolute_script:command_path:" in message
+    assert "bad_relative_script:command_path:../paperclip/runner.py" in message
+    assert "bad_env_path:env_path:PYTHONPATH" in message
 
 
 def test_no_wing_release_check_derives_supervised_boundary_from_operator_policy():
@@ -1339,6 +1386,8 @@ def test_no_wing_release_check_summary_embeds_read_surface_fixture_evidence(tmp_
             "snapshot_status": "fixture_evidence_incomplete",
             "surface_count": 10,
             "surface_with_fixture_count": 10,
+            "declared_fixture_path_count": 10,
+            "declared_test_name_count": 25,
             "status_counts": {"partial_fixture_evidence": 10},
             "physical_fixture_missing_surface_ids": ["channel_identity_and_basic_controls"],
             "violations": [],
@@ -1353,10 +1402,18 @@ def test_no_wing_release_check_summary_embeds_read_surface_fixture_evidence(tmp_
     assert json_summary["read_surface_fixture_evidence"]["live_write"] is False
     assert json_summary["read_surface_fixture_evidence"]["full_autonomous_ready"] is False
     assert json_summary["read_surface_fixture_evidence"]["surface_count"] == 10
+    assert json_summary["read_surface_fixture_evidence"]["declared_fixture_path_count"] == 10
+    assert json_summary["read_surface_fixture_evidence"]["declared_test_name_count"] == 25
+    assert json_summary["read_surface_fixture_evidence"]["physical_gap_surface_count"] == 1
+    assert json_summary["read_surface_fixture_evidence"]["summary_recomputed_from_rows"] is True
+    assert json_summary["read_surface_fixture_evidence"]["fixture_declaration_validation"] is True
+    assert json_summary["read_surface_fixture_evidence"]["contract_gap_consistency_enforced"] is True
     assert json_summary["read_surface_fixture_evidence"]["physical_fixture_missing_surface_ids"] == [
         "channel_identity_and_basic_controls"
     ]
     assert "## Read Surface Fixture Evidence" in markdown_summary
+    assert "declared_fixture_path_count" in markdown_summary
+    assert "contract_gap_consistency_enforced: `true`" in markdown_summary
     assert "physical_fixture_missing_surface_ids" in markdown_summary
 
 
