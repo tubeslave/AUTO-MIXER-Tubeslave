@@ -1933,8 +1933,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     "snapshot_status": "fixture_evidence_incomplete",
                     "surface_count": 10,
                     "surface_with_fixture_count": 10,
-                    "declared_fixture_path_count": 11,
-                    "declared_test_name_count": 28,
+                    "declared_fixture_path_count": 12,
+                    "declared_test_name_count": 31,
                     "physical_gap_surface_count": 10,
                     "summary_recomputed_from_rows": True,
                     "fixture_declaration_validation": True,
@@ -2182,6 +2182,69 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "fx_slots_inserts_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "fx_slots_inserts_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "fx_slots_and_inserts",
+                    "remediation_action_id": "remediate_fx_slots_and_inserts",
+                    "physical_readback_surface_id": "fx_slots_and_inserts",
+                    "physical_readback_action_id": "remediate_fx_slots_and_inserts",
+                    "fixture_physical_gap_declared": True,
+                    "remediation_physical_gap_declared": True,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "fx_send_insert",
+                        "routing",
+                        "mix_balance",
+                    ],
+                    "required_fx_slot_fields": ["slot", "slot_number", "parameter_schema"],
+                    "required_parameter_fields": ["parameter_index", "value", "safe_range"],
+                    "required_parameter_schema_fields": [
+                        "status",
+                        "physical_model_schema_verified",
+                    ],
+                    "required_fx_slot_coverage_flags": [
+                        "identity",
+                        "assignment",
+                        "cache_matches_physical_readback",
+                    ],
+                    "required_insert_fields": ["target_type", "position", "linked_fx_slot"],
+                    "required_insert_coverage_flags": [
+                        "assignment",
+                        "status",
+                        "scoped_diff_marker",
+                    ],
+                    "required_false_safety_flags": [
+                        "live_write",
+                        "mutates_console_state",
+                        "live_widening_allowed",
+                        "full_autonomous_ready",
+                    ],
+                    "minimum_fx_slot_count": 1,
+                    "minimum_fx_parameter_count": 4,
+                    "minimum_insert_count": 1,
+                    "allowed_sources": ["physical_readback", "wing_physical_readback"],
+                    "accepted_row_statuses": ["verified_from_physical_readback"],
+                    "allowed_insert_target_types": ["channel", "bus", "main", "matrix"],
+                    "allowed_insert_positions": ["pre", "post"],
+                    "forbidden_mutation_evidence_fields": [
+                        "manual_write_events",
+                        "fx_parameter_write_events",
+                    ],
+                    "violations": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -2211,8 +2274,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     proof_quality = payload["summary"]["read_surface_proof_quality"]
     assert proof_quality["available"] is True
     assert proof_quality["summary_path"] == str(latest_dir / "summary.json")
-    assert proof_quality["declared_fixture_path_count"] == 11
-    assert proof_quality["declared_test_name_count"] == 28
+    assert proof_quality["declared_fixture_path_count"] == 12
+    assert proof_quality["declared_test_name_count"] == 31
     assert proof_quality["physical_gap_surface_count"] == 10
     assert proof_quality["summary_recomputed_from_rows"] is True
     assert proof_quality["fixture_declaration_validation"] is True
@@ -2359,6 +2422,45 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert matrix_contract["minimum_eq_band_count"] == 8
     assert "physical_readback" in matrix_contract["allowed_sources"]
     assert "matrix_write_events" in matrix_contract["forbidden_mutation_evidence_fields"]
+    fx_contract = proof_quality["fx_slots_inserts_physical_readback_contract"]
+    assert fx_contract["available"] is True
+    assert fx_contract["status"] == "passed"
+    assert fx_contract["schema_id"] == "fx_slots_inserts_physical_readback.v1"
+    assert fx_contract["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert fx_contract["surface_id"] == "fx_slots_and_inserts"
+    assert fx_contract["remediation_action_id"] == "remediate_fx_slots_and_inserts"
+    assert fx_contract["artifact_required"] is True
+    assert fx_contract["physical_fixture_gap_remains"] is True
+    assert fx_contract["accepted_as_physical_fixture_candidate"] is False
+    assert fx_contract["live_authority_granted"] is False
+    assert fx_contract["full_autonomous_ready"] is False
+    assert fx_contract["fixture_physical_gap_declared"] is True
+    assert fx_contract["remediation_physical_gap_declared"] is True
+    assert fx_contract["target_consistency"] is True
+    assert fx_contract["promotion_families_requiring_surface"] == [
+        "fx_send_insert",
+        "routing",
+        "mix_balance",
+    ]
+    assert "parameter_schema" in fx_contract["required_fx_slot_fields"]
+    assert "safe_range" in fx_contract["required_parameter_fields"]
+    assert "physical_model_schema_verified" in fx_contract[
+        "required_parameter_schema_fields"
+    ]
+    assert "scoped_diff_marker" in fx_contract["required_insert_coverage_flags"]
+    assert fx_contract["required_false_safety_flags"] == [
+        "live_write",
+        "mutates_console_state",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+    ]
+    assert fx_contract["minimum_fx_slot_count"] == 1
+    assert fx_contract["minimum_fx_parameter_count"] == 4
+    assert fx_contract["minimum_insert_count"] == 1
+    assert "physical_readback" in fx_contract["allowed_sources"]
+    assert "fx_parameter_write_events" in fx_contract[
+        "forbidden_mutation_evidence_fields"
+    ]
     overlay = payload["autonomy_evidence_overlay"]
     assert overlay["source_report_available"] is True
     assert overlay["source_report_path"] == str(latest_report)
@@ -2557,6 +2659,42 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["matrix_contract_claimed_live_authority"],
                 },
+                "fx_slots_inserts_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "fx_slots_inserts_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "physical_readback_surface_id": "dlive_state",
+                    "physical_readback_action_id": "remediate_dlive_state",
+                    "fixture_physical_gap_declared": False,
+                    "remediation_physical_gap_declared": False,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "target_consistency": False,
+                    "promotion_families_requiring_surface": ["routing"],
+                    "required_fx_slot_fields": ["slot"],
+                    "required_parameter_fields": ["value"],
+                    "required_parameter_schema_fields": ["status"],
+                    "required_fx_slot_coverage_flags": [],
+                    "required_insert_fields": ["target_type"],
+                    "required_insert_coverage_flags": [],
+                    "required_false_safety_flags": ["live_write"],
+                    "minimum_fx_slot_count": 0,
+                    "minimum_fx_parameter_count": 0,
+                    "minimum_insert_count": 0,
+                    "allowed_sources": ["physical_readback", "mixer_state_cache"],
+                    "accepted_row_statuses": ["verified_from_cache"],
+                    "allowed_insert_target_types": ["channel"],
+                    "allowed_insert_positions": ["post"],
+                    "forbidden_mutation_evidence_fields": [],
+                    "violations": ["fx_contract_claimed_live_authority"],
+                },
             }
         ),
         encoding="utf-8",
@@ -2662,6 +2800,28 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert matrix_contract["minimum_matrix_count"] == 0
     assert matrix_contract["minimum_eq_band_count"] == 2
     assert "matrix_contract_claimed_live_authority" in matrix_contract["violations"]
+    fx_contract = payload["summary"]["read_surface_proof_quality"][
+        "fx_slots_inserts_physical_readback_contract"
+    ]
+    assert fx_contract["available"] is True
+    assert fx_contract["surface_id"] == "dlive_state"
+    assert fx_contract["physical_readback_surface_id"] == "dlive_state"
+    assert fx_contract["target_consistency"] is False
+    assert fx_contract["accepted_as_physical_fixture_candidate"] is False
+    assert fx_contract["read_only"] is True
+    assert fx_contract["live_write"] is False
+    assert fx_contract["live_authority_granted"] is False
+    assert fx_contract["full_autonomous_ready"] is False
+    assert fx_contract["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert fx_contract["source_live_write_claimed"] is True
+    assert fx_contract["source_live_authority_granted_claimed"] is True
+    assert fx_contract["source_full_autonomous_ready_claimed"] is True
+    assert fx_contract["promotion_families_requiring_surface"] == ["routing"]
+    assert fx_contract["required_false_safety_flags"] == ["live_write"]
+    assert fx_contract["minimum_fx_slot_count"] == 0
+    assert fx_contract["minimum_fx_parameter_count"] == 0
+    assert fx_contract["minimum_insert_count"] == 0
+    assert "fx_contract_claimed_live_authority" in fx_contract["violations"]
     assert "set_gain" not in set(_walk_keys(payload))
 
 

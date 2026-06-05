@@ -530,8 +530,8 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
           snapshot_status: 'fixture_evidence_incomplete',
           surface_count: 10,
           surface_with_fixture_count: 10,
-          declared_fixture_path_count: 11,
-          declared_test_name_count: 28,
+          declared_fixture_path_count: 12,
+          declared_test_name_count: 31,
           physical_gap_surface_count: 10,
           summary_recomputed_from_rows: true,
           fixture_declaration_validation: true,
@@ -698,6 +698,45 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             minimum_eq_band_count: 8,
             violations: [],
           },
+          fx_slots_inserts_physical_readback_contract: {
+            available: true,
+            status: 'passed',
+            schema_id: 'fx_slots_inserts_physical_readback.v1',
+            contract_status: 'contract_ready_physical_fixture_missing',
+            surface_id: 'fx_slots_and_inserts',
+            remediation_action_id: 'remediate_fx_slots_and_inserts',
+            artifact_required: true,
+            physical_fixture_gap_remains: true,
+            accepted_as_physical_fixture_candidate: false,
+            read_only: true,
+            live_write: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            target_consistency: true,
+            physical_readback_surface_id: 'fx_slots_and_inserts',
+            physical_readback_action_id: 'remediate_fx_slots_and_inserts',
+            fixture_physical_gap_declared: true,
+            remediation_physical_gap_declared: true,
+            promotion_families_requiring_surface: ['fx_send_insert', 'routing', 'mix_balance'],
+            required_fx_slot_fields: ['slot', 'slot_number', 'parameter_schema'],
+            required_parameter_fields: ['parameter_index', 'value', 'safe_range'],
+            required_parameter_schema_fields: ['status', 'physical_model_schema_verified'],
+            required_insert_fields: ['target_type', 'position', 'linked_fx_slot'],
+            required_insert_coverage_flags: ['assignment', 'status', 'scoped_diff_marker'],
+            required_false_safety_flags: [
+              'live_write',
+              'mutates_console_state',
+              'live_widening_allowed',
+              'full_autonomous_ready',
+            ],
+            allowed_sources: ['physical_readback', 'wing_physical_readback'],
+            accepted_row_statuses: ['verified_from_physical_readback'],
+            forbidden_mutation_evidence_fields: ['manual_write_events', 'fx_write_events'],
+            minimum_fx_slot_count: 1,
+            minimum_fx_parameter_count: 4,
+            minimum_insert_count: 1,
+            violations: [],
+          },
         },
       },
     },
@@ -784,6 +823,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'channel_processing_physical_readback_contract',
       'bus_group_main_dca_physical_readback_contract',
       'matrix_state_physical_readback_contract',
+      'fx_slots_inserts_physical_readback_contract',
       'read_surface_remediation_plan',
       'autonomy_evidence:fader_supervised_promotion',
       'autonomy_evidence:gain_trim_supervised_promotion',
@@ -871,7 +911,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'next_readback_target:raw_mixer_state_cache',
     'source_next_readback_target:raw_mixer_state_cache',
     'next_readback_gate:true',
-    'fixture_tests:28',
+    'fixture_tests:31',
     'contract_gap:true',
     'raw_contract_available:true',
     'raw_contract_status:contract_ready_physical_fixture_missing',
@@ -903,13 +943,19 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'matrix_contract_gap:true',
     'matrix_contract_live_authority:false',
     'matrix_contract_target_gate:true',
+    'fx_contract_available:true',
+    'fx_contract_status:contract_ready_physical_fixture_missing',
+    'fx_contract_schema:fx_slots_inserts_physical_readback.v1',
+    'fx_contract_gap:true',
+    'fx_contract_live_authority:false',
+    'fx_contract_target_gate:true',
   ]);
   assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
   assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
   assert.match(proofEvidence.nextStep, /age:120s stale_after:86400s stale:false/);
   assert.match(proofEvidence.nextStep, /read_surface_gaps:10/);
-  assert.match(proofEvidence.nextStep, /fixture_paths:11/);
-  assert.match(proofEvidence.nextStep, /test_names:28/);
+  assert.match(proofEvidence.nextStep, /fixture_paths:12/);
+  assert.match(proofEvidence.nextStep, /test_names:31/);
   assert.match(proofEvidence.nextStep, /contract_gap:true/);
   assert.match(proofEvidence.nextStep, /gap_surfaces:raw_mixer_state_cache/);
   assert.match(proofEvidence.nextStep, /next_readback:raw_mixer_state_cache/);
@@ -935,6 +981,10 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /matrix_contract_gap:true/);
   assert.match(proofEvidence.nextStep, /matrix_contract_live_authority:false/);
   assert.match(proofEvidence.nextStep, /matrix_contract_target_gate:true/);
+  assert.match(proofEvidence.nextStep, /fx_contract:contract_ready_physical_fixture_missing/);
+  assert.match(proofEvidence.nextStep, /fx_contract_gap:true/);
+  assert.match(proofEvidence.nextStep, /fx_contract_live_authority:false/);
+  assert.match(proofEvidence.nextStep, /fx_contract_target_gate:true/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
 
   const rawMixerContract = rows.find(row => row.moduleId === 'raw_mixer_state_physical_readback_contract');
@@ -1092,6 +1142,45 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(matrixStateContract.nextStep, /metering:lufs,true_peak_dbtp,headroom_db/);
   assert.match(matrixStateContract.nextStep, /live_authority:false/);
   assert.match(matrixStateContract.nextStep, /target_consistency:true/);
+
+  const fxSlotsInsertsContract = rows.find(row => row.moduleId === 'fx_slots_inserts_physical_readback_contract');
+  assert.equal(fxSlotsInsertsContract.domain, 'read_surface_contract');
+  assert.equal(fxSlotsInsertsContract.canWriteLive, false);
+  assert.deepEqual(fxSlotsInsertsContract.liveWriteKinds, []);
+  assert.equal(fxSlotsInsertsContract.status, 'contract_ready_physical_fixture_missing');
+  assert.equal(fxSlotsInsertsContract.entrypoint, 'fx_slots_inserts_physical_readback_contract');
+  assert.equal(fxSlotsInsertsContract.module, 'remediate_fx_slots_and_inserts');
+  assert.equal(fxSlotsInsertsContract.tone, 'yellow');
+  assert.deepEqual(fxSlotsInsertsContract.pipelineProfiles, [
+    'available:true',
+    'schema:fx_slots_inserts_physical_readback.v1',
+    'surface:fx_slots_and_inserts',
+    'physical_readback:fx_slots_and_inserts',
+    'physical_action:remediate_fx_slots_and_inserts',
+    'physical_gap_remains:true',
+    'live_authority:false',
+    'target_consistency:true',
+    'promotion_families:fx_send_insert|routing|mix_balance',
+    'slot_fields:slot|slot_number|parameter_schema',
+    'parameter_fields:parameter_index|value|safe_range',
+    'parameter_schema:status|physical_model_schema_verified',
+    'insert_fields:target_type|position|linked_fx_slot',
+    'insert_coverage:assignment|status|scoped_diff_marker',
+    'false_safety:live_write|mutates_console_state|live_widening_allowed|full_autonomous_ready',
+  ]);
+  assert.match(fxSlotsInsertsContract.blockedReason, /physical readback fixture evidence is still missing/);
+  assert.match(fxSlotsInsertsContract.nextStep, /physical_readback:fx_slots_and_inserts/);
+  assert.match(fxSlotsInsertsContract.nextStep, /physical_action:remediate_fx_slots_and_inserts/);
+  assert.match(fxSlotsInsertsContract.nextStep, /families:fx_send_insert,routing,mix_balance/);
+  assert.match(fxSlotsInsertsContract.nextStep, /slot_fields:slot,slot_number,parameter_schema/);
+  assert.match(fxSlotsInsertsContract.nextStep, /parameters:parameter_index,value,safe_range/);
+  assert.match(fxSlotsInsertsContract.nextStep, /inserts:target_type,position,linked_fx_slot/);
+  assert.match(
+    fxSlotsInsertsContract.nextStep,
+    /false_safety:live_write,mutates_console_state,live_widening_allowed,full_autonomous_ready/,
+  );
+  assert.match(fxSlotsInsertsContract.nextStep, /live_authority:false/);
+  assert.match(fxSlotsInsertsContract.nextStep, /target_consistency:true/);
 
   const readRemediation = rows.find(row => row.moduleId === 'read_surface_remediation_plan');
   assert.equal(readRemediation.domain, 'read_surface_remediation');
@@ -1256,7 +1345,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 6);
+  assert.equal(rows.length, 7);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -1308,6 +1397,12 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'matrix_contract_gap:false',
     'matrix_contract_live_authority:false',
     'matrix_contract_target_gate:false',
+    'fx_contract_available:false',
+    'fx_contract_status:missing',
+    'fx_contract_schema:',
+    'fx_contract_gap:false',
+    'fx_contract_live_authority:false',
+    'fx_contract_target_gate:false',
   ]);
 
   assert.equal(rows[1].moduleId, 'raw_mixer_state_physical_readback_contract');
@@ -1344,6 +1439,13 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.equal(rows[5].canWriteLive, false);
   assert.deepEqual(rows[5].liveWriteKinds, []);
   assert.match(rows[5].blockedReason, /contract is missing/);
+
+  assert.equal(rows[6].moduleId, 'fx_slots_inserts_physical_readback_contract');
+  assert.equal(rows[6].domain, 'read_surface_contract');
+  assert.equal(rows[6].status, 'contract_missing');
+  assert.equal(rows[6].canWriteLive, false);
+  assert.deepEqual(rows[6].liveWriteKinds, []);
+  assert.match(rows[6].blockedReason, /contract is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

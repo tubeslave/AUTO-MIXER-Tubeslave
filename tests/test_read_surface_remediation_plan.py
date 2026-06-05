@@ -106,6 +106,17 @@ def test_plan_creates_actions_for_current_partial_and_missing_read_surfaces():
     )
     assert matrix_state["mutates_console_state"] is False
 
+    fx_slots_inserts = actions["fx_slots_and_inserts"]
+    assert fx_slots_inserts["action_type"] == "complete_read_dto"
+    assert fx_slots_inserts["physical_readback_gap"] is True
+    assert fx_slots_inserts["next_physical_readback_target"] is False
+    assert "physical_readback_fixture" in fx_slots_inserts["missing_contracts"]
+    assert any(
+        "fx_slots_inserts_physical_readback_contract" in artifact
+        for artifact in fx_slots_inserts["expected_artifacts"]
+    )
+    assert fx_slots_inserts["mutates_console_state"] is False
+
     presets = actions["user_presets"]
     assert presets["action_type"] == "complete_read_dto"
     assert "enumeration_contract" in presets["missing_contracts"]

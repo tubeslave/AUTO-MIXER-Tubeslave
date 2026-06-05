@@ -79,6 +79,7 @@
 - Channel EQ/dynamics/gate physical readback needs its own schema contract before EQ, compressor, gate, de-esser, frequency-separation, or unmasking proof artifacts are trusted; contract visibility must preserve `physical_fixture_gap_remains=true` and normalize live-authority claims to false.
 - Bus/group/main/DCA physical readback needs its own schema contract before bus balance, DCA, master-bus, mix-balance, or performance-adaptation proof artifacts are trusted; contract visibility must preserve `physical_fixture_gap_remains=true` and normalize live-authority claims to false.
 - Matrix-state physical readback needs its own schema contract before matrix balance, matrix EQ/dynamics/inserts, FX-send, routing, master-bus, or performance-adaptation proof artifacts are trusted; contract visibility must preserve `physical_fixture_gap_remains=true` and normalize live-authority claims to false.
+- FX slots/inserts physical readback needs its own schema contract before FX send/insert, FX parameter, routing, mix-balance, or performance-adaptation proof artifacts are trusted; contract visibility must preserve `physical_fixture_gap_remains=true` and normalize live-authority claims to false.
 
 ## Memory Pipeline Lessons
 

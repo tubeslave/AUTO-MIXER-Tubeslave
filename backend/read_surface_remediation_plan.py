@@ -24,6 +24,10 @@ try:
         CHANNEL_PROCESSING_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         CHANNEL_PROCESSING_SURFACE_ID,
     )
+    from fx_slots_inserts_physical_readback_contract import (
+        FX_SLOTS_INSERTS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        FX_SLOTS_INSERTS_SURFACE_ID,
+    )
     from matrix_state_physical_readback_contract import (
         MATRIX_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         MATRIX_STATE_SURFACE_ID,
@@ -46,6 +50,10 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.channel_processing_physical_readback_contract import (
         CHANNEL_PROCESSING_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         CHANNEL_PROCESSING_SURFACE_ID,
+    )
+    from backend.fx_slots_inserts_physical_readback_contract import (
+        FX_SLOTS_INSERTS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        FX_SLOTS_INSERTS_SURFACE_ID,
     )
     from backend.matrix_state_physical_readback_contract import (
         MATRIX_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
@@ -219,6 +227,11 @@ def _expected_artifacts(surface: ReadSurface, *, physical_readback_gap: bool) ->
             artifacts.append(
                 "Matrix-state physical readback artifact validated by "
                 f"{MATRIX_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
+            )
+        if surface.id == FX_SLOTS_INSERTS_SURFACE_ID:
+            artifacts.append(
+                "FX slots/inserts physical readback artifact validated by "
+                f"{FX_SLOTS_INSERTS_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
             )
     return tuple(artifacts)
 

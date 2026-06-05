@@ -16,6 +16,7 @@ from tools.no_wing_release_check import (
     channel_basic_controls_readback_contract_summary,
     channel_processing_readback_contract_summary,
     current_supervised_live_write_kinds,
+    fx_slots_inserts_readback_contract_summary,
     gain_proof_artifact_root_for_run,
     matrix_state_readback_contract_summary,
     next_wing_proof_plan_summary,
@@ -31,6 +32,7 @@ from tools.no_wing_release_check import (
     validate_bus_group_main_dca_physical_readback_contract_snapshot,
     validate_channel_basic_controls_physical_readback_contract_snapshot,
     validate_channel_processing_physical_readback_contract_snapshot,
+    validate_fx_slots_inserts_physical_readback_contract_snapshot,
     validate_matrix_state_physical_readback_contract_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
     validate_raw_mixer_state_physical_readback_contract_snapshot,
@@ -808,6 +810,113 @@ def test_no_wing_release_check_rejects_matrix_state_contract_drift(monkeypatch):
     ]
 
 
+def test_no_wing_release_check_validates_fx_slots_inserts_readback_contract_snapshot():
+    result = validate_fx_slots_inserts_physical_readback_contract_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert result.detail["schema_id"] == "fx_slots_inserts_physical_readback.v1"
+    assert result.detail["surface_id"] == "fx_slots_and_inserts"
+    assert result.detail["remediation_action_id"] == "remediate_fx_slots_and_inserts"
+    assert result.detail["physical_readback_surface_id"] == "fx_slots_and_inserts"
+    assert result.detail["physical_readback_action_id"] == "remediate_fx_slots_and_inserts"
+    assert result.detail["fixture_physical_gap_declared"] is True
+    assert result.detail["remediation_physical_gap_declared"] is True
+    assert result.detail["artifact_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert "physical_readback" in result.detail["allowed_sources"]
+    assert "mixer_state_cache" not in result.detail["allowed_sources"]
+    assert "verified_from_physical_readback" in result.detail["accepted_row_statuses"]
+    assert "fx_parameter_write_events" in result.detail["forbidden_mutation_evidence_fields"]
+    assert "parameter_schema" in result.detail["required_fx_slot_fields"]
+    assert "safe_range" in result.detail["required_parameter_fields"]
+    assert "physical_model_schema_verified" in result.detail[
+        "required_parameter_schema_fields"
+    ]
+    assert "scoped_diff_marker" in result.detail["required_insert_coverage_flags"]
+    assert result.detail["minimum_fx_slot_count"] == 1
+    assert result.detail["minimum_fx_parameter_count"] == 4
+    assert result.detail["minimum_insert_count"] == 1
+    assert "routing" in result.detail["promotion_families_requiring_surface"]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_fx_slots_inserts_contract_drift(monkeypatch):
+    contract = release_check.build_fx_slots_inserts_physical_readback_contract()
+    corrupted = json.loads(json.dumps(contract))
+    corrupted["schema_id"] = "fx_slots_inserts_physical_readback.v0"
+    corrupted["surface_id"] = "matrix_state"
+    corrupted["safety"]["live_write"] = True
+    corrupted["artifact_contract"]["required_top_level_fields"] = ["type"]
+    corrupted["artifact_contract"]["required_fx_slot_fields"] = ["slot"]
+    corrupted["artifact_contract"]["required_parameter_fields"] = ["value"]
+    corrupted["artifact_contract"]["minimum_fx_parameter_count"] = 0
+    corrupted["artifact_contract"]["allowed_sources"].append("mixer_state_cache")
+    corrupted["artifact_contract"]["accepted_row_statuses"] = ["verified_from_cache"]
+    corrupted["artifact_contract"]["forbidden_mutation_evidence_fields"] = []
+    corrupted["summary"]["physical_readback_surface_id"] = "routing_and_sends"
+    corrupted["summary"]["live_authority_granted"] = True
+    corrupted["summary"]["promotion_families_requiring_surface"] = ["routing"]
+
+    monkeypatch.setattr(
+        release_check,
+        "build_fx_slots_inserts_physical_readback_contract",
+        lambda: corrupted,
+    )
+
+    result = validate_fx_slots_inserts_physical_readback_contract_snapshot()
+
+    assert result.status == "failed"
+    assert "fx_slots_inserts_readback_contract_schema_id_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_readback_contract_surface_id_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_readback_contract_live_write_not_false" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_readback_required_top_level_fields_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_readback_required_fx_slot_fields_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_readback_required_parameter_fields_mismatch" in result.detail[
+        "violations"
+    ]
+    assert (
+        "fx_slots_inserts_readback_artifact_minimum_fx_parameter_count_mismatch"
+        in result.detail["violations"]
+    )
+    assert "fx_slots_inserts_readback_allowed_sources_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_readback_allows_cached_source" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_readback_accepted_statuses_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_readback_forbidden_mutation_fields_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_contract_surface_summary_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_contract_live_authority_not_false" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_promotion_family_missing:fx_send_insert" in result.detail[
+        "violations"
+    ]
+    assert "fx_slots_inserts_promotion_family_missing:mix_balance" in result.detail[
+        "violations"
+    ]
+
+
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_frontend=False, quick=True)
 
@@ -844,6 +953,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "tests/test_channel_processing_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_bus_group_main_dca_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_matrix_state_physical_readback_contract.py" in fixture_check.command
+    assert "tests/test_fx_slots_inserts_physical_readback_contract.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command
@@ -1314,6 +1424,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "channel_processing_physical_readback_contract_schema" in result_names
     assert "bus_group_main_dca_physical_readback_contract_schema" in result_names
     assert "matrix_state_physical_readback_contract_schema" in result_names
+    assert "fx_slots_inserts_physical_readback_contract_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
@@ -1340,6 +1451,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "matrix_state_physical_readback_contract_schema"
     )
     assert result_names.index("matrix_state_physical_readback_contract_schema") < result_names.index(
+        "fx_slots_inserts_physical_readback_contract_schema"
+    )
+    assert result_names.index("fx_slots_inserts_physical_readback_contract_schema") < result_names.index(
         "backend_pytest"
     )
     assert result_names.index("supervised_proof_artifact_report") < result_names.index(
@@ -2549,6 +2663,119 @@ def test_no_wing_release_check_summary_embeds_matrix_state_readback_contract(tmp
     assert "physical_fixture_gap_remains: `true`" in markdown_summary
     assert "live_authority_granted: `false`" in markdown_summary
     assert "minimum_matrix_count: `1`" in markdown_summary
+    assert "target_consistency: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_fx_slots_inserts_readback_contract(tmp_path):
+    result = CheckResult(
+        name="fx_slots_inserts_physical_readback_contract_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "contract_status": "contract_ready_physical_fixture_missing",
+            "schema_id": "fx_slots_inserts_physical_readback.v1",
+            "surface_id": "fx_slots_and_inserts",
+            "remediation_action_id": "remediate_fx_slots_and_inserts",
+            "physical_readback_surface_id": "fx_slots_and_inserts",
+            "physical_readback_action_id": "remediate_fx_slots_and_inserts",
+            "fixture_physical_gap_declared": True,
+            "remediation_physical_gap_declared": True,
+            "artifact_required": True,
+            "physical_fixture_gap_remains": True,
+            "accepted_as_physical_fixture_candidate": False,
+            "live_authority_granted": False,
+            "promotion_families_requiring_surface": [
+                "fx_send_insert",
+                "routing",
+                "mix_balance",
+            ],
+            "required_top_level_field_count": 12,
+            "required_fx_slot_field_count": 16,
+            "required_fx_slot_fields": ["slot", "slot_number", "parameter_schema"],
+            "required_parameter_fields": ["parameter_index", "value", "safe_range"],
+            "required_parameter_safe_range_fields": ["min", "max"],
+            "required_parameter_schema_fields": [
+                "status",
+                "physical_model_schema_verified",
+            ],
+            "required_fx_slot_coverage_flags": [
+                "identity",
+                "assignment",
+                "cache_matches_physical_readback",
+            ],
+            "required_insert_fields": ["target_type", "position", "linked_fx_slot"],
+            "required_insert_coverage_flags": [
+                "assignment",
+                "status",
+                "scoped_diff_marker",
+            ],
+            "required_false_safety_flags": [
+                "live_write",
+                "mutates_console_state",
+                "live_widening_allowed",
+                "full_autonomous_ready",
+            ],
+            "minimum_fx_slot_count": 1,
+            "minimum_fx_parameter_count": 4,
+            "minimum_insert_count": 1,
+            "allowed_sources": ["physical_readback", "wing_physical_readback"],
+            "accepted_row_statuses": ["verified_from_physical_readback"],
+            "allowed_insert_target_types": ["channel", "bus", "main", "matrix"],
+            "allowed_insert_positions": ["pre", "post"],
+            "forbidden_mutation_evidence_fields": [
+                "manual_write_events",
+                "fx_parameter_write_events",
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert fx_slots_inserts_readback_contract_summary([result]) == summary[
+        "fx_slots_inserts_physical_readback_contract"
+    ]
+    contract = json_summary["fx_slots_inserts_physical_readback_contract"]
+    assert contract["read_only"] is True
+    assert contract["live_write"] is False
+    assert contract["mutates_console_state"] is False
+    assert contract["queries_console"] is False
+    assert contract["executes_tests"] is False
+    assert contract["full_autonomous_ready"] is False
+    assert contract["artifact_required"] is True
+    assert contract["physical_fixture_gap_remains"] is True
+    assert contract["accepted_as_physical_fixture_candidate"] is False
+    assert contract["live_authority_granted"] is False
+    assert contract["target_consistency"] is True
+    assert contract["surface_id"] == "fx_slots_and_inserts"
+    assert contract["remediation_action_id"] == "remediate_fx_slots_and_inserts"
+    assert contract["promotion_families_requiring_surface"] == [
+        "fx_send_insert",
+        "routing",
+        "mix_balance",
+    ]
+    assert "parameter_schema" in contract["required_fx_slot_fields"]
+    assert "safe_range" in contract["required_parameter_fields"]
+    assert "physical_model_schema_verified" in contract["required_parameter_schema_fields"]
+    assert "scoped_diff_marker" in contract["required_insert_coverage_flags"]
+    assert contract["required_false_safety_flags"] == [
+        "live_write",
+        "mutates_console_state",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+    ]
+    assert contract["minimum_fx_slot_count"] == 1
+    assert contract["minimum_fx_parameter_count"] == 4
+    assert contract["minimum_insert_count"] == 1
+    assert "## FX Slots Inserts Physical Readback Contract" in markdown_summary
+    assert "physical_fixture_gap_remains: `true`" in markdown_summary
+    assert "live_authority_granted: `false`" in markdown_summary
+    assert "minimum_fx_parameter_count: `4`" in markdown_summary
+    assert "required_false_safety_flags" in markdown_summary
     assert "target_consistency: `true`" in markdown_summary
 
 
