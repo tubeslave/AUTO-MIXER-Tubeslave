@@ -531,6 +531,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             'user_presets',
             'dlive_state',
           ],
+          next_physical_readback_surface_id: 'raw_mixer_state_cache',
         },
       },
     },
@@ -667,6 +668,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'read_surface_quality:true',
     'read_surface_gaps:10',
     'read_surface_gap_ids:raw_mixer_state_cache|channel_identity_and_basic_controls|channel_eq_dynamics_gate|bus_group_main_dca_state|matrix_state|fx_slots_and_inserts|routing_and_sends|snapshots_scenes|user_presets|dlive_state',
+    'next_readback_target:raw_mixer_state_cache',
     'fixture_tests:25',
     'contract_gap:true',
   ]);
@@ -678,6 +680,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /test_names:25/);
   assert.match(proofEvidence.nextStep, /contract_gap:true/);
   assert.match(proofEvidence.nextStep, /gap_surfaces:raw_mixer_state_cache/);
+  assert.match(proofEvidence.nextStep, /next_readback:raw_mixer_state_cache/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
 
   const faderOverlay = rows.find(row => row.moduleId === 'autonomy_evidence:fader_supervised_promotion');
@@ -835,6 +838,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'read_surface_quality:false',
     'read_surface_gaps:0',
     'read_surface_gap_ids:',
+    'next_readback_target:',
     'fixture_tests:0',
     'contract_gap:false',
   ]);

@@ -155,7 +155,8 @@ function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
       { label: 'Proof freshness', value: 'No artifact', tone: 'yellow' as const },
       { label: 'Autonomy overlay', value: overlayRows.length ? `${overlayRows.length} rows` : 'Missing', tone: overlayRows.length ? 'yellow' as const : 'muted' as const },
       { label: 'Read-surface proof', value: 'Missing', tone: 'muted' as const },
-      { label: 'Gap surfaces', value: 'None listed', tone: 'muted' as const }
+      { label: 'Gap surfaces', value: 'None listed', tone: 'muted' as const },
+      { label: 'Next read proof', value: 'No target', tone: 'muted' as const }
     ];
   }
   const stale = profileValue(proof, 'stale:') === 'true';
@@ -172,6 +173,7 @@ function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
     .split('|')
     .map(value => value.trim())
     .filter(Boolean);
+  const nextReadbackTarget = profileValue(proof, 'next_readback_target:');
   const readSurfaceGapValue = hasReadSurfaceGapCount
     ? `${readSurfaceGapCount} physical gaps`
     : 'Unknown';
@@ -192,6 +194,7 @@ function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
     { label: 'Read-surface proof', value: readSurfaceQualityAvailable ? 'Metadata available' : 'Missing', tone: readSurfaceProofTone },
     { label: 'Read-surface gaps', value: readSurfaceGapValue, tone: readSurfaceGapTone },
     { label: 'Gap surfaces', value: compactReadSurfaceGapLabel(gapSurfaceIds, hasReadSurfaceGapCount ? readSurfaceGapCount : null), tone: gapSurfaceIds.length ? 'yellow' as const : 'muted' as const },
+    { label: 'Next read proof', value: nextReadbackTarget || 'No target', tone: nextReadbackTarget ? 'yellow' as const : 'muted' as const },
     { label: 'Fixture tests', value: hasFixtureTestCount ? `${fixtureTestCount} declared tests` : 'Unknown', tone: readSurfaceQualityAvailable ? 'blue' as const : 'muted' as const },
     { label: 'Contract/gap gate', value: contractGapEnforced ? 'Enforced' : 'Missing', tone: contractGapEnforced ? 'green' as const : 'yellow' as const }
   ];

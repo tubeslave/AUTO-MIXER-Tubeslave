@@ -1071,7 +1071,8 @@ test.describe('Automixer backend Product Layer adapter', () => {
                   'snapshots_scenes',
                   'user_presets',
                   'dlive_state'
-                ]
+                ],
+                next_physical_readback_surface_id: 'raw_mixer_state_cache'
               }
             }
           },
@@ -1348,6 +1349,7 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('age:180s stale_after:86400s stale:false').first()).toBeVisible();
     await expect(page.getByText('read_surface_gaps:10; fixture_paths:10; test_names:25').first()).toBeVisible();
     await expect(page.getByText('gap_surfaces:raw_mixer_state_cache').first()).toBeVisible();
+    await expect(page.getByText('next_readback:raw_mixer_state_cache').first()).toBeVisible();
     await expect(page.getByText('Autonomy proof evidence: Fader').first()).toBeVisible();
     await expect(page.getByText('Autonomy proof evidence: Gain').first()).toBeVisible();
     await expect(page.getByText('dry_run_only').first()).toBeVisible();
@@ -1361,6 +1363,8 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('10 physical gaps').first()).toBeVisible();
     await expect(page.getByText('Gap surfaces').first()).toBeVisible();
     await expect(page.getByText('raw_mixer_state_cache +9').first()).toBeVisible();
+    await expect(page.getByText('Next read proof').first()).toBeVisible();
+    await expect(page.getByText('raw_mixer_state_cache', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Fixture tests').first()).toBeVisible();
     await expect(page.getByText('25 declared tests').first()).toBeVisible();
     await expect(page.getByText('Contract/gap gate').first()).toBeVisible();

@@ -1989,6 +1989,7 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
         "raw_mixer_state_cache",
         "channel_identity_and_basic_controls",
     ]
+    assert proof_quality["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
     overlay = payload["autonomy_evidence_overlay"]
     assert overlay["source_report_available"] is True
     assert overlay["source_report_path"] == str(latest_report)

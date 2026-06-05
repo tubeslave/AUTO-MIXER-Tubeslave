@@ -751,11 +751,15 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const contractGapConsistency = Boolean(proofQuality.contract_gap_consistency_enforced);
     const physicalGapSurfaceIds = stringList(proofQuality.physical_fixture_missing_surface_ids);
     const physicalGapSurfaceText = physicalGapSurfaceIds.join('|');
+    const nextPhysicalReadbackSurfaceId = str(
+      proofQuality.next_physical_readback_surface_id,
+      physicalGapSurfaceIds[0] ?? '',
+    );
     const freshnessText = available
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
@@ -779,6 +783,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `read_surface_quality:${proofQualityAvailable}`,
         `read_surface_gaps:${physicalGapSurfaceCount}`,
         `read_surface_gap_ids:${physicalGapSurfaceText}`,
+        `next_readback_target:${nextPhysicalReadbackSurfaceId}`,
         `fixture_tests:${declaredTestNameCount}`,
         `contract_gap:${contractGapConsistency}`,
       ],

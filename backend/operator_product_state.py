@@ -3495,6 +3495,7 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
     available = bool(read_surface)
     physical_missing = _string_list_value(read_surface.get("physical_fixture_missing_surface_ids"))
     physical_gap_count = _safe_int_value(read_surface.get("physical_gap_surface_count"), len(physical_missing))
+    next_physical_readback_surface_id = physical_missing[0] if physical_missing else None
     source_full_autonomous_ready = read_surface.get("full_autonomous_ready") is True
     return {
         "available": available,
@@ -3514,6 +3515,7 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
         "full_autonomous_ready": False,
         "source_full_autonomous_ready_claimed": source_full_autonomous_ready,
         "physical_fixture_missing_surface_ids": physical_missing,
+        "next_physical_readback_surface_id": next_physical_readback_surface_id,
         "violations": _string_list_value(read_surface.get("violations")),
     }
 
