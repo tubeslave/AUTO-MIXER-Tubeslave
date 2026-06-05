@@ -796,11 +796,29 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const channelProcessingContractEqBands = stringList(channelProcessingContract.required_eq_band_fields);
     const channelProcessingContractCompressor = stringList(channelProcessingContract.required_compressor_fields);
     const channelProcessingContractGate = stringList(channelProcessingContract.required_gate_fields);
+    const busMainDcaContract = asRecord(proofQuality.bus_group_main_dca_physical_readback_contract);
+    const busMainDcaContractAvailable = Boolean(busMainDcaContract.available);
+    const busMainDcaContractStatus = str(busMainDcaContract.contract_status, str(busMainDcaContract.status, 'missing'));
+    const busMainDcaContractSchemaId = str(busMainDcaContract.schema_id, '');
+    const busMainDcaContractSurfaceId = str(busMainDcaContract.surface_id, '');
+    const busMainDcaContractActionId = str(busMainDcaContract.remediation_action_id, '');
+    const busMainDcaContractPhysicalSurfaceId = str(busMainDcaContract.physical_readback_surface_id, '');
+    const busMainDcaContractPhysicalActionId = str(busMainDcaContract.physical_readback_action_id, '');
+    const busMainDcaContractGapRemains = busMainDcaContract.physical_fixture_gap_remains === true;
+    const busMainDcaContractLiveAuthority = busMainDcaContract.live_authority_granted === true;
+    const busMainDcaContractTargetConsistency = busMainDcaContract.target_consistency === true;
+    const busMainDcaContractPromotionFamilies = stringList(busMainDcaContract.promotion_families_requiring_surface);
+    const busMainDcaContractBusControls = stringList(busMainDcaContract.required_bus_control_fields);
+    const busMainDcaContractMainControls = stringList(busMainDcaContract.required_main_control_fields);
+    const busMainDcaContractDcaControls = stringList(busMainDcaContract.required_dca_control_fields);
+    const busMainDcaContractBusAssignments = stringList(busMainDcaContract.required_bus_assignment_fields);
+    const busMainDcaContractDcaAssignments = stringList(busMainDcaContract.required_dca_assignment_fields);
+    const busMainDcaContractMetering = stringList(busMainDcaContract.required_metering_fields);
     const freshnessText = available
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
@@ -847,6 +865,12 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `processing_contract_gap:${channelProcessingContractGapRemains}`,
         `processing_contract_live_authority:${channelProcessingContractLiveAuthority}`,
         `processing_contract_target_gate:${channelProcessingContractTargetConsistency}`,
+        `bus_contract_available:${busMainDcaContractAvailable}`,
+        `bus_contract_status:${busMainDcaContractStatus}`,
+        `bus_contract_schema:${busMainDcaContractSchemaId}`,
+        `bus_contract_gap:${busMainDcaContractGapRemains}`,
+        `bus_contract_live_authority:${busMainDcaContractLiveAuthority}`,
+        `bus_contract_target_gate:${busMainDcaContractTargetConsistency}`,
       ],
       blockedReason: available
         ? stale
@@ -987,6 +1011,58 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       tone: !channelProcessingContractAvailable || channelProcessingContractLiveAuthority || !channelProcessingContractTargetConsistency
         ? 'yellow'
         : channelProcessingContractGapRemains
+          ? 'yellow'
+          : 'green'
+    });
+    rows.push({
+      moduleId: 'bus_group_main_dca_physical_readback_contract',
+      label: 'Bus/main/DCA readback contract',
+      domain: 'read_surface_contract',
+      status: busMainDcaContractAvailable ? busMainDcaContractStatus || 'contract_available' : 'contract_missing',
+      entrypoint: 'bus_group_main_dca_physical_readback_contract',
+      module: busMainDcaContractActionId || 'no_contract_action',
+      uiSurface: 'Read-surface proof contract',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${busMainDcaContractAvailable}`,
+        `schema:${busMainDcaContractSchemaId}`,
+        `surface:${busMainDcaContractSurfaceId}`,
+        `physical_readback:${busMainDcaContractPhysicalSurfaceId}`,
+        `physical_action:${busMainDcaContractPhysicalActionId}`,
+        `physical_gap_remains:${busMainDcaContractGapRemains}`,
+        `live_authority:${busMainDcaContractLiveAuthority}`,
+        `target_consistency:${busMainDcaContractTargetConsistency}`,
+        `promotion_families:${busMainDcaContractPromotionFamilies.join('|')}`,
+        `bus_controls:${busMainDcaContractBusControls.join('|')}`,
+        `main_controls:${busMainDcaContractMainControls.join('|')}`,
+        `dca_controls:${busMainDcaContractDcaControls.join('|')}`,
+        `bus_assignments:${busMainDcaContractBusAssignments.join('|')}`,
+        `dca_assignments:${busMainDcaContractDcaAssignments.join('|')}`,
+        `metering:${busMainDcaContractMetering.join('|')}`,
+      ],
+      blockedReason: busMainDcaContractAvailable
+        ? busMainDcaContractGapRemains
+          ? 'Bus/group/main/DCA contract is present, but physical readback fixture evidence is still missing.'
+          : 'Bus/group/main/DCA contract is present; physical gap state must still be reviewed before promotion.'
+        : 'Bus/group/main/DCA physical readback contract is missing from proof summary.',
+      nextStep: busMainDcaContractAvailable
+        ? [
+            busMainDcaContractPhysicalSurfaceId ? `physical_readback:${busMainDcaContractPhysicalSurfaceId}` : '',
+            busMainDcaContractPhysicalActionId ? `physical_action:${busMainDcaContractPhysicalActionId}` : '',
+            busMainDcaContractPromotionFamilies.length ? `families:${busMainDcaContractPromotionFamilies.join(',')}` : '',
+            busMainDcaContractBusControls.length ? `bus_controls:${busMainDcaContractBusControls.join(',')}` : '',
+            busMainDcaContractMainControls.length ? `main_controls:${busMainDcaContractMainControls.join(',')}` : '',
+            busMainDcaContractDcaControls.length ? `dca_controls:${busMainDcaContractDcaControls.join(',')}` : '',
+            busMainDcaContractMetering.length ? `metering:${busMainDcaContractMetering.join(',')}` : '',
+            `physical_gap_remains:${busMainDcaContractGapRemains}`,
+            `live_authority:${busMainDcaContractLiveAuthority}`,
+            `target_consistency:${busMainDcaContractTargetConsistency}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with bus/group/main/DCA readback contract schema validation.',
+      tone: !busMainDcaContractAvailable || busMainDcaContractLiveAuthority || !busMainDcaContractTargetConsistency
+        ? 'yellow'
+        : busMainDcaContractGapRemains
           ? 'yellow'
           : 'green'
     });

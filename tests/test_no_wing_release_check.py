@@ -11,6 +11,7 @@ from tools.no_wing_release_check import (
     CommandCheck,
     autonomy_evidence_overlay_summary,
     autonomy_gap_rollup_summary,
+    bus_group_main_dca_readback_contract_summary,
     build_checks,
     channel_basic_controls_readback_contract_summary,
     channel_processing_readback_contract_summary,
@@ -26,6 +27,7 @@ from tools.no_wing_release_check import (
     supervised_gain_dry_run_summary,
     validate_repo_local_commands,
     validate_no_live_commands,
+    validate_bus_group_main_dca_physical_readback_contract_snapshot,
     validate_channel_basic_controls_physical_readback_contract_snapshot,
     validate_channel_processing_physical_readback_contract_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
@@ -611,6 +613,106 @@ def test_no_wing_release_check_rejects_channel_processing_contract_drift(monkeyp
     assert "channel_processing_promotion_family_missing:deessing" in result.detail["violations"]
 
 
+def test_no_wing_release_check_validates_bus_group_main_dca_readback_contract_snapshot():
+    result = validate_bus_group_main_dca_physical_readback_contract_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert result.detail["schema_id"] == "bus_group_main_dca_physical_readback.v1"
+    assert result.detail["surface_id"] == "bus_group_main_dca_state"
+    assert result.detail["remediation_action_id"] == "remediate_bus_group_main_dca_state"
+    assert result.detail["physical_readback_surface_id"] == "bus_group_main_dca_state"
+    assert result.detail["physical_readback_action_id"] == "remediate_bus_group_main_dca_state"
+    assert result.detail["fixture_physical_gap_declared"] is True
+    assert result.detail["remediation_physical_gap_declared"] is True
+    assert result.detail["artifact_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert "physical_readback" in result.detail["allowed_sources"]
+    assert "mixer_state_cache" not in result.detail["allowed_sources"]
+    assert "verified_from_physical_readback" in result.detail["accepted_surface_statuses"]
+    assert "dca_write_events" in result.detail["forbidden_mutation_evidence_fields"]
+    assert result.detail["required_bus_control_fields"] == [
+        "fader_db",
+        "mute",
+        "pan",
+        "width",
+        "mono",
+    ]
+    assert "true_peak_dbtp" in result.detail["required_metering_fields"]
+    assert "member_buses" in result.detail["required_dca_assignment_fields"]
+    assert result.detail["minimum_bus_count"] == 1
+    assert result.detail["minimum_main_count"] == 1
+    assert result.detail["minimum_dca_count"] == 1
+    assert result.detail["promotion_families_requiring_surface"][:3] == [
+        "bus_group_matrix",
+        "dca",
+        "master_bus",
+    ]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_bus_group_main_dca_contract_drift(monkeypatch):
+    contract = release_check.build_bus_group_main_dca_physical_readback_contract()
+    corrupted = json.loads(json.dumps(contract))
+    corrupted["schema_id"] = "bus_group_main_dca_physical_readback.v0"
+    corrupted["surface_id"] = "raw_mixer_state_cache"
+    corrupted["safety"]["live_write"] = True
+    corrupted["artifact_contract"]["required_top_level_fields"] = ["type"]
+    corrupted["artifact_contract"]["required_bus_control_fields"] = ["fader_db"]
+    corrupted["artifact_contract"]["required_metering_fields"] = ["lufs"]
+    corrupted["artifact_contract"]["minimum_bus_count"] = 0
+    corrupted["artifact_contract"]["allowed_sources"].append("mixer_state_cache")
+    corrupted["artifact_contract"]["accepted_surface_statuses"] = ["verified_from_cache"]
+    corrupted["artifact_contract"]["forbidden_mutation_evidence_fields"] = []
+    corrupted["summary"]["physical_readback_surface_id"] = "dlive_state"
+    corrupted["summary"]["live_authority_granted"] = True
+    corrupted["summary"]["promotion_families_requiring_surface"] = ["dca"]
+
+    monkeypatch.setattr(
+        release_check,
+        "build_bus_group_main_dca_physical_readback_contract",
+        lambda: corrupted,
+    )
+
+    result = validate_bus_group_main_dca_physical_readback_contract_snapshot()
+
+    assert result.status == "failed"
+    assert "bus_group_main_dca_readback_contract_schema_id_mismatch" in result.detail["violations"]
+    assert "bus_group_main_dca_readback_contract_surface_id_mismatch" in result.detail["violations"]
+    assert "bus_group_main_dca_readback_contract_live_write_not_false" in result.detail["violations"]
+    assert (
+        "bus_group_main_dca_readback_required_top_level_fields_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "bus_group_main_dca_readback_required_bus_control_fields_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "bus_group_main_dca_readback_required_metering_fields_mismatch"
+        in result.detail["violations"]
+    )
+    assert "bus_group_main_dca_readback_artifact_minimum_bus_count_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "bus_group_main_dca_readback_allowed_sources_mismatch" in result.detail["violations"]
+    assert "bus_group_main_dca_readback_allows_cached_source" in result.detail["violations"]
+    assert "bus_group_main_dca_readback_accepted_statuses_mismatch" in result.detail["violations"]
+    assert "bus_group_main_dca_readback_forbidden_mutation_fields_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "bus_group_main_dca_contract_surface_summary_mismatch" in result.detail["violations"]
+    assert "bus_group_main_dca_contract_live_authority_not_false" in result.detail["violations"]
+    assert "bus_group_main_dca_promotion_family_missing:bus_group_matrix" in result.detail[
+        "violations"
+    ]
+    assert "bus_group_main_dca_promotion_family_missing:master_bus" in result.detail[
+        "violations"
+    ]
+
+
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_frontend=False, quick=True)
 
@@ -645,6 +747,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "tests/test_raw_mixer_state_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_channel_basic_controls_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_channel_processing_physical_readback_contract.py" in fixture_check.command
+    assert "tests/test_bus_group_main_dca_physical_readback_contract.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command
@@ -1113,6 +1216,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "raw_mixer_state_physical_readback_contract_schema" in result_names
     assert "channel_basic_controls_physical_readback_contract_schema" in result_names
     assert "channel_processing_physical_readback_contract_schema" in result_names
+    assert "bus_group_main_dca_physical_readback_contract_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
@@ -1133,6 +1237,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "channel_processing_physical_readback_contract_schema"
     )
     assert result_names.index("channel_processing_physical_readback_contract_schema") < result_names.index(
+        "bus_group_main_dca_physical_readback_contract_schema"
+    )
+    assert result_names.index("bus_group_main_dca_physical_readback_contract_schema") < result_names.index(
         "backend_pytest"
     )
     assert result_names.index("supervised_proof_artifact_report") < result_names.index(
@@ -2132,6 +2239,118 @@ def test_no_wing_release_check_summary_embeds_channel_processing_readback_contra
     assert "physical_fixture_gap_remains: `true`" in markdown_summary
     assert "live_authority_granted: `false`" in markdown_summary
     assert "minimum_eq_band_count: `4`" in markdown_summary
+    assert "target_consistency: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_bus_group_main_dca_readback_contract(tmp_path):
+    result = CheckResult(
+        name="bus_group_main_dca_physical_readback_contract_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "contract_status": "contract_ready_physical_fixture_missing",
+            "schema_id": "bus_group_main_dca_physical_readback.v1",
+            "surface_id": "bus_group_main_dca_state",
+            "remediation_action_id": "remediate_bus_group_main_dca_state",
+            "physical_readback_surface_id": "bus_group_main_dca_state",
+            "physical_readback_action_id": "remediate_bus_group_main_dca_state",
+            "fixture_physical_gap_declared": True,
+            "remediation_physical_gap_declared": True,
+            "artifact_required": True,
+            "physical_fixture_gap_remains": True,
+            "accepted_as_physical_fixture_candidate": False,
+            "live_authority_granted": False,
+            "promotion_families_requiring_surface": [
+                "bus_group_matrix",
+                "dca",
+                "master_bus",
+            ],
+            "required_top_level_field_count": 14,
+            "required_bus_field_count": 9,
+            "required_main_field_count": 8,
+            "required_dca_field_count": 8,
+            "required_bus_control_fields": ["fader_db", "mute", "pan", "width", "mono"],
+            "required_main_control_fields": ["fader_db", "mute", "pan"],
+            "required_dca_control_fields": ["fader_db", "mute", "monitor"],
+            "required_bus_assignment_fields": [
+                "dca_assignments",
+                "main_send_on",
+                "main_send_level_db",
+                "main_send_pre",
+            ],
+            "required_dca_assignment_fields": ["member_channels", "member_buses"],
+            "required_metering_fields": ["lufs", "true_peak_dbtp", "headroom_db"],
+            "required_bus_coverage_flags": [
+                "controls",
+                "assignments",
+                "metering",
+                "cache_matches_physical_readback",
+            ],
+            "required_main_coverage_flags": [
+                "controls",
+                "metering",
+                "cache_matches_physical_readback",
+            ],
+            "required_dca_coverage_flags": [
+                "identity",
+                "controls",
+                "assignments",
+                "cache_matches_physical_readback",
+            ],
+            "required_false_safety_flags": [
+                "live_write",
+                "mutates_console_state",
+                "live_widening_allowed",
+                "full_autonomous_ready",
+            ],
+            "minimum_bus_count": 1,
+            "minimum_main_count": 1,
+            "minimum_dca_count": 1,
+            "allowed_sources": ["physical_readback", "wing_physical_readback"],
+            "accepted_surface_statuses": ["verified_from_physical_readback"],
+            "forbidden_mutation_evidence_fields": ["manual_write_events", "dca_write_events"],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert bus_group_main_dca_readback_contract_summary([result]) == summary[
+        "bus_group_main_dca_physical_readback_contract"
+    ]
+    contract = json_summary["bus_group_main_dca_physical_readback_contract"]
+    assert contract["read_only"] is True
+    assert contract["live_write"] is False
+    assert contract["mutates_console_state"] is False
+    assert contract["queries_console"] is False
+    assert contract["executes_tests"] is False
+    assert contract["full_autonomous_ready"] is False
+    assert contract["artifact_required"] is True
+    assert contract["physical_fixture_gap_remains"] is True
+    assert contract["accepted_as_physical_fixture_candidate"] is False
+    assert contract["live_authority_granted"] is False
+    assert contract["target_consistency"] is True
+    assert contract["surface_id"] == "bus_group_main_dca_state"
+    assert contract["remediation_action_id"] == "remediate_bus_group_main_dca_state"
+    assert contract["promotion_families_requiring_surface"] == [
+        "bus_group_matrix",
+        "dca",
+        "master_bus",
+    ]
+    assert contract["required_bus_control_fields"] == ["fader_db", "mute", "pan", "width", "mono"]
+    assert "true_peak_dbtp" in contract["required_metering_fields"]
+    assert "member_buses" in contract["required_dca_assignment_fields"]
+    assert contract["minimum_bus_count"] == 1
+    assert contract["minimum_main_count"] == 1
+    assert contract["minimum_dca_count"] == 1
+    assert "## Bus Group Main DCA Physical Readback Contract" in markdown_summary
+    assert "physical_fixture_gap_remains: `true`" in markdown_summary
+    assert "live_authority_granted: `false`" in markdown_summary
+    assert "minimum_bus_count: `1`" in markdown_summary
     assert "target_consistency: `true`" in markdown_summary
 
 

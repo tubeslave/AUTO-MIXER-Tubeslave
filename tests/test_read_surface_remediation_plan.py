@@ -84,6 +84,17 @@ def test_plan_creates_actions_for_current_partial_and_missing_read_surfaces():
     )
     assert channel_basic["mutates_console_state"] is False
 
+    bus_group_main_dca = actions["bus_group_main_dca_state"]
+    assert bus_group_main_dca["action_type"] == "complete_read_dto"
+    assert bus_group_main_dca["physical_readback_gap"] is True
+    assert bus_group_main_dca["next_physical_readback_target"] is False
+    assert "physical_readback_fixture" in bus_group_main_dca["missing_contracts"]
+    assert any(
+        "bus_group_main_dca_physical_readback_contract" in artifact
+        for artifact in bus_group_main_dca["expected_artifacts"]
+    )
+    assert bus_group_main_dca["mutates_console_state"] is False
+
     presets = actions["user_presets"]
     assert presets["action_type"] == "complete_read_dto"
     assert "enumeration_contract" in presets["missing_contracts"]

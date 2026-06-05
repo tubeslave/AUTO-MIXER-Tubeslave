@@ -2065,6 +2065,72 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "bus_group_main_dca_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "bus_group_main_dca_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "bus_group_main_dca_state",
+                    "remediation_action_id": "remediate_bus_group_main_dca_state",
+                    "physical_readback_surface_id": "bus_group_main_dca_state",
+                    "physical_readback_action_id": "remediate_bus_group_main_dca_state",
+                    "fixture_physical_gap_declared": True,
+                    "remediation_physical_gap_declared": True,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "bus_group_matrix",
+                        "dca",
+                        "master_bus",
+                    ],
+                    "required_bus_control_fields": ["fader_db", "mute", "pan", "width", "mono"],
+                    "required_main_control_fields": ["fader_db", "mute", "pan"],
+                    "required_dca_control_fields": ["fader_db", "mute", "monitor"],
+                    "required_bus_assignment_fields": [
+                        "dca_assignments",
+                        "main_send_on",
+                        "main_send_level_db",
+                        "main_send_pre",
+                    ],
+                    "required_dca_assignment_fields": ["member_channels", "member_buses"],
+                    "required_metering_fields": ["lufs", "true_peak_dbtp", "headroom_db"],
+                    "required_bus_coverage_flags": [
+                        "controls",
+                        "assignments",
+                        "metering",
+                        "cache_matches_physical_readback",
+                    ],
+                    "required_main_coverage_flags": [
+                        "controls",
+                        "metering",
+                        "cache_matches_physical_readback",
+                    ],
+                    "required_dca_coverage_flags": [
+                        "identity",
+                        "controls",
+                        "assignments",
+                        "cache_matches_physical_readback",
+                    ],
+                    "minimum_bus_count": 1,
+                    "minimum_main_count": 1,
+                    "minimum_dca_count": 1,
+                    "allowed_sources": ["physical_readback", "wing_physical_readback"],
+                    "accepted_surface_statuses": ["verified_from_physical_readback"],
+                    "forbidden_mutation_evidence_fields": [
+                        "manual_write_events",
+                        "dca_write_events",
+                    ],
+                    "violations": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -2179,6 +2245,40 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert "cache_matches_physical_readback" in processing_contract["required_coverage_flags"]
     assert "physical_readback" in processing_contract["allowed_sources"]
     assert "eq_write_events" in processing_contract["forbidden_mutation_evidence_fields"]
+    bus_contract = proof_quality["bus_group_main_dca_physical_readback_contract"]
+    assert bus_contract["available"] is True
+    assert bus_contract["status"] == "passed"
+    assert bus_contract["schema_id"] == "bus_group_main_dca_physical_readback.v1"
+    assert bus_contract["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert bus_contract["surface_id"] == "bus_group_main_dca_state"
+    assert bus_contract["remediation_action_id"] == "remediate_bus_group_main_dca_state"
+    assert bus_contract["artifact_required"] is True
+    assert bus_contract["physical_fixture_gap_remains"] is True
+    assert bus_contract["accepted_as_physical_fixture_candidate"] is False
+    assert bus_contract["live_authority_granted"] is False
+    assert bus_contract["full_autonomous_ready"] is False
+    assert bus_contract["fixture_physical_gap_declared"] is True
+    assert bus_contract["remediation_physical_gap_declared"] is True
+    assert bus_contract["target_consistency"] is True
+    assert bus_contract["promotion_families_requiring_surface"] == [
+        "bus_group_matrix",
+        "dca",
+        "master_bus",
+    ]
+    assert bus_contract["required_bus_control_fields"] == [
+        "fader_db",
+        "mute",
+        "pan",
+        "width",
+        "mono",
+    ]
+    assert "true_peak_dbtp" in bus_contract["required_metering_fields"]
+    assert "member_buses" in bus_contract["required_dca_assignment_fields"]
+    assert bus_contract["minimum_bus_count"] == 1
+    assert bus_contract["minimum_main_count"] == 1
+    assert bus_contract["minimum_dca_count"] == 1
+    assert "physical_readback" in bus_contract["allowed_sources"]
+    assert "dca_write_events" in bus_contract["forbidden_mutation_evidence_fields"]
     overlay = payload["autonomy_evidence_overlay"]
     assert overlay["source_report_available"] is True
     assert overlay["source_report_path"] == str(latest_report)
@@ -2308,6 +2408,42 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["processing_contract_claimed_live_authority"],
                 },
+                "bus_group_main_dca_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "bus_group_main_dca_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "physical_readback_surface_id": "dlive_state",
+                    "physical_readback_action_id": "remediate_dlive_state",
+                    "fixture_physical_gap_declared": False,
+                    "remediation_physical_gap_declared": False,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "target_consistency": False,
+                    "promotion_families_requiring_surface": ["dca"],
+                    "required_bus_control_fields": ["fader_db"],
+                    "required_main_control_fields": ["fader_db"],
+                    "required_dca_control_fields": ["fader_db"],
+                    "required_bus_assignment_fields": ["dca_assignments"],
+                    "required_dca_assignment_fields": ["member_channels"],
+                    "required_metering_fields": ["lufs"],
+                    "required_bus_coverage_flags": [],
+                    "required_main_coverage_flags": [],
+                    "required_dca_coverage_flags": [],
+                    "minimum_bus_count": 0,
+                    "minimum_main_count": 0,
+                    "minimum_dca_count": 0,
+                    "allowed_sources": ["physical_readback", "mixer_state_cache"],
+                    "accepted_surface_statuses": ["verified_from_cache"],
+                    "forbidden_mutation_evidence_fields": [],
+                    "violations": ["bus_contract_claimed_live_authority"],
+                },
             }
         ),
         encoding="utf-8",
@@ -2372,6 +2508,27 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert processing_contract["promotion_families_requiring_surface"] == ["eq"]
     assert processing_contract["minimum_eq_band_count"] == 2
     assert "processing_contract_claimed_live_authority" in processing_contract["violations"]
+    bus_contract = payload["summary"]["read_surface_proof_quality"][
+        "bus_group_main_dca_physical_readback_contract"
+    ]
+    assert bus_contract["available"] is True
+    assert bus_contract["surface_id"] == "dlive_state"
+    assert bus_contract["physical_readback_surface_id"] == "dlive_state"
+    assert bus_contract["target_consistency"] is False
+    assert bus_contract["accepted_as_physical_fixture_candidate"] is False
+    assert bus_contract["read_only"] is True
+    assert bus_contract["live_write"] is False
+    assert bus_contract["live_authority_granted"] is False
+    assert bus_contract["full_autonomous_ready"] is False
+    assert bus_contract["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert bus_contract["source_live_write_claimed"] is True
+    assert bus_contract["source_live_authority_granted_claimed"] is True
+    assert bus_contract["source_full_autonomous_ready_claimed"] is True
+    assert bus_contract["promotion_families_requiring_surface"] == ["dca"]
+    assert bus_contract["minimum_bus_count"] == 0
+    assert bus_contract["minimum_main_count"] == 0
+    assert bus_contract["minimum_dca_count"] == 0
+    assert "bus_contract_claimed_live_authority" in bus_contract["violations"]
     assert "set_gain" not in set(_walk_keys(payload))
 
 

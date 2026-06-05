@@ -91,6 +91,14 @@ def test_read_surface_fixture_evidence_snapshot_tracks_cached_dto_fixtures_only(
     assert "bus_main_dca_cache_freshness" in surfaces["bus_group_main_dca_state"]["covered_contracts"]
     assert "stale_cache_detection" in surfaces["bus_group_main_dca_state"]["covered_contracts"]
     assert (
+        "physical_readback_artifact_contract"
+        in surfaces["bus_group_main_dca_state"]["covered_contracts"]
+    )
+    assert (
+        "test_bus_group_main_dca_contract_validates_minimal_physical_artifact"
+        in surfaces["bus_group_main_dca_state"]["test_names"]
+    )
+    assert (
         "per_field_stale_cache_fixture_incomplete"
         not in surfaces["bus_group_main_dca_state"]["remaining_gaps"]
     )
@@ -187,10 +195,12 @@ def test_console_read_goal_references_fixture_evidence_without_widening_live_sco
     assert "raw_mixer_state_physical_readback_contract" in row.method_ids
     assert "channel_basic_controls_physical_readback_contract" in row.method_ids
     assert "channel_processing_physical_readback_contract" in row.method_ids
+    assert "bus_group_main_dca_physical_readback_contract" in row.method_ids
     assert "backend/read_surface_fixture_evidence.py" in row.support_paths
     assert "backend/raw_mixer_state_physical_readback_contract.py" in row.support_paths
     assert "backend/channel_basic_controls_physical_readback_contract.py" in row.support_paths
     assert "backend/channel_processing_physical_readback_contract.py" in row.support_paths
+    assert "backend/bus_group_main_dca_physical_readback_contract.py" in row.support_paths
     assert row.current_live_write_kinds == ()
     assert "physical fixtures" in row.next_step
 

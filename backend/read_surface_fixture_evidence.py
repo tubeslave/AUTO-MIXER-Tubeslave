@@ -113,15 +113,22 @@ FIXTURE_EVIDENCE_BY_SURFACE: Dict[str, Dict[str, Tuple[str, ...]]] = {
         ),
     },
     "bus_group_main_dca_state": {
-        "fixture_paths": ("tests/test_operator_product_state.py",),
+        "fixture_paths": (
+            "tests/test_operator_product_state.py",
+            "tests/test_bus_group_main_dca_physical_readback_contract.py",
+        ),
         "test_names": (
             "test_bus_main_dca_snapshot_publishes_cached_console_surfaces_without_queries",
             "test_bus_main_dca_snapshot_marks_missing_cache_without_queries",
+            "test_bus_group_main_dca_contract_describes_future_physical_artifact",
+            "test_bus_group_main_dca_contract_validates_minimal_physical_artifact",
+            "test_bus_group_main_dca_contract_rejects_live_or_cached_claims",
         ),
         "covered_contracts": (
             "cached_bus_main_dca_state",
             "bus_main_dca_cache_freshness",
             "stale_cache_detection",
+            "physical_readback_artifact_contract",
             "coverage_flags",
             "no_console_query",
         ),

@@ -12,6 +12,10 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Mapping, Tuple
 
 try:
+    from bus_group_main_dca_physical_readback_contract import (
+        BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        BUS_GROUP_MAIN_DCA_SURFACE_ID,
+    )
     from channel_basic_controls_physical_readback_contract import (
         CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         CHANNEL_BASIC_CONTROLS_SURFACE_ID,
@@ -27,6 +31,10 @@ try:
         RAW_MIXER_STATE_SURFACE_ID,
     )
 except ImportError:  # pragma: no cover - package import compatibility
+    from backend.bus_group_main_dca_physical_readback_contract import (
+        BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        BUS_GROUP_MAIN_DCA_SURFACE_ID,
+    )
     from backend.channel_basic_controls_physical_readback_contract import (
         CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         CHANNEL_BASIC_CONTROLS_SURFACE_ID,
@@ -193,6 +201,11 @@ def _expected_artifacts(surface: ReadSurface, *, physical_readback_gap: bool) ->
             artifacts.append(
                 "Channel HPF/EQ/dynamics/gate physical readback artifact validated by "
                 f"{CHANNEL_PROCESSING_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
+            )
+        if surface.id == BUS_GROUP_MAIN_DCA_SURFACE_ID:
+            artifacts.append(
+                "Bus/group/main/DCA physical readback artifact validated by "
+                f"{BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
             )
     return tuple(artifacts)
 

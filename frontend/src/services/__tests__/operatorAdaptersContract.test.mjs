@@ -635,6 +635,37 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             minimum_eq_band_count: 4,
             violations: [],
           },
+          bus_group_main_dca_physical_readback_contract: {
+            available: true,
+            status: 'passed',
+            schema_id: 'bus_group_main_dca_physical_readback.v1',
+            contract_status: 'contract_ready_physical_fixture_missing',
+            surface_id: 'bus_group_main_dca_state',
+            remediation_action_id: 'remediate_bus_group_main_dca_state',
+            artifact_required: true,
+            physical_fixture_gap_remains: true,
+            accepted_as_physical_fixture_candidate: false,
+            read_only: true,
+            live_write: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            target_consistency: true,
+            physical_readback_surface_id: 'bus_group_main_dca_state',
+            physical_readback_action_id: 'remediate_bus_group_main_dca_state',
+            fixture_physical_gap_declared: true,
+            remediation_physical_gap_declared: true,
+            promotion_families_requiring_surface: ['bus_group_matrix', 'dca', 'master_bus'],
+            required_bus_control_fields: ['fader_db', 'mute', 'pan', 'width', 'mono'],
+            required_main_control_fields: ['fader_db', 'mute', 'pan'],
+            required_dca_control_fields: ['fader_db', 'mute', 'monitor'],
+            required_bus_assignment_fields: ['dca_assignments', 'main_send_on', 'main_send_level_db', 'main_send_pre'],
+            required_dca_assignment_fields: ['member_channels', 'member_buses'],
+            required_metering_fields: ['lufs', 'true_peak_dbtp', 'headroom_db'],
+            allowed_sources: ['physical_readback', 'wing_physical_readback'],
+            accepted_surface_statuses: ['verified_from_physical_readback'],
+            forbidden_mutation_evidence_fields: ['manual_write_events', 'dca_write_events'],
+            violations: [],
+          },
         },
       },
     },
@@ -719,6 +750,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'raw_mixer_state_physical_readback_contract',
       'channel_basic_controls_physical_readback_contract',
       'channel_processing_physical_readback_contract',
+      'bus_group_main_dca_physical_readback_contract',
       'read_surface_remediation_plan',
       'autonomy_evidence:fader_supervised_promotion',
       'autonomy_evidence:gain_trim_supervised_promotion',
@@ -826,6 +858,12 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'processing_contract_gap:true',
     'processing_contract_live_authority:false',
     'processing_contract_target_gate:true',
+    'bus_contract_available:true',
+    'bus_contract_status:contract_ready_physical_fixture_missing',
+    'bus_contract_schema:bus_group_main_dca_physical_readback.v1',
+    'bus_contract_gap:true',
+    'bus_contract_live_authority:false',
+    'bus_contract_target_gate:true',
   ]);
   assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
   assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
@@ -850,6 +888,10 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /processing_contract_gap:true/);
   assert.match(proofEvidence.nextStep, /processing_contract_live_authority:false/);
   assert.match(proofEvidence.nextStep, /processing_contract_target_gate:true/);
+  assert.match(proofEvidence.nextStep, /bus_contract:contract_ready_physical_fixture_missing/);
+  assert.match(proofEvidence.nextStep, /bus_contract_gap:true/);
+  assert.match(proofEvidence.nextStep, /bus_contract_live_authority:false/);
+  assert.match(proofEvidence.nextStep, /bus_contract_target_gate:true/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
 
   const rawMixerContract = rows.find(row => row.moduleId === 'raw_mixer_state_physical_readback_contract');
@@ -935,6 +977,42 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(channelProcessingContract.nextStep, /gate:enabled,model,range_db/);
   assert.match(channelProcessingContract.nextStep, /live_authority:false/);
   assert.match(channelProcessingContract.nextStep, /target_consistency:true/);
+
+  const busMainDcaContract = rows.find(row => row.moduleId === 'bus_group_main_dca_physical_readback_contract');
+  assert.equal(busMainDcaContract.domain, 'read_surface_contract');
+  assert.equal(busMainDcaContract.canWriteLive, false);
+  assert.deepEqual(busMainDcaContract.liveWriteKinds, []);
+  assert.equal(busMainDcaContract.status, 'contract_ready_physical_fixture_missing');
+  assert.equal(busMainDcaContract.entrypoint, 'bus_group_main_dca_physical_readback_contract');
+  assert.equal(busMainDcaContract.module, 'remediate_bus_group_main_dca_state');
+  assert.equal(busMainDcaContract.tone, 'yellow');
+  assert.deepEqual(busMainDcaContract.pipelineProfiles, [
+    'available:true',
+    'schema:bus_group_main_dca_physical_readback.v1',
+    'surface:bus_group_main_dca_state',
+    'physical_readback:bus_group_main_dca_state',
+    'physical_action:remediate_bus_group_main_dca_state',
+    'physical_gap_remains:true',
+    'live_authority:false',
+    'target_consistency:true',
+    'promotion_families:bus_group_matrix|dca|master_bus',
+    'bus_controls:fader_db|mute|pan|width|mono',
+    'main_controls:fader_db|mute|pan',
+    'dca_controls:fader_db|mute|monitor',
+    'bus_assignments:dca_assignments|main_send_on|main_send_level_db|main_send_pre',
+    'dca_assignments:member_channels|member_buses',
+    'metering:lufs|true_peak_dbtp|headroom_db',
+  ]);
+  assert.match(busMainDcaContract.blockedReason, /physical readback fixture evidence is still missing/);
+  assert.match(busMainDcaContract.nextStep, /physical_readback:bus_group_main_dca_state/);
+  assert.match(busMainDcaContract.nextStep, /physical_action:remediate_bus_group_main_dca_state/);
+  assert.match(busMainDcaContract.nextStep, /families:bus_group_matrix,dca,master_bus/);
+  assert.match(busMainDcaContract.nextStep, /bus_controls:fader_db,mute,pan,width,mono/);
+  assert.match(busMainDcaContract.nextStep, /main_controls:fader_db,mute,pan/);
+  assert.match(busMainDcaContract.nextStep, /dca_controls:fader_db,mute,monitor/);
+  assert.match(busMainDcaContract.nextStep, /metering:lufs,true_peak_dbtp,headroom_db/);
+  assert.match(busMainDcaContract.nextStep, /live_authority:false/);
+  assert.match(busMainDcaContract.nextStep, /target_consistency:true/);
 
   const readRemediation = rows.find(row => row.moduleId === 'read_surface_remediation_plan');
   assert.equal(readRemediation.domain, 'read_surface_remediation');
@@ -1099,7 +1177,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 4);
+  assert.equal(rows.length, 5);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -1139,6 +1217,12 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'processing_contract_gap:false',
     'processing_contract_live_authority:false',
     'processing_contract_target_gate:false',
+    'bus_contract_available:false',
+    'bus_contract_status:missing',
+    'bus_contract_schema:',
+    'bus_contract_gap:false',
+    'bus_contract_live_authority:false',
+    'bus_contract_target_gate:false',
   ]);
 
   assert.equal(rows[1].moduleId, 'raw_mixer_state_physical_readback_contract');
@@ -1161,6 +1245,13 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.equal(rows[3].canWriteLive, false);
   assert.deepEqual(rows[3].liveWriteKinds, []);
   assert.match(rows[3].blockedReason, /contract is missing/);
+
+  assert.equal(rows[4].moduleId, 'bus_group_main_dca_physical_readback_contract');
+  assert.equal(rows[4].domain, 'read_surface_contract');
+  assert.equal(rows[4].status, 'contract_missing');
+  assert.equal(rows[4].canWriteLive, false);
+  assert.deepEqual(rows[4].liveWriteKinds, []);
+  assert.match(rows[4].blockedReason, /contract is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {
