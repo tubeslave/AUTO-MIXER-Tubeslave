@@ -2383,6 +2383,50 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "matrix_state_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "matrix_state_physical_readback.v1",
+                    "intake_status": "operator_artifact_missing",
+                    "surface_id": "matrix_state",
+                    "remediation_action_id": "remediate_matrix_state",
+                    "required_contract_method_id": "matrix_state_physical_readback_contract",
+                    "artifact_search_roots": [
+                        "artifacts/read_surface_physical_readback/matrix_state",
+                    ],
+                    "artifact_count": 0,
+                    "valid_candidate_count": 0,
+                    "invalid_candidate_count": 0,
+                    "valid_matrix_count": 0,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "operator_review_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "fixture_closure_allowed_by_intake": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "operator_required": True,
+                    "execution_allowed_by_intake": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "bus_group_matrix",
+                        "fx_send_insert",
+                        "master_bus",
+                        "mix_balance",
+                        "routing",
+                        "performance_adaptation",
+                    ],
+                    "blocked_by": [
+                        "operator_must_capture_matrix_state_physical_readback_artifact",
+                    ],
+                    "artifact_source_ids": [],
+                    "intake_violations": [],
+                    "violations": [],
+                },
                 "fx_slots_inserts_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "fx_slots_inserts_physical_readback.v1",
@@ -3036,6 +3080,36 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert matrix_contract["minimum_eq_band_count"] == 8
     assert "physical_readback" in matrix_contract["allowed_sources"]
     assert "matrix_write_events" in matrix_contract["forbidden_mutation_evidence_fields"]
+    matrix_intake = proof_quality["matrix_state_physical_readback_artifact_intake"]
+    assert matrix_intake["available"] is True
+    assert matrix_intake["status"] == "passed"
+    assert matrix_intake["schema_id"] == "matrix_state_physical_readback.v1"
+    assert matrix_intake["intake_status"] == "operator_artifact_missing"
+    assert matrix_intake["surface_id"] == "matrix_state"
+    assert matrix_intake["remediation_action_id"] == "remediate_matrix_state"
+    assert matrix_intake["required_contract_method_id"] == "matrix_state_physical_readback_contract"
+    assert matrix_intake["artifact_count"] == 0
+    assert matrix_intake["valid_candidate_count"] == 0
+    assert matrix_intake["invalid_candidate_count"] == 0
+    assert matrix_intake["valid_matrix_count"] == 0
+    assert matrix_intake["accepted_as_physical_fixture_candidate"] is False
+    assert matrix_intake["operator_review_required"] is True
+    assert matrix_intake["physical_fixture_gap_remains"] is True
+    assert matrix_intake["fixture_closure_allowed_by_intake"] is False
+    assert matrix_intake["live_authority_granted"] is False
+    assert matrix_intake["full_autonomous_ready"] is False
+    assert matrix_intake["target_consistency"] is True
+    assert matrix_intake["promotion_families_requiring_surface"] == [
+        "bus_group_matrix",
+        "fx_send_insert",
+        "master_bus",
+        "mix_balance",
+        "routing",
+        "performance_adaptation",
+    ]
+    assert "operator_must_capture_matrix_state_physical_readback_artifact" in matrix_intake[
+        "blocked_by"
+    ]
     fx_contract = proof_quality["fx_slots_inserts_physical_readback_contract"]
     assert fx_contract["available"] is True
     assert fx_contract["status"] == "passed"
@@ -3577,6 +3651,41 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["matrix_contract_claimed_live_authority"],
                 },
+                "matrix_state_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "matrix_state_physical_readback.v1",
+                    "intake_status": "valid_operator_artifact_available",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "required_contract_method_id": "matrix_state_physical_readback_contract",
+                    "artifact_search_roots": [
+                        "artifacts/read_surface_physical_readback/matrix_state",
+                    ],
+                    "artifact_count": 1,
+                    "valid_candidate_count": 1,
+                    "invalid_candidate_count": 0,
+                    "valid_matrix_count": 8,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "operator_review_required": False,
+                    "physical_fixture_gap_remains": False,
+                    "fixture_closure_allowed_by_intake": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "mutates_console_state": True,
+                    "queries_console": True,
+                    "executes_tests": True,
+                    "operator_required": False,
+                    "execution_allowed_by_intake": True,
+                    "live_widening_allowed": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "target_consistency": False,
+                    "promotion_families_requiring_surface": ["routing"],
+                    "blocked_by": [],
+                    "artifact_source_ids": ["unsafe-matrix.json"],
+                    "intake_violations": [],
+                    "violations": ["matrix_intake_claimed_live_authority"],
+                },
                 "fx_slots_inserts_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "fx_slots_inserts_physical_readback.v1",
@@ -3959,6 +4068,37 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert matrix_contract["minimum_matrix_count"] == 0
     assert matrix_contract["minimum_eq_band_count"] == 2
     assert "matrix_contract_claimed_live_authority" in matrix_contract["violations"]
+    matrix_intake = payload["summary"]["read_surface_proof_quality"][
+        "matrix_state_physical_readback_artifact_intake"
+    ]
+    assert matrix_intake["available"] is True
+    assert matrix_intake["surface_id"] == "matrix_state"
+    assert matrix_intake["source_surface_id"] == "dlive_state"
+    assert matrix_intake["remediation_action_id"] == "remediate_matrix_state"
+    assert matrix_intake["source_remediation_action_id"] == "remediate_dlive_state"
+    assert matrix_intake["target_consistency"] is False
+    assert matrix_intake["artifact_count"] == 1
+    assert matrix_intake["valid_candidate_count"] == 1
+    assert matrix_intake["invalid_candidate_count"] == 0
+    assert matrix_intake["valid_matrix_count"] == 8
+    assert matrix_intake["accepted_as_physical_fixture_candidate"] is False
+    assert matrix_intake["operator_review_required"] is True
+    assert matrix_intake["physical_fixture_gap_remains"] is True
+    assert matrix_intake["fixture_closure_allowed_by_intake"] is False
+    assert matrix_intake["read_only"] is True
+    assert matrix_intake["live_write"] is False
+    assert matrix_intake["live_authority_granted"] is False
+    assert matrix_intake["full_autonomous_ready"] is False
+    assert matrix_intake["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert matrix_intake["source_operator_review_required_claimed"] is False
+    assert matrix_intake["source_physical_fixture_gap_remains_claimed"] is False
+    assert matrix_intake["source_fixture_closure_allowed_by_intake_claimed"] is True
+    assert matrix_intake["source_execution_allowed_by_intake_claimed"] is True
+    assert matrix_intake["source_live_write_claimed"] is True
+    assert matrix_intake["source_live_authority_granted_claimed"] is True
+    assert matrix_intake["source_full_autonomous_ready_claimed"] is True
+    assert matrix_intake["promotion_families_requiring_surface"] == ["routing"]
+    assert "matrix_intake_claimed_live_authority" in matrix_intake["violations"]
     fx_contract = payload["summary"]["read_surface_proof_quality"][
         "fx_slots_inserts_physical_readback_contract"
     ]

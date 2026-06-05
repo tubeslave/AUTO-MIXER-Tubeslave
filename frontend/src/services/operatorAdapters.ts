@@ -922,6 +922,25 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const matrixStateContractDynamics = stringList(matrixStateContract.required_dynamics_fields);
     const matrixStateContractInserts = stringList(matrixStateContract.required_insert_fields);
     const matrixStateContractMetering = stringList(matrixStateContract.required_metering_fields);
+    const matrixStateIntake = asRecord(proofQuality.matrix_state_physical_readback_artifact_intake);
+    const matrixStateIntakeAvailable = Boolean(matrixStateIntake.available);
+    const matrixStateIntakeStatus = str(matrixStateIntake.intake_status, str(matrixStateIntake.status, 'missing'));
+    const matrixStateIntakeSchemaId = str(matrixStateIntake.schema_id, '');
+    const matrixStateIntakeSurfaceId = str(matrixStateIntake.surface_id, '');
+    const matrixStateIntakeActionId = str(matrixStateIntake.remediation_action_id, '');
+    const matrixStateIntakeArtifactCount = Math.trunc(num(matrixStateIntake.artifact_count, 0));
+    const matrixStateIntakeValidCount = Math.trunc(num(matrixStateIntake.valid_candidate_count, 0));
+    const matrixStateIntakeInvalidCount = Math.trunc(num(matrixStateIntake.invalid_candidate_count, 0));
+    const matrixStateIntakeValidMatrixCount = Math.trunc(num(matrixStateIntake.valid_matrix_count, 0));
+    const matrixStateIntakeCandidate = matrixStateIntake.accepted_as_physical_fixture_candidate === true;
+    const matrixStateIntakeOperatorReview = matrixStateIntake.operator_review_required === true;
+    const matrixStateIntakeGapRemains = matrixStateIntake.physical_fixture_gap_remains === true;
+    const matrixStateIntakeClosureAllowed = matrixStateIntake.fixture_closure_allowed_by_intake === true;
+    const matrixStateIntakeLiveAuthority = matrixStateIntake.live_authority_granted === true;
+    const matrixStateIntakeTargetConsistency = matrixStateIntake.target_consistency === true;
+    const matrixStateIntakePromotionFamilies = stringList(matrixStateIntake.promotion_families_requiring_surface);
+    const matrixStateIntakeBlockedBy = stringList(matrixStateIntake.blocked_by);
+    const matrixStateIntakeSources = stringList(matrixStateIntake.artifact_source_ids);
     const fxSlotsInsertsContract = asRecord(proofQuality.fx_slots_inserts_physical_readback_contract);
     const fxSlotsInsertsContractAvailable = Boolean(fxSlotsInsertsContract.available);
     const fxSlotsInsertsContractStatus = str(fxSlotsInsertsContract.contract_status, str(fxSlotsInsertsContract.status, 'missing'));
@@ -1020,7 +1039,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; capture_plan:${readSurfaceCapturePlanStatus || 'missing'}; capture_steps:${readSurfaceCapturePlanStepCount}; capture_execution:${readSurfaceCapturePlanExecutionAllowed}; capture_target_gate:${readSurfaceCapturePlanTargetConsistency}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; raw_intake:${rawMixerIntakeStatus || 'missing'}; raw_intake_artifacts:${rawMixerIntakeArtifactCount}; raw_intake_valid:${rawMixerIntakeValidCount}; raw_intake_invalid:${rawMixerIntakeInvalidCount}; raw_intake_candidate:${rawMixerIntakeCandidate}; raw_intake_closure:${rawMixerIntakeClosureAllowed}; raw_intake_target_gate:${rawMixerIntakeTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; channel_intake:${channelBasicIntakeStatus || 'missing'}; channel_intake_artifacts:${channelBasicIntakeArtifactCount}; channel_intake_valid:${channelBasicIntakeValidCount}; channel_intake_invalid:${channelBasicIntakeInvalidCount}; channel_intake_valid_channels:${channelBasicIntakeValidChannelCount}; channel_intake_candidate:${channelBasicIntakeCandidate}; channel_intake_gap:${channelBasicIntakeGapRemains}; channel_intake_closure:${channelBasicIntakeClosureAllowed}; channel_intake_live_authority:${channelBasicIntakeLiveAuthority}; channel_intake_target_gate:${channelBasicIntakeTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; processing_intake:${channelProcessingIntakeStatus || 'missing'}; processing_intake_artifacts:${channelProcessingIntakeArtifactCount}; processing_intake_valid:${channelProcessingIntakeValidCount}; processing_intake_invalid:${channelProcessingIntakeInvalidCount}; processing_intake_valid_channels:${channelProcessingIntakeValidChannelCount}; processing_intake_candidate:${channelProcessingIntakeCandidate}; processing_intake_gap:${channelProcessingIntakeGapRemains}; processing_intake_closure:${channelProcessingIntakeClosureAllowed}; processing_intake_live_authority:${channelProcessingIntakeLiveAuthority}; processing_intake_target_gate:${channelProcessingIntakeTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; bus_intake:${busMainDcaIntakeStatus || 'missing'}; bus_intake_artifacts:${busMainDcaIntakeArtifactCount}; bus_intake_valid:${busMainDcaIntakeValidCount}; bus_intake_invalid:${busMainDcaIntakeInvalidCount}; bus_intake_valid_buses:${busMainDcaIntakeValidBusCount}; bus_intake_valid_mains:${busMainDcaIntakeValidMainCount}; bus_intake_valid_dcas:${busMainDcaIntakeValidDcaCount}; bus_intake_candidate:${busMainDcaIntakeCandidate}; bus_intake_gap:${busMainDcaIntakeGapRemains}; bus_intake_closure:${busMainDcaIntakeClosureAllowed}; bus_intake_live_authority:${busMainDcaIntakeLiveAuthority}; bus_intake_target_gate:${busMainDcaIntakeTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}; scenes_contract:${snapshotsScenesContractStatus || 'missing'}; scenes_contract_gap:${snapshotsScenesContractGapRemains}; scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}; scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}; presets_contract:${userPresetsContractStatus || 'missing'}; presets_contract_gap:${userPresetsContractGapRemains}; presets_contract_live_authority:${userPresetsContractLiveAuthority}; presets_contract_target_gate:${userPresetsContractTargetConsistency}; dlive_contract:${dliveStateContractStatus || 'missing'}; dlive_contract_gap:${dliveStateContractGapRemains}; dlive_contract_live_authority:${dliveStateContractLiveAuthority}; dlive_contract_target_gate:${dliveStateContractTargetConsistency}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; capture_plan:${readSurfaceCapturePlanStatus || 'missing'}; capture_steps:${readSurfaceCapturePlanStepCount}; capture_execution:${readSurfaceCapturePlanExecutionAllowed}; capture_target_gate:${readSurfaceCapturePlanTargetConsistency}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; raw_intake:${rawMixerIntakeStatus || 'missing'}; raw_intake_artifacts:${rawMixerIntakeArtifactCount}; raw_intake_valid:${rawMixerIntakeValidCount}; raw_intake_invalid:${rawMixerIntakeInvalidCount}; raw_intake_candidate:${rawMixerIntakeCandidate}; raw_intake_closure:${rawMixerIntakeClosureAllowed}; raw_intake_target_gate:${rawMixerIntakeTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; channel_intake:${channelBasicIntakeStatus || 'missing'}; channel_intake_artifacts:${channelBasicIntakeArtifactCount}; channel_intake_valid:${channelBasicIntakeValidCount}; channel_intake_invalid:${channelBasicIntakeInvalidCount}; channel_intake_valid_channels:${channelBasicIntakeValidChannelCount}; channel_intake_candidate:${channelBasicIntakeCandidate}; channel_intake_gap:${channelBasicIntakeGapRemains}; channel_intake_closure:${channelBasicIntakeClosureAllowed}; channel_intake_live_authority:${channelBasicIntakeLiveAuthority}; channel_intake_target_gate:${channelBasicIntakeTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; processing_intake:${channelProcessingIntakeStatus || 'missing'}; processing_intake_artifacts:${channelProcessingIntakeArtifactCount}; processing_intake_valid:${channelProcessingIntakeValidCount}; processing_intake_invalid:${channelProcessingIntakeInvalidCount}; processing_intake_valid_channels:${channelProcessingIntakeValidChannelCount}; processing_intake_candidate:${channelProcessingIntakeCandidate}; processing_intake_gap:${channelProcessingIntakeGapRemains}; processing_intake_closure:${channelProcessingIntakeClosureAllowed}; processing_intake_live_authority:${channelProcessingIntakeLiveAuthority}; processing_intake_target_gate:${channelProcessingIntakeTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; bus_intake:${busMainDcaIntakeStatus || 'missing'}; bus_intake_artifacts:${busMainDcaIntakeArtifactCount}; bus_intake_valid:${busMainDcaIntakeValidCount}; bus_intake_invalid:${busMainDcaIntakeInvalidCount}; bus_intake_valid_buses:${busMainDcaIntakeValidBusCount}; bus_intake_valid_mains:${busMainDcaIntakeValidMainCount}; bus_intake_valid_dcas:${busMainDcaIntakeValidDcaCount}; bus_intake_candidate:${busMainDcaIntakeCandidate}; bus_intake_gap:${busMainDcaIntakeGapRemains}; bus_intake_closure:${busMainDcaIntakeClosureAllowed}; bus_intake_live_authority:${busMainDcaIntakeLiveAuthority}; bus_intake_target_gate:${busMainDcaIntakeTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; matrix_intake:${matrixStateIntakeStatus || 'missing'}; matrix_intake_valid_matrices:${matrixStateIntakeValidMatrixCount}; matrix_intake_gap:${matrixStateIntakeGapRemains}; matrix_intake_live_authority:${matrixStateIntakeLiveAuthority}; matrix_intake_target_gate:${matrixStateIntakeTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}; scenes_contract:${snapshotsScenesContractStatus || 'missing'}; scenes_contract_gap:${snapshotsScenesContractGapRemains}; scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}; scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}; presets_contract:${userPresetsContractStatus || 'missing'}; presets_contract_gap:${userPresetsContractGapRemains}; presets_contract_live_authority:${userPresetsContractLiveAuthority}; presets_contract_target_gate:${userPresetsContractTargetConsistency}; dlive_contract:${dliveStateContractStatus || 'missing'}; dlive_contract_gap:${dliveStateContractGapRemains}; dlive_contract_live_authority:${dliveStateContractLiveAuthority}; dlive_contract_target_gate:${dliveStateContractTargetConsistency}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
@@ -1130,6 +1149,17 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `matrix_contract_gap:${matrixStateContractGapRemains}`,
         `matrix_contract_live_authority:${matrixStateContractLiveAuthority}`,
         `matrix_contract_target_gate:${matrixStateContractTargetConsistency}`,
+        `matrix_intake_available:${matrixStateIntakeAvailable}`,
+        `matrix_intake_status:${matrixStateIntakeStatus}`,
+        `matrix_intake_artifacts:${matrixStateIntakeArtifactCount}`,
+        `matrix_intake_valid:${matrixStateIntakeValidCount}`,
+        `matrix_intake_invalid:${matrixStateIntakeInvalidCount}`,
+        `matrix_intake_valid_matrices:${matrixStateIntakeValidMatrixCount}`,
+        `matrix_intake_candidate:${matrixStateIntakeCandidate}`,
+        `matrix_intake_gap:${matrixStateIntakeGapRemains}`,
+        `matrix_intake_closure_allowed:${matrixStateIntakeClosureAllowed}`,
+        `matrix_intake_live_authority:${matrixStateIntakeLiveAuthority}`,
+        `matrix_intake_target_gate:${matrixStateIntakeTargetConsistency}`,
         `fx_contract_available:${fxSlotsInsertsContractAvailable}`,
         `fx_contract_status:${fxSlotsInsertsContractStatus}`,
         `fx_contract_schema:${fxSlotsInsertsContractSchemaId}`,
@@ -1661,6 +1691,59 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         : matrixStateContractGapRemains
           ? 'yellow'
           : 'green'
+    });
+    rows.push({
+      moduleId: 'matrix_state_physical_readback_artifact_intake',
+      label: 'Matrix state readback artifact intake',
+      domain: 'read_surface_artifact_intake',
+      status: matrixStateIntakeAvailable ? matrixStateIntakeStatus || 'intake_available' : 'intake_missing',
+      entrypoint: 'build_matrix_state_physical_readback_artifact_intake',
+      module: matrixStateIntakeActionId || 'no_intake_action',
+      uiSurface: 'Read-surface physical artifact intake',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${matrixStateIntakeAvailable}`,
+        `schema:${matrixStateIntakeSchemaId}`,
+        `surface:${matrixStateIntakeSurfaceId}`,
+        `action:${matrixStateIntakeActionId}`,
+        `artifacts:${matrixStateIntakeArtifactCount}`,
+        `valid:${matrixStateIntakeValidCount}`,
+        `invalid:${matrixStateIntakeInvalidCount}`,
+        `valid_matrices:${matrixStateIntakeValidMatrixCount}`,
+        `candidate:${matrixStateIntakeCandidate}`,
+        `operator_review:${matrixStateIntakeOperatorReview}`,
+        `physical_gap_remains:${matrixStateIntakeGapRemains}`,
+        `fixture_closure_allowed:${matrixStateIntakeClosureAllowed}`,
+        `live_authority:${matrixStateIntakeLiveAuthority}`,
+        `target_consistency:${matrixStateIntakeTargetConsistency}`,
+        matrixStateIntakePromotionFamilies.length ? `promotion_families:${matrixStateIntakePromotionFamilies.join('|')}` : '',
+        matrixStateIntakeSources.length ? `sources:${matrixStateIntakeSources.join(',')}` : '',
+      ].filter(Boolean),
+      blockedReason: matrixStateIntakeAvailable
+        ? matrixStateIntakeBlockedBy.length
+          ? matrixStateIntakeBlockedBy.join(', ')
+          : 'Matrix-state artifact intake is present; manual review still gates fixture closure.'
+        : 'Matrix-state physical artifact intake is missing from proof summary.',
+      nextStep: matrixStateIntakeAvailable
+        ? [
+            matrixStateIntakeSurfaceId ? `surface:${matrixStateIntakeSurfaceId}` : '',
+            matrixStateIntakeActionId ? `action:${matrixStateIntakeActionId}` : '',
+            `artifacts:${matrixStateIntakeArtifactCount}`,
+            `valid:${matrixStateIntakeValidCount}`,
+            `invalid:${matrixStateIntakeInvalidCount}`,
+            `valid_matrices:${matrixStateIntakeValidMatrixCount}`,
+            `candidate:${matrixStateIntakeCandidate}`,
+            `operator_review:${matrixStateIntakeOperatorReview}`,
+            `fixture_closure_allowed:${matrixStateIntakeClosureAllowed}`,
+            `live_authority:${matrixStateIntakeLiveAuthority}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with matrix-state artifact-intake validation.',
+      tone: !matrixStateIntakeAvailable || matrixStateIntakeInvalidCount > 0 || matrixStateIntakeClosureAllowed || matrixStateIntakeLiveAuthority || !matrixStateIntakeTargetConsistency
+        ? 'yellow'
+        : matrixStateIntakeCandidate
+          ? 'yellow'
+          : 'yellow'
     });
     rows.push({
       moduleId: 'fx_slots_inserts_physical_readback_contract',

@@ -22,6 +22,7 @@ from tools.no_wing_release_check import (
     dlive_state_readback_contract_summary,
     fx_slots_inserts_readback_contract_summary,
     gain_proof_artifact_root_for_run,
+    matrix_state_readback_artifact_intake_summary,
     matrix_state_readback_contract_summary,
     next_wing_proof_plan_summary,
     proof_report_path_for_run,
@@ -45,6 +46,7 @@ from tools.no_wing_release_check import (
     validate_channel_processing_physical_readback_contract_snapshot,
     validate_dlive_state_physical_readback_contract_snapshot,
     validate_fx_slots_inserts_physical_readback_contract_snapshot,
+    validate_matrix_state_physical_readback_artifact_intake_snapshot,
     validate_matrix_state_physical_readback_contract_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
     validate_read_surface_physical_readback_capture_plan_snapshot,
@@ -1165,6 +1167,77 @@ def test_no_wing_release_check_rejects_matrix_state_contract_drift(monkeypatch):
     ]
 
 
+def test_no_wing_release_check_validates_matrix_state_artifact_intake_snapshot():
+    result = validate_matrix_state_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["intake_status"] == "operator_artifact_missing"
+    assert result.detail["schema_id"] == "matrix_state_physical_readback.v1"
+    assert result.detail["surface_id"] == "matrix_state"
+    assert result.detail["remediation_action_id"] == "remediate_matrix_state"
+    assert (
+        result.detail["required_contract_method_id"]
+        == "matrix_state_physical_readback_contract"
+    )
+    assert result.detail["artifact_count"] == 0
+    assert result.detail["valid_candidate_count"] == 0
+    assert result.detail["invalid_candidate_count"] == 0
+    assert result.detail["valid_matrix_count"] == 0
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["operator_review_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["fixture_closure_allowed_by_intake"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert "bus_group_matrix" in result.detail["promotion_families_requiring_surface"]
+    assert "fx_send_insert" in result.detail["promotion_families_requiring_surface"]
+    assert "routing" in result.detail["promotion_families_requiring_surface"]
+    assert result.detail["blocked_by"] == [
+        "operator_must_capture_matrix_state_physical_readback_artifact"
+    ]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_matrix_state_artifact_intake_authority(monkeypatch):
+    intake = release_check.build_matrix_state_physical_readback_artifact_intake()
+    corrupted = json.loads(json.dumps(intake))
+    corrupted["safety"]["live_write"] = True
+    corrupted["safety"]["fixture_closure_allowed_by_intake"] = True
+    corrupted["summary"]["physical_fixture_gap_remains"] = False
+    corrupted["summary"]["fixture_closure_allowed_by_intake"] = True
+    corrupted["summary"]["live_authority_granted"] = True
+    corrupted["summary"]["full_autonomous_ready"] = True
+
+    monkeypatch.setattr(
+        release_check,
+        "build_matrix_state_physical_readback_artifact_intake",
+        lambda: corrupted,
+    )
+
+    result = validate_matrix_state_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "failed"
+    assert "matrix_state_artifact_intake_live_write_not_false" in result.detail[
+        "violations"
+    ]
+    assert (
+        "matrix_state_artifact_intake_fixture_closure_allowed_by_intake_not_false"
+        in result.detail["violations"]
+    )
+    assert "matrix_state_artifact_intake_physical_gap_not_true" in result.detail[
+        "violations"
+    ]
+    assert "matrix_state_artifact_intake_fixture_closure_not_false" in result.detail[
+        "violations"
+    ]
+    assert "matrix_state_artifact_intake_live_authority_not_false" in result.detail[
+        "violations"
+    ]
+    assert "matrix_state_artifact_intake_full_autonomous_not_false" in result.detail[
+        "violations"
+    ]
+
+
 def test_no_wing_release_check_validates_fx_slots_inserts_readback_contract_snapshot():
     result = validate_fx_slots_inserts_physical_readback_contract_snapshot()
 
@@ -1519,6 +1592,10 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         in fixture_check.command
     )
     assert "tests/test_matrix_state_physical_readback_contract.py" in fixture_check.command
+    assert (
+        "tests/test_matrix_state_physical_readback_artifact_intake.py"
+        in fixture_check.command
+    )
     assert "tests/test_fx_slots_inserts_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_routing_sends_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_snapshots_scenes_physical_readback_contract.py" in fixture_check.command
@@ -1999,6 +2076,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "bus_group_main_dca_physical_readback_contract_schema" in result_names
     assert "bus_group_main_dca_physical_readback_artifact_intake_schema" in result_names
     assert "matrix_state_physical_readback_contract_schema" in result_names
+    assert "matrix_state_physical_readback_artifact_intake_schema" in result_names
     assert "fx_slots_inserts_physical_readback_contract_schema" in result_names
     assert "routing_sends_physical_readback_contract_schema" in result_names
     assert "snapshots_scenes_physical_readback_contract_schema" in result_names
@@ -2047,6 +2125,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "matrix_state_physical_readback_contract_schema"
     )
     assert result_names.index("matrix_state_physical_readback_contract_schema") < result_names.index(
+        "matrix_state_physical_readback_artifact_intake_schema"
+    )
+    assert result_names.index("matrix_state_physical_readback_artifact_intake_schema") < result_names.index(
         "fx_slots_inserts_physical_readback_contract_schema"
     )
     assert result_names.index("fx_slots_inserts_physical_readback_contract_schema") < result_names.index(
@@ -3729,6 +3810,123 @@ def test_no_wing_release_check_summary_embeds_matrix_state_readback_contract(tmp
     assert "live_authority_granted: `false`" in markdown_summary
     assert "minimum_matrix_count: `1`" in markdown_summary
     assert "target_consistency: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_matrix_state_artifact_intake(tmp_path):
+    result = CheckResult(
+        name="matrix_state_physical_readback_artifact_intake_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "intake_status": "valid_operator_artifact_available",
+            "schema_id": "matrix_state_physical_readback.v1",
+            "surface_id": "matrix_state",
+            "remediation_action_id": "remediate_matrix_state",
+            "required_contract_method_id": "matrix_state_physical_readback_contract",
+            "artifact_search_roots": ["artifacts/read_surface_physical_readback/matrix_state"],
+            "artifact_count": 1,
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "valid_matrix_count": 2,
+            "accepted_as_physical_fixture_candidate": True,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_closure_allowed_by_intake": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "promotion_families_requiring_surface": [
+                "bus_group_matrix",
+                "fx_send_insert",
+                "routing",
+            ],
+            "latest_valid_candidate_source_id": "inline_payload_0",
+            "latest_valid_candidate_captured_at": "2026-06-05T00:00:00Z",
+            "blocked_by": [
+                "operator_must_review_valid_matrix_state_candidate_before_fixture_closure"
+            ],
+            "artifact_source_ids": ["inline_payload_0"],
+            "intake_violations": [],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert matrix_state_readback_artifact_intake_summary([result]) == summary[
+        "matrix_state_physical_readback_artifact_intake"
+    ]
+    intake = json_summary["matrix_state_physical_readback_artifact_intake"]
+    assert intake["read_only"] is True
+    assert intake["live_write"] is False
+    assert intake["mutates_console_state"] is False
+    assert intake["queries_console"] is False
+    assert intake["executes_tests"] is False
+    assert intake["operator_required"] is True
+    assert intake["execution_allowed_by_intake"] is False
+    assert intake["fixture_closure_allowed_by_intake"] is False
+    assert intake["full_autonomous_ready"] is False
+    assert intake["intake_status"] == "valid_operator_artifact_available"
+    assert intake["artifact_count"] == 1
+    assert intake["valid_candidate_count"] == 1
+    assert intake["invalid_candidate_count"] == 0
+    assert intake["valid_matrix_count"] == 2
+    assert intake["accepted_as_physical_fixture_candidate"] is True
+    assert intake["operator_review_required"] is True
+    assert intake["physical_fixture_gap_remains"] is True
+    assert intake["live_authority_granted"] is False
+    assert intake["artifact_source_ids"] == ["inline_payload_0"]
+    assert "## Matrix State Physical Readback Artifact Intake" in markdown_summary
+    assert "artifact_count: `1`" in markdown_summary
+    assert "valid_matrix_count: `2`" in markdown_summary
+    assert "fixture_closure_allowed_by_intake: `false`" in markdown_summary
+
+
+def test_no_wing_release_check_matrix_state_intake_summary_normalizes_authority_claims():
+    result = CheckResult(
+        name="matrix_state_physical_readback_artifact_intake_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "intake_status": "valid_operator_artifact_available",
+            "schema_id": "matrix_state_physical_readback.v1",
+            "surface_id": "matrix_state",
+            "remediation_action_id": "remediate_matrix_state",
+            "required_contract_method_id": "matrix_state_physical_readback_contract",
+            "artifact_search_roots": [],
+            "artifact_count": 1,
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "valid_matrix_count": 1,
+            "accepted_as_physical_fixture_candidate": True,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_closure_allowed_by_intake": True,
+            "live_authority_granted": True,
+            "full_autonomous_ready": True,
+            "promotion_families_requiring_surface": ["routing"],
+            "blocked_by": [],
+            "artifact_source_ids": [],
+            "intake_violations": [],
+            "violations": ["matrix_state_artifact_intake_live_authority_not_false"],
+        },
+    )
+
+    summary = matrix_state_readback_artifact_intake_summary([result])
+
+    assert summary is not None
+    assert summary["accepted_as_physical_fixture_candidate"] is False
+    assert summary["fixture_closure_allowed_by_intake"] is False
+    assert summary["live_authority_granted"] is False
+    assert summary["full_autonomous_ready"] is False
+    assert summary["violations"] == [
+        "matrix_state_artifact_intake_live_authority_not_false"
+    ]
 
 
 def test_no_wing_release_check_summary_embeds_fx_slots_inserts_readback_contract(tmp_path):

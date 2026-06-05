@@ -89,6 +89,7 @@
 - Channel identity/basic-control physical readback artifact intake may accept operator-captured channel fader/trim/mute/pan evidence only as a manual-review candidate; it must keep `fixture_closure_allowed_by_intake=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
 - Channel EQ/dynamics/gate physical readback artifact intake may accept operator-captured HPF/EQ/compressor/gate evidence only as a manual-review candidate; it must keep `fixture_closure_allowed_by_intake=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
 - Bus/group/main/DCA physical readback artifact intake may accept operator-captured bus, main, DCA, assignment, and metering evidence only as a manual-review candidate; it must keep `fixture_closure_allowed_by_intake=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
+- Matrix-state physical readback artifact intake may accept operator-captured matrix controls, EQ, dynamics, inserts, and metering evidence only as a manual-review candidate; it must keep `fixture_closure_allowed_by_intake=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
 
 ## Memory Pipeline Lessons
 

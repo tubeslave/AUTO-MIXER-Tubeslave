@@ -39,6 +39,9 @@ try:
     from matrix_state_physical_readback_contract import (
         build_matrix_state_physical_readback_contract,
     )
+    from matrix_state_physical_readback_artifact_intake import (
+        build_matrix_state_physical_readback_artifact_intake,
+    )
     from autonomy_mode_transition_gate import build_autonomy_mode_transition_gate
     from autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
     from project_goal_capability_matrix import build_project_goal_capability_matrix_snapshot
@@ -92,6 +95,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.matrix_state_physical_readback_contract import (
         build_matrix_state_physical_readback_contract,
+    )
+    from backend.matrix_state_physical_readback_artifact_intake import (
+        build_matrix_state_physical_readback_artifact_intake,
     )
     from backend.autonomy_mode_transition_gate import build_autonomy_mode_transition_gate
     from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
@@ -691,6 +697,31 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "readback_contract_only",
             "no_live_writes",
             "does_not_query_console",
+        ),
+    ),
+    ProcessingMethod(
+        id="matrix_state_physical_readback_artifact_intake",
+        label="Matrix State Physical Readback Artifact Intake",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Read-only intake snapshot for separately captured matrix controls, "
+            "EQ, dynamics, inserts, and metering physical readback artifacts."
+        ),
+        module="backend/matrix_state_physical_readback_artifact_intake.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="artifact_intake_only_matrix_state_operator_review_required",
+        promotion_next=(
+            "operator reviews any valid matrix-state candidate before closing "
+            "the physical fixture gap"
+        ),
+        notes=(
+            "transport_free",
+            "artifact_intake_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "fixture_closure_allowed_by_intake_false",
         ),
     ),
     ProcessingMethod(
@@ -1772,6 +1803,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, read-surface remediation artifact contract",
         "next_step": "Use only to validate separately captured matrix-state readback; do not infer live authority.",
     },
+    "matrix_state_physical_readback_artifact_intake": {
+        "entrypoint": "build_matrix_state_physical_readback_artifact_intake",
+        "ui_surface": "Processing registry, matrix-state physical artifact intake",
+        "next_step": "Use only to surface operator-captured matrix candidates; manual review still gates fixture closure.",
+    },
     "fx_slots_inserts_physical_readback_contract": {
         "entrypoint": (
             "build_fx_slots_inserts_physical_readback_contract / "
@@ -2054,6 +2090,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "matrix_state_physical_readback_contract": (
             build_matrix_state_physical_readback_contract()
+        ),
+        "matrix_state_physical_readback_artifact_intake": (
+            build_matrix_state_physical_readback_artifact_intake()
         ),
         "fx_slots_inserts_physical_readback_contract": (
             build_fx_slots_inserts_physical_readback_contract()
