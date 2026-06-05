@@ -1,6 +1,9 @@
 from pathlib import Path
 
-from backend.processing_proposal_adapters import build_proposal_only_method_contracts
+from backend.processing_proposal_adapters import (
+    adapt_source_identity_replay_calibration_proposals,
+    build_proposal_only_method_contracts,
+)
 from backend.processing_registry import get_pipeline_profile, get_processing_method
 from backend.project_goal_capability_matrix import get_project_goal_capability
 from backend.source_identity_replay_calibration import (
@@ -185,6 +188,19 @@ def test_source_identity_replay_calibration_proposals_are_not_queueable_live_act
     assert proposal["evidence"]["queue_mutation"] is False
     assert proposal["evidence"]["model_mutation"] is False
     assert proposal["evidence"]["memory_mutation"] is False
+
+    adapted = adapt_source_identity_replay_calibration_proposals(proposals)
+    assert adapted[0]["adapter_id"] == "source_identity_replay_calibration"
+    assert adapted[0]["queue_action"] == "preview_only_not_queued"
+    assert adapted[0]["can_import_to_queue"] is False
+    assert adapted[0]["can_apply_live"] is False
+    assert "requested_change" not in adapted[0]
+    assert "unsupported_value_type:source_identity_calibration" in adapted[0]["blockers"]
+    assert adapted[0]["evidence"]["requested_change_allowed"] is False
+    assert adapted[0]["evidence"]["queue_mutation"] is False
+    assert adapted[0]["evidence"]["model_mutation"] is False
+    assert adapted[0]["evidence"]["memory_mutation"] is False
+    assert adapted[0]["evidence"]["downstream_priority_mutation"] is False
 
 
 def test_source_identity_replay_calibration_registry_contract_and_goal_row():

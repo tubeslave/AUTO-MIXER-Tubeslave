@@ -758,6 +758,67 @@ def adapt_source_identity_confidence_proposals(
     return outputs
 
 
+def adapt_source_identity_replay_calibration_proposals(
+    proposals: Iterable[Dict[str, Any]],
+    *,
+    pipeline_id: str = MAIN_PIPELINE_ID,
+) -> List[Dict[str, Any]]:
+    """Adapt replay-calibration proposals for preview-only operator review."""
+
+    outputs: List[Dict[str, Any]] = []
+    for proposal in proposals:
+        if not isinstance(proposal, dict):
+            continue
+        evidence = proposal.get("evidence") if isinstance(proposal.get("evidence"), dict) else {}
+        proposed_action = (
+            proposal.get("proposed_action")
+            if isinstance(proposal.get("proposed_action"), dict)
+            else {}
+        )
+        blockers = {
+            "unsupported_value_type:source_identity_calibration",
+            "not_in_supervised_fader_gain_executor",
+            "calibration_requires_operator_review",
+            "source_identity_replay_calibration_requires_operator_acceptance",
+        }
+        raw_blockers = proposal.get("blockers")
+        if isinstance(raw_blockers, list):
+            blockers.update(str(item) for item in raw_blockers)
+
+        outputs.append(
+            {
+                "id": f"{pipeline_id}:source_identity_replay_calibration:{proposal.get('id')}",
+                "adapter_id": "source_identity_replay_calibration",
+                "pipeline_id": pipeline_id,
+                **_method_contract("source_identity_replay_calibration"),
+                "title": str(proposal.get("title") or "Source identity replay calibration"),
+                "reason": str(
+                    proposal.get("reason")
+                    or "Replay-calibrated source identity trust requires operator review before downstream priority changes."
+                ),
+                "confidence": proposal.get("confidence"),
+                "risk": _risk_from_severity(proposal.get("severity")),
+                "target": proposal.get("target"),
+                "queue_action": "preview_only_not_queued",
+                "can_import_to_queue": False,
+                "can_apply_live": False,
+                "blockers": sorted(blockers),
+                "proposed_action": proposed_action,
+                "evidence": {
+                    **evidence,
+                    "live_executor": False,
+                    "requested_change_allowed": False,
+                    "queue_mutation": False,
+                    "model_mutation": False,
+                    "memory_mutation": False,
+                    "downstream_priority_mutation": False,
+                },
+                "source_proposal_id": proposal.get("id"),
+            }
+        )
+    return outputs
+
+
 def build_registry_blockers(*, pipeline_id: str = MAIN_PIPELINE_ID) -> List[Dict[str, Any]]:
     """Return methods visible in preview but blocked from the main live executor."""
 

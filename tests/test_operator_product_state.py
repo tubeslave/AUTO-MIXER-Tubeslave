@@ -5290,6 +5290,68 @@ def test_main_pipeline_preview_includes_safe_gain_as_preview_only(server):
     assert queue["summary"]["pending_count"] == 0
 
 
+def test_main_pipeline_preview_exposes_source_identity_replay_calibration_review(
+    server,
+):
+    server.source_identity_replay_context_cache_freshness = {
+        "status": "fresh",
+        "field_count": 3,
+        "fresh_field_count": 3,
+        "stale_field_count": 0,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    server.source_identity_replay_events = [
+        {
+            "event_id": f"lead:{index}",
+            "source_id": f"ch{index}",
+            "predicted_source_type": "lead_vocal",
+            "predicted_confidence": 0.86 + index * 0.01,
+            "operator_decision": "accepted",
+            "accepted_source_type": "lead_vocal",
+            "replay_matched": True,
+            "downstream_family": "arrangement_role",
+            "evidence_packet_id": f"packet:{index}",
+            "session_id": "show:source-id",
+        }
+        for index in range(1, 4)
+    ]
+
+    payload = build_main_pipeline_preview(server, total_channels=4)
+    queue = build_decision_queue(server)
+    proposals = [
+        proposal
+        for proposal in payload["proposals"]
+        if proposal["adapter_id"] == "source_identity_replay_calibration"
+    ]
+
+    assert payload["summary"]["source_identity_replay_event_count"] == 3
+    assert payload["summary"]["source_identity_replay_calibration_proposal_count"] == 1
+    assert payload["source_identity_replay_calibration"]["available"] is True
+    assert payload["source_identity_replay_calibration"]["metadata"]["queue_mutation"] is False
+    assert payload["source_identity_replay_calibration"]["metadata"]["live_write"] is False
+    assert (
+        payload["source_identity_replay_calibration"]["metadata"][
+            "downstream_priority_mutation"
+        ]
+        is False
+    )
+    assert len(proposals) == 1
+    proposal = proposals[0]
+    assert proposal["method_id"] == "source_identity_replay_calibration"
+    assert proposal["queue_action"] == "preview_only_not_queued"
+    assert proposal["can_import_to_queue"] is False
+    assert proposal["can_apply_live"] is False
+    assert "requested_change" not in proposal
+    assert "unsupported_value_type:source_identity_calibration" in proposal["blockers"]
+    assert proposal["proposed_action"]["recommended_trust_state"] == (
+        "trusted_for_downstream_priority"
+    )
+    assert proposal["evidence"]["downstream_priority_mutation"] is False
+    assert queue["summary"]["pending_count"] == 0
+
+
 @pytest.mark.asyncio
 async def test_product_state_handlers_round_trip(server, tmp_path):
     server.mixer_client = CachedMixer()
