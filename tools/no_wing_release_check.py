@@ -807,6 +807,12 @@ def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
     if not isinstance(physical_missing, list):
         physical_missing = []
         violations.append("physical_fixture_missing_surface_ids_missing")
+    expected_next_physical_readback_surface_id = (
+        expected_physical_missing[0] if expected_physical_missing else None
+    )
+    next_physical_readback_surface_id = summary.get("next_physical_readback_surface_id")
+    if next_physical_readback_surface_id != expected_next_physical_readback_surface_id:
+        violations.append("read_surface_fixture_next_physical_readback_surface_id_mismatch")
 
     expected_true = ("read_only",)
     for key in expected_true:
@@ -844,6 +850,7 @@ def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
     detail["surface_with_fixture_count"] = summary_surface_with_fixture_count
     detail["status_counts"] = dict(status_counts)
     detail["physical_fixture_missing_surface_ids"] = list(physical_missing)
+    detail["next_physical_readback_surface_id"] = next_physical_readback_surface_id
     detail["declared_fixture_path_count"] = declared_fixture_path_count
     detail["declared_test_name_count"] = declared_test_name_count
     detail["violations"] = violations
@@ -1277,6 +1284,11 @@ def read_surface_fixture_evidence_summary(results: Sequence[CheckResult]) -> dic
         physical_missing = detail.get("physical_fixture_missing_surface_ids")
         violations = detail.get("violations")
         physical_missing_ids = list(physical_missing) if isinstance(physical_missing, list) else []
+        next_physical_readback_surface_id = detail.get("next_physical_readback_surface_id")
+        if not isinstance(next_physical_readback_surface_id, str):
+            next_physical_readback_surface_id = (
+                physical_missing_ids[0] if physical_missing_ids else None
+            )
         return {
             "status": result.status,
             "read_only": True,
@@ -1293,6 +1305,7 @@ def read_surface_fixture_evidence_summary(results: Sequence[CheckResult]) -> dic
             "contract_gap_consistency_enforced": True,
             "status_counts": dict(status_counts) if isinstance(status_counts, Mapping) else {},
             "physical_fixture_missing_surface_ids": physical_missing_ids,
+            "next_physical_readback_surface_id": next_physical_readback_surface_id,
             "violations": list(violations) if isinstance(violations, list) else [],
         }
     return None
@@ -1449,6 +1462,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(read_fixture['status_counts'], sort_keys=True)}`",
                 "- physical_fixture_missing_surface_ids: "
                 f"`{json.dumps(read_fixture['physical_fixture_missing_surface_ids'])}`",
+                "- next_physical_readback_surface_id: "
+                f"`{read_fixture['next_physical_readback_surface_id']}`",
                 f"- violations: `{json.dumps(read_fixture['violations'])}`",
             ]
         )

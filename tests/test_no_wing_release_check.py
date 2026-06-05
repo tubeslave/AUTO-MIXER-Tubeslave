@@ -165,6 +165,10 @@ def test_no_wing_release_check_validates_read_surface_fixture_evidence_snapshot(
     assert result.detail["surface_with_fixture_count"] >= 1
     assert result.detail["status_counts"]["partial_fixture_evidence"] >= 1
     assert result.detail["physical_fixture_missing_surface_ids"]
+    assert (
+        result.detail["next_physical_readback_surface_id"]
+        == result.detail["physical_fixture_missing_surface_ids"][0]
+    )
     assert result.detail["violations"] == []
 
 
@@ -176,6 +180,7 @@ def test_no_wing_release_check_rejects_read_surface_fixture_summary_row_drift(mo
     corrupted["summary"]["status_counts"]["partial_fixture_evidence"] = 0
     corrupted["summary"]["status_counts"]["fixture_evidence_present"] = "not-an-int"
     corrupted["summary"]["physical_fixture_missing_surface_ids"] = []
+    corrupted["summary"]["next_physical_readback_surface_id"] = "dlive_state"
     corrupted["surfaces"][0]["status"] = "unsupported_fixture_status"
 
     monkeypatch.setattr(
@@ -193,6 +198,10 @@ def test_no_wing_release_check_rejects_read_surface_fixture_summary_row_drift(mo
     assert "read_surface_fixture_surface_with_fixture_count_mismatch" in result.detail["violations"]
     assert "read_surface_fixture_status_counts_mismatch" in result.detail["violations"]
     assert "read_surface_fixture_physical_missing_surface_ids_mismatch" in result.detail["violations"]
+    assert (
+        "read_surface_fixture_next_physical_readback_surface_id_mismatch"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_rejects_read_surface_fixture_stale_declarations(monkeypatch):
@@ -1390,6 +1399,7 @@ def test_no_wing_release_check_summary_embeds_read_surface_fixture_evidence(tmp_
             "declared_test_name_count": 25,
             "status_counts": {"partial_fixture_evidence": 10},
             "physical_fixture_missing_surface_ids": ["channel_identity_and_basic_controls"],
+            "next_physical_readback_surface_id": "channel_identity_and_basic_controls",
             "violations": [],
         },
     )
@@ -1411,10 +1421,15 @@ def test_no_wing_release_check_summary_embeds_read_surface_fixture_evidence(tmp_
     assert json_summary["read_surface_fixture_evidence"]["physical_fixture_missing_surface_ids"] == [
         "channel_identity_and_basic_controls"
     ]
+    assert (
+        json_summary["read_surface_fixture_evidence"]["next_physical_readback_surface_id"]
+        == "channel_identity_and_basic_controls"
+    )
     assert "## Read Surface Fixture Evidence" in markdown_summary
     assert "declared_fixture_path_count" in markdown_summary
     assert "contract_gap_consistency_enforced: `true`" in markdown_summary
     assert "physical_fixture_missing_surface_ids" in markdown_summary
+    assert "next_physical_readback_surface_id" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):

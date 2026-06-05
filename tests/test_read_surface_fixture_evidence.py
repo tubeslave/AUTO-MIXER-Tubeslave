@@ -41,6 +41,9 @@ def test_read_surface_fixture_evidence_snapshot_tracks_cached_dto_fixtures_only(
     }
     assert snapshot["summary"]["surface_count"] >= 10
     assert snapshot["summary"]["surface_with_fixture_count"] >= 9
+    assert snapshot["summary"]["next_physical_readback_surface_id"] == (
+        snapshot["summary"]["physical_fixture_missing_surface_ids"][0]
+    )
     assert "channel_identity_and_basic_controls" in surfaces
     assert (
         "test_channel_inventory_publishes_cached_source_patch_readback_only"

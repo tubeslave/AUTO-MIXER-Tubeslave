@@ -263,6 +263,9 @@ def build_read_surface_fixture_evidence_snapshot(
         for row in rows
         if "physical_readback_fixture_missing" in row.remaining_gaps
     )
+    next_physical_readback_surface_id = (
+        rows_with_physical_gaps[0] if rows_with_physical_gaps else None
+    )
     return {
         "type": "read_surface_fixture_evidence",
         "generated_at": _utc_now(),
@@ -285,6 +288,7 @@ def build_read_surface_fixture_evidence_snapshot(
             ),
             "status_counts": status_counts,
             "physical_fixture_missing_surface_ids": list(rows_with_physical_gaps),
+            "next_physical_readback_surface_id": next_physical_readback_surface_id,
             "claim": "read DTO fixtures are tracked but physical readback proof is incomplete",
             "next_global_step": (
                 "Add physical readback fixtures and parity mappings before claiming "
