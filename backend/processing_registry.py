@@ -69,6 +69,9 @@ try:
     from read_surface_physical_readback_fixture_acceptance_ledger import (
         build_read_surface_physical_readback_fixture_acceptance_ledger,
     )
+    from read_surface_physical_readback_fixture_closure_plan import (
+        build_read_surface_physical_readback_fixture_closure_plan,
+    )
     from routing_sends_physical_readback_contract import (
         build_routing_sends_physical_readback_contract,
     )
@@ -146,6 +149,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.read_surface_physical_readback_fixture_acceptance_ledger import (
         build_read_surface_physical_readback_fixture_acceptance_ledger,
+    )
+    from backend.read_surface_physical_readback_fixture_closure_plan import (
+        build_read_surface_physical_readback_fixture_closure_plan,
     )
     from backend.routing_sends_physical_readback_contract import (
         build_routing_sends_physical_readback_contract,
@@ -1066,6 +1072,32 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "no_live_writes",
             "does_not_query_console",
             "fixture_closure_allowed_by_acceptance_false",
+        ),
+    ),
+    ProcessingMethod(
+        id="read_surface_physical_readback_fixture_closure_plan",
+        label="Read Surface Physical Readback Fixture Closure Plan",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Read-only plan that turns accepted physical readback review records "
+            "into manual fixture-closure candidates."
+        ),
+        module="backend/read_surface_physical_readback_fixture_closure_plan.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="closure_plan_only_manual_fixture_update_required",
+        promotion_next=(
+            "operator performs a separate manual fixture baseline update before "
+            "any physical fixture gap can be closed"
+        ),
+        notes=(
+            "transport_free",
+            "manual_fixture_closure_plan_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "fixture_update_allowed_by_plan_false",
+            "fixture_closure_allowed_by_plan_false",
         ),
     ),
     ProcessingMethod(
@@ -2104,6 +2136,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, physical artifact acceptance ledger",
         "next_step": "Use only to record operator review decisions; do not close fixtures or grant live authority.",
     },
+    "read_surface_physical_readback_fixture_closure_plan": {
+        "entrypoint": "build_read_surface_physical_readback_fixture_closure_plan",
+        "ui_surface": "Processing registry, manual physical fixture closure plan",
+        "next_step": "Use only to plan separate manual fixture baseline updates; do not update fixtures or grant live authority.",
+    },
     "auto_fader_v1": {
         "entrypoint": "main_pipeline_preview proposal adapter",
         "ui_surface": "Task Queue preview/proposal rows",
@@ -2385,6 +2422,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "read_surface_physical_readback_fixture_acceptance_ledger": (
             build_read_surface_physical_readback_fixture_acceptance_ledger()
+        ),
+        "read_surface_physical_readback_fixture_closure_plan": (
+            build_read_surface_physical_readback_fixture_closure_plan()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),

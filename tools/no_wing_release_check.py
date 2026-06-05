@@ -297,6 +297,11 @@ from backend.read_surface_physical_readback_fixture_acceptance_ledger import (  
     READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_STATUSES,
     build_read_surface_physical_readback_fixture_acceptance_ledger,
 )
+from backend.read_surface_physical_readback_fixture_closure_plan import (  # noqa: E402
+    READ_SURFACE_PHYSICAL_READBACK_FIXTURE_CLOSURE_PLAN_METHOD_ID,
+    READ_SURFACE_PHYSICAL_READBACK_FIXTURE_CLOSURE_PLAN_STATUSES,
+    build_read_surface_physical_readback_fixture_closure_plan,
+)
 from backend.read_surface_remediation_plan import build_read_surface_remediation_plan  # noqa: E402
 
 DEFAULT_ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "no_wing_release_check"
@@ -5546,6 +5551,158 @@ def validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot()
     )
 
 
+def validate_read_surface_physical_readback_fixture_closure_plan_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "physical_readback_fixture_closure_plan_is_manual_read_only_gate",
+    }
+    violations: list[str] = []
+
+    try:
+        plan = build_read_surface_physical_readback_fixture_closure_plan()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        plan = {}
+        violations.append(f"fixture_closure_plan_build_error:{type(exc).__name__}")
+
+    safety = plan.get("safety") if isinstance(plan.get("safety"), Mapping) else {}
+    summary = plan.get("summary") if isinstance(plan.get("summary"), Mapping) else {}
+    candidates = (
+        plan.get("closure_candidates")
+        if isinstance(plan.get("closure_candidates"), list)
+        else []
+    )
+
+    if plan.get("type") != "read_surface_physical_readback_fixture_closure_plan":
+        violations.append("fixture_closure_plan_type_mismatch")
+    if plan.get("method_id") != READ_SURFACE_PHYSICAL_READBACK_FIXTURE_CLOSURE_PLAN_METHOD_ID:
+        violations.append("fixture_closure_plan_method_id_mismatch")
+    if plan.get("status") not in READ_SURFACE_PHYSICAL_READBACK_FIXTURE_CLOSURE_PLAN_STATUSES:
+        violations.append("fixture_closure_plan_status_unknown")
+
+    for key in ("read_only", "operator_required"):
+        if safety.get(key) is not True:
+            violations.append(f"fixture_closure_plan_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_plan",
+        "fixture_update_allowed_by_plan",
+        "fixture_closure_allowed_by_plan",
+        "live_widening_allowed",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"fixture_closure_plan_{key}_not_false")
+
+    closure_candidate_count = summary.get("closure_candidate_count")
+    accepted_record_count = summary.get("accepted_record_count")
+    invalid_record_count = summary.get("invalid_record_count")
+    unreviewed_candidate_count = summary.get("unreviewed_candidate_count")
+    if not isinstance(closure_candidate_count, int) or closure_candidate_count != len(candidates):
+        violations.append("fixture_closure_plan_candidate_count_mismatch")
+        closure_candidate_count = len(candidates)
+    if not isinstance(accepted_record_count, int):
+        violations.append("fixture_closure_plan_accepted_count_missing")
+        accepted_record_count = 0
+    if not isinstance(invalid_record_count, int):
+        violations.append("fixture_closure_plan_invalid_count_missing")
+        invalid_record_count = 0
+    if not isinstance(unreviewed_candidate_count, int):
+        violations.append("fixture_closure_plan_unreviewed_count_missing")
+        unreviewed_candidate_count = 0
+    if invalid_record_count:
+        violations.append("fixture_closure_plan_invalid_record_present")
+
+    if summary.get("manual_fixture_closure_required") is not True:
+        violations.append("fixture_closure_plan_manual_closure_required_not_true")
+    if summary.get("operator_review_required") is not True:
+        violations.append("fixture_closure_plan_operator_review_not_true")
+    if summary.get("physical_fixture_gap_remains") is not True:
+        violations.append("fixture_closure_plan_physical_gap_not_true")
+    if summary.get("fixture_update_allowed_by_plan") is not False:
+        violations.append("fixture_closure_plan_fixture_update_not_false")
+    if summary.get("fixture_closure_allowed_by_plan") is not False:
+        violations.append("fixture_closure_plan_fixture_closure_not_false")
+    if summary.get("live_authority_granted") is not False:
+        violations.append("fixture_closure_plan_live_authority_not_false")
+    if summary.get("full_autonomous_ready") is not False:
+        violations.append("fixture_closure_plan_full_autonomous_not_false")
+
+    for index, candidate in enumerate(candidates):
+        if not isinstance(candidate, Mapping):
+            violations.append(f"fixture_closure_plan_candidate_{index}_not_object")
+            continue
+        if candidate.get("manual_fixture_closure_required") is not True:
+            violations.append(f"fixture_closure_plan_candidate_{index}_manual_required_not_true")
+        if candidate.get("fixture_update_allowed_by_plan") is not False:
+            violations.append(f"fixture_closure_plan_candidate_{index}_update_not_false")
+        if candidate.get("fixture_closure_allowed_by_plan") is not False:
+            violations.append(f"fixture_closure_plan_candidate_{index}_closure_not_false")
+        if candidate.get("live_authority_granted") is not False:
+            violations.append(f"fixture_closure_plan_candidate_{index}_live_authority_not_false")
+        if candidate.get("full_autonomous_ready") is not False:
+            violations.append(f"fixture_closure_plan_candidate_{index}_full_auto_not_false")
+
+    closure_candidate_surface_ids = summary.get("closure_candidate_surface_ids")
+    rejected_surface_ids = summary.get("rejected_surface_ids")
+    invalid_record_ids = summary.get("invalid_record_ids")
+    unreviewed_surface_ids = summary.get("unreviewed_candidate_surface_ids")
+    blocked_by = summary.get("blocked_by")
+    detail["plan_status"] = plan.get("status")
+    detail["ledger_status"] = summary.get("ledger_status")
+    detail["review_candidate_count"] = int(summary.get("review_candidate_count") or 0)
+    detail["acceptance_record_count"] = int(summary.get("acceptance_record_count") or 0)
+    detail["accepted_record_count"] = accepted_record_count
+    detail["rejected_record_count"] = int(summary.get("rejected_record_count") or 0)
+    detail["invalid_record_count"] = invalid_record_count
+    detail["unreviewed_candidate_count"] = unreviewed_candidate_count
+    detail["closure_candidate_count"] = closure_candidate_count
+    detail["closure_candidate_surface_ids"] = (
+        list(closure_candidate_surface_ids)
+        if isinstance(closure_candidate_surface_ids, list)
+        else []
+    )
+    detail["rejected_surface_ids"] = (
+        list(rejected_surface_ids) if isinstance(rejected_surface_ids, list) else []
+    )
+    detail["invalid_record_ids"] = (
+        list(invalid_record_ids) if isinstance(invalid_record_ids, list) else []
+    )
+    detail["unreviewed_candidate_surface_ids"] = (
+        list(unreviewed_surface_ids) if isinstance(unreviewed_surface_ids, list) else []
+    )
+    detail["manual_fixture_closure_candidate_available"] = summary.get(
+        "manual_fixture_closure_candidate_available"
+    )
+    detail["manual_fixture_closure_required"] = summary.get(
+        "manual_fixture_closure_required"
+    )
+    detail["operator_review_required"] = summary.get("operator_review_required")
+    detail["physical_fixture_gap_remains"] = summary.get("physical_fixture_gap_remains")
+    detail["fixture_update_allowed_by_plan"] = summary.get(
+        "fixture_update_allowed_by_plan"
+    )
+    detail["fixture_closure_allowed_by_plan"] = summary.get(
+        "fixture_closure_allowed_by_plan"
+    )
+    detail["live_authority_granted"] = summary.get("live_authority_granted")
+    detail["full_autonomous_ready"] = summary.get("full_autonomous_ready")
+    detail["blocked_by"] = list(blocked_by) if isinstance(blocked_by, list) else []
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="read_surface_physical_readback_fixture_closure_plan_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_supervised_proof_report_gain_dry_run(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -8022,6 +8179,74 @@ def read_surface_physical_readback_fixture_acceptance_ledger_summary(
     return None
 
 
+def read_surface_physical_readback_fixture_closure_plan_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "read_surface_physical_readback_fixture_closure_plan_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        blocked_by = detail.get("blocked_by")
+        closure_candidate_surface_ids = detail.get("closure_candidate_surface_ids")
+        rejected_surface_ids = detail.get("rejected_surface_ids")
+        invalid_record_ids = detail.get("invalid_record_ids")
+        unreviewed_surface_ids = detail.get("unreviewed_candidate_surface_ids")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_plan": False,
+            "fixture_update_allowed_by_plan": False,
+            "fixture_closure_allowed_by_plan": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "plan_status": detail.get("plan_status"),
+            "ledger_status": detail.get("ledger_status"),
+            "review_candidate_count": int(detail.get("review_candidate_count") or 0),
+            "acceptance_record_count": int(detail.get("acceptance_record_count") or 0),
+            "accepted_record_count": int(detail.get("accepted_record_count") or 0),
+            "rejected_record_count": int(detail.get("rejected_record_count") or 0),
+            "invalid_record_count": int(detail.get("invalid_record_count") or 0),
+            "unreviewed_candidate_count": int(
+                detail.get("unreviewed_candidate_count") or 0
+            ),
+            "closure_candidate_count": int(detail.get("closure_candidate_count") or 0),
+            "closure_candidate_surface_ids": (
+                list(closure_candidate_surface_ids)
+                if isinstance(closure_candidate_surface_ids, list)
+                else []
+            ),
+            "rejected_surface_ids": (
+                list(rejected_surface_ids)
+                if isinstance(rejected_surface_ids, list)
+                else []
+            ),
+            "invalid_record_ids": (
+                list(invalid_record_ids) if isinstance(invalid_record_ids, list) else []
+            ),
+            "unreviewed_candidate_surface_ids": (
+                list(unreviewed_surface_ids)
+                if isinstance(unreviewed_surface_ids, list)
+                else []
+            ),
+            "manual_fixture_closure_candidate_available": (
+                detail.get("manual_fixture_closure_candidate_available") is True
+            ),
+            "manual_fixture_closure_required": True,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "next_wing_proof_plan_schema":
@@ -8081,6 +8306,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     )
     fixture_acceptance_ledger = (
         read_surface_physical_readback_fixture_acceptance_ledger_summary(results)
+    )
+    fixture_closure_plan = read_surface_physical_readback_fixture_closure_plan_summary(
+        results
     )
     next_plan = next_wing_proof_plan_summary(results)
     summary = {
@@ -8159,6 +8387,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     if fixture_acceptance_ledger is not None:
         summary["read_surface_physical_readback_fixture_acceptance_ledger"] = (
             fixture_acceptance_ledger
+        )
+    if fixture_closure_plan is not None:
+        summary["read_surface_physical_readback_fixture_closure_plan"] = (
+            fixture_closure_plan
         )
     if next_plan is not None:
         summary["next_wing_proof_plan"] = next_plan
@@ -9593,6 +9825,71 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(fixture_acceptance_ledger['violations'])}`",
             ]
         )
+    if fixture_closure_plan is not None:
+        lines.extend(
+            [
+                "",
+                "## Read Surface Physical Readback Fixture Closure Plan",
+                "",
+                f"- schema_check: `{fixture_closure_plan['status']}`",
+                f"- read_only: `{str(fixture_closure_plan['read_only']).lower()}`",
+                f"- live_write: `{str(fixture_closure_plan['live_write']).lower()}`",
+                "- mutates_console_state: "
+                f"`{str(fixture_closure_plan['mutates_console_state']).lower()}`",
+                "- queries_console: "
+                f"`{str(fixture_closure_plan['queries_console']).lower()}`",
+                "- executes_tests: "
+                f"`{str(fixture_closure_plan['executes_tests']).lower()}`",
+                "- operator_required: "
+                f"`{str(fixture_closure_plan['operator_required']).lower()}`",
+                "- execution_allowed_by_plan: "
+                f"`{str(fixture_closure_plan['execution_allowed_by_plan']).lower()}`",
+                "- fixture_update_allowed_by_plan: "
+                f"`{str(fixture_closure_plan['fixture_update_allowed_by_plan']).lower()}`",
+                "- fixture_closure_allowed_by_plan: "
+                f"`{str(fixture_closure_plan['fixture_closure_allowed_by_plan']).lower()}`",
+                "- live_widening_allowed: "
+                f"`{str(fixture_closure_plan['live_widening_allowed']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(fixture_closure_plan['live_authority_granted']).lower()}`",
+                "- full_autonomous_ready: "
+                f"`{str(fixture_closure_plan['full_autonomous_ready']).lower()}`",
+                f"- plan_status: `{fixture_closure_plan['plan_status']}`",
+                f"- ledger_status: `{fixture_closure_plan['ledger_status']}`",
+                "- review_candidate_count: "
+                f"`{fixture_closure_plan['review_candidate_count']}`",
+                "- acceptance_record_count: "
+                f"`{fixture_closure_plan['acceptance_record_count']}`",
+                "- accepted_record_count: "
+                f"`{fixture_closure_plan['accepted_record_count']}`",
+                "- rejected_record_count: "
+                f"`{fixture_closure_plan['rejected_record_count']}`",
+                "- invalid_record_count: "
+                f"`{fixture_closure_plan['invalid_record_count']}`",
+                "- unreviewed_candidate_count: "
+                f"`{fixture_closure_plan['unreviewed_candidate_count']}`",
+                "- closure_candidate_count: "
+                f"`{fixture_closure_plan['closure_candidate_count']}`",
+                "- manual_fixture_closure_candidate_available: "
+                f"`{str(fixture_closure_plan['manual_fixture_closure_candidate_available']).lower()}`",
+                "- manual_fixture_closure_required: "
+                f"`{str(fixture_closure_plan['manual_fixture_closure_required']).lower()}`",
+                "- operator_review_required: "
+                f"`{str(fixture_closure_plan['operator_review_required']).lower()}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(fixture_closure_plan['physical_fixture_gap_remains']).lower()}`",
+                "- closure_candidate_surface_ids: "
+                f"`{json.dumps(fixture_closure_plan['closure_candidate_surface_ids'])}`",
+                "- rejected_surface_ids: "
+                f"`{json.dumps(fixture_closure_plan['rejected_surface_ids'])}`",
+                "- invalid_record_ids: "
+                f"`{json.dumps(fixture_closure_plan['invalid_record_ids'])}`",
+                "- unreviewed_candidate_surface_ids: "
+                f"`{json.dumps(fixture_closure_plan['unreviewed_candidate_surface_ids'])}`",
+                f"- blocked_by: `{json.dumps(fixture_closure_plan['blocked_by'])}`",
+                f"- violations: `{json.dumps(fixture_closure_plan['violations'])}`",
+            ]
+        )
     if next_plan is not None:
         lines.extend(
             [
@@ -9847,6 +10144,15 @@ def run_release_checks(
             results.append(fixture_acceptance_ledger_result)
             if (
                 fixture_acceptance_ledger_result.status != "passed"
+                and not continue_on_failure
+            ):
+                break
+            fixture_closure_plan_result = (
+                validate_read_surface_physical_readback_fixture_closure_plan_snapshot()
+            )
+            results.append(fixture_closure_plan_result)
+            if (
+                fixture_closure_plan_result.status != "passed"
                 and not continue_on_failure
             ):
                 break

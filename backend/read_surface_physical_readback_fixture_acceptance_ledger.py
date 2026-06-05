@@ -70,6 +70,19 @@ def _string_list(value: Any) -> Tuple[str, ...]:
     return tuple(str(item) for item in value if isinstance(item, str) and item)
 
 
+def _is_utc_timestamp(value: str) -> bool:
+    if not value:
+        return False
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        return False
+    return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
+
+
 def _record_list(value: Iterable[Mapping[str, Any]] | None) -> Tuple[Mapping[str, Any], ...]:
     if value is None:
         return ()
@@ -128,9 +141,15 @@ def _validated_record(
         violations.append("acceptance_record_reviewer_missing")
     if not reviewed_at:
         violations.append("acceptance_record_reviewed_at_missing")
+    elif not _is_utc_timestamp(reviewed_at):
+        violations.append("acceptance_record_reviewed_at_invalid")
+    if not artifact_source_id:
+        violations.append("acceptance_record_artifact_source_missing")
     if required_contract_method_id != candidate.get("required_contract_method_id"):
         violations.append("acceptance_record_contract_mismatch")
-    if candidate_artifact_sources and artifact_source_id not in candidate_artifact_sources:
+    if candidate and not candidate_artifact_sources:
+        violations.append("acceptance_record_candidate_artifact_sources_missing")
+    elif candidate_artifact_sources and artifact_source_id not in candidate_artifact_sources:
         violations.append("acceptance_record_artifact_source_mismatch")
     if unsafe_flags:
         violations.append("acceptance_record_unsafe_authority_claim")

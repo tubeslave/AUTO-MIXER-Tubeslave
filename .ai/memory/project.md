@@ -99,6 +99,7 @@
 - Read-surface physical readback artifact review queue aggregates all per-surface artifact-intake results as one operator review gate after dLive-state intake in no-WING release evidence; it must keep `execution_allowed_by_queue=false`, `fixture_closure_allowed_by_queue=false`, `live_authority_granted=false`, and `full_autonomous_ready=false`.
 - Cockpit module status should expose the read-surface physical readback artifact review queue as its own read-only operator review row, preserving `canWriteLive=false`, empty `liveWriteKinds`, `fixture_closure_allowed=false`, `live_authority=false`, and `full_autonomous_ready=false` even when review candidates exist.
 - Read-surface physical readback fixture acceptance ledger may record operator accepted/rejected review candidates only as review records; it must keep `fixture_closure_allowed_by_acceptance=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false` until a separate manual fixture-closure decision exists.
+- Read-surface physical readback fixture closure plan may surface accepted ledger records as manual fixture-baseline update candidates only; it must keep `fixture_update_allowed_by_plan=false`, `fixture_closure_allowed_by_plan=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false` until a separate baseline update is performed and reviewed.
 
 ## Memory Pipeline Lessons
 

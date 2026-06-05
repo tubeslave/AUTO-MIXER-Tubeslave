@@ -161,6 +161,55 @@ def test_acceptance_ledger_rejects_unsafe_or_unmatched_records():
     ]
 
 
+def test_acceptance_ledger_rejects_missing_artifact_source_id():
+    spec, queue = _queue_with_valid_candidate()
+    ledger = build_read_surface_physical_readback_fixture_acceptance_ledger(
+        review_queue=queue,
+        acceptance_records=[
+            {
+                "review_id": "missing-artifact-source",
+                "surface_id": spec["surface_id"],
+                "required_contract_method_id": spec["required_contract_method_id"],
+                "decision": "accepted",
+                "reviewed_by": "operator",
+                "reviewed_at": "2026-06-05T19:45:00Z",
+            }
+        ],
+    )
+
+    assert ledger["status"] == "operator_acceptance_replacement_required"
+    assert ledger["summary"]["invalid_record_ids"] == ["missing-artifact-source"]
+    assert ledger["records"][0]["valid"] is False
+    assert "acceptance_record_artifact_source_missing" in ledger["records"][0][
+        "violations"
+    ]
+
+
+def test_acceptance_ledger_rejects_non_utc_review_timestamp():
+    spec, queue = _queue_with_valid_candidate()
+    ledger = build_read_surface_physical_readback_fixture_acceptance_ledger(
+        review_queue=queue,
+        acceptance_records=[
+            {
+                "review_id": "local-time-review",
+                "surface_id": spec["surface_id"],
+                "artifact_source_id": "raw-mixer-physical.json",
+                "required_contract_method_id": spec["required_contract_method_id"],
+                "decision": "accepted",
+                "reviewed_by": "operator",
+                "reviewed_at": "2026-06-05 22:45:00",
+            }
+        ],
+    )
+
+    assert ledger["status"] == "operator_acceptance_replacement_required"
+    assert ledger["summary"]["invalid_record_ids"] == ["local-time-review"]
+    assert ledger["records"][0]["valid"] is False
+    assert "acceptance_record_reviewed_at_invalid" in ledger["records"][0][
+        "violations"
+    ]
+
+
 def test_acceptance_ledger_is_transport_free():
     source = Path(
         "backend/read_surface_physical_readback_fixture_acceptance_ledger.py"
