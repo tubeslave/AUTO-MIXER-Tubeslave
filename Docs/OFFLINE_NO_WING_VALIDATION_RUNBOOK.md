@@ -84,7 +84,20 @@ The no-WING validation can be treated as passed only if:
 - `tools/no_wing_release_check.py` status is `passed` for release-style handoff;
 - `connection_policy` is `no_hardware_no_network_no_live_writes`;
 - `live_write` is `false`;
+- `read_surface_fixture_evidence` is `passed`;
+- `read_surface_fixture_evidence_schema` is `passed`;
+- `gain_dry_run_proof` is `passed`;
+- `supervised_proof_report_gain_dry_run_schema` is `passed`;
+- `next_wing_proof_plan_schema` is `passed`;
 - `supervised_proof_report_gap_rollup_schema` is `passed`;
+- `summary.json` and `summary.md` expose the Supervised Gain Dry-Run Proof as
+  read-only, non-live, non-promoting evidence for fake-mixer gain pre-read,
+  apply readback, rollback, cooldown block, and emergency-stop block behavior;
+- `summary.json` and `summary.md` expose the Next WING Proof Plan as
+  read-only and operator-required with `execution_allowed_by_plan=false`;
+- `summary.json` and `summary.md` expose Read Surface Fixture Evidence as
+  read-only, non-live, non-autonomous evidence, including the remaining physical
+  readback fixture gaps;
 - `summary.json` and `summary.md` expose the read-only Autonomy Gap Rollup with
   Full Autonomous still not ready and Supervised live-write kinds matching the
   current operator-mode policy;
@@ -100,6 +113,7 @@ The no-WING validation can be treated as passed only if:
 Correct wording:
 
 - `offline dry-run validated`;
+- `gain dry-run proof captured`;
 - `proposal workflow simulated`;
 - `supervised path remains the only live write candidate`;
 - `real WING validation still required for hardware proof`.

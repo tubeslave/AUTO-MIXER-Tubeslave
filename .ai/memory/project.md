@@ -45,6 +45,9 @@
 - MuQ-A1 FX-led rock passes should treat `0.9` whole-mix score as an aspirational, not fixed, gate unless calibrated against references; on SONG REPA the provided commercial reference scored `0.7959`, while subtle reference-guided FX plus section-selective modulation reached `0.7725` without clipping.
 - Operator accepted the `MIX_AYAIC_FX_SOFTPRINT_FINAL` direction for Desktop/MIX: use AYAIC Mix Monolith-inspired level-plane/relative balance, shared filtered FX returns, real MuQ-A1 audit, and light mix-print mastering. Avoid MuQ score chasing through segment EQ, clipping, heavy limiting, or aggressive compression when this direction is requested.
 - Operator accepted Ayaic level-plane balancing as the default rule for offline mixes and real-console soundcheck/live work: gain staging and balance must measure both individual sources and the summed stems/groups. Use Ayaic planes as the primary default (`-22` lead/main, `-25` strong sources and Drums/Bass/Guitars/BG Vocal buses, `-27` tucked backing vocals, `-30` keys/synth/ambient support, `-35` FX/deep effects), while live safety limits override target loudness.
+- No-WING release checks must capture supervised gain dry-run proof through the Product Layer proposal path and classify it as read-only, non-live, non-promoting evidence until physical WING pre-read/apply/rollback proof exists.
+- No-WING release summaries may expose next physical WING proof plan metadata, but only with `operator_required=true`, `execution_allowed_by_plan=false`, and no implication that Codex or automation may run it.
+- Read-surface fixture evidence is part of no-WING readiness: declared fixture paths and pytest function names must be drift-checked before release proof reports are trusted, and no-WING summaries should keep remaining physical readback fixture gaps visible.
 
 ## Memory Pipeline Lessons
 

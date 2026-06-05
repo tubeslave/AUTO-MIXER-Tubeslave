@@ -27,12 +27,14 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_status  # noqa: E402
+from backend.read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot  # noqa: E402
 
 DEFAULT_ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "no_wing_release_check"
 DEFAULT_BACKEND_PORT = 8765
 DEFAULT_COMMAND_TIMEOUT_SEC = 900
 AUTONOMY_GAP_ROLLUP_SOURCE = "autonomy_mode_transition_gate.rows[mode=auto]"
 DEFAULT_HOMEBREW_GIT = Path("/opt/homebrew/bin/git")
+GAIN_DRY_RUN_REASON = "no_wing_release_gain_dry_run"
 
 FORBIDDEN_COMMAND_TOKENS = (
     "wing_operator_proposal_validation_runner.py",
@@ -185,6 +187,7 @@ def build_checks(
     command_timeout_sec: float | None = DEFAULT_COMMAND_TIMEOUT_SEC,
 ) -> list[CommandCheck]:
     offline_artifact_root = (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "offline_validation"
+    gain_proof_root = gain_proof_artifact_root_for_run(run_dir)
     proof_report_path = proof_report_path_for_run(run_dir)
     checks = [
         CommandCheck(
@@ -194,6 +197,19 @@ def build_checks(
                 "-m",
                 "pytest",
                 "tests/test_write_surface_inventory_static_scan.py",
+                "-q",
+                "--tb=short",
+            ),
+            cwd=str(repo_root),
+            env={"PYTHONPATH": "backend"},
+        ),
+        CommandCheck(
+            name="read_surface_fixture_evidence",
+            command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "tests/test_read_surface_fixture_evidence.py",
                 "-q",
                 "--tb=short",
             ),
@@ -225,12 +241,36 @@ def build_checks(
             cwd=str(repo_root),
         ),
         CommandCheck(
+            name="gain_dry_run_proof",
+            command=(
+                sys.executable,
+                "tools/gain_proof_dry_run_runner.py",
+                "--artifact-root",
+                str(gain_proof_root),
+                "--channel",
+                "1",
+                "--initial-gain-db",
+                "1.0",
+                "--delta-db",
+                "-0.25",
+                "--cooldown-sec",
+                "2.0",
+                "--reason",
+                GAIN_DRY_RUN_REASON,
+            ),
+            cwd=str(repo_root),
+            env={"PYTHONPATH": "backend"},
+        ),
+        CommandCheck(
             name="supervised_proof_artifact_report",
             command=(
                 sys.executable,
                 "tools/evaluate_supervised_proof_artifacts.py",
                 "--artifact-root",
                 str(offline_artifact_root),
+                "--artifact-root",
+                str(gain_proof_root),
+                "--require-physical",
                 "--output",
                 str(proof_report_path),
                 "--quiet",
@@ -293,6 +333,10 @@ def build_checks(
 
 def proof_report_path_for_run(run_dir: Path | None) -> Path:
     return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "supervised_proof_artifact_report.json"
+
+
+def gain_proof_artifact_root_for_run(run_dir: Path | None) -> Path:
+    return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "gain_proof_dry_run"
 
 
 def validate_no_live_commands(checks: Iterable[CommandCheck]) -> None:
@@ -503,6 +547,239 @@ def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResul
     )
 
 
+def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "read_surface_fixture_evidence_must_remain_read_only_and_non_autonomous",
+    }
+    violations: list[str] = []
+
+    try:
+        snapshot = build_read_surface_fixture_evidence_snapshot()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        snapshot = {}
+        violations.append(f"snapshot_build_error:{type(exc).__name__}")
+
+    safety = snapshot.get("safety") if isinstance(snapshot.get("safety"), Mapping) else {}
+    summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), Mapping) else {}
+    status_counts = summary.get("status_counts") if isinstance(summary.get("status_counts"), Mapping) else {}
+    physical_missing = summary.get("physical_fixture_missing_surface_ids")
+    if not isinstance(physical_missing, list):
+        physical_missing = []
+        violations.append("physical_fixture_missing_surface_ids_missing")
+
+    expected_true = ("read_only",)
+    for key in expected_true:
+        if safety.get(key) is not True:
+            violations.append(f"read_surface_fixture_{key}_not_true")
+    expected_false = (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "full_autonomous_ready",
+    )
+    for key in expected_false:
+        if safety.get(key) is not False:
+            violations.append(f"read_surface_fixture_{key}_not_false")
+    if snapshot.get("type") != "read_surface_fixture_evidence":
+        violations.append("read_surface_fixture_type_mismatch")
+    if snapshot.get("status") == "fixture_evidence_complete" and physical_missing:
+        violations.append("fixture_status_complete_but_physical_gaps_remain")
+    if not physical_missing:
+        violations.append("physical_readback_gaps_not_reported")
+
+    detail["snapshot_status"] = snapshot.get("status")
+    detail["surface_count"] = int(summary.get("surface_count") or 0)
+    detail["surface_with_fixture_count"] = int(summary.get("surface_with_fixture_count") or 0)
+    detail["status_counts"] = dict(status_counts)
+    detail["physical_fixture_missing_surface_ids"] = list(physical_missing)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="read_surface_fixture_evidence_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def validate_supervised_proof_report_gain_dry_run(report_path: Path) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    payload, load_error = _json_object_from_path(report_path)
+    detail: dict[str, object] = {
+        "report_path": str(report_path),
+        "policy": "supervised_proof_report_must_include_read_only_gain_dry_run_evidence",
+    }
+    violations: list[str] = []
+    gain_rows: list[Mapping[str, Any]] = []
+
+    if load_error is not None:
+        violations.append(load_error)
+    else:
+        assert payload is not None
+        safety = payload.get("safety") if isinstance(payload.get("safety"), Mapping) else {}
+        summary = payload.get("summary") if isinstance(payload.get("summary"), Mapping) else {}
+        rows = payload.get("rows") if isinstance(payload.get("rows"), list) else []
+
+        if safety.get("read_only") is not True:
+            violations.append("proof_report_read_only_not_true")
+        for key in ("live_write", "live_widening_allowed", "full_autonomous_ready"):
+            if safety.get(key) is not False:
+                violations.append(f"proof_report_{key}_not_false")
+
+        gain_rows = [
+            row
+            for row in rows
+            if isinstance(row, Mapping)
+            and row.get("value_type") == "gain"
+            and row.get("proof_mode") == "dry_run"
+            and row.get("status") == "dry_run_ready"
+        ]
+        if not gain_rows:
+            violations.append("gain_dry_run_ready_row_missing")
+
+        value_type_counts = summary.get("value_type_counts")
+        if not isinstance(value_type_counts, Mapping) or int(value_type_counts.get("gain") or 0) < 1:
+            violations.append("summary_gain_value_type_count_missing")
+        dry_run_ids = summary.get("dry_run_ready_proof_ids")
+        if not isinstance(dry_run_ids, list) or not dry_run_ids:
+            violations.append("summary_dry_run_ready_proof_ids_missing")
+
+        for row in gain_rows:
+            if row.get("promotion_allowed") is not False:
+                violations.append("gain_dry_run_promotion_allowed_not_false")
+            if row.get("autonomous_ready") is not False:
+                violations.append("gain_dry_run_autonomous_ready_not_false")
+            blockers = row.get("blockers") if isinstance(row.get("blockers"), list) else []
+            if "physical_proof_required_for_promotion" not in blockers:
+                violations.append("gain_dry_run_physical_proof_blocker_missing")
+            evidence = row.get("evidence") if isinstance(row.get("evidence"), Mapping) else {}
+            expected_sources = {
+                "pre_read_source": "fake_mixer",
+                "readback_source": "fake_mixer",
+                "rollback_readback_source": "fake_mixer",
+            }
+            for key, expected in expected_sources.items():
+                if evidence.get(key) != expected:
+                    violations.append(f"gain_dry_run_{key}_not_fake_mixer")
+            if evidence.get("operator_approval_recorded") is not True:
+                violations.append("gain_dry_run_operator_approval_missing")
+            if evidence.get("idempotency_key_present") is not True:
+                violations.append("gain_dry_run_idempotency_key_missing")
+
+        detail["gain_dry_run_row_count"] = len(gain_rows)
+        detail["dry_run_ready_proof_ids"] = list(dry_run_ids) if isinstance(dry_run_ids, list) else []
+        detail["value_type_counts"] = dict(value_type_counts) if isinstance(value_type_counts, Mapping) else {}
+
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="supervised_proof_report_gain_dry_run_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    payload, load_error = _json_object_from_path(report_path)
+    detail: dict[str, object] = {
+        "report_path": str(report_path),
+        "policy": "next_wing_proof_plan_must_be_operator_required_and_non_executing",
+    }
+    violations: list[str] = []
+    planned_value_types: list[str] = []
+    planned_channels: list[int] = []
+    global_blockers: list[str] = []
+    step_count = 0
+    plan_status: object = None
+
+    if load_error is not None:
+        violations.append(load_error)
+    else:
+        assert payload is not None
+        plan = payload.get("next_wing_proof_plan") if isinstance(payload.get("next_wing_proof_plan"), Mapping) else {}
+        safety = plan.get("safety") if isinstance(plan.get("safety"), Mapping) else {}
+        summary = plan.get("summary") if isinstance(plan.get("summary"), Mapping) else {}
+        steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
+        plan_status = plan.get("status")
+
+        if plan.get("type") != "supervised_wing_proof_plan":
+            violations.append("next_wing_proof_plan_type_mismatch")
+        if plan_status not in {"operator_proof_required", "manual_review_ready", "blocked_by_invalid_artifacts"}:
+            violations.append("next_wing_proof_plan_status_unknown")
+
+        expected_true = ("read_only", "operator_required")
+        for key in expected_true:
+            if safety.get(key) is not True:
+                violations.append(f"next_wing_proof_plan_{key}_not_true")
+        expected_false = (
+            "live_write",
+            "execution_allowed_by_plan",
+            "live_widening_allowed",
+            "automatic_safety_update_allowed",
+            "full_autonomous_ready",
+        )
+        for key in expected_false:
+            if safety.get(key) is not False:
+                violations.append(f"next_wing_proof_plan_{key}_not_false")
+
+        step_count = int(summary.get("step_count") or 0)
+        if step_count != len(steps):
+            violations.append("next_wing_proof_plan_step_count_mismatch")
+        planned_value_types = [str(item) for item in summary.get("planned_value_types", []) if item] if isinstance(summary.get("planned_value_types"), list) else []
+        planned_channels = [
+            int(item)
+            for item in summary.get("planned_channels", [])
+            if isinstance(item, (int, float, str)) and str(item).strip().lstrip("-").isdigit()
+        ] if isinstance(summary.get("planned_channels"), list) else []
+        global_blockers = [str(item) for item in summary.get("global_blockers", []) if item] if isinstance(summary.get("global_blockers"), list) else []
+        if plan_status == "operator_proof_required" and step_count < 1:
+            violations.append("next_wing_proof_plan_required_without_steps")
+        if plan_status == "operator_proof_required" and "operator_must_approve_and_execute_manually" not in global_blockers:
+            violations.append("next_wing_proof_plan_operator_blocker_missing")
+
+        for index, step in enumerate(steps):
+            if not isinstance(step, Mapping):
+                violations.append(f"next_wing_proof_plan_step_{index}_not_object")
+                continue
+            if step.get("execution_allowed_by_plan") is not False:
+                violations.append(f"next_wing_proof_plan_step_{index}_execution_allowed")
+            if step.get("operator_approval_required") is not True:
+                violations.append(f"next_wing_proof_plan_step_{index}_operator_approval_not_required")
+            if step.get("live_execution_required") is not True:
+                violations.append(f"next_wing_proof_plan_step_{index}_live_execution_not_declared")
+            try:
+                delta_db = float(step.get("delta_db"))
+            except (TypeError, ValueError):
+                violations.append(f"next_wing_proof_plan_step_{index}_delta_invalid")
+                continue
+            if delta_db >= 0 or abs(delta_db) > 0.5:
+                violations.append(f"next_wing_proof_plan_step_{index}_delta_not_safe_negative_proof")
+
+    detail["plan_status"] = plan_status
+    detail["step_count"] = step_count
+    detail["planned_value_types"] = planned_value_types
+    detail["planned_channels"] = planned_channels
+    detail["global_blockers"] = global_blockers
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="next_wing_proof_plan_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def autonomy_gap_rollup_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "supervised_proof_report_gap_rollup_schema":
@@ -530,9 +807,85 @@ def autonomy_gap_rollup_summary(results: Sequence[CheckResult]) -> dict[str, obj
     return None
 
 
+def supervised_gain_dry_run_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "supervised_proof_report_gain_dry_run_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        dry_run_ids = detail.get("dry_run_ready_proof_ids")
+        value_type_counts = detail.get("value_type_counts")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "promotion_allowed": False,
+            "autonomous_ready": False,
+            "gain_dry_run_row_count": int(detail.get("gain_dry_run_row_count") or 0),
+            "dry_run_ready_proof_ids": list(dry_run_ids) if isinstance(dry_run_ids, list) else [],
+            "value_type_counts": dict(value_type_counts) if isinstance(value_type_counts, Mapping) else {},
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
+def read_surface_fixture_evidence_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "read_surface_fixture_evidence_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        status_counts = detail.get("status_counts")
+        physical_missing = detail.get("physical_fixture_missing_surface_ids")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "full_autonomous_ready": False,
+            "snapshot_status": detail.get("snapshot_status"),
+            "surface_count": int(detail.get("surface_count") or 0),
+            "surface_with_fixture_count": int(detail.get("surface_with_fixture_count") or 0),
+            "status_counts": dict(status_counts) if isinstance(status_counts, Mapping) else {},
+            "physical_fixture_missing_surface_ids": list(physical_missing)
+            if isinstance(physical_missing, list)
+            else [],
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
+def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "next_wing_proof_plan_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        planned_value_types = detail.get("planned_value_types")
+        planned_channels = detail.get("planned_channels")
+        global_blockers = detail.get("global_blockers")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "execution_allowed_by_plan": False,
+            "operator_required": True,
+            "full_autonomous_ready": False,
+            "plan_status": detail.get("plan_status"),
+            "step_count": int(detail.get("step_count") or 0),
+            "planned_value_types": list(planned_value_types) if isinstance(planned_value_types, list) else [],
+            "planned_channels": list(planned_channels) if isinstance(planned_channels, list) else [],
+            "global_blockers": list(global_blockers) if isinstance(global_blockers, list) else [],
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at: str) -> dict[str, object]:
     failed = [result.name for result in results if result.status != "passed"]
     gap_rollup = autonomy_gap_rollup_summary(results)
+    gain_dry_run = supervised_gain_dry_run_summary(results)
+    read_fixture = read_surface_fixture_evidence_summary(results)
+    next_plan = next_wing_proof_plan_summary(results)
     summary = {
         "type": "no_wing_release_check",
         "generated_at": generated_at,
@@ -544,6 +897,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     }
     if gap_rollup is not None:
         summary["autonomy_gap_rollup"] = gap_rollup
+    if gain_dry_run is not None:
+        summary["supervised_gain_dry_run"] = gain_dry_run
+    if read_fixture is not None:
+        summary["read_surface_fixture_evidence"] = read_fixture
+    if next_plan is not None:
+        summary["next_wing_proof_plan"] = next_plan
     summary_path = run_dir / "summary.json"
     _write_text(summary_path, json.dumps(summary, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
 
@@ -577,6 +936,63 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 "- policy_supervised_live_write_kinds: "
                 f"`{json.dumps(gap_rollup['policy_supervised_live_write_kinds'])}`",
                 f"- violations: `{json.dumps(gap_rollup['violations'])}`",
+            ]
+        )
+    if gain_dry_run is not None:
+        lines.extend(
+            [
+                "",
+                "## Supervised Gain Dry-Run Proof",
+                "",
+                f"- schema_check: `{gain_dry_run['status']}`",
+                f"- read_only: `{str(gain_dry_run['read_only']).lower()}`",
+                f"- live_write: `{str(gain_dry_run['live_write']).lower()}`",
+                f"- promotion_allowed: `{str(gain_dry_run['promotion_allowed']).lower()}`",
+                f"- autonomous_ready: `{str(gain_dry_run['autonomous_ready']).lower()}`",
+                f"- gain_dry_run_row_count: `{gain_dry_run['gain_dry_run_row_count']}`",
+                "- dry_run_ready_proof_ids: "
+                f"`{json.dumps(gain_dry_run['dry_run_ready_proof_ids'])}`",
+                f"- violations: `{json.dumps(gain_dry_run['violations'])}`",
+            ]
+        )
+    if read_fixture is not None:
+        lines.extend(
+            [
+                "",
+                "## Read Surface Fixture Evidence",
+                "",
+                f"- schema_check: `{read_fixture['status']}`",
+                f"- read_only: `{str(read_fixture['read_only']).lower()}`",
+                f"- live_write: `{str(read_fixture['live_write']).lower()}`",
+                f"- full_autonomous_ready: `{str(read_fixture['full_autonomous_ready']).lower()}`",
+                f"- snapshot_status: `{read_fixture['snapshot_status']}`",
+                f"- surface_count: `{read_fixture['surface_count']}`",
+                f"- surface_with_fixture_count: `{read_fixture['surface_with_fixture_count']}`",
+                "- status_counts: "
+                f"`{json.dumps(read_fixture['status_counts'], sort_keys=True)}`",
+                "- physical_fixture_missing_surface_ids: "
+                f"`{json.dumps(read_fixture['physical_fixture_missing_surface_ids'])}`",
+                f"- violations: `{json.dumps(read_fixture['violations'])}`",
+            ]
+        )
+    if next_plan is not None:
+        lines.extend(
+            [
+                "",
+                "## Next WING Proof Plan",
+                "",
+                f"- schema_check: `{next_plan['status']}`",
+                f"- read_only: `{str(next_plan['read_only']).lower()}`",
+                f"- live_write: `{str(next_plan['live_write']).lower()}`",
+                f"- execution_allowed_by_plan: `{str(next_plan['execution_allowed_by_plan']).lower()}`",
+                f"- operator_required: `{str(next_plan['operator_required']).lower()}`",
+                f"- full_autonomous_ready: `{str(next_plan['full_autonomous_ready']).lower()}`",
+                f"- plan_status: `{next_plan['plan_status']}`",
+                f"- step_count: `{next_plan['step_count']}`",
+                f"- planned_value_types: `{json.dumps(next_plan['planned_value_types'])}`",
+                f"- planned_channels: `{json.dumps(next_plan['planned_channels'])}`",
+                f"- global_blockers: `{json.dumps(next_plan['global_blockers'])}`",
+                f"- violations: `{json.dumps(next_plan['violations'])}`",
             ]
         )
     if failed:
@@ -622,7 +1038,20 @@ def run_release_checks(
         results.append(result)
         if result.status != "passed" and not continue_on_failure:
             break
+        if check.name == "read_surface_fixture_evidence" and result.status == "passed":
+            read_fixture_result = validate_read_surface_fixture_evidence_snapshot()
+            results.append(read_fixture_result)
+            if read_fixture_result.status != "passed" and not continue_on_failure:
+                break
         if check.name == "supervised_proof_artifact_report" and result.status == "passed":
+            gain_dry_run_result = validate_supervised_proof_report_gain_dry_run(proof_report_path)
+            results.append(gain_dry_run_result)
+            if gain_dry_run_result.status != "passed" and not continue_on_failure:
+                break
+            next_plan_result = validate_supervised_proof_report_next_wing_plan(proof_report_path)
+            results.append(next_plan_result)
+            if next_plan_result.status != "passed" and not continue_on_failure:
+                break
             artifact_result = validate_supervised_proof_report_gap_rollup(proof_report_path)
             results.append(artifact_result)
             if artifact_result.status != "passed" and not continue_on_failure:

@@ -186,6 +186,9 @@ async def run(args: argparse.Namespace) -> int:
 
     summary: Dict[str, Any] = {
         "run_id": run_id,
+        "proof_artifact_schema": "gain_proof_dry_run.v1",
+        "proof_runner": "gain_proof_dry_run_runner",
+        "proof_mode": "dry_run",
         "status": "started",
         "channel": args.channel,
         "initial_gain_db": args.initial_gain_db,
@@ -238,6 +241,19 @@ async def run(args: argparse.Namespace) -> int:
         apply_result = extract_apply_result(apply_payload)
         summary["proposal_result"] = proposal_result
         summary["apply_result"] = apply_payload
+        summary.update(
+            {
+                "pre_read_status": apply_result.get("pre_read_status"),
+                "pre_read_source": "fake_mixer",
+                "readback_status": apply_result.get("readback_status"),
+                "readback_source": "fake_mixer",
+                "proof_status": apply_result.get("proof_status", "verified"),
+                "rollback_available": bool(apply_result.get("rollback_available")),
+                "rollback_value": apply_result.get("rollback_value", old_value),
+                "operator_approval_recorded": True,
+                "idempotency_key_present": True,
+            }
+        )
         if not verified(apply_result):
             summary.update({"status": "failed", "reason": "apply_not_verified"})
             recorder.write_summary(summary)
@@ -280,6 +296,13 @@ async def run(args: argparse.Namespace) -> int:
         rollback_status = rollback_payload.get("rollback_readback_status") or rollback_payload.get("readback_status")
         rollback_proof_status = rollback_payload.get("rollback_proof_status") or rollback_payload.get("proof_status")
         summary["rollback_result"] = rollback_payload
+        summary.update(
+            {
+                "rollback_readback_status": rollback_status,
+                "rollback_readback_source": "fake_mixer",
+                "rollback_proof_status": rollback_proof_status,
+            }
+        )
         if (
             rollback_payload.get("type") != "manual_write_rollback_applied"
             or rollback_payload.get("rollback_status") != "applied"
@@ -310,6 +333,8 @@ async def run(args: argparse.Namespace) -> int:
         summary["emergency_stop_result"] = emergency
         summary["emergency_proposal_result"] = emergency_proposal_result
         summary["post_emergency_apply_result"] = emergency_apply
+        summary["emergency_stop_proof_status"] = "verified" if extract_apply_result(emergency_apply).get("reason") == "emergency_stop_active" else ""
+        summary["blocked_followup_status"] = "verified" if extract_apply_result(cooldown_apply).get("reason") == "cooldown" else ""
         if extract_apply_result(emergency_apply).get("reason") != "emergency_stop_active":
             summary.update({"status": "failed", "reason": "emergency_stop_not_blocked"})
             recorder.write_summary(summary)

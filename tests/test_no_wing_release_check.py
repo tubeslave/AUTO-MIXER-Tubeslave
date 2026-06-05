@@ -12,10 +12,17 @@ from tools.no_wing_release_check import (
     autonomy_gap_rollup_summary,
     build_checks,
     current_supervised_live_write_kinds,
+    gain_proof_artifact_root_for_run,
+    next_wing_proof_plan_summary,
     proof_report_path_for_run,
+    read_surface_fixture_evidence_summary,
     run_command_check,
     run_release_checks,
+    supervised_gain_dry_run_summary,
     validate_no_live_commands,
+    validate_read_surface_fixture_evidence_snapshot,
+    validate_supervised_proof_report_next_wing_plan,
+    validate_supervised_proof_report_gain_dry_run,
     validate_supervised_proof_report_gap_rollup,
     write_summary,
 )
@@ -100,15 +107,36 @@ def test_no_wing_release_check_derives_supervised_boundary_from_operator_policy(
     assert current_supervised_live_write_kinds() == ("fader", "gain")
 
 
+def test_no_wing_release_check_validates_read_surface_fixture_evidence_snapshot():
+    result = validate_read_surface_fixture_evidence_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["snapshot_status"] == "fixture_evidence_incomplete"
+    assert result.detail["surface_count"] >= 1
+    assert result.detail["surface_with_fixture_count"] >= 1
+    assert result.detail["status_counts"]["partial_fixture_evidence"] >= 1
+    assert result.detail["physical_fixture_missing_surface_ids"]
+    assert result.detail["violations"] == []
+
+
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_frontend=False, quick=True)
 
     check_names = [check.name for check in checks]
     assert "write_surface_static_scan" in check_names
+    assert "read_surface_fixture_evidence" in check_names
     assert "memory_lint" in check_names
+    assert "gain_dry_run_proof" in check_names
     assert "supervised_proof_artifact_report" in check_names
     assert check_names.index("write_surface_static_scan") < check_names.index("backend_pytest")
+    assert check_names.index("read_surface_fixture_evidence") < check_names.index("backend_pytest")
+    assert check_names.index("write_surface_static_scan") < check_names.index(
+        "read_surface_fixture_evidence"
+    )
     assert check_names.index("offline_operator_validation_harness") < check_names.index(
+        "gain_dry_run_proof"
+    )
+    assert check_names.index("gain_dry_run_proof") < check_names.index(
         "supervised_proof_artifact_report"
     )
     assert check_names.index("supervised_proof_artifact_report") < check_names.index(
@@ -120,16 +148,32 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         for check in checks
         if check.name == "write_surface_static_scan"
     )
+    fixture_check = next(check for check in checks if check.name == "read_surface_fixture_evidence")
+    assert "tests/test_read_surface_fixture_evidence.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command
+    assert "--require-physical" in report_check.command
     assert str(proof_report_path_for_run(tmp_path)) in report_check.command
+    assert str(gain_proof_artifact_root_for_run(tmp_path)) in report_check.command
+    assert report_check.command.count("--artifact-root") == 2
+    gain_check = next(check for check in checks if check.name == "gain_dry_run_proof")
+    assert "tools/gain_proof_dry_run_runner.py" in gain_check.command
+    assert str(gain_proof_artifact_root_for_run(tmp_path)) in gain_check.command
 
 
 def valid_proof_report_with_gap_rollup() -> dict:
     return {
         "type": "supervised_proof_artifact_report",
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "live_widening_allowed": False,
+            "full_autonomous_ready": False,
+        },
         "summary": {
+            "value_type_counts": {"gain": 1},
+            "dry_run_ready_proof_ids": ["gain-proof-dry-run"],
             "autonomy_gap_rollup": {
                 "read_only": True,
                 "live_write": False,
@@ -149,11 +193,72 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 ),
             }
         },
+        "rows": [
+            {
+                "proof_id": "gain-proof-dry-run",
+                "value_type": "gain",
+                "channel": 1,
+                "proof_mode": "dry_run",
+                "status": "dry_run_ready",
+                "promotion_allowed": False,
+                "autonomous_ready": False,
+                "blockers": ["physical_proof_required_for_promotion"],
+                "evidence": {
+                    "pre_read_status": "verified_from_physical_readback",
+                    "pre_read_source": "fake_mixer",
+                    "readback_status": "verified_from_physical_readback",
+                    "readback_source": "fake_mixer",
+                    "rollback_readback_status": "verified_from_physical_readback",
+                    "rollback_readback_source": "fake_mixer",
+                    "operator_approval_recorded": True,
+                    "idempotency_key_present": True,
+                },
+            }
+        ],
         "autonomy_mode_transition_gate": {
             "summary": {
                 "autonomous_apply_allowed_modes": [],
                 "blocked_modes": ["auto"],
             }
+        },
+        "next_wing_proof_plan": {
+            "type": "supervised_wing_proof_plan",
+            "status": "operator_proof_required",
+            "safety": {
+                "read_only": True,
+                "live_write": False,
+                "execution_allowed_by_plan": False,
+                "live_widening_allowed": False,
+                "automatic_safety_update_allowed": False,
+                "full_autonomous_ready": False,
+                "operator_required": True,
+            },
+            "summary": {
+                "step_count": 1,
+                "planned_value_types": ["gain"],
+                "planned_channels": [3],
+                "global_blockers": [
+                    "operator_must_approve_and_execute_manually",
+                    "proof_plan_does_not_contact_mixer",
+                ],
+            },
+            "steps": [
+                {
+                    "id": "gain_physical_proof_ch3",
+                    "value_type": "gain",
+                    "channel": 3,
+                    "delta_db": -0.25,
+                    "live_execution_required": True,
+                    "execution_allowed_by_plan": False,
+                    "operator_approval_required": True,
+                    "command": ["python", "tools/wing_operator_proposal_validation_runner.py"],
+                    "rationale": "physical proof required",
+                    "prerequisites": ["operator approval"],
+                    "abort_conditions": ["operator concern"],
+                    "expected_artifacts": ["summary.json"],
+                    "evidence_blockers_to_review": ["physical_candidate_missing"],
+                }
+            ],
         },
     }
 
@@ -169,6 +274,77 @@ def test_no_wing_release_check_validates_proof_report_gap_rollup_schema(tmp_path
     assert result.detail["full_auto_gap_bucket_counts"] == {"read_surface": 1}
     assert result.detail["supervised_current_live_write_kinds"] == ["fader", "gain"]
     assert result.detail["policy_supervised_live_write_kinds"] == ["fader", "gain"]
+
+
+def test_no_wing_release_check_validates_gain_dry_run_report_schema(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    report_path.write_text(json.dumps(valid_proof_report_with_gap_rollup()), encoding="utf-8")
+
+    result = validate_supervised_proof_report_gain_dry_run(report_path)
+
+    assert result.status == "passed"
+    assert result.detail["gain_dry_run_row_count"] == 1
+    assert result.detail["dry_run_ready_proof_ids"] == ["gain-proof-dry-run"]
+    assert result.detail["value_type_counts"] == {"gain": 1}
+
+
+def test_no_wing_release_check_validates_next_wing_proof_plan_schema(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    report_path.write_text(json.dumps(valid_proof_report_with_gap_rollup()), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "passed"
+    assert result.detail["plan_status"] == "operator_proof_required"
+    assert result.detail["step_count"] == 1
+    assert result.detail["planned_value_types"] == ["gain"]
+    assert result.detail["planned_channels"] == [3]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_next_wing_proof_plan_that_grants_execution(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    plan = payload["next_wing_proof_plan"]
+    plan["safety"]["execution_allowed_by_plan"] = True
+    plan["safety"]["live_write"] = True
+    plan["safety"]["operator_required"] = False
+    plan["summary"]["global_blockers"] = []
+    plan["steps"][0]["execution_allowed_by_plan"] = True
+    plan["steps"][0]["operator_approval_required"] = False
+    plan["steps"][0]["delta_db"] = 0.25
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "failed"
+    assert "next_wing_proof_plan_execution_allowed_by_plan_not_false" in result.detail["violations"]
+    assert "next_wing_proof_plan_live_write_not_false" in result.detail["violations"]
+    assert "next_wing_proof_plan_operator_required_not_true" in result.detail["violations"]
+    assert "next_wing_proof_plan_operator_blocker_missing" in result.detail["violations"]
+    assert "next_wing_proof_plan_step_0_execution_allowed" in result.detail["violations"]
+    assert "next_wing_proof_plan_step_0_operator_approval_not_required" in result.detail["violations"]
+    assert "next_wing_proof_plan_step_0_delta_not_safe_negative_proof" in result.detail["violations"]
+
+
+def test_no_wing_release_check_rejects_gain_dry_run_report_that_claims_promotion(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["rows"][0]["promotion_allowed"] = True
+    payload["rows"][0]["autonomous_ready"] = True
+    payload["rows"][0]["blockers"] = []
+    payload["rows"][0]["evidence"]["pre_read_source"] = "physical_readback"
+    payload["summary"]["dry_run_ready_proof_ids"] = []
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_gain_dry_run(report_path)
+
+    assert result.status == "failed"
+    assert "summary_dry_run_ready_proof_ids_missing" in result.detail["violations"]
+    assert "gain_dry_run_promotion_allowed_not_false" in result.detail["violations"]
+    assert "gain_dry_run_autonomous_ready_not_false" in result.detail["violations"]
+    assert "gain_dry_run_physical_proof_blocker_missing" in result.detail["violations"]
+    assert "gain_dry_run_pre_read_source_not_fake_mixer" in result.detail["violations"]
 
 
 def test_no_wing_release_check_rejects_missing_proof_report_gap_rollup(tmp_path):
@@ -254,8 +430,23 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
 
     result_names = [result["name"] for result in summary["results"]]
     assert summary["status"] == "passed"
+    assert "read_surface_fixture_evidence_schema" in result_names
+    assert "supervised_proof_report_gain_dry_run_schema" in result_names
+    assert "next_wing_proof_plan_schema" in result_names
     assert "supervised_proof_report_gap_rollup_schema" in result_names
+    assert result_names.index("read_surface_fixture_evidence") < result_names.index(
+        "read_surface_fixture_evidence_schema"
+    )
+    assert result_names.index("read_surface_fixture_evidence_schema") < result_names.index(
+        "backend_pytest"
+    )
     assert result_names.index("supervised_proof_artifact_report") < result_names.index(
+        "supervised_proof_report_gain_dry_run_schema"
+    )
+    assert result_names.index("supervised_proof_report_gain_dry_run_schema") < result_names.index(
+        "next_wing_proof_plan_schema"
+    )
+    assert result_names.index("next_wing_proof_plan_schema") < result_names.index(
         "supervised_proof_report_gap_rollup_schema"
     )
 
@@ -806,6 +997,96 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
     assert "full_auto_gap_bucket_counts" in markdown_summary
     assert '"read_surface": 14' in markdown_summary
     assert 'supervised_current_live_write_kinds: `["fader", "gain"]`' in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_gain_dry_run_proof(tmp_path):
+    result = CheckResult(
+        name="supervised_proof_report_gain_dry_run_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "gain_dry_run_row_count": 1,
+            "dry_run_ready_proof_ids": ["gain-proof-dry-run"],
+            "value_type_counts": {"gain": 1},
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert supervised_gain_dry_run_summary([result]) == summary["supervised_gain_dry_run"]
+    assert json_summary["supervised_gain_dry_run"]["live_write"] is False
+    assert json_summary["supervised_gain_dry_run"]["promotion_allowed"] is False
+    assert json_summary["supervised_gain_dry_run"]["autonomous_ready"] is False
+    assert json_summary["supervised_gain_dry_run"]["gain_dry_run_row_count"] == 1
+    assert "## Supervised Gain Dry-Run Proof" in markdown_summary
+    assert 'dry_run_ready_proof_ids: `["gain-proof-dry-run"]`' in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_read_surface_fixture_evidence(tmp_path):
+    result = CheckResult(
+        name="read_surface_fixture_evidence_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "snapshot_status": "fixture_evidence_incomplete",
+            "surface_count": 10,
+            "surface_with_fixture_count": 10,
+            "status_counts": {"partial_fixture_evidence": 10},
+            "physical_fixture_missing_surface_ids": ["channel_identity_and_basic_controls"],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert read_surface_fixture_evidence_summary([result]) == summary["read_surface_fixture_evidence"]
+    assert json_summary["read_surface_fixture_evidence"]["live_write"] is False
+    assert json_summary["read_surface_fixture_evidence"]["full_autonomous_ready"] is False
+    assert json_summary["read_surface_fixture_evidence"]["surface_count"] == 10
+    assert json_summary["read_surface_fixture_evidence"]["physical_fixture_missing_surface_ids"] == [
+        "channel_identity_and_basic_controls"
+    ]
+    assert "## Read Surface Fixture Evidence" in markdown_summary
+    assert "physical_fixture_missing_surface_ids" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
+    result = CheckResult(
+        name="next_wing_proof_plan_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "plan_status": "operator_proof_required",
+            "step_count": 1,
+            "planned_value_types": ["gain"],
+            "planned_channels": [3],
+            "global_blockers": ["operator_must_approve_and_execute_manually"],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert next_wing_proof_plan_summary([result]) == summary["next_wing_proof_plan"]
+    assert json_summary["next_wing_proof_plan"]["live_write"] is False
+    assert json_summary["next_wing_proof_plan"]["execution_allowed_by_plan"] is False
+    assert json_summary["next_wing_proof_plan"]["operator_required"] is True
+    assert json_summary["next_wing_proof_plan"]["planned_value_types"] == ["gain"]
+    assert "## Next WING Proof Plan" in markdown_summary
+    assert 'planned_value_types: `["gain"]`' in markdown_summary
 
 
 def test_no_wing_release_check_records_command_timeout(tmp_path):

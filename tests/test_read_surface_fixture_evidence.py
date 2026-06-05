@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 from backend.processing_registry import (
@@ -9,6 +10,19 @@ from backend.project_goal_capability_matrix import get_project_goal_capability
 from backend.read_surface_fixture_evidence import (
     build_read_surface_fixture_evidence_snapshot,
 )
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _declared_test_functions(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.startswith("test_")
+    }
 
 
 def test_read_surface_fixture_evidence_snapshot_tracks_cached_dto_fixtures_only():
@@ -139,6 +153,35 @@ def test_console_read_goal_references_fixture_evidence_without_widening_live_sco
     assert "backend/read_surface_fixture_evidence.py" in row.support_paths
     assert row.current_live_write_kinds == ()
     assert "physical fixtures" in row.next_step
+
+
+def test_read_surface_fixture_evidence_declares_existing_fixture_tests():
+    snapshot = build_read_surface_fixture_evidence_snapshot()
+
+    for surface in snapshot["surfaces"]:
+        surface_id = surface["surface_id"]
+        fixture_paths = surface["fixture_paths"]
+        test_names = surface["test_names"]
+        if surface["status"] == "missing_fixture_evidence":
+            assert fixture_paths == []
+            assert test_names == []
+            continue
+
+        assert fixture_paths, surface_id
+        assert test_names, surface_id
+        available_tests_by_path = {}
+        for relative_path in fixture_paths:
+            assert relative_path.startswith("tests/"), (surface_id, relative_path)
+            fixture_path = ROOT / relative_path
+            assert fixture_path.exists(), (surface_id, relative_path)
+            available_tests_by_path[relative_path] = _declared_test_functions(fixture_path)
+
+        missing_tests = [
+            name
+            for name in test_names
+            if not any(name in names for names in available_tests_by_path.values())
+        ]
+        assert missing_tests == [], (surface_id, missing_tests)
 
 
 def test_read_surface_fixture_evidence_module_stays_transport_free():

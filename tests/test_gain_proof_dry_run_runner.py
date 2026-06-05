@@ -73,8 +73,16 @@ async def test_gain_proof_dry_run_uses_operator_proposal_path_only(tmp_path: Pat
     assert exit_code == 0
     summary = read_summary(tmp_path)
     assert summary["status"] == "passed"
+    assert summary["proof_artifact_schema"] == "gain_proof_dry_run.v1"
+    assert summary["proof_runner"] == "gain_proof_dry_run_runner"
+    assert summary["proof_mode"] == "dry_run"
     assert summary["physical_wing"] is False
     assert summary["write_policy"] == "fake_mixer_apply_operator_proposal_only"
+    assert summary["pre_read_source"] == "fake_mixer"
+    assert summary["readback_source"] == "fake_mixer"
+    assert summary["rollback_readback_source"] == "fake_mixer"
+    assert summary["operator_approval_recorded"] is True
+    assert summary["idempotency_key_present"] is True
     apply_result = summary["apply_result"]["apply_result"]
     assert apply_result["pre_read_status"] == "verified_from_physical_readback"
     assert apply_result["readback_status"] == "verified_from_physical_readback"
