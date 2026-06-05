@@ -8,6 +8,7 @@ All tests work without hardware or network (all external connections mocked).
 import asyncio
 import json
 import os
+import time
 import numpy as np
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
@@ -873,11 +874,27 @@ class TestAutoMixerServerRuntimeErrors:
         })
 
 
+class TimestampedState(dict):
+    def __init__(self, owner):
+        super().__init__()
+        self.owner = owner
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        self.owner.state_timestamps[key] = time.time()
+
+    def update(self, *args, **kwargs):
+        for key, value in dict(*args, **kwargs).items():
+            self[key] = value
+
+
 class DummyWingLike:
     def __init__(self):
         self.is_connected = True
         self.send = MagicMock()
-        self.state = {"/ch/1/fdr": -8.0, "/ch/1/in/set/trim": 1.0}
+        self.state_timestamps = {}
+        self.state = TimestampedState(self)
+        self.state.update({"/ch/1/fdr": -8.0, "/ch/1/in/set/trim": 1.0})
         self.set_channel_fader = MagicMock(return_value=True)
         self.set_channel_gain = MagicMock()
         self.set_eq_band = MagicMock()
@@ -1085,13 +1102,40 @@ class TestWingDeploymentWriteBoundary:
         assert payload["old_value"] == -8.0
         assert payload["pre_read_status"] == "verified_from_cache"
         assert payload["pre_read_source"] == "mixer_state_cache"
-        assert payload["readback_status"] == "not_verified"
+        assert payload["readback_status"] == "readback_cache_not_fresh"
         assert payload["readback_value"] == -8.0
+        assert payload["readback_cache_freshness"]["status"] == "not_after_write"
+        assert payload["readback_cache_freshness"]["updated_after_minimum"] is False
         assert payload["proof_status"] == "partial"
         assert payload["rollback_available"] is True
         assert payload["rollback_value"] == -8.0
         assert payload["rollback_status"] == "not_attempted"
         server.mixer_client.set_channel_fader.assert_called_once_with(1, -6.0)
+
+    @pytest.mark.asyncio
+    async def test_websocket_fader_blocks_when_cache_pre_read_is_stale(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time() - 120.0
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_fader"](
+            websocket,
+            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-stale-cache"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "pre_read_cache_not_fresh"
+        assert payload["pre_read_status"] == "verified_from_cache"
+        assert payload["pre_read_source"] == "mixer_state_cache"
+        assert payload["cache_freshness"]["status"] == "stale"
+        assert payload["cache_freshness"]["address"] == "/ch/1/fdr"
+        assert payload["proof_status"] == "blocked"
+        server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_websocket_fader_enforces_cooldown_for_same_wing_target(self, dummy_wing_server):
@@ -1154,6 +1198,38 @@ class TestWingDeploymentWriteBoundary:
         assert payload["rollback_value"] == 1.0
         assert payload["rollback_address"] == "/ch/1/in/set/trim"
         assert payload["rollback_status"] == "not_attempted"
+        server.mixer_client.set_channel_gain.assert_called_once_with(1, 2.0)
+
+    @pytest.mark.asyncio
+    async def test_websocket_gain_demotes_cache_readback_not_updated_after_write(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server.mixer_client.state = {"/ch/1/in/set/trim": 1.0}
+        server.mixer_client.state_timestamps = {"/ch/1/in/set/trim": time.time()}
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        def apply_gain_without_timestamp(channel, value):
+            server.mixer_client.state[f"/ch/{channel}/in/set/trim"] = value
+            return True
+
+        server.mixer_client.set_channel_gain.side_effect = apply_gain_without_timestamp
+
+        await handlers["set_gain"](
+            websocket,
+            {"channel": 1, "value": 2.0, "approved": True, "approval_id": "unit-gain-cache-not-updated"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_applied"
+        assert payload["status"] == "applied"
+        assert payload["readback_value"] == 2.0
+        assert payload["readback_status"] == "readback_cache_not_fresh"
+        assert payload["readback_cache_freshness"]["status"] == "not_after_write"
+        assert payload["readback_cache_freshness"]["updated_after_minimum"] is False
+        assert payload["proof_status"] == "partial"
+        assert payload["rollback_available"] is True
         server.mixer_client.set_channel_gain.assert_called_once_with(1, 2.0)
 
     @pytest.mark.asyncio
@@ -1573,6 +1649,38 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_phase_invert.assert_not_called()
         server.mixer_client.set_channel_delay.assert_not_called()
 
+    def test_auto_compressor_reset_helper_is_fail_closed_evidence(self, dummy_wing_server):
+        server = dummy_wing_server
+
+        result = server._reset_compressor_on_channel(7)
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "auto_compressor_reset_direct_apply_quarantined"
+        assert result["surface"] == "auto_compressor_reset"
+        assert result["write_policy"] == "proposal_only_quarantined"
+        assert result["live_write_allowed"] is False
+        assert result["mutates_mixer"] is False
+        assert {
+            "cmd": "set_compressor_on",
+            "channel": 7,
+            "on": 0,
+            "semantic": "reset_compressor_disable",
+        } in result["blocked_calls"]
+        assert {
+            "cmd": "set_compressor",
+            "channel": 7,
+            "threshold": -10.0,
+            "ratio": "3.0",
+            "attack": 10.0,
+            "release": 100.0,
+            "gain": 0.0,
+            "mix": 100.0,
+            "knee": 0,
+            "semantic": "reset_compressor_defaults",
+        } in result["blocked_calls"]
+        server.mixer_client.set_compressor_on.assert_not_called()
+        server.mixer_client.set_compressor.assert_not_called()
+
     @pytest.mark.asyncio
     async def test_restore_snapshot_quarantine_blocks_restore_helper_even_with_valid_snapshot(
         self,
@@ -1903,5 +2011,5 @@ class TestWingDeploymentWriteBoundary:
         assert payload["type"] == "manual_write_rollback_applied"
         assert payload["status"] == "applied"
         assert payload["rollback_status"] == "partial"
-        assert payload["rollback_readback_status"] == "not_verified"
+        assert payload["rollback_readback_status"] == "readback_cache_not_fresh"
         assert payload["rollback_proof_status"] == "partial"

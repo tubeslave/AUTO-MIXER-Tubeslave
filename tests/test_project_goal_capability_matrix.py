@@ -95,6 +95,41 @@ def test_deessing_is_tracked_as_proposal_only_method_not_ignored():
     assert "de-esser" in row.next_step
 
 
+def test_gating_is_freshness_and_identity_guarded_without_live_widening():
+    gating = get_project_goal_capability("gating")
+    console_gate = get_project_goal_capability("console_gate_control")
+
+    for row in (gating, console_gate):
+        assert row is not None
+        assert row.status == "proposal_only"
+        assert row.autonomy_mode_ceiling == "assisted"
+        assert "context_aware_gate_agent" in row.method_ids
+        assert "backend/auto_fader_v2/controller.py" in row.support_paths
+        assert "backend/source_identity_downstream_gate.py" in row.support_paths
+        assert row.current_live_write_kinds == ()
+        assert "trusted source identity" in row.next_step
+        assert "AutoFaderV2" in row.blocker
+
+
+def test_equalization_tracks_fail_closed_auto_eq_boundary():
+    row = get_project_goal_capability("equalization")
+    console = get_project_goal_capability("console_eq_control")
+
+    for capability in (row, console):
+        assert capability is not None
+        assert capability.status == "proposal_only"
+        assert capability.autonomy_mode_ceiling == "assisted"
+        assert "auto_eq" in capability.method_ids
+        assert "backend/auto_eq.py" in capability.support_paths
+        assert "backend/auto_fader_v2/controller.py" in capability.support_paths
+        assert "backend/auto_soundcheck_engine.py" in capability.support_paths
+        assert "blocked evidence" in capability.blocker
+        assert capability.current_live_write_kinds == ()
+    assert "AutoSoundcheck EQ-enable writes" in console.blocker
+    assert "operator review" in row.next_step
+    assert "readback and rollback proof" in console.next_step
+
+
 def test_arrangement_roles_are_tracked_as_proposal_layer_without_live_widening():
     row = get_project_goal_capability("identify_arrangement_roles")
 
@@ -108,12 +143,29 @@ def test_arrangement_roles_are_tracked_as_proposal_layer_without_live_widening()
 
 def test_compression_is_tracked_as_transport_free_proposal_layer():
     row = get_project_goal_capability("compression")
+    console = get_project_goal_capability("console_compressor_control")
 
     assert row is not None
     assert row.status == "proposal_only"
     assert row.autonomy_mode_ceiling == "assisted"
     assert "compressor_dynamics_proposal" in row.method_ids
+    assert "auto_compressor" in row.method_ids
+    assert "auto_compressor_cf" in row.method_ids
+    assert "backend/auto_compressor.py" in row.support_paths
+    assert "backend/auto_compressor_cf.py" in row.support_paths
+    assert "backend/server.py" in row.support_paths
+    assert "backend/auto_soundcheck_engine.py" in console.support_paths
+    assert "server reset helper" in row.blocker
+    assert "blocked evidence" in row.blocker
+    assert "AutoSoundcheck compressor-threshold writes" in console.blocker
     assert "operator review" in row.next_step
+    assert console is not None
+    assert console.status == "proposal_only"
+    assert "auto_compressor" in console.method_ids
+    assert "auto_compressor_cf" in console.method_ids
+    assert "backend/auto_compressor.py" in console.support_paths
+    assert "backend/auto_compressor_cf.py" in console.support_paths
+    assert "blocked evidence" in console.blocker
 
 
 def test_panning_is_tracked_as_transport_free_proposal_layer():
@@ -124,10 +176,29 @@ def test_panning_is_tracked_as_transport_free_proposal_layer():
     assert row.status == "proposal_only"
     assert row.autonomy_mode_ceiling == "assisted"
     assert "pan_spatial_proposal" in row.method_ids
+    assert "auto_panner" in row.method_ids
+    assert "backend/auto_panner.py" in row.support_paths
+    assert "backend/auto_panner_adaptive.py" in row.support_paths
+    assert "fail-closed" in row.blocker
     assert "operator review" in row.next_step
     assert console is not None
     assert console.status == "proposal_only"
     assert "pan_spatial_proposal" in console.method_ids
+    assert "backend/auto_panner.py" in console.support_paths
+    assert "backend/auto_panner_adaptive.py" in console.support_paths
+    assert "adaptive panner" in console.blocker
+    assert "blocked evidence" in console.blocker
+
+
+def test_phase_correction_tracks_fail_closed_delay_polarity_boundary():
+    row = get_project_goal_capability("phase_correction")
+
+    assert row is not None
+    assert row.status == "proposal_only"
+    assert row.autonomy_mode_ceiling == "assisted"
+    assert "phase_alignment" in row.method_ids
+    assert "blocked evidence" in row.blocker
+    assert "readback and rollback proof" in row.next_step
 
 
 def test_fx_is_tracked_as_transport_free_proposal_layer():
@@ -139,12 +210,24 @@ def test_fx_is_tracked_as_transport_free_proposal_layer():
     assert effects.status == "proposal_only"
     assert effects.autonomy_mode_ceiling == "assisted"
     assert "fx_send_proposal" in effects.method_ids
+    assert "auto_fx" in effects.method_ids
+    assert "backend/operator_product_state.py" in effects.support_paths
+    assert "backend/auto_fx.py" in effects.support_paths
+    assert "AutoReverb" in effects.blocker
+    assert "fail-closed" in effects.blocker
+    assert "read-only FX schema hints" in effects.next_step
     assert sends is not None
     assert sends.status == "proposal_only"
     assert "fx_send_proposal" in sends.method_ids
+    assert "backend/auto_fx.py" in sends.support_paths
     assert console is not None
     assert console.status == "proposal_only"
     assert "fx_send_proposal" in console.method_ids
+    assert "backend/operator_product_state.py" in console.support_paths
+    assert "backend/auto_fx.py" in console.support_paths
+    assert "AutoReverb" in console.blocker
+    assert "blocked evidence" in console.blocker
+    assert "schema hints" in console.next_step
 
 
 def test_master_bus_is_tracked_as_transport_free_proposal_layer():
@@ -191,7 +274,9 @@ def test_decision_basis_is_tracked_as_proposal_layer_without_live_widening():
     assert row.status == "proposal_only"
     assert row.autonomy_mode_ceiling == "assisted"
     assert "decision_evidence_packet_proposal" in row.method_ids
+    assert "backend/source_identity_downstream_gate.py" in row.support_paths
     assert row.current_live_write_kinds == ()
+    assert "trusted-source-identity" in row.next_step
     assert "replay" in row.next_step
 
 
@@ -214,11 +299,25 @@ def test_bus_group_balance_is_tracked_as_proposal_layer_without_live_widening():
     assert mix_balance.status == "proposal_only"
     assert "bus_group_balance_proposal" in mix_balance.method_ids
     assert mix_balance.current_live_write_kinds == ("fader",)
+    assert "AutoFOH bus/DCA/master typed actions are blocked evidence" in mix_balance.blocker
     assert console is not None
     assert console.status == "proposal_only"
     assert console.autonomy_mode_ceiling == "assisted"
     assert "bus_group_balance_proposal" in console.method_ids
+    assert "backend/autofoh_safety.py" in console.support_paths
+    assert "blocked evidence only" in console.blocker
     assert console.current_live_write_kinds == ()
+
+
+def test_fader_control_stays_product_layer_only_with_autosoundcheck_restore_evidence():
+    row = get_project_goal_capability("console_fader_control")
+
+    assert row is not None
+    assert row.status == "canonical"
+    assert row.current_live_write_kinds == ("fader",)
+    assert "backend/auto_soundcheck_engine.py" in row.support_paths
+    assert "AutoSoundcheck fader restore is blocked evidence" in row.blocker
+    assert "Product Layer approval" in row.next_step
 
 
 def test_mute_control_is_tracked_as_proposal_layer_without_live_widening():
@@ -228,7 +327,9 @@ def test_mute_control_is_tracked_as_proposal_layer_without_live_widening():
     assert row.status == "proposal_only"
     assert row.autonomy_mode_ceiling == "assisted"
     assert "mute_management_proposal" in row.method_ids
+    assert "backend/auto_soundcheck_engine.py" in row.support_paths
     assert row.current_live_write_kinds == ()
+    assert "AutoSoundcheck mute restore returns blocked evidence" in row.blocker
     assert "operator review" in row.next_step
 
 
@@ -250,8 +351,12 @@ def test_scene_preset_control_is_tracked_as_proposal_layer_without_live_widening
     assert row.status == "proposal_only"
     assert row.autonomy_mode_ceiling == "assisted"
     assert "scene_preset_management_proposal" in row.method_ids
+    assert "backend/operator_product_state.py" in row.support_paths
     assert row.current_live_write_kinds == ()
     assert "operator review" in row.next_step
+    assert "read-only scoped scene/preset diffs" in row.next_step
+    assert "Product Layer snapshot freshness" in row.next_step
+    assert "read-only rollback evidence" in row.next_step
 
 
 def test_snapshot_is_read_only_and_fail_closed_for_live_widening():

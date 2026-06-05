@@ -22,6 +22,11 @@ try:
 except ImportError:  # pragma: no cover - direct PYTHONPATH=backend compatibility
     from automation_trace import AutomationDecisionTrace
 
+try:
+    from .source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+except ImportError:  # pragma: no cover - direct PYTHONPATH=backend compatibility
+    from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+
 
 CONTEXT_AWARE_GATE_VERSION = "context_aware_gate_v1"
 EPSILON = 1e-12
@@ -97,6 +102,38 @@ def _amplitude_from_db(db_value: Any) -> float:
 
 def _round(value: Any, digits: int = 3) -> float:
     return round(_safe_float(value), digits)
+
+
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "unknown_fields",
+        "missing_fields",
+        "max_age_seconds",
+        "oldest_age_seconds",
+        "read_only",
+        "live_write",
+        "queries_console",
+    )
+    normalized = {key: payload[key] for key in allowed_keys if key in payload}
+    normalized.setdefault("status", _freshness_status(payload))
+    normalized.setdefault("provided", True)
+    return normalized
 
 
 def normalize_instrument(value: str) -> str:
@@ -241,6 +278,11 @@ class BleedTelemetry:
     false_close_risk: float = 0.0
     timestamp: str = field(default_factory=utc_now)
     source: str = CONTEXT_AWARE_GATE_VERSION
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
+    source_identity_trust_state: str = "not_provided"
+    source_identity_trust_confidence: float = 0.0
+    source_identity_replay_outcome_count: int = 0
+    source_identity_calibration_freshness: Optional[Dict[str, Any]] = None
     evidence: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -276,6 +318,11 @@ class BleedTelemetry:
             chatter_risk=_round(_clip01(chatter), 3),
             false_open_risk=_round(_clip01(false_open), 3),
             false_close_risk=_round(_clip01(false_close), 3),
+            current_state_cache_freshness=getattr(snapshot, "current_state_cache_freshness", None),
+            source_identity_trust_state=str(getattr(snapshot, "source_identity_trust_state", "not_provided")),
+            source_identity_trust_confidence=_safe_float(getattr(snapshot, "source_identity_trust_confidence", 0.0)),
+            source_identity_replay_outcome_count=int(getattr(snapshot, "source_identity_replay_outcome_count", 0) or 0),
+            source_identity_calibration_freshness=getattr(snapshot, "source_identity_calibration_freshness", None),
             evidence={
                 "feature_source": getattr(snapshot, "source", "unknown"),
                 "band_energy_db": dict(band_energy),
@@ -422,6 +469,49 @@ class ContextAwareGateAgent:
             return None
 
         instrument = normalize_instrument(telemetry.expected_instrument)
+        current_state_freshness = _freshness_payload(telemetry.current_state_cache_freshness)
+        current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+        source_identity_trust = evaluate_source_identity_downstream_trust(
+            source_id=f"channel:{telemetry.channel_id}",
+            source_type=instrument,
+            trust_state=telemetry.source_identity_trust_state,
+            trust_confidence=telemetry.source_identity_trust_confidence,
+            replay_outcome_count=telemetry.source_identity_replay_outcome_count,
+            current_state_cache_freshness=telemetry.source_identity_calibration_freshness,
+        )
+        blockers = []
+        if current_state_freshness_status not in {"fresh", "not_provided"}:
+            blockers.append("context_aware_gate_context_cache_not_fresh")
+        blockers.extend(source_identity_trust.blockers)
+        if blockers:
+            blockers_tuple = tuple(sorted(set(blockers)))
+            return ContextGateRecommendation(
+                channel_id=telemetry.channel_id,
+                action_type="gate_analysis_hold",
+                suggested_params={},
+                confidence=0.0,
+                risk_score=1.0,
+                reason=(
+                    f"{telemetry.channel_label or 'Channel'} gate/expander proposal "
+                    "is held until fresh context and trusted source identity are available."
+                ),
+                safety_status="analysis_only",
+                dry_run=True,
+                evidence={
+                    "telemetry": telemetry.to_dict(),
+                    "context_instrument": instrument,
+                    "policy": self.config.to_dict(),
+                    "current_state_cache_freshness_status": current_state_freshness_status,
+                    "current_state_cache_freshness": current_state_freshness,
+                    "source_identity_downstream_trust": source_identity_trust.to_dict(),
+                    "blockers": blockers_tuple,
+                    "live_write": False,
+                    "queue_mutation": False,
+                    "model_mutation": False,
+                    "memory_mutation": False,
+                    "decision_log_ready": True,
+                },
+            )
         risk = self._risk_score(telemetry)
         confidence = self._confidence(telemetry, risk)
         action_type = "gate" if instrument in DRUM_SOURCES and telemetry.tail_risk < 0.55 else "expander"
@@ -445,7 +535,13 @@ class ContextAwareGateAgent:
                 "telemetry": telemetry.to_dict(),
                 "context_instrument": instrument,
                 "policy": self.config.to_dict(),
+                "current_state_cache_freshness_status": current_state_freshness_status,
+                "current_state_cache_freshness": current_state_freshness,
+                "source_identity_downstream_trust": source_identity_trust.to_dict(),
                 "live_write": False,
+                "queue_mutation": False,
+                "model_mutation": False,
+                "memory_mutation": False,
                 "decision_log_ready": True,
             },
         )

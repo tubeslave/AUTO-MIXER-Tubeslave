@@ -48,6 +48,14 @@ def test_safe_drum_group_creates_proposal_only_balance_recommendation():
             assignment_confidence=0.9,
             confidence=0.9,
             persistence_cycles=3,
+            current_state_cache_freshness={
+                "status": "fresh",
+                "field_count": 7,
+                "fresh_field_count": 7,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
         )
     )
 
@@ -61,6 +69,11 @@ def test_safe_drum_group_creates_proposal_only_balance_recommendation():
     assert recommendation.blockers == ()
     assert recommendation.evidence["ayaic_level_plane"] is True
     assert recommendation.evidence["transport_free"] is True
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 7
+    assert recommendation.evidence["source_identity_downstream_trust"]["status"] == (
+        "legacy_unverified"
+    )
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "bus_group_balance_proposal"
@@ -72,6 +85,7 @@ def test_safe_drum_group_creates_proposal_only_balance_recommendation():
     assert "unsupported_value_type:bus_group_balance" in proposal["blockers"]
     assert proposal["proposed_action"]["suggested_delta_db"] == recommendation.suggested_delta_db
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
 
 
 def test_peak_limited_bus_up_is_analysis_only():
@@ -121,6 +135,145 @@ def test_low_assignment_confidence_blocks_group_balance():
     assert "bus_assignment_confidence_low" in recommendation.blockers
 
 
+def test_source_identity_hold_blocks_bus_group_balance_proposal():
+    recommendation = analyze_bus_group_balance_need(
+        BusGroupBalanceAnalysisInput(
+            bus_id="group:drums",
+            bus_kind="group",
+            bus_label="DRUMS",
+            source_role="drums",
+            current_fader_db=-5.0,
+            integrated_lufs=-26.1,
+            short_term_lufs=-25.8,
+            true_peak_dbfs=-8.0,
+            summed_child_lufs=-25.6,
+            child_count=8,
+            dominant_child_share=0.35,
+            main_bus_headroom_db=6.0,
+            feedback_risk=0.1,
+            assignment_confidence=0.9,
+            confidence=0.9,
+            persistence_cycles=3,
+            current_state_cache_freshness={"status": "fresh", "read_only": True},
+            source_identity_trust_state="hold_for_operator_review",
+            source_identity_trust_confidence=0.52,
+            source_identity_replay_outcome_count=4,
+            source_identity_calibration_freshness={
+                "status": "fresh",
+                "field_count": 4,
+                "fresh_field_count": 4,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_not_trusted_for_downstream" in recommendation.blockers
+    assert recommendation.severity == "medium"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["source_id"] == "group:drums"
+    assert trust["source_type"] == "drums"
+    assert trust["status"] == "held_for_operator_review"
+    assert trust["usable_for_downstream"] is False
+    proposal = recommendation.to_operator_proposal()
+    assert proposal["can_apply_live"] is False
+    assert "requested_change" not in proposal
+
+
+def test_stale_source_identity_replay_context_blocks_bus_group_balance_proposal():
+    analysis = BusGroupBalanceAnalysisInput(
+        bus_id="group:drums",
+        bus_kind="group",
+        bus_label="DRUMS",
+        source_role="drums",
+        current_fader_db=-5.0,
+        integrated_lufs=-26.1,
+        short_term_lufs=-25.8,
+        true_peak_dbfs=-8.0,
+        summed_child_lufs=-25.6,
+        child_count=8,
+        dominant_child_share=0.35,
+        main_bus_headroom_db=6.0,
+        feedback_risk=0.1,
+        assignment_confidence=0.9,
+        confidence=0.9,
+        persistence_cycles=3,
+        current_state_cache_freshness={"status": "fresh", "read_only": True},
+        source_identity_trust_state="trusted_for_downstream_priority",
+        source_identity_trust_confidence=0.91,
+        source_identity_replay_outcome_count=8,
+        source_identity_calibration_freshness={
+            "status": "stale",
+            "field_count": 4,
+            "fresh_field_count": 2,
+            "stale_field_count": 2,
+            "stale_fields": ["accepted_outcomes", "rejected_outcomes"],
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+        },
+    )
+    recommendation = analyze_bus_group_balance_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_replay_context_not_fresh" in recommendation.blockers
+    assert recommendation.severity == "high"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["status"] == "trusted"
+    assert trust["usable_for_downstream"] is False
+    assert trust["evidence"]["current_source_identity_replay_context_cache_freshness"] == "stale"
+    assert trust["evidence"]["current_state_cache_freshness"]["stale_fields"] == [
+        "accepted_outcomes",
+        "rejected_outcomes",
+    ]
+    assert build_bus_group_balance_proposals([analysis]) == ()
+
+
+def test_stale_current_bus_group_state_blocks_proposal_only_recommendation():
+    recommendation = analyze_bus_group_balance_need(
+        BusGroupBalanceAnalysisInput(
+            bus_id="group:drums",
+            bus_kind="group",
+            bus_label="DRUMS",
+            source_role="drums",
+            current_fader_db=-5.0,
+            integrated_lufs=-26.1,
+            short_term_lufs=-25.8,
+            true_peak_dbfs=-8.0,
+            summed_child_lufs=-25.6,
+            child_count=8,
+            dominant_child_share=0.35,
+            main_bus_headroom_db=6.0,
+            feedback_risk=0.1,
+            assignment_confidence=0.9,
+            confidence=0.9,
+            persistence_cycles=3,
+            current_state_cache_freshness={
+                "status": "stale",
+                "field_count": 7,
+                "fresh_field_count": 4,
+                "stale_field_count": 3,
+                "stale_fields": ["bus_fader_db", "assignment_members", "matrix_send_db"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "bus_group_current_state_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "stale"
+    assert recommendation.evidence["current_state_cache_freshness"]["stale_fields"] == [
+        "bus_fader_db",
+        "assignment_members",
+        "matrix_send_db",
+    ]
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
 def test_bus_group_helpers_resolve_ayaic_planes():
     assert classify_bus_family("Lead Vocal", "Lead Vox", "group") == "lead_vocal"
     assert classify_bus_family("Backing Vocal", "BGV", "group") == "backing_vocal"
@@ -162,6 +315,29 @@ def test_build_bus_group_balance_proposals_filters_to_proposal_only_items():
     assert proposals[0]["can_import_to_queue"] is False
 
 
+def test_build_bus_group_balance_proposals_filters_stale_state_items():
+    proposals = build_bus_group_balance_proposals(
+        [
+            BusGroupBalanceAnalysisInput(
+                bus_id="group:drums",
+                bus_kind="group",
+                source_role="drums",
+                current_fader_db=-5.0,
+                integrated_lufs=-26.1,
+                true_peak_dbfs=-8.0,
+                child_count=8,
+                main_bus_headroom_db=6.0,
+                assignment_confidence=0.9,
+                confidence=0.9,
+                persistence_cycles=3,
+                current_state_cache_freshness={"status": "stale"},
+            ),
+        ]
+    )
+
+    assert proposals == ()
+
+
 def test_bus_group_balance_proposal_is_registered_as_goal_capability():
     method = get_processing_method("bus_group_balance_proposal")
     main = get_pipeline_profile("main_live_assist")
@@ -181,4 +357,16 @@ def test_bus_group_balance_proposal_is_registered_as_goal_capability():
     assert console.status == "proposal_only"
     assert console.autonomy_mode_ceiling == "assisted"
     assert "bus_group_balance_proposal" in console.method_ids
+    assert "backend/source_identity_downstream_gate.py" in mix_balance.support_paths
+    assert "backend/source_identity_downstream_gate.py" in console.support_paths
     assert contracts["bus_group_balance_proposal"]["proposal_contract"]["value_type"] == "bus_group_balance"
+    assert (
+        "current_bus_group_dca_matrix_cache_freshness"
+        in contracts["bus_group_balance_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "source_identity_downstream_trust"
+        in contracts["bus_group_balance_proposal"]["proposal_contract"][
+            "safety_evidence_required"
+        ]
+    )

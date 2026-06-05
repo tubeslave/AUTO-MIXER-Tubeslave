@@ -67,6 +67,98 @@ def test_live_capable_methods_require_supervision_and_only_fader_gain():
         assert method.status == "canonical"
 
 
+def test_auto_gate_caig_is_proposal_only_with_quarantined_direct_send():
+    method = get_processing_method("auto_gate_caig")
+
+    assert method is not None
+    assert method.status == "proposal_only"
+    assert method.can_analyze is True
+    assert method.can_propose is True
+    assert method.can_write_live is False
+    assert method.live_write_kinds == ()
+    assert "direct_gate_send_quarantined" in method.notes
+    assert "no_live_writes" in method.notes
+
+
+def test_auto_eq_is_proposal_only_with_quarantined_direct_apply():
+    method = get_processing_method("auto_eq")
+
+    assert method is not None
+    assert method.status == "proposal_only"
+    assert method.can_analyze is True
+    assert method.can_propose is True
+    assert method.can_write_live is False
+    assert method.live_write_kinds == ()
+    assert "direct_eq_apply_quarantined" in method.notes
+    assert "direct_eq_reset_quarantined" in method.notes
+    assert "blocked_apply_evidence" in method.notes
+    assert "no_live_writes" in method.notes
+
+
+def test_auto_fx_planner_is_proposal_only_with_quarantined_direct_apply():
+    method = get_processing_method("auto_fx")
+
+    assert method is not None
+    assert method.status == "proposal_only"
+    assert method.can_analyze is True
+    assert method.can_propose is True
+    assert method.can_write_live is False
+    assert method.live_write_kinds == ()
+    assert "direct_fx_apply_quarantined" in method.notes
+    assert "direct_reverb_apply_quarantined" in method.notes
+    assert "blocked_apply_evidence" in method.notes
+    assert "no_live_writes" in method.notes
+
+
+def test_auto_panner_is_proposal_only_with_quarantined_direct_apply():
+    method = get_processing_method("auto_panner")
+
+    assert method is not None
+    assert method.status == "proposal_only"
+    assert method.can_analyze is True
+    assert method.can_propose is True
+    assert method.can_write_live is False
+    assert method.live_write_kinds == ()
+    assert "direct_pan_apply_quarantined" in method.notes
+    assert "adaptive_pan_send_quarantined" in method.notes
+    assert "blocked_apply_evidence" in method.notes
+    assert "no_live_writes" in method.notes
+
+
+def test_phase_alignment_is_proposal_only_with_quarantined_direct_apply():
+    method = get_processing_method("phase_alignment")
+
+    assert method is not None
+    assert method.status == "proposal_only"
+    assert method.can_analyze is True
+    assert method.can_propose is True
+    assert method.can_write_live is False
+    assert method.live_write_kinds == ()
+    assert "phase_delay_apply_quarantined" in method.notes
+    assert "phase_delay_reset_quarantined" in method.notes
+    assert "blocked_apply_evidence" in method.notes
+    assert "no_live_writes" in method.notes
+
+
+def test_auto_compressor_is_proposal_only_with_quarantined_direct_apply():
+    method = get_processing_method("auto_compressor")
+    cf_method = get_processing_method("auto_compressor_cf")
+
+    assert method is not None
+    assert method.status == "proposal_only"
+    assert method.can_analyze is True
+    assert method.can_propose is True
+    assert method.can_write_live is False
+    assert method.live_write_kinds == ()
+    assert "direct_compressor_apply_quarantined" in method.notes
+    assert "blocked_apply_evidence" in method.notes
+    assert "no_live_writes" in method.notes
+    assert cf_method is not None
+    assert cf_method.status == "proposal_only"
+    assert "direct_cf_compressor_apply_quarantined" in cf_method.notes
+    assert "blocked_apply_evidence" in cf_method.notes
+
+
 def test_main_live_pipeline_executor_is_only_supervised_fader_gain():
     main = get_pipeline_profile("main_live_assist")
     assert main is not None
@@ -87,6 +179,7 @@ def test_main_live_pipeline_executor_is_only_supervised_fader_gain():
     assert context_gate.can_propose is True
     assert context_gate.can_write_live is False
     assert context_gate.status == "proposal_only"
+    assert "source_identity_downstream_trust" in context_gate.notes
     assert "context_aware_gate_agent" in main.proposal_method_ids
 
 
@@ -300,9 +393,13 @@ def test_write_surface_inventory_covers_known_legacy_write_paths():
         "backend/auto_test_routing.py": "routing_snapshot_scene_writes",
         "backend/handlers/eq_handlers.py": "eq_direct_apply_and_reset",
         "backend/system_measurement.py": "eq_direct_apply_and_reset",
+        "backend/auto_soundcheck_engine.py": "eq_direct_apply_and_reset",
+        "backend/autofoh_safety.py": "bus_dca_master_fader_direct_apply",
         "backend/auto_compressor.py": "compressor_direct_apply",
         "backend/auto_gate_caig.py": "gate_hpf_send_direct_apply",
+        "backend/auto_panner.py": "pan_phase_delay_direct_apply",
         "backend/auto_panner_adaptive.py": "pan_phase_delay_direct_apply",
+        "backend/auto_fader_v2/controller.py": "pan_phase_delay_direct_apply",
         "backend/auto_fx.py": "fx_insert_send_direct_apply",
         "backend/voice_control.py": "voice_ai_direct_commands",
         "backend/ai/agent.py": "voice_ai_direct_commands",
@@ -337,9 +434,51 @@ def test_write_surface_snapshot_status_counts_and_blocked_surfaces():
 def test_specific_write_surface_statuses_match_policy():
     assert get_write_surface("product_layer_fader_gain_apply").status == "canonical_supervised"
     assert get_write_surface("context_gate_bleed_recommendations").status == "proposal_only"
+    gate_surface = get_write_surface("gate_hpf_send_direct_apply")
+    assert gate_surface.status == "quarantined"
+    assert gate_surface.allowed_live is False
+    assert "CAIG _send_osc is fail-closed" in gate_surface.gate
+    assert "AutoFaderV2/AutoFOH adaptive or typed gate actions return blocked evidence" in gate_surface.gate
+    assert "AutoFOH gate/HPF/send actions are blocked" in gate_surface.current_policy
+    pan_surface = get_write_surface("pan_phase_delay_direct_apply")
+    assert pan_surface.status == "quarantined"
+    assert pan_surface.allowed_live is False
+    assert "set_channel_pan" in pan_surface.entrypoints
+    assert "adaptive panner" in pan_surface.gate
+    assert "pan separation are fail-closed" in pan_surface.gate
+    assert "phase alignment" in pan_surface.gate
+    assert "AutoFOH phase actions are fail-closed" in pan_surface.gate
+    assert "phase/delay apply/reset paths return blocked evidence" in pan_surface.current_policy
+    compressor_surface = get_write_surface("compressor_direct_apply")
+    assert compressor_surface.status == "quarantined"
+    assert compressor_surface.allowed_live is False
+    assert "direct apply paths are fail-closed" in compressor_surface.gate
+    assert "AutoMixerServer._reset_compressor_on_channel" in compressor_surface.entrypoints
+    assert "AutoFOH compressor typed actions" in compressor_surface.current_policy
+    assert "server compressor reset helper" in compressor_surface.current_policy
+    assert "AutoSoundcheck legacy compressor-threshold writes" in compressor_surface.current_policy
+    bus_surface = get_write_surface("bus_dca_master_fader_direct_apply")
+    assert bus_surface.status == "quarantined"
+    assert bus_surface.allowed_live is False
+    assert "AutoFOH bus/DCA/master fader actions return blocked evidence" in bus_surface.gate
+    assert "No bus, DCA, group, matrix, or master fader live writes" in bus_surface.current_policy
+    eq_surface = get_write_surface("eq_direct_apply_and_reset")
+    assert eq_surface.status == "quarantined"
+    assert eq_surface.allowed_live is False
+    assert "AutoEQ, AutoFaderV2 masking EQ, AutoFOH EQ actions, and AutoSoundcheck legacy EQ-enable writes are fail-closed" in eq_surface.gate
+    assert "AutoSoundcheck EQ-enable writes return blocked evidence" in eq_surface.current_policy
+    fx_surface = get_write_surface("fx_insert_send_direct_apply")
+    assert fx_surface.status == "quarantined"
+    assert fx_surface.allowed_live is False
+    assert "AutoFX/AutoReverb/AutoFOH send apply paths are fail-closed" in fx_surface.gate
+    assert "set_reverb_send" in fx_surface.entrypoints
+    assert "set_reverb_params" in fx_surface.entrypoints
     assert get_write_surface("latency_benchmark_tools").status == "lab_only"
     assert get_write_surface("routing_snapshot_scene_writes").status == "quarantined"
-    assert get_write_surface("manual_reset_restore_scripts").status == "blocked"
+    reset_surface = get_write_surface("manual_reset_restore_scripts")
+    assert reset_surface.status == "blocked"
+    assert "backend/auto_soundcheck_engine.py" in reset_surface.paths
+    assert "AutoSoundcheck fader/mute restore emits blocked evidence only" in reset_surface.current_policy
 
 
 def test_safety_coverage_matrix_records_live_proof_gaps():

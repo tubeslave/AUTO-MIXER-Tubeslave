@@ -350,6 +350,8 @@ class SafetyDecision:
     bounded: bool = False
     rate_limited: bool = False
     sent: bool = False
+    blocked: bool = False
+    write_policy: str = ""
     message: str = ""
     payload: Dict[str, Any] = field(default_factory=dict)
 
@@ -424,6 +426,10 @@ class AutoFOHSafetyConfig:
         )
 
 
+AUTOFOH_DIRECT_WRITE_POLICY = "proposal_only_quarantined"
+AUTOFOH_ALLOWED_DIRECT_WRITE_TYPES = (ChannelGainMove, ChannelFaderMove)
+
+
 class AutoFOHSafetyController:
     def __init__(
         self,
@@ -456,6 +462,16 @@ class AutoFOHSafetyController:
         bounded_action, bounded = self._apply_bounds(action)
         decision.action = bounded_action
         decision.bounded = bounded
+
+        blocked_payload = self._blocked_direct_write_payload(bounded_action)
+        if blocked_payload is not None:
+            decision.allowed = False
+            decision.blocked = True
+            decision.write_policy = AUTOFOH_DIRECT_WRITE_POLICY
+            decision.payload = blocked_payload
+            decision.message = "blocked by AutoFOH proposal-only direct-write policy"
+            self.history.append(decision)
+            return decision
 
         if runtime_state != RuntimeState.ROLLBACK and self._is_rate_limited(bounded_action):
             decision.allowed = False
@@ -490,6 +506,178 @@ class AutoFOHSafetyController:
         for key, value in action.__dict__.items():
             payload[key] = value
         return payload
+
+    def _blocked_direct_write_payload(self, action: TypedCorrectionAction) -> Dict[str, Any] | None:
+        if isinstance(action, AUTOFOH_ALLOWED_DIRECT_WRITE_TYPES):
+            return None
+
+        blocked_calls = self._blocked_calls_for(action)
+        if not blocked_calls:
+            return None
+
+        payload = self._decision_payload(action)
+        payload.update({
+            "blocked": True,
+            "blocked_reason": "autofoh_direct_apply_surface_quarantined",
+            "blocked_calls": blocked_calls,
+            "blocked_call_count": len(blocked_calls),
+            "write_policy": AUTOFOH_DIRECT_WRITE_POLICY,
+            "live_write_allowed": False,
+            "can_apply_live": False,
+            "mutates_mixer": False,
+        })
+        return payload
+
+    def _blocked_calls_for(self, action: TypedCorrectionAction) -> List[Dict[str, Any]]:
+        if isinstance(action, BusFaderMove):
+            return [{
+                "cmd": "set_bus_fader",
+                "bus": action.bus_id,
+                "value_db": action.target_db,
+                "semantic": "bus_fader_move",
+            }]
+        if isinstance(action, DCAFaderMove):
+            return [{
+                "cmd": "set_dca_fader",
+                "dca": action.dca_id,
+                "value_db": action.target_db,
+                "semantic": "dca_fader_move",
+            }]
+        if isinstance(action, MasterFaderMove):
+            return [{
+                "cmd": "set_main_fader",
+                "main": action.main_id,
+                "value_db": action.target_db,
+                "semantic": "master_fader_move",
+            }]
+        if isinstance(action, PolarityAdjust):
+            return [{
+                "cmd": "set_polarity",
+                "channel": action.channel_id,
+                "inverted": action.inverted,
+                "semantic": "phase_polarity_adjust",
+            }]
+        if isinstance(action, DelayAdjust):
+            return [{
+                "cmd": "set_delay",
+                "channel": action.channel_id,
+                "delay_ms": action.delay_ms,
+                "enabled": action.enabled,
+                "semantic": "phase_delay_adjust",
+            }]
+        if isinstance(action, ChannelEQMove):
+            return [{
+                "cmd": "set_eq_band",
+                "channel": action.channel_id,
+                "band": action.band,
+                "freq": action.freq_hz,
+                "gain": action.gain_db,
+                "q": action.q,
+                "semantic": "channel_eq_move",
+            }]
+        if isinstance(action, BusEQMove):
+            return [{
+                "cmd": "set_bus_eq_band",
+                "bus": action.bus_id,
+                "band": action.band,
+                "freq": action.freq_hz,
+                "gain": action.gain_db,
+                "q": action.q,
+                "semantic": "bus_eq_move",
+            }]
+        if isinstance(action, HighPassAdjust):
+            return [{
+                "cmd": "set_hpf",
+                "channel": action.channel_id,
+                "freq": action.freq_hz,
+                "enabled": action.enabled,
+                "semantic": "channel_hpf_adjust",
+            }]
+        if isinstance(action, CompressorAdjust):
+            return [{
+                "cmd": "set_compressor",
+                "channel": action.channel_id,
+                "threshold_db": action.threshold_db,
+                "ratio": action.ratio,
+                "attack_ms": action.attack_ms,
+                "release_ms": action.release_ms,
+                "makeup_db": action.makeup_db,
+                "enabled": action.enabled,
+                "semantic": "channel_compressor_adjust",
+            }]
+        if isinstance(action, BusCompressorAdjust):
+            return [{
+                "cmd": "set_bus_compressor",
+                "bus": action.bus_id,
+                "threshold_db": action.threshold_db,
+                "ratio": action.ratio,
+                "attack_ms": action.attack_ms,
+                "release_ms": action.release_ms,
+                "makeup_db": action.makeup_db,
+                "enabled": action.enabled,
+                "semantic": "bus_compressor_adjust",
+            }]
+        if isinstance(action, CompressorMakeupAdjust):
+            return [{
+                "cmd": "set_compressor_gain",
+                "channel": action.channel_id,
+                "makeup_db": action.makeup_db,
+                "semantic": "channel_compressor_makeup_adjust",
+            }]
+        if isinstance(action, BusCompressorMakeupAdjust):
+            return [{
+                "cmd": "set_bus_compressor_gain",
+                "bus": action.bus_id,
+                "makeup_db": action.makeup_db,
+                "semantic": "bus_compressor_makeup_adjust",
+            }]
+        if isinstance(action, GateAdjust):
+            return [
+                {
+                    "cmd": "set_gate",
+                    "channel": action.channel_id,
+                    "threshold_db": action.threshold_db,
+                    "range_db": action.range_db,
+                    "attack_ms": action.attack_ms,
+                    "hold_ms": action.hold_ms,
+                    "release_ms": action.release_ms,
+                    "enabled": action.enabled,
+                    "semantic": "channel_gate_adjust",
+                },
+                {
+                    "cmd": "set_gate_on",
+                    "channel": action.channel_id,
+                    "on": 1 if action.enabled else 0,
+                    "semantic": "channel_gate_enable",
+                },
+            ]
+        if isinstance(action, PanAdjust):
+            return [{
+                "cmd": "set_pan",
+                "channel": action.channel_id,
+                "pan": action.pan,
+                "semantic": "channel_pan_adjust",
+            }]
+        if isinstance(action, SendLevelAdjust):
+            return [{
+                "cmd": "set_send_level",
+                "channel": action.channel_id,
+                "send_bus": action.send_bus,
+                "level_db": action.level_db,
+                "semantic": "fx_send_level_adjust",
+            }]
+        if isinstance(action, EmergencyFeedbackNotch):
+            return [{
+                "cmd": "set_eq_band",
+                "channel": action.channel_id,
+                "band": action.band,
+                "freq": action.freq_hz,
+                "gain": action.gain_db,
+                "q": action.q,
+                "ttl_seconds": action.ttl_seconds,
+                "semantic": "emergency_feedback_notch",
+            }]
+        return []
 
     def _apply_bounds(self, action: TypedCorrectionAction) -> Tuple[TypedCorrectionAction, bool]:
         bounded = False
@@ -766,94 +954,7 @@ class AutoFOHSafetyController:
             return self._require_method("set_gain", lambda a: self.mixer_client.set_gain(a.channel_id, a.target_db))
         if isinstance(action, ChannelFaderMove):
             return self._require_method("set_fader", lambda a: self.mixer_client.set_fader(a.channel_id, a.target_db))
-        if isinstance(action, BusFaderMove):
-            return self._require_method("set_bus_fader", lambda a: self.mixer_client.set_bus_fader(a.bus_id, a.target_db))
-        if isinstance(action, DCAFaderMove):
-            return self._require_method("set_dca_fader", lambda a: self.mixer_client.set_dca_fader(a.dca_id, a.target_db))
-        if isinstance(action, MasterFaderMove):
-            return self._require_method("set_main_fader", lambda a: self.mixer_client.set_main_fader(a.main_id, a.target_db))
-        if isinstance(action, PolarityAdjust):
-            return self._require_method("set_polarity", lambda a: self.mixer_client.set_polarity(a.channel_id, a.inverted))
-        if isinstance(action, DelayAdjust):
-            return self._require_method("set_delay", lambda a: self.mixer_client.set_delay(a.channel_id, a.delay_ms, enabled=a.enabled))
-        if isinstance(action, ChannelEQMove):
-            return self._require_method("set_eq_band", lambda a: self.mixer_client.set_eq_band(a.channel_id, a.band, a.freq_hz, a.gain_db, a.q))
-        if isinstance(action, BusEQMove):
-            return self._require_method("set_bus_eq_band", lambda a: self.mixer_client.set_bus_eq_band(a.bus_id, a.band, a.freq_hz, a.gain_db, a.q))
-        if isinstance(action, HighPassAdjust):
-            return self._require_method("set_hpf", lambda a: self.mixer_client.set_hpf(a.channel_id, a.freq_hz, enabled=a.enabled))
-        if isinstance(action, CompressorAdjust):
-            return self._require_method(
-                "set_compressor",
-                lambda a: self.mixer_client.set_compressor(
-                    a.channel_id,
-                    threshold_db=a.threshold_db,
-                    ratio=a.ratio,
-                    attack_ms=a.attack_ms,
-                    release_ms=a.release_ms,
-                    makeup_db=a.makeup_db,
-                    enabled=a.enabled,
-                ),
-            )
-        if isinstance(action, BusCompressorAdjust):
-            return self._require_method(
-                "set_bus_compressor",
-                lambda a: self.mixer_client.set_bus_compressor(
-                    a.bus_id,
-                    threshold_db=a.threshold_db,
-                    ratio=a.ratio,
-                    attack_ms=a.attack_ms,
-                    release_ms=a.release_ms,
-                    makeup_db=a.makeup_db,
-                    enabled=a.enabled,
-                ),
-            )
-        if isinstance(action, CompressorMakeupAdjust):
-            return self._require_method(
-                "set_compressor_gain",
-                lambda a: self.mixer_client.set_compressor_gain(a.channel_id, a.makeup_db),
-            )
-        if isinstance(action, BusCompressorMakeupAdjust):
-            return self._require_method(
-                "set_bus_compressor_gain",
-                lambda a: self.mixer_client.set_bus_compressor_gain(a.bus_id, a.makeup_db),
-            )
-        if isinstance(action, GateAdjust):
-            return self._require_method(
-                "set_gate",
-                lambda a: self._set_gate(a),
-            )
-        if isinstance(action, PanAdjust):
-            return self._require_method("set_pan", lambda a: self.mixer_client.set_pan(a.channel_id, a.pan))
-        if isinstance(action, SendLevelAdjust):
-            return self._require_method("set_send_level", lambda a: self.mixer_client.set_send_level(a.channel_id, a.send_bus, a.level_db))
-        if isinstance(action, EmergencyFeedbackNotch):
-            return self._require_method("set_eq_band", lambda a: self.mixer_client.set_eq_band(a.channel_id, a.band, a.freq_hz, a.gain_db, a.q))
         return None
-
-    def _set_gate(self, action: GateAdjust):
-        try:
-            result = self.mixer_client.set_gate(
-                action.channel_id,
-                threshold=action.threshold_db,
-                range_db=action.range_db,
-                attack=action.attack_ms,
-                hold=action.hold_ms,
-                release=action.release_ms,
-                ratio="GATE",
-            )
-        except TypeError:
-            result = self.mixer_client.set_gate(
-                action.channel_id,
-                threshold_db=action.threshold_db,
-                enabled=action.enabled,
-            )
-        setter = getattr(self.mixer_client, "set_gate_on", None)
-        if setter is not None:
-            on_result = setter(action.channel_id, 1 if action.enabled else 0)
-            if result is False or on_result is False:
-                return False
-        return result
 
     def _require_method(self, method_name: str, callback):
         if hasattr(self.mixer_client, method_name):

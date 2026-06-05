@@ -138,7 +138,13 @@ State хранит дневной счетчик, последнюю созда�
 
 Для dispatch state дополнительно хранит последний attempt, `issue_id`, `selected_agent_id`, mode, result, reason, blocked reason и использованные idempotency keys. Повторный запуск с тем же key не отправляет повторный `PATCH`.
 
-## Отключить dry-run
+## Отключение dry-run только вручную
+
+Отключение `dry-run` не является частью Codex cycle, autoloop или любого
+автономного agent workflow. Codex cycle must not disable `dry-run`, must not use
+External Paperclip/PiperClip as an agent runner, and must leave this watchdog in
+dry-run/audit-only mode unless a human operator performs the manual preflight
+outside the cycle.
 
 В `tools/paperclip_watchdog/.env` измени:
 
@@ -191,4 +197,8 @@ Plist не устанавливается автоматически. Перед
 - fallback `GET /api/companies/:companyId/heartbeat-runs?issueId=:issueId`
 - opt-in only `PATCH /api/issues/:issueId`
 
-TODO перед отключением `dry-run`: подтвердить форму ответов `dashboard`, `agents`, `issues` и `heartbeat-runs` на живом Paperclip для компании Automixer.
+Manual precondition before disabling `dry-run`: confirm the response shape for
+`dashboard`, `agents`, `issues`, and `heartbeat-runs` on the live Paperclip
+instance for the Automixer company, then record that evidence in a repo-local
+report. Until that evidence exists, keep the watchdog in dry-run/audit-only
+mode.

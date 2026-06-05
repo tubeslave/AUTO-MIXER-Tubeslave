@@ -34,8 +34,10 @@ you want the background automation active.
 - The prompt keeps TODO/FIXME scans focused on owned Automixer code, tests,
   tooling, and current docs. Vendored, generated, artifact, and reference
   corpora such as `external/`, `models/training_state.json`,
-  `backend/ai/knowledge/`, `artifacts/`, and archived/manual docs are treated as
-  scan noise unless the selected task explicitly targets them.
+  `backend/ai/knowledge/`, `frontend/node_modules/`, nested
+  `**/node_modules/`, `backend/venv/`, `**/.venv/`, `artifacts/`, and
+  archived/manual docs are treated as scan noise unless the selected task
+  explicitly targets them.
 - Does not run immediately at login; `launchd` starts it on the 20-minute
   interval.
 - Uses a lock directory at `.codex_autoloop.lock` to avoid parallel runs.
@@ -64,12 +66,18 @@ you want the background automation active.
   The `Changed Files` section must be
   non-empty, include repo-local markdown links, and link back to the cycle
   report itself so the audit artifact is visible in the file list. Reports must
+  explicitly state the exact Scope lines
+  `Codex CLI was the only agent workflow used.` and
+  `External Paperclip/PiperClip was not used as an agent runner.`, and must
   explicitly state that no neighboring repositories or external local projects
   were analyzed, modified, or used. The worktree evidence must mention both
   modified/changed files and new/untracked files, even when one side is empty.
   The plain-language project-state subsection must explicitly cover what
   already works, what works partially, what is not implemented, and the current
-  risks. Reports must not contradict the repo-local boundary later by claiming
+  risks. The end-of-report order is fixed: `## Три обязательных вопроса`
+  appears before the final top-level `## Объяснение простым языком` section,
+  and no top-level report section may follow that plain-language section.
+  Reports must not contradict the repo-local boundary later by claiming
   that external Paperclip/PiperClip ran the cycle or that neighboring project
   paths such as `/Users/dmitrijvolkov/paperclip` were analyzed, modified, or
   used.

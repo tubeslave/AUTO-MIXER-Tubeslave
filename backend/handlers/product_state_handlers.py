@@ -14,6 +14,8 @@ from operator_product_state import (
     build_dashboard_snapshot,
     build_decision_queue,
     build_decision_traces,
+    build_dlive_state_snapshot,
+    build_fx_inserts_snapshot,
     build_groups_buses_snapshot,
     build_matrix_snapshot,
     build_memory_knowledge_snapshot,
@@ -155,6 +157,9 @@ def register_handlers(server):
                 "source": result.get("readback_source"),
                 "value": result.get("readback_value"),
             }
+            cache_freshness = result.get("readback_cache_freshness")
+            if isinstance(cache_freshness, dict):
+                readback["cache_freshness"] = cache_freshness
         rollback = None
         if result.get("rollback_available") is not None or result.get("rollback_status") is not None:
             rollback = {
@@ -173,6 +178,14 @@ def register_handlers(server):
                 "source": result.get("pre_read_source", change.get("pre_read_source")),
                 "value": pre_read_value,
             }
+            cache_freshness = (
+                result.get("pre_read_cache_freshness")
+                or result.get("cache_freshness")
+                or change.get("pre_read_cache_freshness")
+                or change.get("cache_freshness")
+            )
+            if isinstance(cache_freshness, dict):
+                pre_read["cache_freshness"] = cache_freshness
         return {
             "idempotency_key": idempotency_key,
             "proposal_id": getattr(proposal, "id", None),
@@ -239,10 +252,23 @@ def register_handlers(server):
                 "pre_read_status": (read_value or {}).get("status"),
                 "pre_read_source": (read_value or {}).get("source"),
             }
+        cache_freshness_blocker = getattr(server, "_cache_freshness_blocks_pre_read", None)
+        if callable(cache_freshness_blocker) and cache_freshness_blocker(read_value):
+            return None, {
+                "reason": "linked_pre_read_cache_not_fresh" if linked else "pre_read_cache_not_fresh",
+                "channel": normalized["channel"],
+                "value_type": normalized["value_type"],
+                "address": normalized["address"],
+                "pre_read_status": (read_value or {}).get("status"),
+                "pre_read_source": (read_value or {}).get("source"),
+                "pre_read_value": old_value,
+                "cache_freshness": (read_value or {}).get("cache_freshness"),
+            }
         normalized["old_value"] = old_value
         normalized["pre_read_value"] = old_value
         normalized["pre_read_status"] = (read_value or {}).get("status")
         normalized["pre_read_source"] = (read_value or {}).get("source")
+        normalized["pre_read_cache_freshness"] = (read_value or {}).get("cache_freshness")
         normalized["delta_db"] = round(float(normalized["effective_value"]) - old_float, 3)
         max_delta = APPLY_DELTA_LIMITS_DB.get(normalized["value_type"])
         if max_delta is not None and abs(normalized["delta_db"]) > max_delta:
@@ -410,8 +436,32 @@ def register_handlers(server):
                 total_channels=data.get("total_channels", 24),
                 send_count=data.get("send_count", 16),
                 main_count=data.get("main_count", 1),
+                matrix_send_count=data.get("matrix_send_count", 8),
                 output_groups=data.get("output_groups", ("MOD", "CRD")),
                 output_count=data.get("output_count", 64),
+            ),
+        )
+
+    async def handle_get_fx_inserts_snapshot(websocket, data):
+        await server.send_to_client(
+            websocket,
+            build_fx_inserts_snapshot(
+                server,
+                fx_slot_count=data.get("fx_slot_count", 16),
+                total_channels=data.get("total_channels", 24),
+                bus_count=data.get("bus_count", 16),
+                main_count=data.get("main_count", 4),
+                matrix_count=data.get("matrix_count", 8),
+                parameter_count=data.get("parameter_count", 32),
+            ),
+        )
+
+    async def handle_get_dlive_state_snapshot(websocket, data):
+        await server.send_to_client(
+            websocket,
+            build_dlive_state_snapshot(
+                server,
+                total_channels=data.get("total_channels", 48),
             ),
         )
 
@@ -700,6 +750,7 @@ def register_handlers(server):
                     operator_mode=operator_mode,
                     requested_change=raw_change,
                     normalized_change=normalized,
+                    apply_result={"status": "blocked", **error},
                     idempotency_key=idempotency_key,
                     status="blocked",
                     blocked_reason=error["reason"],
@@ -1052,6 +1103,7 @@ def register_handlers(server):
                 operator_mode=operator_mode,
                 requested_change=requested_change,
                 normalized_change=normalized_change,
+                apply_result={"status": "blocked", **safety_error},
                 idempotency_key=idempotency_key,
                 status="blocked",
                 blocked_reason=safety_error["reason"],
@@ -1102,6 +1154,8 @@ def register_handlers(server):
         "get_bus_main_dca_snapshot": handle_get_bus_main_dca_snapshot,
         "get_matrix_snapshot": handle_get_matrix_snapshot,
         "get_routing_sends_snapshot": handle_get_routing_sends_snapshot,
+        "get_fx_inserts_snapshot": handle_get_fx_inserts_snapshot,
+        "get_dlive_state_snapshot": handle_get_dlive_state_snapshot,
         "get_snapshots_scenes_snapshot": handle_get_snapshots_scenes_snapshot,
         "get_user_presets_snapshot": handle_get_user_presets_snapshot,
         "get_memory_knowledge_snapshot": handle_get_memory_knowledge_snapshot,

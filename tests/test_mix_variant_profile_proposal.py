@@ -57,6 +57,14 @@ def test_live_pop_rock_variant_creates_proposal_only_profile():
             reference_confidence=0.84,
             arrangement_confidence=0.88,
             persistence_cycles=3,
+            current_state_cache_freshness={
+                "status": "fresh",
+                "field_count": 8,
+                "fresh_field_count": 8,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
         )
     )
 
@@ -71,6 +79,11 @@ def test_live_pop_rock_variant_creates_proposal_only_profile():
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["no_named_artist_style_clone"] is True
     assert recommendation.evidence["ayaic_level_planes"] is True
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 8
+    assert recommendation.evidence["source_identity_downstream_trust"]["status"] == (
+        "legacy_unverified"
+    )
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "mix_variant_profile_proposal"
@@ -82,6 +95,7 @@ def test_live_pop_rock_variant_creates_proposal_only_profile():
     assert "unsupported_value_type:mix_variant_profile" in proposal["blockers"]
     assert "bus_group_balance_proposal" in proposal["proposed_action"]["followup_proposal_methods"]
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
 
 
 def test_style_clone_and_active_performance_block_mix_variant():
@@ -140,6 +154,162 @@ def test_missing_reference_metrics_or_arrangement_context_blocks_variant():
     assert recommendation.status == "analysis_only"
     assert "reference_metrics_missing" in recommendation.blockers
     assert "arrangement_context_missing" in recommendation.blockers
+
+
+def test_source_identity_hold_blocks_mix_variant_profile_proposal():
+    recommendation = analyze_mix_variant_profile_need(
+        MixVariantProfileAnalysisInput(
+            variant_id="variant:pop-rock-live",
+            genre="pop rock",
+            task="live",
+            current_profile_id="custom:live_foh",
+            reference_id="ref:house_pop_rock",
+            reference_lufs=-17.8,
+            reference_metrics_available=True,
+            arrangement_context_available=True,
+            arrangement_roles=("lead_vocal", "drums", "bass", "guitar", "keys"),
+            detected_source_count=18,
+            stem_count=5,
+            operator_intent="operator_variant_request",
+            mix_window="soundcheck",
+            current_integrated_lufs=-18.5,
+            current_true_peak_dbfs=-5.5,
+            main_bus_headroom_db=4.5,
+            feedback_risk=0.18,
+            genre_confidence=0.92,
+            task_confidence=0.9,
+            reference_confidence=0.84,
+            arrangement_confidence=0.88,
+            persistence_cycles=3,
+            current_state_cache_freshness={"status": "fresh", "read_only": True},
+            source_identity_trust_state="hold_for_operator_review",
+            source_identity_trust_confidence=0.55,
+            source_identity_replay_outcome_count=4,
+            source_identity_calibration_freshness={
+                "status": "fresh",
+                "field_count": 4,
+                "fresh_field_count": 4,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_not_trusted_for_downstream" in recommendation.blockers
+    assert recommendation.severity == "medium"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["source_id"] == "variant:pop-rock-live"
+    assert trust["source_type"] == "lead_vocal,drums,bass,guitar,keys"
+    assert trust["status"] == "held_for_operator_review"
+    assert trust["usable_for_downstream"] is False
+    proposal = recommendation.to_operator_proposal()
+    assert proposal["can_apply_live"] is False
+    assert "requested_change" not in proposal
+
+
+def test_stale_source_identity_replay_context_blocks_mix_variant_profile_proposal():
+    analysis = MixVariantProfileAnalysisInput(
+        variant_id="variant:pop-rock-live",
+        genre="pop rock",
+        task="live",
+        current_profile_id="custom:live_foh",
+        reference_id="ref:house_pop_rock",
+        reference_lufs=-17.8,
+        reference_metrics_available=True,
+        arrangement_context_available=True,
+        arrangement_roles=("lead_vocal", "drums", "bass", "guitar", "keys"),
+        detected_source_count=18,
+        stem_count=5,
+        operator_intent="operator_variant_request",
+        mix_window="soundcheck",
+        current_integrated_lufs=-18.5,
+        current_true_peak_dbfs=-5.5,
+        main_bus_headroom_db=4.5,
+        feedback_risk=0.18,
+        genre_confidence=0.92,
+        task_confidence=0.9,
+        reference_confidence=0.84,
+        arrangement_confidence=0.88,
+        persistence_cycles=3,
+        current_state_cache_freshness={"status": "fresh", "read_only": True},
+        source_identity_trust_state="trusted_for_downstream_priority",
+        source_identity_trust_confidence=0.91,
+        source_identity_replay_outcome_count=8,
+        source_identity_calibration_freshness={
+            "status": "stale",
+            "field_count": 4,
+            "fresh_field_count": 2,
+            "stale_field_count": 2,
+            "stale_fields": ["accepted_outcomes", "rejected_outcomes"],
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+        },
+    )
+    recommendation = analyze_mix_variant_profile_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_replay_context_not_fresh" in recommendation.blockers
+    assert recommendation.severity == "high"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["status"] == "trusted"
+    assert trust["usable_for_downstream"] is False
+    assert trust["evidence"]["current_source_identity_replay_context_cache_freshness"] == "stale"
+    assert trust["evidence"]["current_state_cache_freshness"]["stale_fields"] == [
+        "accepted_outcomes",
+        "rejected_outcomes",
+    ]
+    assert build_mix_variant_profile_proposals([analysis]) == ()
+
+
+def test_stale_mix_variant_context_blocks_profile_proposal():
+    recommendation = analyze_mix_variant_profile_need(
+        MixVariantProfileAnalysisInput(
+            variant_id="variant:pop-rock-live",
+            genre="pop rock",
+            task="live",
+            current_profile_id="custom:live_foh",
+            reference_id="ref:house_pop_rock",
+            reference_lufs=-17.8,
+            reference_metrics_available=True,
+            arrangement_context_available=True,
+            arrangement_roles=("lead_vocal", "drums", "bass", "guitar", "keys"),
+            detected_source_count=18,
+            stem_count=5,
+            operator_intent="operator_variant_request",
+            mix_window="soundcheck",
+            current_integrated_lufs=-18.5,
+            current_true_peak_dbfs=-5.5,
+            main_bus_headroom_db=4.5,
+            feedback_risk=0.18,
+            genre_confidence=0.92,
+            task_confidence=0.9,
+            reference_confidence=0.84,
+            arrangement_confidence=0.88,
+            persistence_cycles=3,
+            current_state_cache_freshness={
+                "status": "stale",
+                "field_count": 8,
+                "fresh_field_count": 6,
+                "stale_field_count": 2,
+                "stale_fields": ["reference_metrics", "arrangement_roles"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "mix_variant_context_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "stale"
+    assert recommendation.evidence["current_state_cache_freshness"]["stale_fields"] == [
+        "reference_metrics",
+        "arrangement_roles",
+    ]
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
 
 
 def test_loudness_up_requires_true_peak_headroom_evidence():
@@ -235,6 +405,34 @@ def test_build_mix_variant_profile_proposals_filters_to_proposal_only_items():
     assert proposals[0]["can_import_to_queue"] is False
 
 
+def test_build_mix_variant_profile_proposals_filters_stale_context_items():
+    proposals = build_mix_variant_profile_proposals(
+        [
+            MixVariantProfileAnalysisInput(
+                variant_id="variant:ok",
+                genre="jazz",
+                task="studio",
+                reference_metrics_available=True,
+                arrangement_context_available=True,
+                arrangement_roles=("piano", "bass", "drums"),
+                detected_source_count=8,
+                operator_intent="operator_variant_request",
+                mix_window="studio",
+                current_integrated_lufs=-18.0,
+                main_bus_headroom_db=5.0,
+                genre_confidence=0.9,
+                task_confidence=0.9,
+                reference_confidence=0.8,
+                arrangement_confidence=0.85,
+                persistence_cycles=3,
+                current_state_cache_freshness={"status": "stale"},
+            ),
+        ]
+    )
+
+    assert proposals == ()
+
+
 def test_mix_variant_profile_proposal_is_registered_as_goal_capability():
     method = get_processing_method("mix_variant_profile_proposal")
     main = get_pipeline_profile("main_live_assist")
@@ -254,4 +452,15 @@ def test_mix_variant_profile_proposal_is_registered_as_goal_capability():
     assert capability.status == "proposal_only"
     assert capability.autonomy_mode_ceiling == "assisted"
     assert "mix_variant_profile_proposal" in capability.method_ids
+    assert "backend/source_identity_downstream_gate.py" in capability.support_paths
     assert contracts["mix_variant_profile_proposal"]["proposal_contract"]["value_type"] == "mix_variant_profile"
+    assert (
+        "current_mix_variant_context_cache_freshness"
+        in contracts["mix_variant_profile_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "source_identity_downstream_trust"
+        in contracts["mix_variant_profile_proposal"]["proposal_contract"][
+            "safety_evidence_required"
+        ]
+    )

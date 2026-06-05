@@ -7,10 +7,10 @@ but it never creates a live console write request.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 import math
-from typing import Any, Dict, Iterable, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
 
 SCENE_PRESET_METHOD_ID = "scene_preset_management_proposal"
@@ -155,6 +155,11 @@ class ScenePresetManagementAnalysisInput:
     scope_confidence: float = 0.75
     rollback_confidence: float = 0.75
     persistence_cycles: int = 1
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
+    current_snapshots_scenes_snapshot: Optional[Dict[str, Any]] = None
+    current_user_presets_snapshot: Optional[Dict[str, Any]] = None
+    scoped_diff_evidence: Optional[Dict[str, Any]] = None
+    rollback_evidence: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -236,6 +241,210 @@ def _severity(blockers: Iterable[str], destructive_scope_score: float, affected_
     return "low"
 
 
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "missing_fields",
+        "untimestamped_present_fields",
+        "stale_after_sec",
+        "read_only",
+        "live_write",
+        "queries_console",
+        "snapshot_type",
+        "snapshot_source",
+        "snapshot_read_coverage_status",
+        "snapshot_live_write",
+        "snapshot_queries_console",
+        "snapshot_live_apply_allowed",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = True
+    normalized.setdefault("status", _freshness_status(payload))
+    return normalized
+
+
+def scene_preset_cache_freshness_from_snapshots(
+    artifact_type: Any,
+    *,
+    current_snapshots_scenes_snapshot: Optional[Mapping[str, Any]] = None,
+    current_user_presets_snapshot: Optional[Mapping[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Return freshness evidence from read-only Product Layer snapshots."""
+
+    normalized_artifact_type = normalize_artifact_type(artifact_type)
+    if normalized_artifact_type in {"scene", "snapshot"}:
+        snapshot = current_snapshots_scenes_snapshot
+    elif normalized_artifact_type in {"user_preset", "channel_preset", "fx_preset"}:
+        snapshot = current_user_presets_snapshot
+    else:
+        snapshot = current_snapshots_scenes_snapshot or current_user_presets_snapshot
+    if not isinstance(snapshot, Mapping):
+        return None
+
+    summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), Mapping) else {}
+    safety = snapshot.get("safety") if isinstance(snapshot.get("safety"), Mapping) else {}
+    cache_freshness = snapshot.get("cache_freshness")
+    if isinstance(cache_freshness, Mapping):
+        payload = _freshness_payload(cache_freshness)
+    else:
+        payload = {
+            "status": str(summary.get("cache_freshness_status") or "unknown").strip().lower(),
+            "provided": True,
+        }
+    payload.update(
+        {
+            "snapshot_type": snapshot.get("type", "unknown"),
+            "snapshot_source": snapshot.get("source", "unknown"),
+            "snapshot_read_coverage_status": summary.get("read_coverage_status", "unknown"),
+            "snapshot_live_write": bool(safety.get("live_write")),
+            "snapshot_queries_console": bool(safety.get("queries_console")),
+            "snapshot_live_apply_allowed": bool(summary.get("live_apply_allowed")),
+        }
+    )
+    return payload
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        return default
+    return numeric if numeric >= 0 else default
+
+
+def scene_preset_scoped_diff_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Normalize read-only scoped scene/preset diff evidence."""
+
+    if not isinstance(payload, Mapping):
+        return {
+            "provided": False,
+            "available": False,
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+            "mutates_console_state": False,
+        }
+    target_preview_available = bool(
+        payload.get("target_preview_available")
+        if "target_preview_available" in payload
+        else payload.get("preview_available")
+    )
+    rollback_snapshot_id = str(
+        payload.get("rollback_snapshot_id")
+        or payload.get("rollback_id")
+        or ""
+    ).strip()
+    rollback_available = bool(
+        payload.get("rollback_snapshot_available")
+        if "rollback_snapshot_available" in payload
+        else payload.get("rollback_available")
+    ) or bool(rollback_snapshot_id)
+    changed_parameter_count = _safe_int(
+        payload.get("estimated_changed_parameter_count")
+        if "estimated_changed_parameter_count" in payload
+        else payload.get("changed_parameter_count"),
+        0,
+    )
+    affected_channel_count = _safe_int(payload.get("affected_channel_count"), 0)
+    affected_bus_count = _safe_int(payload.get("affected_bus_count"), 0)
+    affected_fx_slot_count = _safe_int(payload.get("affected_fx_slot_count"), 0)
+    destructive_scope_score = _clip01(payload.get("destructive_scope_score", 0.0))
+    scope_confidence = _clip01(payload.get("scope_confidence", 0.0))
+    rollback_confidence = _clip01(payload.get("rollback_confidence", 0.0))
+    available = bool(
+        payload.get("available")
+        if "available" in payload
+        else payload.get("scoped_diff_available")
+    )
+    if not available and changed_parameter_count > 0:
+        available = True
+    if not available and any((affected_channel_count, affected_bus_count, affected_fx_slot_count)):
+        available = True
+
+    return {
+        "provided": True,
+        "available": available,
+        "target_preview_available": target_preview_available,
+        "rollback_snapshot_available": rollback_available,
+        "rollback_snapshot_id": rollback_snapshot_id,
+        "estimated_changed_parameter_count": changed_parameter_count,
+        "affected_channel_count": affected_channel_count,
+        "affected_bus_count": affected_bus_count,
+        "affected_fx_slot_count": affected_fx_slot_count,
+        "destructive_scope_score": round(destructive_scope_score, 3),
+        "scope_confidence": round(scope_confidence, 3),
+        "rollback_confidence": round(rollback_confidence, 3),
+        "diff_source": str(payload.get("source") or payload.get("diff_source") or "unknown"),
+        "diff_id": str(payload.get("id") or payload.get("diff_id") or "").strip(),
+        "read_only": bool(payload.get("read_only", True)),
+        "live_write": bool(payload.get("live_write", False)),
+        "queries_console": bool(payload.get("queries_console", False)),
+        "mutates_console_state": bool(payload.get("mutates_console_state", False)),
+        "destructive_change_marker": str(payload.get("destructive_change_marker") or "").strip(),
+    }
+
+
+def scene_preset_rollback_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Normalize read-only rollback evidence for scene/preset changes."""
+
+    if not isinstance(payload, Mapping):
+        return {
+            "provided": False,
+            "available": False,
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+            "mutates_console_state": False,
+            "target_scope_matches": True,
+        }
+    rollback_snapshot_id = str(
+        payload.get("rollback_snapshot_id")
+        or payload.get("snapshot_id")
+        or payload.get("rollback_id")
+        or ""
+    ).strip()
+    available = bool(
+        payload.get("available")
+        if "available" in payload
+        else payload.get("rollback_snapshot_available")
+    ) or bool(rollback_snapshot_id)
+    target_scope_matches = bool(
+        payload.get("target_scope_matches")
+        if "target_scope_matches" in payload
+        else payload.get("covers_target_scope", True)
+    )
+    return {
+        "provided": True,
+        "available": available,
+        "rollback_snapshot_id": rollback_snapshot_id,
+        "rollback_confidence": round(_clip01(payload.get("rollback_confidence", payload.get("confidence", 0.0))), 3),
+        "rollback_source": str(payload.get("source") or payload.get("rollback_source") or "unknown"),
+        "rollback_evidence_id": str(payload.get("id") or payload.get("evidence_id") or "").strip(),
+        "target_scope_matches": target_scope_matches,
+        "target_scope": str(payload.get("target_scope") or "").strip(),
+        "read_only": bool(payload.get("read_only", True)),
+        "live_write": bool(payload.get("live_write", False)),
+        "queries_console": bool(payload.get("queries_console", False)),
+        "mutates_console_state": bool(payload.get("mutates_console_state", False)),
+        "destructive_change_marker": str(payload.get("destructive_change_marker") or "").strip(),
+    }
+
+
 def _action_needs_existing_target(action_type: str) -> bool:
     return action_type in {"scene_recall", "preset_recall"}
 
@@ -267,9 +476,49 @@ def analyze_scene_preset_management_need(
     destructive_scope = _clip01(analysis.destructive_scope_score)
     current_signal = _safe_float(analysis.current_mix_signal_dbfs, -100.0)
     target_confidence = _clip01(analysis.target_confidence)
-    scope_confidence = _clip01(analysis.scope_confidence)
-    rollback_confidence = _clip01(analysis.rollback_confidence)
+    scoped_diff = scene_preset_scoped_diff_payload(analysis.scoped_diff_evidence)
+    rollback = scene_preset_rollback_payload(analysis.rollback_evidence)
+    scope_confidence = max(_clip01(analysis.scope_confidence), _clip01(scoped_diff.get("scope_confidence")))
+    rollback_confidence = max(
+        _clip01(analysis.rollback_confidence),
+        _clip01(scoped_diff.get("rollback_confidence")),
+        _clip01(rollback.get("rollback_confidence")),
+    )
     persistence = max(1, int(analysis.persistence_cycles or 1))
+    current_state_cache_freshness = (
+        analysis.current_state_cache_freshness
+        if isinstance(analysis.current_state_cache_freshness, Mapping)
+        else scene_preset_cache_freshness_from_snapshots(
+            artifact_type,
+            current_snapshots_scenes_snapshot=analysis.current_snapshots_scenes_snapshot,
+            current_user_presets_snapshot=analysis.current_user_presets_snapshot,
+        )
+    )
+    current_state_freshness = _freshness_payload(current_state_cache_freshness)
+    current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+
+    target_preview_available = bool(
+        analysis.target_preview_available or scoped_diff.get("target_preview_available")
+    )
+    scoped_diff_available = bool(analysis.scoped_diff_available or scoped_diff.get("available"))
+    rollback_snapshot_id = str(
+        analysis.rollback_snapshot_id
+        or rollback.get("rollback_snapshot_id")
+        or scoped_diff.get("rollback_snapshot_id")
+        or ""
+    ).strip()
+    rollback_snapshot_available = bool(
+        analysis.rollback_snapshot_available
+        or rollback.get("available")
+        or scoped_diff.get("rollback_snapshot_available")
+        or rollback_snapshot_id
+    )
+    changed_parameters = max(changed_parameters, _safe_int(scoped_diff.get("estimated_changed_parameter_count"), 0))
+    affected_channels = max(affected_channels, _safe_int(scoped_diff.get("affected_channel_count"), 0))
+    affected_buses = max(affected_buses, _safe_int(scoped_diff.get("affected_bus_count"), 0))
+    affected_fx = max(affected_fx, _safe_int(scoped_diff.get("affected_fx_slot_count"), 0))
+    affected_total = affected_channels + affected_buses + affected_fx
+    destructive_scope = max(destructive_scope, _clip01(scoped_diff.get("destructive_scope_score")))
 
     blockers = []
     if not artifact_id and not artifact_name:
@@ -282,12 +531,32 @@ def analyze_scene_preset_management_need(
         blockers.append("unsupported_scene_preset_scope")
     if not analysis.current_state_readback_available:
         blockers.append("current_console_state_readback_missing")
-    if not analysis.target_preview_available:
+    if not target_preview_available:
         blockers.append("scene_preset_preview_missing")
-    if not analysis.scoped_diff_available:
+    if not scoped_diff_available:
         blockers.append("scene_preset_scoped_diff_missing")
-    if not analysis.rollback_snapshot_available or not analysis.rollback_snapshot_id:
+    if not rollback_snapshot_available or not rollback_snapshot_id:
         blockers.append("rollback_snapshot_missing")
+    if scoped_diff.get("provided") is True:
+        if scoped_diff.get("read_only") is not True:
+            blockers.append("scene_preset_scoped_diff_not_read_only")
+        if scoped_diff.get("live_write") is True:
+            blockers.append("scene_preset_scoped_diff_live_write_claim")
+        if scoped_diff.get("queries_console") is True:
+            blockers.append("scene_preset_scoped_diff_queries_console")
+        if scoped_diff.get("mutates_console_state") is True:
+            blockers.append("scene_preset_scoped_diff_mutates_console_state")
+    if rollback.get("provided") is True:
+        if rollback.get("read_only") is not True:
+            blockers.append("scene_preset_rollback_not_read_only")
+        if rollback.get("live_write") is True:
+            blockers.append("scene_preset_rollback_live_write_claim")
+        if rollback.get("queries_console") is True:
+            blockers.append("scene_preset_rollback_queries_console")
+        if rollback.get("mutates_console_state") is True:
+            blockers.append("scene_preset_rollback_mutates_console_state")
+        if rollback.get("target_scope_matches") is False:
+            blockers.append("scene_preset_rollback_target_scope_mismatch")
     if not operator_intent:
         blockers.append("operator_intent_required")
     if analysis.active_performance or window not in SAFE_SCENE_PRESET_WINDOWS:
@@ -324,6 +593,8 @@ def analyze_scene_preset_management_need(
         blockers.append("scope_confidence_low")
     if rollback_confidence < MIN_ROLLBACK_CONFIDENCE:
         blockers.append("rollback_confidence_low")
+    if current_state_freshness_status not in {"fresh", "not_provided"}:
+        blockers.append("scene_preset_current_state_cache_not_fresh")
 
     confidence = _clip01(
         0.22 * target_confidence
@@ -331,7 +602,7 @@ def analyze_scene_preset_management_need(
         + 0.18 * rollback_confidence
         + 0.12 * min(persistence / 3.0, 1.0)
         + 0.10 * (1.0 if analysis.current_state_readback_available else 0.0)
-        + 0.08 * (1.0 if analysis.target_preview_available else 0.0)
+        + 0.08 * (1.0 if target_preview_available else 0.0)
         + 0.05 * (1.0 - destructive_scope)
         + 0.03 * (1.0 if operator_intent else 0.0)
     )
@@ -348,10 +619,10 @@ def analyze_scene_preset_management_need(
         "action_type": action_type,
         "target_scope": target_scope,
         "current_state_readback_available": bool(analysis.current_state_readback_available),
-        "target_preview_available": bool(analysis.target_preview_available),
-        "scoped_diff_available": bool(analysis.scoped_diff_available),
-        "rollback_snapshot_available": bool(analysis.rollback_snapshot_available),
-        "rollback_snapshot_id": analysis.rollback_snapshot_id,
+        "target_preview_available": target_preview_available,
+        "scoped_diff_available": scoped_diff_available,
+        "rollback_snapshot_available": rollback_snapshot_available,
+        "rollback_snapshot_id": rollback_snapshot_id,
         "operator_intent": operator_intent,
         "change_window": window,
         "active_performance": bool(analysis.active_performance),
@@ -368,6 +639,10 @@ def analyze_scene_preset_management_need(
         "scope_confidence": round(scope_confidence, 3),
         "rollback_confidence": round(rollback_confidence, 3),
         "persistence_cycles": persistence,
+        "current_state_cache_freshness_status": current_state_freshness_status,
+        "current_state_cache_freshness": current_state_freshness,
+        "scoped_diff_evidence": scoped_diff,
+        "rollback_evidence": rollback,
         "transport_free": True,
         "destructive_console_state": True,
     }
@@ -393,10 +668,32 @@ def analyze_scene_preset_management_need(
 
 def build_scene_preset_management_proposals(
     analyses: Iterable[ScenePresetManagementAnalysisInput],
+    *,
+    current_snapshots_scenes_snapshot: Optional[Mapping[str, Any]] = None,
+    current_user_presets_snapshot: Optional[Mapping[str, Any]] = None,
 ) -> Tuple[Dict[str, Any], ...]:
     proposals = []
     for analysis in analyses:
-        recommendation = analyze_scene_preset_management_need(analysis)
+        enriched_analysis = analysis
+        if (
+            analysis.current_state_cache_freshness is None
+            and analysis.current_snapshots_scenes_snapshot is None
+            and analysis.current_user_presets_snapshot is None
+            and (
+                current_snapshots_scenes_snapshot is not None
+                or current_user_presets_snapshot is not None
+            )
+        ):
+            enriched_analysis = replace(
+                analysis,
+                current_snapshots_scenes_snapshot=dict(current_snapshots_scenes_snapshot)
+                if isinstance(current_snapshots_scenes_snapshot, Mapping)
+                else None,
+                current_user_presets_snapshot=dict(current_user_presets_snapshot)
+                if isinstance(current_user_presets_snapshot, Mapping)
+                else None,
+            )
+        recommendation = analyze_scene_preset_management_need(enriched_analysis)
         if recommendation.status == "proposal_only":
             proposals.append(recommendation.to_operator_proposal())
     return tuple(proposals)

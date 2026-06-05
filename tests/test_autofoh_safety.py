@@ -2,6 +2,7 @@
 
 import os
 import sys
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
@@ -22,6 +23,19 @@ from autofoh_safety import (
     MasterFaderMove,
     PolarityAdjust,
 )
+
+
+def assert_blocked_evidence(decision, cmd):
+    assert decision.allowed is False
+    assert decision.sent is False
+    assert decision.blocked is True
+    assert decision.write_policy == "proposal_only_quarantined"
+    assert decision.payload["blocked"] is True
+    assert decision.payload["write_policy"] == "proposal_only_quarantined"
+    assert decision.payload["live_write_allowed"] is False
+    assert decision.payload["can_apply_live"] is False
+    assert decision.payload["mutates_mixer"] is False
+    assert any(call["cmd"] == cmd for call in decision.payload["blocked_calls"])
 
 
 class FakeMixer:
@@ -133,7 +147,7 @@ def test_state_machine_forbids_tonal_correction_during_song_start_stabilize():
     assert "not allowed" in decision.message
 
 
-def test_emergency_feedback_action_is_allowed_in_emergency_feedback_state():
+def test_emergency_feedback_action_is_bounded_but_quarantined_in_emergency_state():
     mixer = FakeMixer()
     controller = AutoFOHSafetyController(mixer)
 
@@ -150,10 +164,19 @@ def test_emergency_feedback_action_is_allowed_in_emergency_feedback_state():
         runtime_state=RuntimeState.EMERGENCY_FEEDBACK,
     )
 
-    assert decision.allowed is True
-    assert decision.sent is True
+    assert_blocked_evidence(decision, "set_eq_band")
     assert decision.bounded is True
-    assert mixer.calls[-1] == ("set_eq_band", 3, 4, 3150.0, -6.0, 8.0)
+    assert decision.payload["blocked_calls"][0] == {
+        "cmd": "set_eq_band",
+        "channel": 3,
+        "band": 4,
+        "freq": 3150.0,
+        "gain": -6.0,
+        "q": 8.0,
+        "ttl_seconds": 120.0,
+        "semantic": "emergency_feedback_notch",
+    }
+    assert mixer.calls == []
 
 
 def test_rate_limiter_blocks_excessive_rapid_fader_corrections():
@@ -229,12 +252,13 @@ def test_rollback_state_bypasses_rate_limit_for_reversible_actions():
         runtime_state=RuntimeState.ROLLBACK,
     )
 
-    assert first.sent is True
-    assert rollback.sent is True
+    assert_blocked_evidence(first, "set_eq_band")
+    assert_blocked_evidence(rollback, "set_eq_band")
     assert rollback.rate_limited is False
+    assert mixer.calls == []
 
 
-def test_safety_layer_blocks_unsupported_actions():
+def test_safety_layer_quarantines_hpf_before_transport_support_matters():
     controller = AutoFOHSafetyController(NoHPFMixer())
 
     decision = controller.execute(
@@ -242,9 +266,8 @@ def test_safety_layer_blocks_unsupported_actions():
         runtime_state=RuntimeState.SOURCE_LEARNING,
     )
 
-    assert decision.supported is False
-    assert decision.sent is False
-    assert decision.allowed is False
+    assert decision.supported is True
+    assert_blocked_evidence(decision, "set_hpf")
 
 
 def test_safety_layer_bounds_outgoing_correction_values():
@@ -269,9 +292,18 @@ def test_safety_layer_bounds_outgoing_correction_values():
         runtime_state=RuntimeState.SOURCE_LEARNING,
     )
 
-    assert decision.sent is True
+    assert_blocked_evidence(decision, "set_eq_band")
     assert decision.bounded is True
-    assert mixer.calls[-1] == ("set_eq_band", 5, 1, 90.0, 1.0, 1.0)
+    assert decision.payload["blocked_calls"][0] == {
+        "cmd": "set_eq_band",
+        "channel": 5,
+        "band": 1,
+        "freq": 90.0,
+        "gain": 1.0,
+        "q": 1.0,
+        "semantic": "channel_eq_move",
+    }
+    assert mixer.calls == []
 
 
 def test_compressor_makeup_adjust_uses_safety_bounds():
@@ -287,9 +319,10 @@ def test_compressor_makeup_adjust_uses_safety_bounds():
         runtime_state=RuntimeState.SOURCE_LEARNING,
     )
 
-    assert decision.sent is True
+    assert_blocked_evidence(decision, "set_compressor_gain")
     assert decision.bounded is True
-    assert mixer.calls[-1] == ("set_compressor_gain", 2, 12.0)
+    assert decision.payload["blocked_calls"][0]["makeup_db"] == 12.0
+    assert mixer.calls == []
 
 
 def test_master_fader_move_can_only_cut_and_is_step_limited():
@@ -309,9 +342,10 @@ def test_master_fader_move_can_only_cut_and_is_step_limited():
         runtime_state=RuntimeState.SOURCE_LEARNING,
     )
 
-    assert cut.sent is True
+    assert_blocked_evidence(cut, "set_main_fader")
     assert cut.bounded is True
-    assert mixer.calls[-1] == ("set_main_fader", 1, -3.0)
+    assert cut.payload["blocked_calls"][0]["value_db"] == -3.0
+    assert mixer.calls == []
 
 
 def test_master_fader_move_never_raises_main_fader():
@@ -328,9 +362,10 @@ def test_master_fader_move_never_raises_main_fader():
         runtime_state=RuntimeState.SOURCE_LEARNING,
     )
 
-    assert decision.sent is True
+    assert_blocked_evidence(decision, "set_main_fader")
     assert decision.bounded is True
-    assert mixer.calls[-1] == ("set_main_fader", 1, -6.0)
+    assert decision.payload["blocked_calls"][0]["value_db"] == -6.0
+    assert mixer.calls == []
 
 
 def test_bus_and_dca_fader_moves_are_step_limited_and_never_above_zero():
@@ -352,12 +387,13 @@ def test_bus_and_dca_fader_moves_are_step_limited_and_never_above_zero():
         runtime_state=RuntimeState.SOURCE_LEARNING,
     )
 
-    assert bus.sent is True
+    assert_blocked_evidence(bus, "set_bus_fader")
     assert bus.bounded is True
-    assert dca.sent is True
+    assert_blocked_evidence(dca, "set_dca_fader")
     assert dca.bounded is True
-    assert ("set_bus_fader", 1, -7.0) in mixer.calls
-    assert ("set_dca_fader", 2, -8.5) in mixer.calls
+    assert bus.payload["blocked_calls"][0]["value_db"] == -7.0
+    assert dca.payload["blocked_calls"][0]["value_db"] == -8.5
+    assert mixer.calls == []
 
 
 def test_bus_processing_actions_use_bus_translators_and_bounds():
@@ -388,12 +424,16 @@ def test_bus_processing_actions_use_bus_translators_and_bounds():
         runtime_state=RuntimeState.SOURCE_LEARNING,
     )
 
-    assert eq_decision.sent is True
+    assert_blocked_evidence(eq_decision, "set_bus_eq_band")
     assert eq_decision.bounded is True
-    assert ("set_bus_eq_band", 3, 2, 350.0, -1.0, 0.44) in mixer.calls
-    assert compressor_decision.sent is True
+    assert eq_decision.payload["blocked_calls"][0]["gain"] == -1.0
+    assert eq_decision.payload["blocked_calls"][0]["q"] == 0.44
+    assert_blocked_evidence(compressor_decision, "set_bus_compressor")
     assert compressor_decision.bounded is True
-    assert mixer.calls[-1] == ("set_bus_compressor", 3, -50.0, 20.0, 1.0, 600.0, 12.0, True)
+    assert compressor_decision.payload["blocked_calls"][0]["threshold_db"] == -50.0
+    assert compressor_decision.payload["blocked_calls"][0]["ratio"] == 20.0
+    assert compressor_decision.payload["blocked_calls"][0]["makeup_db"] == 12.0
+    assert mixer.calls == []
 
 
 def test_phase_actions_are_bounded_and_use_safety_translators():
@@ -415,8 +455,36 @@ def test_phase_actions_are_bounded_and_use_safety_translators():
         runtime_state=RuntimeState.SOURCE_LEARNING,
     )
 
-    assert delay.sent is True
+    assert_blocked_evidence(delay, "set_delay")
     assert delay.bounded is True
-    assert polarity.sent is True
-    assert ("set_delay", 1, 1.25, True) in mixer.calls
-    assert ("set_polarity", 2, True) in mixer.calls
+    assert_blocked_evidence(polarity, "set_polarity")
+    assert delay.payload["blocked_calls"][0]["delay_ms"] == 1.25
+    assert polarity.payload["blocked_calls"][0]["inverted"] is True
+    assert mixer.calls == []
+
+
+def test_autofoh_safety_source_has_no_direct_non_fader_gain_writes():
+    source = Path("backend/autofoh_safety.py").read_text()
+
+    assert "self.mixer_client.set_gain(" in source
+    assert "self.mixer_client.set_fader(" in source
+    for forbidden in (
+        "self.mixer_client.set_bus_fader(",
+        "self.mixer_client.set_dca_fader(",
+        "self.mixer_client.set_main_fader(",
+        "self.mixer_client.set_polarity(",
+        "self.mixer_client.set_delay(",
+        "self.mixer_client.set_eq_band(",
+        "self.mixer_client.set_bus_eq_band(",
+        "self.mixer_client.set_hpf(",
+        "self.mixer_client.set_compressor(",
+        "self.mixer_client.set_bus_compressor(",
+        "self.mixer_client.set_compressor_gain(",
+        "self.mixer_client.set_bus_compressor_gain(",
+        "self.mixer_client.set_gate(",
+        "self.mixer_client.set_pan(",
+        "self.mixer_client.set_send_level(",
+    ):
+        assert forbidden not in source
+    assert '"cmd": "set_eq_band"' in source
+    assert '"cmd": "set_gate"' in source

@@ -7,10 +7,15 @@ send proposals, but it never creates a live console write request.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 import math
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+
+try:
+    from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
 
 FX_METHOD_ID = "fx_send_proposal"
@@ -24,6 +29,11 @@ HIGH_INTELLIGIBILITY_RISK = 0.65
 MIN_SEND_DELTA_DB = 1.5
 
 DRY_ANCHOR_FAMILIES = {"kick", "bass", "sub", "master", "reference"}
+FX_TYPE_SCHEMA_FAMILIES = {
+    "reverb": "reverb",
+    "delay": "delay",
+    "chorus": "modulation",
+}
 ROLE_TOKENS = (
     ("lead_vocal", ("lead_vocal", "lead vocal", "main_vocal", "main vocal", "vox lead")),
     ("backing_vocal", ("backing_vocal", "backing vocal", "back_vocal", "bgv", "bv")),
@@ -144,6 +154,13 @@ class FXSendAnalysisInput:
     source_confidence: float = 0.75
     persistence_cycles: int = 1
     requested_fx_type: Optional[str] = None
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
+    current_fx_parameter_schema: Optional[Dict[str, Any]] = None
+    current_fx_inserts_snapshot: Optional[Dict[str, Any]] = None
+    source_identity_trust_state: str = "not_provided"
+    source_identity_trust_confidence: float = 0.0
+    source_identity_replay_outcome_count: int = 0
+    source_identity_calibration_freshness: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -227,13 +244,177 @@ class FXSendRecommendation:
         }
 
 
-def _severity(delta: Optional[float], feedback_risk: float, intelligibility_risk: float) -> str:
+def _severity(
+    delta: Optional[float],
+    feedback_risk: float,
+    intelligibility_risk: float,
+    blockers: Iterable[str] = (),
+) -> str:
+    blocker_set = set(blockers)
+    if (
+        "source_identity_blocked_from_downstream_trust" in blocker_set
+        or "source_identity_replay_context_not_fresh" in blocker_set
+    ):
+        return "high"
+    if "source_identity_not_trusted_for_downstream" in blocker_set:
+        return "medium"
+    if blocker_set & {
+        "fx_parameter_schema_family_mismatch",
+        "fx_inserts_snapshot_cache_not_fresh",
+        "fx_parameter_schema_not_mapped",
+        "fx_parameter_schema_not_scoped_to_fx_type",
+    }:
+        return "medium"
     magnitude = abs(delta or 0.0)
     if feedback_risk >= 0.45 or intelligibility_risk >= 0.5 or magnitude >= 8.0:
         return "high"
     if magnitude >= 3.0:
         return "medium"
     return "low"
+
+
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "missing_fields",
+        "untimestamped_present_fields",
+        "stale_after_sec",
+        "read_only",
+        "live_write",
+        "queries_console",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = True
+    normalized.setdefault("status", _freshness_status(payload))
+    return normalized
+
+
+def _schema_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _fx_parameter_schema_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "schema_family",
+        "schema_source",
+        "mapped_parameter_count",
+        "generic_parameter_count",
+        "cached_parameter_count",
+        "physical_model_schema_verified",
+        "live_write_authority",
+        "fx_slot",
+        "fx_model",
+        "snapshot_type",
+        "snapshot_cache_freshness_status",
+        "snapshot_read_coverage_status",
+        "snapshot_queries_console",
+        "snapshot_live_write",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = bool(payload.get("provided", True))
+    normalized.setdefault("status", _schema_status(payload))
+    normalized.setdefault("schema_family", "unknown")
+    return normalized
+
+
+def _expected_schema_family(fx_type: str) -> str:
+    return FX_TYPE_SCHEMA_FAMILIES.get(str(fx_type or "").strip().lower(), "unknown")
+
+
+def fx_parameter_schema_from_snapshot(
+    snapshot: Optional[Mapping[str, Any]],
+    fx_type: str,
+) -> Dict[str, Any]:
+    """Extract scoped FX schema evidence from a Product Layer FX snapshot."""
+
+    if not isinstance(snapshot, Mapping):
+        return {
+            "status": "not_provided",
+            "provided": False,
+            "schema_family": "unknown",
+            "schema_source": "fx_inserts_snapshot_not_provided",
+        }
+    expected_family = _expected_schema_family(fx_type)
+    safety = snapshot.get("safety") if isinstance(snapshot.get("safety"), Mapping) else {}
+    summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), Mapping) else {}
+    cache_freshness = (
+        snapshot.get("cache_freshness")
+        if isinstance(snapshot.get("cache_freshness"), Mapping)
+        else {}
+    )
+    base = {
+        "provided": True,
+        "schema_family": "unknown",
+        "schema_source": "fx_inserts_snapshot",
+        "snapshot_type": snapshot.get("type"),
+        "snapshot_cache_freshness_status": cache_freshness.get(
+            "status",
+            summary.get("cache_freshness_status", "unknown"),
+        ),
+        "snapshot_read_coverage_status": summary.get("read_coverage_status", "unknown"),
+        "snapshot_queries_console": safety.get("queries_console"),
+        "snapshot_live_write": safety.get("live_write"),
+        "physical_model_schema_verified": False,
+        "live_write_authority": False,
+    }
+    if snapshot.get("type") != "fx_inserts_snapshot":
+        return {
+            **base,
+            "status": "unknown",
+            "schema_source": "unexpected_snapshot_type",
+        }
+    for slot in snapshot.get("fx_slots") or ():
+        if not isinstance(slot, Mapping):
+            continue
+        schema = slot.get("parameter_schema")
+        if not isinstance(schema, Mapping):
+            continue
+        schema_family = str(schema.get("schema_family") or "unknown").strip().lower()
+        if schema.get("status") == "mapped" and schema_family == expected_family:
+            return {
+                **base,
+                "status": "mapped",
+                "schema_family": schema_family,
+                "schema_source": schema.get("schema_source", "fx_inserts_snapshot"),
+                "mapped_parameter_count": schema.get("mapped_parameter_count", 0),
+                "generic_parameter_count": schema.get("generic_parameter_count", 0),
+                "cached_parameter_count": schema.get("cached_parameter_count", 0),
+                "physical_model_schema_verified": bool(schema.get("physical_model_schema_verified")),
+                "live_write_authority": bool(schema.get("live_write_authority")),
+                "fx_slot": slot.get("slot"),
+                "fx_model": slot.get("model"),
+            }
+    snapshot_schema = snapshot.get("parameter_schema") if isinstance(snapshot.get("parameter_schema"), Mapping) else {}
+    return {
+        **base,
+        "status": snapshot_schema.get("status", "missing"),
+        "schema_source": snapshot_schema.get("schema_source", "fx_inserts_snapshot"),
+        "mapped_parameter_count": snapshot_schema.get("mapped_parameter_count", 0),
+        "generic_parameter_count": snapshot_schema.get("generic_parameter_count", 0),
+        "cached_parameter_count": snapshot_schema.get("cached_parameter_count", 0),
+        "physical_model_schema_verified": bool(snapshot_schema.get("physical_model_schema_verified")),
+        "live_write_authority": bool(snapshot_schema.get("live_write_authority")),
+    }
 
 
 def _select_preset(analysis: FXSendAnalysisInput, family: str) -> Optional[FXPreset]:
@@ -262,6 +443,16 @@ def analyze_fx_send_need(
     source_confidence = _clip01(analysis.source_confidence)
     headroom = _safe_float(analysis.return_headroom_db)
     persistence = max(1, int(analysis.persistence_cycles or 1))
+    current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
+    current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    source_identity_trust = evaluate_source_identity_downstream_trust(
+        source_id=f"ch:{int(analysis.channel_id)}",
+        source_type=str(analysis.source_role or "unknown"),
+        trust_state=analysis.source_identity_trust_state,
+        trust_confidence=analysis.source_identity_trust_confidence,
+        replay_outcome_count=analysis.source_identity_replay_outcome_count,
+        current_state_cache_freshness=analysis.source_identity_calibration_freshness,
+    )
 
     blockers = []
     if family in DRY_ANCHOR_FAMILIES:
@@ -275,6 +466,36 @@ def analyze_fx_send_need(
         blockers.append("feedback_risk_high")
     if preset.fx_type in {"delay", "reverb"} and intelligibility_risk >= HIGH_INTELLIGIBILITY_RISK:
         blockers.append("intelligibility_risk_high")
+    if current_state_freshness_status not in {"fresh", "not_provided"}:
+        blockers.append("fx_current_state_cache_not_fresh")
+    expected_fx_schema_family = _expected_schema_family(preset.fx_type)
+    schema_input = (
+        analysis.current_fx_parameter_schema
+        if isinstance(analysis.current_fx_parameter_schema, Mapping)
+        else fx_parameter_schema_from_snapshot(analysis.current_fx_inserts_snapshot, preset.fx_type)
+    )
+    fx_parameter_schema = _fx_parameter_schema_payload(schema_input)
+    fx_parameter_schema_status = str(fx_parameter_schema.get("status") or "unknown")
+    provided_schema_family = str(fx_parameter_schema.get("schema_family") or "unknown").strip().lower()
+    if fx_parameter_schema_status not in {"mapped", "not_provided"}:
+        blockers.append("fx_parameter_schema_not_mapped")
+    elif fx_parameter_schema_status == "mapped" and provided_schema_family == "unknown":
+        blockers.append("fx_parameter_schema_not_scoped_to_fx_type")
+    elif (
+        fx_parameter_schema_status == "mapped"
+        and expected_fx_schema_family != "unknown"
+        and provided_schema_family != expected_fx_schema_family
+    ):
+        blockers.append("fx_parameter_schema_family_mismatch")
+    snapshot_schema_freshness_status = str(
+        fx_parameter_schema.get("snapshot_cache_freshness_status") or "not_provided"
+    ).strip().lower()
+    if (
+        fx_parameter_schema.get("provided") is True
+        and fx_parameter_schema.get("snapshot_type") == "fx_inserts_snapshot"
+        and snapshot_schema_freshness_status != "fresh"
+    ):
+        blockers.append("fx_inserts_snapshot_cache_not_fresh")
 
     target = _clip(preset.target_send_db, MIN_SEND_DB, MAX_SEND_DB)
     if intelligibility_risk >= 0.45:
@@ -285,6 +506,7 @@ def analyze_fx_send_need(
     delta = None if current is None else round(target - current, 1)
     if delta is not None and abs(delta) < MIN_SEND_DELTA_DB:
         blockers.append("send_change_not_needed")
+    blockers.extend(source_identity_trust.blockers)
 
     delay_ms = tempo_delay_ms(analysis.tempo_bpm, preset.delay_note) if preset.fx_type == "delay" else None
     confidence = _clip01(
@@ -309,6 +531,12 @@ def analyze_fx_send_need(
         "intelligibility_risk": round(intelligibility_risk, 3),
         "source_confidence": round(source_confidence, 3),
         "persistence_cycles": persistence,
+        "current_state_cache_freshness_status": current_state_freshness_status,
+        "current_state_cache_freshness": current_state_freshness,
+        "current_fx_parameter_schema_status": fx_parameter_schema_status,
+        "current_fx_parameter_schema": fx_parameter_schema,
+        "expected_fx_schema_family": expected_fx_schema_family,
+        "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
         "post_fader_send_required_before_promotion": True,
         "return_filtering_required": True,
@@ -342,7 +570,7 @@ def analyze_fx_send_need(
         delay_ms=delay_ms,
         ducking_db=round(preset.ducking_db if analysis.vocal_priority else 0.0, 1),
         confidence=round(confidence, 3),
-        severity=_severity(delta, feedback_risk, intelligibility_risk),
+        severity=_severity(delta, feedback_risk, intelligibility_risk, blockers),
         reason=reason,
         blockers=tuple(sorted(set(blockers))),
         evidence=evidence,
@@ -351,10 +579,22 @@ def analyze_fx_send_need(
 
 def build_fx_send_proposals(
     analyses: Iterable[FXSendAnalysisInput],
+    *,
+    current_fx_inserts_snapshot: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, Any], ...]:
     proposals = []
     for analysis in analyses:
-        recommendation = analyze_fx_send_need(analysis)
+        enriched_analysis = analysis
+        if (
+            current_fx_inserts_snapshot is not None
+            and analysis.current_fx_inserts_snapshot is None
+            and analysis.current_fx_parameter_schema is None
+        ):
+            enriched_analysis = replace(
+                analysis,
+                current_fx_inserts_snapshot=current_fx_inserts_snapshot,
+            )
+        recommendation = analyze_fx_send_need(enriched_analysis)
         if recommendation.status == "proposal_only":
             proposals.append(recommendation.to_operator_proposal())
     return tuple(proposals)

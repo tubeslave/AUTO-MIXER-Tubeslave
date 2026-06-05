@@ -11,6 +11,11 @@ from datetime import datetime, timezone
 import math
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
+try:
+    from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+
 
 DEESSER_METHOD_ID = "deesser_vocal_sibilance"
 DEESSER_VERSION = "deesser_vocal_sibilance_v1"
@@ -99,6 +104,11 @@ class DeesserAnalysisInput:
     contribution_share: float = 0.0
     persistence_cycles: int = 1
     true_peak_headroom_db: float = 6.0
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
+    source_identity_trust_state: str = "not_provided"
+    source_identity_trust_confidence: float = 0.0
+    source_identity_replay_outcome_count: int = 0
+    source_identity_calibration_freshness: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -171,6 +181,18 @@ def _severity_from_score(score: float) -> str:
     return "low"
 
 
+def _severity(blockers: Iterable[str], score: float) -> str:
+    blocker_set = set(blockers)
+    if (
+        "source_identity_blocked_from_downstream_trust" in blocker_set
+        or "source_identity_replay_context_not_fresh" in blocker_set
+    ):
+        return "high"
+    if "source_identity_not_trusted_for_downstream" in blocker_set:
+        return "medium"
+    return _severity_from_score(score)
+
+
 def _frequency_from_bands(band_energy_db: Mapping[str, Any]) -> float:
     bands = _normalize_band_map(band_energy_db)
     air = bands.get("air", -120.0)
@@ -181,6 +203,37 @@ def _frequency_from_bands(band_energy_db: Mapping[str, Any]) -> float:
     if harshness > sibilance + 2.0:
         return 6200.0
     return DEFAULT_CENTER_HZ
+
+
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "missing_fields",
+        "untimestamped_present_fields",
+        "stale_after_sec",
+        "read_only",
+        "live_write",
+        "queries_console",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = True
+    normalized.setdefault("status", _freshness_status(payload))
+    return normalized
 
 
 def analyze_deesser_need(
@@ -199,6 +252,16 @@ def analyze_deesser_need(
     contribution = _clip01(analysis.contribution_share)
     persistence = max(1, int(analysis.persistence_cycles or 1))
     is_vocal = is_vocal_role(analysis.source_role)
+    current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
+    current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    source_identity_trust = evaluate_source_identity_downstream_trust(
+        source_id=f"ch:{int(analysis.channel_id)}",
+        source_type=str(analysis.source_role or "unknown"),
+        trust_state=analysis.source_identity_trust_state,
+        trust_confidence=analysis.source_identity_trust_confidence,
+        replay_outcome_count=analysis.source_identity_replay_outcome_count,
+        current_state_cache_freshness=analysis.source_identity_calibration_freshness,
+    )
 
     evidence = {
         "source": DEESSER_VERSION,
@@ -209,6 +272,9 @@ def analyze_deesser_need(
         "persistence_cycles": persistence,
         "peak_dbfs": round(_safe_float(analysis.peak_dbfs), 2),
         "true_peak_headroom_db": round(_safe_float(analysis.true_peak_headroom_db), 2),
+        "current_state_cache_freshness_status": current_state_freshness_status,
+        "current_state_cache_freshness": current_state_freshness,
+        "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
     }
 
@@ -219,6 +285,9 @@ def analyze_deesser_need(
         blockers.append("sibilance_below_threshold")
     if _safe_float(analysis.true_peak_headroom_db) < 1.0:
         blockers.append("insufficient_true_peak_headroom_for_processing")
+    if current_state_freshness_status not in {"fresh", "not_provided"}:
+        blockers.append("deesser_current_state_cache_not_fresh")
+    blockers.extend(source_identity_trust.blockers)
 
     score = _clip01(
         0.35 * (ratio / max(min_ratio, EPSILON))
@@ -252,7 +321,7 @@ def analyze_deesser_need(
         threshold_db=round(threshold, 1),
         ratio=round(ratio_value, 2),
         confidence=round(confidence, 3),
-        severity=_severity_from_score(score),
+        severity=_severity(blockers, score),
         reason=reason,
         blockers=tuple(sorted(set(blockers))),
         evidence=evidence,

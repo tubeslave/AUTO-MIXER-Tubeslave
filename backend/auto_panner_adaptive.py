@@ -535,6 +535,12 @@ class AutoPannerController:
         self.sample_rate = sample_rate
         self.genre = genre
         self.mixer_client = mixer_client
+        self.live_write_allowed = False
+        self.write_policy = "proposal_only_quarantined"
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+        self.last_blocked_calls: List[Dict[str, Any]] = []
         
         # Initialize components
         self.crossover = LinkwitzRileyCrossover(sample_rate)
@@ -560,6 +566,11 @@ class AutoPannerController:
         Returns:
             {channel_id: PanningDecision}
         """
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+        self.last_blocked_calls = []
+
         decisions = {}
         
         for channel_id, audio in audio_data.items():
@@ -602,7 +613,8 @@ class AutoPannerController:
         # Update panning with smoothing
         pan_gains = self.engine.update()
         
-        # Send OSC if available
+        # Direct pan writes are quarantined. Legacy callers may still pass a
+        # mixer client, but this branch must only produce blocked evidence.
         if self.mixer_client:
             self._send_osc(pan_gains, decisions)
         
@@ -610,23 +622,56 @@ class AutoPannerController:
     
     def _send_osc(self, pan_gains: Dict[int, Tuple[float, float]], 
                  decisions: Dict[int, PanningDecision]):
-        """Send panning commands via OSC."""
-        try:
-            for channel_id, (left_gain, right_gain) in pan_gains.items():
-                # Convert to pan position (-1 to +1)
-                # Using sine/cosine inverse
-                if left_gain > 0 and right_gain > 0:
-                    pan_pos = (np.arctan2(right_gain, left_gain) * 4 / np.pi) - 1
-                else:
-                    pan_pos = 0.0
-                
-                # Send to mixer (format depends on mixer implementation)
-                # Example: /ch/{n}/mix/pan
-                if hasattr(self.mixer_client, 'set_channel_pan'):
-                    self.mixer_client.set_channel_pan(channel_id, pan_pos)
-                    
-        except Exception as e:
-            logger.error(f"OSC send error: {e}")
+        """Return blocked adaptive-pan evidence without mutating a mixer client."""
+
+        blocked_calls = self._build_apply_calls(pan_gains, decisions)
+        self.last_write_attempted = bool(blocked_calls)
+        self.last_write_blocked = bool(blocked_calls)
+        self.last_write_count = 0
+        self.last_blocked_calls = blocked_calls
+        reason = "adaptive_pan_direct_apply_quarantined" if blocked_calls else "no_pan_decisions"
+        if blocked_calls:
+            logger.warning(
+                "Adaptive panner live writes are quarantined; %s pan commands kept as evidence",
+                len(blocked_calls),
+            )
+        return {
+            "applied": False,
+            "blocked": bool(blocked_calls),
+            "calls": [],
+            "blocked_calls": blocked_calls,
+            "reason": reason,
+            "write_policy": self.write_policy,
+            "live_write_allowed": self.live_write_allowed,
+            "can_apply_live": False,
+            "mixer_client_present": self.mixer_client is not None,
+            "mutates_mixer": False,
+        }
+
+    def _build_apply_calls(
+        self,
+        pan_gains: Dict[int, Tuple[float, float]],
+        decisions: Dict[int, PanningDecision],
+    ) -> List[Dict[str, Any]]:
+        """Build would-be adaptive pan write commands as blocked evidence."""
+
+        blocked_calls: List[Dict[str, Any]] = []
+        for channel_id, (left_gain, right_gain) in pan_gains.items():
+            if left_gain > 0 and right_gain > 0:
+                pan_pos = (np.arctan2(right_gain, left_gain) * 4 / np.pi) - 1
+            else:
+                pan_pos = 0.0
+            decision = decisions.get(channel_id)
+            blocked_calls.append({
+                "cmd": "set_channel_pan",
+                "channel": channel_id,
+                "pan_value": float(pan_pos),
+                "position_degrees": decision.position if decision else None,
+                "position_name": decision.position_enum.name if decision else None,
+                "instrument_type": decision.instrument_type if decision else None,
+                "confidence": decision.confidence if decision else None,
+            })
+        return blocked_calls
     
     def set_genre(self, genre: Genre):
         """Change genre template."""
@@ -644,7 +689,14 @@ class AutoPannerController:
                     'current_pan': self.engine.current_pans.get(ch, 0.0)
                 }
                 for ch in range(self.num_channels)
-            }
+            },
+            'live_write_allowed': self.live_write_allowed,
+            'write_policy': self.write_policy,
+            'mixer_client_present': self.mixer_client is not None,
+            'last_write_attempted': self.last_write_attempted,
+            'last_write_blocked': self.last_write_blocked,
+            'last_write_count': self.last_write_count,
+            'last_blocked_call_count': len(self.last_blocked_calls),
         }
 
 

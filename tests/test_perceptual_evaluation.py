@@ -288,9 +288,20 @@ def test_shadow_mode_does_not_change_osc_behavior(tmp_path):
     )
     outcomes = engine._evaluate_pending_actions(force=True)
 
-    assert decision is not None and decision.sent is True
-    assert len(outcomes) == 1
-    assert mixer.calls == [("set_eq_band", 1, 2, 350.0, -1.0, 1.3)]
+    assert decision is not None
+    assert decision.sent is False
+    assert decision.blocked is True
+    assert decision.payload["blocked_calls"][0] == {
+        "cmd": "set_eq_band",
+        "channel": 1,
+        "band": 2,
+        "freq": 350.0,
+        "gain": -1.0,
+        "q": 1.3,
+        "semantic": "channel_eq_move",
+    }
+    assert outcomes == []
+    assert mixer.calls == []
 
 
 def test_reward_signal_combines_stably():

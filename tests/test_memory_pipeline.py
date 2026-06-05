@@ -64,6 +64,23 @@ def test_memory_files_have_required_structure() -> None:
     assert ok, errors
 
 
+def test_current_tasks_memory_preserves_live_readiness_boundary() -> None:
+    memory_lint = load_memory_lint()
+    current_tasks = next(
+        item
+        for item in memory_lint.REQUIRED_FILES
+        if item.path == ".ai/project-layer/current_tasks.md"
+    )
+
+    assert "## Active Tasks" in current_tasks.headings
+    assert "## Watch List" in current_tasks.headings
+    assert "dry-run or audit-only" in current_tasks.required_terms
+    assert (
+        "do not treat shadow-only or offline-only evidence as live readiness"
+        in current_tasks.required_terms
+    )
+
+
 def test_append_decision_preserves_existing_content(tmp_path: Path) -> None:
     copy_template(tmp_path, "decision_record.md")
     decisions = tmp_path / ".ai" / "project-layer" / "decisions.md"

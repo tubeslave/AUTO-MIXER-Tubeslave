@@ -120,6 +120,53 @@ def test_no_wing_release_check_rejects_forbidden_live_command():
     assert "bad_supervised_smoke_runner:wing_supervised_smoke_runner.py" in message
 
 
+def test_no_wing_release_check_rejects_current_cycle_forbidden_command_boundary():
+    current_cycle_forbidden_tokens = (
+        "set_fader",
+        "set_gain",
+        "set_trim",
+        "set_input_trim",
+        "set_channel_trim",
+        "set_preamp_trim",
+        "set_preamp_gain",
+        "set_eq",
+        "set_compressor",
+        "route_output",
+        "load_snap",
+        "save_snap",
+        "reset",
+        "mute",
+        "unmute",
+        "set_insert",
+        "set_fx_model",
+        "set_fx_on",
+        "set_fx_mix",
+        "set_fx_parameter",
+    )
+    missing = [
+        token
+        for token in current_cycle_forbidden_tokens
+        if token not in release_check.FORBIDDEN_COMMAND_TOKENS
+    ]
+    assert missing == []
+
+    checks = [
+        CommandCheck(
+            name=f"bad_{token}_runner",
+            command=("python3", f"tools/{token}_audit.py"),
+            cwd=".",
+        )
+        for token in current_cycle_forbidden_tokens
+    ]
+
+    with pytest.raises(ValueError) as excinfo:
+        validate_no_live_commands(checks)
+
+    message = str(excinfo.value)
+    for token in current_cycle_forbidden_tokens:
+        assert f"bad_{token}_runner:{token}" in message
+
+
 def test_no_wing_release_check_rejects_forbidden_live_command_in_check_name():
     checks = [
         CommandCheck(

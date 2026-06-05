@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from dante_routing_config import get_module_signal_info, get_routing_as_dict
 try:
@@ -53,8 +53,13 @@ DEFAULT_MATRIX_COUNT = 8
 DEFAULT_SEND_COUNT = 16
 DEFAULT_OUTPUT_COUNT = 64
 DEFAULT_OUTPUT_GROUPS = ("MOD", "CRD")
+DEFAULT_FX_SLOT_COUNT = 16
+DEFAULT_FX_PARAMETER_COUNT = 32
+DEFAULT_DLIVE_CHANNEL_COUNT = 48
+MAX_DLIVE_CHANNEL_COUNT = 128
 DEFAULT_SNAPSHOT_COUNT = 200
 DEFAULT_USER_PRESET_COUNT = 200
+DEFAULT_CACHE_STALE_AFTER_SEC = 30.0
 MIN_ACTIVE_DB = -90.0
 DEFAULT_TELEMETRY_STORAGE_DIR = "data/telemetry/sessions"
 TELEMETRY_ALERT_CONTEXT_ALLOWLIST = {
@@ -67,9 +72,81 @@ TELEMETRY_ALERT_CONTEXT_ALLOWLIST = {
     "previous_fader_db",
 }
 
+FX_PARAMETER_SCHEMA_BY_FAMILY: Mapping[str, Dict[int, Dict[str, Any]]] = {
+    "reverb": {
+        1: {"semantic_name": "decay_time", "unit": "seconds", "safe_min": 0.1, "safe_max": 8.0},
+        2: {"semantic_name": "predelay", "unit": "milliseconds", "safe_min": 0.0, "safe_max": 250.0},
+        3: {"semantic_name": "density", "unit": "ratio", "safe_min": 0.0, "safe_max": 1.0},
+        4: {"semantic_name": "brightness", "unit": "ratio", "safe_min": 0.0, "safe_max": 1.0},
+        5: {"semantic_name": "high_pass_filter", "unit": "hertz", "safe_min": 20.0, "safe_max": 1000.0},
+        6: {"semantic_name": "low_pass_filter", "unit": "hertz", "safe_min": 1000.0, "safe_max": 20000.0},
+    },
+    "delay": {
+        1: {"semantic_name": "left_delay_time", "unit": "milliseconds", "safe_min": 1.0, "safe_max": 2000.0},
+        2: {"semantic_name": "right_delay_time", "unit": "milliseconds", "safe_min": 1.0, "safe_max": 2000.0},
+        3: {"semantic_name": "feedback", "unit": "ratio", "safe_min": 0.0, "safe_max": 0.75},
+        4: {"semantic_name": "stereo_width", "unit": "ratio", "safe_min": 0.0, "safe_max": 1.0},
+        5: {"semantic_name": "high_pass_filter", "unit": "hertz", "safe_min": 20.0, "safe_max": 1000.0},
+        6: {"semantic_name": "low_pass_filter", "unit": "hertz", "safe_min": 1000.0, "safe_max": 20000.0},
+    },
+    "modulation": {
+        1: {"semantic_name": "rate", "unit": "hertz", "safe_min": 0.01, "safe_max": 10.0},
+        2: {"semantic_name": "depth", "unit": "ratio", "safe_min": 0.0, "safe_max": 1.0},
+        3: {"semantic_name": "left_delay_time", "unit": "milliseconds", "safe_min": 0.0, "safe_max": 80.0},
+        4: {"semantic_name": "right_delay_time", "unit": "milliseconds", "safe_min": 0.0, "safe_max": 80.0},
+        5: {"semantic_name": "high_pass_filter", "unit": "hertz", "safe_min": 20.0, "safe_max": 1000.0},
+        6: {"semantic_name": "low_pass_filter", "unit": "hertz", "safe_min": 1000.0, "safe_max": 20000.0},
+    },
+}
+
+FX_MODEL_FAMILY_TOKENS: Mapping[str, Tuple[str, ...]] = {
+    "reverb": ("REV", "REVERB", "PLATE", "ROOM", "HALL", "CHAMBER", "AMBI"),
+    "delay": ("DLY", "DELAY", "ECHO"),
+    "modulation": ("CHORUS", "CHO", "DOUBLER", "MOD", "FLANGER", "PHASER"),
+}
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _utc_epoch() -> float:
+    return datetime.now(timezone.utc).timestamp()
+
+
+def _coerce_epoch_seconds(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        timestamp = value
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+        return timestamp.timestamp()
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        if numeric > 1_000_000_000_000:
+            return numeric / 1000.0
+        return numeric
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            return _coerce_epoch_seconds(float(text))
+        except ValueError:
+            pass
+        try:
+            normalized = text.replace("Z", "+00:00")
+            return _coerce_epoch_seconds(datetime.fromisoformat(normalized))
+        except ValueError:
+            return None
+    return None
+
+
+def _iso_from_epoch(value: Optional[float]) -> Optional[str]:
+    if value is None:
+        return None
+    return datetime.fromtimestamp(value, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _safe_call(fn: Callable[..., Any], *args: Any, default: Any = None, **kwargs: Any) -> Any:
@@ -192,9 +269,193 @@ def _cached_raw(client: Any, address: str) -> Any:
     return state.get(address)
 
 
+def _dlive_fader_raw_to_db(value: Any) -> Optional[float]:
+    try:
+        raw = max(0, min(0x3FFF, int(value)))
+    except (TypeError, ValueError):
+        return None
+    if raw == 0:
+        return -100.0
+    if raw <= 0x2AAA:
+        return round((raw / 0x2AAA) * 100.0 - 100.0, 1)
+    return round(((raw - 0x2AAA) / (0x3FFF - 0x2AAA)) * 10.0, 1)
+
+
 def _state_has_address(client: Any, address: str) -> bool:
     state = getattr(client, "state", None)
     return isinstance(state, dict) and address in state and state.get(address) is not None
+
+
+def _address_tuple(addresses: Any) -> Tuple[str, ...]:
+    if isinstance(addresses, str):
+        return (addresses,)
+    try:
+        return tuple(str(address) for address in addresses if address)
+    except TypeError:
+        return ()
+
+
+def _state_has_any_address(client: Any, addresses: Any) -> bool:
+    return any(_state_has_address(client, address) for address in _address_tuple(addresses))
+
+
+def _cached_timestamp_epoch(client: Any, address: str) -> Optional[float]:
+    for attr in ("state_timestamps", "_state_timestamps", "state_updated_at", "_state_updated_at"):
+        timestamps = getattr(client, attr, None)
+        if not isinstance(timestamps, Mapping):
+            continue
+        raw = timestamps.get(address)
+        if isinstance(raw, Mapping):
+            raw = raw.get("updated_at") or raw.get("timestamp") or raw.get("ts")
+        epoch = _coerce_epoch_seconds(raw)
+        if epoch is not None:
+            return epoch
+    metadata = getattr(client, "state_metadata", None) or getattr(client, "_state_metadata", None)
+    if isinstance(metadata, Mapping):
+        row = metadata.get(address)
+        if isinstance(row, Mapping):
+            return _coerce_epoch_seconds(row.get("updated_at") or row.get("timestamp") or row.get("ts"))
+    return None
+
+
+def _cache_freshness_for_field_addresses(
+    client: Any,
+    field_addresses: Mapping[str, Any],
+    *,
+    stale_after_sec: float = DEFAULT_CACHE_STALE_AFTER_SEC,
+    now_epoch: Optional[float] = None,
+) -> Dict[str, Any]:
+    now = _utc_epoch() if now_epoch is None else float(now_epoch)
+    fields: Dict[str, Dict[str, Any]] = {}
+    for field, raw_addresses in field_addresses.items():
+        addresses = _address_tuple(raw_addresses)
+        selected_address = next(
+            (address for address in addresses if _state_has_address(client, address)),
+            None,
+        )
+        updated_epoch = _cached_timestamp_epoch(client, selected_address) if selected_address else None
+        age_sec = round(max(0.0, now - updated_epoch), 3) if updated_epoch is not None else None
+        if selected_address is None:
+            status = "missing"
+        elif updated_epoch is None:
+            status = "unknown"
+        elif age_sec is not None and age_sec > stale_after_sec:
+            status = "stale"
+        else:
+            status = "fresh"
+        fields[str(field)] = {
+            "status": status,
+            "address": selected_address,
+            "candidate_addresses": list(addresses),
+            "present": selected_address is not None,
+            "updated_at": _iso_from_epoch(updated_epoch),
+            "age_sec": age_sec,
+            "source": "state_timestamps" if updated_epoch is not None else "unavailable",
+        }
+
+    statuses = [row["status"] for row in fields.values()]
+    if not statuses or all(status == "missing" for status in statuses):
+        status = "missing"
+    elif "stale" in statuses:
+        status = "stale"
+    elif "unknown" in statuses:
+        status = "unknown"
+    elif "missing" in statuses:
+        status = "partial"
+    else:
+        status = "fresh"
+
+    return {
+        "status": status,
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "source": "state_timestamps" if any(row["updated_at"] for row in fields.values()) else "unavailable",
+        "stale_after_sec": float(stale_after_sec),
+        "field_count": len(fields),
+        "present_field_count": sum(1 for row in fields.values() if row["present"]),
+        "timestamped_field_count": sum(1 for row in fields.values() if row["updated_at"]),
+        "fresh_field_count": sum(1 for row in fields.values() if row["status"] == "fresh"),
+        "stale_field_count": sum(1 for row in fields.values() if row["status"] == "stale"),
+        "unknown_field_count": sum(1 for row in fields.values() if row["status"] == "unknown"),
+        "missing_field_count": sum(1 for row in fields.values() if row["status"] == "missing"),
+        "missing_fields": [field for field, row in fields.items() if row["status"] == "missing"],
+        "stale_fields": [field for field, row in fields.items() if row["status"] == "stale"],
+        "untimestamped_present_fields": [
+            field
+            for field, row in fields.items()
+            if row["present"] and row["updated_at"] is None
+        ],
+        "fields": fields,
+    }
+
+
+def _cache_freshness_for_addresses(
+    client: Any,
+    addresses: Iterable[str],
+    *,
+    stale_after_sec: float = DEFAULT_CACHE_STALE_AFTER_SEC,
+    now_epoch: Optional[float] = None,
+) -> Dict[str, Any]:
+    unique_addresses = tuple(dict.fromkeys(str(address) for address in addresses if address))
+    state = getattr(client, "state", None)
+    present_addresses = [
+        address
+        for address in unique_addresses
+        if isinstance(state, dict) and address in state and state.get(address) is not None
+    ]
+    now = _utc_epoch() if now_epoch is None else float(now_epoch)
+    timestamp_rows = []
+    for address in present_addresses:
+        updated_epoch = _cached_timestamp_epoch(client, address)
+        if updated_epoch is None:
+            continue
+        timestamp_rows.append({
+            "address": address,
+            "updated_at": _iso_from_epoch(updated_epoch),
+            "age_sec": round(max(0.0, now - updated_epoch), 3),
+        })
+    ages = [float(row["age_sec"]) for row in timestamp_rows]
+    max_age = max(ages) if ages else None
+    min_age = min(ages) if ages else None
+    if not present_addresses:
+        status = "missing"
+    elif not timestamp_rows:
+        status = "unknown"
+    elif max_age is not None and max_age > stale_after_sec:
+        status = "stale"
+    elif len(timestamp_rows) < len(present_addresses):
+        status = "partial"
+    else:
+        status = "fresh"
+    tracked = {row["address"] for row in timestamp_rows}
+    return {
+        "status": status,
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "source": "state_timestamps" if timestamp_rows else "unavailable",
+        "stale_after_sec": float(stale_after_sec),
+        "address_count": len(unique_addresses),
+        "present_address_count": len(present_addresses),
+        "timestamped_address_count": len(timestamp_rows),
+        "missing_address_count": len(unique_addresses) - len(present_addresses),
+        "untimestamped_present_addresses": [
+            address
+            for address in present_addresses
+            if address not in tracked
+        ],
+        "oldest_updated_at": _iso_from_epoch(min(_coerce_epoch_seconds(row["updated_at"]) for row in timestamp_rows))
+        if timestamp_rows
+        else None,
+        "newest_updated_at": _iso_from_epoch(max(_coerce_epoch_seconds(row["updated_at"]) for row in timestamp_rows))
+        if timestamp_rows
+        else None,
+        "max_age_sec": round(max_age, 3) if max_age is not None else None,
+        "min_age_sec": round(min_age, 3) if min_age is not None else None,
+    }
 
 
 def _read_coverage_status(fields: Mapping[str, bool]) -> str:
@@ -321,6 +582,62 @@ def _meter_for_channel(capture: Any, channel: int) -> Dict[str, Any]:
     }
 
 
+def _source_patch_label(source_group: Any, source_channel: Any) -> Optional[str]:
+    group = str(source_group or "").strip().upper()
+    channel = _safe_int_value(source_channel, 0) if source_channel is not None else 0
+    if group and channel > 0:
+        return f"{group} {channel}"
+    if group:
+        return group
+    if channel > 0:
+        return f"Input {channel}"
+    return None
+
+
+def _channel_source_patch_snapshot(client: Any, channel: int) -> Dict[str, Any]:
+    addresses = {
+        "main_source_group": f"/ch/{channel}/in/conn/grp",
+        "main_source_channel": f"/ch/{channel}/in/conn/in",
+        "alt_source_group": f"/ch/{channel}/in/conn/altgrp",
+        "alt_source_channel": f"/ch/{channel}/in/conn/altin",
+    }
+    fields = {
+        field: _state_has_address(client, address)
+        for field, address in addresses.items()
+    }
+    read_coverage = _read_coverage_section(
+        fields,
+        "mixer_state_cache" if any(fields.values()) else "unavailable",
+    )
+    read_coverage["cache_freshness"] = _cache_freshness_for_field_addresses(client, addresses)
+    main_group = _cached_raw(client, addresses["main_source_group"])
+    main_channel = _cached_int(client, addresses["main_source_channel"])
+    alt_group = _cached_raw(client, addresses["alt_source_group"])
+    alt_channel = _cached_int(client, addresses["alt_source_channel"])
+    main_label = _source_patch_label(main_group, main_channel)
+    alt_label = _source_patch_label(alt_group, alt_channel)
+    return {
+        "channel": channel,
+        "main": {
+            "source_group": main_group,
+            "source_channel": main_channel,
+            "label": main_label,
+            "available": bool(main_label),
+        },
+        "alt": {
+            "source_group": alt_group,
+            "source_channel": alt_channel,
+            "label": alt_label,
+            "available": bool(alt_label),
+        },
+        "active_label": main_label,
+        "input_assignment_policy": "blocked_manual_only",
+        "destructive_change_marker": "source_patch_change_would_repatch_channel_input",
+        "read_coverage": read_coverage,
+        "cache_freshness": read_coverage["cache_freshness"],
+    }
+
+
 def _channel_read_coverage(
     client: Any,
     channel: int,
@@ -379,6 +696,12 @@ def _channel_read_coverage(
             or _state_has_address(client, f"/ch/{channel}/dyn/$gr")
         ),
     }
+    source_patch_fields = {
+        "main_source_group": _state_has_address(client, f"/ch/{channel}/in/conn/grp"),
+        "main_source_channel": _state_has_address(client, f"/ch/{channel}/in/conn/in"),
+        "alt_source_group": _state_has_address(client, f"/ch/{channel}/in/conn/altgrp"),
+        "alt_source_channel": _state_has_address(client, f"/ch/{channel}/in/conn/altin"),
+    }
 
     sections = {
         "identity": _read_coverage_section(
@@ -399,6 +722,10 @@ def _channel_read_coverage(
         "basic_controls": _read_coverage_section(
             control_fields,
             "mixer_state_cache" if any(control_fields.values()) else "unavailable",
+        ),
+        "source_patch": _read_coverage_section(
+            source_patch_fields,
+            "mixer_state_cache" if any(source_patch_fields.values()) else "unavailable",
         ),
         "processing": _read_coverage_section(
             processing_fields,
@@ -469,6 +796,31 @@ def _channel_inventory_read_coverage(channels: Iterable[Mapping[str, Any]]) -> D
     }
 
 
+def _channel_inventory_cache_addresses(total_channels: int) -> List[str]:
+    addresses: List[str] = []
+    for channel in range(1, total_channels + 1):
+        addresses.extend([
+            f"/ch/{channel}/$name",
+            f"/ch/{channel}/name",
+            f"/ch/{channel}/fdr",
+            f"/ch/{channel}/in/set/trim",
+            f"/ch/{channel}/mute",
+            f"/ch/{channel}/pan",
+            f"/ch/{channel}/in/conn/grp",
+            f"/ch/{channel}/in/conn/in",
+            f"/ch/{channel}/in/conn/altgrp",
+            f"/ch/{channel}/in/conn/altin",
+            f"/ch/{channel}/gate/on",
+            f"/ch/{channel}/gate/thr",
+            f"/ch/{channel}/dyn/on",
+            f"/ch/{channel}/dyn/thr26",
+            f"/ch/{channel}/dyn/thr",
+            f"/ch/{channel}/dyn/gr",
+            f"/ch/{channel}/dyn/$gr",
+        ])
+    return addresses
+
+
 def build_channel_inventory(server: Any, total_channels: int = DEFAULT_CHANNEL_COUNT) -> Dict[str, Any]:
     total_channels = max(1, min(int(total_channels or DEFAULT_CHANNEL_COUNT), DEFAULT_DANTE_CHANNEL_COUNT))
     client = getattr(server, "mixer_client", None)
@@ -492,6 +844,9 @@ def build_channel_inventory(server: Any, total_channels: int = DEFAULT_CHANNEL_C
         if active:
             active_count += 1
         status = "active" if active else ("idle" if meter.get("available") else "unknown")
+        source_patch = _channel_source_patch_snapshot(client, channel)
+        fallback_source = f"In {channel:02d}"
+        source_label = source_patch.get("active_label") or fallback_source
         pan = _cached_numeric(client, f"/ch/{channel}/pan")
         gate_enabled = _cached_int(client, f"/ch/{channel}/gate/on")
         gate_threshold_db = _cached_numeric(client, f"/ch/{channel}/gate/thr")
@@ -520,7 +875,9 @@ def build_channel_inventory(server: Any, total_channels: int = DEFAULT_CHANNEL_C
                 "id": channel,
                 "number": channel,
                 "name": name,
-                "source": f"In {channel:02d}",
+                "source": source_label,
+                "fallback_source": fallback_source,
+                "source_patch": source_patch,
                 "dante_channel": channel,
                 "routing_role": routing_role,
                 "tap_point": routing_item.get("tap_point"),
@@ -560,6 +917,10 @@ def build_channel_inventory(server: Any, total_channels: int = DEFAULT_CHANNEL_C
         )
 
     inventory_read_coverage = _channel_inventory_read_coverage(channels)
+    cache_freshness = _cache_freshness_for_addresses(
+        client,
+        _channel_inventory_cache_addresses(total_channels),
+    )
     return {
         "type": "channel_inventory",
         "generated_at": _utc_now(),
@@ -576,18 +937,28 @@ def build_channel_inventory(server: Any, total_channels: int = DEFAULT_CHANNEL_C
             "named_channels": named_count,
             "coverage_percent": round((named_count / total_channels) * 100, 1) if total_channels else 0.0,
             "read_coverage_status": inventory_read_coverage["status"],
+            "cache_freshness_status": cache_freshness["status"],
         },
         "read_coverage": inventory_read_coverage,
+        "cache_freshness": cache_freshness,
         "channels": channels,
         "routing_scheme": routing,
     }
 
 
-def _processing_section_coverage(fields: Mapping[str, bool]) -> Dict[str, Any]:
-    return _read_coverage_section(
+def _processing_section_coverage(
+    fields: Mapping[str, bool],
+    *,
+    client: Any = None,
+    field_addresses: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    coverage = _read_coverage_section(
         fields,
         "mixer_state_cache" if any(fields.values()) else "unavailable",
     )
+    if client is not None and field_addresses is not None:
+        coverage["cache_freshness"] = _cache_freshness_for_field_addresses(client, field_addresses)
+    return coverage
 
 
 def _eq_band_snapshot(client: Any, channel: int, band: int) -> Dict[str, Any]:
@@ -596,65 +967,96 @@ def _eq_band_snapshot(client: Any, channel: int, band: int) -> Dict[str, Any]:
         "gain_db": f"/ch/{channel}/eq/{band}g",
         "q": f"/ch/{channel}/eq/{band}q",
     }
-    fields = {field: _state_has_address(client, address) for field, address in addresses.items()}
+    fields = {field: _state_has_any_address(client, address) for field, address in addresses.items()}
+    read_coverage = _processing_section_coverage(
+        fields,
+        client=client,
+        field_addresses=addresses,
+    )
     return {
         "band": band,
         "frequency_hz": _cached_numeric(client, addresses["frequency_hz"]),
         "gain_db": _cached_numeric(client, addresses["gain_db"]),
         "q": _cached_numeric(client, addresses["q"]),
-        "read_coverage": _processing_section_coverage(fields),
+        "read_coverage": read_coverage,
+        "cache_freshness": read_coverage["cache_freshness"],
     }
 
 
 def _channel_processing_snapshot_row(channel: Mapping[str, Any], client: Any) -> Dict[str, Any]:
     number = int(channel.get("number") or channel.get("id") or 0)
+    hpf_addresses = {
+        "enabled": f"/ch/{number}/flt/lc",
+        "frequency_hz": f"/ch/{number}/flt/lcf",
+    }
     hpf_fields = {
-        "enabled": _state_has_address(client, f"/ch/{number}/flt/lc"),
-        "frequency_hz": _state_has_address(client, f"/ch/{number}/flt/lcf"),
+        field: _state_has_any_address(client, addresses)
+        for field, addresses in hpf_addresses.items()
     }
     eq_bands = [_eq_band_snapshot(client, number, band) for band in range(1, 5)]
-    eq_fields = {"enabled": _state_has_address(client, f"/ch/{number}/eq/on")}
+    eq_addresses: Dict[str, Any] = {"enabled": f"/ch/{number}/eq/on"}
     for band in eq_bands:
-        coverage = band.get("read_coverage", {})
-        fields = coverage.get("fields", {}) if isinstance(coverage, dict) else {}
-        eq_fields[f"band_{band['band']}_frequency_hz"] = bool(fields.get("frequency_hz"))
-        eq_fields[f"band_{band['band']}_gain_db"] = bool(fields.get("gain_db"))
-        eq_fields[f"band_{band['band']}_q"] = bool(fields.get("q"))
+        band_number = band["band"]
+        eq_addresses[f"band_{band_number}_frequency_hz"] = f"/ch/{number}/eq/{band_number}f"
+        eq_addresses[f"band_{band_number}_gain_db"] = f"/ch/{number}/eq/{band_number}g"
+        eq_addresses[f"band_{band_number}_q"] = f"/ch/{number}/eq/{band_number}q"
+    eq_fields = {
+        field: _state_has_any_address(client, addresses)
+        for field, addresses in eq_addresses.items()
+    }
 
+    compressor_addresses = {
+        "enabled": f"/ch/{number}/dyn/on",
+        "model": f"/ch/{number}/dyn/mdl",
+        "threshold_db": (f"/ch/{number}/dyn/thr26", f"/ch/{number}/dyn/thr"),
+        "ratio": f"/ch/{number}/dyn/ratio",
+        "attack_ms": f"/ch/{number}/dyn/att",
+        "release_ms": f"/ch/{number}/dyn/rel",
+        "makeup_db": f"/ch/{number}/dyn/gain",
+        "mix_pct": f"/ch/{number}/dyn/mix",
+        "detector": f"/ch/{number}/dyn/det",
+        "gain_reduction_db": (f"/ch/{number}/dyn/gr", f"/ch/{number}/dyn/$gr"),
+    }
     compressor_fields = {
-        "enabled": _state_has_address(client, f"/ch/{number}/dyn/on"),
-        "model": _state_has_address(client, f"/ch/{number}/dyn/mdl"),
-        "threshold_db": (
-            _state_has_address(client, f"/ch/{number}/dyn/thr26")
-            or _state_has_address(client, f"/ch/{number}/dyn/thr")
-        ),
-        "ratio": _state_has_address(client, f"/ch/{number}/dyn/ratio"),
-        "attack_ms": _state_has_address(client, f"/ch/{number}/dyn/att"),
-        "release_ms": _state_has_address(client, f"/ch/{number}/dyn/rel"),
-        "makeup_db": _state_has_address(client, f"/ch/{number}/dyn/gain"),
-        "mix_pct": _state_has_address(client, f"/ch/{number}/dyn/mix"),
-        "detector": _state_has_address(client, f"/ch/{number}/dyn/det"),
-        "gain_reduction_db": (
-            _state_has_address(client, f"/ch/{number}/dyn/gr")
-            or _state_has_address(client, f"/ch/{number}/dyn/$gr")
-        ),
+        field: _state_has_any_address(client, addresses)
+        for field, addresses in compressor_addresses.items()
+    }
+    gate_addresses = {
+        "enabled": f"/ch/{number}/gate/on",
+        "model": f"/ch/{number}/gate/mdl",
+        "threshold_db": f"/ch/{number}/gate/thr",
+        "range_db": f"/ch/{number}/gate/range",
+        "attack_ms": f"/ch/{number}/gate/att",
+        "hold_ms": f"/ch/{number}/gate/hld",
+        "release_ms": f"/ch/{number}/gate/rel",
+        "accent": f"/ch/{number}/gate/acc",
+        "ratio": f"/ch/{number}/gate/ratio",
     }
     gate_fields = {
-        "enabled": _state_has_address(client, f"/ch/{number}/gate/on"),
-        "model": _state_has_address(client, f"/ch/{number}/gate/mdl"),
-        "threshold_db": _state_has_address(client, f"/ch/{number}/gate/thr"),
-        "range_db": _state_has_address(client, f"/ch/{number}/gate/range"),
-        "attack_ms": _state_has_address(client, f"/ch/{number}/gate/att"),
-        "hold_ms": _state_has_address(client, f"/ch/{number}/gate/hld"),
-        "release_ms": _state_has_address(client, f"/ch/{number}/gate/rel"),
-        "accent": _state_has_address(client, f"/ch/{number}/gate/acc"),
-        "ratio": _state_has_address(client, f"/ch/{number}/gate/ratio"),
+        field: _state_has_any_address(client, addresses)
+        for field, addresses in gate_addresses.items()
     }
     sections = {
-        "hpf": _processing_section_coverage(hpf_fields),
-        "eq": _processing_section_coverage(eq_fields),
-        "compressor": _processing_section_coverage(compressor_fields),
-        "gate": _processing_section_coverage(gate_fields),
+        "hpf": _processing_section_coverage(
+            hpf_fields,
+            client=client,
+            field_addresses=hpf_addresses,
+        ),
+        "eq": _processing_section_coverage(
+            eq_fields,
+            client=client,
+            field_addresses=eq_addresses,
+        ),
+        "compressor": _processing_section_coverage(
+            compressor_fields,
+            client=client,
+            field_addresses=compressor_addresses,
+        ),
+        "gate": _processing_section_coverage(
+            gate_fields,
+            client=client,
+            field_addresses=gate_addresses,
+        ),
     }
     section_statuses = {name: section["status"] for name, section in sections.items()}
 
@@ -765,6 +1167,44 @@ def _channel_processing_coverage_summary(channels: Iterable[Mapping[str, Any]]) 
     }
 
 
+def _channel_processing_cache_addresses(total_channels: int) -> List[str]:
+    addresses: List[str] = []
+    for channel in range(1, total_channels + 1):
+        addresses.extend([
+            f"/ch/{channel}/flt/lc",
+            f"/ch/{channel}/flt/lcf",
+            f"/ch/{channel}/eq/on",
+            f"/ch/{channel}/dyn/on",
+            f"/ch/{channel}/dyn/mdl",
+            f"/ch/{channel}/dyn/thr26",
+            f"/ch/{channel}/dyn/thr",
+            f"/ch/{channel}/dyn/ratio",
+            f"/ch/{channel}/dyn/att",
+            f"/ch/{channel}/dyn/rel",
+            f"/ch/{channel}/dyn/gain",
+            f"/ch/{channel}/dyn/mix",
+            f"/ch/{channel}/dyn/det",
+            f"/ch/{channel}/dyn/gr",
+            f"/ch/{channel}/dyn/$gr",
+            f"/ch/{channel}/gate/on",
+            f"/ch/{channel}/gate/mdl",
+            f"/ch/{channel}/gate/thr",
+            f"/ch/{channel}/gate/range",
+            f"/ch/{channel}/gate/att",
+            f"/ch/{channel}/gate/hld",
+            f"/ch/{channel}/gate/rel",
+            f"/ch/{channel}/gate/acc",
+            f"/ch/{channel}/gate/ratio",
+        ])
+        for band in range(1, 5):
+            addresses.extend([
+                f"/ch/{channel}/eq/{band}f",
+                f"/ch/{channel}/eq/{band}g",
+                f"/ch/{channel}/eq/{band}q",
+            ])
+    return addresses
+
+
 def build_channel_processing_snapshot(
     server: Any,
     total_channels: int = DEFAULT_CHANNEL_COUNT,
@@ -779,6 +1219,10 @@ def build_channel_processing_snapshot(
         if isinstance(channel, dict)
     ]
     read_coverage = _channel_processing_coverage_summary(channels)
+    cache_freshness = _cache_freshness_for_addresses(
+        client,
+        _channel_processing_cache_addresses(len(channels)),
+    )
     return {
         "type": "channel_processing_snapshot",
         "generated_at": _utc_now(),
@@ -797,10 +1241,12 @@ def build_channel_processing_snapshot(
             "read_coverage_status": read_coverage["status"],
             "channels_with_any_processing_cache": read_coverage["channels_with_any_processing_cache"],
             "channels_with_complete_processing_cache": read_coverage["channels_with_complete_processing_cache"],
+            "cache_freshness_status": cache_freshness["status"],
             "live_apply_allowed": False,
             "claim": "cached processing read coverage is exposed but not complete autonomous proof",
         },
         "read_coverage": read_coverage,
+        "cache_freshness": cache_freshness,
         "channels": channels,
     }
 
@@ -810,6 +1256,19 @@ def _console_surface_section_coverage(fields: Mapping[str, bool]) -> Dict[str, A
         fields,
         "mixer_state_cache" if any(fields.values()) else "unavailable",
     )
+
+
+def _console_surface_section_coverage_for_addresses(
+    client: Any,
+    field_addresses: Mapping[str, Any],
+) -> Dict[str, Any]:
+    fields = {
+        field: _state_has_any_address(client, addresses)
+        for field, addresses in field_addresses.items()
+    }
+    coverage = _console_surface_section_coverage(fields)
+    coverage["cache_freshness"] = _cache_freshness_for_field_addresses(client, field_addresses)
+    return coverage
 
 
 def _console_eq_band_snapshot(client: Any, prefix: str, band: int) -> Dict[str, Any]:
@@ -1047,6 +1506,74 @@ def _console_surface_coverage_summary(groups: Mapping[str, Iterable[Mapping[str,
     }
 
 
+def _bus_main_dca_cache_addresses(
+    *,
+    bus_count: int,
+    main_count: int,
+    dca_count: int,
+) -> List[str]:
+    addresses: List[str] = []
+    for bus in range(1, bus_count + 1):
+        prefix = f"/bus/{bus}"
+        addresses.extend([
+            f"{prefix}/$name",
+            f"{prefix}/name",
+            f"{prefix}/tags",
+            f"{prefix}/fdr",
+            f"{prefix}/mute",
+            f"{prefix}/pan",
+            f"{prefix}/wid",
+            f"{prefix}/busmono",
+            f"{prefix}/eq/on",
+        ])
+        for band in range(1, 9):
+            addresses.extend([
+                f"{prefix}/eq/{band}f",
+                f"{prefix}/eq/{band}g",
+                f"{prefix}/eq/{band}q",
+            ])
+        addresses.extend([
+            f"{prefix}/dyn/on",
+            f"{prefix}/dyn/mdl",
+            f"{prefix}/dyn/thr37",
+            f"{prefix}/dyn/ratio",
+            f"{prefix}/dyn/knee",
+            f"{prefix}/dyn/det",
+            f"{prefix}/dyn/att",
+            f"{prefix}/dyn/rel",
+            f"{prefix}/dyn/gain",
+            f"{prefix}/dyn/mix",
+            f"{prefix}/main/1/on",
+            f"{prefix}/main/1/lvl",
+            f"{prefix}/main/1/pre",
+        ])
+    for main in range(1, main_count + 1):
+        prefix = f"/main/{main}"
+        addresses.extend([
+            f"{prefix}/fdr",
+            f"{prefix}/mute",
+            f"{prefix}/pan",
+            f"{prefix}/eq/on",
+        ])
+        for band in range(1, 9):
+            addresses.extend([
+                f"{prefix}/eq/{band}f",
+                f"{prefix}/eq/{band}g",
+                f"{prefix}/eq/{band}q",
+            ])
+    for dca in range(1, dca_count + 1):
+        prefix = f"/dca/{dca}"
+        addresses.extend([
+            f"{prefix}/name",
+            f"{prefix}/col",
+            f"{prefix}/icon",
+            f"{prefix}/fdr",
+            f"{prefix}/mute",
+            f"{prefix}/mon",
+        ])
+    return addresses
+
+
 def build_bus_main_dca_snapshot(
     server: Any,
     *,
@@ -1068,6 +1595,14 @@ def build_bus_main_dca_snapshot(
         "mains": mains,
         "dcas": dcas,
     })
+    cache_freshness = _cache_freshness_for_addresses(
+        client,
+        _bus_main_dca_cache_addresses(
+            bus_count=bus_count,
+            main_count=main_count,
+            dca_count=dca_count,
+        ),
+    )
     return {
         "type": "bus_main_dca_snapshot",
         "generated_at": _utc_now(),
@@ -1086,10 +1621,12 @@ def build_bus_main_dca_snapshot(
             "main_count": len(mains),
             "dca_count": len(dcas),
             "read_coverage_status": read_coverage["status"],
+            "cache_freshness_status": cache_freshness["status"],
             "live_apply_allowed": False,
             "claim": "cached bus/main/DCA read coverage is exposed but not complete autonomous proof",
         },
         "read_coverage": read_coverage,
+        "cache_freshness": cache_freshness,
         "buses": buses,
         "mains": mains,
         "dcas": dcas,
@@ -1141,9 +1678,31 @@ def _matrix_surface_row(client: Any, matrix: int) -> Dict[str, Any]:
         "pre_insert": pre_insert["read_coverage"]["status"] == "complete",
         "post_insert": post_insert["read_coverage"]["status"] == "complete",
     }
+    dynamics_addresses = {
+        "enabled": f"{prefix}/dyn/on",
+        "model": f"{prefix}/dyn/mdl",
+        "threshold_db": f"{prefix}/dyn/thr37",
+        "ratio": f"{prefix}/dyn/ratio",
+        "knee": f"{prefix}/dyn/knee",
+        "detector": f"{prefix}/dyn/det",
+        "attack_ms": f"{prefix}/dyn/att",
+        "release_ms": f"{prefix}/dyn/rel",
+        "makeup_db": f"{prefix}/dyn/gain",
+        "mix_pct": f"{prefix}/dyn/mix",
+    }
+    dynamics_fields = {
+        field: _state_has_address(client, address)
+        for field, address in dynamics_addresses.items()
+    }
+    dynamics_coverage = _console_surface_section_coverage(dynamics_fields)
+    dynamics_coverage["cache_freshness"] = _cache_freshness_for_field_addresses(
+        client,
+        dynamics_addresses,
+    )
     sections = {
         "basic_controls": _console_surface_section_coverage(basic_fields),
         "eq": eq["read_coverage"],
+        "dynamics": dynamics_coverage,
         "inserts": _console_surface_section_coverage(insert_fields),
     }
     return {
@@ -1153,6 +1712,19 @@ def _matrix_surface_row(client: Any, matrix: int) -> Dict[str, Any]:
         "mute": _cached_int(client, f"{prefix}/mute"),
         "pan": _cached_numeric(client, f"{prefix}/pan"),
         "eq": eq,
+        "dynamics": {
+            "enabled": _cached_int(client, dynamics_addresses["enabled"]),
+            "model": _cached_raw(client, dynamics_addresses["model"]),
+            "threshold_db": _cached_numeric(client, dynamics_addresses["threshold_db"]),
+            "ratio": _cached_raw(client, dynamics_addresses["ratio"]),
+            "knee": _cached_numeric(client, dynamics_addresses["knee"]),
+            "detector": _cached_raw(client, dynamics_addresses["detector"]),
+            "attack_ms": _cached_numeric(client, dynamics_addresses["attack_ms"]),
+            "release_ms": _cached_numeric(client, dynamics_addresses["release_ms"]),
+            "makeup_db": _cached_numeric(client, dynamics_addresses["makeup_db"]),
+            "mix_pct": _cached_numeric(client, dynamics_addresses["mix_pct"]),
+            "read_coverage": sections["dynamics"],
+        },
         "inserts": {
             "pre_insert": pre_insert,
             "post_insert": post_insert,
@@ -1160,6 +1732,45 @@ def _matrix_surface_row(client: Any, matrix: int) -> Dict[str, Any]:
         },
         "read_coverage": _section_status_payload(sections),
     }
+
+
+def _matrix_cache_addresses(matrix_count: int) -> List[str]:
+    addresses: List[str] = []
+    for matrix in range(1, matrix_count + 1):
+        prefix = f"/mtx/{matrix}"
+        addresses.extend([
+            f"{prefix}/fdr",
+            f"{prefix}/mute",
+            f"{prefix}/pan",
+            f"{prefix}/eq/on",
+        ])
+        for band in range(1, 9):
+            addresses.extend([
+                f"{prefix}/eq/{band}f",
+                f"{prefix}/eq/{band}g",
+                f"{prefix}/eq/{band}q",
+            ])
+        addresses.extend([
+            f"{prefix}/dyn/on",
+            f"{prefix}/dyn/mdl",
+            f"{prefix}/dyn/thr37",
+            f"{prefix}/dyn/ratio",
+            f"{prefix}/dyn/knee",
+            f"{prefix}/dyn/det",
+            f"{prefix}/dyn/att",
+            f"{prefix}/dyn/rel",
+            f"{prefix}/dyn/gain",
+            f"{prefix}/dyn/mix",
+            f"{prefix}/preins/on",
+            f"{prefix}/preins/ins",
+            f"{prefix}/preins/$stat",
+            f"{prefix}/postins/on",
+            f"{prefix}/postins/ins",
+            f"{prefix}/postins/$stat",
+            f"{prefix}/postins/mode",
+            f"{prefix}/postins/w",
+        ])
+    return addresses
 
 
 def build_matrix_snapshot(
@@ -1173,6 +1784,10 @@ def build_matrix_snapshot(
     matrix_count = _bounded_int_value(matrix_count, default=DEFAULT_MATRIX_COUNT, minimum=1, maximum=16)
     matrices = [_matrix_surface_row(client, matrix) for matrix in range(1, matrix_count + 1)]
     read_coverage = _console_surface_coverage_summary({"matrices": matrices})
+    cache_freshness = _cache_freshness_for_addresses(
+        client,
+        _matrix_cache_addresses(matrix_count),
+    )
     return {
         "type": "matrix_snapshot",
         "generated_at": _utc_now(),
@@ -1189,11 +1804,591 @@ def build_matrix_snapshot(
         "summary": {
             "matrix_count": len(matrices),
             "read_coverage_status": read_coverage["status"],
+            "cache_freshness_status": cache_freshness["status"],
             "live_apply_allowed": False,
             "claim": "cached matrix read coverage is exposed but not complete autonomous proof",
         },
         "read_coverage": read_coverage,
+        "cache_freshness": cache_freshness,
         "matrices": matrices,
+    }
+
+
+def _fx_parameter_family(model: Any) -> Optional[str]:
+    text = str(model or "").strip().upper()
+    if not text:
+        return None
+    for family, tokens in FX_MODEL_FAMILY_TOKENS.items():
+        if any(token in text for token in tokens):
+            return family
+    return None
+
+
+def _fx_parameter_schema_hint(model: Any, parameter_index: int) -> Dict[str, Any]:
+    family = _fx_parameter_family(model)
+    mapped_schema = (
+        FX_PARAMETER_SCHEMA_BY_FAMILY.get(family, {}).get(parameter_index)
+        if family
+        else None
+    )
+    if mapped_schema:
+        status = "mapped"
+        semantic_name = str(mapped_schema["semantic_name"])
+        unit = str(mapped_schema["unit"])
+        safe_min = mapped_schema.get("safe_min")
+        safe_max = mapped_schema.get("safe_max")
+    else:
+        status = "generic_numeric"
+        semantic_name = f"parameter_{parameter_index}"
+        unit = "raw"
+        safe_min = None
+        safe_max = None
+    return {
+        "schema_status": status,
+        "schema_family": family or "unknown",
+        "schema_source": "automixer_generic_fx_parameter_hints",
+        "semantic_name": semantic_name,
+        "unit": unit,
+        "safe_range": {
+            "min": safe_min,
+            "max": safe_max,
+        },
+    }
+
+
+def _cached_fx_parameter_rows(
+    client: Any,
+    fx_slot: int,
+    parameter_count: int,
+    *,
+    model: Any,
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for parameter in range(1, parameter_count + 1):
+        address = f"/fx/{fx_slot}/{parameter}"
+        if not _state_has_address(client, address):
+            continue
+        schema_hint = _fx_parameter_schema_hint(model, parameter)
+        rows.append({
+            "parameter_index": parameter,
+            "value": _cached_raw(client, address),
+            **schema_hint,
+            "read_coverage": _read_coverage_section({"value": True}, "mixer_state_cache"),
+        })
+    return rows
+
+
+def _fx_slot_parameter_schema_summary(model: Any, parameters: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
+    rows = tuple(parameters)
+    status_counts = {
+        "mapped": sum(1 for row in rows if row.get("schema_status") == "mapped"),
+        "generic_numeric": sum(1 for row in rows if row.get("schema_status") == "generic_numeric"),
+    }
+    if not rows:
+        status = "missing"
+    elif status_counts["generic_numeric"]:
+        status = "partial"
+    else:
+        status = "mapped"
+    return {
+        "status": status,
+        "schema_family": _fx_parameter_family(model) or "unknown",
+        "schema_source": "automixer_generic_fx_parameter_hints",
+        "mapped_parameter_count": status_counts["mapped"],
+        "generic_parameter_count": status_counts["generic_numeric"],
+        "cached_parameter_count": len(rows),
+        "physical_model_schema_verified": False,
+        "live_write_authority": False,
+    }
+
+
+def _fx_slot_row(client: Any, fx_slot: int, *, parameter_count: int) -> Dict[str, Any]:
+    model = _cached_raw(client, f"/fx/{fx_slot}/mdl")
+    parameters = _cached_fx_parameter_rows(client, fx_slot, parameter_count, model=model)
+    parameter_schema = _fx_slot_parameter_schema_summary(model, parameters)
+    fields = {
+        "model": _state_has_address(client, f"/fx/{fx_slot}/mdl"),
+        "on": _state_has_address(client, f"/fx/{fx_slot}/on"),
+        "mix": _state_has_address(client, f"/fx/{fx_slot}/fxmix"),
+        "source": _state_has_address(client, f"/fx/{fx_slot}/$esrc"),
+        "mode": _state_has_address(client, f"/fx/{fx_slot}/$emode"),
+        "assigned_channel": _state_has_address(client, f"/fx/{fx_slot}/$a_chn"),
+        "assigned_position": _state_has_address(client, f"/fx/{fx_slot}/$a_pos"),
+        "parameters": bool(parameters),
+    }
+    on = _cached_int(client, f"/fx/{fx_slot}/on")
+    mix = _cached_numeric(client, f"/fx/{fx_slot}/fxmix")
+    return {
+        "slot": f"FX{fx_slot}",
+        "slot_number": fx_slot,
+        "model": model,
+        "on": on,
+        "mix": mix,
+        "source": _cached_raw(client, f"/fx/{fx_slot}/$esrc"),
+        "mode": _cached_raw(client, f"/fx/{fx_slot}/$emode"),
+        "assigned_channel": _cached_int(client, f"/fx/{fx_slot}/$a_chn"),
+        "assigned_position": _cached_raw(client, f"/fx/{fx_slot}/$a_pos"),
+        "active": bool(on == 1 and mix is not None and mix > 0),
+        "cached_parameter_count": len(parameters),
+        "parameter_schema": parameter_schema,
+        "parameters": parameters,
+        "fx_model_change_policy": "blocked_manual_only",
+        "fx_bypass_policy": "blocked_manual_only",
+        "fx_mix_policy": "blocked_manual_only",
+        "destructive_change_marker": "fx_slot_change_would_modify_processing_chain",
+        "read_coverage": _console_surface_section_coverage(fields),
+    }
+
+
+def _active_insert_slot(slot: Any) -> Optional[str]:
+    text = str(slot or "").strip().upper()
+    if not text or text in {"NONE", "OFF", "0"}:
+        return None
+    return text
+
+
+def _fx_insert_row(client: Any, *, target_type: str, target: int, position: str) -> Dict[str, Any]:
+    insert_state = _console_insert_snapshot(
+        client,
+        target_type=target_type,
+        target=target,
+        position=position,
+    )
+    slot = _active_insert_slot(insert_state.get("slot"))
+    row = {
+        "target_type": target_type,
+        "target": target,
+        "position": position,
+        "on": insert_state.get("on"),
+        "slot": insert_state.get("slot"),
+        "status": insert_state.get("status"),
+        "mode": insert_state.get("mode"),
+        "weight": insert_state.get("weight"),
+        "linked_fx_slot": slot,
+        "active": bool(insert_state.get("on") == 1 and slot),
+        "insert_assignment_policy": "blocked_manual_only",
+        "destructive_change_marker": "insert_assignment_would_repatch_processing_chain",
+        "read_coverage": insert_state.get("read_coverage", _console_surface_section_coverage({})),
+    }
+    return row
+
+
+def _fx_insert_coverage_summary(groups: Mapping[str, Iterable[Mapping[str, Any]]]) -> Dict[str, Any]:
+    status_counts: Dict[str, int] = {"complete": 0, "partial": 0, "missing": 0}
+    surface_status_counts: Dict[str, Dict[str, int]] = {}
+    for surface_name, rows_iterable in groups.items():
+        rows = tuple(rows_iterable)
+        surface_status_counts[surface_name] = {"complete": 0, "partial": 0, "missing": 0}
+        for row in rows:
+            coverage = row.get("read_coverage") if isinstance(row, dict) else {}
+            status = str(coverage.get("status") or "missing") if isinstance(coverage, dict) else "missing"
+            status_counts[status] = status_counts.get(status, 0) + 1
+            surface_status_counts[surface_name][status] = surface_status_counts[surface_name].get(status, 0) + 1
+    statuses = [
+        status
+        for status, count in status_counts.items()
+        for _ in range(count)
+    ]
+    return {
+        "status": _overall_read_coverage_status(statuses),
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "surface_status_counts": surface_status_counts,
+        "row_status_counts": status_counts,
+    }
+
+
+def _fx_parameter_schema_summary(fx_slots: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
+    rows = tuple(fx_slots)
+    mapped = 0
+    generic = 0
+    missing = 0
+    for row in rows:
+        schema = row.get("parameter_schema", {}) if isinstance(row, Mapping) else {}
+        if not isinstance(schema, Mapping):
+            missing += 1
+            continue
+        mapped += int(schema.get("mapped_parameter_count") or 0)
+        generic += int(schema.get("generic_parameter_count") or 0)
+        if schema.get("status") == "missing":
+            missing += 1
+    if mapped == 0 and generic == 0:
+        status = "missing"
+    elif generic:
+        status = "partial"
+    else:
+        status = "mapped"
+    return {
+        "status": status,
+        "mapped_parameter_count": mapped,
+        "generic_parameter_count": generic,
+        "slot_missing_schema_count": missing,
+        "schema_source": "automixer_generic_fx_parameter_hints",
+        "physical_model_schema_verified": False,
+        "live_write_authority": False,
+    }
+
+
+def _insert_cache_addresses(target_type: str, target: int, position: str) -> List[str]:
+    target_prefix = {
+        "matrix": "mtx",
+        "mtx": "mtx",
+        "bus": "bus",
+        "main": "main",
+        "channel": "ch",
+        "ch": "ch",
+    }.get(str(target_type).lower(), str(target_type).lower())
+    position_key = str(position).lower()
+    insert_suffix = "postins" if position_key == "post" else "preins"
+    base = f"/{target_prefix}/{int(target)}/{insert_suffix}"
+    addresses = [
+        f"{base}/on",
+        f"{base}/ins",
+        f"{base}/$stat",
+    ]
+    if position_key == "post":
+        addresses.extend([f"{base}/mode", f"{base}/w"])
+    return addresses
+
+
+def _fx_inserts_cache_addresses(
+    *,
+    fx_slot_count: int,
+    parameter_count: int,
+    insert_targets: Iterable[Tuple[str, int]],
+) -> List[str]:
+    addresses: List[str] = []
+    for fx_slot in range(1, fx_slot_count + 1):
+        addresses.extend([
+            f"/fx/{fx_slot}/mdl",
+            f"/fx/{fx_slot}/on",
+            f"/fx/{fx_slot}/fxmix",
+            f"/fx/{fx_slot}/$esrc",
+            f"/fx/{fx_slot}/$emode",
+            f"/fx/{fx_slot}/$a_chn",
+            f"/fx/{fx_slot}/$a_pos",
+        ])
+        for parameter in range(1, parameter_count + 1):
+            addresses.append(f"/fx/{fx_slot}/{parameter}")
+    for target_type, target in insert_targets:
+        for position in ("pre", "post"):
+            addresses.extend(_insert_cache_addresses(target_type, target, position))
+    return addresses
+
+
+def build_fx_inserts_snapshot(
+    server: Any,
+    *,
+    fx_slot_count: int = DEFAULT_FX_SLOT_COUNT,
+    total_channels: int = DEFAULT_CHANNEL_COUNT,
+    bus_count: int = DEFAULT_BUS_COUNT,
+    main_count: int = DEFAULT_MAIN_COUNT,
+    matrix_count: int = DEFAULT_MATRIX_COUNT,
+    parameter_count: int = DEFAULT_FX_PARAMETER_COUNT,
+) -> Dict[str, Any]:
+    """Return cached FX rack and insert state without querying or mutating hardware."""
+
+    client = getattr(server, "mixer_client", None)
+    fx_slot_count = _bounded_int_value(fx_slot_count, default=DEFAULT_FX_SLOT_COUNT, minimum=1, maximum=32)
+    total_channels = _bounded_int_value(total_channels, default=DEFAULT_CHANNEL_COUNT, minimum=1, maximum=DEFAULT_DANTE_CHANNEL_COUNT)
+    bus_count = _bounded_int_value(bus_count, default=DEFAULT_BUS_COUNT, minimum=1, maximum=32)
+    main_count = _bounded_int_value(main_count, default=DEFAULT_MAIN_COUNT, minimum=1, maximum=8)
+    matrix_count = _bounded_int_value(matrix_count, default=DEFAULT_MATRIX_COUNT, minimum=1, maximum=16)
+    parameter_count = _bounded_int_value(parameter_count, default=DEFAULT_FX_PARAMETER_COUNT, minimum=1, maximum=64)
+
+    fx_slots = [
+        _fx_slot_row(client, slot, parameter_count=parameter_count)
+        for slot in range(1, fx_slot_count + 1)
+    ]
+    insert_targets = [
+        ("channel", target)
+        for target in range(1, total_channels + 1)
+    ] + [
+        ("bus", target)
+        for target in range(1, bus_count + 1)
+    ] + [
+        ("main", target)
+        for target in range(1, main_count + 1)
+    ] + [
+        ("matrix", target)
+        for target in range(1, matrix_count + 1)
+    ]
+    inserts = [
+        _fx_insert_row(client, target_type=target_type, target=target, position=position)
+        for target_type, target in insert_targets
+        for position in ("pre", "post")
+    ]
+    read_coverage = _fx_insert_coverage_summary({
+        "fx_slots": fx_slots,
+        "inserts": inserts,
+    })
+    parameter_schema = _fx_parameter_schema_summary(fx_slots)
+    cache_freshness = _cache_freshness_for_addresses(
+        client,
+        _fx_inserts_cache_addresses(
+            fx_slot_count=fx_slot_count,
+            parameter_count=parameter_count,
+            insert_targets=insert_targets,
+        ),
+    )
+    return {
+        "type": "fx_inserts_snapshot",
+        "generated_at": _utc_now(),
+        "source": "runtime_cached_state",
+        "available": True,
+        "connection": _connection_summary(server),
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "full_autonomous_ready": False,
+            "fx_apply_allowed": False,
+            "insert_assignment_allowed": False,
+        },
+        "summary": {
+            "fx_slot_count": len(fx_slots),
+            "insert_count": len(inserts),
+            "active_fx_slot_count": sum(1 for row in fx_slots if row.get("active")),
+            "active_insert_count": sum(1 for row in inserts if row.get("active")),
+            "cached_parameter_count": sum(int(row.get("cached_parameter_count") or 0) for row in fx_slots),
+            "read_coverage_status": read_coverage["status"],
+            "parameter_schema_status": parameter_schema["status"],
+            "cache_freshness_status": cache_freshness["status"],
+            "live_apply_allowed": False,
+            "claim": "cached FX and insert read coverage is exposed but FX and insert apply remain blocked",
+        },
+        "read_coverage": read_coverage,
+        "parameter_schema": parameter_schema,
+        "cache_freshness": cache_freshness,
+        "fx_slots": fx_slots,
+        "inserts": inserts,
+    }
+
+
+def _dlive_midi_base_channel(client: Any) -> int:
+    return _bounded_int_value(
+        getattr(client, "midi_base_channel", 0),
+        default=0,
+        minimum=0,
+        maximum=15,
+    )
+
+
+def _dlive_cached_name(client: Any, channel: int) -> Optional[str]:
+    channel_names = getattr(client, "_channel_names", None)
+    if isinstance(channel_names, Mapping):
+        raw_name = channel_names.get(channel)
+        if isinstance(raw_name, str) and raw_name.strip():
+            return raw_name.strip()
+    raw_state_name = _cached_raw(client, f"name/{channel}")
+    if isinstance(raw_state_name, str) and raw_state_name.strip():
+        return raw_state_name.strip()
+    return None
+
+
+def _dlive_cached_mute(client: Any, channel: int, midi_base_channel: int) -> Optional[bool]:
+    cached = _cached_raw(client, f"mute/{channel}")
+    if isinstance(cached, bool):
+        return cached
+    if cached is not None:
+        try:
+            return bool(int(cached))
+        except (TypeError, ValueError):
+            text = str(cached).strip().lower()
+            if text in {"true", "on", "muted", "yes"}:
+                return True
+            if text in {"false", "off", "unmuted", "no"}:
+                return False
+    note_velocity = _cached_int(client, f"note/{midi_base_channel}/{channel - 1}")
+    if note_velocity is not None:
+        return note_velocity >= 0x40
+    return None
+
+
+def _dlive_channel_row(client: Any, channel: int, midi_base_channel: int) -> Dict[str, Any]:
+    cached_name = _dlive_cached_name(client, channel)
+    fader_raw = _cached_int(client, f"fader/{channel}")
+    note_velocity = _cached_int(client, f"note/{midi_base_channel}/{channel - 1}")
+    mute = _dlive_cached_mute(client, channel, midi_base_channel)
+    sections = {
+        "identity": _read_coverage_section(
+            {"cached_name": bool(cached_name)},
+            "midi_tcp_state" if cached_name else "unavailable",
+        ),
+        "fader": _read_coverage_section(
+            {
+                "raw_14bit_fader": fader_raw is not None,
+                "fader_db_conversion": fader_raw is not None,
+            },
+            "midi_tcp_state" if fader_raw is not None else "unavailable",
+        ),
+        "mute": _read_coverage_section(
+            {
+                "tracked_mute": mute is not None,
+                "raw_note_velocity": note_velocity is not None,
+            },
+            "midi_tcp_state" if mute is not None or note_velocity is not None else "unavailable",
+        ),
+    }
+    read_coverage = _section_status_payload(sections)
+    read_coverage["source_kinds"] = ["midi_tcp_state"] if read_coverage["status"] != "missing" else []
+    return {
+        "channel": channel,
+        "name": cached_name or f"dLive Ch {channel}",
+        "name_source": "midi_tcp_state" if cached_name else "fallback_label",
+        "fader_raw_14bit": fader_raw,
+        "fader_db": _dlive_fader_raw_to_db(fader_raw),
+        "mute": mute,
+        "raw_note_velocity": note_velocity,
+        "midi_base_channel": midi_base_channel,
+        "read_coverage": read_coverage,
+        "fader_change_policy": "blocked_manual_only",
+        "mute_change_policy": "blocked_manual_only",
+    }
+
+
+def _dlive_state_key_counts(client: Any) -> Dict[str, int]:
+    state = getattr(client, "state", None)
+    if not isinstance(state, dict):
+        return {
+            "raw_state_keys": 0,
+            "cached_names": 0,
+            "cached_faders": 0,
+            "cached_mutes": 0,
+            "raw_note_events": 0,
+            "raw_cc_events": 0,
+            "raw_pitchbend_events": 0,
+        }
+    return {
+        "raw_state_keys": len(state),
+        "cached_names": sum(1 for key in state if str(key).startswith("name/")),
+        "cached_faders": sum(1 for key in state if str(key).startswith("fader/")),
+        "cached_mutes": sum(1 for key in state if str(key).startswith("mute/")),
+        "raw_note_events": sum(1 for key in state if str(key).startswith("note/")),
+        "raw_cc_events": sum(1 for key in state if str(key).startswith("cc/")),
+        "raw_pitchbend_events": sum(1 for key in state if str(key).startswith("pitchbend/")),
+    }
+
+
+def _dlive_state_coverage_summary(channels: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
+    channel_rows = tuple(channels)
+    channel_status_counts: Dict[str, int] = {"complete": 0, "partial": 0, "missing": 0}
+    section_status_counts: Dict[str, Dict[str, int]] = {}
+    for row in channel_rows:
+        coverage = row.get("read_coverage") if isinstance(row, dict) else {}
+        status = str(coverage.get("status") or "missing") if isinstance(coverage, dict) else "missing"
+        channel_status_counts[status] = channel_status_counts.get(status, 0) + 1
+        sections = coverage.get("sections", {}) if isinstance(coverage, dict) else {}
+        if not isinstance(sections, dict):
+            continue
+        for section_name, section in sections.items():
+            section_status_counts.setdefault(section_name, {"complete": 0, "partial": 0, "missing": 0})
+            section_status = (
+                str(section.get("status") or "missing")
+                if isinstance(section, dict)
+                else "missing"
+            )
+            section_status_counts[section_name][section_status] = (
+                section_status_counts[section_name].get(section_status, 0) + 1
+            )
+    statuses = [
+        status
+        for status, count in channel_status_counts.items()
+        for _ in range(count)
+    ]
+    return {
+        "status": _overall_read_coverage_status(statuses),
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "channel_status_counts": channel_status_counts,
+        "section_status_counts": section_status_counts,
+        "channels_with_cached_name": section_status_counts.get("identity", {}).get("complete", 0),
+        "channels_with_cached_fader": section_status_counts.get("fader", {}).get("complete", 0),
+        "channels_with_cached_mute": sum(
+            1
+            for row in channel_rows
+            if (row.get("read_coverage") or {}).get("sections", {}).get("mute", {}).get("status") != "missing"
+        ),
+    }
+
+
+def _dlive_cache_addresses(total_channels: int, midi_base_channel: int) -> List[str]:
+    addresses: List[str] = []
+    for channel in range(1, total_channels + 1):
+        addresses.extend([
+            f"name/{channel}",
+            f"fader/{channel}",
+            f"mute/{channel}",
+            f"note/{midi_base_channel}/{channel - 1}",
+        ])
+    return addresses
+
+
+def build_dlive_state_snapshot(
+    server: Any,
+    *,
+    total_channels: int = DEFAULT_DLIVE_CHANNEL_COUNT,
+) -> Dict[str, Any]:
+    """Return cached dLive MIDI/TCP state without querying or mutating hardware."""
+
+    client = getattr(server, "mixer_client", None)
+    total_channels = _bounded_int_value(
+        total_channels,
+        default=DEFAULT_DLIVE_CHANNEL_COUNT,
+        minimum=1,
+        maximum=MAX_DLIVE_CHANNEL_COUNT,
+    )
+    midi_base_channel = _dlive_midi_base_channel(client)
+    channels = [
+        _dlive_channel_row(client, channel, midi_base_channel)
+        for channel in range(1, total_channels + 1)
+    ]
+    read_coverage = _dlive_state_coverage_summary(channels)
+    state_key_counts = _dlive_state_key_counts(client)
+    cache_freshness = _cache_freshness_for_addresses(
+        client,
+        _dlive_cache_addresses(total_channels, midi_base_channel),
+    )
+    return {
+        "type": "dlive_state_snapshot",
+        "generated_at": _utc_now(),
+        "source": "midi_tcp_cached_state",
+        "available": True,
+        "connection": _connection_summary(server),
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "full_autonomous_ready": False,
+            "dlive_apply_allowed": False,
+            "midi_send_allowed": False,
+        },
+        "summary": {
+            "channel_count": len(channels),
+            "midi_base_channel": midi_base_channel,
+            "read_coverage_status": read_coverage["status"],
+            "channels_with_cached_name": read_coverage["channels_with_cached_name"],
+            "channels_with_cached_fader": read_coverage["channels_with_cached_fader"],
+            "channels_with_cached_mute": read_coverage["channels_with_cached_mute"],
+            "raw_state_key_count": state_key_counts["raw_state_keys"],
+            "cache_freshness_status": cache_freshness["status"],
+            "wing_parity_status": "partial",
+            "live_apply_allowed": False,
+            "claim": "cached dLive MIDI/TCP state is exposed but WING parity and autonomous proof remain incomplete",
+        },
+        "read_coverage": read_coverage,
+        "cache_freshness": cache_freshness,
+        "state_key_counts": state_key_counts,
+        "known_gaps": [
+            "dLive EQ, dynamics, routing, scenes, and FX are not normalized into this cached DTO",
+            "preamp gain pitchbend cache is transport-channel scoped, not safely per-input-channel proof",
+            "physical readback fixtures and stale-cache timestamps are still required before parity claims",
+        ],
+        "channels": channels,
     }
 
 
@@ -1211,13 +2406,13 @@ def _cached_send_active(on: Any, level_db: Any) -> bool:
 
 def _channel_bus_send_row(client: Any, channel: int, send: int) -> Dict[str, Any]:
     base = f"/ch/{channel}/send/{send}"
-    fields = {
-        "on": _state_has_address(client, f"{base}/on"),
-        "level_db": _state_has_address(client, f"{base}/lvl"),
-        "pre_on": _state_has_address(client, f"{base}/pon"),
-        "mode": _state_has_address(client, f"{base}/mode"),
-        "plink": _state_has_address(client, f"{base}/plink"),
-        "pan": _state_has_address(client, f"{base}/pan"),
+    field_addresses = {
+        "on": f"{base}/on",
+        "level_db": f"{base}/lvl",
+        "pre_on": f"{base}/pon",
+        "mode": f"{base}/mode",
+        "plink": f"{base}/plink",
+        "pan": f"{base}/pan",
     }
     on = _cached_int(client, f"{base}/on")
     level_db = _cached_numeric(client, f"{base}/lvl")
@@ -1232,16 +2427,16 @@ def _channel_bus_send_row(client: Any, channel: int, send: int) -> Dict[str, Any
         "plink": _cached_int(client, f"{base}/plink"),
         "pan": _cached_numeric(client, f"{base}/pan"),
         "active": _cached_send_active(on, level_db),
-        "read_coverage": _console_surface_section_coverage(fields),
+        "read_coverage": _console_surface_section_coverage_for_addresses(client, field_addresses),
     }
 
 
 def _channel_main_send_row(client: Any, channel: int, main: int) -> Dict[str, Any]:
     base = f"/ch/{channel}/main/{main}"
-    fields = {
-        "on": _state_has_address(client, f"{base}/on"),
-        "level_db": _state_has_address(client, f"{base}/lvl"),
-        "pre": _state_has_address(client, f"{base}/pre"),
+    field_addresses = {
+        "on": f"{base}/on",
+        "level_db": f"{base}/lvl",
+        "pre": f"{base}/pre",
     }
     on = _cached_int(client, f"{base}/on")
     level_db = _cached_numeric(client, f"{base}/lvl")
@@ -1252,15 +2447,36 @@ def _channel_main_send_row(client: Any, channel: int, main: int) -> Dict[str, An
         "level_db": level_db,
         "pre": _cached_int(client, f"{base}/pre"),
         "active": _cached_send_active(on, level_db),
-        "read_coverage": _console_surface_section_coverage(fields),
+        "read_coverage": _console_surface_section_coverage_for_addresses(client, field_addresses),
+    }
+
+
+def _channel_matrix_send_row(client: Any, channel: int, matrix: int) -> Dict[str, Any]:
+    send_key = f"MX{matrix}"
+    base = f"/ch/{channel}/send/{send_key}"
+    field_addresses = {
+        "on": f"{base}/on",
+        "level_db": f"{base}/lvl",
+    }
+    on = _cached_int(client, f"{base}/on")
+    level_db = _cached_numeric(client, f"{base}/lvl")
+    return {
+        "channel": channel,
+        "send": send_key,
+        "target_matrix": matrix,
+        "on": on,
+        "level_db": level_db,
+        "active": _cached_send_active(on, level_db),
+        "destructive_change_marker": "matrix_send_write_would_change_console_routing",
+        "read_coverage": _console_surface_section_coverage_for_addresses(client, field_addresses),
     }
 
 
 def _output_route_row(client: Any, output_group: str, output_number: int) -> Dict[str, Any]:
     base = f"/io/out/{output_group}/{output_number}"
-    fields = {
-        "source_group": _state_has_address(client, f"{base}/grp"),
-        "source_channel": _state_has_address(client, f"{base}/in"),
+    field_addresses = {
+        "source_group": f"{base}/grp",
+        "source_channel": f"{base}/in",
     }
     source_group = _cached_raw(client, f"{base}/grp")
     source_channel = _cached_int(client, f"{base}/in")
@@ -1270,7 +2486,7 @@ def _output_route_row(client: Any, output_group: str, output_number: int) -> Dic
         "source_group": source_group,
         "source_channel": source_channel,
         "destructive_change_marker": "output_routing_write_would_repatch_console",
-        "read_coverage": _console_surface_section_coverage(fields),
+        "read_coverage": _console_surface_section_coverage_for_addresses(client, field_addresses),
     }
 
 
@@ -1337,12 +2553,47 @@ def _normalise_output_groups(output_groups: Any) -> List[str]:
     return groups or list(DEFAULT_OUTPUT_GROUPS)
 
 
+def _routing_sends_cache_addresses(
+    *,
+    total_channels: int,
+    send_count: int,
+    main_count: int,
+    matrix_send_count: int,
+    output_groups: Iterable[str],
+    output_count: int,
+) -> List[str]:
+    addresses: List[str] = []
+    for channel in range(1, total_channels + 1):
+        for send in range(1, send_count + 1):
+            base = f"/ch/{channel}/send/{send}"
+            addresses.extend([
+                f"{base}/on",
+                f"{base}/lvl",
+                f"{base}/pon",
+                f"{base}/mode",
+                f"{base}/plink",
+                f"{base}/pan",
+            ])
+        for main in range(1, main_count + 1):
+            base = f"/ch/{channel}/main/{main}"
+            addresses.extend([f"{base}/on", f"{base}/lvl", f"{base}/pre"])
+        for matrix in range(1, matrix_send_count + 1):
+            base = f"/ch/{channel}/send/MX{matrix}"
+            addresses.extend([f"{base}/on", f"{base}/lvl"])
+    for group in output_groups:
+        for output_number in range(1, output_count + 1):
+            base = f"/io/out/{group}/{output_number}"
+            addresses.extend([f"{base}/grp", f"{base}/in"])
+    return addresses
+
+
 def build_routing_sends_snapshot(
     server: Any,
     *,
     total_channels: int = DEFAULT_CHANNEL_COUNT,
     send_count: int = DEFAULT_SEND_COUNT,
     main_count: int = 1,
+    matrix_send_count: int = DEFAULT_MATRIX_COUNT,
     output_groups: Any = DEFAULT_OUTPUT_GROUPS,
     output_count: int = DEFAULT_OUTPUT_COUNT,
 ) -> Dict[str, Any]:
@@ -1352,6 +2603,7 @@ def build_routing_sends_snapshot(
     total_channels = _bounded_int_value(total_channels, default=DEFAULT_CHANNEL_COUNT, minimum=1, maximum=DEFAULT_DANTE_CHANNEL_COUNT)
     send_count = _bounded_int_value(send_count, default=DEFAULT_SEND_COUNT, minimum=1, maximum=32)
     main_count = _bounded_int_value(main_count, default=1, minimum=1, maximum=4)
+    matrix_send_count = _bounded_int_value(matrix_send_count, default=DEFAULT_MATRIX_COUNT, minimum=1, maximum=16)
     output_count = _bounded_int_value(output_count, default=DEFAULT_OUTPUT_COUNT, minimum=1, maximum=128)
     groups = _normalise_output_groups(output_groups)
     static_dante_routes = [
@@ -1368,6 +2620,11 @@ def build_routing_sends_snapshot(
         for channel in range(1, total_channels + 1)
         for main in range(1, main_count + 1)
     ]
+    channel_matrix_sends = [
+        _channel_matrix_send_row(client, channel, matrix)
+        for channel in range(1, total_channels + 1)
+        for matrix in range(1, matrix_send_count + 1)
+    ]
     output_routes = [
         _output_route_row(client, group, output_number)
         for group in groups
@@ -1377,8 +2634,20 @@ def build_routing_sends_snapshot(
         "static_dante_routes": static_dante_routes,
         "channel_bus_sends": channel_bus_sends,
         "channel_main_sends": channel_main_sends,
+        "channel_matrix_sends": channel_matrix_sends,
         "output_routes": output_routes,
     })
+    cache_freshness = _cache_freshness_for_addresses(
+        client,
+        _routing_sends_cache_addresses(
+            total_channels=total_channels,
+            send_count=send_count,
+            main_count=main_count,
+            matrix_send_count=matrix_send_count,
+            output_groups=groups,
+            output_count=output_count,
+        ),
+    )
     return {
         "type": "routing_sends_snapshot",
         "generated_at": _utc_now(),
@@ -1396,17 +2665,22 @@ def build_routing_sends_snapshot(
             "static_dante_route_count": len(static_dante_routes),
             "channel_bus_send_count": len(channel_bus_sends),
             "channel_main_send_count": len(channel_main_sends),
+            "channel_matrix_send_count": len(channel_matrix_sends),
             "output_route_count": len(output_routes),
             "active_bus_send_count": sum(1 for row in channel_bus_sends if row.get("active")),
             "active_main_send_count": sum(1 for row in channel_main_sends if row.get("active")),
+            "active_matrix_send_count": sum(1 for row in channel_matrix_sends if row.get("active")),
             "read_coverage_status": read_coverage["status"],
+            "cache_freshness_status": cache_freshness["status"],
             "live_apply_allowed": False,
             "claim": "static routing and cached send read coverage are exposed but not complete autonomous proof",
         },
         "read_coverage": read_coverage,
+        "cache_freshness": cache_freshness,
         "static_dante_routes": static_dante_routes,
         "channel_bus_sends": channel_bus_sends,
         "channel_main_sends": channel_main_sends,
+        "channel_matrix_sends": channel_matrix_sends,
         "output_routes": output_routes,
     }
 
@@ -1565,6 +2839,32 @@ def _snapshot_scene_coverage_summary(rows: Iterable[Mapping[str, Any]], active_f
     }
 
 
+def _snapshot_scene_cache_addresses(snapshot_count: int) -> Tuple[str, ...]:
+    addresses = [
+        "snapshot_catalog",
+        "snapshots",
+        "/$ctl/lib/snapshots",
+        "/snapshots",
+        "/$ctl/lib/$actidx",
+        "/$ctl/lib/$activeidx",
+        "/$ctl/lib/$active",
+        "/$ctl/lib/$actname",
+        "/$ctl/lib/$actshow",
+    ]
+    for index in range(1, snapshot_count + 1):
+        addresses.extend(
+            (
+                f"/$ctl/lib/{index}/$name",
+                f"/$ctl/lib/{index}/name",
+                f"/$ctl/lib/$name/{index}",
+                f"/snap/{index}/$name",
+                f"/snap/{index}/name",
+                f"/scene/{index}/name",
+            )
+        )
+    return tuple(addresses)
+
+
 def build_snapshots_scenes_snapshot(
     server: Any,
     *,
@@ -1597,6 +2897,10 @@ def build_snapshots_scenes_snapshot(
         "current_show": bool(current_show),
     }
     read_coverage = _snapshot_scene_coverage_summary(rows, active_fields)
+    cache_freshness = _cache_freshness_for_addresses(
+        client,
+        _snapshot_scene_cache_addresses(snapshot_count),
+    )
     return {
         "type": "snapshots_scenes_snapshot",
         "generated_at": _utc_now(),
@@ -1619,9 +2923,11 @@ def build_snapshots_scenes_snapshot(
             "active_snapshot_name": active_name,
             "current_show": current_show,
             "read_coverage_status": read_coverage["status"],
+            "cache_freshness_status": cache_freshness["status"],
             "live_apply_allowed": False,
             "claim": "cached snapshot/scene catalog read coverage is exposed but scene load/save remains blocked",
         },
+        "cache_freshness": cache_freshness,
         "active_scene": {
             "active_snapshot_index": active_index,
             "active_snapshot_name": active_name,
@@ -1758,6 +3064,29 @@ def _user_preset_coverage_summary(rows: Iterable[Mapping[str, Any]]) -> Dict[str
     }
 
 
+def _user_preset_cache_addresses(preset_count: int) -> Tuple[str, ...]:
+    addresses = [
+        "user_preset_catalog",
+        "user_presets",
+        "presets",
+        "/presets",
+        "/$ctl/lib/presets",
+    ]
+    for index in range(1, preset_count + 1):
+        addresses.extend(
+            (
+                f"/preset/{index}/$name",
+                f"/preset/{index}/name",
+                f"/user/preset/{index}/name",
+                f"/$ctl/lib/preset/{index}/$name",
+                f"/preset/{index}/scope",
+                f"/preset/{index}/type",
+                f"/preset/{index}/target",
+            )
+        )
+    return tuple(addresses)
+
+
 def build_user_presets_snapshot(
     server: Any,
     *,
@@ -1773,6 +3102,10 @@ def build_user_presets_snapshot(
         for index in range(1, preset_count + 1)
     ]
     read_coverage = _user_preset_coverage_summary(rows)
+    cache_freshness = _cache_freshness_for_addresses(
+        client,
+        _user_preset_cache_addresses(preset_count),
+    )
     return {
         "type": "user_presets_snapshot",
         "generated_at": _utc_now(),
@@ -1792,9 +3125,11 @@ def build_user_presets_snapshot(
             "preset_count": len(rows),
             "named_preset_count": sum(1 for row in rows if row.get("preset_name")),
             "read_coverage_status": read_coverage["status"],
+            "cache_freshness_status": cache_freshness["status"],
             "live_apply_allowed": False,
             "claim": "cached user preset catalog read coverage is exposed but preset recall/store remains blocked",
         },
+        "cache_freshness": cache_freshness,
         "read_coverage": read_coverage,
         "presets": rows,
     }

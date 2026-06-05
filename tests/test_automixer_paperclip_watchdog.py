@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
 from tools.paperclip_watchdog import automixer_paperclip_watchdog as watchdog
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class FakePaperclipAPI:
@@ -198,6 +202,18 @@ def test_external_paperclip_still_requires_token(tmp_path):
     assert watchdog.missing_config(settings) == ["PAPERCLIP_TOKEN"]
     with pytest.raises(ValueError, match="PAPERCLIP_TOKEN is required"):
         watchdog.build_api(settings)
+
+
+def test_watchdog_readme_keeps_dry_run_disable_manual_only():
+    readme = PROJECT_ROOT.joinpath("tools/paperclip_watchdog/README.md").read_text(
+        encoding="utf-8"
+    )
+    normalized = " ".join(readme.split())
+
+    assert "TODO" not in readme
+    assert "Codex cycle must not disable `dry-run`" in readme
+    assert "External Paperclip/PiperClip as an agent runner" in readme
+    assert "keep the watchdog in dry-run/audit-only mode" in normalized
 
 
 def test_dispatch_default_config_does_not_patch(tmp_path):

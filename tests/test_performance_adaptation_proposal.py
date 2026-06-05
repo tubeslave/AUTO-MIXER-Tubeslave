@@ -56,6 +56,14 @@ def test_persistent_loud_musician_creates_proposal_only_downward_adaptation():
             source_confidence=0.9,
             trend_confidence=0.88,
             safety_confidence=0.86,
+            current_state_cache_freshness={
+                "status": "fresh",
+                "field_count": 8,
+                "fresh_field_count": 8,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
         )
     )
 
@@ -68,6 +76,9 @@ def test_persistent_loud_musician_creates_proposal_only_downward_adaptation():
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["rate_limited"] is True
     assert recommendation.evidence["active_performance"] is True
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 8
+    assert recommendation.evidence["source_identity_downstream_trust"]["status"] == "legacy_unverified"
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "performance_adaptation_proposal"
@@ -79,6 +90,7 @@ def test_persistent_loud_musician_creates_proposal_only_downward_adaptation():
     assert "unsupported_value_type:performance_adaptation" in proposal["blockers"]
     assert proposal["proposed_action"]["suggested_delta_db"] == -1.5
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
 
 
 def test_upward_adaptation_requires_headroom_and_low_feedback_bleed():
@@ -148,6 +160,170 @@ def test_missing_evidence_or_manual_override_blocks_adaptation():
     assert "cooldown_not_elapsed" in recommendation.blockers
     assert "trend_persistence_low" in recommendation.blockers
     assert "latency_budget_missing" in recommendation.blockers
+
+
+def test_stale_current_performance_context_blocks_adaptation_proposal():
+    recommendation = analyze_performance_adaptation_need(
+        PerformanceAdaptationAnalysisInput(
+            target_id="ch:7",
+            target_kind="channel",
+            target_label="Lead Guitar",
+            source_role="electric_guitar",
+            arrangement_role="support",
+            baseline_level_lufs=-25.0,
+            current_level_lufs=-21.6,
+            short_term_lufs=-21.2,
+            current_fader_db=-6.0,
+            true_peak_dbfs=-7.0,
+            main_bus_headroom_db=5.0,
+            feedback_risk=0.12,
+            bleed_risk=0.2,
+            baseline_available=True,
+            current_readback_available=True,
+            rollback_available=True,
+            operator_intent="operator_adaptation_review",
+            adaptation_window="performance",
+            active_performance=True,
+            cooldown_elapsed_sec=12.0,
+            persistence_cycles=4,
+            latency_budget_ms=180.0,
+            latency_budget_met=True,
+            source_confidence=0.9,
+            trend_confidence=0.88,
+            safety_confidence=0.86,
+            current_state_cache_freshness={
+                "status": "stale",
+                "field_count": 8,
+                "fresh_field_count": 6,
+                "stale_field_count": 2,
+                "stale_fields": ["current_level_lufs", "trend_persistence"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "performance_adaptation_current_state_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "stale"
+    assert recommendation.evidence["current_state_cache_freshness"]["stale_fields"] == [
+        "current_level_lufs",
+        "trend_persistence",
+    ]
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_source_identity_hold_blocks_downstream_performance_adaptation():
+    recommendation = analyze_performance_adaptation_need(
+        PerformanceAdaptationAnalysisInput(
+            target_id="ch:7",
+            target_kind="channel",
+            target_label="Lead Guitar",
+            source_role="electric_guitar",
+            arrangement_role="support",
+            baseline_level_lufs=-25.0,
+            current_level_lufs=-21.6,
+            short_term_lufs=-21.2,
+            current_fader_db=-6.0,
+            true_peak_dbfs=-7.0,
+            main_bus_headroom_db=5.0,
+            feedback_risk=0.12,
+            bleed_risk=0.2,
+            baseline_available=True,
+            current_readback_available=True,
+            rollback_available=True,
+            operator_intent="operator_adaptation_review",
+            adaptation_window="performance",
+            active_performance=True,
+            cooldown_elapsed_sec=12.0,
+            persistence_cycles=4,
+            latency_budget_ms=180.0,
+            latency_budget_met=True,
+            source_confidence=0.9,
+            trend_confidence=0.88,
+            safety_confidence=0.86,
+            source_identity_trust_state="hold_for_operator_review",
+            source_identity_trust_confidence=0.42,
+            source_identity_replay_outcome_count=4,
+            source_identity_calibration_freshness={
+                "status": "fresh",
+                "field_count": 4,
+                "fresh_field_count": 4,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_not_trusted_for_downstream" in recommendation.blockers
+    assert recommendation.severity == "medium"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["status"] == "held_for_operator_review"
+    assert trust["usable_for_downstream"] is False
+    assert trust["evidence"]["queue_mutation"] is False
+    assert trust["evidence"]["model_mutation"] is False
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_stale_source_identity_replay_context_blocks_downstream_performance_adaptation():
+    recommendation = analyze_performance_adaptation_need(
+        PerformanceAdaptationAnalysisInput(
+            target_id="ch:7",
+            target_kind="channel",
+            target_label="Lead Guitar",
+            source_role="electric_guitar",
+            arrangement_role="support",
+            baseline_level_lufs=-25.0,
+            current_level_lufs=-21.6,
+            short_term_lufs=-21.2,
+            current_fader_db=-6.0,
+            true_peak_dbfs=-7.0,
+            main_bus_headroom_db=5.0,
+            feedback_risk=0.12,
+            bleed_risk=0.2,
+            baseline_available=True,
+            current_readback_available=True,
+            rollback_available=True,
+            operator_intent="operator_adaptation_review",
+            adaptation_window="performance",
+            active_performance=True,
+            cooldown_elapsed_sec=12.0,
+            persistence_cycles=4,
+            latency_budget_ms=180.0,
+            latency_budget_met=True,
+            source_confidence=0.9,
+            trend_confidence=0.88,
+            safety_confidence=0.86,
+            source_identity_trust_state="trusted_for_downstream_priority",
+            source_identity_trust_confidence=0.9,
+            source_identity_replay_outcome_count=5,
+            source_identity_calibration_freshness={
+                "status": "stale",
+                "field_count": 4,
+                "fresh_field_count": 2,
+                "stale_field_count": 2,
+                "stale_fields": ["accepted_labels", "replay_outcomes"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_replay_context_not_fresh" in recommendation.blockers
+    assert recommendation.severity == "high"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["status"] == "trusted"
+    assert trust["usable_for_downstream"] is False
+    assert trust["evidence"]["current_state_cache_freshness"]["stale_fields"] == [
+        "accepted_labels",
+        "replay_outcomes",
+    ]
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
 
 
 def test_small_or_recent_drift_is_analysis_only():
@@ -224,6 +400,34 @@ def test_build_performance_adaptation_proposals_filters_to_proposal_only_items()
     assert proposals[0]["can_import_to_queue"] is False
 
 
+def test_build_performance_adaptation_proposals_filters_stale_context_items():
+    proposals = build_performance_adaptation_proposals(
+        [
+            PerformanceAdaptationAnalysisInput(
+                target_id="ch:7",
+                target_kind="channel",
+                source_role="electric_guitar",
+                baseline_level_lufs=-25.0,
+                current_level_lufs=-21.6,
+                current_fader_db=-6.0,
+                main_bus_headroom_db=5.0,
+                baseline_available=True,
+                current_readback_available=True,
+                rollback_available=True,
+                operator_intent="operator_adaptation_review",
+                cooldown_elapsed_sec=12.0,
+                persistence_cycles=4,
+                source_confidence=0.9,
+                trend_confidence=0.88,
+                safety_confidence=0.86,
+                current_state_cache_freshness={"status": "stale"},
+            ),
+        ]
+    )
+
+    assert proposals == ()
+
+
 def test_performance_adaptation_helpers_normalize_target_kind():
     assert normalize_target_kind("ch") == "channel"
     assert normalize_target_kind("subgroup") == "group"
@@ -248,8 +452,19 @@ def test_performance_adaptation_proposal_is_registered_as_goal_capability():
     assert capability.status == "proposal_only"
     assert capability.autonomy_mode_ceiling == "assisted"
     assert "performance_adaptation_proposal" in capability.method_ids
+    assert "backend/source_identity_downstream_gate.py" in capability.support_paths
     assert live is not None and live.status == "proposal_only"
     assert "performance_adaptation_proposal" in live.method_ids
+    assert "backend/source_identity_downstream_gate.py" in live.support_paths
     assert realtime is not None and realtime.status == "proposal_only"
     assert "performance_adaptation_proposal" in realtime.method_ids
+    assert "backend/source_identity_downstream_gate.py" in realtime.support_paths
     assert contracts["performance_adaptation_proposal"]["proposal_contract"]["value_type"] == "performance_adaptation"
+    assert (
+        "current_performance_context_cache_freshness"
+        in contracts["performance_adaptation_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "source_identity_downstream_trust"
+        in contracts["performance_adaptation_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )

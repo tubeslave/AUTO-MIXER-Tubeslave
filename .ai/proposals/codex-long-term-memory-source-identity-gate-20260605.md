@@ -1,0 +1,82 @@
+# Proposal: long-term-memory-source-identity-gate-20260605
+
+## Short thesis
+
+Use replay-calibrated source identity trust as a memory-learning blocker so
+future proposal priority cannot learn from explicitly untrusted source context.
+
+## What I understood
+
+The memory-learning layer already checks verified decisions, offline replay,
+accepted/rejected outcomes, evidence packets, telemetry sessions, engineer
+actions, reference comparisons, genre and arrangement context, replay
+correlation, outcome consistency, safety regressions, conflicts, manual
+override bursts, latency, active performance, auto-apply requests, operator
+review, and current-context freshness. It is explicitly non-queueable,
+transport-free, and no-memory-mutation. Because learning records can influence
+future proposal priority, source identity trust should become part of the
+safety evidence before learning review is proposed.
+
+## Proposed solution
+
+Add optional source identity trust fields to `LongTermMemoryLearningInput` and
+evaluate them through `source_identity_downstream_gate`. Add the resulting
+blockers and evidence to `LongTermMemoryLearningRecommendation`. Keep legacy
+missing calibration allowed so existing callers remain compatible, but block
+explicit `hold`, `blocked`, stale, or unrecognized trust states.
+
+Update the proposal-only contract and capability matrix support path, then add
+focused tests for legacy compatibility, held trust, stale replay context, and
+contract/matrix evidence.
+
+## Likely files to touch
+
+- `backend/long_term_memory_learning_proposal.py`
+- `backend/processing_proposal_adapters.py`
+- `backend/project_goal_capability_matrix.py`
+- `tests/test_long_term_memory_learning_proposal.py`
+- `.ai/briefs/long-term-memory-source-identity-gate-20260605.md`
+- `Docs/adr/long-term-memory-source-identity-gate-20260605.md`
+
+## Alternatives considered
+
+- Require source identity calibration for all memory-learning inputs
+  immediately. Rejected because legacy callers do not yet pass replay
+  artifacts.
+- Ignore replay trust for learning records. Rejected because a wrong source
+  identity can turn an accepted-looking outcome into unsafe future priority.
+- Duplicate trust-state parsing inside memory learning. Rejected because the
+  shared gate keeps blocker names and no-mutation evidence consistent across
+  downstream modules.
+
+## Risks
+
+- Conservative blocking may hold useful learning records until replay
+  calibration is consistently available.
+- The gate currently relies on upstream trust-state strings; future DTO wiring
+  should pass structured calibration records.
+
+## Test plan
+
+```bash
+PYTHONPATH=backend python3 -m py_compile \
+  backend/long_term_memory_learning_proposal.py \
+  backend/source_identity_downstream_gate.py \
+  backend/processing_proposal_adapters.py \
+  backend/project_goal_capability_matrix.py \
+  tests/test_long_term_memory_learning_proposal.py
+PYTHONPATH=backend python3 -m pytest \
+  tests/test_long_term_memory_learning_proposal.py \
+  tests/test_source_identity_downstream_gate.py \
+  tests/test_processing_registry.py \
+  tests/test_project_goal_capability_matrix.py -q
+PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q
+/opt/homebrew/bin/git diff --check
+```
+
+## Where the other agent may disagree
+
+Kimi may argue that memory learning already has enough accepted/rejected
+outcome checks. I would keep the source identity gate because outcome checks
+show operator history, while replay trust decides whether the source identity
+context is safe to learn from downstream.

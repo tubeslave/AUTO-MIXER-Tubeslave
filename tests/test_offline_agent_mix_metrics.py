@@ -19,6 +19,14 @@ def load_offline_agent_mix():
     return module
 
 
+def _blocked_action(report, label):
+    return next(
+        item
+        for item in report["applied_actions"]
+        if item["label"] == label and item.get("blocked")
+    )
+
+
 def test_event_based_metrics_raise_tom_rms_above_bleed_only_average():
     mod = load_offline_agent_mix()
     sr = 48_000
@@ -367,7 +375,7 @@ def test_ride_event_detection_survives_single_clipped_peak():
     assert 1.7 < first_start_sec < 2.3
 
 
-def test_autofoh_measurement_corrections_reduce_presence_masking_by_guitar():
+def test_autofoh_measurement_corrections_records_presence_masking_eq_proposal_without_mutating_plan():
     mod = load_offline_agent_mix()
     sr = 48_000
     duration_sec = 0.6
@@ -403,12 +411,22 @@ def test_autofoh_measurement_corrections_reduce_presence_masking_by_guitar():
 
     assert report["enabled"] is True
     assert any(item["label"] == "lead_masking" for item in report["detected_problems"])
-    assert any(item["label"] == "lead_masking" and item["sent"] for item in report["applied_actions"])
-    assert len(plans[2].eq_bands) >= 3
-    assert plans[2].eq_bands[2][1] < 0.0
+    action = _blocked_action(report, "lead_masking")
+    assert action["sent"] is False
+    assert action["write_policy"] == "proposal_only_quarantined"
+    assert action["blocked_reason"] == "autofoh_direct_apply_surface_quarantined"
+    assert action["mutates_mixer"] is False
+    assert any(
+        call["cmd"] == "set_eq_band"
+        and call["channel"] == 2
+        and call["gain"] < 0.0
+        for call in action["blocked_calls"]
+    )
+    assert plans[2].eq_bands == []
+    assert not any(call["cmd"] == "set_eq_band" for call in report["virtual_console_calls"])
 
 
-def test_autofoh_measurement_corrections_control_excess_sub_from_bass():
+def test_autofoh_measurement_corrections_records_low_end_eq_proposal_without_mutating_plan():
     mod = load_offline_agent_mix()
     sr = 48_000
     duration_sec = 0.6
@@ -444,9 +462,19 @@ def test_autofoh_measurement_corrections_control_excess_sub_from_bass():
 
     assert report["enabled"] is True
     assert any(item["label"] == "low_end" for item in report["detected_problems"])
-    assert any(item["label"] == "low_end" and item["sent"] for item in report["applied_actions"])
-    assert plans[1].eq_bands
-    assert plans[1].eq_bands[0][1] < 0.0
+    action = _blocked_action(report, "low_end")
+    assert action["sent"] is False
+    assert action["write_policy"] == "proposal_only_quarantined"
+    assert action["blocked_reason"] == "autofoh_direct_apply_surface_quarantined"
+    assert action["mutates_mixer"] is False
+    assert any(
+        call["cmd"] == "set_eq_band"
+        and call["channel"] == 1
+        and call["gain"] < 0.0
+        for call in action["blocked_calls"]
+    )
+    assert plans[1].eq_bands == []
+    assert report["virtual_console_calls"] == []
 
 
 def test_autofoh_measurement_corrections_raise_quieter_secondary_lead():

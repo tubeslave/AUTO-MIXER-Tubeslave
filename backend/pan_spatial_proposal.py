@@ -10,7 +10,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import math
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+
+try:
+    from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
 
 PAN_METHOD_ID = "pan_spatial_proposal"
@@ -105,6 +110,11 @@ class PanAnalysisInput:
     role_confidence: float = 0.7
     arrangement_role: str = ""
     persistence_cycles: int = 1
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
+    source_identity_trust_state: str = "not_provided"
+    source_identity_trust_confidence: float = 0.0
+    source_identity_replay_outcome_count: int = 0
+    source_identity_calibration_freshness: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -170,13 +180,52 @@ class PanRecommendation:
         }
 
 
-def _severity_from_delta(delta: float) -> str:
+def _severity_from_delta(delta: float, blockers: Iterable[str] = ()) -> str:
+    blocker_set = set(blockers)
+    if (
+        "source_identity_blocked_from_downstream_trust" in blocker_set
+        or "source_identity_replay_context_not_fresh" in blocker_set
+    ):
+        return "high"
+    if "source_identity_not_trusted_for_downstream" in blocker_set:
+        return "medium"
     magnitude = abs(delta)
     if magnitude >= 35.0:
         return "high"
     if magnitude >= 16.0:
         return "medium"
     return "low"
+
+
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "missing_fields",
+        "untimestamped_present_fields",
+        "stale_after_sec",
+        "read_only",
+        "live_write",
+        "queries_console",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = True
+    normalized.setdefault("status", _freshness_status(payload))
+    return normalized
 
 
 def _target_from_context(analysis: PanAnalysisInput, family: str) -> Tuple[float, str, Tuple[str, ...]]:
@@ -217,6 +266,16 @@ def analyze_pan_need(
     contribution = _clip01(analysis.contribution_share)
     role_confidence = _clip01(analysis.role_confidence)
     persistence = max(1, int(analysis.persistence_cycles or 1))
+    current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
+    current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    source_identity_trust = evaluate_source_identity_downstream_trust(
+        source_id=f"ch:{int(analysis.channel_id)}",
+        source_type=str(analysis.source_role or "unknown"),
+        trust_state=analysis.source_identity_trust_state,
+        trust_confidence=analysis.source_identity_trust_confidence,
+        replay_outcome_count=analysis.source_identity_replay_outcome_count,
+        current_state_cache_freshness=analysis.source_identity_calibration_freshness,
+    )
 
     target, decision_source, blockers = _target_from_context(analysis, family)
     target = round(_clip(target, -MAX_PAN_PERCENT, MAX_PAN_PERCENT), 1)
@@ -227,6 +286,9 @@ def analyze_pan_need(
         blocker_list.append("pan_change_not_needed")
     if target != 0.0 and mono_risk >= HIGH_MONO_RISK:
         blocker_list.append("mono_compatibility_risk_high")
+    if current_state_freshness_status not in {"fresh", "not_provided"}:
+        blocker_list.append("pan_current_state_cache_not_fresh")
+    blocker_list.extend(source_identity_trust.blockers)
 
     confidence = _clip01(
         0.40 * role_confidence
@@ -251,6 +313,9 @@ def analyze_pan_need(
         "role_confidence": round(role_confidence, 3),
         "arrangement_role": analysis.arrangement_role,
         "persistence_cycles": persistence,
+        "current_state_cache_freshness_status": current_state_freshness_status,
+        "current_state_cache_freshness": current_state_freshness,
+        "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
     }
 
@@ -273,7 +338,7 @@ def analyze_pan_need(
         target_pan_percent=target,
         delta_pan_percent=delta,
         confidence=round(confidence, 3),
-        severity=_severity_from_delta(delta),
+        severity=_severity_from_delta(delta, blocker_list),
         reason=reason,
         blockers=tuple(sorted(set(blocker_list))),
         evidence=evidence,

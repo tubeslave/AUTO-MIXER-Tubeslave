@@ -95,6 +95,13 @@ class AutoCompressorController:
         self._corrections_in_row: Dict[int, int] = {}
         self.current_params: Dict[int, Dict[str, Any]] = {}
         self.channel_features: Dict[int, ChannelSignalFeatures] = {}
+        self.live_write_allowed = False
+        self.write_policy = "proposal_only_quarantined"
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+        self.last_blocked_calls: List[Dict[str, Any]] = []
+        self.last_apply_result: Dict[str, Any] = {}
 
     def stop(self):
         """Stop all activity and release audio."""
@@ -235,32 +242,109 @@ class AutoCompressorController:
             except Exception as e:
                 logger.debug(f"Auto Compressor status callback: {e}")
 
+    def _reset_write_telemetry(self):
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+        self.last_blocked_calls = []
+        self.last_apply_result = {}
+
+    def _blocked_compressor_result(
+        self,
+        reason: str,
+        blocked_calls: List[Dict[str, Any]],
+        *,
+        channel: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        self.last_write_attempted = bool(blocked_calls)
+        self.last_write_blocked = bool(blocked_calls)
+        self.last_write_count = 0
+        self.last_blocked_calls = list(blocked_calls)
+        result = {
+            "applied": False,
+            "blocked": bool(blocked_calls),
+            "calls": [],
+            "blocked_calls": list(blocked_calls),
+            "blocked_call_count": len(blocked_calls),
+            "reason": reason,
+            "write_policy": self.write_policy,
+            "live_write_allowed": self.live_write_allowed,
+            "can_apply_live": False,
+            "mixer_client_present": self.mixer_client is not None,
+            "mutates_mixer": False,
+        }
+        if channel is not None:
+            result["channel"] = channel
+        self.last_apply_result = result
+        if blocked_calls:
+            logger.warning(
+                "AutoCompressor live writes are quarantined; %s commands kept as evidence",
+                len(blocked_calls),
+            )
+        return result
+
+    def _compressor_on_call(self, mixer_ch: int, on: int, semantic: str) -> Dict[str, Any]:
+        return {
+            "cmd": "set_compressor_on",
+            "channel": mixer_ch,
+            "on": int(on),
+            "semantic": semantic,
+        }
+
+    def _compressor_param_call(
+        self,
+        mixer_ch: int,
+        params: Dict[str, Any],
+        *,
+        semantic: str,
+    ) -> Dict[str, Any]:
+        return {
+            "cmd": "set_compressor",
+            "channel": mixer_ch,
+            "threshold": float(params.get("threshold", -15.0)),
+            "ratio": str(params.get("ratio_wing", "3.0")),
+            "attack": float(params.get("attack_ms", 15.0)),
+            "release": float(params.get("release_ms", 150.0)),
+            "knee": int(round(float(params.get("knee", 2.0)))),
+            "gain": float(params.get("gain", 0.0)),
+            "semantic": semantic,
+        }
+
+    def _record_blocked_compressor_calls(
+        self,
+        reason: str,
+        blocked_calls: List[Dict[str, Any]],
+        *,
+        channel: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        result = self._blocked_compressor_result(reason, blocked_calls, channel=channel)
+        self._send_status(
+            {
+                "compressor_apply_blocked": True,
+                "channel": channel,
+                "reason": reason,
+                "blocked_call_count": len(blocked_calls),
+                "mutates_mixer": False,
+            }
+        )
+        return result
+
+    def _block_compressor_on(self, mixer_ch: int, on: int, semantic: str) -> Dict[str, Any]:
+        return self._record_blocked_compressor_calls(
+            "auto_compressor_direct_apply_quarantined",
+            [self._compressor_on_call(mixer_ch, on, semantic)],
+            channel=mixer_ch,
+        )
+
     def _apply_compressor_smooth(
         self,
         mixer_ch: int,
         target: Dict[str, Any],
         duration_sec: float = TRANSITION_DURATION_SEC,
-    ):
-        """Apply compressor params with smooth interpolation (blocking)."""
-        if not self.mixer_client or not self.mixer_client.is_connected:
-            return
-        # Check if compressor is enabled, enable if not
-        try:
-            compressor_on = self.mixer_client.get_compressor_on(mixer_ch)
-            if compressor_on is None or compressor_on == 0:
-                logger.info(f"Enabling compressor on channel {mixer_ch} before applying parameters")
-                self.mixer_client.set_compressor_on(mixer_ch, 1)
-                time.sleep(0.15)  # Increased delay for mixer to process enable command
-                logger.debug(f"Compressor enabled on ch{mixer_ch}, waiting before applying params")
-        except Exception as e:
-            logger.warning(f"Could not check/enable compressor ch{mixer_ch}: {e}, enabling anyway")
-            try:
-                self.mixer_client.set_compressor_on(mixer_ch, 1)
-                time.sleep(0.15)  # Increased delay
-            except Exception as e2:
-                logger.error(f"Failed to enable compressor ch{mixer_ch}: {e2}")
-                return
-        
+    ) -> Dict[str, Any]:
+        """Return blocked compressor evidence without mutating the mixer."""
+        self._reset_write_telemetry()
+
         current = self.current_params.get(mixer_ch, {})
         thr0 = current.get("threshold", -15)
         ratio_wing0 = current.get("ratio_wing", "3.0")
@@ -274,44 +358,50 @@ class AutoCompressorController:
         rel1 = target.get("release_ms", rel0)
         knee1 = target.get("knee", knee0)
         gain1 = target.get("gain", gain0)
-        logger.info(f"Applying compressor to ch{mixer_ch}: thr={thr1:.1f}dB, ratio={ratio_wing1}, attack={att1:.1f}ms, release={rel1:.1f}ms, knee={knee1:.1f}, makeup_gain={gain1:.1f}dB")
-        n = max(1, int(duration_sec * TRANSITION_UPDATE_HZ))
-        dt = 1.0 / TRANSITION_UPDATE_HZ
-        logger.debug(f"Compressor transition: {n} steps, {dt*1000:.1f}ms per step")
-        for i in range(n + 1):
-            if not self.is_active:
-                logger.warning(f"Compressor application interrupted (is_active=False) for ch{mixer_ch}")
-                break
-            t = _ease_out(i / n)
-            thr = thr0 + (thr1 - thr0) * t
-            att = att0 + (att1 - att0) * t
-            rel = rel0 + (rel1 - rel0) * t
-            knee = knee0 + (knee1 - knee0) * t
-            gain = gain0 + (gain1 - gain0) * t
-            try:
-                self.mixer_client.set_compressor(
-                    mixer_ch,
-                    threshold=float(thr),
-                    ratio=str(ratio_wing1),
-                    attack=float(att),
-                    release=float(rel),
-                    knee=int(round(knee)),
-                    gain=float(gain)
-                )
-            except Exception as e:
-                logger.error(f"Set compressor ch{mixer_ch} step {i}/{n}: {e}", exc_info=True)
-            time.sleep(dt)
-        # Ensure compressor is enabled at the end (redundant but safe)
-        try:
-            self.mixer_client.set_compressor_on(mixer_ch, 1)
-            logger.debug(f"Compressor ch{mixer_ch} enabled confirmed")
-        except Exception as e:
-            logger.warning(f"Failed to ensure compressor enabled ch{mixer_ch}: {e}")
+        logger.info(
+            "Blocking compressor apply to ch%s: thr=%.1fdB, ratio=%s, attack=%.1fms, release=%.1fms, knee=%.1f, makeup_gain=%.1fdB",
+            mixer_ch,
+            thr1,
+            ratio_wing1,
+            att1,
+            rel1,
+            knee1,
+            gain1,
+        )
+        planned = {
+            "threshold": thr1,
+            "ratio_wing": ratio_wing1,
+            "attack_ms": att1,
+            "release_ms": rel1,
+            "knee": knee1,
+            "gain": gain1,
+        }
         self.current_params[mixer_ch] = {
             "threshold": thr1, "ratio_wing": ratio_wing1, "attack_ms": att1,
             "release_ms": rel1, "knee": knee1, "gain": gain1,
         }
-        logger.info(f"Compressor params applied to ch{mixer_ch}: thr={thr1:.1f}dB, ratio={ratio_wing1}, attack={att1:.1f}ms, release={rel1:.1f}ms, makeup_gain={gain1:.1f}dB")
+        blocked_calls = [
+            self._compressor_on_call(mixer_ch, 1, "enable_before_compressor_params"),
+            self._compressor_param_call(mixer_ch, planned, semantic="apply_compressor_params"),
+            self._compressor_on_call(mixer_ch, 1, "ensure_compressor_enabled"),
+        ]
+        result = self._record_blocked_compressor_calls(
+            "auto_compressor_direct_apply_quarantined",
+            blocked_calls,
+            channel=mixer_ch,
+        )
+        result["planned_params"] = planned
+        result["transition_duration_sec"] = duration_sec
+        logger.info(
+            "Compressor params kept as blocked evidence for ch%s: thr=%.1fdB, ratio=%s, attack=%.1fms, release=%.1fms, makeup_gain=%.1fdB",
+            mixer_ch,
+            thr1,
+            ratio_wing1,
+            att1,
+            rel1,
+            gain1,
+        )
+        return result
 
     async def start_soundcheck(
         self,
@@ -356,8 +446,7 @@ class AutoCompressorController:
                     compressor_was_on = self.mixer_client.get_compressor_on(mixer_ch)
                     if compressor_was_on == 1:
                         logger.info(f"Soundcheck: Temporarily disabling compressor on {name} (ch{mixer_ch}) for clean signal analysis")
-                        self.mixer_client.set_compressor_on(mixer_ch, 0)
-                        await asyncio.sleep(0.5)  # Wait for compressor to fully disengage and clear any compression artifacts
+                        self._block_compressor_on(mixer_ch, 0, "soundcheck_clean_analysis_disable")
                 except Exception as e:
                     logger.warning(f"Soundcheck: Could not disable compressor on ch{mixer_ch} for analysis: {e}")
             
@@ -373,10 +462,7 @@ class AutoCompressorController:
                 self._send_status({"soundcheck": True, "message": f"No audio buffer for {name}, skipping", "current_channel": mixer_ch})
                 # Re-enable compressor if it was on
                 if compressor_was_on == 1 and self.mixer_client:
-                    try:
-                        self.mixer_client.set_compressor_on(mixer_ch, 1)
-                    except:
-                        pass
+                    self._block_compressor_on(mixer_ch, 1, "soundcheck_restore_after_skip")
                 continue
             logger.info(f"Soundcheck: Recording {name} (audio_ch={audio_ch}, mixer_ch={mixer_ch}) for {self.soundcheck_duration_per_channel}s (compressor disabled for analysis)...")
             samples_list = []
@@ -484,24 +570,17 @@ class AutoCompressorController:
             
             # Re-enable compressor before applying new parameters (if it was disabled)
             if compressor_was_on == 1 and self.mixer_client:
-                try:
-                    logger.debug(f"Soundcheck: Re-enabling compressor on ch{mixer_ch} before applying new params")
-                    self.mixer_client.set_compressor_on(mixer_ch, 1)
-                    await asyncio.sleep(0.1)
-                except Exception as e:
-                    logger.warning(f"Soundcheck: Could not re-enable compressor on ch{mixer_ch}: {e}")
+                logger.debug(f"Soundcheck: Blocking re-enable compressor on ch{mixer_ch} before applying new params")
+                self._block_compressor_on(mixer_ch, 1, "soundcheck_restore_before_params")
             
             try:
-                await loop.run_in_executor(None, lambda: self._apply_compressor_smooth(mixer_ch_copy, params_copy))
-                logger.info(f"Soundcheck: Compressor params applied to {name}")
+                apply_result = await loop.run_in_executor(None, lambda: self._apply_compressor_smooth(mixer_ch_copy, params_copy))
+                logger.info(f"Soundcheck: Compressor params blocked as evidence for {name}: {apply_result}")
             except Exception as e:
                 logger.error(f"Soundcheck: Error applying compressor to {name}: {e}", exc_info=True)
                 # Ensure compressor is enabled even if application failed
                 if compressor_was_on == 1 and self.mixer_client:
-                    try:
-                        self.mixer_client.set_compressor_on(mixer_ch, 1)
-                    except:
-                        pass
+                    self._block_compressor_on(mixer_ch, 1, "soundcheck_restore_after_error")
                 self._send_status({
                     "soundcheck": True,
                     "current_channel": mixer_ch,
@@ -727,8 +806,13 @@ class AutoCompressorController:
         
         self._last_correction_time[mixer_ch] = now
         self._corrections_in_row[mixer_ch] = n + 1
-        self._apply_compressor_smooth(mixer_ch, params, duration_sec=0.5)
-        self._send_status({"live": True, "auto_corrected": mixer_ch, "issue": issue})
+        apply_result = self._apply_compressor_smooth(mixer_ch, params, duration_sec=0.5)
+        self._send_status({
+            "live": True,
+            "auto_correct_blocked": mixer_ch,
+            "issue": issue,
+            "result": apply_result,
+        })
 
     async def start_live(self, auto_correct: bool = True):
         if not self.is_active:
@@ -751,15 +835,12 @@ class AutoCompressorController:
                     compressor_on = self.mixer_client.get_compressor_on(mixer_ch)
                     logger.info(f"Channel {mixer_ch}: current compressor_on={compressor_on} (type: {type(compressor_on).__name__})")
                     
-                    # Force enable compressor regardless of current state
-                    # (state may be out of sync with mixer)
-                    logger.info(f"Force enabling compressor on channel {mixer_ch} for live mode")
-                    self.mixer_client.set_compressor_on(mixer_ch, 1)
+                    logger.info(f"Blocking compressor enable on channel {mixer_ch} for live mode")
+                    self._block_compressor_on(mixer_ch, 1, "live_start_enable_compressor")
                     enabled_count += 1
-                    await asyncio.sleep(0.05)  # Small delay between commands
                 except Exception as e:
                     logger.warning(f"Could not enable compressor ch{mixer_ch} at live start: {e}", exc_info=True)
-            logger.info(f"Force enabled {enabled_count} compressors for live mode")
+            logger.info(f"Kept {enabled_count} live-start compressor enables as blocked evidence")
         else:
             logger.warning(f"Cannot enable compressors: mixer_client={self.mixer_client is not None}, connected={self.mixer_client.is_connected if self.mixer_client else False}")
         
@@ -782,4 +863,12 @@ class AutoCompressorController:
             "channels": list(self.channels),
             "channel_mapping": dict(self.channel_mapping),
             "current_params": dict(self.current_params),
+            "live_write_allowed": self.live_write_allowed,
+            "write_policy": self.write_policy,
+            "last_write_attempted": self.last_write_attempted,
+            "last_write_blocked": self.last_write_blocked,
+            "last_write_count": self.last_write_count,
+            "last_blocked_call_count": len(self.last_blocked_calls),
+            "last_blocked_calls": list(self.last_blocked_calls),
+            "last_apply_result": dict(self.last_apply_result),
         }

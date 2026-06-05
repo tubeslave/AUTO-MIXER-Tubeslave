@@ -445,6 +445,15 @@ export interface DashboardRuntime {
   blockedDecisions: number;
   sourceLabel: string;
   spectrumBins?: number[];
+  analysisTraces?: Partial<Record<'phase' | 'correlation' | 'dynamics' | 'loudness', DashboardRuntimeTrace>>;
+}
+
+export interface DashboardRuntimeTrace {
+  values: number[];
+  primary?: string;
+  secondary?: string;
+  sourceLabel?: string;
+  sourceTone?: Tone;
 }
 
 export interface RuntimeStatusItem {

@@ -10,7 +10,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import math
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+
+try:
+    from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
 
 COMPRESSOR_METHOD_ID = "compressor_dynamics_proposal"
@@ -113,6 +118,11 @@ class CompressorAnalysisInput:
     persistence_cycles: int = 1
     transient_density: float = 0.0
     loudness_stability: float = 0.5
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
+    source_identity_trust_state: str = "not_provided"
+    source_identity_trust_confidence: float = 0.0
+    source_identity_replay_outcome_count: int = 0
+    source_identity_calibration_freshness: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -186,7 +196,15 @@ class CompressorRecommendation:
         }
 
 
-def _severity_from_score(score: float) -> str:
+def _severity_from_score(score: float, blockers: Iterable[str] = ()) -> str:
+    blocker_set = set(blockers)
+    if (
+        "source_identity_blocked_from_downstream_trust" in blocker_set
+        or "source_identity_replay_context_not_fresh" in blocker_set
+    ):
+        return "high"
+    if "source_identity_not_trusted_for_downstream" in blocker_set:
+        return "medium"
     if score >= 0.75:
         return "high"
     if score >= 0.45:
@@ -196,6 +214,37 @@ def _severity_from_score(score: float) -> str:
 
 def _preset_for_role(source_role: str) -> CompressorRolePreset:
     return ROLE_PRESETS[classify_source_family(source_role)]
+
+
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "missing_fields",
+        "untimestamped_present_fields",
+        "stale_after_sec",
+        "read_only",
+        "live_write",
+        "queries_console",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = True
+    normalized.setdefault("status", _freshness_status(payload))
+    return normalized
 
 
 def analyze_compressor_need(
@@ -218,6 +267,16 @@ def analyze_compressor_need(
     stability = _clip01(analysis.loudness_stability)
     peak_dbfs = _safe_float(analysis.peak_dbfs, -120.0)
     rms_dbfs = _safe_float(analysis.rms_dbfs, -120.0)
+    current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
+    current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    source_identity_trust = evaluate_source_identity_downstream_trust(
+        source_id=f"ch:{int(analysis.channel_id)}",
+        source_type=str(analysis.source_role or "unknown"),
+        trust_state=analysis.source_identity_trust_state,
+        trust_confidence=analysis.source_identity_trust_confidence,
+        replay_outcome_count=analysis.source_identity_replay_outcome_count,
+        current_state_cache_freshness=analysis.source_identity_calibration_freshness,
+    )
 
     cf_excess = max(0.0, crest_factor - preset.target_crest_factor_db)
     lra_excess = max(0.0, lra_db - preset.lra_trigger_db)
@@ -242,6 +301,9 @@ def analyze_compressor_need(
         blockers.append("existing_compression_already_heavy")
     if headroom < 1.0:
         blockers.append("insufficient_true_peak_headroom_for_makeup")
+    if current_state_freshness_status not in {"fresh", "not_provided"}:
+        blockers.append("compressor_current_state_cache_not_fresh")
+    blockers.extend(source_identity_trust.blockers)
 
     target_gr = _clip(preset.target_gain_reduction_db + score * 1.5, 1.0, 6.0)
     ratio = _clip(preset.ratio + score * 1.4, MIN_RATIO, MAX_RATIO)
@@ -266,6 +328,9 @@ def analyze_compressor_need(
         "persistence_cycles": persistence,
         "transient_density": round(transient_density, 3),
         "loudness_stability": round(stability, 3),
+        "current_state_cache_freshness_status": current_state_freshness_status,
+        "current_state_cache_freshness": current_state_freshness,
+        "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "target_crest_factor_db": preset.target_crest_factor_db,
         "crest_factor_trigger_db": preset.crest_factor_trigger_db,
         "lra_trigger_db": preset.lra_trigger_db,
@@ -299,7 +364,7 @@ def analyze_compressor_need(
         makeup_gain_db=round(makeup, 1),
         target_gain_reduction_db=round(target_gr, 1),
         confidence=round(confidence, 3),
-        severity=_severity_from_score(score),
+        severity=_severity_from_score(score, blockers),
         reason=reason,
         blockers=tuple(sorted(set(blockers))),
         evidence=evidence,

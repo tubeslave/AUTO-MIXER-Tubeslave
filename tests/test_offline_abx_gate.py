@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -95,6 +96,149 @@ def test_abx_gate_can_pass_technical_artifact_without_preference_claim():
     assert result["preference_pass"] is False
     assert result["trials"]["n"] == 0
     assert result["warnings"][0]["code"] == "no_abx_trials"
+
+
+def test_abx_gate_accepts_attached_safety_audit_when_required():
+    payload = {
+        "seed": 42,
+        "clips": [
+            {"clip_id": "a", "variant": "A", "lufs": -16.0, "peak_dbfs": -3.0, "sha256": "a" * 64},
+            {"clip_id": "b", "variant": "B", "lufs": -15.8, "peak_dbfs": -2.8, "sha256": "b" * 64},
+        ],
+        "safety_audits": [
+            {
+                "name": "autoeq_audit_validation",
+                "schema_version": "0.1",
+                "passed": True,
+                "artifact": "artifacts/offline/autoeq_audit_report.json",
+                "target_render_sha256": "b" * 64,
+            }
+        ],
+    }
+    config = offline_abx_gate.ABXGateConfig(require_safety_audits=True)
+
+    result = offline_abx_gate.evaluate_abx_artifact(payload, config)
+
+    assert result["overall_pass"] is True
+    assert result["technical_pass"] is True
+    assert result["safety_audits"]["required"] is True
+    assert result["safety_audits"]["passed"] == ["autoeq_audit_validation"]
+    assert result["safety_audits"]["with_provenance"] == ["autoeq_audit_validation"]
+
+
+def test_abx_gate_requires_safety_audit_render_provenance_when_required():
+    payload = {
+        "seed": 42,
+        "clips": [
+            {"clip_id": "a", "variant": "A", "lufs": -16.0, "peak_dbfs": -3.0, "sha256": "a" * 64},
+            {"clip_id": "b", "variant": "B", "lufs": -15.8, "peak_dbfs": -2.8, "sha256": "b" * 64},
+        ],
+        "safety_audits": [{"name": "autoeq_audit_validation", "passed": True}],
+    }
+    config = offline_abx_gate.ABXGateConfig(require_safety_audits=True)
+
+    result = offline_abx_gate.evaluate_abx_artifact(payload, config)
+
+    assert result["overall_pass"] is False
+    assert result["technical_pass"] is False
+    assert "safety_audit_missing_provenance" in {failure["code"] for failure in result["failures"]}
+    assert result["safety_audits"]["missing_provenance"] == ["autoeq_audit_validation"]
+
+
+def test_abx_gate_rejects_safety_audit_for_different_render_when_required():
+    payload = {
+        "seed": 42,
+        "clips": [
+            {"clip_id": "a", "variant": "A", "lufs": -16.0, "peak_dbfs": -3.0, "sha256": "a" * 64},
+            {"clip_id": "b", "variant": "B", "lufs": -15.8, "peak_dbfs": -2.8, "sha256": "b" * 64},
+        ],
+        "safety_audits": [
+            {
+                "name": "autoeq_audit_validation",
+                "passed": True,
+                "target_render_sha256": "c" * 64,
+            }
+        ],
+    }
+    config = offline_abx_gate.ABXGateConfig(require_safety_audits=True)
+
+    result = offline_abx_gate.evaluate_abx_artifact(payload, config)
+
+    assert result["overall_pass"] is False
+    assert result["technical_pass"] is False
+    assert "safety_audit_render_mismatch" in {failure["code"] for failure in result["failures"]}
+    assert result["safety_audits"]["mismatched_provenance"] == ["autoeq_audit_validation"]
+
+
+def test_abx_gate_blocks_failed_or_missing_safety_audit_status():
+    payload = {
+        "seed": 42,
+        "clips": [
+            {"clip_id": "a", "variant": "A", "lufs": -16.0, "peak_dbfs": -3.0, "sha256": "a" * 64},
+            {"clip_id": "b", "variant": "B", "lufs": -15.8, "peak_dbfs": -2.8, "sha256": "b" * 64},
+        ],
+        "safety_audits": [
+            {"name": "autoeq_audit_validation", "passed": False},
+            {"name": "dynamic_eq_playbook"},
+        ],
+    }
+
+    result = offline_abx_gate.evaluate_abx_artifact(payload)
+    codes = {failure["code"] for failure in result["failures"]}
+
+    assert result["overall_pass"] is False
+    assert result["technical_pass"] is False
+    assert "safety_audit_failed" in codes
+    assert "safety_audit_missing_status" in codes
+
+
+def test_abx_gate_can_require_safety_audit_evidence():
+    payload = {
+        "seed": 42,
+        "clips": [
+            {"clip_id": "a", "variant": "A", "lufs": -16.0, "peak_dbfs": -3.0, "sha256": "a" * 64},
+            {"clip_id": "b", "variant": "B", "lufs": -15.8, "peak_dbfs": -2.8, "sha256": "b" * 64},
+        ],
+    }
+    config = offline_abx_gate.ABXGateConfig(require_safety_audits=True)
+
+    result = offline_abx_gate.evaluate_abx_artifact(payload, config)
+
+    assert result["overall_pass"] is False
+    assert "missing_safety_audit" in {failure["code"] for failure in result["failures"]}
+
+
+def test_abx_gate_cli_can_require_safety_audit(tmp_path):
+    artifact = tmp_path / "artifact.json"
+    report_path = tmp_path / "report.json"
+    artifact.write_text(
+        json.dumps(
+            {
+                "seed": 42,
+                "clips": [
+                    {"clip_id": "a", "variant": "A", "lufs": -16.0, "peak_dbfs": -3.0, "sha256": "a" * 64},
+                    {"clip_id": "b", "variant": "B", "lufs": -15.8, "peak_dbfs": -2.8, "sha256": "b" * 64},
+                ],
+                "safety_audits": [
+                    {
+                        "name": "autoeq_audit_validation",
+                        "passed": True,
+                        "target_render_sha256": "b" * 64,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = offline_abx_gate.main([str(artifact), "--require-safety-audit", "--out", str(report_path)])
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert report["overall_pass"] is True
+    assert report["safety_audits"]["required"] is True
+    assert report["safety_audits"]["passed"] == ["autoeq_audit_validation"]
+    assert report["safety_audits"]["with_provenance"] == ["autoeq_audit_validation"]
 
 
 def test_abx_gate_fails_overall_when_preference_is_required():

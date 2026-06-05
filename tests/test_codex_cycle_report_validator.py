@@ -31,6 +31,7 @@ VALID_REPORT = """# Automixer Codex Cycle 20260530T000000Z
 
 ## Scope
 
+Codex CLI was the only agent workflow used.
 External Paperclip/PiperClip was not used as an agent runner.
 No neighboring repositories or external local projects were analyzed, modified,
 or used.
@@ -59,6 +60,10 @@ Latest test artifacts under `artifacts/` and `sessions/` were inspected.
 TODO/FIXME scan, excluding vendored/generated/reference noise, found only
 bounded owned-code items.
 Local project tasks in `.ai/project-layer/current_tasks.md` were inspected.
+Project canon from `README.md`, `AGENTS.md`, `CLAUDE.md`,
+`.ai/memory/project.md`, and `Docs/PROJECT_IMPLEMENTATION_PLAN.md` confirms
+the main goal: supervised gate for live changes, with all other actions kept
+read-only, proposal-only, shadow-only, or offline-only.
 
 ## Short Plan
 
@@ -188,10 +193,12 @@ def test_cycle_report_validator_rejects_missing_scope_section(tmp_path):
         "automixer_codex_cycle_20260530T000000Z.md",
         VALID_REPORT.replace(
             "## Scope\n\n"
+            "Codex CLI was the only agent workflow used.\n"
             "External Paperclip/PiperClip was not used as an agent runner.\n"
             "No neighboring repositories or external local projects were analyzed, modified,\n"
             "or used.\n"
             "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.\n\n",
+            "Codex CLI was the only agent workflow used.\n"
             "External Paperclip/PiperClip was not used as an agent runner.\n"
             "No neighboring repositories or external local projects were analyzed, modified,\n"
             "or used.\n"
@@ -225,6 +232,81 @@ def test_cycle_report_validator_rejects_missing_project_boundary_evidence(tmp_pa
     )
 
 
+def test_cycle_report_validator_rejects_missing_codex_cli_agent_workflow_evidence(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace("Codex CLI was the only agent workflow used.\n", ""),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "missing required report phrase: Codex CLI was the only agent workflow used."
+        in errors
+    )
+    assert (
+        "missing required Scope evidence: Codex CLI was the only agent workflow used."
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_non_exact_codex_cli_agent_workflow_line(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "Codex CLI was the only agent workflow used.\n",
+            "Codex CLI was the only agent workflow used. Extra scope note.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "Scope must contain exact agent workflow line: "
+        "Codex CLI was the only agent workflow used."
+        in errors
+    )
+    assert (
+        "missing required Scope evidence: Codex CLI was the only agent workflow used."
+        not in errors
+    )
+
+
+def test_cycle_report_validator_rejects_non_exact_external_agent_runner_line(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "External Paperclip/PiperClip was not used as an agent runner.\n",
+            "External Paperclip/PiperClip was not used as an agent runner. Extra scope note.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "Scope must contain exact external agent boundary line: "
+        "External Paperclip/PiperClip was not used as an agent runner."
+        in errors
+    )
+    assert (
+        "missing required Scope evidence: External Paperclip/PiperClip was not "
+        "used as an agent runner."
+        not in errors
+    )
+
+
 def test_cycle_report_validator_rejects_missing_secret_boundary_evidence(tmp_path):
     validator = load_validator_module()
     secret_boundary = (
@@ -242,6 +324,34 @@ def test_cycle_report_validator_rejects_missing_secret_boundary_evidence(tmp_pat
     assert (
         "missing required Scope evidence: No `.env`, tokens, credentials, "
         "API keys, or local secrets were accessed or modified."
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_missing_project_goal_evidence(tmp_path):
+    validator = load_validator_module()
+    goal_evidence = (
+        "Project canon from `README.md`, `AGENTS.md`, `CLAUDE.md`,\n"
+        "`.ai/memory/project.md`, and `Docs/PROJECT_IMPLEMENTATION_PLAN.md` confirms\n"
+        "the main goal: supervised gate for live changes, with all other actions kept\n"
+        "read-only, proposal-only, shadow-only, or offline-only.\n"
+    )
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(goal_evidence, ""),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "What Was Found is missing project-goal evidence: README.md" in errors
+    assert (
+        "What Was Found is missing project-goal evidence: supervised gate"
+        in errors
+    )
+    assert (
+        "What Was Found is missing project-goal evidence: "
+        "read-only/proposal-only/shadow-only/offline-only boundary"
         in errors
     )
 
@@ -396,6 +506,29 @@ def test_cycle_report_validator_rejects_external_paperclip_runner_contradiction(
     assert any(
         "report body contradicts repo-local project boundary evidence" in error
         and "external paperclip/piperclip" in error
+        for error in errors
+    )
+
+
+def test_cycle_report_validator_rejects_piperclip_runner_without_external_prefix(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "A safe local report validator was checked.",
+            "A safe local report validator was checked.\n"
+            "PiperClip was launched as the agent runner for this cycle.",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert any(
+        "report body contradicts repo-local project boundary evidence" in error
+        and "piperclip" in error
         for error in errors
     )
 
@@ -1477,6 +1610,30 @@ def test_cycle_report_validator_rejects_memory_lint_without_outcome(tmp_path):
     )
 
 
+def test_cycle_report_validator_rejects_tests_and_checks_memory_lint_with_alternate_root(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "- `python3 tools/memory/memory_lint.py`\n"
+            "  - Passed: required memory files and safety wording are present.\n",
+            "- `python3 tools/memory/memory_lint.py --root /tmp/other`\n"
+            "  - Passed: required memory files and safety wording are present.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "Tests And Checks memory lint result must use repo-local memory lint "
+        "without alternate-root arguments: --root"
+        in errors
+    )
+
+
 def test_cycle_report_validator_rejects_missing_memory_lint_result_section(tmp_path):
     validator = load_validator_module()
     report_path = write_report(
@@ -1556,6 +1713,30 @@ def test_cycle_report_validator_rejects_memory_lint_result_without_exact_command
     assert (
         "Memory Lint Result must include exact command: "
         "python3 tools/memory/memory_lint.py"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_memory_lint_result_with_alternate_root(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "`python3 tools/memory/memory_lint.py` passed.\n"
+            "Status: `PASS`.\n",
+            "`python3 tools/memory/memory_lint.py --root /tmp/other` passed.\n"
+            "Status: `PASS`.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "Memory Lint Result must use repo-local memory lint without "
+        "alternate-root arguments: --root"
         in errors
     )
 
@@ -1861,6 +2042,10 @@ Latest test artifacts under `artifacts/` and `sessions/` were inspected.
 TODO/FIXME scan, excluding vendored/generated/reference noise, found only
 bounded owned-code items.
 Local project tasks in `.ai/project-layer/current_tasks.md` were inspected.
+Project canon from `README.md`, `AGENTS.md`, `CLAUDE.md`,
+`.ai/memory/project.md`, and `Docs/PROJECT_IMPLEMENTATION_PLAN.md` confirms
+the main goal: supervised gate for live changes, with all other actions kept
+read-only, proposal-only, shadow-only, or offline-only.
 Earlier readiness notes:
 - Исследование: 88%
 - Архитектура: 84%
@@ -1880,7 +2065,11 @@ inspected.
 Latest test artifacts under `artifacts/` and `sessions/` were inspected.
 TODO/FIXME scan, excluding vendored/generated/reference noise, found only
 bounded owned-code items.
-Local project tasks in `.ai/project-layer/current_tasks.md` were inspected.""",
+Local project tasks in `.ai/project-layer/current_tasks.md` were inspected.
+Project canon from `README.md`, `AGENTS.md`, `CLAUDE.md`,
+`.ai/memory/project.md`, and `Docs/PROJECT_IMPLEMENTATION_PLAN.md` confirms
+the main goal: supervised gate for live changes, with all other actions kept
+read-only, proposal-only, shadow-only, or offline-only.""",
             misplaced_scores,
         )
         .replace(
@@ -2026,5 +2215,22 @@ def test_cycle_report_validator_rejects_subsection_after_readiness_scores(tmp_pa
     assert (
         "### Общая готовность направления must be the final "
         "plain-language subsection"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_text_after_readiness_scores(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT + "\nExtra notes should not follow readiness scores.\n",
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "### Общая готовность направления readiness scores must be the final "
+        "plain-language content"
         in errors
     )

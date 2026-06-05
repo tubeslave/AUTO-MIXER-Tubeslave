@@ -52,6 +52,7 @@ class PromotionTarget:
     safety_row_id: str = ""
     write_surface_ids: Tuple[str, ...] = ()
     read_surface_ids: Tuple[str, ...] = ()
+    evidence_requirement_ids: Tuple[str, ...] = ()
     target_mode: str = "supervised_live_candidate"
 
 
@@ -72,6 +73,7 @@ class PromotionReadinessRow:
     write_surface_statuses: Tuple[str, ...]
     read_surface_ids: Tuple[str, ...]
     read_surface_statuses: Tuple[str, ...]
+    evidence_requirement_ids: Tuple[str, ...]
     blockers: Tuple[str, ...]
     next_required_evidence: Tuple[str, ...]
 
@@ -90,6 +92,7 @@ class PromotionReadinessRow:
             "write_surface_statuses",
             "read_surface_ids",
             "read_surface_statuses",
+            "evidence_requirement_ids",
             "blockers",
             "next_required_evidence",
         ):
@@ -180,13 +183,38 @@ PROMOTION_TARGETS: Tuple[PromotionTarget, ...] = (
         read_surface_ids=("channel_identity_and_basic_controls",),
     ),
     PromotionTarget(
-        id="routing_scene_preset_supervised_promotion",
-        label="Routing/scene/preset supervised promotion",
-        capability_ids=("console_routing_control", "console_scene_preset_control"),
-        action_family="routing_snapshot_scene",
+        id="routing_supervised_promotion",
+        label="Routing supervised promotion",
+        capability_ids=("console_routing_control",),
+        action_family="routing",
         safety_row_id="routing_snapshots_scenes",
         write_surface_ids=("routing_snapshot_scene_writes",),
-        read_surface_ids=("routing_and_sends", "snapshots_scenes", "user_presets"),
+        read_surface_ids=("routing_and_sends",),
+        evidence_requirement_ids=(
+            "current_route_cache_freshness",
+            "route_diff_evidence",
+            "source_identity_downstream_trust",
+            "routing_physical_fixture",
+            "hardware_readback_and_rollback_proof",
+        ),
+    ),
+    PromotionTarget(
+        id="scene_preset_supervised_promotion",
+        label="Scene/preset supervised promotion",
+        capability_ids=("console_scene_preset_control",),
+        action_family="scene_preset",
+        safety_row_id="routing_snapshots_scenes",
+        write_surface_ids=("routing_snapshot_scene_writes",),
+        read_surface_ids=("snapshots_scenes", "user_presets"),
+        evidence_requirement_ids=(
+            "current_scene_preset_cache_freshness",
+            "snapshots_scenes_snapshot_cache_freshness",
+            "user_presets_snapshot_cache_freshness",
+            "read_only_scoped_diff_evidence",
+            "read_only_rollback_evidence",
+            "scene_preset_physical_fixture",
+            "hardware_readback_and_rollback_proof",
+        ),
     ),
 )
 
@@ -293,6 +321,7 @@ def _target_readiness(target: PromotionTarget, *, full_autonomous_blocked: bool)
         write_surface_statuses=tuple(surface.status for surface in write_surfaces),
         read_surface_ids=tuple(surface.id for surface in read_surfaces),
         read_surface_statuses=tuple(surface.status for surface in read_surfaces),
+        evidence_requirement_ids=target.evidence_requirement_ids,
         blockers=tuple(sorted(set(blockers))),
         next_required_evidence=tuple(dict.fromkeys(item for item in next_required if item)),
     )

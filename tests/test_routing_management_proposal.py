@@ -57,6 +57,14 @@ def test_soundcheck_channel_route_diff_creates_proposal_only_recommendation():
             source_confidence=0.9,
             route_confidence=0.92,
             persistence_cycles=3,
+            current_state_cache_freshness={
+                "status": "fresh",
+                "field_count": 6,
+                "fresh_field_count": 6,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
         )
     )
 
@@ -66,6 +74,11 @@ def test_soundcheck_channel_route_diff_creates_proposal_only_recommendation():
     assert recommendation.blockers == ()
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["destructive_console_state"] is True
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 6
+    assert recommendation.evidence["source_identity_downstream_trust"]["status"] == (
+        "legacy_unverified"
+    )
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "routing_management_proposal"
@@ -77,6 +90,7 @@ def test_soundcheck_channel_route_diff_creates_proposal_only_recommendation():
     assert "unsupported_value_type:routing" in proposal["blockers"]
     assert proposal["proposed_action"]["proposed_source"]["group"] == "DANTE"
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
 
 
 def test_active_performance_and_active_route_block_routing_proposal():
@@ -108,6 +122,114 @@ def test_active_performance_and_active_route_block_routing_proposal():
     assert recommendation.to_operator_proposal()["can_apply_live"] is False
 
 
+def test_source_identity_hold_blocks_routing_proposal():
+    recommendation = analyze_routing_management_need(
+        RoutingManagementAnalysisInput(
+            route_id="ch:10:input",
+            route_kind="channel_input",
+            target_label="Lead Vox input",
+            current_source_group="LOCAL",
+            current_source_channel=10,
+            current_source_label="Local 10",
+            proposed_source_group="DANTE",
+            proposed_source_channel=10,
+            proposed_source_label="Dante Vox 10",
+            expected_source_role="lead_vocal",
+            route_readback_available=True,
+            rollback_route_available=True,
+            snapshot_baseline_id="soundcheck_pre_patch",
+            operator_intent="operator_patch_request",
+            route_change_window="soundcheck",
+            active_performance=False,
+            current_route_signal_dbfs=-82.0,
+            proposed_source_signal_dbfs=-28.0,
+            proposed_source_verified=True,
+            destructive_scope_score=0.1,
+            affected_target_count=1,
+            source_confidence=0.9,
+            route_confidence=0.92,
+            persistence_cycles=3,
+            current_state_cache_freshness={"status": "fresh", "read_only": True},
+            source_identity_trust_state="hold_for_operator_review",
+            source_identity_trust_confidence=0.58,
+            source_identity_replay_outcome_count=4,
+            source_identity_calibration_freshness={
+                "status": "fresh",
+                "field_count": 4,
+                "fresh_field_count": 4,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_not_trusted_for_downstream" in recommendation.blockers
+    assert recommendation.severity == "medium"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["source_id"] == "DANTE:10"
+    assert trust["source_type"] == "lead_vocal"
+    assert trust["status"] == "held_for_operator_review"
+    assert trust["usable_for_downstream"] is False
+    proposal = recommendation.to_operator_proposal()
+    assert proposal["can_apply_live"] is False
+    assert "requested_change" not in proposal
+
+
+def test_stale_source_identity_replay_context_blocks_routing_proposal():
+    analysis = RoutingManagementAnalysisInput(
+        route_id="ch:10:input",
+        route_kind="channel_input",
+        current_source_group="LOCAL",
+        current_source_channel=10,
+        proposed_source_group="DANTE",
+        proposed_source_channel=10,
+        expected_source_role="lead_vocal",
+        route_readback_available=True,
+        rollback_route_available=True,
+        snapshot_baseline_id="soundcheck_pre_patch",
+        operator_intent="operator_patch_request",
+        route_change_window="soundcheck",
+        active_performance=False,
+        current_route_signal_dbfs=-82.0,
+        proposed_source_verified=True,
+        destructive_scope_score=0.1,
+        affected_target_count=1,
+        source_confidence=0.9,
+        route_confidence=0.92,
+        persistence_cycles=3,
+        current_state_cache_freshness={"status": "fresh", "read_only": True},
+        source_identity_trust_state="trusted_for_downstream_priority",
+        source_identity_trust_confidence=0.91,
+        source_identity_replay_outcome_count=8,
+        source_identity_calibration_freshness={
+            "status": "stale",
+            "field_count": 4,
+            "fresh_field_count": 2,
+            "stale_field_count": 2,
+            "stale_fields": ["accepted_outcomes", "rejected_outcomes"],
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+        },
+    )
+    recommendation = analyze_routing_management_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_replay_context_not_fresh" in recommendation.blockers
+    assert recommendation.severity == "high"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["status"] == "trusted"
+    assert trust["usable_for_downstream"] is False
+    assert trust["evidence"]["current_source_identity_replay_context_cache_freshness"] == "stale"
+    assert trust["evidence"]["current_state_cache_freshness"]["stale_fields"] == [
+        "accepted_outcomes",
+        "rejected_outcomes",
+    ]
+    assert build_routing_management_proposals([analysis]) == ()
+
+
 def test_missing_readback_or_rollback_blocks_routing_proposal():
     recommendation = analyze_routing_management_need(
         RoutingManagementAnalysisInput(
@@ -131,6 +253,56 @@ def test_missing_readback_or_rollback_blocks_routing_proposal():
     assert recommendation.status == "analysis_only"
     assert "route_readback_missing" in recommendation.blockers
     assert "rollback_route_missing" in recommendation.blockers
+
+
+def test_stale_current_routing_state_blocks_proposal_only_recommendation():
+    recommendation = analyze_routing_management_need(
+        RoutingManagementAnalysisInput(
+            route_id="ch:10:input",
+            route_kind="channel_input",
+            target_label="Lead Vox input",
+            current_source_group="LOCAL",
+            current_source_channel=10,
+            current_source_label="Local 10",
+            proposed_source_group="DANTE",
+            proposed_source_channel=10,
+            proposed_source_label="Dante Vox 10",
+            expected_source_role="lead_vocal",
+            route_readback_available=True,
+            rollback_route_available=True,
+            snapshot_baseline_id="soundcheck_pre_patch",
+            operator_intent="operator_patch_request",
+            route_change_window="soundcheck",
+            active_performance=False,
+            current_route_signal_dbfs=-82.0,
+            proposed_source_signal_dbfs=-28.0,
+            proposed_source_verified=True,
+            destructive_scope_score=0.1,
+            affected_target_count=1,
+            source_confidence=0.9,
+            route_confidence=0.92,
+            persistence_cycles=3,
+            current_state_cache_freshness={
+                "status": "stale",
+                "field_count": 6,
+                "fresh_field_count": 4,
+                "stale_field_count": 2,
+                "stale_fields": ["current_source", "rollback_route"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "routing_current_state_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "stale"
+    assert recommendation.evidence["current_state_cache_freshness"]["stale_fields"] == [
+        "current_source",
+        "rollback_route",
+    ]
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
 
 
 def test_unchanged_route_is_analysis_only():
@@ -203,6 +375,34 @@ def test_build_routing_management_proposals_filters_to_proposal_only_items():
     assert proposals[0]["target"] == "ch:10:input"
 
 
+def test_build_routing_management_proposals_filters_stale_state_items():
+    proposals = build_routing_management_proposals(
+        [
+            RoutingManagementAnalysisInput(
+                route_id="ch:10:input",
+                route_kind="channel_input",
+                current_source_group="LOCAL",
+                current_source_channel=10,
+                proposed_source_group="DANTE",
+                proposed_source_channel=10,
+                route_readback_available=True,
+                rollback_route_available=True,
+                snapshot_baseline_id="baseline",
+                operator_intent="operator_patch_request",
+                route_change_window="soundcheck",
+                current_route_signal_dbfs=-82.0,
+                proposed_source_verified=True,
+                source_confidence=0.9,
+                route_confidence=0.9,
+                persistence_cycles=3,
+                current_state_cache_freshness={"status": "stale"},
+            ),
+        ]
+    )
+
+    assert proposals == ()
+
+
 def test_routing_management_proposal_is_registered_as_goal_capability():
     method = get_processing_method("routing_management_proposal")
     direct_write = get_processing_method("routing_snapshot_reset_writes")
@@ -222,4 +422,15 @@ def test_routing_management_proposal_is_registered_as_goal_capability():
     assert capability.status == "proposal_only"
     assert capability.autonomy_mode_ceiling == "assisted"
     assert "routing_management_proposal" in capability.method_ids
+    assert "backend/source_identity_downstream_gate.py" in capability.support_paths
     assert contracts["routing_management_proposal"]["proposal_contract"]["value_type"] == "routing"
+    assert (
+        "current_route_cache_freshness"
+        in contracts["routing_management_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "source_identity_downstream_trust"
+        in contracts["routing_management_proposal"]["proposal_contract"][
+            "safety_evidence_required"
+        ]
+    )

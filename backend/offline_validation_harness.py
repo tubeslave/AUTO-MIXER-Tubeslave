@@ -90,14 +90,19 @@ class OfflineMixerState:
 
     def __init__(self, channels: Iterable[OfflineChannelFixture]):
         self.state: Dict[str, Any] = {}
+        self.state_timestamps: Dict[str, float] = {}
         self.channel_numbers: List[int] = []
         for channel in channels:
             self.channel_numbers.append(int(channel.channel))
-            self.state[f"/ch/{channel.channel}/$name"] = channel.name
-            self.state[f"/ch/{channel.channel}/name"] = channel.name
-            self.state[f"/ch/{channel.channel}/fdr"] = float(channel.fader_db)
-            self.state[f"/ch/{channel.channel}/in/set/trim"] = float(channel.gain_db)
-            self.state[f"/ch/{channel.channel}/mute"] = int(channel.mute)
+            self._set_state_value(f"/ch/{channel.channel}/$name", channel.name)
+            self._set_state_value(f"/ch/{channel.channel}/name", channel.name)
+            self._set_state_value(f"/ch/{channel.channel}/fdr", float(channel.fader_db))
+            self._set_state_value(f"/ch/{channel.channel}/in/set/trim", float(channel.gain_db))
+            self._set_state_value(f"/ch/{channel.channel}/mute", int(channel.mute))
+
+    def _set_state_value(self, address: str, value: Any) -> None:
+        self.state[address] = value
+        self.state_timestamps[address] = datetime.now(timezone.utc).timestamp()
 
     def read(self, channel: int, value_type: str) -> Optional[float]:
         return _coerce_float(self.state.get(address_for(channel, value_type)))
@@ -105,7 +110,7 @@ class OfflineMixerState:
     def apply(self, channel: int, value_type: str, value: float) -> Dict[str, Any]:
         address = address_for(channel, value_type)
         old_value = self.read(channel, value_type)
-        self.state[address] = float(value)
+        self._set_state_value(address, float(value))
         readback_value = self.read(channel, value_type)
         return {
             "address": address,

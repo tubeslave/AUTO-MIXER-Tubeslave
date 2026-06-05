@@ -699,6 +699,7 @@ class AutoSoundcheckEngine:
             }
         )
         self._soundcheck_action_proposals: List[Dict[str, Any]] = []
+        self.blocked_console_write_history: List[Dict[str, Any]] = []
         self.perceptual_config = perceptual_config
         self.perceptual_evaluator: Optional[Any] = None
         self._perceptual_pending_audio: Dict[int, Dict[str, Any]] = {}
@@ -842,6 +843,35 @@ class AutoSoundcheckEngine:
             self.on_observation(payload)
         except Exception:
             pass
+
+    def _record_blocked_console_write(
+        self,
+        cmd: str,
+        *,
+        semantic: str,
+        reason: str,
+        **fields: Any,
+    ) -> Dict[str, Any]:
+        blocked_call = {"cmd": cmd, **fields, "semantic": semantic}
+        payload = {
+            "blocked": True,
+            "blocked_reason": "auto_soundcheck_direct_apply_surface_quarantined",
+            "write_policy": "proposal_only_quarantined",
+            "live_write_allowed": False,
+            "can_apply_live": False,
+            "mutates_mixer": False,
+            "mixer_client_present": self.mixer_client is not None,
+            "reason": reason,
+            "blocked_calls": [blocked_call],
+            "blocked_call_count": 1,
+        }
+        self.blocked_console_write_history.append(payload)
+        logger.info(
+            "AutoSoundcheck blocked legacy direct write '%s' (%s)",
+            cmd,
+            semantic,
+        )
+        return payload
 
     def _default_autofoh_log_path(self) -> Path:
         configured_path = (self.autofoh_log_path or "").strip()
@@ -4068,10 +4098,10 @@ class AutoSoundcheckEngine:
                 continue
             if decision.sent and isinstance(decision.action, ChannelFaderMove):
                 self.channels[decision.action.channel_id].fader_db = decision.action.target_db
-            if decision.sent:
+            if decision.sent or getattr(decision, "blocked", False):
                 applied_decisions.append(decision)
                 logger.info(
-                    "AutoFOH applied '%s': %s -> %s",
+                    "AutoFOH decision '%s': %s -> %s",
                     label,
                     action.action_type,
                     decision.message,
@@ -4396,7 +4426,13 @@ class AutoSoundcheckEngine:
             existing_eq_on = self._as_bool(raw_settings.get("eq_on"), False)
             existing_bands = raw_settings.get("eq_bands") or []
             if not existing_eq_on and hasattr(self.mixer_client, "set_eq_on"):
-                self.mixer_client.set_eq_on(ch, 1)
+                self._record_blocked_console_write(
+                    "set_eq_on",
+                    channel=ch,
+                    on=1,
+                    semantic="enable_eq_before_auto_soundcheck_eq",
+                    reason=f"EQ enable before correction for {preset}",
+                )
             for band_idx, (freq, gain, q) in enumerate(adapted_bands, start=1):
                 if band_idx > 4:
                     break
@@ -5357,10 +5393,20 @@ class AutoSoundcheckEngine:
                     existing_gr_db - self.compressor_gr_target_db,
                 )
                 if hasattr(self.mixer_client, "set_compressor_threshold"):
-                    self.mixer_client.set_compressor_threshold(ch, round(target_threshold, 1))
+                    blocked_threshold = round(target_threshold, 1)
+                    self._record_blocked_console_write(
+                        "set_compressor_threshold",
+                        channel=ch,
+                        threshold_db=blocked_threshold,
+                        current_threshold_db=round(current_threshold, 1),
+                        compressor_model=current_model,
+                        gain_reduction_db=round(existing_gr_db, 1),
+                        semantic="preserve_character_compressor_threshold_relief",
+                        reason=f"{current_model} compressor GR relief for {info.name}",
+                    )
                     logger.info(
                         f"Ch {ch} '{info.name}': {current_model} GR={existing_gr_db:.1f}dB; "
-                        f"raising threshold {current_threshold:.1f}→{target_threshold:.1f}dB"
+                        f"blocked threshold raise {current_threshold:.1f}→{target_threshold:.1f}dB"
                     )
             else:
                 logger.info(
@@ -5804,7 +5850,7 @@ class AutoSoundcheckEngine:
                     ),
                     runtime_state=RuntimeState.EMERGENCY_FEEDBACK,
                 )
-                if decision and decision.sent:
+                if decision and (decision.sent or getattr(decision, "blocked", False)):
                     self._record_feedback_action_sent(ch)
             except Exception:
                 pass
@@ -6013,32 +6059,49 @@ class AutoSoundcheckEngine:
         self._engine_thread.start()
 
     def restore_original_settings(self):
-        """Restore channels to their original fader positions (before reset).
+        """Record blocked evidence for restoring original channel settings.
 
-        This is a safety fallback: if the auto-soundcheck results are
-        unacceptable, calling this method restores the fader levels
-        that were captured before the reset step.
+        Live restore must go through the Product Layer supervised manual gate.
+        This method preserves exact restore intent without mutating the mixer.
         """
         if not self.mixer_client:
             logger.warning("No mixer client — cannot restore settings")
             return
 
-        restored = 0
+        blocked_writes = 0
         for ch, info in self.channels.items():
             snap = info.original_snapshot
             if snap is None or not snap.had_processing:
                 continue
             try:
                 if snap.fader_db > -90.0:
-                    self.mixer_client.set_fader(ch, snap.fader_db)
+                    self._record_blocked_console_write(
+                        "set_fader",
+                        channel=ch,
+                        value_db=snap.fader_db,
+                        manual_gate="apply_operator_proposal",
+                        semantic="restore_original_fader_state",
+                        reason=f"Restore original fader for {info.name}",
+                    )
+                    blocked_writes += 1
                 if snap.muted:
-                    self.mixer_client.set_mute(ch, True)
-                restored += 1
-                logger.info(f"Ch {ch} '{info.name}': restored fader={snap.fader_db:.1f}dB")
+                    self._record_blocked_console_write(
+                        "set_mute",
+                        channel=ch,
+                        muted=True,
+                        manual_gate="apply_operator_proposal",
+                        semantic="restore_original_mute_state",
+                        reason=f"Restore original mute state for {info.name}",
+                    )
+                    blocked_writes += 1
+                logger.info(
+                    f"Ch {ch} '{info.name}': recorded blocked restore evidence "
+                    f"for fader={snap.fader_db:.1f}dB"
+                )
             except Exception as e:
                 logger.warning(f"Ch {ch}: restore failed: {e}")
 
-        logger.info(f"Restored original settings for {restored} channel(s)")
+        logger.info(f"Recorded blocked restore evidence for {blocked_writes} write(s)")
 
     def stop(self):
         """Stop the engine, joining threads before releasing resources."""

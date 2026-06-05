@@ -10,7 +10,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import math
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+
+try:
+    from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
 
 MIX_VARIANT_METHOD_ID = "mix_variant_profile_proposal"
@@ -258,6 +263,11 @@ class MixVariantProfileAnalysisInput:
     reference_confidence: float = 0.65
     arrangement_confidence: float = 0.7
     persistence_cycles: int = 1
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
+    source_identity_trust_state: str = "not_provided"
+    source_identity_trust_confidence: float = 0.0
+    source_identity_replay_outcome_count: int = 0
+    source_identity_calibration_freshness: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -339,13 +349,54 @@ def _profile_payload(profile: MixVariantTargetProfile) -> Dict[str, Any]:
 
 def _severity(blockers: Iterable[str], profile: MixVariantTargetProfile, feedback_risk: float) -> str:
     blocker_set = set(blockers)
-    if "active_performance_variant_blocked" in blocker_set or "style_clone_request_blocked" in blocker_set:
+    if (
+        "source_identity_blocked_from_downstream_trust" in blocker_set
+        or "source_identity_replay_context_not_fresh" in blocker_set
+        or "active_performance_variant_blocked" in blocker_set
+        or "style_clone_request_blocked" in blocker_set
+    ):
         return "high"
+    if (
+        "source_identity_not_trusted_for_downstream" in blocker_set
+        or "source_identity_trust_state_unknown" in blocker_set
+    ):
+        return "medium"
     if feedback_risk >= MAX_FEEDBACK_RISK_FOR_AMBIENT_LIVE_PROFILE and profile.ambience >= 0.2:
         return "high"
     if abs(profile.target_integrated_lufs + 18.0) >= 4.0 or profile.density >= 0.75:
         return "medium"
     return "low"
+
+
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "missing_fields",
+        "untimestamped_present_fields",
+        "stale_after_sec",
+        "read_only",
+        "live_write",
+        "queries_console",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = True
+    normalized.setdefault("status", _freshness_status(payload))
+    return normalized
 
 
 def analyze_mix_variant_profile_need(
@@ -380,6 +431,16 @@ def analyze_mix_variant_profile_need(
     window = _normalize_token(analysis.mix_window)
     operator_intent = str(analysis.operator_intent or "").strip().lower()
     lufs_delta = profile.target_integrated_lufs - current_lufs
+    current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
+    current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    source_identity_trust = evaluate_source_identity_downstream_trust(
+        source_id=str(analysis.variant_id),
+        source_type=",".join(roles) or str(profile.genre),
+        trust_state=analysis.source_identity_trust_state,
+        trust_confidence=analysis.source_identity_trust_confidence,
+        replay_outcome_count=analysis.source_identity_replay_outcome_count,
+        current_state_cache_freshness=analysis.source_identity_calibration_freshness,
+    )
 
     blockers = []
     if genre not in SUPPORTED_GENRES:
@@ -414,6 +475,9 @@ def analyze_mix_variant_profile_need(
         blockers.append("feedback_risk_too_high_for_variant_ambience")
     if current_profile == profile.id and abs(lufs_delta) < 0.2:
         blockers.append("mix_variant_profile_change_not_needed")
+    if current_state_freshness_status not in {"fresh", "not_provided"}:
+        blockers.append("mix_variant_context_cache_not_fresh")
+    blockers.extend(source_identity_trust.blockers)
 
     confidence = _clip01(
         0.22 * genre_confidence
@@ -456,6 +520,9 @@ def analyze_mix_variant_profile_need(
         "reference_confidence": round(reference_confidence, 3),
         "arrangement_confidence": round(arrangement_confidence, 3),
         "persistence_cycles": persistence,
+        "current_state_cache_freshness_status": current_state_freshness_status,
+        "current_state_cache_freshness": current_state_freshness,
+        "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
         "no_named_artist_style_clone": True,
         "ayaic_level_planes": True,

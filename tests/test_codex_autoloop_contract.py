@@ -130,9 +130,13 @@ def test_codex_cycle_prompt_requires_repo_local_safety_report_shape():
         "Не запускай бесконечный цикл.",
         "`/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/.paperclip/reports/`",
         "Не используй внешний Paperclip/PiperClip как систему запуска агентов.",
+        "`Codex CLI was the only agent workflow used.`",
         "статус live safety: обязательно укажи, что live OSC/WING writes не выполнялись.",
+        "`## Три обязательных вопроса`",
         "`## Объяснение простым языком`",
-        "## 8. Три обязательных вопроса",
+        "## 7. Три обязательных вопроса",
+        "## 8. Объяснение простым языком",
+        "Перед финальным разделом `## Объяснение простым языком`",
         "1. Что нового проект научился делать?",
         "2. Что сейчас является самым слабым местом?",
         "3. Что даст наибольший прогресс в следующем цикле?",
@@ -140,6 +144,29 @@ def test_codex_cycle_prompt_requires_repo_local_safety_report_shape():
 
     for phrase in required_report_phrases:
         assert phrase in prompt_text
+
+
+def test_codex_autoloop_readme_documents_exact_agent_scope_lines():
+    readme_text = README_PATH.read_text(encoding="utf-8")
+
+    assert "exact Scope lines" in readme_text
+    assert "`Codex CLI was the only agent workflow used.`" in readme_text
+    assert "`External Paperclip/PiperClip was not used as an agent runner.`" in readme_text
+
+
+def test_codex_autoloop_readme_documents_nested_dependency_todo_scan_noise():
+    readme_text = README_PATH.read_text(encoding="utf-8")
+    normalized_readme_text = " ".join(readme_text.split())
+
+    assert "TODO/FIXME scans focused on owned Automixer code" in normalized_readme_text
+    assert "`frontend/node_modules/`" in readme_text
+    assert "`**/node_modules/`" in readme_text
+    assert "`backend/venv/`" in readme_text
+    assert "`**/.venv/`" in readme_text
+    assert (
+        "scan noise unless the selected task explicitly targets them"
+        in normalized_readme_text
+    )
 
 
 def test_codex_autoloop_limit_gate_policy_matches_current_runner():

@@ -46,6 +46,14 @@ def test_idle_close_mic_creates_proposal_only_mute_recommendation():
             dropout_risk=0.1,
             expected_next_cue_sec=40.0,
             persistence_cycles=3,
+            current_state_cache_freshness={
+                "status": "fresh",
+                "field_count": 5,
+                "fresh_field_count": 5,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
         )
     )
 
@@ -57,6 +65,9 @@ def test_idle_close_mic_creates_proposal_only_mute_recommendation():
     assert recommendation.blockers == ()
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["manual_mute_authority_preserved"] is True
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 5
+    assert recommendation.evidence["source_identity_downstream_trust"]["status"] == "legacy_unverified"
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "mute_management_proposal"
@@ -68,6 +79,7 @@ def test_idle_close_mic_creates_proposal_only_mute_recommendation():
     assert "unsupported_value_type:mute_state" in proposal["blockers"]
     assert proposal["proposed_action"]["proposed_muted"] is True
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
 
 
 def test_auto_muted_channel_with_returned_signal_creates_unmute_proposal():
@@ -161,6 +173,137 @@ def test_manual_mute_is_not_unmuted_without_authority():
     assert "manual_mute_authority_required" in recommendation.blockers
 
 
+def test_stale_current_mute_state_blocks_proposal_only_recommendation():
+    recommendation = analyze_mute_management_need(
+        MuteManagementAnalysisInput(
+            channel_id=12,
+            channel_label="Floor Tom",
+            source_role="floor_tom",
+            current_muted=False,
+            allow_auto_mute_candidate=True,
+            rms_dbfs=-67.0,
+            peak_dbfs=-55.0,
+            noise_floor_dbfs=-66.0,
+            idle_duration_sec=48.0,
+            source_confidence=0.9,
+            bleed_risk=0.25,
+            feedback_risk=0.05,
+            dropout_risk=0.1,
+            expected_next_cue_sec=40.0,
+            persistence_cycles=3,
+            current_state_cache_freshness={
+                "status": "stale",
+                "field_count": 5,
+                "fresh_field_count": 3,
+                "stale_field_count": 2,
+                "stale_fields": ["current_muted", "mute_owner"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "mute_current_state_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "stale"
+    assert recommendation.evidence["current_state_cache_freshness"]["stale_fields"] == [
+        "current_muted",
+        "mute_owner",
+    ]
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_source_identity_hold_blocks_downstream_mute_proposal():
+    recommendation = analyze_mute_management_need(
+        MuteManagementAnalysisInput(
+            channel_id=12,
+            channel_label="Floor Tom",
+            source_role="floor_tom",
+            current_muted=False,
+            allow_auto_mute_candidate=True,
+            rms_dbfs=-67.0,
+            peak_dbfs=-55.0,
+            noise_floor_dbfs=-66.0,
+            idle_duration_sec=48.0,
+            source_confidence=0.9,
+            bleed_risk=0.25,
+            feedback_risk=0.05,
+            dropout_risk=0.1,
+            expected_next_cue_sec=40.0,
+            persistence_cycles=3,
+            source_identity_trust_state="hold_for_operator_review",
+            source_identity_trust_confidence=0.42,
+            source_identity_replay_outcome_count=4,
+            source_identity_calibration_freshness={
+                "status": "fresh",
+                "field_count": 4,
+                "fresh_field_count": 4,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_not_trusted_for_downstream" in recommendation.blockers
+    assert recommendation.severity == "medium"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["status"] == "held_for_operator_review"
+    assert trust["usable_for_downstream"] is False
+    assert trust["evidence"]["queue_mutation"] is False
+    assert trust["evidence"]["model_mutation"] is False
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_stale_source_identity_replay_context_blocks_downstream_mute_proposal():
+    recommendation = analyze_mute_management_need(
+        MuteManagementAnalysisInput(
+            channel_id=12,
+            channel_label="Floor Tom",
+            source_role="floor_tom",
+            current_muted=False,
+            allow_auto_mute_candidate=True,
+            rms_dbfs=-67.0,
+            peak_dbfs=-55.0,
+            noise_floor_dbfs=-66.0,
+            idle_duration_sec=48.0,
+            source_confidence=0.9,
+            bleed_risk=0.25,
+            feedback_risk=0.05,
+            dropout_risk=0.1,
+            expected_next_cue_sec=40.0,
+            persistence_cycles=3,
+            source_identity_trust_state="trusted_for_downstream_priority",
+            source_identity_trust_confidence=0.9,
+            source_identity_replay_outcome_count=5,
+            source_identity_calibration_freshness={
+                "status": "stale",
+                "field_count": 4,
+                "fresh_field_count": 2,
+                "stale_field_count": 2,
+                "stale_fields": ["accepted_labels", "replay_outcomes"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_replay_context_not_fresh" in recommendation.blockers
+    assert recommendation.severity == "high"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["status"] == "trusted"
+    assert trust["usable_for_downstream"] is False
+    assert trust["evidence"]["current_state_cache_freshness"]["stale_fields"] == [
+        "accepted_labels",
+        "replay_outcomes",
+    ]
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
 def test_mute_helpers_classify_source_family():
     assert classify_source_family("Lead Vocal") == "lead_vocal"
     assert classify_source_family("Floor Tom") == "tom"
@@ -200,6 +343,29 @@ def test_build_mute_management_proposals_filters_to_proposal_only_items():
     assert proposals[0]["channel"] == 12
 
 
+def test_build_mute_management_proposals_filters_stale_state_items():
+    proposals = build_mute_management_proposals(
+        [
+            MuteManagementAnalysisInput(
+                channel_id=12,
+                source_role="floor_tom",
+                current_muted=False,
+                allow_auto_mute_candidate=True,
+                rms_dbfs=-67.0,
+                peak_dbfs=-55.0,
+                idle_duration_sec=48.0,
+                source_confidence=0.9,
+                dropout_risk=0.1,
+                expected_next_cue_sec=40.0,
+                persistence_cycles=3,
+                current_state_cache_freshness={"status": "stale"},
+            ),
+        ]
+    )
+
+    assert proposals == ()
+
+
 def test_mute_management_proposal_is_registered_as_goal_capability():
     method = get_processing_method("mute_management_proposal")
     main = get_pipeline_profile("main_live_assist")
@@ -216,4 +382,13 @@ def test_mute_management_proposal_is_registered_as_goal_capability():
     assert capability.status == "proposal_only"
     assert capability.autonomy_mode_ceiling == "assisted"
     assert "mute_management_proposal" in capability.method_ids
+    assert "backend/source_identity_downstream_gate.py" in capability.support_paths
     assert contracts["mute_management_proposal"]["proposal_contract"]["value_type"] == "mute_state"
+    assert (
+        "current_mute_cache_freshness"
+        in contracts["mute_management_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "source_identity_downstream_trust"
+        in contracts["mute_management_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )

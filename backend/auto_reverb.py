@@ -221,6 +221,8 @@ class AutoReverb:
         self.hpf_hz = hpf_hz
         self.lpf_hz = lpf_hz
         self.decisions: Dict[int, ReverbDecision] = {}
+        self.live_write_allowed = False
+        self.write_policy = "proposal_only_quarantined"
 
     def calculate_reverb(
         self,
@@ -310,53 +312,59 @@ class AutoReverb:
         self,
         mixer_client: Any,
         decisions: Optional[Dict[int, ReverbDecision]] = None,
-    ) -> int:
-        """
-        Send reverb settings to the mixer via OSC.
+    ) -> Dict[str, Any]:
+        """Return blocked reverb apply evidence without mutating a mixer client.
 
-        Returns the number of channels updated.
-
-        NOTE: The specific OSC commands depend on the mixer model.
-        This implementation targets Behringer Wing's reverb send
-        architecture.  If the mixer_client does not support specific
-        reverb methods, settings are logged but not applied.
+        Reverb decisions are useful for assisted mixing, but direct reverb
+        send/parameter writes are quarantined until FX readback, feedback checks,
+        and rollback proof exist. Keep this method for legacy callers, but fail
+        closed even when a mixer client is supplied.
         """
         if decisions is None:
             decisions = self.decisions
-        if not mixer_client or not decisions:
-            return 0
+        blocked_calls = self._build_apply_calls(decisions)
+        if not blocked_calls:
+            reason = "no_decisions"
+        elif mixer_client:
+            reason = "reverb_direct_apply_quarantined"
+        else:
+            reason = "no_mixer_client"
+        return {
+            "applied": False,
+            "blocked": bool(blocked_calls),
+            "calls": [],
+            "blocked_calls": blocked_calls,
+            "reason": reason,
+            "write_policy": self.write_policy,
+            "live_write_allowed": self.live_write_allowed,
+            "can_apply_live": False,
+            "mixer_client_present": mixer_client is not None,
+            "mutates_mixer": False,
+        }
 
-        applied = 0
+    def _build_apply_calls(
+        self,
+        decisions: Optional[Dict[int, ReverbDecision]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Build would-be reverb write commands as reviewable blocked evidence."""
+        if not decisions:
+            return []
+        calls: List[Dict[str, Any]] = []
         for ch_id, dec in decisions.items():
-            try:
-                # Set reverb send level if supported.
-                if hasattr(mixer_client, "set_reverb_send"):
-                    mixer_client.set_reverb_send(ch_id, dec.reverb_level_lu)
-                    applied += 1
-
-                # Set reverb type/decay/predelay on the FX bus
-                # if supported.
-                if hasattr(mixer_client, "set_reverb_params"):
-                    mixer_client.set_reverb_params(
-                        ch_id,
-                        reverb_type=dec.reverb_type,
-                        decay_time=dec.decay_time_s,
-                        predelay=dec.predelay_ms,
-                        brightness=dec.brightness,
-                        density=dec.density,
-                        hpf=dec.hpf_hz,
-                        lpf=dec.lpf_hz,
-                    )
-
-                logger.info(
-                    f"AutoReverb: Ch{ch_id} ({dec.instrument}) -> "
-                    f"type={dec.reverb_type}, decay={dec.decay_time_s:.2f}s, "
-                    f"level={dec.reverb_level_lu:.1f} LU, "
-                    f"predelay={dec.predelay_ms:.0f}ms"
-                )
-            except Exception as e:
-                logger.error(
-                    f"AutoReverb: Failed to apply reverb for Ch{ch_id}: {e}"
-                )
-
-        return applied
+            calls.append({
+                "cmd": "set_reverb_send",
+                "channel": ch_id,
+                "level_lu": dec.reverb_level_lu,
+            })
+            calls.append({
+                "cmd": "set_reverb_params",
+                "channel": ch_id,
+                "reverb_type": dec.reverb_type,
+                "decay_time": dec.decay_time_s,
+                "predelay": dec.predelay_ms,
+                "brightness": dec.brightness,
+                "density": dec.density,
+                "hpf": dec.hpf_hz,
+                "lpf": dec.lpf_hz,
+            })
+        return calls

@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+from pathlib import Path
 
 import pytest
 import numpy as np
@@ -19,6 +20,46 @@ from correction_action_executor import CorrectionActionExecutorConfig, GatedCorr
 from feedback_detector import FeedbackEvent
 from observation_mixer import ObservationMixerClient
 from signal_metrics import ChannelMetrics, InterChannelMetrics, LevelMetrics
+
+
+def _blocked_history(engine, cmd):
+    return [
+        decision
+        for decision in engine.safety_controller.history
+        if getattr(decision, "blocked", False)
+        and any(call["cmd"] == cmd for call in decision.payload.get("blocked_calls", []))
+    ]
+
+
+def _blocked_calls(engine, cmd):
+    return [
+        call
+        for decision in _blocked_history(engine, cmd)
+        for call in decision.payload.get("blocked_calls", [])
+        if call["cmd"] == cmd
+    ]
+
+
+def _blocked_console_calls(engine, cmd):
+    return [
+        call
+        for payload in engine.blocked_console_write_history
+        for call in payload.get("blocked_calls", [])
+        if call["cmd"] == cmd
+    ]
+
+
+def test_auto_soundcheck_source_has_no_direct_mixer_writes():
+    source = Path("backend/auto_soundcheck_engine.py").read_text()
+
+    assert "self.mixer_client.set_" not in source
+    assert '"set_fader"' in source
+    assert "self.mixer_client.set_eq_on(" not in source
+    assert "self.mixer_client.set_compressor_threshold(" not in source
+    assert "self.mixer_client.set_mute(" not in source
+    assert '"set_eq_on"' in source
+    assert '"set_compressor_threshold"' in source
+    assert '"set_mute"' in source
 
 
 class FakeMixer:
@@ -542,7 +583,11 @@ def test_group_bus_correction_skips_monitor_buses():
     engine.runtime_state = RuntimeState.SOURCE_LEARNING
     engine._apply_group_bus_corrections()
 
-    assert ("set_bus_fader", 12, 0.0) in mixer.calls
+    bus_blocks = _blocked_history(engine, "set_bus_fader")
+    assert bus_blocks
+    assert bus_blocks[0].payload["blocked_calls"][0]["bus"] == 12
+    assert bus_blocks[0].payload["blocked_calls"][0]["value_db"] == 0.0
+    assert not any(call[0] == "set_bus_fader" for call in mixer.calls)
     assert not any(call[:2] == ("set_bus_fader", 13) for call in mixer.calls)
 
 
@@ -602,7 +647,11 @@ def test_drum_phase_delay_corrects_processed_channels_through_safety(monkeypatch
 
     engine._detect_and_fix_phase()
 
-    assert ("set_delay", 2, 0.25, True) in mixer.calls
+    delay_blocks = _blocked_history(engine, "set_delay")
+    assert delay_blocks
+    assert delay_blocks[0].payload["blocked_calls"][0]["channel"] == 2
+    assert delay_blocks[0].payload["blocked_calls"][0]["delay_ms"] == 0.25
+    assert not any(call[0] == "set_delay" for call in mixer.calls)
 
 
 def test_phase_pairing_does_not_align_unrelated_lead_vocals():
@@ -675,8 +724,8 @@ def test_live_shared_mix_uses_master_reference_without_source_correcting_it():
 
     decisions = engine._apply_live_shared_mix_pass()
 
-    assert any(decision.sent for decision in decisions)
-    assert ("set_main_fader", 1, -3.0) in mixer.calls
+    assert any(decision.blocked for decision in decisions)
+    assert not any(call[0] == "set_main_fader" for call in mixer.calls)
     assert not any(call[0] == "set_eq_band" and call[1] in {23, 24} for call in mixer.calls)
 
 
@@ -780,10 +829,29 @@ def test_eq_correction_enables_eq_and_retunes_mismatched_existing_band():
 
     engine._apply_eq(1, "snare")
 
-    assert ("set_eq_on", 1, 1) in mixer.calls
+    eq_on_blocks = _blocked_console_calls(engine, "set_eq_on")
+    assert eq_on_blocks == [
+        {
+            "cmd": "set_eq_on",
+            "channel": 1,
+            "on": 1,
+            "semantic": "enable_eq_before_auto_soundcheck_eq",
+        }
+    ]
+    assert engine.blocked_console_write_history[-1]["write_policy"] == "proposal_only_quarantined"
+    assert engine.blocked_console_write_history[-1]["mutates_mixer"] is False
+    assert ("set_eq_on", 1, 1) not in mixer.calls
     band2_calls = [call for call in mixer.calls if call[0] == "set_eq_band" and call[2] == 2]
-    assert band2_calls
-    assert band2_calls[0][3] == pytest.approx(400.0)
+    assert not band2_calls
+    eq_blocks = _blocked_history(engine, "set_eq_band")
+    blocked_band2 = [
+        call
+        for decision in eq_blocks
+        for call in decision.payload["blocked_calls"]
+        if call["band"] == 2
+    ]
+    assert blocked_band2
+    assert blocked_band2[0]["freq"] == pytest.approx(400.0)
 
 
 def test_gate_is_enabled_for_close_drum_mics():
@@ -807,8 +875,10 @@ def test_gate_is_enabled_for_close_drum_mics():
 
     engine._apply_gate(1, info, "tom")
 
-    assert any(call[0] == "set_gate" for call in mixer.calls)
-    assert ("set_gate_on", 1, 1) in mixer.calls
+    assert _blocked_history(engine, "set_gate")
+    assert _blocked_history(engine, "set_gate_on")
+    assert not any(call[0] == "set_gate" for call in mixer.calls)
+    assert ("set_gate_on", 1, 1) not in mixer.calls
 
 
 def test_automatic_fx_sends_are_disabled_by_default():
@@ -866,8 +936,23 @@ def test_character_compressor_model_is_preserved_when_gr_is_available():
 
     engine._apply_compressor(1, info, "kick")
 
-    assert ("set_compressor_threshold", 1, -12.0) in mixer.calls
-    assert ("set_compressor_gain", 1, 2.0) in mixer.calls
+    threshold_blocks = _blocked_console_calls(engine, "set_compressor_threshold")
+    assert threshold_blocks
+    assert threshold_blocks[-1] == {
+        "cmd": "set_compressor_threshold",
+        "channel": 1,
+        "threshold_db": -12.0,
+        "current_threshold_db": -18.0,
+        "compressor_model": "B160",
+        "gain_reduction_db": 12.0,
+        "semantic": "preserve_character_compressor_threshold_relief",
+    }
+    assert not any(call[0] == "set_compressor_threshold" for call in mixer.calls)
+    makeup_blocks = _blocked_calls(engine, "set_compressor_gain")
+    assert makeup_blocks
+    assert makeup_blocks[-1]["channel"] == 1
+    assert makeup_blocks[-1]["makeup_db"] == 2.0
+    assert not any(call[0] == "set_compressor_gain" for call in mixer.calls)
     assert not any(call[0] == "set_compressor" for call in mixer.calls)
 
 
@@ -906,9 +991,16 @@ def test_existing_generic_compressor_makeup_compensates_gain_reduction():
 
     engine._apply_compressor(1, info, "leadVocal")
 
-    comp_calls = [call for call in mixer.calls if call[0] == "set_compressor"]
-    assert comp_calls
-    assert comp_calls[-1][6] == 2.0
+    comp_blocks = _blocked_calls(engine, "set_compressor")
+    assert comp_blocks
+    assert comp_blocks[-1]["channel"] == 1
+    assert comp_blocks[-1]["threshold_db"] == -19.0
+    assert comp_blocks[-1]["ratio"] == 3.0
+    assert comp_blocks[-1]["attack_ms"] == 5.0
+    assert comp_blocks[-1]["release_ms"] == 80.0
+    assert comp_blocks[-1]["makeup_db"] == 2.0
+    assert comp_blocks[-1]["enabled"] is True
+    assert not any(call[0] == "set_compressor" for call in mixer.calls)
 
 
 def test_b160_missing_gr_meter_gets_conservative_makeup_from_signal_headroom():
@@ -952,7 +1044,11 @@ def test_b160_missing_gr_meter_gets_conservative_makeup_from_signal_headroom():
 
     engine._apply_compressor(1, info, "kick")
 
-    assert ("set_compressor_gain", 1, 1.0) in mixer.calls
+    makeup_blocks = _blocked_calls(engine, "set_compressor_gain")
+    assert makeup_blocks
+    assert makeup_blocks[-1]["channel"] == 1
+    assert makeup_blocks[-1]["makeup_db"] == 1.0
+    assert not any(call[0] == "set_compressor_gain" for call in mixer.calls)
     assert not any(call[0] == "set_compressor" for call in mixer.calls)
 
 
@@ -997,8 +1093,10 @@ def test_feedback_events_are_cooled_down_and_use_least_busy_eq_band():
     engine._handle_feedback_event(1, event)
 
     eq_calls = [call for call in mixer.calls if call[0] == "set_eq_band"]
-    assert len(eq_calls) == 1
-    assert eq_calls[0][2] == 3
+    assert not eq_calls
+    eq_blocks = _blocked_calls(engine, "set_eq_band")
+    assert len(eq_blocks) == 1
+    assert eq_blocks[0]["band"] == 3
 
 
 def test_monitor_analysis_routes_lead_masking_action_through_safety_layer():
@@ -1054,9 +1152,12 @@ def test_monitor_analysis_routes_lead_masking_action_through_safety_layer():
     decisions = engine._run_autofoh_monitor_analysis()
 
     assert len(decisions) == 1
-    assert decisions[0].sent is True
-    assert mixer.calls[-1][0] == "set_eq_band"
-    assert mixer.calls[-1][1] == 2
+    assert decisions[0].sent is False
+    assert decisions[0].blocked is True
+    eq_blocks = _blocked_calls(engine, "set_eq_band")
+    assert eq_blocks
+    assert eq_blocks[-1]["channel"] == 2
+    assert not any(call[0] == "set_eq_band" for call in mixer.calls)
 
 
 def test_proxy_audio_rollback_restores_previous_console_state():
@@ -1113,14 +1214,77 @@ def test_proxy_audio_rollback_restores_previous_console_state():
         },
     )
 
-    assert decision is not None and decision.sent is True
+    assert decision is not None
+    assert decision.sent is False
+    assert decision.blocked is True
 
     outcomes = engine._evaluate_pending_actions(force=True)
 
-    assert len(outcomes) == 1
-    assert outcomes[0].worsened is True
-    assert outcomes[0].should_rollback is True
-    assert mixer.calls[-1] == ("set_eq_band", 1, 2, 350.0, 0.0, 1.3)
+    assert outcomes == []
+    eq_blocks = _blocked_calls(engine, "set_eq_band")
+    assert eq_blocks
+    assert eq_blocks[-1]["channel"] == 1
+    assert eq_blocks[-1]["band"] == 2
+    assert eq_blocks[-1]["freq"] == 350.0
+    assert eq_blocks[-1]["gain"] == -1.0
+    assert not any(call[0] == "set_eq_band" for call in mixer.calls)
+
+
+def test_restore_original_settings_blocks_fader_and_mute_restore():
+    class RestoreMixer:
+        def __init__(self):
+            self.calls = []
+
+        def set_fader(self, channel, value_db):
+            self.calls.append(("set_fader", channel, value_db))
+            return True
+
+        def set_mute(self, channel, muted):
+            self.calls.append(("set_mute", channel, muted))
+            return True
+
+    mixer = RestoreMixer()
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="Lead Vox",
+            original_snapshot=ChannelSnapshot(
+                channel=1,
+                fader_db=-12.0,
+                muted=True,
+                had_processing=True,
+            ),
+        )
+    }
+
+    engine.restore_original_settings()
+
+    assert mixer.calls == []
+    fader_blocks = _blocked_console_calls(engine, "set_fader")
+    assert fader_blocks == [
+        {
+            "cmd": "set_fader",
+            "channel": 1,
+            "value_db": -12.0,
+            "manual_gate": "apply_operator_proposal",
+            "semantic": "restore_original_fader_state",
+        }
+    ]
+    assert ("set_mute", 1, True) not in mixer.calls
+    mute_blocks = _blocked_console_calls(engine, "set_mute")
+    assert mute_blocks == [
+        {
+            "cmd": "set_mute",
+            "channel": 1,
+            "muted": True,
+            "manual_gate": "apply_operator_proposal",
+            "semantic": "restore_original_mute_state",
+        }
+    ]
+    assert engine.blocked_console_write_history[-1]["write_policy"] == "proposal_only_quarantined"
+    assert engine.blocked_console_write_history[-1]["can_apply_live"] is False
 
 
 def test_engine_can_save_and_load_soundcheck_profile(tmp_path):
@@ -1516,8 +1680,13 @@ def test_phase_target_guard_allows_mirror_eq_inside_green_corridor():
     )
 
     assert decision is not None
-    assert decision.sent
-    assert mixer.calls[-1][0] == "set_eq_band"
+    assert decision.sent is False
+    assert decision.blocked is True
+    eq_blocks = _blocked_calls(engine, "set_eq_band")
+    assert eq_blocks
+    assert eq_blocks[-1]["channel"] == 1
+    assert eq_blocks[-1]["band"] == 3
+    assert not any(call[0] == "set_eq_band" for call in mixer.calls)
 
 
 def test_phase_target_guard_blocks_initial_fader_move_without_mutating_channel_state():

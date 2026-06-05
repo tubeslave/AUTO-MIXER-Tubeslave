@@ -45,6 +45,14 @@ def test_vocal_sibilance_creates_proposal_only_recommendation():
             contribution_share=0.72,
             persistence_cycles=3,
             true_peak_headroom_db=5.0,
+            current_state_cache_freshness={
+                "status": "fresh",
+                "field_count": 8,
+                "fresh_field_count": 8,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
         )
     )
 
@@ -56,6 +64,9 @@ def test_vocal_sibilance_creates_proposal_only_recommendation():
     assert recommendation.confidence >= 0.45
     assert recommendation.blockers == ()
     assert recommendation.evidence["transport_free"] is True
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 8
+    assert recommendation.evidence["source_identity_downstream_trust"]["status"] == "legacy_unverified"
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "deesser_vocal_sibilance"
@@ -64,6 +75,7 @@ def test_vocal_sibilance_creates_proposal_only_recommendation():
     assert "requested_change" not in proposal
     assert "unsupported_value_type:deesser" in proposal["blockers"]
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
 
 
 def test_non_vocal_sibilance_is_not_deesser_proposal():
@@ -96,6 +108,136 @@ def test_low_sibilance_vocal_is_analysis_only():
 
     assert recommendation.status == "analysis_only"
     assert "sibilance_below_threshold" in recommendation.blockers
+
+
+def test_stale_current_deesser_state_blocks_proposal_only_recommendation():
+    recommendation = analyze_deesser_need(
+        DeesserAnalysisInput(
+            channel_id=7,
+            channel_label="Lead Vox",
+            source_role="lead_vocal",
+            band_energy_db={
+                "low_mid": -38.0,
+                "mid": -30.0,
+                "presence": -24.0,
+                "sibilance": -16.0,
+                "air": -18.0,
+            },
+            sibilance_excess_db=4.5,
+            peak_dbfs=-7.0,
+            contribution_share=0.72,
+            persistence_cycles=3,
+            true_peak_headroom_db=5.0,
+            current_state_cache_freshness={
+                "status": "stale",
+                "field_count": 8,
+                "fresh_field_count": 5,
+                "stale_field_count": 3,
+                "stale_fields": ["frequency_hz", "threshold_db", "ratio"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "deesser_current_state_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "stale"
+    assert recommendation.evidence["current_state_cache_freshness"]["stale_fields"] == [
+        "frequency_hz",
+        "threshold_db",
+        "ratio",
+    ]
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_source_identity_hold_blocks_downstream_deesser_proposal():
+    recommendation = analyze_deesser_need(
+        DeesserAnalysisInput(
+            channel_id=7,
+            channel_label="Lead Vox",
+            source_role="lead_vocal",
+            band_energy_db={
+                "low_mid": -38.0,
+                "mid": -30.0,
+                "presence": -24.0,
+                "sibilance": -16.0,
+                "air": -18.0,
+            },
+            sibilance_excess_db=4.5,
+            peak_dbfs=-7.0,
+            contribution_share=0.72,
+            persistence_cycles=3,
+            true_peak_headroom_db=5.0,
+            source_identity_trust_state="hold_for_operator_review",
+            source_identity_trust_confidence=0.42,
+            source_identity_replay_outcome_count=4,
+            source_identity_calibration_freshness={
+                "status": "fresh",
+                "field_count": 4,
+                "fresh_field_count": 4,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_not_trusted_for_downstream" in recommendation.blockers
+    assert recommendation.severity == "medium"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["status"] == "held_for_operator_review"
+    assert trust["usable_for_downstream"] is False
+    assert trust["evidence"]["model_mutation"] is False
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_stale_source_identity_replay_context_blocks_downstream_deesser_proposal():
+    recommendation = analyze_deesser_need(
+        DeesserAnalysisInput(
+            channel_id=7,
+            channel_label="Lead Vox",
+            source_role="lead_vocal",
+            band_energy_db={
+                "low_mid": -38.0,
+                "mid": -30.0,
+                "presence": -24.0,
+                "sibilance": -16.0,
+                "air": -18.0,
+            },
+            sibilance_excess_db=4.5,
+            peak_dbfs=-7.0,
+            contribution_share=0.72,
+            persistence_cycles=3,
+            true_peak_headroom_db=5.0,
+            source_identity_trust_state="trusted_for_downstream_priority",
+            source_identity_trust_confidence=0.9,
+            source_identity_replay_outcome_count=5,
+            source_identity_calibration_freshness={
+                "status": "stale",
+                "field_count": 4,
+                "fresh_field_count": 2,
+                "stale_field_count": 2,
+                "stale_fields": ["accepted_labels", "replay_outcomes"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_replay_context_not_fresh" in recommendation.blockers
+    assert recommendation.severity == "high"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["status"] == "trusted"
+    assert trust["usable_for_downstream"] is False
+    assert trust["evidence"]["current_state_cache_freshness"]["stale_fields"] == [
+        "accepted_labels",
+        "replay_outcomes",
+    ]
 
 
 def test_deesser_ratio_estimator_uses_sibilance_band_share():
@@ -132,6 +274,24 @@ def test_build_deesser_proposals_filters_to_proposal_only_items():
     assert proposals[0]["channel"] == 7
 
 
+def test_build_deesser_proposals_filters_stale_state_items():
+    proposals = build_deesser_proposals(
+        [
+            DeesserAnalysisInput(
+                channel_id=7,
+                source_role="lead_vocal",
+                band_energy_db={"sibilance": -15.0, "presence": -25.0},
+                sibilance_excess_db=4.0,
+                contribution_share=0.7,
+                persistence_cycles=3,
+                current_state_cache_freshness={"status": "stale"},
+            ),
+        ]
+    )
+
+    assert proposals == ()
+
+
 def test_deesser_is_registered_as_proposal_only_goal_capability():
     method = get_processing_method("deesser_vocal_sibilance")
     capability = get_project_goal_capability("deessing")
@@ -144,3 +304,5 @@ def test_deesser_is_registered_as_proposal_only_goal_capability():
     assert capability.status == "proposal_only"
     assert capability.method_ids == ("deesser_vocal_sibilance",)
     assert contracts["deesser_vocal_sibilance"]["proposal_contract"]["value_type"] == "deesser"
+    evidence = contracts["deesser_vocal_sibilance"]["proposal_contract"]["safety_evidence_required"]
+    assert "source_identity_downstream_trust" in evidence

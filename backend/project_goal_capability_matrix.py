@@ -143,9 +143,22 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Automatically determine instrument and source types.",
         status="canonical",
         autonomy_mode_ceiling="analysis",
-        method_ids=("auto_soundcheck_engine",),
-        support_paths=("backend/ml/channel_classifier.py", "backend/channel_recognizer.py"),
-        next_step="Tie classifier confidence into proposal priority and rejection reasons.",
+        method_ids=(
+            "auto_soundcheck_engine",
+            "source_identity_confidence_proposal",
+            "source_identity_replay_calibration",
+        ),
+        support_paths=(
+            "backend/ml/channel_classifier.py",
+            "backend/channel_recognizer.py",
+            "backend/source_identity_confidence_proposal.py",
+            "backend/source_identity_replay_calibration.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
+        next_step=(
+            "Route replay-calibrated source identity trust states to operator review "
+            "before downstream source-specific proposal priority changes."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="identify_arrangement_roles",
@@ -155,9 +168,13 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("arrangement_role_proposal", "agentic_method_foundation"),
-        support_paths=("backend/arrangement_role_proposal.py", "backend/autofoh_profiles.py"),
+        support_paths=(
+            "backend/arrangement_role_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+            "backend/autofoh_profiles.py",
+        ),
         blocker="Role confidence is not yet a live apply authority.",
-        next_step="Route arrangement-role proposals to operator review; replay accepted/rejected role decisions before feeding downstream mix actions.",
+        next_step="Route fresh-context arrangement-role proposals to operator review; replay accepted/rejected role decisions before feeding downstream mix actions.",
     ),
     ProjectGoalCapabilityRow(
         id="gain_staging",
@@ -181,9 +198,16 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("auto_eq", "autoeq_audit_validation", "phase_aware_eq_guard"),
+        support_paths=(
+            "backend/auto_eq.py",
+            "backend/auto_fader_v2/controller.py",
+            "backend/auto_soundcheck_engine.py",
+            "backend/autoeq_audit.py",
+            "backend/phase_aware_eq_guard.py",
+        ),
         target_console_surfaces=("eq",),
-        blocker="EQ live writes need filter audit, feedback safety, readback, and rollback proof.",
-        next_step="Promote only audited EQ proposals; keep direct EQ apply quarantined.",
+        blocker="EQ live writes need filter audit, feedback safety, readback, and rollback proof; AutoEQ direct apply/reset, AutoFaderV2 masking EQ, and AutoSoundcheck EQ-enable writes now return blocked evidence.",
+        next_step="Route AutoEQ, AutoFaderV2 masking EQ, and AutoSoundcheck EQ-enable blocked evidence to operator review; promote only audited EQ proposals with fresh phase context.",
     ),
     ProjectGoalCapabilityRow(
         id="compression",
@@ -193,10 +217,17 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("compressor_dynamics_proposal", "auto_compressor", "auto_compressor_cf"),
-        support_paths=("backend/compressor_dynamics_proposal.py",),
+        support_paths=(
+            "backend/compressor_dynamics_proposal.py",
+            "backend/auto_compressor.py",
+            "backend/auto_compressor_cf.py",
+            "backend/auto_soundcheck_engine.py",
+            "backend/server.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("compressor",),
-        blocker="Compressor apply paths are not proven through the supervised gate.",
-        next_step="Route compressor proposals to operator review, then add fake-mixer proof before any supervised dynamics write.",
+        blocker="Compressor apply paths are not proven through the supervised gate; AutoCompressor/CF, server reset helper, and AutoSoundcheck threshold writes now return blocked evidence instead of mutating the console.",
+        next_step="Route AutoCompressor/CF, server reset helper, and AutoSoundcheck threshold blocked evidence to operator review; require fresh dynamics readback, makeup/headroom and rollback proof before assisted apply.",
     ),
     ProjectGoalCapabilityRow(
         id="gating",
@@ -206,9 +237,18 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("context_aware_gate_agent", "auto_gate_caig"),
+        support_paths=(
+            "backend/auto_gate_caig.py",
+            "backend/auto_fader_v2/controller.py",
+            "backend/context_aware_gate.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("gate",),
-        blocker="Gate live writes remain blocked until false-open/false-close evidence is replayed.",
-        next_step="Evaluate gate decisions against real bleed telemetry before any supervised promotion.",
+        blocker="Gate live writes remain blocked; CAIG direct gate sends and AutoFaderV2 adaptive gate return blocked evidence until false-open/false-close evidence is replayed.",
+        next_step=(
+            "Evaluate gate decisions against fresh bleed telemetry, trusted source "
+            "identity, false-open/false-close replay, and rollback readback before any supervised promotion."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="deessing",
@@ -218,7 +258,12 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("deesser_vocal_sibilance",),
-        support_paths=("backend/ai/rule_engine.py", "backend/ai/agent.py"),
+        support_paths=(
+            "backend/deesser_vocal_sibilance.py",
+            "backend/source_identity_downstream_gate.py",
+            "backend/ai/rule_engine.py",
+            "backend/ai/agent.py",
+        ),
         target_console_surfaces=("compressor", "eq"),
         blocker="De-esser live writes need dynamics or dynamic-EQ readback and rollback proof.",
         next_step="Connect vocal de-esser proposals to operator review without creating live writes.",
@@ -231,10 +276,15 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("pan_spatial_proposal", "auto_panner"),
-        support_paths=("backend/pan_spatial_proposal.py",),
+        support_paths=(
+            "backend/auto_panner.py",
+            "backend/auto_panner_adaptive.py",
+            "backend/pan_spatial_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("pan",),
-        blocker="Pan live writes need stage/stereo evidence, mono check, readback, and rollback proof.",
-        next_step="Route spatial pan proposals to operator review before any supervised pan-write proof.",
+        blocker="Pan live writes need stage/stereo evidence, mono check, readback, and rollback proof; AutoPanner and adaptive panner direct apply are fail-closed.",
+        next_step="Route AutoPanner/adaptive evidence and spatial pan proposals to operator review before any supervised pan-write proof.",
     ),
     ProjectGoalCapabilityRow(
         id="frequency_separation",
@@ -243,9 +293,16 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Automatically perform frequency separation of instruments.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("cross_adaptive_eq", "agentic_method_foundation"),
+        method_ids=("frequency_separation_proposal", "cross_adaptive_eq", "agentic_method_foundation"),
+        support_paths=(
+            "backend/frequency_separation_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         blocker="Frequency split decisions are not yet tied to safe console moves.",
-        next_step="Emit explainable split proposals with source/stem contribution evidence.",
+        next_step=(
+            "Route fresh-context source/stem frequency-lane proposals to operator review "
+            "before deriving any EQ or fader move."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="cross_channel_unmasking",
@@ -255,8 +312,16 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("cross_adaptive_eq", "live_shared_mix"),
-        blocker="Unmasking can recommend changes but cannot write EQ/fader relationships live.",
-        next_step="Route unmasking output into linked proposals with rollback evidence.",
+        support_paths=(
+            "backend/auto_fader_v2/controller.py",
+            "backend/cross_adaptive_eq.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
+        blocker="Unmasking can recommend changes but cannot write EQ/fader relationships live; AutoFaderV2 masking EQ returns blocked evidence.",
+        next_step=(
+            "Route fresh-context unmasking output with trusted source identity into "
+            "linked cut/boost proposals with EQ-band rollback evidence."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="phase_correction",
@@ -267,8 +332,8 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         autonomy_mode_ceiling="assisted",
         method_ids=("phase_alignment", "phase_aware_eq_guard"),
         target_console_surfaces=("pan",),
-        blocker="Delay/polarity writes are not physically proven and can damage mono compatibility.",
-        next_step="Keep GCC-PHAT proposals dry-run until delay/polarity readback is proven.",
+        blocker="Delay/polarity writes are not physically proven, can damage mono compatibility, and now return blocked evidence instead of mutating the console.",
+        next_step="Route phase alignment blocked evidence to operator review; require fresh phase context plus delay/polarity readback and rollback proof before any live apply.",
     ),
     ProjectGoalCapabilityRow(
         id="effects_management",
@@ -278,10 +343,15 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("fx_send_proposal", "auto_fx"),
-        support_paths=("backend/fx_send_proposal.py",),
+        support_paths=(
+            "backend/operator_product_state.py",
+            "backend/auto_fx.py",
+            "backend/fx_send_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("fx",),
-        blocker="FX rack/insert writes are broad state changes and are blocked from live runtime.",
-        next_step="Route FX send/return proposals to operator review before any supervised FX-write proof.",
+        blocker="FX rack/insert/reverb writes are broad state changes; AutoFX and AutoReverb direct apply are fail-closed and blocked from live runtime.",
+        next_step="Route AutoFX/AutoReverb plans and FX send/return proposals through read-only FX schema hints and operator review before any supervised FX-write proof.",
     ),
     ProjectGoalCapabilityRow(
         id="effect_sends",
@@ -291,9 +361,13 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("fx_send_proposal", "auto_fx"),
-        support_paths=("backend/fx_send_proposal.py",),
+        support_paths=(
+            "backend/auto_fx.py",
+            "backend/fx_send_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("fx",),
-        blocker="Send level automation lacks feedback, intelligibility, and readback proof.",
+        blocker="Send level automation is fail-closed until feedback, intelligibility, and readback proof exist.",
         next_step="Keep sends proposal-only until feedback risk, return headroom, readback, and rollback proof are complete.",
     ),
     ProjectGoalCapabilityRow(
@@ -304,11 +378,14 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="supervised_narrow",
         method_ids=("bus_group_balance_proposal", "auto_fader_v1", "live_shared_mix", "lufs_gain_staging"),
-        support_paths=("backend/bus_group_balance_proposal.py",),
+        support_paths=(
+            "backend/bus_group_balance_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("fader", "groups", "dca"),
         current_live_write_kinds=("fader",),
-        blocker="Only channel fader/gain paths are allowed; bus/DCA/group balance is not proven.",
-        next_step="Route bus/group/DCA balance proposals to operator review and prove assignment readback before any write promotion.",
+        blocker="Only channel fader/gain paths are allowed; bus/DCA/group balance is not proven and AutoFOH bus/DCA/master typed actions are blocked evidence.",
+        next_step="Route bus/group/DCA balance proposals to operator review and prove trusted source identity plus fresh assignment/fader readback before any write promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="musician_level_adaptation",
@@ -318,9 +395,12 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("performance_adaptation_proposal", "agentic_method_foundation", "auto_fader_v1"),
-        support_paths=("backend/performance_adaptation_proposal.py",),
+        support_paths=(
+            "backend/performance_adaptation_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         blocker="Shadow gain rides are not yet trusted live authority.",
-        next_step="Route persistent musician-level drift to operator review with cooldown, readback, rollback, headroom, and feedback evidence before any supervised ride promotion.",
+        next_step="Route persistent musician-level drift to operator review with fresh trend/readback, cooldown, rollback, headroom, and feedback evidence before any supervised ride promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="live_adaptation",
@@ -330,9 +410,12 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("performance_adaptation_proposal", "agentic_method_foundation", "muq_perceptual_shadow"),
-        support_paths=("backend/performance_adaptation_proposal.py",),
+        support_paths=(
+            "backend/performance_adaptation_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         blocker="Live adaptation needs latency, quality, and safety proof per action family.",
-        next_step="Keep concert-time adaptation proposal-only until replay match, latency budget, operator review, and per-family hardware proof are complete.",
+        next_step="Keep concert-time adaptation proposal-only until fresh trend/readback, replay match, latency budget, operator review, and per-family hardware proof are complete.",
     ),
     ProjectGoalCapabilityRow(
         id="genre_variants",
@@ -347,9 +430,13 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "mix_agent_conservative",
             "ml_processing_graph",
         ),
-        support_paths=("backend/mix_variant_profile_proposal.py", "backend/ml/reference_profiles.py"),
+        support_paths=(
+            "backend/mix_variant_profile_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+            "backend/ml/reference_profiles.py",
+        ),
         blocker="Genre variants can fan out into many mix and console surfaces.",
-        next_step="Route mix-variant profiles to operator review; require reference metrics, arrangement context, and follow-up proposal fan-out before any live or preset apply.",
+        next_step="Route mix-variant profiles to operator review; require trusted source identity, fresh reference metrics, arrangement context, and follow-up proposal fan-out before any live or preset apply.",
     ),
     ProjectGoalCapabilityRow(
         id="master_bus_optimization",
@@ -376,9 +463,12 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("performance_adaptation_proposal", "agentic_method_foundation", "supervised_manual_fader_gain"),
-        support_paths=("backend/performance_adaptation_proposal.py",),
+        support_paths=(
+            "backend/performance_adaptation_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         blocker="Real-time corrections are limited by per-family safety proof and operator mode.",
-        next_step="Route reversible, rate-limited correction candidates to operator review; promote only one fader/gain family after replay and hardware proof.",
+        next_step="Route reversible, rate-limited correction candidates to operator review with fresh trend/readback; promote only one fader/gain family after replay and hardware proof.",
     ),
     ProjectGoalCapabilityRow(
         id="console_read_parameters",
@@ -387,10 +477,23 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Read all available console parameters.",
         status="proposal_only",
         autonomy_mode_ceiling="analysis",
-        method_ids=("product_operator_state",),
-        support_paths=("backend/read_surface_inventory.py", "backend/wing_client.py", "backend/dlive_client.py"),
+        method_ids=(
+            "product_operator_state",
+            "read_surface_remediation_plan",
+            "read_surface_fixture_evidence",
+        ),
+        support_paths=(
+            "backend/read_surface_inventory.py",
+            "backend/read_surface_remediation_plan.py",
+            "backend/read_surface_fixture_evidence.py",
+            "backend/wing_client.py",
+            "backend/dlive_client.py",
+        ),
         blocker="Read coverage is inventoried but still partial for matrix, routing/send, scene contents, presets, and dLive parity.",
-        next_step="Close partial/missing read surfaces before claiming full console-state awareness.",
+        next_step=(
+            "Close partial read surfaces with physical fixtures, stale-cache evidence, "
+            "scene/preset diffs, and dLive/WING parity before claiming full console-state awareness."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="console_analyze_state",
@@ -401,7 +504,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         autonomy_mode_ceiling="analysis",
         method_ids=("product_operator_state", "agentic_method_foundation"),
         support_paths=("backend/operator_product_state.py",),
-        next_step="Expose more bus/matrix/FX state in read-only snapshots before proposing writes.",
+        next_step="Keep expanding bus/matrix/FX read-only snapshots with schema, freshness, and physical fixture evidence before proposing writes.",
     ),
     ProjectGoalCapabilityRow(
         id="console_preamp_trim_control",
@@ -424,10 +527,11 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="canonical",
         autonomy_mode_ceiling="supervised_narrow",
         method_ids=("supervised_manual_fader_gain",),
+        support_paths=("backend/auto_soundcheck_engine.py",),
         target_console_surfaces=("fader",),
         current_live_write_kinds=("fader",),
-        blocker="Only supervised bounded channel fader moves are current live scope.",
-        next_step="Repeat proof across representative channels before any autonomous fader mode.",
+        blocker="Only supervised bounded channel fader moves are current live scope; AutoSoundcheck fader restore is blocked evidence, not a live executor.",
+        next_step="Route AutoSoundcheck restore evidence through Product Layer approval and repeat proof across representative channels before any autonomous fader mode.",
     ),
     ProjectGoalCapabilityRow(
         id="console_mute_control",
@@ -437,10 +541,14 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("mute_management_proposal",),
-        support_paths=("backend/mute_management_proposal.py",),
+        support_paths=(
+            "backend/auto_soundcheck_engine.py",
+            "backend/mute_management_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("mute",),
-        blocker="Mute automation can create dropouts and is not in the supervised proof path.",
-        next_step="Route mute/unmute recommendations to operator review; require intent, readback, rollback, and hardware proof before any mute write promotion.",
+        blocker="Mute automation can create dropouts and is not in the supervised proof path; AutoSoundcheck mute restore returns blocked evidence only.",
+        next_step="Route mute/unmute recommendations to operator review; require fresh intent/readback, rollback, and hardware proof before any mute write promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="console_pan_control",
@@ -450,8 +558,14 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("pan_spatial_proposal", "auto_panner"),
+        support_paths=(
+            "backend/auto_panner.py",
+            "backend/auto_panner_adaptive.py",
+            "backend/pan_spatial_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("pan",),
-        blocker="No supervised pan write proof.",
+        blocker="No supervised pan write proof; AutoPanner, adaptive panner, and controller pan separation return blocked evidence only.",
         next_step="Keep pan settings proposal-only until readback, mono compatibility, and rollback proof are complete.",
     ),
     ProjectGoalCapabilityRow(
@@ -462,9 +576,15 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("auto_eq", "phase_aware_eq_guard"),
+        support_paths=(
+            "backend/auto_eq.py",
+            "backend/auto_fader_v2/controller.py",
+            "backend/auto_soundcheck_engine.py",
+            "backend/phase_aware_eq_guard.py",
+        ),
         target_console_surfaces=("eq",),
-        blocker="Direct EQ apply remains quarantined.",
-        next_step="Require AutoEQ audit and fake-mixer proof before supervised EQ candidates.",
+        blocker="Direct EQ apply/reset, AutoFaderV2 masking EQ, and AutoSoundcheck EQ-enable writes remain quarantined and return blocked evidence only.",
+        next_step="Require AutoEQ audit, feedback safety, readback and rollback proof before supervised EQ candidates.",
     ),
     ProjectGoalCapabilityRow(
         id="console_compressor_control",
@@ -474,9 +594,17 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("compressor_dynamics_proposal", "auto_compressor", "auto_compressor_cf"),
+        support_paths=(
+            "backend/auto_soundcheck_engine.py",
+            "backend/server.py",
+            "backend/compressor_dynamics_proposal.py",
+            "backend/auto_compressor.py",
+            "backend/auto_compressor_cf.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("compressor",),
-        blocker="Compressor writes are not in current live executor.",
-        next_step="Keep dynamics settings proposal-only until readback, rollback, and bounded makeup proof are complete.",
+        blocker="Compressor writes are not in current live executor; AutoCompressor/CF apply, server reset helper, and AutoSoundcheck compressor-threshold writes return blocked evidence only.",
+        next_step="Keep dynamics settings proposal-only until readback, rollback, and bounded makeup/headroom proof are complete.",
     ),
     ProjectGoalCapabilityRow(
         id="console_gate_control",
@@ -486,9 +614,15 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("context_aware_gate_agent", "auto_gate_caig"),
+        support_paths=(
+            "backend/auto_gate_caig.py",
+            "backend/auto_fader_v2/controller.py",
+            "backend/context_aware_gate.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("gate",),
-        blocker="Gate writes are blocked until replay evidence reduces false decisions.",
-        next_step="Create supervised gate candidate only after telemetry validation.",
+        blocker="Gate writes are blocked; CAIG direct gate sends and AutoFaderV2 adaptive gate are quarantined until replay evidence reduces false decisions.",
+        next_step="Create supervised gate candidate only after fresh telemetry validation, trusted source identity, and rollback readback proof.",
     ),
     ProjectGoalCapabilityRow(
         id="console_routing_control",
@@ -498,10 +632,13 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("routing_management_proposal",),
-        support_paths=("backend/routing_management_proposal.py",),
+        support_paths=(
+            "backend/routing_management_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("routing",),
         blocker="Routing writes can rewrite broad mixer state.",
-        next_step="Route routing diffs to operator review; require full route readback, rollback, scope limits, and hardware proof before any routing write promotion.",
+        next_step="Route routing diffs to operator review; require trusted source identity, fresh full route readback, rollback, scope limits, and hardware proof before any routing write promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="console_dca_group_matrix_control",
@@ -511,10 +648,14 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("bus_group_balance_proposal",),
-        support_paths=("backend/bus_group_balance_proposal.py",),
+        support_paths=(
+            "backend/bus_group_balance_proposal.py",
+            "backend/autofoh_safety.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("dca", "groups", "matrices"),
-        blocker="Group/DCA/matrix writes have no supervised proof path.",
-        next_step="Keep DCA/group/matrix settings proposal-only until assignment readback, true-peak safety, rollback, and hardware proof are complete.",
+        blocker="Group/DCA/matrix writes have no supervised proof path; AutoFOH bus/DCA/master typed actions are blocked evidence only.",
+        next_step="Keep DCA/group/matrix settings proposal-only until trusted source identity, fresh assignment/fader readback, true-peak safety, rollback, and hardware proof are complete.",
     ),
     ProjectGoalCapabilityRow(
         id="console_fx_control",
@@ -524,9 +665,15 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("fx_send_proposal", "auto_fx"),
+        support_paths=(
+            "backend/operator_product_state.py",
+            "backend/auto_fx.py",
+            "backend/fx_send_proposal.py",
+            "backend/source_identity_downstream_gate.py",
+        ),
         target_console_surfaces=("fx",),
-        blocker="FX direct apply is blocked from the canonical live runtime.",
-        next_step="Keep FX settings proposal-only until send/return readback, feedback checks, and rollback proof are complete.",
+        blocker="FX direct apply is blocked from the canonical live runtime; AutoFX and AutoReverb apply_to_mixer return blocked evidence only.",
+        next_step="Keep FX settings proposal-only until schema hints become verified model readback, feedback checks, and rollback proof are complete.",
     ),
     ProjectGoalCapabilityRow(
         id="console_scene_preset_control",
@@ -536,10 +683,13 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=("scene_preset_management_proposal",),
-        support_paths=("backend/scene_preset_management_proposal.py",),
+        support_paths=(
+            "backend/operator_product_state.py",
+            "backend/scene_preset_management_proposal.py",
+        ),
         target_console_surfaces=("scenes", "presets"),
         blocker="Scenes and presets can overwrite broad console state.",
-        next_step="Route scoped scene/preset diffs to operator review; require full state readback, rollback, scope limits, and hardware proof before any scene/preset write promotion.",
+        next_step="Route read-only scoped scene/preset diffs to operator review with Product Layer snapshot freshness and read-only rollback evidence; require scope limits and hardware proof before any scene/preset write promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="decision_basis",
@@ -556,11 +706,12 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         support_paths=(
             "backend/decision_evidence_packet_proposal.py",
+            "backend/source_identity_downstream_gate.py",
             "backend/source_knowledge.py",
             "backend/decision_memory.py",
         ),
         blocker="Evidence packets are operator-review contracts, not live apply authority.",
-        next_step="Attach evidence packets to every proposal and rejected shadow decision, then replay accepted/rejected outcomes before promotion.",
+        next_step="Attach fresh-context and trusted-source-identity evidence packets to every proposal and rejected shadow decision, then replay accepted/rejected outcomes before promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="long_term_memory_learning",
@@ -572,12 +723,13 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         method_ids=("long_term_memory_learning_proposal", "product_operator_state"),
         support_paths=(
             "backend/long_term_memory_learning_proposal.py",
+            "backend/source_identity_downstream_gate.py",
             "backend/decision_memory.py",
             "backend/telemetry/",
             ".ai/memory/project.md",
         ),
         blocker="Memory-learning proposals are review contracts, not autonomous console authority.",
-        next_step="Route learning records to operator review and replay correlation before they influence future proposal priority.",
+        next_step="Route trusted-source, fresh-context learning records to operator review and replay correlation before they influence future proposal priority.",
     ),
 )
 

@@ -32,6 +32,7 @@ class WingClient(MixerClientBase):
         self._stop_receiver = False
         
         self.state = {}
+        self.state_timestamps = {}
         self.callbacks = {}
         
         self.is_connected = False
@@ -121,6 +122,10 @@ class WingClient(MixerClientBase):
         if position_key not in pos_map:
             raise ValueError(f"Unsupported insert position: {position}")
         return f"/{type_map[target_key]}/{int(target)}/{pos_map[position_key]}"
+
+    def _set_state_value(self, address: str, value: Any) -> None:
+        self.state[address] = value
+        self.state_timestamps[address] = time.time()
 
     def connect(self, timeout: float = 5.0) -> bool:
         """
@@ -250,13 +255,13 @@ class WingClient(MixerClientBase):
         # For string values like names, use the first argument
         if ('/name' in address or '/$name' in address) and args:
             # $name returns the actual name string
-            self.state[address] = args[0] if args else ''
+            self._set_state_value(address, args[0] if args else '')
         elif len(args) >= 3:
-            self.state[address] = args[2]  # Actual value
+            self._set_state_value(address, args[2])  # Actual value
         elif len(args) == 1:
-            self.state[address] = args[0]
+            self._set_state_value(address, args[0])
         else:
-            self.state[address] = args
+            self._set_state_value(address, args)
         
         # Call registered callbacks
         if address in self.callbacks:
@@ -325,9 +330,9 @@ class WingClient(MixerClientBase):
             # Update local state cache when setting values (not queries)
             if values:
                 if len(values) == 1:
-                    self.state[address] = values[0]
+                    self._set_state_value(address, values[0])
                 else:
-                    self.state[address] = values
+                    self._set_state_value(address, values)
             return True
         except OSError as e:
             # Socket error - mark as disconnected

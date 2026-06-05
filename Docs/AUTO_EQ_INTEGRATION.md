@@ -258,7 +258,14 @@ with open('config/eq_presets/pop.json') as f:
 controller.set_profile(preset['name'])
 ```
 
-## OSC Команды
+## OSC адреса только для справки
+
+Эти OSC-адреса приведены только как reference для чтения протокола и аудита
+контрактов. Они не являются инструкцией к прямому AutoEQ apply и не дают AutoEQ
+права на live write. Любая будущая operator-facing EQ правка должна проходить
+через Product Layer proposal, `backend/autoeq_audit.py`, supervised gate,
+physical pre-read, bounded delta, readback, rollback, cooldown и preserved
+artifacts.
 
 ```
 /ch/{01-32}/eq/1/g      # Gain полосы 1
@@ -274,8 +281,8 @@ controller.set_profile(preset['name'])
 ### Unit тесты
 
 ```bash
-cd /Users/dmitrijvolkov/AUTO\ MIXER\ Tubeslave/backend
-python auto_eq_processing.py
+cd /Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main
+PYTHONPATH=backend python3 -m pytest tests/test_autoeq_audit.py -q
 ```
 
 ### Интеграционный тест
@@ -308,7 +315,7 @@ for inp in inputs:
 - `auto_eq_processing.py` — Новые компоненты
 - `config/eq_presets/` — Жанровые пресеты
 
-## TODO
+## Следующие безопасные срезы
 
 - [ ] Интегрировать DualEMA в AutoEQController как shadow/proposal output без
       прямого OSC apply.

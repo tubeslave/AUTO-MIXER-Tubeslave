@@ -43,6 +43,125 @@ class EQBand:
         }
 
 
+def _build_eq_apply_calls(channel: int, mixer_bands: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    calls: List[Dict[str, Any]] = [
+        {
+            "cmd": "set_eq_on",
+            "channel": channel,
+            "on": 1,
+            "semantic": "enable_eq_before_apply",
+        }
+    ]
+    for band_name, params in mixer_bands.items():
+        if band_name == 'low':
+            calls.append(
+                {
+                    "cmd": "set_eq_low_shelf",
+                    "channel": channel,
+                    "gain": params.get('lg'),
+                    "freq": params.get('lf'),
+                    "q": params.get('lq'),
+                }
+            )
+        elif band_name == 'high':
+            calls.append(
+                {
+                    "cmd": "set_eq_high_shelf",
+                    "channel": channel,
+                    "gain": params.get('hg'),
+                    "freq": params.get('hf'),
+                    "q": params.get('hq'),
+                }
+            )
+        elif band_name.startswith('band'):
+            band_num = int(band_name[-1])
+            calls.append(
+                {
+                    "cmd": "set_eq_band",
+                    "channel": channel,
+                    "band": band_num,
+                    "freq": params.get(f'{band_num}f'),
+                    "gain": params.get(f'{band_num}g'),
+                    "q": params.get(f'{band_num}q'),
+                }
+            )
+    return calls
+
+
+def _build_eq_reset_calls(channel: int) -> List[Dict[str, Any]]:
+    calls: List[Dict[str, Any]] = [
+        {
+            "cmd": "set_eq_on",
+            "channel": channel,
+            "on": 1,
+            "semantic": "enable_eq_before_reset",
+        },
+        {
+            "cmd": "send",
+            "path": f"/ch/{channel}/eq/lg",
+            "value": 0.0,
+            "semantic": "reset_low_shelf_gain",
+            "channel": channel,
+        },
+    ]
+    for band in [1, 2, 3, 4]:
+        calls.append(
+            {
+                "cmd": "send",
+                "path": f"/ch/{channel}/eq/{band}g",
+                "value": 0.0,
+                "semantic": "reset_peak_band_gain",
+                "channel": channel,
+                "band": band,
+            }
+        )
+    calls.append(
+        {
+            "cmd": "send",
+            "path": f"/ch/{channel}/eq/hg",
+            "value": 0.0,
+            "semantic": "reset_high_shelf_gain",
+            "channel": channel,
+        }
+    )
+    return calls
+
+
+def _store_blocked_eq_result(
+    owner,
+    reason: str,
+    blocked_calls: List[Dict[str, Any]],
+    *,
+    channel: Optional[int] = None,
+) -> Dict[str, Any]:
+    owner.last_write_attempted = bool(blocked_calls)
+    owner.last_write_blocked = bool(blocked_calls)
+    owner.last_write_count = 0
+    owner.last_blocked_calls = list(blocked_calls)
+    result = {
+        "applied": False,
+        "blocked": bool(blocked_calls),
+        "calls": [],
+        "blocked_calls": list(blocked_calls),
+        "blocked_call_count": len(blocked_calls),
+        "reason": reason,
+        "write_policy": owner.write_policy,
+        "live_write_allowed": owner.live_write_allowed,
+        "can_apply_live": False,
+        "mixer_client_present": owner.mixer_client is not None,
+        "mutates_mixer": False,
+    }
+    if channel is not None:
+        result["channel"] = channel
+    owner.last_apply_result = result
+    if blocked_calls:
+        logger.warning(
+            "AutoEQ live writes are quarantined; %s commands kept as evidence",
+            len(blocked_calls),
+        )
+    return result
+
+
 @dataclass
 class SpectralData:
     """Contains spectral analysis results."""
@@ -2135,6 +2254,13 @@ class AutoEQController:
         # Correction history tracking
         self.applied_corrections_history: List[List[EQBand]] = []
         self.cumulative_eq_response: Optional[np.ndarray] = None
+        self.live_write_allowed = False
+        self.write_policy = "proposal_only_quarantined"
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+        self.last_blocked_calls: List[Dict[str, Any]] = []
+        self.last_apply_result: Dict[str, Any] = {}
         
         # Callbacks
         self.on_spectrum_update: Optional[Callable[[Dict], None]] = None
@@ -2457,127 +2583,62 @@ class AutoEQController:
         if self.apply_mode == "auto" and corrections:
             self.apply_to_mixer()
     
-    def apply_to_mixer(self, corrections: List[EQBand] = None) -> bool:
+    def apply_to_mixer(self, corrections: List[EQBand] = None) -> Dict[str, Any]:
         """
-        Apply EQ corrections to the mixer.
+        Return blocked EQ correction evidence without mutating a mixer.
         
         Args:
             corrections: Optional corrections to apply (uses current if None)
             
         Returns:
-            True if applied successfully
+            Structured blocked evidence for would-be EQ writes.
         """
-        if not self.mixer_client or not self.mixer_client.is_connected:
-            logger.warning("Mixer not connected")
-            self._notify_status('error', 'Mixer not connected')
-            return False
-        
         if not self.current_channel:
             logger.warning("No channel selected")
-            return False
+            return _store_blocked_eq_result(self, "no_auto_eq_channel", [])
         
         corrections = corrections or self.current_corrections
         if not corrections:
             logger.debug("No corrections to apply (signal may be too quiet or already matches target)")
-            return False
-        
-        try:
-            # Enable EQ
-            self.mixer_client.set_eq_on(self.current_channel, 1)
-            
-            # Map corrections to mixer bands
-            mixer_bands = self.corrector.map_to_mixer_bands(corrections)
-            
-            # Apply each band
-            for band_name, params in mixer_bands.items():
-                if band_name == 'low':
-                    self.mixer_client.set_eq_low_shelf(
-                        self.current_channel,
-                        gain=params.get('lg'),
-                        freq=params.get('lf'),
-                        q=params.get('lq')
-                    )
-                elif band_name == 'high':
-                    self.mixer_client.set_eq_high_shelf(
-                        self.current_channel,
-                        gain=params.get('hg'),
-                        freq=params.get('hf'),
-                        q=params.get('hq')
-                    )
-                elif band_name.startswith('band'):
-                    band_num = int(band_name[-1])
-                    self.mixer_client.set_eq_band(
-                        self.current_channel,
-                        band=band_num,
-                        freq=params.get(f'{band_num}f'),
-                        gain=params.get(f'{band_num}g'),
-                        q=params.get(f'{band_num}q')
-                    )
-            
-            # Store applied corrections in history
-            self.applied_corrections_history.append(corrections.copy())
-            
-            # Limit history size (keep last 10 applications)
-            if len(self.applied_corrections_history) > 10:
-                self.applied_corrections_history.pop(0)
-            
-            logger.info(f"Applied EQ corrections to channel {self.current_channel}")
-            self._notify_status('applied', f'EQ applied to channel {self.current_channel}')
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error applying EQ: {e}")
-            self._notify_status('error', f'Error applying EQ: {e}')
-            return False
+            return _store_blocked_eq_result(self, "no_auto_eq_corrections", [], channel=self.current_channel)
+
+        mixer_bands = self.corrector.map_to_mixer_bands(corrections)
+        blocked_calls = _build_eq_apply_calls(self.current_channel, mixer_bands)
+        result = _store_blocked_eq_result(
+            self,
+            "auto_eq_direct_apply_quarantined",
+            blocked_calls,
+            channel=self.current_channel,
+        )
+        result["corrections"] = [correction.to_dict() for correction in corrections]
+        logger.info(
+            "EQ corrections for channel %s kept as blocked evidence",
+            self.current_channel,
+        )
+        self._notify_status('blocked', f'EQ apply blocked for channel {self.current_channel}')
+        return result
     
-    def reset_eq(self) -> bool:
+    def reset_eq(self) -> Dict[str, Any]:
         """
-        Reset EQ to flat (0 dB on all bands).
+        Return blocked EQ reset evidence.
         
         Returns:
-            True if reset successfully
+            Structured blocked evidence for would-be EQ reset writes.
         """
-        if not self.mixer_client or not self.mixer_client.is_connected:
-            logger.warning("Mixer not connected")
-            return False
-        
         if not self.current_channel:
-            return False
-        
-        try:
-            ch = self.current_channel
-            
-            # Ensure EQ is enabled (needed for changes to take effect)
-            if hasattr(self.mixer_client, 'set_eq_on'):
-                self.mixer_client.set_eq_on(ch, 1)
-                import time
-                time.sleep(0.05)
-            
-            # Reset all bands to 0 dB using direct OSC addresses (only reset gain, don't change Q or frequency)
-            import time
-            logger.info(f"Reset EQ: Sending gain=0 commands for channel {ch}")
-            
-            # Low shelf gain
-            self.mixer_client.send(f"/ch/{ch}/eq/lg", 0.0)
-            time.sleep(0.05)
-            
-            # Band 1-4 gains
-            for band in [1, 2, 3, 4]:
-                self.mixer_client.send(f"/ch/{ch}/eq/{band}g", 0.0)
-                time.sleep(0.05)
-            
-            # High shelf gain
-            self.mixer_client.send(f"/ch/{ch}/eq/hg", 0.0)
-            
-            self.current_corrections = []
-            
-            logger.info(f"Reset EQ for channel {ch}")
-            self._notify_status('reset', f'EQ reset for channel {ch}')
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error resetting EQ: {e}")
-            return False
+            return _store_blocked_eq_result(self, "no_auto_eq_channel", [])
+
+        ch = self.current_channel
+        blocked_calls = _build_eq_reset_calls(ch)
+        result = _store_blocked_eq_result(
+            self,
+            "auto_eq_reset_quarantined",
+            blocked_calls,
+            channel=ch,
+        )
+        logger.info("EQ reset for channel %s kept as blocked evidence", ch)
+        self._notify_status('blocked', f'EQ reset blocked for channel {ch}')
+        return result
     
     def get_current_eq(self) -> Optional[Dict[str, Any]]:
         """
@@ -2655,7 +2716,16 @@ class AutoEQController:
             'auto_apply': self.auto_apply,
             'apply_mode': self.apply_mode,
             'corrections_count': len(self.current_corrections),
-            'preview_available': self.preview.is_available()
+            'preview_available': self.preview.is_available(),
+            'live_write_allowed': self.live_write_allowed,
+            'write_policy': self.write_policy,
+            'mixer_client_present': self.mixer_client is not None,
+            'last_write_attempted': self.last_write_attempted,
+            'last_write_blocked': self.last_write_blocked,
+            'last_write_count': self.last_write_count,
+            'last_blocked_call_count': len(self.last_blocked_calls),
+            'last_blocked_calls': list(self.last_blocked_calls),
+            'last_apply_result': dict(self.last_apply_result),
         }
 
 
@@ -2723,6 +2793,13 @@ class MultiChannelAutoEQController:
         # Components
         self.corrector = EQCorrector()
         self.preview = EQPreview()
+        self.live_write_allowed = False
+        self.write_policy = "proposal_only_quarantined"
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+        self.last_blocked_calls: List[Dict[str, Any]] = []
+        self.last_apply_result: Dict[str, Any] = {}
         
         # Callbacks
         self.on_spectrum_update: Optional[Callable[[Dict], None]] = None
@@ -2993,63 +3070,31 @@ class MultiChannelAutoEQController:
         
         logger.info(f"Profile changed for channel {channel} to {profile_name}")
     
-    def apply_channel_correction(self, channel: int) -> bool:
-        """Apply corrections for a specific channel."""
+    def apply_channel_correction(self, channel: int) -> Dict[str, Any]:
+        """Return blocked EQ correction evidence for a specific channel."""
         # Check if channel has corrections (even if analysis stopped)
         if channel not in self.active_channels:
             logger.warning(f"Channel {channel} not found in active channels")
-            return False
-        
-        if not self.mixer_client or not self.mixer_client.is_connected:
-            logger.warning("Mixer not connected")
-            return False
+            return _store_blocked_eq_result(self, "auto_eq_channel_not_found", [], channel=channel)
         
         corrections = self.active_channels[channel].get('corrections', [])
         if not corrections:
             logger.debug(f"No corrections to apply for channel {channel} (signal may be too quiet or already matches target)")
-            return False
-        
-        try:
-            # Enable EQ
-            self.mixer_client.set_eq_on(channel, 1)
-            
-            # Map corrections to mixer bands
-            mixer_bands = self.corrector.map_to_mixer_bands(corrections)
-            
-            # Apply each band
-            for band_name, params in mixer_bands.items():
-                if band_name == 'low':
-                    self.mixer_client.set_eq_low_shelf(
-                        channel,
-                        gain=params.get('lg'),
-                        freq=params.get('lf'),
-                        q=params.get('lq')
-                    )
-                elif band_name == 'high':
-                    self.mixer_client.set_eq_high_shelf(
-                        channel,
-                        gain=params.get('hg'),
-                        freq=params.get('hf'),
-                        q=params.get('hq')
-                    )
-                elif band_name.startswith('band'):
-                    band_num = int(band_name[-1])
-                    self.mixer_client.set_eq_band(
-                        channel,
-                        band=band_num,
-                        freq=params.get(f'{band_num}f'),
-                        gain=params.get(f'{band_num}g'),
-                        q=params.get(f'{band_num}q')
-                    )
-            
-            logger.info(f"Applied EQ corrections to channel {channel}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error applying EQ to channel {channel}: {e}")
-            return False
+            return _store_blocked_eq_result(self, "no_auto_eq_corrections", [], channel=channel)
+
+        mixer_bands = self.corrector.map_to_mixer_bands(corrections)
+        blocked_calls = _build_eq_apply_calls(channel, mixer_bands)
+        result = _store_blocked_eq_result(
+            self,
+            "auto_eq_direct_apply_quarantined",
+            blocked_calls,
+            channel=channel,
+        )
+        result["corrections"] = [correction.to_dict() for correction in corrections]
+        logger.info("EQ corrections for channel %s kept as blocked evidence", channel)
+        return result
     
-    def apply_all_corrections(self, use_conflict_resolver: bool = True) -> Dict[int, bool]:
+    def apply_all_corrections(self, use_conflict_resolver: bool = True) -> Dict[int, Dict[str, Any]]:
         """Apply corrections for all channels. If use_conflict_resolver, reduces overlapping low-band boosts (e.g. kick+bass 100-200 Hz)."""
         if use_conflict_resolver:
             corrections_per_ch = {
@@ -3108,5 +3153,14 @@ class MultiChannelAutoEQController:
                     'corrections_count': len(state['corrections'])
                 }
                 for ch, state in self.active_channels.items()
-            }
+            },
+            'live_write_allowed': self.live_write_allowed,
+            'write_policy': self.write_policy,
+            'mixer_client_present': self.mixer_client is not None,
+            'last_write_attempted': self.last_write_attempted,
+            'last_write_blocked': self.last_write_blocked,
+            'last_write_count': self.last_write_count,
+            'last_blocked_call_count': len(self.last_blocked_calls),
+            'last_blocked_calls': list(self.last_blocked_calls),
+            'last_apply_result': dict(self.last_apply_result),
         }

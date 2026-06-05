@@ -90,6 +90,8 @@ class AutoPanner:
         self.transition_ms = max(0.0, float(transition_ms))
         self.decisions: Dict[int, PanDecision] = {}
         self.band_accumulator: Dict[int, Dict[str, int]] = {}
+        self.live_write_allowed = False
+        self.write_policy = "proposal_only_quarantined"
 
     # ------------------------------------------------------------------
     # Public API
@@ -236,34 +238,52 @@ class AutoPanner:
         self,
         mixer_client: Any,
         decisions: Optional[Dict[int, PanDecision]] = None,
-    ) -> int:
-        """
-        Send pan positions to the mixer via OSC.
+    ) -> Dict[str, Any]:
+        """Return blocked pan apply evidence without mutating a mixer client.
 
-        Returns the number of channels updated.
+        Pan decisions are useful for assisted mixing, but direct pan writes are
+        quarantined until current-pan readback, mono compatibility, and rollback
+        proof exist. Keep this method for legacy callers, but fail closed.
         """
         if decisions is None:
             decisions = self.decisions
-        if not mixer_client or not decisions:
-            return 0
+        blocked_calls = self._build_apply_calls(decisions)
+        if not blocked_calls:
+            reason = "no_decisions"
+        elif mixer_client:
+            reason = "pan_direct_apply_quarantined"
+        else:
+            reason = "no_mixer_client"
+        return {
+            "applied": False,
+            "blocked": bool(blocked_calls),
+            "calls": [],
+            "blocked_calls": blocked_calls,
+            "reason": reason,
+            "write_policy": self.write_policy,
+            "live_write_allowed": self.live_write_allowed,
+            "can_apply_live": False,
+            "mixer_client_present": mixer_client is not None,
+            "mutates_mixer": False,
+        }
 
-        if not hasattr(mixer_client, "set_channel_pan"):
-            logger.warning("Mixer client has no set_channel_pan method")
-            return 0
-
-        applied = 0
+    def _build_apply_calls(
+        self,
+        decisions: Optional[Dict[int, PanDecision]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Build would-be pan write commands as reviewable blocked evidence."""
+        if not decisions:
+            return []
+        calls: List[Dict[str, Any]] = []
         for ch_id, dec in decisions.items():
-            try:
-                mixer_client.set_channel_pan(ch_id, dec.pan_percent)
-                applied += 1
-                logger.info(
-                    f"AutoPanner: Ch{ch_id} ({dec.instrument}) -> "
-                    f"pan={dec.pan_percent:+.1f}% ({dec.reason})"
-                )
-            except Exception as e:
-                logger.error(f"AutoPanner: Failed to set pan for Ch{ch_id}: {e}")
-
-        return applied
+            calls.append({
+                "cmd": "set_channel_pan",
+                "channel": ch_id,
+                "pan_percent": dec.pan_percent,
+                "instrument": dec.instrument,
+                "reason": dec.reason,
+            })
+        return calls
 
     # ------------------------------------------------------------------
     # Internal helpers

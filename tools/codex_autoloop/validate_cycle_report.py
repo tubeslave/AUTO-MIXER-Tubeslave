@@ -19,6 +19,23 @@ REPORT_TITLE_PATTERN = re.compile(
 )
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^\]\n]+\]\(([^)\n]+)\)")
 
+CODEX_CLI_AGENT_WORKFLOW_PHRASE = "Codex CLI was the only agent workflow used."
+EXTERNAL_AGENT_RUNNER_PHRASE = (
+    "External Paperclip/PiperClip was not used as an agent runner."
+)
+EXACT_SCOPE_LINE_REQUIREMENTS = (
+    (
+        CODEX_CLI_AGENT_WORKFLOW_PHRASE,
+        "Scope must contain exact agent workflow line: "
+        f"{CODEX_CLI_AGENT_WORKFLOW_PHRASE}",
+    ),
+    (
+        EXTERNAL_AGENT_RUNNER_PHRASE,
+        "Scope must contain exact external agent boundary line: "
+        f"{EXTERNAL_AGENT_RUNNER_PHRASE}",
+    ),
+)
+
 REQUIRED_PHRASES = (
     "## Scope",
     "## What Was Found",
@@ -29,7 +46,8 @@ REQUIRED_PHRASES = (
     "## Changed Files",
     "Live safety status:",
     "no live OSC/WING writes were executed",
-    "External Paperclip/PiperClip was not used as an agent runner",
+    CODEX_CLI_AGENT_WORKFLOW_PHRASE,
+    EXTERNAL_AGENT_RUNNER_PHRASE,
     "No neighboring repositories or external local projects were analyzed, modified, or used.",
     "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.",
     "No `.env`, tokens, credentials, API keys, or local secrets were accessed or modified.",
@@ -99,8 +117,27 @@ REQUIRED_RECENT_DISCOVERY_EVIDENCE = (
     ("test artifacts", ("test artifacts", "тестовые артефакты", "artifacts", "sessions")),
 )
 
+REQUIRED_PROJECT_GOAL_EVIDENCE = (
+    ("README.md", ("README.md",)),
+    ("AGENTS.md", ("AGENTS.md",)),
+    ("CLAUDE.md", ("CLAUDE.md",)),
+    (".ai/memory/project.md", (".ai/memory/project.md",)),
+    ("Docs/PROJECT_IMPLEMENTATION_PLAN.md", ("Docs/PROJECT_IMPLEMENTATION_PLAN.md",)),
+    ("supervised gate", ("supervised gate", "supervised gate", "супервиз")),
+    (
+        "read-only/proposal-only/shadow-only/offline-only boundary",
+        (
+            "read-only",
+            "proposal-only",
+            "shadow-only",
+            "offline-only",
+        ),
+    ),
+)
+
 REQUIRED_SCOPE_PHRASES = (
-    "External Paperclip/PiperClip was not used as an agent runner",
+    CODEX_CLI_AGENT_WORKFLOW_PHRASE,
+    EXTERNAL_AGENT_RUNNER_PHRASE,
     "No neighboring repositories or external local projects were analyzed, modified, or used.",
     "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.",
     "Live safety status:",
@@ -111,6 +148,8 @@ REQUIRED_SCOPE_PHRASES = (
 PROJECT_BOUNDARY_AUDIT_TERMS = (
     "/users/dmitrijvolkov/paperclip",
     "/users/dmitrijvolkov/automixer-kimi-paperclip-analyst",
+    "paperclip/piperclip",
+    "piperclip",
     "external paperclip/piperclip",
     "external paperclip",
     "external piperclip",
@@ -249,6 +288,7 @@ MEMORY_LINT_EVIDENCE_TERMS = (
     "tools/memory/memory_lint.py",
 )
 MEMORY_LINT_REQUIRED_COMMAND = "python3 tools/memory/memory_lint.py"
+MEMORY_LINT_FORBIDDEN_ARGUMENTS = ("--root",)
 MEMORY_LINT_STATUS_PATTERN = re.compile(r"\b(?:PASS|FAIL)\b", re.IGNORECASE)
 
 MANDATORY_QUESTIONS_HEADING = "## Три обязательных вопроса"
@@ -414,6 +454,33 @@ def _validate_readiness_scores(text: str) -> list[str]:
     return errors
 
 
+def _validate_readiness_scores_are_final_content(text: str) -> list[str]:
+    section_body = _extract_heading_section(text, READINESS_EXPLANATION_HEADING)
+    if not section_body:
+        return []
+
+    score_matches = []
+    for label in REQUIRED_READINESS_SCORES:
+        pattern = re.compile(
+            rf"^\s*(?:[-*]\s*)?{re.escape(label)}\s*:\s*\d{{1,3}}\s*%\s*$",
+            re.MULTILINE,
+        )
+        match = pattern.search(section_body)
+        if not match:
+            return []
+
+        score_matches.append(match)
+
+    final_score = max(score_matches, key=lambda match: match.end())
+    if section_body[final_score.end():].strip():
+        return [
+            f"{READINESS_EXPLANATION_HEADING} readiness scores must be the "
+            "final plain-language content"
+        ]
+
+    return []
+
+
 def _validate_report_title(text: str, report_path: Path) -> list[str]:
     match = REPORT_TITLE_PATTERN.search(text)
     if not match:
@@ -515,6 +582,11 @@ def _validate_scope_evidence(text: str) -> list[str]:
     for phrase in REQUIRED_SCOPE_PHRASES:
         if not _contains_required_phrase(scope_body, phrase):
             errors.append(f"missing required Scope evidence: {phrase}")
+
+    scope_lines = {line.strip() for line in scope_body.splitlines()}
+    for phrase, error in EXACT_SCOPE_LINE_REQUIREMENTS:
+        if phrase not in scope_lines:
+            errors.append(error)
 
     return errors
 
@@ -674,6 +746,20 @@ def _validate_todo_scan_boundary_evidence(text: str) -> list[str]:
     return errors
 
 
+def _validate_project_goal_evidence(text: str) -> list[str]:
+    section_body = _extract_heading_section(text, "## What Was Found")
+    if not section_body:
+        return []
+
+    normalized_section = _collapse_whitespace(section_body).lower()
+    errors: list[str] = []
+    for label, phrases in REQUIRED_PROJECT_GOAL_EVIDENCE:
+        if not any(phrase.lower() in normalized_section for phrase in phrases):
+            errors.append(f"What Was Found is missing project-goal evidence: {label}")
+
+    return errors
+
+
 def _validate_tests_and_checks_evidence(text: str) -> list[str]:
     section_body = _extract_heading_section(text, "## Tests And Checks")
     if not section_body:
@@ -705,6 +791,18 @@ def _validate_memory_lint_evidence(text: str) -> list[str]:
     if not evidence_chunks:
         return ["Tests And Checks must include memory lint result"]
 
+    forbidden_arguments = [
+        argument
+        for argument in MEMORY_LINT_FORBIDDEN_ARGUMENTS
+        if any(argument in chunk for chunk in evidence_chunks)
+    ]
+    if forbidden_arguments:
+        return [
+            "Tests And Checks memory lint result must use repo-local memory "
+            "lint without alternate-root arguments: "
+            + ", ".join(forbidden_arguments)
+        ]
+
     if any(TEST_RESULT_EVIDENCE_PATTERN.search(chunk) for chunk in evidence_chunks):
         return []
 
@@ -728,6 +826,18 @@ def _validate_memory_lint_result_section(text: str) -> list[str]:
         errors.append(
             "Memory Lint Result must include exact command: "
             f"{MEMORY_LINT_REQUIRED_COMMAND}"
+        )
+
+    forbidden_arguments = [
+        argument
+        for argument in MEMORY_LINT_FORBIDDEN_ARGUMENTS
+        if argument in section_body
+    ]
+    if forbidden_arguments:
+        errors.append(
+            "Memory Lint Result must use repo-local memory lint without "
+            "alternate-root arguments: "
+            + ", ".join(forbidden_arguments)
         )
 
     if not TEST_RESULT_EVIDENCE_PATTERN.search(section_body):
@@ -1466,10 +1576,12 @@ def validate_report(
     errors.extend(_validate_discovery_evidence(text))
     errors.extend(_validate_recent_discovery_evidence(text))
     errors.extend(_validate_todo_scan_boundary_evidence(text))
+    errors.extend(_validate_project_goal_evidence(text))
     errors.extend(_validate_tests_and_checks_evidence(text))
     errors.extend(_validate_memory_lint_evidence(text))
     errors.extend(_validate_memory_lint_result_section(text))
     errors.extend(_validate_readiness_scores(text))
+    errors.extend(_validate_readiness_scores_are_final_content(text))
     errors.extend(_validate_ordered_core_sections(text))
     errors.extend(_validate_ordered_mid_sections(text))
     errors.extend(_validate_ordered_end_sections(text))

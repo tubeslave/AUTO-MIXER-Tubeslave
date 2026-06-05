@@ -10,7 +10,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import math
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+
+try:
+    from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
 
 ROUTING_METHOD_ID = "routing_management_proposal"
@@ -122,6 +127,11 @@ class RoutingManagementAnalysisInput:
     source_confidence: float = 0.75
     route_confidence: float = 0.75
     persistence_cycles: int = 1
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
+    source_identity_trust_state: str = "not_provided"
+    source_identity_trust_confidence: float = 0.0
+    source_identity_replay_outcome_count: int = 0
+    source_identity_calibration_freshness: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -191,13 +201,68 @@ def _severity(blockers: Iterable[str], destructive_scope_score: float, affected_
     if (
         "active_performance_routing_blocked" in blocker_set
         or "routing_scope_too_broad" in blocker_set
+        or "source_identity_blocked_from_downstream_trust" in blocker_set
+        or "source_identity_replay_context_not_fresh" in blocker_set
         or destructive_scope_score >= 0.7
         or affected_count > 4
     ):
         return "high"
+    if (
+        "source_identity_not_trusted_for_downstream" in blocker_set
+        or "source_identity_trust_state_unknown" in blocker_set
+    ):
+        return "medium"
     if destructive_scope_score >= 0.25 or affected_count > 1:
         return "medium"
     return "low"
+
+
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "missing_fields",
+        "untimestamped_present_fields",
+        "stale_after_sec",
+        "read_only",
+        "live_write",
+        "queries_console",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = True
+    normalized.setdefault("status", _freshness_status(payload))
+    return normalized
+
+
+def _route_source_identity(
+    analysis: RoutingManagementAnalysisInput,
+    proposed_norm: Tuple[str, Optional[int]],
+    route_kind: str,
+) -> Tuple[str, str]:
+    if proposed_norm[0] and proposed_norm[1] is not None:
+        source_id = f"{proposed_norm[0]}:{proposed_norm[1]}"
+    else:
+        source_id = str(analysis.route_id)
+    source_type = (
+        str(analysis.expected_source_role or "").strip()
+        or str(analysis.proposed_source_label or "").strip()
+        or route_kind
+    )
+    return source_id, source_type
 
 
 def analyze_routing_management_need(
@@ -228,6 +293,21 @@ def analyze_routing_management_need(
     persistence = max(1, int(analysis.persistence_cycles or 1))
     window = str(analysis.route_change_window or "").strip().lower().replace("-", "_")
     operator_intent = str(analysis.operator_intent or "").strip().lower()
+    current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
+    current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    source_identity_id, source_identity_type = _route_source_identity(
+        analysis,
+        proposed_norm,
+        route_kind,
+    )
+    source_identity_trust = evaluate_source_identity_downstream_trust(
+        source_id=source_identity_id,
+        source_type=source_identity_type,
+        trust_state=analysis.source_identity_trust_state,
+        trust_confidence=analysis.source_identity_trust_confidence,
+        replay_outcome_count=analysis.source_identity_replay_outcome_count,
+        current_state_cache_freshness=analysis.source_identity_calibration_freshness,
+    )
 
     blockers = []
     if route_kind not in SUPPORTED_ROUTE_KINDS:
@@ -256,6 +336,9 @@ def analyze_routing_management_need(
         blockers.append("source_confidence_low")
     if route_confidence < MIN_ROUTE_CONFIDENCE:
         blockers.append("route_confidence_low")
+    if current_state_freshness_status not in {"fresh", "not_provided"}:
+        blockers.append("routing_current_state_cache_not_fresh")
+    blockers.extend(source_identity_trust.blockers)
 
     confidence = _clip01(
         0.25 * source_confidence
@@ -294,6 +377,9 @@ def analyze_routing_management_need(
         "source_confidence": round(source_confidence, 3),
         "route_confidence": round(route_confidence, 3),
         "persistence_cycles": persistence,
+        "current_state_cache_freshness_status": current_state_freshness_status,
+        "current_state_cache_freshness": current_state_freshness,
+        "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
         "destructive_console_state": True,
     }

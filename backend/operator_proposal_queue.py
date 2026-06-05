@@ -219,6 +219,9 @@ class OperatorProposalQueue:
         safety_evidence = raw_change.get("safety_evidence")
         if isinstance(safety_evidence, list):
             normalized["safety_evidence"] = [dict(item) for item in safety_evidence if isinstance(item, dict)]
+        cache_freshness = raw_change.get("cache_freshness")
+        if isinstance(cache_freshness, dict):
+            normalized["cache_freshness"] = dict(cache_freshness)
         return normalized
 
     def _normalize_requested_changes(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:

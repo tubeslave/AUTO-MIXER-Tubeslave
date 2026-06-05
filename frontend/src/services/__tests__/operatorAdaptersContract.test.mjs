@@ -382,6 +382,33 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
         },
       ],
     },
+    autonomy_promotion_readiness: {
+      rows: [
+        {
+          id: 'scene_preset_supervised_promotion',
+          label: 'Scene/preset supervised promotion',
+          action_family: 'scene_preset',
+          target_mode: 'supervised_live_candidate',
+          status: 'manual_only_blocked',
+          supervised_live_allowed: false,
+          autonomous_ready: false,
+          safety_row_id: 'routing_snapshots_scenes',
+          safety_status: 'blocked',
+          read_surface_statuses: ['partial', 'partial'],
+          write_surface_statuses: ['quarantined'],
+          blockers: [
+            'safety_status_blocked',
+            'write_surface_routing_snapshot_scene_writes_quarantined',
+          ],
+          next_required_evidence: ['Keep scene apply blocked.'],
+          evidence_requirement_ids: [
+            'current_scene_preset_cache_freshness',
+            'read_only_scoped_diff_evidence',
+            'read_only_rollback_evidence',
+          ],
+        },
+      ],
+    },
   });
 
   assert.deepEqual(
@@ -391,6 +418,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'write_surface:product_layer_fader_gain_apply',
       'write_surface:legacy_ws_to_osc_router',
       'safety_coverage:gain_supervised',
+      'promotion_readiness:scene_preset_supervised_promotion',
     ],
   );
 
@@ -413,6 +441,17 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.equal(gainCoverage.canWriteLive, false);
   assert.equal(gainCoverage.blockedReason, 'Physical WING gain proof is not complete.');
   assert.equal(gainCoverage.tone, 'blue');
+
+  const scenePresetReadiness = rows[4];
+  assert.equal(scenePresetReadiness.domain, 'promotion_readiness');
+  assert.equal(scenePresetReadiness.canWriteLive, false);
+  assert.deepEqual(scenePresetReadiness.liveWriteKinds, []);
+  assert.equal(scenePresetReadiness.status, 'manual_only_blocked');
+  assert.equal(scenePresetReadiness.entrypoint, 'scene_preset');
+  assert.equal(scenePresetReadiness.module, 'routing_snapshots_scenes');
+  assert.equal(scenePresetReadiness.tone, 'red');
+  assert.match(scenePresetReadiness.blockedReason, /safety_status_blocked/);
+  assert.match(scenePresetReadiness.nextStep, /read_only_scoped_diff_evidence/);
 });
 
 test('adaptTelemetryAlertsSnapshot maps generated alert artifacts as read-only evidence', async () => {
@@ -1028,6 +1067,75 @@ test('dashboardTelemetryForChannel derives read-only strip state from channel sn
 
   assert.equal(clipping.safeState, 'CLIP');
   assert.equal(clipping.accent, 'red');
+});
+
+test('dashboard analyzer metrics populate read-only phase dynamics and LUFS cards', async () => {
+  const { adaptDashboardRuntime } = await importTypeScript('services/operatorAdapters.ts');
+  const { dashboardAnalysisCards } = await importTypeScript('components/dashboard/dashboardTelemetryModel.ts');
+
+  const runtime = adaptDashboardRuntime(
+    {
+      master_bus: {
+        integrated_lufs: -18.2,
+        true_peak_db: -2.4,
+      },
+      analyzer: {
+        spectrum_bins: [12, 24, 36, 48],
+        phase_history: [-0.5, 0, 0.5],
+        phase_label: 'Phase locked',
+        phase_summary: 'OH pair aligned',
+        correlation_history: [-0.25, 0.25],
+        dynamics_history: [44, 55, 66],
+        dynamics_label: 'GR avg 2.4',
+        dynamics_summary: 'Transient window stable',
+        lufs_history: [-30, -24, -18],
+        lufs_label: '-18.2 LUFS',
+        loudness_summary: 'Inside Ayaic corridor',
+      },
+      channel_summary: {
+        active_channels: 14,
+        total_channels: 48,
+      },
+    },
+    {
+      agents: [
+        { confidence: 88 },
+      ],
+    },
+    {
+      summary: {
+        pending_count: 2,
+        blocked_count: 1,
+      },
+    },
+  );
+
+  assert.deepEqual(runtime.spectrumBins, [12, 24, 36, 48]);
+  assert.deepEqual(runtime.analysisTraces.phase.values, [31, 50, 69]);
+  assert.deepEqual(runtime.analysisTraces.correlation.values, [40.5, 59.5]);
+  assert.deepEqual(runtime.analysisTraces.dynamics.values, [44, 55, 66]);
+  assert.deepEqual(runtime.analysisTraces.loudness.values, [50, 60, 70]);
+  assert.equal(runtime.analysisTraces.phase.sourceLabel, 'Backend analyzer DTO');
+  assert.equal(runtime.analysisTraces.phase.sourceTone, 'green');
+
+  const cards = dashboardAnalysisCards(runtime, [
+    { id: 'phase', title: 'Phase Scope', accent: 'green', values: [10], primary: 'fallback phase', secondary: 'fallback secondary' },
+    { id: 'dynamics', title: 'Dynamics Overview', accent: 'yellow', values: [20], primary: 'fallback dynamics', secondary: 'fallback secondary' },
+    { id: 'loudness', title: 'Loudness History', accent: 'green', values: [30], primary: 'fallback loudness', secondary: 'fallback secondary' },
+    { id: 'spectral', title: 'Spectral Balance', accent: 'purple', values: [40], primary: 'fallback spectral', secondary: 'fallback secondary' },
+  ]);
+
+  assert.equal(cards[0].primary, 'Phase locked');
+  assert.equal(cards[0].secondary, 'OH pair aligned');
+  assert.equal(cards[0].sourceLabel, 'Backend DTO');
+  assert.equal(cards[0].sourceTone, 'green');
+  assert.deepEqual(cards[1].values, [44, 55, 66]);
+  assert.equal(cards[2].primary, '-18.2 LUFS');
+  assert.equal(cards[3].sourceLabel, undefined);
+  assert.deepEqual(cards[3].values, [40]);
+
+  const dashboardMockSource = await fs.readFile(path.join(srcRoot, 'mock/dashboardMock.ts'), 'utf8');
+  assert.equal(dashboardMockSource.includes('TODO(analyzer metrics)'), false);
 });
 
 test('read-only DTO adapters preserve explicit empty backend snapshots', async () => {

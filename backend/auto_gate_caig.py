@@ -557,6 +557,11 @@ class AutoGateController:
         self.num_channels = num_channels
         self.sample_rate = sample_rate
         self.mixer_client = mixer_client
+        self.live_write_allowed = False
+        self.write_policy = "proposal_only_quarantined"
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
         
         # Components
         self.extractor = FeatureExtractor(sample_rate)
@@ -639,6 +644,10 @@ class AutoGateController:
         Returns:
             {channel_id: GateDecision}
         """
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+
         # Step 1: Extract features
         features = {}
         for ch, audio in audio_data.items():
@@ -686,22 +695,25 @@ class AutoGateController:
             
             decisions[ch] = decision
         
-        # Send OSC if available
+        # Gate live writes are quarantined. Keep this as an explicit fail-closed
+        # branch so legacy callers that pass a mixer client do not mutate state.
         if self.mixer_client:
             self._send_osc(decisions)
         
         return decisions
     
     def _send_osc(self, decisions: Dict[int, GateDecision]):
-        """Send gate decisions via OSC."""
-        try:
-            for ch, decision in decisions.items():
-                # Send gate gain
-                if hasattr(self.mixer_client, 'set_channel_gate'):
-                    self.mixer_client.set_channel_gate(ch, decision.gain_db)
-                    
-        except Exception as e:
-            logger.error(f"OSC send error: {e}")
+        """Quarantine legacy gate writes and keep decisions as dry-run output."""
+
+        self.last_write_attempted = bool(decisions)
+        self.last_write_blocked = bool(decisions)
+        self.last_write_count = 0
+        if decisions:
+            logger.warning(
+                "CAIG gate live writes are quarantined; %s decisions kept as dry-run proposals",
+                len(decisions),
+            )
+        return 0
     
     def get_status(self) -> Dict[str, Any]:
         """Get current status."""
@@ -710,7 +722,13 @@ class AutoGateController:
             'groups': {
                 group.value: len(channels)
                 for group, channels in self.group_analyzer.group_channels.items()
-            }
+            },
+            'live_write_allowed': self.live_write_allowed,
+            'write_policy': self.write_policy,
+            'mixer_client_present': self.mixer_client is not None,
+            'last_write_attempted': self.last_write_attempted,
+            'last_write_blocked': self.last_write_blocked,
+            'last_write_count': self.last_write_count,
         }
 
 

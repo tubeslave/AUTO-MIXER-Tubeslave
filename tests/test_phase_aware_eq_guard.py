@@ -14,6 +14,7 @@ from phase_aware_eq_guard import (
     PhaseChannelInput,
     analyze_phase_aware_eq_guard,
 )
+from processing_proposal_adapters import build_proposal_only_method_contracts
 
 
 def _sine(freq_hz, *, sample_rate=48000, seconds=0.2, amp=0.35):
@@ -36,6 +37,14 @@ def test_low_frequency_phase_cancellation_blocks_aggressive_eq_boost():
             group_id="DRUMS",
             low_freq_focus=True,
             low_freq_loss_threshold_db=1.0,
+            current_state_cache_freshness={
+                "status": "fresh",
+                "field_count": 6,
+                "fresh_field_count": 6,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
         ),
     )
 
@@ -47,6 +56,49 @@ def test_low_frequency_phase_cancellation_blocks_aggressive_eq_boost():
     assert result.pair_measurements[0].polarity_candidate is True
     assert result.pair_measurements[0].low_freq_sum_loss_db >= 1.0
     assert "hold aggressive EQ boosts" in " ".join(result.warnings)
+    assert result.metadata["current_state_cache_freshness_status"] == "fresh"
+    assert result.metadata["current_state_cache_freshness"]["fresh_field_count"] == 6
+
+
+def test_stale_phase_context_blocks_phase_candidates_and_holds_eq():
+    sample_rate = 48000
+    kick_anchor = _sine(70.0, sample_rate=sample_rate)
+    kick_outer = -kick_anchor.copy()
+
+    result = analyze_phase_aware_eq_guard(
+        [
+            PhaseChannelInput(1, kick_anchor, group_id="DRUMS", weight=1.0, label="kick in"),
+            PhaseChannelInput(2, kick_outer, group_id="DRUMS", weight=0.6, label="kick out"),
+        ],
+        PhaseAwareEQGuardConfig(
+            sample_rate=sample_rate,
+            group_id="DRUMS",
+            low_freq_focus=True,
+            low_freq_loss_threshold_db=1.0,
+            current_state_cache_freshness={
+                "status": "stale",
+                "field_count": 6,
+                "fresh_field_count": 4,
+                "stale_field_count": 2,
+                "stale_fields": ["phase_audio_window", "group_phase_measurements"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        ),
+    )
+
+    assert result.eq_action_policy == EQActionPolicy.PHASE_UNRELIABLE
+    assert result.suggested_actions == ()
+    assert result.pair_measurements == ()
+    assert "phase context cache is not fresh" in " ".join(result.warnings)
+    assert "phase_aware_eq_context_cache_not_fresh" in result.metadata["blockers"]
+    assert result.metadata["current_state_cache_freshness_status"] == "stale"
+    assert result.metadata["current_state_cache_freshness"]["stale_fields"] == [
+        "phase_audio_window",
+        "group_phase_measurements",
+    ]
+    assert result.metadata["live_write_allowed"] is False
 
 
 def test_high_bleed_lowers_phase_confidence_and_holds_eq():
@@ -207,6 +259,7 @@ def test_phase_aware_eq_guard_registry_entry_is_proposal_only():
     from processing_registry import get_processing_method
 
     method = get_processing_method("phase_aware_eq_guard")
+    contracts = {item["method_id"]: item for item in build_proposal_only_method_contracts()}
 
     assert method is not None
     assert method.status == "proposal_only"
@@ -215,6 +268,11 @@ def test_phase_aware_eq_guard_registry_entry_is_proposal_only():
     assert method.can_write_live is False
     assert "lab_dsp" in method.pipeline_profiles
     assert "shadow_quality" in method.pipeline_profiles
+    assert contracts["phase_aware_eq_guard"]["proposal_contract"]["value_type"] == "phase_eq_guard"
+    assert (
+        "current_phase_audio_context_cache_freshness"
+        in contracts["phase_aware_eq_guard"]["proposal_contract"]["safety_evidence_required"]
+    )
 
 
 def test_phase_aware_eq_guard_module_is_transport_free():

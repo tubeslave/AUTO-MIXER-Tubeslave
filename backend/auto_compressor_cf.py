@@ -30,7 +30,7 @@ Hard Limits:
 import numpy as np
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from collections import deque
 from enum import Enum
 
@@ -400,6 +400,13 @@ class AutoCFCompressorController:
         self.is_active = False
         self.current_channel: Optional[int] = None
         self.current_params: Optional[CFCompressorParams] = None
+        self.live_write_allowed = False
+        self.write_policy = "proposal_only_quarantined"
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+        self.last_blocked_calls: List[Dict[str, Any]] = []
+        self.last_apply_result: Dict[str, Any] = {}
         
         logger.info("AutoCFCompressorController initialized")
     
@@ -448,44 +455,98 @@ class AutoCFCompressorController:
         self.current_params = new_params
         return new_params
     
-    def apply_params(self, channel: int, params: CFCompressorParams):
+    def _blocked_apply_result(
+        self,
+        reason: str,
+        blocked_calls: List[Dict[str, Any]],
+        *,
+        channel: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        self.last_write_attempted = bool(blocked_calls)
+        self.last_write_blocked = bool(blocked_calls)
+        self.last_write_count = 0
+        self.last_blocked_calls = list(blocked_calls)
+        result = {
+            "applied": False,
+            "blocked": bool(blocked_calls),
+            "calls": [],
+            "blocked_calls": list(blocked_calls),
+            "blocked_call_count": len(blocked_calls),
+            "reason": reason,
+            "write_policy": self.write_policy,
+            "live_write_allowed": self.live_write_allowed,
+            "can_apply_live": False,
+            "mixer_client_present": self.mixer_client is not None,
+            "mutates_mixer": False,
+        }
+        if channel is not None:
+            result["channel"] = channel
+        self.last_apply_result = result
+        if blocked_calls:
+            logger.warning(
+                "AutoCFCompressor live writes are quarantined; %s commands kept as evidence",
+                len(blocked_calls),
+            )
+        return result
+
+    def _build_param_calls(self, channel: int, params: CFCompressorParams) -> List[Dict[str, Any]]:
+        return [
+            {
+                "cmd": "set_compressor_on",
+                "channel": channel,
+                "on": 1,
+                "semantic": "enable_before_cf_params",
+            },
+            {
+                "cmd": "set_compressor",
+                "channel": channel,
+                "threshold": float(params.threshold_db),
+                "ratio": str(params.ratio),
+                "attack": float(params.attack_ms),
+                "release": float(params.release_ms),
+                "knee": int(round(params.knee_db)),
+                "gain": float(params.makeup_gain_db),
+                "cf_db": float(params.cf_db),
+                "cf_class": params.cf_class.value,
+                "semantic": "apply_cf_compressor_params",
+            },
+        ]
+
+    def apply_params(self, channel: int, params: CFCompressorParams) -> Dict[str, Any]:
         """
-        Apply compressor parameters to mixer channel via OSC.
+        Return blocked compressor parameter evidence without mutating a mixer.
         
         Args:
             channel: Mixer channel number
             params: Compressor parameters
         """
-        if not self.mixer_client or not self.mixer_client.is_connected:
-            logger.warning("No mixer client connected")
-            return
-        
-        try:
-            # Enable compressor if needed
-            self.mixer_client.set_compressor_on(channel, 1)
-            
-            # Set parameters
-            self.mixer_client.set_compressor(
-                channel,
-                threshold=float(params.threshold_db),
-                ratio=str(params.ratio),
-                attack=float(params.attack_ms),
-                release=float(params.release_ms),
-                knee=int(round(params.knee_db)),
-                gain=float(params.makeup_gain_db)
-            )
-            
-            logger.info(
-                f"Applied CF compressor to ch{channel}: "
-                f"CF={params.cf_db:.1f}dB ({params.cf_class.value}), "
-                f"attack={params.attack_ms:.1f}ms, "
-                f"release={params.release_ms:.1f}ms, "
-                f"ratio={params.ratio:.1f}:1, "
-                f"thr={params.threshold_db:.1f}dB"
-            )
-            
-        except Exception as e:
-            logger.error(f"Failed to apply compressor to ch{channel}: {e}")
+        blocked_calls = self._build_param_calls(channel, params)
+        result = self._blocked_apply_result(
+            "auto_cf_compressor_direct_apply_quarantined",
+            blocked_calls,
+            channel=channel,
+        )
+        result["planned_params"] = {
+            "threshold": float(params.threshold_db),
+            "ratio": float(params.ratio),
+            "attack_ms": float(params.attack_ms),
+            "release_ms": float(params.release_ms),
+            "knee_db": float(params.knee_db),
+            "makeup_gain_db": float(params.makeup_gain_db),
+            "cf_db": float(params.cf_db),
+            "cf_class": params.cf_class.value,
+        }
+        logger.info(
+            "CF compressor params kept as blocked evidence for ch%s: CF=%.1fdB (%s), attack=%.1fms, release=%.1fms, ratio=%.1f:1, thr=%.1fdB",
+            channel,
+            params.cf_db,
+            params.cf_class.value,
+            params.attack_ms,
+            params.release_ms,
+            params.ratio,
+            params.threshold_db,
+        )
+        return result
     
     def reset(self):
         """Reset controller state."""

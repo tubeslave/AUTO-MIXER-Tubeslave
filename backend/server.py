@@ -586,7 +586,11 @@ class AutoMixerServer:
                         "results": [],
                     }
 
-        proposals = build_soundcheck_operator_proposals(bundle or {}, source=source)
+        proposals = build_soundcheck_operator_proposals(
+            bundle or {},
+            mixer_client=self.mixer_client,
+            source=source,
+        )
         summary = import_operator_proposals(
             self.operator_proposal_queue,
             proposals,
@@ -749,6 +753,100 @@ class AutoMixerServer:
         return ""
 
     @staticmethod
+    def _coerce_epoch_seconds(value: Any) -> Optional[float]:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            timestamp = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+            return timestamp.timestamp()
+        if isinstance(value, (int, float)):
+            numeric = float(value)
+            return numeric / 1000.0 if numeric > 1_000_000_000_000 else numeric
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return None
+            try:
+                return AutoMixerServer._coerce_epoch_seconds(float(text))
+            except ValueError:
+                pass
+            try:
+                return AutoMixerServer._coerce_epoch_seconds(datetime.fromisoformat(text.replace("Z", "+00:00")))
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _iso_from_epoch(value: Optional[float]) -> Optional[str]:
+        if value is None:
+            return None
+        return datetime.fromtimestamp(value, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+    def _manual_write_cache_freshness(
+        self,
+        address: str,
+        *,
+        minimum_updated_at_epoch: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        client = self.mixer_client
+        state = getattr(client, "state", None) if client else None
+        present = bool(address and isinstance(state, dict) and state.get(address) is not None)
+        updated_epoch = None
+        if address:
+            for attr in ("state_timestamps", "_state_timestamps", "state_updated_at", "_state_updated_at"):
+                timestamps = getattr(client, attr, None) if client else None
+                if not isinstance(timestamps, dict):
+                    continue
+                raw = timestamps.get(address)
+                if isinstance(raw, dict):
+                    raw = raw.get("updated_at") or raw.get("timestamp") or raw.get("ts")
+                updated_epoch = self._coerce_epoch_seconds(raw)
+                if updated_epoch is not None:
+                    break
+
+        now = datetime.now(timezone.utc).timestamp()
+        age_sec = round(max(0.0, now - updated_epoch), 3) if updated_epoch is not None else None
+        stale_after_sec = 30.0
+        if not address:
+            status = "unsupported"
+        elif not present:
+            status = "missing"
+        elif updated_epoch is None:
+            status = "unknown"
+        elif age_sec is not None and age_sec > stale_after_sec:
+            status = "stale"
+        elif minimum_updated_at_epoch is not None and updated_epoch < minimum_updated_at_epoch:
+            status = "not_after_write"
+        else:
+            status = "fresh"
+        return {
+            "status": status,
+            "address": address or None,
+            "source": "state_timestamps" if updated_epoch is not None else "unavailable",
+            "updated_at": self._iso_from_epoch(updated_epoch),
+            "minimum_updated_at": self._iso_from_epoch(minimum_updated_at_epoch),
+            "updated_after_minimum": (
+                None
+                if minimum_updated_at_epoch is None or updated_epoch is None
+                else updated_epoch >= minimum_updated_at_epoch
+            ),
+            "age_sec": age_sec,
+            "stale_after_sec": stale_after_sec,
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+        }
+
+    @staticmethod
+    def _cache_freshness_blocks_pre_read(read_result: Optional[Dict[str, Any]]) -> bool:
+        if not isinstance(read_result, dict):
+            return False
+        if read_result.get("source") != "mixer_state_cache":
+            return False
+        cache_freshness = read_result.get("cache_freshness")
+        return not isinstance(cache_freshness, dict) or cache_freshness.get("status") != "fresh"
+
+    @staticmethod
     def _clamp_manual_write_value(value: float, value_type: str) -> float:
         if value_type == "fader":
             return max(-144.0, min(10.0, float(value)))
@@ -784,10 +882,14 @@ class AutoMixerServer:
         effective_value: float,
         value_type: str,
         readback_source: str = "mixer_state_cache",
+        readback_cache_freshness: Optional[Dict[str, Any]] = None,
     ) -> str:
         readback_float = self._coerce_optional_float(readback_value)
         if readback_float is None:
             return "readback_unavailable"
+        if readback_source == "mixer_state_cache":
+            if not isinstance(readback_cache_freshness, dict) or readback_cache_freshness.get("status") != "fresh":
+                return "readback_cache_not_fresh"
 
         tolerance = self._manual_write_readback_tolerance.get(value_type, 0.05)
         if abs(readback_float - effective_value) <= tolerance:
@@ -830,6 +932,7 @@ class AutoMixerServer:
         value_type: str,
         address: str,
         prefer_physical: bool = False,
+        minimum_cache_updated_at_epoch: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Read a fader/gain value for proof metadata without writing.
 
@@ -883,6 +986,10 @@ class AutoMixerServer:
                 "status": "verified_from_cache",
                 "source": "mixer_state_cache",
                 "address": address,
+                "cache_freshness": self._manual_write_cache_freshness(
+                    address,
+                    minimum_updated_at_epoch=minimum_cache_updated_at_epoch,
+                ),
             }
 
         physical = await physical_read()
@@ -1040,6 +1147,7 @@ class AutoMixerServer:
         old_value_float = self._coerce_optional_float(old_value)
         pre_read_status = str(pre_read.get("status") or "readback_unavailable")
         pre_read_source = str(pre_read.get("source") or "unavailable")
+        pre_read_cache_freshness = pre_read.get("cache_freshness")
         if old_value_float is None:
             return self._manual_write_blocked_result(
                 reason="pre_read_unavailable",
@@ -1055,6 +1163,24 @@ class AutoMixerServer:
                     "pre_read_source": pre_read_source,
                     "pre_read_value": old_value,
                     "pre_read_error": pre_read.get("error"),
+                },
+            )
+
+        if self._cache_freshness_blocks_pre_read(pre_read):
+            return self._manual_write_blocked_result(
+                reason="pre_read_cache_not_fresh",
+                channel=channel_int,
+                value=requested_value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+                extra={
+                    "address": address,
+                    "effective_value": effective_value,
+                    "pre_read_status": pre_read_status,
+                    "pre_read_source": pre_read_source,
+                    "pre_read_value": old_value,
+                    "cache_freshness": pre_read_cache_freshness,
                 },
             )
 
@@ -1079,6 +1205,7 @@ class AutoMixerServer:
                 },
             )
 
+        write_started_epoch = datetime.now(timezone.utc).timestamp()
         try:
             write_result = write_method(channel_int, effective_value)
         except Exception as exc:
@@ -1131,15 +1258,18 @@ class AutoMixerServer:
             value_type=write_kind,
             address=address,
             prefer_physical=True,
+            minimum_cache_updated_at_epoch=write_started_epoch,
         )
         readback_value = readback.get("value")
         readback_source = str(readback.get("source") or "unavailable")
+        readback_cache_freshness = readback.get("cache_freshness")
         readback_status = self._manual_write_readback_status(
             old_value=old_value,
             readback_value=readback_value,
             effective_value=effective_value,
             value_type=write_kind,
             readback_source=readback_source,
+            readback_cache_freshness=readback_cache_freshness,
         )
         proof_status = self._manual_write_proof_status(readback_status)
         rollback_value = self._coerce_optional_float(old_value)
@@ -1156,9 +1286,11 @@ class AutoMixerServer:
             "pre_read_value": old_value,
             "pre_read_status": pre_read_status,
             "pre_read_source": pre_read_source,
+            "pre_read_cache_freshness": pre_read_cache_freshness,
             "readback_value": readback_value,
             "readback_status": readback_status,
             "readback_source": readback_source,
+            "readback_cache_freshness": readback_cache_freshness,
             "proof_status": proof_status,
             "rollback_available": rollback_available,
             "rollback_value": rollback_value,
@@ -4659,11 +4791,14 @@ class AutoMixerServer:
                 return
             # Применяем напрямую через mixer_client
             try:
-                success = await self._apply_phase_corrections_direct(measurements)
+                result = await self._apply_phase_corrections_direct(measurements)
+                success = result.get("applied", False) if isinstance(result, dict) else bool(result)
                 await self.broadcast({
                     "type": "phase_alignment_apply_result",
                     "success": success,
-                    "message": f"Phase/delay corrections applied to {len(measurements)} channel pairs" if success else "Failed to apply corrections"
+                    "blocked": result.get("blocked", False) if isinstance(result, dict) else False,
+                    "result": result if isinstance(result, dict) else None,
+                    "message": f"Phase/delay corrections applied to {len(measurements)} channel pairs" if success else "Phase/delay corrections blocked or failed"
                 })
             except Exception as e:
                 logger.error(f"Error applying phase corrections directly: {e}", exc_info=True)
@@ -4707,13 +4842,16 @@ class AutoMixerServer:
                 })
                 return
             
-            success = self.phase_alignment_controller.apply_corrections(measurements)
+            result = self.phase_alignment_controller.apply_corrections(measurements)
+            success = result.get("applied", False) if isinstance(result, dict) else bool(result)
             
             await self.broadcast({
                 "type": "phase_alignment_apply_result",
                 "success": success,
+                "blocked": result.get("blocked", False) if isinstance(result, dict) else False,
+                "result": result if isinstance(result, dict) else None,
                 "corrections": self.phase_alignment_controller.corrections.copy() if self.phase_alignment_controller.corrections else {},
-                "message": "Phase/delay corrections applied to mixer" if success else "Failed to apply corrections"
+                "message": "Phase/delay corrections applied to mixer" if success else "Phase/delay corrections blocked or failed"
             })
         
         except Exception as e:
@@ -4727,70 +4865,11 @@ class AutoMixerServer:
             })
     
     async def _apply_phase_corrections_direct(self, measurements: dict):
-        """Apply phase/delay corrections directly through mixer client."""
-        import re
-        applied_count = 0
-        
-        for pair_key, meas in measurements.items():
-            # Парсинг ключа пары каналов
-            if isinstance(pair_key, tuple):
-                ref_ch, ch = pair_key
-            elif isinstance(pair_key, str):
-                match = re.match(r'\((\d+),\s*(\d+)\)', pair_key)
-                if match:
-                    ref_ch = int(match.group(1))
-                    ch = int(match.group(2))
-                else:
-                    logger.warning(f"Could not parse channel pair: {pair_key}")
-                    continue
-            else:
-                logger.warning(f"Unknown pair key format: {pair_key}")
-                continue
-            
-            delay_ms = meas.get('optimal_delay_ms', 0.0)
-            phase_invert = meas.get('phase_invert', 0)
-            coherence = meas.get('coherence', 0.0)
-            
-            logger.info(f"Applying corrections to channel {ch}: delay={delay_ms:.2f} ms, phase_invert={phase_invert}, coherence={coherence:.2f}")
-            
-            # PRIORITY: Phase inversion first, delay only if necessary
-            # If phase inversion is needed and delay is small (< 2ms), try phase only first
-            DELAY_SIGNIFICANT_THRESHOLD = 2.0  # ms
-            COHERENCE_THRESHOLD = 0.6
-            
-            if phase_invert == 1 and abs(delay_ms) < DELAY_SIGNIFICANT_THRESHOLD:
-                if coherence >= COHERENCE_THRESHOLD:
-                    logger.info(f"Channel {ch}: Small delay ({delay_ms:.2f}ms) with phase invert - prioritizing phase only")
-                    delay_ms = 0.0
-                else:
-                    logger.info(f"Channel {ch}: Low coherence ({coherence:.2f}) even with phase invert - keeping delay")
-            
-            # Skip very small delays (< 0.3ms) if coherence is good
-            if abs(delay_ms) < 0.3 and coherence >= COHERENCE_THRESHOLD:
-                logger.info(f"Channel {ch}: Negligible delay ({delay_ms:.2f}ms) with good coherence - skipping delay")
-                delay_ms = 0.0
-            
-            # Применение задержки только если она значительная
-            if abs(delay_ms) >= 0.3:
-                # Получаем max_delay_ms из контроллера если он есть
-                max_delay = 10.0  # Default 10ms - musically acceptable
-                if self.phase_alignment_controller:
-                    max_delay = getattr(self.phase_alignment_controller, 'max_delay_ms', 10.0)
-                delay_value = max(0.5, min(max_delay, abs(delay_ms)))
-                self.mixer_client.set_channel_delay(ch, delay_value, mode="MS")
-                logger.info(f"Channel {ch}: Applied delay {delay_value:.2f} ms (clamped to max {max_delay}ms)")
-            else:
-                self.mixer_client.send(f"/ch/{ch}/in/set/dlyon", 0)
-                logger.info(f"Channel {ch}: Delay disabled (too small or unnecessary)")
-            
-            # Применение инверсии фазы
-            self.mixer_client.set_channel_phase_invert(ch, phase_invert)
-            logger.info(f"Channel {ch}: Phase invert set to {phase_invert}")
-            
-            applied_count += 1
-        
-        logger.info(f"Applied corrections directly to {applied_count} channels")
-        return applied_count > 0
+        """Return blocked phase/delay evidence instead of writing directly."""
+        controller = self.phase_alignment_controller or PhaseAlignmentController(
+            mixer_client=self.mixer_client
+        )
+        return controller.apply_corrections(measurements)
     
     async def reset_phase_delay(self, websocket, channels: List[int] = None):
         """Reset and disable all phase inversions and delays on specified channels."""
@@ -4821,15 +4900,18 @@ class AutoMixerServer:
         try:
             # Если контроллер инициализирован, используем его метод
             if self.phase_alignment_controller:
-                success = self.phase_alignment_controller.reset_all_phase_delay(channels)
+                result = self.phase_alignment_controller.reset_all_phase_delay(channels)
             else:
                 # Иначе сбрасываем напрямую через mixer_client
-                success = await self._reset_phase_delay_direct(channels)
+                result = await self._reset_phase_delay_direct(channels)
+            success = result.get("applied", False) if isinstance(result, dict) else bool(result)
             
             await self.broadcast({
                 "type": "phase_alignment_reset_result",
                 "success": success,
-                "message": f"Phase and delay reset for {len(channels)} channels" if success else "Failed to reset phase/delay"
+                "blocked": result.get("blocked", False) if isinstance(result, dict) else False,
+                "result": result if isinstance(result, dict) else None,
+                "message": f"Phase and delay reset for {len(channels)} channels" if success else "Phase/delay reset blocked or failed"
             })
         
         except Exception as e:
@@ -4841,29 +4923,11 @@ class AutoMixerServer:
             })
     
     async def _reset_phase_delay_direct(self, channels: List[int]):
-        """Reset phase and delay directly through mixer client."""
-        reset_count = 0
-        
-        for ch in channels:
-            try:
-                # Сброс инверсии фазы (0 = нормальная фаза)
-                self.mixer_client.set_channel_phase_invert(ch, 0)
-                
-                # Отключение задержки
-                self.mixer_client.send(f"/ch/{ch}/in/set/dlyon", 0)
-                
-                # Сброс значения задержки на минимальное
-                self.mixer_client.send(f"/ch/{ch}/in/set/dlymode", "MS")
-                self.mixer_client.send(f"/ch/{ch}/in/set/dly", 0.5)  # Минимальное значение
-                
-                reset_count += 1
-                logger.info(f"Channel {ch}: Reset phase and delay (direct)")
-                
-            except Exception as e:
-                logger.error(f"Error resetting channel {ch}: {e}")
-        
-        logger.info(f"Reset phase and delay for {reset_count} channels (direct)")
-        return reset_count > 0
+        """Return blocked phase/delay reset evidence instead of writing directly."""
+        controller = self.phase_alignment_controller or PhaseAlignmentController(
+            mixer_client=self.mixer_client
+        )
+        return controller.reset_all_phase_delay(channels)
     
     # ========== Auto Fader Methods ==========
     
@@ -6056,26 +6120,57 @@ class AutoMixerServer:
         })
     
     # ========== Auto Compressor ==========
-    
+
+    def _blocked_compressor_reset_result(self, mixer_ch: int) -> Dict[str, Any]:
+        return {
+            "status": "blocked",
+            "success": False,
+            "applied": False,
+            "blocked": True,
+            "surface": "auto_compressor_reset",
+            "reason": "auto_compressor_reset_direct_apply_quarantined",
+            "channel": mixer_ch,
+            "write_policy": "proposal_only_quarantined",
+            "live_write_allowed": False,
+            "can_apply_live": False,
+            "mutates_mixer": False,
+            "blocked_calls": [
+                {
+                    "cmd": "set_compressor_on",
+                    "channel": mixer_ch,
+                    "on": 0,
+                    "semantic": "reset_compressor_disable",
+                },
+                {
+                    "cmd": "set_compressor",
+                    "channel": mixer_ch,
+                    "threshold": -10.0,
+                    "ratio": "3.0",
+                    "attack": 10.0,
+                    "release": 100.0,
+                    "gain": 0.0,
+                    "mix": 100.0,
+                    "knee": 0,
+                    "semantic": "reset_compressor_defaults",
+                },
+            ],
+        }
+
     def _reset_compressor_on_channel(self, mixer_ch: int):
-        """Reset compressor to defaults and turn off on one mixer channel (blocking)."""
-        import time
-        self.mixer_client.set_compressor_on(mixer_ch, 0)
-        time.sleep(0.02)
-        self.mixer_client.set_compressor(
-            mixer_ch,
-            threshold=-10.0,
-            ratio="3.0",
-            attack=10.0,
-            release=100.0,
-            gain=0.0,
-            mix=100.0,
-            knee=0,
+        """Return blocked reset evidence instead of mutating compressor state."""
+        result = self._blocked_compressor_reset_result(int(mixer_ch))
+        logger.warning(
+            "Blocked quarantined Auto Compressor reset helper",
+            extra={
+                "event": "auto_compressor_reset_blocked",
+                "surface": result["surface"],
+                "channel": result["channel"],
+            },
         )
-        time.sleep(0.02)
+        return result
 
     async def start_auto_compressor(self, websocket, device_id, channels: list, channel_mapping: dict, channel_names: dict = None):
-        """Start Auto Compressor: open audio capture (post-fader). Resets compressor params on selected channels."""
+        """Start Auto Compressor: open audio capture and keep reset writes as blocked evidence."""
         if await self._block_quarantined_wing_write_surface(
             websocket,
             surface="start_auto_compressor",
@@ -6100,7 +6195,7 @@ class AutoMixerServer:
         channel_names = {int(k): str(v) for k, v in (channel_names or {}).items()}
         if self.auto_compressor_controller:
             self.auto_compressor_controller.stop()
-        # Reset compressor parameters on all channels that will be used by Auto Compressor
+        # Preserve reset intent as blocked evidence; compressor live writes remain quarantined.
         mixer_channels = list({channel_mapping.get(ac, ac) for ac in channels})
         loop = asyncio.get_running_loop()
         for ch in mixer_channels:

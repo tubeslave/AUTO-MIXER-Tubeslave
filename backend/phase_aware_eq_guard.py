@@ -53,6 +53,7 @@ class PhaseAwareEQGuardConfig:
     bleed_risk_threshold: float = 0.55
     anchor_weight_bias: float = 0.35
     dry_run: bool = True
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         data = asdict(self)
@@ -257,6 +258,67 @@ def _group_gain_db(channels: Sequence[PhaseChannelInput]) -> float:
     return _amp_to_db(_rms(summed))
 
 
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "missing_fields",
+        "untimestamped_present_fields",
+        "stale_after_sec",
+        "read_only",
+        "live_write",
+        "queries_console",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = True
+    normalized.setdefault("status", _freshness_status(payload))
+    return normalized
+
+
+def _base_metadata(
+    config: PhaseAwareEQGuardConfig,
+    *,
+    candidate_count: int = 0,
+    channel_count: int = 0,
+    group_gain_source: str = "unavailable",
+) -> Dict[str, Any]:
+    freshness = _freshness_payload(config.current_state_cache_freshness)
+    return {
+        "live_write_allowed": False,
+        "transport_free": True,
+        "candidate_count": int(candidate_count),
+        "channel_count": int(channel_count),
+        "group_gain_source": group_gain_source,
+        "current_state_cache_freshness_status": str(freshness.get("status") or "unknown"),
+        "current_state_cache_freshness": freshness,
+        "pi_surface_coverage": {
+            "group": True,
+            "group_enable_mode": True,
+            "group_gain": True,
+            "gain": True,
+            "weight": True,
+            "global_low_freq_focus": True,
+            "lookahead_buffer_ms": True,
+            "report_latency": True,
+            "phase_lock": config.group_enable_mode == GroupEnableMode.GROUP_PHASE_LOCK,
+        },
+    }
+
+
 def _pair_policy(
     *,
     delay_ms: float,
@@ -357,6 +419,8 @@ def analyze_phase_aware_eq_guard(
     """Build a proposal-only phase guard result for AutoEQ decisions."""
 
     logic_latency_ms = float(config.lookahead_buffer_ms) if config.report_latency else 0.0
+    current_state_freshness = _freshness_payload(config.current_state_cache_freshness)
+    current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
     if not config.global_enabled or config.group_enable_mode == GroupEnableMode.GROUP_OFF:
         return PhaseAwareEQGuardResult(
             method_id="automixer_phase_aware_eq_guard_v1",
@@ -375,10 +439,33 @@ def analyze_phase_aware_eq_guard(
             pair_measurements=(),
             suggested_actions=(),
             warnings=("group disabled; no phase or EQ action should be taken",),
-            metadata={"live_write_allowed": False, "transport_free": True},
+            metadata=_base_metadata(config),
         )
 
     usable = _filter_channels(channels, config)
+    if current_state_freshness_status not in {"fresh", "not_provided"}:
+        metadata = _base_metadata(config, channel_count=len(usable))
+        metadata["blockers"] = ("phase_aware_eq_context_cache_not_fresh",)
+        return PhaseAwareEQGuardResult(
+            method_id="automixer_phase_aware_eq_guard_v1",
+            group_id=config.group_id,
+            group_enable_mode=config.group_enable_mode,
+            global_enabled=config.global_enabled,
+            low_freq_focus=config.low_freq_focus,
+            dry_run=True,
+            sample_rate=config.sample_rate,
+            lookahead_buffer_ms=config.lookahead_buffer_ms,
+            report_latency=config.report_latency,
+            logic_latency_ms=logic_latency_ms,
+            anchor_channel=usable[0].channel_id if usable else None,
+            group_gain_db=_group_gain_db(usable),
+            eq_action_policy=EQActionPolicy.PHASE_UNRELIABLE,
+            pair_measurements=(),
+            suggested_actions=(),
+            warnings=("phase context cache is not fresh; collect fresh phase evidence before EQ proposals",),
+            metadata=metadata,
+        )
+
     if len(usable) < 2:
         return PhaseAwareEQGuardResult(
             method_id="automixer_phase_aware_eq_guard_v1",
@@ -397,7 +484,7 @@ def analyze_phase_aware_eq_guard(
             pair_measurements=(),
             suggested_actions=(),
             warnings=("at least two usable channels are required for group phase analysis",),
-            metadata={"live_write_allowed": False, "transport_free": True},
+            metadata=_base_metadata(config, channel_count=len(usable), group_gain_source="summed_weighted_audio"),
         )
 
     anchor = _select_anchor(usable, config)
@@ -471,24 +558,12 @@ def analyze_phase_aware_eq_guard(
         pair_measurements=tuple(measurements),
         suggested_actions=tuple(suggested_actions),
         warnings=tuple(warnings),
-        metadata={
-            "live_write_allowed": False,
-            "transport_free": True,
-            "candidate_count": len(suggested_actions),
-            "channel_count": len(usable),
-            "group_gain_source": "summed_weighted_audio",
-            "pi_surface_coverage": {
-                "group": True,
-                "group_enable_mode": True,
-                "group_gain": True,
-                "gain": True,
-                "weight": True,
-                "global_low_freq_focus": True,
-                "lookahead_buffer_ms": True,
-                "report_latency": True,
-                "phase_lock": config.group_enable_mode == GroupEnableMode.GROUP_PHASE_LOCK,
-            },
-        },
+        metadata=_base_metadata(
+            config,
+            candidate_count=len(suggested_actions),
+            channel_count=len(usable),
+            group_gain_source="summed_weighted_audio",
+        ),
     )
 
 

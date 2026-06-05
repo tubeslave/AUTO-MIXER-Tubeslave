@@ -72,7 +72,8 @@ def test_broad_console_surfaces_are_blocked_by_missing_proof_or_manual_only_poli
     rows = {row.id: row for row in iter_promotion_readiness_rows()}
 
     eq = rows["eq_supervised_promotion"]
-    routing = rows["routing_scene_preset_supervised_promotion"]
+    routing = rows["routing_supervised_promotion"]
+    scene_preset = rows["scene_preset_supervised_promotion"]
     bus = rows["bus_group_matrix_supervised_promotion"]
 
     assert eq.supervised_live_allowed is False
@@ -81,9 +82,38 @@ def test_broad_console_surfaces_are_blocked_by_missing_proof_or_manual_only_poli
     assert "read_surface_channel_eq_dynamics_gate_partial" in eq.blockers
 
     assert routing.status == "manual_only_blocked"
+    assert routing.action_family == "routing"
+    assert routing.capability_ids == ("console_routing_control",)
+    assert routing.read_surface_ids == ("routing_and_sends",)
+    assert routing.evidence_requirement_ids == (
+        "current_route_cache_freshness",
+        "route_diff_evidence",
+        "source_identity_downstream_trust",
+        "routing_physical_fixture",
+        "hardware_readback_and_rollback_proof",
+    )
     assert "safety_status_blocked" in routing.blockers
     assert "write_surface_routing_snapshot_scene_writes_quarantined" in routing.blockers
-    assert "read_surface_user_presets_partial" in routing.blockers
+
+    assert scene_preset.status == "manual_only_blocked"
+    assert scene_preset.supervised_live_allowed is False
+    assert scene_preset.autonomous_ready is False
+    assert scene_preset.action_family == "scene_preset"
+    assert scene_preset.capability_ids == ("console_scene_preset_control",)
+    assert scene_preset.read_surface_ids == ("snapshots_scenes", "user_presets")
+    assert scene_preset.evidence_requirement_ids == (
+        "current_scene_preset_cache_freshness",
+        "snapshots_scenes_snapshot_cache_freshness",
+        "user_presets_snapshot_cache_freshness",
+        "read_only_scoped_diff_evidence",
+        "read_only_rollback_evidence",
+        "scene_preset_physical_fixture",
+        "hardware_readback_and_rollback_proof",
+    )
+    assert "safety_status_blocked" in scene_preset.blockers
+    assert "write_surface_routing_snapshot_scene_writes_quarantined" in scene_preset.blockers
+    assert "read_surface_snapshots_scenes_partial" in scene_preset.blockers
+    assert "read_surface_user_presets_partial" in scene_preset.blockers
 
     assert bus.supervised_live_allowed is False
     assert "safety_coverage_row_missing" in bus.blockers
@@ -97,3 +127,21 @@ def test_no_readiness_row_widens_live_write_authority():
             assert row.action_family == "fader"
         else:
             assert row.status in {"proof_blocked", "read_coverage_blocked", "manual_only_blocked"}
+
+
+def test_readiness_snapshot_serializes_evidence_requirement_ids():
+    snapshot = build_autonomy_promotion_readiness_snapshot()
+    rows = {row["id"]: row for row in snapshot["rows"]}
+    scene_preset = rows["scene_preset_supervised_promotion"]
+
+    assert scene_preset["supervised_live_allowed"] is False
+    assert scene_preset["autonomous_ready"] is False
+    assert scene_preset["evidence_requirement_ids"] == [
+        "current_scene_preset_cache_freshness",
+        "snapshots_scenes_snapshot_cache_freshness",
+        "user_presets_snapshot_cache_freshness",
+        "read_only_scoped_diff_evidence",
+        "read_only_rollback_evidence",
+        "scene_preset_physical_fixture",
+        "hardware_readback_and_rollback_proof",
+    ]

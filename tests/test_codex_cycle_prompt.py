@@ -72,11 +72,16 @@ def test_codex_cycle_prompt_requires_complete_human_report_sections():
     text = PROMPT_PATH.read_text(encoding="utf-8")
 
     assert "`automixer_codex_cycle_YYYYMMDDTHHMMSSZ.md`" in text
+    assert "`Codex CLI was the only agent workflow used.`" in text
+    assert "`External Paperclip/PiperClip was not used as an agent runner.`" in text
     assert "статус live safety: обязательно укажи, что live OSC/WING writes не выполнялись." in text
     assert "результат memory lint в отдельном разделе `## Memory Lint Result`" in text
     assert "`python3 tools/memory/memory_lint.py`" in text
     assert "результат memory lint" in text
+    assert "`## Три обязательных вопроса`" in text
     assert "`## Объяснение простым языком`" in text
+    assert "финальный top-level раздел" in text
+    assert "Не добавляй после этого раздела другие top-level разделы." in text
     assert "### Что было сделано" in text
     assert "### Зачем это нужно проекту" in text
     assert "### В каком состоянии проект сейчас" in text
@@ -86,10 +91,24 @@ def test_codex_cycle_prompt_requires_complete_human_report_sections():
     assert "### Общая готовность направления" in text
     assert "Исследование: N%" in text
     assert "Готовность к реальному концерту: N%" in text
-    assert "## 8. Три обязательных вопроса" in text
+    assert "## 7. Три обязательных вопроса" in text
+    assert "Перед финальным разделом `## Объяснение простым языком`" in text
     assert "1. Что нового проект научился делать?" in text
     assert "2. Что сейчас является самым слабым местом?" in text
     assert "3. Что даст наибольший прогресс в следующем цикле?" in text
+
+
+def test_codex_cycle_prompt_matches_validator_end_section_order():
+    text = PROMPT_PATH.read_text(encoding="utf-8")
+    validator = load_validator_module()
+
+    questions_heading_index = text.index("## 7. Три обязательных вопроса")
+    plain_explanation_index = text.index("## 8. Объяснение простым языком")
+
+    assert questions_heading_index < plain_explanation_index
+    assert validator.REQUIRED_END_SECTION_ORDER[0] == "## Три обязательных вопроса"
+    assert validator.REQUIRED_END_SECTION_ORDER[4] == "## Объяснение простым языком"
+    assert validator.PLAIN_EXPLANATION_HEADING == "## Объяснение простым языком"
 
 
 def test_codex_cycle_prompt_keeps_todo_scan_focused_on_owned_project_paths():
@@ -103,6 +122,9 @@ def test_codex_cycle_prompt_keeps_todo_scan_focused_on_owned_project_paths():
         "`backend/ai/knowledge/`",
         "`frontend/node_modules/`",
         "`node_modules/`",
+        "`**/node_modules/`",
+        "`backend/venv/`",
+        "`**/.venv/`",
         "`artifacts/`",
         "`Docs/archive/`",
         "`Docs/manuals/`",

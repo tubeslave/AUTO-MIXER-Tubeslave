@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import math
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
 
 MASTER_BUS_METHOD_ID = "master_bus_optimization_proposal"
@@ -99,6 +99,7 @@ class MasterBusAnalysisInput:
     limiter_or_dynamics_proof: bool = False
     confidence: float = 0.75
     persistence_cycles: int = 1
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -208,6 +209,37 @@ def _safe_static_trim(loudness_gap_db: float, true_peak_headroom_db: float, prof
     return round(_clip(loudness_gap_db, -MASTER_STATIC_DOWN_GAIN_CAP_DB, 0.0), 1)
 
 
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "missing_fields",
+        "untimestamped_present_fields",
+        "stale_after_sec",
+        "read_only",
+        "live_write",
+        "queries_console",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = True
+    normalized.setdefault("status", _freshness_status(payload))
+    return normalized
+
+
 def _tonal_moves(analysis: MasterBusAnalysisInput) -> Tuple[float, float, float]:
     tilt = _safe_float(analysis.spectral_tilt_db)
     low_excess = _safe_float(analysis.low_end_excess_db)
@@ -274,6 +306,8 @@ def analyze_master_bus_need(
     confidence_input = _clip01(analysis.confidence)
     persistence = max(1, int(analysis.persistence_cycles or 1))
     stereo_correlation = _clip(_safe_float(analysis.stereo_correlation), -1.0, 1.0)
+    current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
+    current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
 
     blockers = []
     if integrated_lufs <= -70.0 or true_peak <= -90.0:
@@ -286,6 +320,8 @@ def analyze_master_bus_need(
         blockers.append("master_loudness_requires_approved_limiter_or_dynamics_stage")
     if stereo_correlation < -0.15:
         blockers.append("stereo_correlation_phase_risk")
+    if current_state_freshness_status not in {"fresh", "not_provided"}:
+        blockers.append("master_bus_current_state_cache_not_fresh")
 
     eq_magnitude = max(abs(broad_eq_tilt), abs(low_shelf), abs(high_shelf))
     ceiling_move_needed = current_ceiling > profile.max_true_peak_dbfs + 0.1
@@ -336,6 +372,8 @@ def analyze_master_bus_need(
         "current_limiter_ceiling_dbfs": round(current_ceiling, 2),
         "limiter_or_dynamics_proof": bool(analysis.limiter_or_dynamics_proof),
         "persistence_cycles": persistence,
+        "current_state_cache_freshness_status": current_state_freshness_status,
+        "current_state_cache_freshness": current_state_freshness,
         "transport_free": True,
         "lufs_only_loudness_up_is_not_listening_master": True,
     }

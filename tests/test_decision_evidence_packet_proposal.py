@@ -49,6 +49,14 @@ def _complete_input(**overrides):
         "manual_override_active": False,
         "auto_apply_requested": False,
         "active_performance": False,
+        "current_state_cache_freshness": {
+            "status": "fresh",
+            "field_count": 9,
+            "fresh_field_count": 9,
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+        },
     }
     data.update(overrides)
     return DecisionEvidenceAnalysisInput(**data)
@@ -84,6 +92,11 @@ def test_complete_evidence_packet_creates_proposal_only_recommendation():
     assert recommendation.blockers == ()
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["decision_evidence_packet"] is True
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 9
+    assert recommendation.evidence["source_identity_downstream_trust"]["status"] == (
+        "legacy_unverified"
+    )
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "decision_evidence_packet_proposal"
@@ -97,6 +110,7 @@ def test_complete_evidence_packet_creates_proposal_only_recommendation():
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["queue_mutation"] is False
     assert proposal["evidence"]["rollback_required_before_promotion"] is True
+    assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
 
 
 def test_missing_critical_evidence_blocks_packet():
@@ -170,6 +184,97 @@ def test_conflicting_or_unreadbacked_packet_blocks_promotion():
     assert "auto_apply_not_supported" in recommendation.blockers
 
 
+def test_stale_decision_evidence_context_blocks_packet():
+    recommendation = analyze_decision_evidence_packet_need(
+        _complete_input(
+            current_state_cache_freshness={
+                "status": "stale",
+                "field_count": 9,
+                "fresh_field_count": 7,
+                "stale_field_count": 2,
+                "stale_fields": ["audio_analysis", "inter_channel_context"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            }
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "decision_evidence_context_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "stale"
+    assert recommendation.evidence["current_state_cache_freshness"]["stale_fields"] == [
+        "audio_analysis",
+        "inter_channel_context",
+    ]
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_source_identity_hold_blocks_decision_evidence_packet():
+    recommendation = analyze_decision_evidence_packet_need(
+        _complete_input(
+            source_identity_trust_state="hold_for_operator_review",
+            source_identity_trust_confidence=0.56,
+            source_identity_replay_outcome_count=4,
+            source_identity_calibration_freshness={
+                "status": "fresh",
+                "field_count": 4,
+                "fresh_field_count": 4,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_not_trusted_for_downstream" in recommendation.blockers
+    assert recommendation.severity == "medium"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["source_id"] == "ch:1"
+    assert trust["source_type"] == "gain_fader"
+    assert trust["status"] == "held_for_operator_review"
+    assert trust["usable_for_downstream"] is False
+    proposal = recommendation.to_operator_proposal()
+    assert proposal["can_apply_live"] is False
+    assert proposal["can_import_to_queue"] is False
+    assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["queue_mutation"] is False
+    assert "requested_change" not in proposal
+
+
+def test_stale_source_identity_replay_context_blocks_decision_evidence_packet():
+    analysis = _complete_input(
+        source_identity_trust_state="trusted_for_downstream_priority",
+        source_identity_trust_confidence=0.91,
+        source_identity_replay_outcome_count=8,
+        source_identity_calibration_freshness={
+            "status": "stale",
+            "field_count": 4,
+            "fresh_field_count": 2,
+            "stale_field_count": 2,
+            "stale_fields": ["accepted_outcomes", "rejected_outcomes"],
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+        },
+    )
+    recommendation = analyze_decision_evidence_packet_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "source_identity_replay_context_not_fresh" in recommendation.blockers
+    assert recommendation.severity == "high"
+    trust = recommendation.evidence["source_identity_downstream_trust"]
+    assert trust["status"] == "trusted"
+    assert trust["usable_for_downstream"] is False
+    assert trust["evidence"]["current_source_identity_replay_context_cache_freshness"] == "stale"
+    assert trust["evidence"]["current_state_cache_freshness"]["stale_fields"] == [
+        "accepted_outcomes",
+        "rejected_outcomes",
+    ]
+    assert build_decision_evidence_packet_proposals([analysis]) == ()
+
+
 def test_analysis_only_packet_does_not_require_console_rollback():
     recommendation = analyze_decision_evidence_packet_need(
         _complete_input(
@@ -216,6 +321,20 @@ def test_build_decision_evidence_packet_proposals_filters_to_proposal_only_items
     assert proposals[0]["can_import_to_queue"] is False
 
 
+def test_build_decision_evidence_packet_proposals_filters_stale_context_items():
+    proposals = build_decision_evidence_packet_proposals(
+        [
+            _complete_input(
+                decision_id="proposal:stale",
+                target_id="ch:1",
+                current_state_cache_freshness={"status": "stale"},
+            ),
+        ]
+    )
+
+    assert proposals == ()
+
+
 def test_decision_evidence_packet_proposal_is_registered_as_goal_capability():
     method = get_processing_method("decision_evidence_packet_proposal")
     main = get_pipeline_profile("main_live_assist")
@@ -238,4 +357,14 @@ def test_decision_evidence_packet_proposal_is_registered_as_goal_capability():
     assert "decision_evidence_packet_proposal" in capability.method_ids
     assert contracts["decision_evidence_packet_proposal"]["proposal_contract"]["value_type"] == (
         "decision_evidence_packet"
+    )
+    assert (
+        "current_decision_evidence_context_cache_freshness"
+        in contracts["decision_evidence_packet_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "source_identity_downstream_trust"
+        in contracts["decision_evidence_packet_proposal"]["proposal_contract"][
+            "safety_evidence_required"
+        ]
     )

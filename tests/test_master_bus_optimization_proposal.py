@@ -43,6 +43,14 @@ def test_healthy_master_creates_proposal_only_recommendation():
             stereo_correlation=0.1,
             confidence=0.9,
             persistence_cycles=3,
+            current_state_cache_freshness={
+                "status": "fresh",
+                "field_count": 8,
+                "fresh_field_count": 8,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
         )
     )
 
@@ -56,6 +64,8 @@ def test_healthy_master_creates_proposal_only_recommendation():
     assert recommendation.blockers == ()
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["lufs_only_loudness_up_is_not_listening_master"] is True
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 8
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "master_bus_optimization_proposal"
@@ -67,6 +77,7 @@ def test_healthy_master_creates_proposal_only_recommendation():
     assert "unsupported_value_type:master_bus" in proposal["blockers"]
     assert proposal["proposed_action"]["suggested_trim_db"] == recommendation.suggested_trim_db
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
 
 
 def test_peak_limited_loudness_up_is_analysis_only_without_dynamics_proof():
@@ -117,6 +128,46 @@ def test_low_end_and_harshness_create_broad_eq_fields():
     assert recommendation.evidence["harshness_db"] == 3.0
 
 
+def test_stale_current_master_bus_state_blocks_proposal_only_recommendation():
+    recommendation = analyze_master_bus_need(
+        MasterBusAnalysisInput(
+            bus_label="Main L/R",
+            target_profile="live",
+            integrated_lufs=-18.7,
+            short_term_lufs=-18.3,
+            true_peak_dbfs=-4.5,
+            crest_factor_db=10.5,
+            lra_db=5.0,
+            spectral_tilt_db=1.8,
+            low_end_excess_db=1.4,
+            harshness_db=0.4,
+            stereo_correlation=0.1,
+            confidence=0.9,
+            persistence_cycles=3,
+            current_state_cache_freshness={
+                "status": "stale",
+                "field_count": 8,
+                "fresh_field_count": 5,
+                "stale_field_count": 3,
+                "stale_fields": ["limiter_ceiling_dbfs", "main_eq", "bus_compressor"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "master_bus_current_state_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "stale"
+    assert recommendation.evidence["current_state_cache_freshness"]["stale_fields"] == [
+        "limiter_ceiling_dbfs",
+        "main_eq",
+        "bus_compressor",
+    ]
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
 def test_build_master_bus_proposals_filters_to_proposal_only_items():
     proposals = build_master_bus_proposals(
         [
@@ -144,6 +195,24 @@ def test_build_master_bus_proposals_filters_to_proposal_only_items():
     assert proposals[0]["can_import_to_queue"] is False
 
 
+def test_build_master_bus_proposals_filters_stale_state_items():
+    proposals = build_master_bus_proposals(
+        [
+            MasterBusAnalysisInput(
+                bus_id="main_lr",
+                target_profile="live",
+                integrated_lufs=-18.7,
+                true_peak_dbfs=-4.5,
+                confidence=0.9,
+                persistence_cycles=3,
+                current_state_cache_freshness={"status": "stale"},
+            ),
+        ]
+    )
+
+    assert proposals == ()
+
+
 def test_master_bus_helpers_resolve_reference_target_safely():
     profile = resolve_target_profile("streaming", reference_lufs=-9.0)
 
@@ -169,3 +238,7 @@ def test_master_bus_proposal_is_registered_as_goal_capability():
     assert capability.autonomy_mode_ceiling == "assisted"
     assert "master_bus_optimization_proposal" in capability.method_ids
     assert contracts["master_bus_optimization_proposal"]["proposal_contract"]["value_type"] == "master_bus"
+    assert (
+        "current_main_bus_processing_cache_freshness"
+        in contracts["master_bus_optimization_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )

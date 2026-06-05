@@ -13,6 +13,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 SAFE_GAIN_SOURCE = "safe_gain_calibrator"
 SOUNDCHECK_SOURCE = "soundcheck_recommendation_bundle"
+CACHE_FRESHNESS_STALE_AFTER_SEC = 30.0
 
 
 def _utc_now() -> str:
@@ -36,6 +37,36 @@ def _coerce_float(value: Any) -> Optional[float]:
 def _round(value: Any, digits: int = 1) -> Optional[float]:
     numeric = _coerce_float(value)
     return round(numeric, digits) if numeric is not None else None
+
+
+def _coerce_epoch_seconds(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        timestamp = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return timestamp.timestamp()
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        return numeric / 1000.0 if numeric > 1_000_000_000_000 else numeric
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            return _coerce_epoch_seconds(float(text))
+        except ValueError:
+            pass
+        try:
+            return _coerce_epoch_seconds(datetime.fromisoformat(text.replace("Z", "+00:00")))
+        except ValueError:
+            return None
+    return None
+
+
+def _iso_from_epoch(value: Optional[float]) -> Optional[str]:
+    if value is None:
+        return None
+    return datetime.fromtimestamp(value, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _clip(value: float, low: float, high: float) -> float:
@@ -67,6 +98,119 @@ def _cached_trim_from_state(client: Any, channel: int) -> Optional[float]:
         if value is not None:
             return value
     return None
+
+
+def _state_cache_timestamp(client: Any, address: str) -> Optional[float]:
+    for attr in ("state_timestamps", "_state_timestamps", "state_updated_at", "_state_updated_at"):
+        timestamps = getattr(client, attr, None)
+        if not isinstance(timestamps, dict):
+            continue
+        raw = timestamps.get(address)
+        if isinstance(raw, dict):
+            raw = raw.get("updated_at") or raw.get("timestamp") or raw.get("ts")
+        epoch = _coerce_epoch_seconds(raw)
+        if epoch is not None:
+            return epoch
+    return None
+
+
+def _cached_value_address(client: Any, channel: int, value_type: str) -> Optional[str]:
+    state = getattr(client, "state", None)
+    if not isinstance(state, dict):
+        return None
+    candidates = ()
+    if value_type == "gain":
+        candidates = (
+            f"/ch/{channel}/in/set/trim",
+            f"/ch/{channel:02d}/in/set/trim",
+            f"/ch/{channel}/gain",
+        )
+    elif value_type == "fader":
+        candidates = (
+            f"/ch/{channel}/fdr",
+            f"/ch/{channel:02d}/fdr",
+        )
+    for address in candidates:
+        if state.get(address) is not None:
+            return address
+    return None
+
+
+def _cache_freshness_for_change(client: Any, change: Dict[str, Any]) -> Dict[str, Any]:
+    channel = _coerce_int(change.get("channel"))
+    value_type = str(change.get("value_type") or "").strip().lower()
+    address = _cached_value_address(client, channel, value_type) if channel is not None else None
+    updated_epoch = _state_cache_timestamp(client, address) if address else None
+    now = datetime.now(timezone.utc).timestamp()
+    age_sec = round(max(0.0, now - updated_epoch), 3) if updated_epoch is not None else None
+    if value_type not in {"gain", "fader"} or channel is None:
+        status = "unsupported"
+    elif address is None:
+        status = "missing"
+    elif updated_epoch is None:
+        status = "unknown"
+    elif age_sec is not None and age_sec > CACHE_FRESHNESS_STALE_AFTER_SEC:
+        status = "stale"
+    else:
+        status = "fresh"
+    return {
+        "status": status,
+        "address": address,
+        "value_type": value_type or None,
+        "channel": channel,
+        "source": "state_timestamps" if updated_epoch is not None else "unavailable",
+        "updated_at": _iso_from_epoch(updated_epoch),
+        "age_sec": age_sec,
+        "stale_after_sec": CACHE_FRESHNESS_STALE_AFTER_SEC,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+
+
+def _append_cache_freshness_evidence(change: Dict[str, Any], freshness: Dict[str, Any]) -> None:
+    change["cache_freshness"] = freshness
+    change.setdefault("safety_evidence", []).append({
+        "label": "Cache freshness",
+        "value": freshness.get("status"),
+        "address": freshness.get("address"),
+        "age_sec": freshness.get("age_sec"),
+        "stale_after_sec": freshness.get("stale_after_sec"),
+    })
+
+
+def _gate_proposal_cache_freshness(proposal: Dict[str, Any], client: Any) -> Dict[str, Any]:
+    if client is None:
+        return proposal
+    if not isinstance(getattr(client, "state", None), dict):
+        return proposal
+    change = proposal.get("requested_change")
+    if not isinstance(change, dict):
+        return proposal
+    freshness = _cache_freshness_for_change(client, change)
+    proposal.setdefault("raw", {})["cache_freshness"] = [freshness]
+    proposal["cache_freshness"] = [freshness]
+    if freshness["status"] == "fresh":
+        _append_cache_freshness_evidence(change, freshness)
+        proposal["raw"]["apply_status"] = proposal["raw"].get("apply_status", "cache_freshness_verified")
+        proposal["apply_status"] = proposal["raw"]["apply_status"]
+        return proposal
+
+    proposal["raw"]["apply_status"] = "blocked_cache_freshness_not_fresh"
+    proposal["raw"]["apply_blockers"] = [f"cache_freshness_{freshness['status']}:{freshness.get('address') or 'unknown'}"]
+    proposal["raw"]["blocked_requested_change"] = dict(change)
+    proposal["apply_status"] = proposal["raw"]["apply_status"]
+    proposal["apply_blockers"] = proposal["raw"]["apply_blockers"]
+    proposal["blocked_requested_change"] = proposal["raw"]["blocked_requested_change"]
+    proposal["kind"] = "analysis"
+    proposal["requested_change"] = None
+    proposal["reason"] = (
+        f"{proposal.get('reason', '').rstrip()} "
+        "Current cached console value is not fresh enough for an applyable proposal."
+    ).strip()
+    proposal["title"] = f"{proposal.get('title', 'Operator recommendation')}: cache freshness not verified"
+    proposal["confidence"] = min(_coerce_float(proposal.get("confidence")) or 0.7, 0.7)
+    return proposal
 
 
 def _safe_current_trim(client: Any, channel: int) -> Optional[float]:
@@ -272,27 +416,26 @@ def build_safe_gain_operator_proposals(
         confidence = _coerce_float(raw_suggestion.get("confidence"))
         if confidence is None:
             confidence = 0.86 if current_trim is not None else 0.7
-        proposals.append(
-            {
-                "id": f"safe_gain:{audio_channel}:{mixer_channel}",
-                "title": f"Ch {mixer_channel}: SafeGain {sign}{gain_db:.1f} dB trim",
-                "target": mixer_channel,
-                "channel": mixer_channel,
-                "kind": "gain" if requested_change else "analysis",
-                "severity": _safe_gain_severity(raw_suggestion, gain_db),
-                "confidence": confidence if current_trim is not None else min(confidence, 0.7),
-                "source": source,
-                "reason": _safe_gain_reason(raw_suggestion, requested_change),
-                "requested_change": requested_change,
-                "raw": {
-                    "audio_channel": audio_channel,
-                    "mixer_channel": mixer_channel,
-                    "suggestion": dict(raw_suggestion),
-                    "current_trim_db": _round(current_trim),
-                    "target_trim_db": _round(target_trim),
-                },
-            }
-        )
+        proposal = {
+            "id": f"safe_gain:{audio_channel}:{mixer_channel}",
+            "title": f"Ch {mixer_channel}: SafeGain {sign}{gain_db:.1f} dB trim",
+            "target": mixer_channel,
+            "channel": mixer_channel,
+            "kind": "gain" if requested_change else "analysis",
+            "severity": _safe_gain_severity(raw_suggestion, gain_db),
+            "confidence": confidence if current_trim is not None else min(confidence, 0.7),
+            "source": source,
+            "reason": _safe_gain_reason(raw_suggestion, requested_change),
+            "requested_change": requested_change,
+            "raw": {
+                "audio_channel": audio_channel,
+                "mixer_channel": mixer_channel,
+                "suggestion": dict(raw_suggestion),
+                "current_trim_db": _round(current_trim),
+                "target_trim_db": _round(target_trim),
+            },
+        }
+        proposals.append(_gate_proposal_cache_freshness(proposal, mixer_client))
     return proposals
 
 
@@ -360,6 +503,7 @@ def _proposal_title(item: Dict[str, Any], kind: str, requested_change: Optional[
 def build_soundcheck_operator_proposals(
     bundle: Optional[Dict[str, Any]],
     *,
+    mixer_client: Any = None,
     source: str = SOUNDCHECK_SOURCE,
 ) -> List[Dict[str, Any]]:
     """Convert no-write soundcheck recommendations into operator proposals."""
@@ -381,27 +525,26 @@ def build_soundcheck_operator_proposals(
         severity = "high" if mode == "approval_required" else "medium"
         if mode == "observe_only":
             severity = "low"
-        proposals.append(
-            {
-                "id": f"soundcheck:{item_id}",
-                "title": _proposal_title(item, kind, requested_change),
-                "target": (requested_change or {}).get("channel")
-                or target_dict.get("mixer_channel")
-                or item.get("channel"),
-                "channel": (requested_change or {}).get("channel"),
-                "kind": (requested_change or {}).get("value_type") or kind,
-                "severity": severity,
-                "confidence": _coerce_float(item.get("confidence") or _source_payload(item).get("confidence")),
-                "source": source,
-                "reason": _operator_summary(item),
-                "requested_change": requested_change,
-                "raw": {
-                    "bundle_schema_version": bundle.get("schema_version"),
-                    "bundle_generated_at": bundle.get("generated_at"),
-                    "soundcheck_item": dict(item),
-                },
-            }
-        )
+        proposal = {
+            "id": f"soundcheck:{item_id}",
+            "title": _proposal_title(item, kind, requested_change),
+            "target": (requested_change or {}).get("channel")
+            or target_dict.get("mixer_channel")
+            or item.get("channel"),
+            "channel": (requested_change or {}).get("channel"),
+            "kind": (requested_change or {}).get("value_type") or kind,
+            "severity": severity,
+            "confidence": _coerce_float(item.get("confidence") or _source_payload(item).get("confidence")),
+            "source": source,
+            "reason": _operator_summary(item),
+            "requested_change": requested_change,
+            "raw": {
+                "bundle_schema_version": bundle.get("schema_version"),
+                "bundle_generated_at": bundle.get("generated_at"),
+                "soundcheck_item": dict(item),
+            },
+        }
+        proposals.append(_gate_proposal_cache_freshness(proposal, mixer_client))
     return proposals
 
 

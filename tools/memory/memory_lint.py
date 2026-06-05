@@ -67,7 +67,14 @@ REQUIRED_FILES: tuple[MemoryFile, ...] = (
             "live-write",
         ),
     ),
-    MemoryFile(".ai/project-layer/current_tasks.md", ("# Current Tasks",)),
+    MemoryFile(
+        ".ai/project-layer/current_tasks.md",
+        ("# Current Tasks", "## Active Tasks", "## Watch List"),
+        (
+            "dry-run or audit-only",
+            "do not treat shadow-only or offline-only evidence as live readiness",
+        ),
+    ),
     MemoryFile(".ai/project-layer/decisions.md", ("# Decisions", "## Records")),
     MemoryFile(".ai/project-layer/experiments.md", ("# Experiments", "## Records")),
     MemoryFile(".ai/project-layer/session_reports.md", ("# Session Reports", "## Records")),

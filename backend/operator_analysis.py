@@ -20,6 +20,7 @@ GAIN_TRIM_PEAK_THRESHOLD_DB = -1.0
 GAIN_TRIM_PEAK_TARGET_DB = -3.0
 MAX_FADER_REDUCTION_DB = 6.0
 MAX_GAIN_REDUCTION_DB = 3.0
+CACHE_FRESHNESS_STALE_AFTER_SEC = 30.0
 VOCAL_LUFS_TARGET_DB = -22.0
 VOCAL_LUFS_MARGIN_DB = 2.0
 STRONG_SOURCE_LUFS_TARGET_DB = -25.0
@@ -68,6 +69,160 @@ def _round(value: Any, digits: int = 1) -> Optional[float]:
         return round(float(value), digits)
     except (TypeError, ValueError):
         return None
+
+
+def _coerce_epoch_seconds(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        timestamp = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return timestamp.timestamp()
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        return numeric / 1000.0 if numeric > 1_000_000_000_000 else numeric
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            return _coerce_epoch_seconds(float(text))
+        except ValueError:
+            pass
+        try:
+            return _coerce_epoch_seconds(datetime.fromisoformat(text.replace("Z", "+00:00")))
+        except ValueError:
+            return None
+    return None
+
+
+def _iso_from_epoch(value: Optional[float]) -> Optional[str]:
+    if value is None:
+        return None
+    return datetime.fromtimestamp(value, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _cached_timestamp_epoch(client: Any, address: str) -> Optional[float]:
+    for attr in ("state_timestamps", "_state_timestamps", "state_updated_at", "_state_updated_at"):
+        timestamps = getattr(client, attr, None)
+        if not isinstance(timestamps, dict):
+            continue
+        raw = timestamps.get(address)
+        if isinstance(raw, dict):
+            raw = raw.get("updated_at") or raw.get("timestamp") or raw.get("ts")
+        epoch = _coerce_epoch_seconds(raw)
+        if epoch is not None:
+            return epoch
+    return None
+
+
+def _change_cache_address(change: Dict[str, Any]) -> Optional[str]:
+    channel = change.get("channel")
+    value_type = str(change.get("value_type") or "").strip().lower()
+    if channel is None:
+        return None
+    try:
+        channel_id = int(channel)
+    except (TypeError, ValueError):
+        return None
+    if value_type == "fader":
+        return f"/ch/{channel_id}/fdr"
+    if value_type == "gain":
+        return f"/ch/{channel_id}/in/set/trim"
+    return None
+
+
+def _change_cache_freshness(client: Any, change: Dict[str, Any]) -> Dict[str, Any]:
+    address = _change_cache_address(change)
+    state = getattr(client, "state", None)
+    present = bool(address and isinstance(state, dict) and address in state and state.get(address) is not None)
+    updated_epoch = _cached_timestamp_epoch(client, address) if address else None
+    now = datetime.now(timezone.utc).timestamp()
+    age_sec = round(max(0.0, now - updated_epoch), 3) if updated_epoch is not None else None
+    if not address:
+        status = "unsupported"
+    elif not present:
+        status = "missing"
+    elif updated_epoch is None:
+        status = "unknown"
+    elif age_sec is not None and age_sec > CACHE_FRESHNESS_STALE_AFTER_SEC:
+        status = "stale"
+    else:
+        status = "fresh"
+    return {
+        "status": status,
+        "address": address,
+        "value_type": str(change.get("value_type") or "").strip().lower() or None,
+        "channel": change.get("channel"),
+        "source": "state_timestamps" if updated_epoch is not None else "unavailable",
+        "updated_at": _iso_from_epoch(updated_epoch),
+        "age_sec": age_sec,
+        "stale_after_sec": CACHE_FRESHNESS_STALE_AFTER_SEC,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+
+
+def _append_cache_freshness_evidence(change: Dict[str, Any], evidence: Dict[str, Any]) -> None:
+    change["cache_freshness"] = evidence
+    change.setdefault("safety_evidence", []).append({
+        "label": "Cache freshness",
+        "value": evidence["status"],
+        "address": evidence.get("address"),
+        "age_sec": evidence.get("age_sec"),
+        "stale_after_sec": evidence.get("stale_after_sec"),
+    })
+
+
+def _apply_cache_freshness_gate(proposal: Dict[str, Any], client: Any) -> Dict[str, Any]:
+    raw = proposal.setdefault("raw", {})
+    single_change = proposal.get("requested_change")
+    linked_changes = proposal.get("requested_changes") or []
+    changes = linked_changes if linked_changes else ([single_change] if isinstance(single_change, dict) else [])
+    if not changes:
+        return proposal
+
+    freshness_rows = [_change_cache_freshness(client, change) for change in changes]
+    blockers = [
+        f"cache_freshness_{row['status']}:{row.get('address') or 'unknown'}"
+        for row in freshness_rows
+        if row["status"] != "fresh"
+    ]
+    raw["cache_freshness"] = freshness_rows
+    if not blockers:
+        for change, freshness in zip(changes, freshness_rows):
+            _append_cache_freshness_evidence(change, freshness)
+        raw["apply_status"] = raw.get("apply_status", "cache_freshness_verified")
+        proposal["cache_freshness"] = freshness_rows
+        proposal["apply_status"] = raw["apply_status"]
+        return proposal
+
+    raw["apply_status"] = "blocked_cache_freshness_not_fresh"
+    raw["apply_blockers"] = sorted(blockers)
+    raw["blocked_requested_changes"] = [dict(change) for change in changes]
+    proposal["cache_freshness"] = freshness_rows
+    proposal["apply_status"] = raw["apply_status"]
+    proposal["apply_blockers"] = raw["apply_blockers"]
+    proposal["blocked_requested_changes"] = raw["blocked_requested_changes"]
+    proposal["kind"] = "analysis"
+    proposal["reason"] = (
+        f"{proposal.get('reason', '').rstrip()} "
+        "Current cached console value is not fresh enough for an applyable proposal."
+    ).strip()
+    proposal["title"] = f"{proposal.get('title', 'Operator analysis')}: cache freshness not verified"
+    if linked_changes:
+        proposal["requested_changes"] = []
+    else:
+        proposal["requested_change"] = None
+    return proposal
+
+
+def _gate_observation_proposal(observation: Dict[str, Any], client: Any) -> Dict[str, Any]:
+    proposal = observation.get("proposal")
+    if isinstance(proposal, dict):
+        _apply_cache_freshness_gate(proposal, client)
+        observation["message"] = proposal.get("title", observation.get("message"))
+    return observation
 
 
 def _fader_reduction_change(channel: Dict[str, Any], reduction_db: float) -> Optional[Dict[str, Any]]:
@@ -442,8 +597,10 @@ def build_operator_analysis_report(
     previewed: List[Dict[str, Any]] = []
     created: List[Dict[str, Any]] = []
     blocked: List[Dict[str, Any]] = []
+    cache_freshness_blocked = 0
     shadow_gain_rides: List[Dict[str, Any]] = []
     shadow_traces_recorded = 0
+    client = getattr(server, "mixer_client", None)
 
     if audio_running:
         recent_traces = (
@@ -463,6 +620,9 @@ def build_operator_analysis_report(
 
         paired_channels = set()
         for observation in _build_stereo_level_observations(inventory["channels"]):
+            observation = _gate_observation_proposal(observation, client)
+            if (observation.get("proposal") or {}).get("raw", {}).get("apply_status") == "blocked_cache_freshness_not_fresh":
+                cache_freshness_blocked += 1
             paired_channels.update(int(channel) for channel in observation.get("channels", []))
             observations.append({key: value for key, value in observation.items() if key != "proposal"})
             if include_proposal_previews:
@@ -480,6 +640,9 @@ def build_operator_analysis_report(
             observation = _observe_channel(channel)
             if not observation:
                 continue
+            observation = _gate_observation_proposal(observation, client)
+            if (observation.get("proposal") or {}).get("raw", {}).get("apply_status") == "blocked_cache_freshness_not_fresh":
+                cache_freshness_blocked += 1
             observations.append({key: value for key, value in observation.items() if key != "proposal"})
             if include_proposal_previews:
                 previewed.append(observation["proposal"])
@@ -510,6 +673,7 @@ def build_operator_analysis_report(
         "observation_count": len(observations),
         "created_count": len(created),
         "blocked_count": len(blocked),
+        "cache_freshness_blocked_count": cache_freshness_blocked,
         "shadow_gain_ride_count": len(shadow_gain_rides),
         "shadow_gain_ride_trace_count": shadow_traces_recorded,
         "observations": observations,

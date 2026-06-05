@@ -278,6 +278,7 @@ class DLiveClient(MixerClientBase):
         self._reconnect_interval = 3.0
 
         self.state: Dict[str, Any] = {}
+        self.state_timestamps: Dict[str, float] = {}
         self.callbacks: Dict[str, List[Callable]] = {}
         self._channel_names: Dict[int, str] = {}
 
@@ -410,17 +411,21 @@ class DLiveClient(MixerClientBase):
             else:
                 i += 1
 
+    def _set_state_value(self, key: str, value: Any) -> None:
+        self.state[key] = value
+        self.state_timestamps[key] = time.time()
+
     def _handle_cc(self, channel: int, cc: int, value: int):
         key = f"cc/{channel}/{cc}"
-        self.state[key] = value
+        self._set_state_value(key, value)
 
         # Track NRPN state machine to reconstruct fader values
         if cc == 0x63:  # NRPN MSB
-            self.state[f"_nrpn_msb/{channel}"] = value
+            self._set_state_value(f"_nrpn_msb/{channel}", value)
         elif cc == 0x62:  # NRPN LSB
-            self.state[f"_nrpn_lsb/{channel}"] = value
+            self._set_state_value(f"_nrpn_lsb/{channel}", value)
         elif cc == 0x06:  # Data Entry MSB
-            self.state[f"_data_msb/{channel}"] = value
+            self._set_state_value(f"_data_msb/{channel}", value)
         elif cc == 0x26:  # Data Entry LSB
             data_msb = self.state.get(f"_data_msb/{channel}", 0)
             nrpn_msb = self.state.get(f"_nrpn_msb/{channel}", 0)
@@ -430,23 +435,23 @@ class DLiveClient(MixerClientBase):
             # NRPN MSB 0x00 = fader level for input channels
             if nrpn_msb == 0x00:
                 ch_1based = nrpn_lsb + 1
-                self.state[f"fader/{ch_1based}"] = full_value
+                self._set_state_value(f"fader/{ch_1based}", full_value)
                 self._notify(f"fader/{ch_1based}", fader_value_to_db(full_value))
 
         self._notify(key, value)
 
     def _handle_note(self, channel: int, note: int, velocity: int):
         key = f"note/{channel}/{note}"
-        self.state[key] = velocity
+        self._set_state_value(key, velocity)
         # Track mute state: note number = channel-1, velocity >= 0x40 = muted
         ch_1based = note + 1
-        self.state[f"mute/{ch_1based}"] = velocity >= 0x40
+        self._set_state_value(f"mute/{ch_1based}", velocity >= 0x40)
         self._notify(key, velocity)
 
     def _handle_pitchbend(self, channel: int, lsb: int, msb: int):
         value = (msb << 7) | lsb
         key = f"pitchbend/{channel}"
-        self.state[key] = value
+        self._set_state_value(key, value)
         self._notify(key, value)
 
     def _handle_sysex(self, body: bytes):
@@ -468,7 +473,7 @@ class DLiveClient(MixerClientBase):
             name_bytes = payload[3:]
             name = name_bytes.decode("ascii", errors="replace").rstrip('\x00').strip()
             self._channel_names[ch_1based] = name
-            self.state[f"name/{ch_1based}"] = name
+            self._set_state_value(f"name/{ch_1based}", name)
             logger.debug(f"dLive ch {ch_1based} name: '{name}'")
 
     def _notify(self, address: str, *args):

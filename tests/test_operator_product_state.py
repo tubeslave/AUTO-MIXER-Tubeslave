@@ -18,6 +18,8 @@ from backend.operator_product_state import (
     build_channel_processing_snapshot,
     build_decision_queue,
     build_decision_traces,
+    build_dlive_state_snapshot,
+    build_fx_inserts_snapshot,
     build_groups_buses_snapshot,
     build_matrix_snapshot,
     build_memory_knowledge_snapshot,
@@ -45,18 +47,34 @@ sys.modules.setdefault("server", server_module)
 AutoMixerServer = server_module.AutoMixerServer
 
 
+class TimestampedState(dict):
+    def __init__(self, owner):
+        super().__init__()
+        self.owner = owner
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        self.owner.state_timestamps[key] = time.time()
+
+    def update(self, *args, **kwargs):
+        for key, value in dict(*args, **kwargs).items():
+            self[key] = value
+
+
 class CachedMixer:
     is_connected = True
     ip = "192.168.1.102"
     port = 2223
 
     def __init__(self):
-        self.state = {
+        self.state_timestamps = {}
+        self.state = TimestampedState(self)
+        self.state.update({
             "/ch/1/$name": "Kick In",
             "/ch/2/$name": "Lead Vocal",
             "/ch/2/fdr": -8.0,
             "/ch/2/in/set/trim": 1.0,
-        }
+        })
         self.send = MagicMock()
         self.get_all_channel_names = MagicMock(return_value={1: "Should Not Scan"})
 
@@ -72,6 +90,34 @@ class CachedMixer:
             if token.upper().startswith("#D") and token[2:].isdigit():
                 assignments.append(int(token[2:]))
         return sorted(set(assignments))
+
+
+class CachedDLiveMixer:
+    is_connected = True
+    ip = "192.168.3.70"
+    port = 51328
+    midi_base_channel = 0
+
+    def __init__(self):
+        self.state_timestamps = {}
+        self.state = TimestampedState(self)
+        self.state.update({
+            "name/1": "Lead Vox",
+            "fader/1": 0x2AAA,
+            "mute/1": False,
+            "note/0/1": 0x7F,
+            "cc/0/99": 0x00,
+            "pitchbend/0": 0x2000,
+        })
+        self._channel_names = {1: "Lead Vox"}
+        self.send = MagicMock()
+        self._send_raw = MagicMock()
+        self.get_fader = MagicMock(return_value=-99.0)
+        self.get_channel_settings = MagicMock(return_value={})
+        self.request_channel_names = MagicMock()
+
+    def get_state(self):
+        return {"cached": True, "raw_state_key_count": len(self.state)}
 
 
 class FakeAudioCapture:
@@ -246,6 +292,74 @@ def test_channel_inventory_publishes_cached_channel_detail_readback_only(server)
     mixer.get_all_channel_names.assert_not_called()
 
 
+def test_channel_inventory_publishes_cached_source_patch_readback_only(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/ch/2/in/conn/grp": "MOD",
+        "/ch/2/in/conn/in": 12,
+        "/ch/2/in/conn/altgrp": "CRD",
+        "/ch/2/in/conn/altin": 5,
+        "/ch/2/mute": 0,
+        "/ch/2/pan": 0.25,
+    })
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+    server.audio_capture = None
+
+    inventory = build_channel_inventory(server, total_channels=2)
+    channel_2 = inventory["channels"][1]
+    source_patch = channel_2["source_patch"]
+
+    assert channel_2["source"] == "MOD 12"
+    assert channel_2["fallback_source"] == "In 02"
+    assert source_patch["main"] == {
+        "source_group": "MOD",
+        "source_channel": 12,
+        "label": "MOD 12",
+        "available": True,
+    }
+    assert source_patch["alt"] == {
+        "source_group": "CRD",
+        "source_channel": 5,
+        "label": "CRD 5",
+        "available": True,
+    }
+    assert source_patch["input_assignment_policy"] == "blocked_manual_only"
+    assert source_patch["destructive_change_marker"] == "source_patch_change_would_repatch_channel_input"
+    assert source_patch["read_coverage"]["status"] == "complete"
+    assert source_patch["read_coverage"]["source"] == "mixer_state_cache"
+    assert source_patch["cache_freshness"]["status"] == "fresh"
+    assert source_patch["cache_freshness"]["field_count"] == 4
+    assert channel_2["read_coverage"]["sections"]["source_patch"]["status"] == "complete"
+    assert inventory["cache_freshness"]["present_address_count"] == 10
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_channel_inventory_exposes_fresh_cache_timestamps_without_queries(server):
+    mixer = CachedMixer()
+    now = time.time()
+    mixer.state_timestamps = {address: now - 2.0 for address in mixer.state}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+    server.audio_capture = None
+
+    inventory = build_channel_inventory(server, total_channels=2)
+    freshness = inventory["cache_freshness"]
+
+    assert inventory["summary"]["cache_freshness_status"] == "fresh"
+    assert freshness["status"] == "fresh"
+    assert freshness["read_only"] is True
+    assert freshness["live_write"] is False
+    assert freshness["queries_console"] is False
+    assert freshness["present_address_count"] == 4
+    assert freshness["timestamped_address_count"] == 4
+    assert freshness["max_age_sec"] < freshness["stale_after_sec"]
+    assert freshness["untimestamped_present_addresses"] == []
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
 def test_channel_inventory_marks_missing_cached_read_sections_without_writes(server):
     mixer = CachedMixer()
     mixer.state = {}
@@ -263,6 +377,7 @@ def test_channel_inventory_marks_missing_cached_read_sections_without_writes(ser
     assert coverage["mutates_console_state"] is False
     assert coverage["sections"]["basic_controls"]["status"] == "missing"
     assert coverage["sections"]["basic_controls"]["source"] == "unavailable"
+    assert coverage["sections"]["source_patch"]["status"] == "missing"
     assert coverage["sections"]["processing"]["status"] == "missing"
     assert coverage["sections"]["metering"]["status"] == "missing"
     assert "mixer_state_cache" not in coverage["source_kinds"]
@@ -332,6 +447,54 @@ def test_channel_processing_snapshot_publishes_cached_processing_readback_only(s
     assert channel_2["read_coverage"]["sections"]["eq"]["status"] == "complete"
     assert channel_2["read_coverage"]["sections"]["compressor"]["status"] == "complete"
     assert channel_2["read_coverage"]["sections"]["gate"]["status"] == "complete"
+    assert channel_2["hpf"]["read_coverage"]["cache_freshness"]["status"] == "fresh"
+    assert channel_2["eq"]["read_coverage"]["cache_freshness"]["field_count"] == 13
+    assert channel_2["eq"]["read_coverage"]["cache_freshness"]["status"] == "fresh"
+    assert channel_2["eq"]["bands"][0]["cache_freshness"]["fields"]["gain_db"]["status"] == "fresh"
+    assert channel_2["compressor"]["read_coverage"]["cache_freshness"]["status"] == "fresh"
+    assert channel_2["gate"]["read_coverage"]["cache_freshness"]["status"] == "fresh"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_channel_processing_snapshot_marks_stale_cache_timestamps_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/ch/2/flt/lc": 1,
+        "/ch/2/flt/lcf": 120.0,
+        "/ch/2/eq/on": 1,
+    })
+    stale_time = time.time() - 120.0
+    mixer.state_timestamps = {
+        "/ch/2/flt/lc": stale_time,
+        "/ch/2/flt/lcf": stale_time,
+        "/ch/2/eq/on": stale_time,
+    }
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+    server.audio_capture = None
+
+    snapshot = build_channel_processing_snapshot(server, total_channels=2)
+    freshness = snapshot["cache_freshness"]
+    channel_2 = snapshot["channels"][1]
+    hpf_freshness = channel_2["hpf"]["read_coverage"]["cache_freshness"]
+    eq_freshness = channel_2["eq"]["read_coverage"]["cache_freshness"]
+
+    assert snapshot["summary"]["cache_freshness_status"] == "stale"
+    assert freshness["status"] == "stale"
+    assert freshness["present_address_count"] == 3
+    assert freshness["timestamped_address_count"] == 3
+    assert freshness["max_age_sec"] > freshness["stale_after_sec"]
+    assert freshness["live_write"] is False
+    assert freshness["queries_console"] is False
+    assert hpf_freshness["status"] == "stale"
+    assert hpf_freshness["fields"]["enabled"]["status"] == "stale"
+    assert hpf_freshness["fields"]["frequency_hz"]["status"] == "stale"
+    assert hpf_freshness["queries_console"] is False
+    assert eq_freshness["status"] == "stale"
+    assert eq_freshness["stale_fields"] == ["enabled"]
+    assert eq_freshness["missing_field_count"] == 12
+    assert eq_freshness["fields"]["band_1_frequency_hz"]["status"] == "missing"
     mixer.send.assert_not_called()
     mixer.get_all_channel_names.assert_not_called()
 
@@ -415,6 +578,11 @@ def test_bus_main_dca_snapshot_publishes_cached_console_surfaces_without_queries
         "full_autonomous_ready": False,
     }
     assert snapshot["summary"]["read_coverage_status"] == "complete"
+    assert snapshot["summary"]["cache_freshness_status"] == "fresh"
+    assert snapshot["cache_freshness"]["status"] == "fresh"
+    assert snapshot["cache_freshness"]["present_address_count"] == 79
+    assert snapshot["cache_freshness"]["timestamped_address_count"] == 79
+    assert snapshot["cache_freshness"]["queries_console"] is False
     assert bus["name"] == "Vocal Bus"
     assert bus["fader_db"] == -4.0
     assert bus["eq"]["bands"][7]["frequency_hz"] == 1000.0
@@ -439,6 +607,8 @@ def test_bus_main_dca_snapshot_marks_missing_cache_without_queries(server):
     snapshot = build_bus_main_dca_snapshot(server, bus_count=1, main_count=1, dca_count=1)
 
     assert snapshot["summary"]["read_coverage_status"] == "missing"
+    assert snapshot["summary"]["cache_freshness_status"] == "missing"
+    assert snapshot["cache_freshness"]["status"] == "missing"
     assert snapshot["read_coverage"]["surface_status_counts"]["buses"]["missing"] == 1
     assert snapshot["read_coverage"]["surface_status_counts"]["mains"]["missing"] == 1
     assert snapshot["read_coverage"]["surface_status_counts"]["dcas"]["missing"] == 1
@@ -456,6 +626,32 @@ def test_bus_main_dca_snapshot_marks_missing_cache_without_queries(server):
     mixer.get_all_channel_names.assert_not_called()
 
 
+def test_bus_main_dca_snapshot_marks_stale_cache_timestamps_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/bus/1/fdr": -5.0,
+        "/main/1/fdr": -2.0,
+        "/dca/1/fdr": -4.0,
+    })
+    stale_time = time.time() - 120.0
+    mixer.state_timestamps = {address: stale_time for address in mixer.state}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_bus_main_dca_snapshot(server, bus_count=1, main_count=1, dca_count=1)
+
+    assert snapshot["summary"]["cache_freshness_status"] == "stale"
+    assert snapshot["cache_freshness"]["status"] == "stale"
+    assert snapshot["cache_freshness"]["present_address_count"] == 3
+    assert snapshot["cache_freshness"]["timestamped_address_count"] == 3
+    assert snapshot["cache_freshness"]["max_age_sec"] > snapshot["cache_freshness"]["stale_after_sec"]
+    assert snapshot["buses"][0]["read_coverage"]["sections"]["basic_controls"]["status"] == "partial"
+    assert snapshot["mains"][0]["read_coverage"]["sections"]["basic_controls"]["status"] == "partial"
+    assert snapshot["dcas"][0]["read_coverage"]["sections"]["basic_controls"]["status"] == "partial"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
 def test_matrix_snapshot_publishes_cached_console_state_without_queries(server):
     mixer = CachedMixer()
     mixer.state.update({
@@ -463,6 +659,16 @@ def test_matrix_snapshot_publishes_cached_console_state_without_queries(server):
         "/mtx/1/mute": 0,
         "/mtx/1/pan": 0.0,
         "/mtx/1/eq/on": 1,
+        "/mtx/1/dyn/on": 1,
+        "/mtx/1/dyn/mdl": "COMP",
+        "/mtx/1/dyn/thr37": -24.0,
+        "/mtx/1/dyn/ratio": "2.5",
+        "/mtx/1/dyn/knee": 2.0,
+        "/mtx/1/dyn/det": "PEAK",
+        "/mtx/1/dyn/att": 18.0,
+        "/mtx/1/dyn/rel": 220.0,
+        "/mtx/1/dyn/gain": 1.5,
+        "/mtx/1/dyn/mix": 90.0,
         "/mtx/1/preins/on": 1,
         "/mtx/1/preins/ins": "FX1",
         "/mtx/1/preins/$stat": "OK",
@@ -491,13 +697,24 @@ def test_matrix_snapshot_publishes_cached_console_state_without_queries(server):
         "full_autonomous_ready": False,
     }
     assert snapshot["summary"]["read_coverage_status"] == "complete"
+    assert snapshot["summary"]["cache_freshness_status"] == "fresh"
+    assert snapshot["cache_freshness"]["status"] == "fresh"
+    assert snapshot["cache_freshness"]["present_address_count"] == 46
+    assert snapshot["cache_freshness"]["timestamped_address_count"] == 46
+    assert snapshot["cache_freshness"]["queries_console"] is False
     assert matrix["fader_db"] == -5.0
     assert matrix["eq"]["bands"][7]["frequency_hz"] == 1280.0
+    assert matrix["dynamics"]["enabled"] == 1
+    assert matrix["dynamics"]["threshold_db"] == -24.0
+    assert matrix["dynamics"]["ratio"] == "2.5"
+    assert matrix["dynamics"]["makeup_db"] == 1.5
+    assert matrix["dynamics"]["read_coverage"]["cache_freshness"]["status"] == "fresh"
     assert matrix["inserts"]["pre_insert"]["slot"] == "FX1"
     assert matrix["inserts"]["post_insert"]["mode"] == "insert"
     assert matrix["read_coverage"]["status"] == "complete"
     assert matrix["read_coverage"]["sections"]["basic_controls"]["status"] == "complete"
     assert matrix["read_coverage"]["sections"]["eq"]["status"] == "complete"
+    assert matrix["read_coverage"]["sections"]["dynamics"]["status"] == "complete"
     assert matrix["read_coverage"]["sections"]["inserts"]["status"] == "complete"
     mixer.send.assert_not_called()
     mixer.get_all_channel_names.assert_not_called()
@@ -513,12 +730,325 @@ def test_matrix_snapshot_marks_missing_cache_without_queries(server):
     matrix = snapshot["matrices"][0]
 
     assert snapshot["summary"]["read_coverage_status"] == "missing"
+    assert snapshot["summary"]["cache_freshness_status"] == "missing"
+    assert snapshot["cache_freshness"]["status"] == "missing"
     assert snapshot["read_coverage"]["surface_status_counts"]["matrices"]["missing"] == 1
-    assert matrix["read_coverage"]["missing_sections"] == ["basic_controls", "eq", "inserts"]
+    assert matrix["read_coverage"]["missing_sections"] == ["basic_controls", "eq", "dynamics", "inserts"]
+    assert matrix["dynamics"]["read_coverage"]["status"] == "missing"
+    assert matrix["dynamics"]["read_coverage"]["cache_freshness"]["status"] == "missing"
     assert matrix["inserts"]["pre_insert"]["read_coverage"]["status"] == "missing"
     assert matrix["inserts"]["post_insert"]["read_coverage"]["status"] == "missing"
     mixer.send.assert_not_called()
     mixer.get_all_channel_names.assert_not_called()
+
+
+def test_matrix_snapshot_marks_stale_cache_timestamps_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/mtx/1/fdr": -6.0,
+        "/mtx/1/mute": 0,
+        "/mtx/1/pan": 0.0,
+        "/mtx/1/eq/on": 1,
+    })
+    stale_time = time.time() - 120.0
+    mixer.state_timestamps = {address: stale_time for address in mixer.state}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_matrix_snapshot(server, matrix_count=1)
+    matrix = snapshot["matrices"][0]
+
+    assert snapshot["summary"]["cache_freshness_status"] == "stale"
+    assert snapshot["cache_freshness"]["status"] == "stale"
+    assert snapshot["cache_freshness"]["present_address_count"] == 4
+    assert snapshot["cache_freshness"]["timestamped_address_count"] == 4
+    assert snapshot["cache_freshness"]["max_age_sec"] > snapshot["cache_freshness"]["stale_after_sec"]
+    assert matrix["read_coverage"]["sections"]["basic_controls"]["status"] == "complete"
+    assert matrix["read_coverage"]["sections"]["eq"]["status"] == "partial"
+    assert matrix["dynamics"]["read_coverage"]["cache_freshness"]["status"] == "missing"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_fx_inserts_snapshot_publishes_cached_fx_and_insert_state_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/fx/1/mdl": "REV",
+        "/fx/1/on": 1,
+        "/fx/1/fxmix": 35.0,
+        "/fx/1/$esrc": "BUS1",
+        "/fx/1/$emode": "send",
+        "/fx/1/$a_chn": 2,
+        "/fx/1/$a_pos": "post",
+        "/fx/1/1": 0.25,
+        "/fx/1/2": 0.75,
+        "/ch/2/preins/on": 1,
+        "/ch/2/preins/ins": "FX1",
+        "/ch/2/preins/$stat": "OK",
+        "/ch/2/postins/on": 0,
+        "/ch/2/postins/ins": "NONE",
+        "/ch/2/postins/$stat": "OK",
+        "/ch/2/postins/mode": "insert",
+        "/ch/2/postins/w": 100.0,
+    })
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_fx_inserts_snapshot(
+        server,
+        fx_slot_count=2,
+        total_channels=2,
+        bus_count=1,
+        main_count=1,
+        matrix_count=1,
+        parameter_count=2,
+    )
+    fx_1 = snapshot["fx_slots"][0]
+    insert = next(
+        row
+        for row in snapshot["inserts"]
+        if row["target_type"] == "channel" and row["target"] == 2 and row["position"] == "pre"
+    )
+
+    assert snapshot["type"] == "fx_inserts_snapshot"
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "full_autonomous_ready": False,
+        "fx_apply_allowed": False,
+        "insert_assignment_allowed": False,
+    }
+    assert snapshot["summary"]["fx_slot_count"] == 2
+    assert snapshot["summary"]["active_fx_slot_count"] == 1
+    assert snapshot["summary"]["active_insert_count"] == 1
+    assert snapshot["summary"]["cached_parameter_count"] == 2
+    assert snapshot["summary"]["read_coverage_status"] == "partial"
+    assert snapshot["summary"]["parameter_schema_status"] == "mapped"
+    assert snapshot["summary"]["cache_freshness_status"] == "fresh"
+    assert snapshot["parameter_schema"]["status"] == "mapped"
+    assert snapshot["parameter_schema"]["mapped_parameter_count"] == 2
+    assert snapshot["parameter_schema"]["generic_parameter_count"] == 0
+    assert snapshot["parameter_schema"]["physical_model_schema_verified"] is False
+    assert snapshot["parameter_schema"]["live_write_authority"] is False
+    assert snapshot["cache_freshness"]["status"] == "fresh"
+    assert snapshot["cache_freshness"]["present_address_count"] == 17
+    assert snapshot["cache_freshness"]["timestamped_address_count"] == 17
+    assert snapshot["cache_freshness"]["queries_console"] is False
+    assert fx_1["slot"] == "FX1"
+    assert fx_1["model"] == "REV"
+    assert fx_1["mix"] == 35.0
+    assert fx_1["cached_parameter_count"] == 2
+    assert fx_1["parameter_schema"]["status"] == "mapped"
+    assert fx_1["parameter_schema"]["schema_family"] == "reverb"
+    assert fx_1["parameters"][0]["parameter_index"] == 1
+    assert fx_1["parameters"][0]["schema_status"] == "mapped"
+    assert fx_1["parameters"][0]["semantic_name"] == "decay_time"
+    assert fx_1["parameters"][0]["unit"] == "seconds"
+    assert fx_1["parameters"][0]["safe_range"] == {"min": 0.1, "max": 8.0}
+    assert fx_1["read_coverage"]["status"] == "complete"
+    assert insert["linked_fx_slot"] == "FX1"
+    assert insert["active"] is True
+    assert insert["insert_assignment_policy"] == "blocked_manual_only"
+    assert insert["destructive_change_marker"] == "insert_assignment_would_repatch_processing_chain"
+    assert insert["read_coverage"]["status"] == "complete"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_fx_inserts_snapshot_uses_generic_schema_for_unknown_fx_models(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/fx/1/mdl": "CUSTOM-FX",
+        "/fx/1/on": 1,
+        "/fx/1/fxmix": 50.0,
+        "/fx/1/1": 0.33,
+    })
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_fx_inserts_snapshot(
+        server,
+        fx_slot_count=1,
+        total_channels=1,
+        bus_count=1,
+        main_count=1,
+        matrix_count=1,
+        parameter_count=1,
+    )
+    fx_1 = snapshot["fx_slots"][0]
+    parameter = fx_1["parameters"][0]
+
+    assert snapshot["summary"]["parameter_schema_status"] == "partial"
+    assert snapshot["parameter_schema"]["status"] == "partial"
+    assert snapshot["parameter_schema"]["mapped_parameter_count"] == 0
+    assert snapshot["parameter_schema"]["generic_parameter_count"] == 1
+    assert snapshot["parameter_schema"]["physical_model_schema_verified"] is False
+    assert fx_1["parameter_schema"]["status"] == "partial"
+    assert fx_1["parameter_schema"]["schema_family"] == "unknown"
+    assert parameter["schema_status"] == "generic_numeric"
+    assert parameter["semantic_name"] == "parameter_1"
+    assert parameter["unit"] == "raw"
+    assert parameter["safe_range"] == {"min": None, "max": None}
+    assert snapshot["safety"]["fx_apply_allowed"] is False
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_fx_inserts_snapshot_marks_missing_cache_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state = {}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_fx_inserts_snapshot(
+        server,
+        fx_slot_count=1,
+        total_channels=1,
+        bus_count=1,
+        main_count=1,
+        matrix_count=1,
+        parameter_count=1,
+    )
+
+    assert snapshot["summary"]["read_coverage_status"] == "missing"
+    assert snapshot["summary"]["parameter_schema_status"] == "missing"
+    assert snapshot["parameter_schema"]["status"] == "missing"
+    assert snapshot["parameter_schema"]["physical_model_schema_verified"] is False
+    assert snapshot["summary"]["cache_freshness_status"] == "missing"
+    assert snapshot["cache_freshness"]["status"] == "missing"
+    assert snapshot["summary"]["active_fx_slot_count"] == 0
+    assert snapshot["summary"]["active_insert_count"] == 0
+    assert snapshot["read_coverage"]["surface_status_counts"]["fx_slots"]["missing"] == 1
+    assert snapshot["read_coverage"]["surface_status_counts"]["inserts"]["missing"] == 8
+    assert snapshot["fx_slots"][0]["model"] is None
+    assert snapshot["fx_slots"][0]["read_coverage"]["status"] == "missing"
+    assert snapshot["inserts"][0]["insert_assignment_policy"] == "blocked_manual_only"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_fx_inserts_snapshot_marks_stale_cache_timestamps_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/fx/1/mdl": "DLY",
+        "/fx/1/on": 1,
+        "/fx/1/fxmix": 40.0,
+        "/fx/1/1": 0.5,
+        "/ch/1/postins/on": 1,
+        "/ch/1/postins/ins": "FX1",
+        "/ch/1/postins/$stat": "OK",
+        "/ch/1/postins/mode": "insert",
+        "/ch/1/postins/w": 95.0,
+    })
+    stale_time = time.time() - 120.0
+    mixer.state_timestamps = {address: stale_time for address in mixer.state}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_fx_inserts_snapshot(
+        server,
+        fx_slot_count=1,
+        total_channels=1,
+        bus_count=1,
+        main_count=1,
+        matrix_count=1,
+        parameter_count=1,
+    )
+
+    assert snapshot["summary"]["cache_freshness_status"] == "stale"
+    assert snapshot["cache_freshness"]["status"] == "stale"
+    assert snapshot["cache_freshness"]["present_address_count"] == 9
+    assert snapshot["cache_freshness"]["timestamped_address_count"] == 9
+    assert snapshot["cache_freshness"]["max_age_sec"] > snapshot["cache_freshness"]["stale_after_sec"]
+    assert snapshot["fx_slots"][0]["read_coverage"]["status"] == "partial"
+    active_insert = next(
+        row
+        for row in snapshot["inserts"]
+        if row["target_type"] == "channel" and row["target"] == 1 and row["position"] == "post"
+    )
+    assert active_insert["read_coverage"]["status"] == "complete"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_dlive_state_snapshot_publishes_cached_midi_tcp_state_without_queries(server):
+    mixer = CachedDLiveMixer()
+    server.connection_mode = "dlive"
+    server.mixer_client = mixer
+
+    snapshot = build_dlive_state_snapshot(server, total_channels=2)
+    channel_1 = snapshot["channels"][0]
+    channel_2 = snapshot["channels"][1]
+
+    assert snapshot["type"] == "dlive_state_snapshot"
+    assert snapshot["source"] == "midi_tcp_cached_state"
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "full_autonomous_ready": False,
+        "dlive_apply_allowed": False,
+        "midi_send_allowed": False,
+    }
+    assert snapshot["summary"]["channel_count"] == 2
+    assert snapshot["summary"]["read_coverage_status"] == "partial"
+    assert snapshot["summary"]["channels_with_cached_name"] == 1
+    assert snapshot["summary"]["channels_with_cached_fader"] == 1
+    assert snapshot["summary"]["channels_with_cached_mute"] == 2
+    assert snapshot["summary"]["cache_freshness_status"] == "fresh"
+    assert snapshot["summary"]["wing_parity_status"] == "partial"
+    assert snapshot["summary"]["live_apply_allowed"] is False
+    assert snapshot["state_key_counts"]["raw_state_keys"] == 6
+    assert snapshot["state_key_counts"]["raw_pitchbend_events"] == 1
+    assert snapshot["cache_freshness"]["status"] == "fresh"
+    assert snapshot["cache_freshness"]["queries_console"] is False
+    assert channel_1["name"] == "Lead Vox"
+    assert channel_1["fader_raw_14bit"] == 0x2AAA
+    assert channel_1["fader_db"] == 0.0
+    assert channel_1["mute"] is False
+    assert channel_1["read_coverage"]["status"] == "partial"
+    assert channel_1["read_coverage"]["sections"]["identity"]["status"] == "complete"
+    assert channel_1["read_coverage"]["sections"]["fader"]["status"] == "complete"
+    assert channel_1["read_coverage"]["sections"]["mute"]["status"] == "partial"
+    assert channel_2["name"] == "dLive Ch 2"
+    assert channel_2["mute"] is True
+    assert channel_2["fader_db"] is None
+    assert channel_2["read_coverage"]["sections"]["mute"]["status"] == "complete"
+    assert "physical readback fixtures" in snapshot["known_gaps"][2]
+    mixer.send.assert_not_called()
+    mixer._send_raw.assert_not_called()
+    mixer.get_fader.assert_not_called()
+    mixer.get_channel_settings.assert_not_called()
+    mixer.request_channel_names.assert_not_called()
+
+
+def test_dlive_state_snapshot_marks_missing_cache_without_queries(server):
+    mixer = CachedDLiveMixer()
+    mixer.state = {}
+    mixer._channel_names = {}
+    server.connection_mode = "dlive"
+    server.mixer_client = mixer
+
+    snapshot = build_dlive_state_snapshot(server, total_channels=2)
+
+    assert snapshot["summary"]["read_coverage_status"] == "missing"
+    assert snapshot["summary"]["channels_with_cached_name"] == 0
+    assert snapshot["summary"]["channels_with_cached_fader"] == 0
+    assert snapshot["summary"]["channels_with_cached_mute"] == 0
+    assert snapshot["summary"]["cache_freshness_status"] == "missing"
+    assert snapshot["state_key_counts"]["raw_state_keys"] == 0
+    assert snapshot["cache_freshness"]["status"] == "missing"
+    assert snapshot["read_coverage"]["channel_status_counts"]["missing"] == 2
+    assert snapshot["channels"][0]["name"] == "dLive Ch 1"
+    assert snapshot["channels"][0]["read_coverage"]["missing_sections"] == ["identity", "fader", "mute"]
+    mixer.send.assert_not_called()
+    mixer._send_raw.assert_not_called()
+    mixer.get_fader.assert_not_called()
+    mixer.get_channel_settings.assert_not_called()
+    mixer.request_channel_names.assert_not_called()
 
 
 def test_routing_sends_snapshot_publishes_static_and_cached_state_without_queries(server):
@@ -533,6 +1063,8 @@ def test_routing_sends_snapshot_publishes_static_and_cached_state_without_querie
         "/ch/2/main/1/on": 1,
         "/ch/2/main/1/lvl": -3.0,
         "/ch/2/main/1/pre": 0,
+        "/ch/2/send/MX1/on": 1,
+        "/ch/2/send/MX1/lvl": -18.0,
         "/io/out/MOD/1/grp": "CH",
         "/io/out/MOD/1/in": 2,
     })
@@ -544,6 +1076,7 @@ def test_routing_sends_snapshot_publishes_static_and_cached_state_without_querie
         total_channels=2,
         send_count=1,
         main_count=1,
+        matrix_send_count=1,
         output_groups=["MOD"],
         output_count=1,
     )
@@ -557,19 +1090,33 @@ def test_routing_sends_snapshot_publishes_static_and_cached_state_without_querie
         "full_autonomous_ready": False,
     }
     assert snapshot["summary"]["read_coverage_status"] == "partial"
+    assert snapshot["summary"]["cache_freshness_status"] == "fresh"
     assert snapshot["summary"]["active_bus_send_count"] == 1
     assert snapshot["summary"]["active_main_send_count"] == 1
+    assert snapshot["summary"]["active_matrix_send_count"] == 1
+    assert snapshot["cache_freshness"]["status"] == "fresh"
+    assert snapshot["cache_freshness"]["queries_console"] is False
     assert snapshot["static_dante_routes"][0]["read_coverage"]["source"] == "static_config"
     send = next(row for row in snapshot["channel_bus_sends"] if row["channel"] == 2)
     main_send = next(row for row in snapshot["channel_main_sends"] if row["channel"] == 2)
+    matrix_send = next(row for row in snapshot["channel_matrix_sends"] if row["channel"] == 2)
     route = snapshot["output_routes"][0]
     assert send["active"] is True
     assert send["read_coverage"]["status"] == "complete"
+    assert send["read_coverage"]["cache_freshness"]["status"] == "fresh"
     assert main_send["active"] is True
     assert main_send["read_coverage"]["status"] == "complete"
+    assert main_send["read_coverage"]["cache_freshness"]["status"] == "fresh"
+    assert matrix_send["target_matrix"] == 1
+    assert matrix_send["active"] is True
+    assert matrix_send["level_db"] == -18.0
+    assert matrix_send["read_coverage"]["status"] == "complete"
+    assert matrix_send["read_coverage"]["cache_freshness"]["status"] == "fresh"
+    assert matrix_send["destructive_change_marker"] == "matrix_send_write_would_change_console_routing"
     assert route["source_group"] == "CH"
     assert route["source_channel"] == 2
     assert route["read_coverage"]["status"] == "complete"
+    assert route["read_coverage"]["cache_freshness"]["status"] == "fresh"
     assert route["destructive_change_marker"] == "output_routing_write_would_repatch_console"
     mixer.send.assert_not_called()
     mixer.get_all_channel_names.assert_not_called()
@@ -586,18 +1133,74 @@ def test_routing_sends_snapshot_marks_missing_cache_without_queries(server):
         total_channels=1,
         send_count=1,
         main_count=1,
+        matrix_send_count=1,
         output_groups=["MOD"],
         output_count=1,
     )
 
     assert snapshot["summary"]["read_coverage_status"] == "partial"
+    assert snapshot["summary"]["cache_freshness_status"] == "missing"
+    assert snapshot["cache_freshness"]["status"] == "missing"
     assert snapshot["read_coverage"]["surface_status_counts"]["static_dante_routes"]["complete"] >= 1
     assert snapshot["read_coverage"]["surface_status_counts"]["channel_bus_sends"]["missing"] == 1
     assert snapshot["read_coverage"]["surface_status_counts"]["channel_main_sends"]["missing"] == 1
+    assert snapshot["read_coverage"]["surface_status_counts"]["channel_matrix_sends"]["missing"] == 1
     assert snapshot["read_coverage"]["surface_status_counts"]["output_routes"]["missing"] == 1
     assert snapshot["channel_bus_sends"][0]["read_coverage"]["status"] == "missing"
     assert snapshot["channel_main_sends"][0]["read_coverage"]["status"] == "missing"
+    assert snapshot["channel_matrix_sends"][0]["read_coverage"]["status"] == "missing"
+    assert snapshot["channel_matrix_sends"][0]["read_coverage"]["cache_freshness"]["status"] == "missing"
     assert snapshot["output_routes"][0]["read_coverage"]["status"] == "missing"
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
+def test_routing_sends_snapshot_marks_stale_cache_timestamps_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/ch/1/send/1/on": 1,
+        "/ch/1/send/1/lvl": -14.0,
+        "/ch/1/send/1/pon": 1,
+        "/ch/1/send/1/mode": "POST",
+        "/ch/1/send/1/plink": 1,
+        "/ch/1/send/1/pan": -10.0,
+        "/ch/1/main/1/on": 1,
+        "/ch/1/main/1/lvl": -4.0,
+        "/ch/1/main/1/pre": 0,
+        "/ch/1/send/MX1/on": 1,
+        "/ch/1/send/MX1/lvl": -20.0,
+        "/io/out/MOD/1/grp": "CH",
+        "/io/out/MOD/1/in": 1,
+    })
+    stale_time = time.time() - 120.0
+    mixer.state_timestamps = {address: stale_time for address in mixer.state}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_routing_sends_snapshot(
+        server,
+        total_channels=1,
+        send_count=1,
+        main_count=1,
+        matrix_send_count=1,
+        output_groups=["MOD"],
+        output_count=1,
+    )
+
+    bus_send = snapshot["channel_bus_sends"][0]
+    main_send = snapshot["channel_main_sends"][0]
+    matrix_send = snapshot["channel_matrix_sends"][0]
+    route = snapshot["output_routes"][0]
+
+    assert snapshot["summary"]["cache_freshness_status"] == "stale"
+    assert snapshot["cache_freshness"]["status"] == "stale"
+    assert snapshot["cache_freshness"]["present_address_count"] == 13
+    assert snapshot["cache_freshness"]["timestamped_address_count"] == 13
+    assert snapshot["cache_freshness"]["max_age_sec"] > snapshot["cache_freshness"]["stale_after_sec"]
+    assert bus_send["read_coverage"]["cache_freshness"]["status"] == "stale"
+    assert main_send["read_coverage"]["cache_freshness"]["status"] == "stale"
+    assert matrix_send["read_coverage"]["cache_freshness"]["status"] == "stale"
+    assert route["read_coverage"]["cache_freshness"]["status"] == "stale"
     mixer.send.assert_not_called()
     mixer.get_all_channel_names.assert_not_called()
 
@@ -635,6 +1238,11 @@ def test_snapshots_scenes_snapshot_publishes_cached_catalog_without_queries(serv
     assert snapshot["summary"]["active_snapshot_name"] == "Band A live start"
     assert snapshot["summary"]["current_show"] == "Sunday Show"
     assert snapshot["summary"]["read_coverage_status"] == "partial"
+    assert snapshot["summary"]["cache_freshness_status"] == "fresh"
+    assert snapshot["cache_freshness"]["status"] == "fresh"
+    assert snapshot["cache_freshness"]["present_address_count"] == 4
+    assert snapshot["cache_freshness"]["timestamped_address_count"] == 4
+    assert snapshot["cache_freshness"]["queries_console"] is False
     assert snapshot["summary"]["live_apply_allowed"] is False
     assert snapshot["active_scene"]["read_coverage"]["status"] == "complete"
     assert active["snapshot_index"] == 2
@@ -648,6 +1256,34 @@ def test_snapshots_scenes_snapshot_publishes_cached_catalog_without_queries(serv
     mixer.get_all_channel_names.assert_not_called()
 
 
+def test_snapshots_scenes_snapshot_marks_stale_cache_timestamps_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "snapshots": {
+            1: {"name": "Pre-show baseline"},
+            "2": "Band A live start",
+        },
+        "/$ctl/lib/$actidx": 2,
+        "/$ctl/lib/$active": "Band A live start",
+    })
+    stale_time = time.time() - 120.0
+    mixer.state_timestamps = {address: stale_time for address in mixer.state}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_snapshots_scenes_snapshot(server, snapshot_count=2)
+
+    assert snapshot["summary"]["cache_freshness_status"] == "stale"
+    assert snapshot["cache_freshness"]["status"] == "stale"
+    assert snapshot["cache_freshness"]["present_address_count"] == 3
+    assert snapshot["cache_freshness"]["timestamped_address_count"] == 3
+    assert snapshot["cache_freshness"]["max_age_sec"] > snapshot["cache_freshness"]["stale_after_sec"]
+    assert snapshot["cache_freshness"]["live_write"] is False
+    assert snapshot["cache_freshness"]["queries_console"] is False
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
 def test_snapshots_scenes_snapshot_marks_missing_cache_without_queries(server):
     mixer = CachedMixer()
     mixer.state = {}
@@ -657,6 +1293,8 @@ def test_snapshots_scenes_snapshot_marks_missing_cache_without_queries(server):
     snapshot = build_snapshots_scenes_snapshot(server, snapshot_count=2)
 
     assert snapshot["summary"]["read_coverage_status"] == "missing"
+    assert snapshot["summary"]["cache_freshness_status"] == "missing"
+    assert snapshot["cache_freshness"]["status"] == "missing"
     assert snapshot["summary"]["named_snapshot_count"] == 0
     assert snapshot["summary"]["active_snapshot_index"] is None
     assert snapshot["active_scene"]["read_coverage"]["status"] == "missing"
@@ -701,6 +1339,11 @@ def test_user_presets_snapshot_publishes_cached_catalog_without_queries(server):
     assert snapshot["summary"]["preset_count"] == 3
     assert snapshot["summary"]["named_preset_count"] == 2
     assert snapshot["summary"]["read_coverage_status"] == "partial"
+    assert snapshot["summary"]["cache_freshness_status"] == "fresh"
+    assert snapshot["cache_freshness"]["status"] == "fresh"
+    assert snapshot["cache_freshness"]["present_address_count"] == 1
+    assert snapshot["cache_freshness"]["timestamped_address_count"] == 1
+    assert snapshot["cache_freshness"]["queries_console"] is False
     assert snapshot["summary"]["live_apply_allowed"] is False
     assert preset["preset_index"] == 1
     assert preset["preset_name"] == "Lead Vocal Strip"
@@ -717,6 +1360,36 @@ def test_user_presets_snapshot_publishes_cached_catalog_without_queries(server):
     mixer.get_all_channel_names.assert_not_called()
 
 
+def test_user_presets_snapshot_marks_stale_cache_timestamps_without_queries(server):
+    mixer = CachedMixer()
+    mixer.state.update({
+        "user_presets": {
+            1: {
+                "name": "Lead Vocal Strip",
+                "scope": "channel_strip",
+                "target_type": "channel",
+                "target": "CH 2",
+            },
+        },
+    })
+    stale_time = time.time() - 120.0
+    mixer.state_timestamps = {address: stale_time for address in mixer.state}
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+
+    snapshot = build_user_presets_snapshot(server, preset_count=1)
+
+    assert snapshot["summary"]["cache_freshness_status"] == "stale"
+    assert snapshot["cache_freshness"]["status"] == "stale"
+    assert snapshot["cache_freshness"]["present_address_count"] == 1
+    assert snapshot["cache_freshness"]["timestamped_address_count"] == 1
+    assert snapshot["cache_freshness"]["max_age_sec"] > snapshot["cache_freshness"]["stale_after_sec"]
+    assert snapshot["cache_freshness"]["live_write"] is False
+    assert snapshot["cache_freshness"]["queries_console"] is False
+    mixer.send.assert_not_called()
+    mixer.get_all_channel_names.assert_not_called()
+
+
 def test_user_presets_snapshot_marks_missing_cache_without_queries(server):
     mixer = CachedMixer()
     mixer.state = {}
@@ -726,6 +1399,8 @@ def test_user_presets_snapshot_marks_missing_cache_without_queries(server):
     snapshot = build_user_presets_snapshot(server, preset_count=2)
 
     assert snapshot["summary"]["read_coverage_status"] == "missing"
+    assert snapshot["summary"]["cache_freshness_status"] == "missing"
+    assert snapshot["cache_freshness"]["status"] == "missing"
     assert snapshot["summary"]["named_preset_count"] == 0
     assert snapshot["read_coverage"]["surface_status_counts"]["user_preset_slots"]["missing"] == 2
     assert snapshot["presets"][0]["preset_name"] is None
@@ -846,6 +1521,16 @@ def test_frontend_read_model_snapshots_are_display_only(server):
             output_groups=["MOD"],
             output_count=1,
         ),
+        build_fx_inserts_snapshot(
+            server,
+            fx_slot_count=2,
+            total_channels=2,
+            bus_count=1,
+            main_count=1,
+            matrix_count=1,
+            parameter_count=2,
+        ),
+        build_dlive_state_snapshot(server, total_channels=2),
         build_snapshots_scenes_snapshot(server, snapshot_count=2),
         build_user_presets_snapshot(server, preset_count=2),
         build_groups_buses_snapshot(server),
@@ -860,6 +1545,8 @@ def test_frontend_read_model_snapshots_are_display_only(server):
         "bus_main_dca_snapshot",
         "matrix_snapshot",
         "routing_sends_snapshot",
+        "fx_inserts_snapshot",
+        "dlive_state_snapshot",
         "snapshots_scenes_snapshot",
         "user_presets_snapshot",
         "groups_buses_snapshot",
@@ -873,14 +1560,18 @@ def test_frontend_read_model_snapshots_are_display_only(server):
     assert snapshots[2]["safety"]["queries_console"] is False
     assert snapshots[3]["safety"]["queries_console"] is False
     assert snapshots[4]["safety"]["queries_console"] is False
-    assert snapshots[4]["safety"]["scene_load_allowed"] is False
+    assert snapshots[4]["safety"]["fx_apply_allowed"] is False
     assert snapshots[5]["safety"]["queries_console"] is False
-    assert snapshots[5]["safety"]["preset_recall_allowed"] is False
-    assert snapshots[6]["buses"]
-    assert snapshots[7]["memories"]
-    assert snapshots[8]["sessions"]
-    assert snapshots[9]["rules"]
-    assert snapshots[10]["communications"]
+    assert snapshots[5]["safety"]["dlive_apply_allowed"] is False
+    assert snapshots[6]["safety"]["queries_console"] is False
+    assert snapshots[6]["safety"]["scene_load_allowed"] is False
+    assert snapshots[7]["safety"]["queries_console"] is False
+    assert snapshots[7]["safety"]["preset_recall_allowed"] is False
+    assert snapshots[8]["buses"]
+    assert snapshots[9]["memories"]
+    assert snapshots[10]["sessions"]
+    assert snapshots[11]["rules"]
+    assert snapshots[12]["communications"]
 
     forbidden_keys = {
         "action",
@@ -1478,6 +2169,18 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
         object(),
         {"total_channels": 1, "send_count": 1, "output_groups": ["MOD"], "output_count": 1},
     )
+    await server._dispatch["get_fx_inserts_snapshot"](
+        object(),
+        {
+            "fx_slot_count": 1,
+            "total_channels": 1,
+            "bus_count": 1,
+            "main_count": 1,
+            "matrix_count": 1,
+            "parameter_count": 1,
+        },
+    )
+    await server._dispatch["get_dlive_state_snapshot"](object(), {"total_channels": 2})
     await server._dispatch["get_snapshots_scenes_snapshot"](object(), {"snapshot_count": 2})
     await server._dispatch["get_user_presets_snapshot"](object(), {"preset_count": 2})
     await server._dispatch["get_memory_knowledge_snapshot"](object(), {})
@@ -1503,6 +2206,8 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
         "bus_main_dca_snapshot",
         "matrix_snapshot",
         "routing_sends_snapshot",
+        "fx_inserts_snapshot",
+        "dlive_state_snapshot",
         "snapshots_scenes_snapshot",
         "user_presets_snapshot",
         "memory_knowledge_snapshot",
@@ -1522,6 +2227,10 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
     assert by_type["matrix_snapshot"]["safety"]["live_write"] is False
     assert by_type["routing_sends_snapshot"]["safety"]["queries_console"] is False
     assert by_type["routing_sends_snapshot"]["safety"]["live_write"] is False
+    assert by_type["fx_inserts_snapshot"]["safety"]["queries_console"] is False
+    assert by_type["fx_inserts_snapshot"]["safety"]["fx_apply_allowed"] is False
+    assert by_type["dlive_state_snapshot"]["safety"]["queries_console"] is False
+    assert by_type["dlive_state_snapshot"]["safety"]["dlive_apply_allowed"] is False
     assert by_type["snapshots_scenes_snapshot"]["safety"]["queries_console"] is False
     assert by_type["snapshots_scenes_snapshot"]["safety"]["scene_load_allowed"] is False
     assert by_type["user_presets_snapshot"]["safety"]["queries_console"] is False
@@ -1729,6 +2438,7 @@ async def test_supervised_linked_proposal_apply_routes_each_change_through_manua
     server.mixer_client = MagicMock()
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/9/fdr": 0.0, "/ch/10/fdr": 0.0}
+    server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     server._apply_manual_console_write = AsyncMock(side_effect=[
         {
             "status": "applied",
@@ -1796,6 +2506,7 @@ async def test_supervised_linked_apply_blocks_when_pre_read_is_missing(server):
     server.mixer_client = MagicMock()
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/9/fdr": 0.0}
+    server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     server._apply_manual_console_write = AsyncMock()
     server.send_to_client = AsyncMock()
 
@@ -1832,6 +2543,7 @@ async def test_supervised_linked_apply_rolls_back_first_channel_when_second_fail
     server.mixer_client = MagicMock()
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/9/fdr": 0.0, "/ch/10/fdr": 0.0}
+    server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     server._apply_manual_console_write = AsyncMock(side_effect=[
         {
             "status": "applied",
@@ -1906,6 +2618,7 @@ async def test_supervised_operator_proposal_apply_routes_through_manual_gate(ser
     server.mixer_client = MagicMock()
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     server._apply_manual_console_write = AsyncMock(return_value={
         "status": "applied",
         "channel": 2,
@@ -1940,11 +2653,47 @@ async def test_supervised_operator_proposal_apply_routes_through_manual_gate(ser
 
 
 @pytest.mark.asyncio
+async def test_supervised_operator_proposal_apply_blocks_stale_cache_pre_read(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server.mixer_client.state_timestamps["/ch/2/fdr"] = time.time() - 120.0
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "title": "Lead Vocal: stale supervised fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    proposal = build_decision_queue(server)["pending_actions"][0]
+    assert proposal["can_apply"] is True
+
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {"proposal_id": proposal["id"], "approved": True, "idempotency_key": "stale-pre-read"},
+    )
+
+    server._apply_manual_console_write.assert_not_called()
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_blocked"
+    assert payload["status"] == "apply_blocked"
+    assert payload["apply_result"]["reason"] == "pre_read_cache_not_fresh"
+    assert payload["apply_result"]["cache_freshness"]["status"] == "stale"
+    assert payload["apply_result"]["cache_freshness"]["address"] == "/ch/2/fdr"
+
+
+@pytest.mark.asyncio
 async def test_supervised_apply_requires_idempotency_key(server):
     server.operator_mode = "supervised"
     server.mixer_client = MagicMock()
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     server._apply_manual_console_write = AsyncMock()
     server.send_to_client = AsyncMock()
 
@@ -1976,6 +2725,7 @@ async def test_supervised_apply_blocks_duplicate_idempotency_key(server):
     server.mixer_client = MagicMock()
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     server._apply_manual_console_write = AsyncMock(return_value={
         "status": "applied",
         "channel": 2,
@@ -2060,6 +2810,7 @@ async def test_supervised_apply_blocks_cumulative_delta_before_manual_gate(serve
     server.mixer_client = MagicMock()
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     server._operator_apply_delta_history = {
         (2, "fader"): [{"ts": time.monotonic(), "delta_db": -2.4}]
     }
@@ -2095,6 +2846,7 @@ async def test_supervised_apply_blocks_large_delta_before_manual_gate(server):
     server.mixer_client = MagicMock()
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/2/fdr": 0.0}
+    server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     server._apply_manual_console_write = AsyncMock()
     server.send_to_client = AsyncMock()
 
@@ -2127,6 +2879,7 @@ async def test_supervised_apply_uses_normalized_clamped_value_after_validation(s
     server.mixer_client = MagicMock()
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/2/in/set/trim": 18.0}
+    server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     server._apply_manual_console_write = AsyncMock(return_value={
         "status": "applied",
         "channel": 2,
@@ -2165,6 +2918,7 @@ async def test_decision_trace_and_safety_monitor_expose_apply_evidence(server, t
     server.mixer_client = MagicMock()
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     server._apply_manual_console_write = AsyncMock(return_value={
         "status": "applied",
         "channel": 2,
@@ -2324,6 +3078,32 @@ def test_operator_analysis_creates_applyable_proposal_when_fader_cache_exists(se
     assert proposal["requested_change"]["value_type"] == "fader"
     assert proposal["requested_change"]["channel"] == 2
     assert proposal["requested_change"]["value"] < -8.0
+    assert proposal["requested_change"]["cache_freshness"]["status"] == "fresh"
+    assert any(
+        item["label"] == "Cache freshness" and item["value"] == "fresh"
+        for item in proposal["requested_change"]["safety_evidence"]
+    )
+
+
+def test_operator_analysis_blocks_applyable_proposal_when_fader_cache_is_stale(server):
+    server.mixer_client = CachedMixer()
+    server.mixer_client.state_timestamps["/ch/2/fdr"] = time.time() - 120.0
+    server.audio_capture = FakeAudioCapture()
+
+    report = build_operator_analysis_report(server, total_channels=4, create_proposals=True)
+    queue = build_decision_queue(server)
+
+    assert report["status"] == "ok"
+    assert report["created_count"] == 1
+    assert report["cache_freshness_blocked_count"] == 1
+    proposal = queue["pending_actions"][0]
+    assert proposal["id"] == "analysis:peak_risk:2"
+    assert proposal["can_apply"] is False
+    assert proposal["requested_change"] is None
+    assert proposal["apply_blockers"] == ["missing_requested_change"]
+    assert proposal["raw"]["apply_status"] == "blocked_cache_freshness_not_fresh"
+    assert proposal["raw"]["cache_freshness"][0]["status"] == "stale"
+    assert proposal["raw"]["blocked_requested_changes"][0]["value_type"] == "fader"
 
 
 def test_operator_analysis_creates_gain_trim_down_for_near_clipping(server):
@@ -2515,6 +3295,26 @@ def test_safe_gain_recommendation_bridge_builds_applyable_trim_proposal():
     assert proposal["requested_change"]["channel"] == 2
     assert proposal["requested_change"]["current_value"] == 1.0
     assert proposal["requested_change"]["value"] == 3.5
+    assert proposal["requested_change"]["cache_freshness"]["status"] == "fresh"
+
+
+def test_safe_gain_recommendation_bridge_blocks_stale_trim_cache():
+    mixer = CachedMixer()
+    mixer.state_timestamps["/ch/2/in/set/trim"] = time.time() - 120.0
+
+    proposals = build_safe_gain_operator_proposals(
+        FakeSafeGainCalibrator().get_suggestions(),
+        channel_mapping={1: 2},
+        mixer_client=mixer,
+    )
+
+    assert len(proposals) == 1
+    proposal = proposals[0]
+    assert proposal["kind"] == "analysis"
+    assert proposal["requested_change"] is None
+    assert proposal["raw"]["apply_status"] == "blocked_cache_freshness_not_fresh"
+    assert proposal["raw"]["cache_freshness"][0]["status"] == "stale"
+    assert proposal["raw"]["blocked_requested_change"]["value_type"] == "gain"
 
 
 def test_soundcheck_recommendation_bridge_maps_gain_and_fader_to_applyable_proposals():
@@ -2527,6 +3327,29 @@ def test_soundcheck_recommendation_bridge_maps_gain_and_fader_to_applyable_propo
     assert [proposal["requested_change"]["value_type"] for proposal in proposals] == ["gain", "fader"]
     assert proposals[0]["requested_change"]["value"] == -4.0
     assert proposals[1]["requested_change"]["value"] == -8.5
+
+
+def test_soundcheck_recommendation_bridge_blocks_stale_cache_when_mixer_client_is_supplied():
+    mixer = CachedMixer()
+    mixer.state.update({
+        "/ch/1/in/set/trim": 0.0,
+        "/ch/2/fdr": -10.0,
+    })
+    mixer.state_timestamps["/ch/2/fdr"] = time.time() - 120.0
+    workflow = NoWriteSoundcheckRecommendationWorkflow()
+    workflow.recommend_input_gain(channel=1, current_trim_db=0.0, target_trim_db=-4.0)
+    workflow.recommend_fader(channel=2, current_fader_db=-10.0, target_fader_db=-11.5)
+
+    proposals = build_soundcheck_operator_proposals(
+        workflow.build_bundle(),
+        mixer_client=mixer,
+    )
+
+    assert proposals[0]["requested_change"]["cache_freshness"]["status"] == "fresh"
+    assert proposals[1]["kind"] == "analysis"
+    assert proposals[1]["requested_change"] is None
+    assert proposals[1]["raw"]["apply_status"] == "blocked_cache_freshness_not_fresh"
+    assert proposals[1]["raw"]["cache_freshness"][0]["status"] == "stale"
 
 
 @pytest.mark.asyncio

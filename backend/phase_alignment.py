@@ -16,7 +16,7 @@ import numpy as np
 import threading
 import logging
 import time
-from typing import Dict, List, Callable, Optional, Tuple
+from typing import Any, Dict, List, Callable, Optional, Tuple
 from collections import deque
 from scipy import signal
 from scipy.signal import hilbert, coherence, find_peaks
@@ -589,6 +589,13 @@ class PhaseAlignmentController:
         self.all_channels = []  # Все каналы включая reference
         self.corrections: Dict[int, Dict[str, float]] = {}  # {channel: {delay_ms, phase_invert}}
         self._apply_once_timer: Optional[threading.Timer] = None
+        self.live_write_allowed = False
+        self.write_policy = "proposal_only_quarantined"
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+        self.last_blocked_calls: List[Dict[str, Any]] = []
+        self.last_apply_result: Dict[str, Any] = {}
         
     def start_analysis(self,
                       device_id: int,
@@ -652,8 +659,8 @@ class PhaseAlignmentController:
                     measurements = self.analyzer.get_measurements()
                     self.stop_analysis()
                     if measurements and self.mixer_client:
-                        self.apply_corrections(measurements)
-                        logger.info("Phase alignment apply_once: corrections applied")
+                        result = self.apply_corrections(measurements)
+                        logger.info("Phase alignment apply_once: corrections blocked as evidence: %s", result)
                     self._apply_once_timer = None
                 self._apply_once_timer = threading.Timer(apply_once_duration_sec, _after_duration)
                 self._apply_once_timer.daemon = True
@@ -675,228 +682,319 @@ class PhaseAlignmentController:
         self.is_active = False
         logger.info("Phase alignment analysis stopped")
     
-    def apply_corrections(self, measurements: Dict = None):
+    def apply_corrections(self, measurements: Dict = None) -> Dict[str, Any]:
         """
-        Применение коррекций к микшеру через OSC.
-        
+        Build blocked phase/delay correction evidence without mutating a mixer.
+
         Args:
             measurements: Результаты измерений (если None, используются последние)
         """
-        if not self.mixer_client:
-            logger.error("No mixer client available")
-            return False
-        
+        self._reset_write_telemetry()
+
         if measurements is None:
             if self.analyzer:
                 measurements = self.analyzer.get_measurements()
                 logger.info(f"Got measurements from analyzer: {measurements}")
             else:
                 logger.error("No measurements available and no analyzer")
-                return False
-        
+                return self._blocked_phase_result("no_phase_measurements", [])
+
         if not isinstance(measurements, dict):
             logger.error(f"Invalid measurements type: {type(measurements)}, expected dict")
-            return False
-        
+            return self._blocked_phase_result("invalid_phase_measurements", [])
+
         if len(measurements) == 0:
             logger.warning("Measurements dictionary is empty")
-            return False
-        
-        logger.info("Applying phase/delay corrections to mixer...")
+            return self._blocked_phase_result("empty_phase_measurements", [])
+
+        logger.info("Building blocked phase/delay correction evidence...")
         logger.info(f"Measurements received: {measurements}")
         logger.info(f"Measurements type: {type(measurements)}, length: {len(measurements)}")
         logger.info(f"Channels to align: {self.channels_to_align}")
-        
-        applied_count = 0
-        
+
+        blocked_calls: List[Dict[str, Any]] = []
+
         # Обработка измерений
         for pair_key, meas in measurements.items():
-            try:
-                # Парсинг ключа пары каналов
-                # Формат может быть: "(ref_ch, ch)" или tuple
-                if isinstance(pair_key, tuple):
-                    if len(pair_key) != 2:
-                        logger.warning(f"Invalid tuple length: {pair_key}")
-                        continue
-                    ref_ch, ch = pair_key
-                elif isinstance(pair_key, str):
-                    # Парсинг строки вида "(1, 2)"
-                    import re
-                    match = re.match(r'\((\d+),\s*(\d+)\)', pair_key)
-                    if match:
-                        ref_ch = int(match.group(1))
-                        ch = int(match.group(2))
-                    else:
-                        logger.warning(f"Could not parse channel pair: {pair_key}")
-                        continue
-                else:
-                    logger.warning(f"Unknown pair key format: {pair_key} (type: {type(pair_key)})")
-                    continue
-                
-                # Проверка типа данных измерения
-                if not isinstance(meas, dict):
-                    logger.warning(f"Invalid measurement data type for {pair_key}: {type(meas)}")
-                    continue
-                
-            except Exception as e:
-                logger.error(f"Error parsing pair_key {pair_key}: {e}")
+            parsed_pair = self._parse_measurement_pair(pair_key)
+            if parsed_pair is None:
                 continue
-            
-            # Проверка, что канал должен быть обработан
-            # Обрабатываем все каналы из измерений, которые есть в all_channels или channels_to_align
-            # Это включает каналы перед reference channel
-            should_process = False
-            
-            # Проверяем, что канал в списке всех каналов (включая reference)
-            if hasattr(self, 'all_channels') and self.all_channels:
-                if ch in self.all_channels:
-                    should_process = True
-            # Или проверяем channels_to_align
-            elif self.channels_to_align:
-                if ch in self.channels_to_align:
-                    should_process = True
-                # Также обрабатываем каналы перед reference
-                elif self.reference_channel and ch < self.reference_channel:
-                    should_process = True
-                    logger.debug(f"Processing channel {ch} (before reference channel {self.reference_channel})")
-            else:
-                # Если списки не заданы, обрабатываем все каналы из измерений
-                should_process = True
-            
-            if not should_process:
+            ref_ch, ch = parsed_pair
+
+            if not isinstance(meas, dict):
+                logger.warning(f"Invalid measurement data type for {pair_key}: {type(meas)}")
+                continue
+
+            if not self._should_process_channel(ch):
                 logger.debug(f"Skipping channel {ch} (not in processing list)")
                 continue
-            
-            # Check for bleed: skip or reduce confidence if high bleed detected
-            # Bleed can distort cross-correlation measurements
-            if self.bleed_service and self.bleed_service.enabled:
-                bleed_info = self.bleed_service.get_bleed_info(ch)
-                if bleed_info and bleed_info.bleed_ratio > 0.5:
-                    coherence = meas.get('coherence', 0.0)
-                    # If coherence is already low (<0.5) and bleed is high, skip correction
-                    if coherence < 0.5:
-                        logger.warning(f"Skipping phase correction for channel {ch}: high bleed (ratio={bleed_info.bleed_ratio:.2f}) "
-                                     f"and low coherence ({coherence:.2f}) - measurement unreliable")
-                        continue
-                    else:
-                        # Reduce confidence: only apply if delay is significant and coherence is high
-                        if abs(meas.get('optimal_delay_ms', 0.0)) < 1.0:
-                            logger.debug(f"Skipping small delay correction for channel {ch} due to bleed (ratio={bleed_info.bleed_ratio:.2f})")
-                            continue
-            
-            delay_ms = meas.get('optimal_delay_ms', 0.0)
-            phase_invert = meas.get('phase_invert', 0)
-            coherence = meas.get('coherence', 0.0)
-            
+
+            if self._should_skip_for_bleed(ch, meas):
+                continue
+
+            delay_ms = float(meas.get('optimal_delay_ms', 0.0) or 0.0)
+            phase_invert = int(meas.get('phase_invert', 0) or 0)
+            coherence = float(meas.get('coherence', 0.0) or 0.0)
+
             logger.info(f"Processing channel {ch}: delay={delay_ms:.2f} ms, phase_invert={phase_invert}, coherence={coherence:.2f}")
-            
-            # PRIORITY: Phase inversion first, delay only if necessary
-            # If phase inversion is needed and delay is small (< 2ms), try phase only first
-            # Delay is applied only if it's significant (> 2ms) or coherence is low even with phase
-            DELAY_SIGNIFICANT_THRESHOLD = 2.0  # ms - below this, phase inversion may be sufficient
-            COHERENCE_THRESHOLD = 0.6  # minimum coherence for acceptable alignment
-            
-            # Determine if delay is truly needed
-            # If delay is small and phase inversion is needed, prioritize phase inversion only
-            if phase_invert == 1 and abs(delay_ms) < DELAY_SIGNIFICANT_THRESHOLD:
-                if coherence >= COHERENCE_THRESHOLD:
-                    # Good coherence with phase inversion - delay may not be needed
-                    logger.info(f"Channel {ch}: Small delay ({delay_ms:.2f}ms) with phase invert - prioritizing phase only")
-                    delay_ms = 0.0  # Skip delay, phase inversion should suffice
-                else:
-                    logger.info(f"Channel {ch}: Low coherence ({coherence:.2f}) even with phase invert - keeping delay")
-            
-            # If delay is very small (< 0.3ms), it's likely not musically significant
-            # Skip it unless coherence is very low
-            if abs(delay_ms) < 0.3 and coherence >= COHERENCE_THRESHOLD:
-                logger.info(f"Channel {ch}: Negligible delay ({delay_ms:.2f}ms) with good coherence - skipping delay")
-                delay_ms = 0.0
-            
-            # Сохранение коррекций
+
+            delay_ms = self._phase_delay_candidate(delay_ms, phase_invert, coherence, ch)
+
+            # Сохранение коррекций as local evidence only; no console writes happen here.
             self.corrections[ch] = {
                 'delay_ms': delay_ms,
                 'phase_invert': phase_invert
             }
-            
-            # Применение задержки только если она значительная
-            if abs(delay_ms) >= 0.3:  # Минимальный порог 0.3ms (musically significant)
-                # Конвертация в миллисекунды (режим MS)
-                # Убеждаемся, что задержка положительная (абсолютное значение)
-                # set_channel_delay автоматически включает задержку (dlyon = 1)
-                delay_value = abs(delay_ms)
-                # Убеждаемся, что значение в допустимом диапазоне (0.5 - max_delay_ms)
-                max_delay = getattr(self, 'max_delay_ms', 10.0)
-                delay_value = max(0.5, min(max_delay, delay_value))
-                
-                logger.info(f"Setting delay for channel {ch}: {delay_value:.2f} ms")
-                self.mixer_client.set_channel_delay(ch, delay_value, mode="MS")
-                logger.info(f"Channel {ch}: Applied delay {delay_value:.2f} ms (enabled)")
+
+            blocked_calls.extend(
+                self._build_phase_apply_calls(
+                    reference_channel=ref_ch,
+                    channel=ch,
+                    delay_ms=delay_ms,
+                    phase_invert=phase_invert,
+                    coherence=coherence,
+                )
+            )
+
+        reason = "phase_delay_direct_apply_quarantined" if blocked_calls else "no_phase_corrections"
+        result = self._blocked_phase_result(reason, blocked_calls)
+        logger.info("Phase/delay direct apply blocked; %s would-be calls kept as evidence", len(blocked_calls))
+        return result
+
+    def _reset_write_telemetry(self):
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+        self.last_blocked_calls = []
+        self.last_apply_result = {}
+
+    def _parse_measurement_pair(self, pair_key) -> Optional[Tuple[int, int]]:
+        try:
+            if isinstance(pair_key, tuple):
+                if len(pair_key) != 2:
+                    logger.warning(f"Invalid tuple length: {pair_key}")
+                    return None
+                return int(pair_key[0]), int(pair_key[1])
+            if isinstance(pair_key, str):
+                import re
+                match = re.match(r'\((\d+),\s*(\d+)\)', pair_key)
+                if match:
+                    return int(match.group(1)), int(match.group(2))
+                logger.warning(f"Could not parse channel pair: {pair_key}")
+                return None
+            logger.warning(f"Unknown pair key format: {pair_key} (type: {type(pair_key)})")
+            return None
+        except Exception as exc:
+            logger.error(f"Error parsing pair_key {pair_key}: {exc}")
+            return None
+
+    def _should_process_channel(self, channel: int) -> bool:
+        # Обрабатываем все каналы из измерений, которые есть в all_channels или channels_to_align.
+        if hasattr(self, 'all_channels') and self.all_channels:
+            return channel in self.all_channels
+        if self.channels_to_align:
+            if channel in self.channels_to_align:
+                return True
+            if self.reference_channel and channel < self.reference_channel:
+                logger.debug(f"Processing channel {channel} (before reference channel {self.reference_channel})")
+                return True
+            return False
+        return True
+
+    def _should_skip_for_bleed(self, channel: int, measurement: Dict[str, Any]) -> bool:
+        if not self.bleed_service or not self.bleed_service.enabled:
+            return False
+
+        bleed_info = self.bleed_service.get_bleed_info(channel)
+        if not bleed_info or bleed_info.bleed_ratio <= 0.5:
+            return False
+
+        coherence = float(measurement.get('coherence', 0.0) or 0.0)
+        if coherence < 0.5:
+            logger.warning(
+                "Skipping phase correction for channel %s: high bleed (ratio=%.2f) and low coherence (%.2f)",
+                channel,
+                bleed_info.bleed_ratio,
+                coherence,
+            )
+            return True
+        if abs(float(measurement.get('optimal_delay_ms', 0.0) or 0.0)) < 1.0:
+            logger.debug(
+                "Skipping small delay correction for channel %s due to bleed (ratio=%.2f)",
+                channel,
+                bleed_info.bleed_ratio,
+            )
+            return True
+        return False
+
+    def _phase_delay_candidate(
+        self,
+        delay_ms: float,
+        phase_invert: int,
+        coherence: float,
+        channel: int,
+    ) -> float:
+        delay_significant_threshold = 2.0
+        coherence_threshold = 0.6
+
+        if phase_invert == 1 and abs(delay_ms) < delay_significant_threshold:
+            if coherence >= coherence_threshold:
+                logger.info(
+                    "Channel %s: Small delay (%.2fms) with phase invert - prioritizing phase only",
+                    channel,
+                    delay_ms,
+                )
+                delay_ms = 0.0
             else:
-                # Отключение задержки если она очень мала
-                logger.info(f"Disabling delay for channel {ch} (too small: {delay_ms:.2f} ms)")
-                self.mixer_client.send(f"/ch/{ch}/in/set/dlyon", 0)
-                logger.info(f"Channel {ch}: Delay disabled (too small: {delay_ms:.2f} ms)")
-            
-            # Применение инверсии фазы (1 = инвертировано, 0 = нормально)
-            logger.info(f"Setting phase invert for channel {ch}: {phase_invert}")
-            self.mixer_client.set_channel_phase_invert(ch, phase_invert)
-            if phase_invert:
-                logger.info(f"Channel {ch}: Applied phase inversion")
-            else:
-                logger.info(f"Channel {ch}: Phase normal (not inverted)")
-            
-            applied_count += 1
-        
-        logger.info(f"Applied corrections to {applied_count} channels")
-        return applied_count > 0
+                logger.info(
+                    "Channel %s: Low coherence (%.2f) even with phase invert - keeping delay",
+                    channel,
+                    coherence,
+                )
+
+        if abs(delay_ms) < 0.3 and coherence >= coherence_threshold:
+            logger.info(
+                "Channel %s: Negligible delay (%.2fms) with good coherence - skipping delay",
+                channel,
+                delay_ms,
+            )
+            delay_ms = 0.0
+
+        return delay_ms
+
+    def _build_phase_apply_calls(
+        self,
+        *,
+        reference_channel: int,
+        channel: int,
+        delay_ms: float,
+        phase_invert: int,
+        coherence: float,
+    ) -> List[Dict[str, Any]]:
+        calls: List[Dict[str, Any]] = []
+        if abs(delay_ms) >= 0.3:
+            max_delay = getattr(self, 'max_delay_ms', 10.0)
+            delay_value = max(0.5, min(max_delay, abs(delay_ms)))
+            calls.append(
+                {
+                    "cmd": "set_channel_delay",
+                    "channel": channel,
+                    "delay_ms": delay_value,
+                    "mode": "MS",
+                    "reference_channel": reference_channel,
+                    "measured_delay_ms": delay_ms,
+                    "coherence": coherence,
+                }
+            )
+        else:
+            calls.append(
+                {
+                    "cmd": "send",
+                    "path": f"/ch/{channel}/in/set/dlyon",
+                    "value": 0,
+                    "semantic": "disable_channel_delay",
+                    "channel": channel,
+                    "reference_channel": reference_channel,
+                    "measured_delay_ms": delay_ms,
+                    "coherence": coherence,
+                }
+            )
+
+        calls.append(
+            {
+                "cmd": "set_channel_phase_invert",
+                "channel": channel,
+                "phase_invert": phase_invert,
+                "reference_channel": reference_channel,
+                "coherence": coherence,
+            }
+        )
+        return calls
+
+    def _build_phase_reset_calls(self, channels: List[int]) -> List[Dict[str, Any]]:
+        calls: List[Dict[str, Any]] = []
+        for channel in channels:
+            calls.extend(
+                [
+                    {
+                        "cmd": "set_channel_phase_invert",
+                        "channel": channel,
+                        "phase_invert": 0,
+                        "semantic": "reset_phase_invert",
+                    },
+                    {
+                        "cmd": "send",
+                        "path": f"/ch/{channel}/in/set/dlyon",
+                        "value": 0,
+                        "semantic": "disable_channel_delay",
+                        "channel": channel,
+                    },
+                    {
+                        "cmd": "send",
+                        "path": f"/ch/{channel}/in/set/dlymode",
+                        "value": "MS",
+                        "semantic": "reset_delay_mode",
+                        "channel": channel,
+                    },
+                    {
+                        "cmd": "send",
+                        "path": f"/ch/{channel}/in/set/dly",
+                        "value": 0.5,
+                        "semantic": "reset_delay_value",
+                        "channel": channel,
+                    },
+                ]
+            )
+        return calls
+
+    def _blocked_phase_result(self, reason: str, blocked_calls: List[Dict[str, Any]]) -> Dict[str, Any]:
+        self.last_write_attempted = bool(blocked_calls)
+        self.last_write_blocked = bool(blocked_calls)
+        self.last_write_count = 0
+        self.last_blocked_calls = list(blocked_calls)
+        result = {
+            "applied": False,
+            "blocked": bool(blocked_calls),
+            "calls": [],
+            "blocked_calls": list(blocked_calls),
+            "blocked_call_count": len(blocked_calls),
+            "reason": reason,
+            "write_policy": self.write_policy,
+            "live_write_allowed": self.live_write_allowed,
+            "can_apply_live": False,
+            "mixer_client_present": self.mixer_client is not None,
+            "mutates_mixer": False,
+        }
+        self.last_apply_result = result
+        if blocked_calls:
+            logger.warning(
+                "Phase/delay live writes are quarantined; %s commands kept as evidence",
+                len(blocked_calls),
+            )
+        return result
     
-    def reset_all_phase_delay(self, channels: List[int] = None):
+    def reset_all_phase_delay(self, channels: List[int] = None) -> Dict[str, Any]:
         """
-        Сброс и выключение всех фаз и задержек на указанных каналах.
+        Build blocked reset evidence for phase and delay values.
         
         Args:
             channels: Список каналов для сброса (если None, сбрасываются все каналы с коррекциями)
         """
-        if not self.mixer_client:
-            logger.error("No mixer client available")
-            return False
-        
+        self._reset_write_telemetry()
+
         if channels is None:
             # Используем все каналы с коррекциями или все каналы для выравнивания
             channels = list(self.corrections.keys()) if self.corrections else self.channels_to_align
         
         if not channels:
             logger.warning("No channels specified for reset")
-            return False
-        
-        logger.info(f"Resetting phase and delay for {len(channels)} channels...")
-        
-        reset_count = 0
-        
-        for ch in channels:
-            try:
-                # Сброс инверсии фазы (0 = нормальная фаза)
-                self.mixer_client.set_channel_phase_invert(ch, 0)
-                
-                # Отключение задержки
-                self.mixer_client.send(f"/ch/{ch}/in/set/dlyon", 0)
-                
-                # Сброс значения задержки на минимальное
-                self.mixer_client.send(f"/ch/{ch}/in/set/dlymode", "MS")
-                self.mixer_client.send(f"/ch/{ch}/in/set/dly", 0.5)  # Минимальное значение
-                
-                # Удаление из коррекций
-                if ch in self.corrections:
-                    del self.corrections[ch]
-                
-                reset_count += 1
-                logger.info(f"Channel {ch}: Reset phase and delay")
-                
-            except Exception as e:
-                logger.error(f"Error resetting channel {ch}: {e}")
-        
-        logger.info(f"Reset phase and delay for {reset_count} channels")
-        return True
+            return self._blocked_phase_result("no_phase_reset_channels", [])
+
+        logger.info(f"Building blocked phase/delay reset evidence for {len(channels)} channels...")
+        blocked_calls = self._build_phase_reset_calls(channels)
+        result = self._blocked_phase_result("phase_delay_reset_quarantined", blocked_calls)
+        logger.info("Phase/delay reset blocked; %s would-be calls kept as evidence", len(blocked_calls))
+        return result
     
     def get_status(self) -> Dict:
         """Получение статуса контроллера."""
@@ -904,5 +1002,14 @@ class PhaseAlignmentController:
             'active': self.is_active,
             'reference_channel': self.reference_channel,
             'channels': self.channels_to_align,
-            'corrections': self.corrections.copy()
+            'corrections': self.corrections.copy(),
+            'live_write_allowed': self.live_write_allowed,
+            'write_policy': self.write_policy,
+            'mixer_client_present': self.mixer_client is not None,
+            'last_write_attempted': self.last_write_attempted,
+            'last_write_blocked': self.last_write_blocked,
+            'last_write_count': self.last_write_count,
+            'last_blocked_call_count': len(self.last_blocked_calls),
+            'last_blocked_calls': list(self.last_blocked_calls),
+            'last_apply_result': dict(self.last_apply_result),
         }

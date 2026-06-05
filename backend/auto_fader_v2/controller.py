@@ -240,6 +240,9 @@ class AutoFaderControllerV2:
         self.noise_gate_threshold_lufs = float(auto_fader_cfg.get("noise_gate_threshold_lufs", ACTIVITY_THRESHOLD_LUFS))
         self._inactive_since: Dict[int, float] = {}
         self._gate_closed_channels: Dict[int, bool] = {}
+        self.live_non_fader_write_allowed = False
+        self.non_fader_write_policy = "proposal_only_quarantined"
+        self._reset_non_fader_write_telemetry()
         
         # ML component
         self.ml_collector = MLDataCollector()
@@ -425,10 +428,96 @@ class AutoFaderControllerV2:
             "air": float(metric.band_energy_air),
         }
 
-    def _apply_adaptive_noise_gate(self, channel_id: int, metric: ChannelMetrics, now_ts: float) -> None:
+    @staticmethod
+    def _eq_band_for_frequency(frequency_hz: float) -> int:
+        """Map a masking EQ target to a conservative WING parametric band."""
+        if 1000 <= frequency_hz < 2000:
+            return 2
+        if 2000 <= frequency_hz <= 4000:
+            return 3
+        return 2
+
+    def _reset_non_fader_write_telemetry(self) -> None:
+        self.last_non_fader_write_attempted = False
+        self.last_non_fader_write_blocked = False
+        self.last_non_fader_write_count = 0
+        self.last_blocked_non_fader_calls: list[Dict[str, Any]] = []
+
+    def _no_non_fader_write_result(self, reason: str) -> Dict[str, Any]:
+        return {
+            "applied": False,
+            "blocked": False,
+            "calls": [],
+            "blocked_calls": [],
+            "blocked_call_count": 0,
+            "reason": reason,
+            "write_policy": self.non_fader_write_policy,
+            "live_write_allowed": self.live_non_fader_write_allowed,
+            "can_apply_live": False,
+            "mixer_client_present": self.mixer_client is not None,
+            "mutates_mixer": False,
+        }
+
+    def _store_blocked_non_fader_write(
+        self,
+        *,
+        reason: str,
+        blocked_calls: list[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        calls = [dict(call) for call in blocked_calls]
+        self.last_non_fader_write_attempted = bool(calls)
+        self.last_non_fader_write_blocked = bool(calls)
+        self.last_non_fader_write_count = 0
+        self.last_blocked_non_fader_calls.extend(calls)
+        logger.info(
+            "AutoFaderV2 non-fader live writes blocked: reason=%s calls=%s",
+            reason,
+            len(calls),
+        )
+        return {
+            "applied": False,
+            "blocked": bool(calls),
+            "calls": [],
+            "blocked_calls": calls,
+            "blocked_call_count": len(calls),
+            "reason": reason,
+            "write_policy": self.non_fader_write_policy,
+            "live_write_allowed": self.live_non_fader_write_allowed,
+            "can_apply_live": False,
+            "mixer_client_present": self.mixer_client is not None,
+            "mutates_mixer": False,
+        }
+
+    def _block_eq_adjustments(
+        self,
+        eq_adjustments: list[EQAdjustment],
+        *,
+        reason: str,
+        semantic: str,
+    ) -> Dict[str, Any]:
+        blocked_calls = []
+        for eq_adj in eq_adjustments:
+            band_num = self._eq_band_for_frequency(eq_adj.frequency_hz)
+            blocked_calls.append({
+                "cmd": "set_eq_band",
+                "channel": eq_adj.channel_id,
+                "band": band_num,
+                "freq": eq_adj.frequency_hz,
+                "gain": eq_adj.gain_db,
+                "q": eq_adj.q_factor,
+                "semantic": semantic,
+            })
+        if not blocked_calls:
+            return self._no_non_fader_write_result("no_eq_adjustments")
+        return self._store_blocked_non_fader_write(
+            reason=reason,
+            blocked_calls=blocked_calls,
+        )
+
+    def _apply_adaptive_noise_gate(self, channel_id: int, metric: ChannelMetrics, now_ts: float) -> Dict[str, Any]:
         """Open/close gate based on sustained inactivity."""
         if not self.adaptive_noise_gate_enabled or not self.mixer_client:
-            return
+            return self._no_non_fader_write_result("adaptive_noise_gate_disabled_or_no_mixer_client")
 
         level = metric.lufs_momentary
         currently_inactive = level < self.noise_gate_threshold_lufs
@@ -437,64 +526,137 @@ class AutoFaderControllerV2:
             self._inactive_since.setdefault(channel_id, now_ts)
             inactive_for = now_ts - self._inactive_since[channel_id]
             if inactive_for >= self.noise_gate_hold_sec and not self._gate_closed_channels.get(channel_id, False):
-                if hasattr(self.mixer_client, "set_gate_on"):
-                    self.mixer_client.set_gate_on(channel_id, 1)
-                    self._gate_closed_channels[channel_id] = True
-                elif hasattr(self.mixer_client, "set_channel_fader"):
-                    # Fallback for setups without gate OSC control.
-                    self.mixer_client.set_channel_fader(channel_id, -120.0)
-                    self._gate_closed_channels[channel_id] = True
+                self._gate_closed_channels[channel_id] = True
+                blocked_calls = [{
+                    "cmd": "set_gate_on",
+                    "channel": channel_id,
+                    "on": 1,
+                    "semantic": "adaptive_noise_gate_close",
+                    "level_lufs": level,
+                    "threshold_lufs": self.noise_gate_threshold_lufs,
+                    "inactive_for_sec": inactive_for,
+                }]
+                if hasattr(self.mixer_client, "set_channel_fader"):
+                    blocked_calls.append({
+                        "cmd": "set_channel_fader",
+                        "channel": channel_id,
+                        "fader_db": -120.0,
+                        "semantic": "adaptive_noise_gate_fader_fallback_mute",
+                        "reason": "fallback fader mute is also quarantined outside Product Layer",
+                    })
+                return self._store_blocked_non_fader_write(
+                    reason="auto_fader_v2_adaptive_noise_gate_quarantined",
+                    blocked_calls=blocked_calls,
+                )
         else:
             self._inactive_since.pop(channel_id, None)
             if self._gate_closed_channels.get(channel_id, False):
-                if hasattr(self.mixer_client, "set_gate_on"):
-                    self.mixer_client.set_gate_on(channel_id, 0)
                 self._gate_closed_channels[channel_id] = False
+                return self._store_blocked_non_fader_write(
+                    reason="auto_fader_v2_adaptive_noise_gate_quarantined",
+                    blocked_calls=[{
+                        "cmd": "set_gate_on",
+                        "channel": channel_id,
+                        "on": 0,
+                        "semantic": "adaptive_noise_gate_open",
+                        "level_lufs": level,
+                        "threshold_lufs": self.noise_gate_threshold_lufs,
+                    }],
+                )
+        return self._no_non_fader_write_result("adaptive_noise_gate_no_state_change")
 
     def _apply_pan_separation(
         self,
         vocal_channels: list[int],
         background_channels: list[int],
         all_metrics: Dict[int, ChannelMetrics],
-    ) -> None:
+    ) -> Dict[str, Any]:
         """
-        Apply simple pan separation when stereo metrics are available.
+        Build blocked pan-separation evidence when stereo metrics are available.
 
         Current C++ metrics usually do not expose L/R values, so this path
-        stays disabled unless stereo data is present.
+        stays disabled unless stereo data is present. Direct pan writes remain
+        quarantined until current-pan readback, mono checks, and rollback proof.
         """
         if not self.pan_separation_enabled or not self.mixer_client:
-            return
-        if not hasattr(self.mixer_client, "set_channel_pan"):
-            if not self._warned_missing_pan_support:
-                logger.warning("Pan separation enabled, but mixer client has no set_channel_pan")
-                self._warned_missing_pan_support = True
-            return
+            return {
+                "applied": False,
+                "blocked": False,
+                "calls": [],
+                "blocked_calls": [],
+                "reason": "pan_separation_disabled_or_no_mixer_client",
+                "write_policy": "proposal_only_quarantined",
+                "live_write_allowed": False,
+                "can_apply_live": False,
+                "mixer_client_present": self.mixer_client is not None,
+                "mutates_mixer": False,
+            }
 
         sample_metric = next(iter(all_metrics.values()), None)
         if sample_metric is None or not self._has_stereo_metrics(sample_metric):
             if not self._warned_missing_pan_support:
                 logger.info("Pan separation skipped: stereo L/R metrics are unavailable in C++ bridge")
                 self._warned_missing_pan_support = True
-            return
+            return {
+                "applied": False,
+                "blocked": False,
+                "calls": [],
+                "blocked_calls": [],
+                "reason": "stereo_metrics_unavailable",
+                "write_policy": "proposal_only_quarantined",
+                "live_write_allowed": False,
+                "can_apply_live": False,
+                "mixer_client_present": True,
+                "mutates_mixer": False,
+            }
 
         if not vocal_channels or not background_channels:
-            return
+            return {
+                "applied": False,
+                "blocked": False,
+                "calls": [],
+                "blocked_calls": [],
+                "reason": "missing_vocal_or_background_channels",
+                "write_policy": "proposal_only_quarantined",
+                "live_write_allowed": False,
+                "can_apply_live": False,
+                "mixer_client_present": True,
+                "mutates_mixer": False,
+            }
 
         # Keep lead vocal near center and gently push backgrounds away.
         lead_vocal = vocal_channels[0]
-        try:
-            self.mixer_client.set_channel_pan(lead_vocal, 0.0)
-        except Exception as exc:
-            logger.debug(f"Failed to center lead vocal pan for ch {lead_vocal}: {exc}")
-
+        blocked_calls = [{
+            "cmd": "set_channel_pan",
+            "channel": lead_vocal,
+            "pan_percent": 0.0,
+            "reason": "center lead vocal for pan separation",
+        }]
         side = -1.0
         for ch_id in background_channels:
-            try:
-                self.mixer_client.set_channel_pan(ch_id, side * self.pan_max_offset)
-            except Exception as exc:
-                logger.debug(f"Failed to set pan for ch {ch_id}: {exc}")
+            blocked_calls.append({
+                "cmd": "set_channel_pan",
+                "channel": ch_id,
+                "pan_percent": side * self.pan_max_offset,
+                "reason": "background pan separation",
+            })
             side *= -1.0
+        logger.info(
+            "Pan separation live writes blocked; %s pan commands kept as evidence",
+            len(blocked_calls),
+        )
+        return {
+            "applied": False,
+            "blocked": True,
+            "calls": [],
+            "blocked_calls": blocked_calls,
+            "reason": "pan_separation_direct_apply_quarantined",
+            "write_policy": "proposal_only_quarantined",
+            "live_write_allowed": False,
+            "can_apply_live": False,
+            "mixer_client_present": True,
+            "mutates_mixer": False,
+        }
     
     def _validate_real_audio_input(self) -> bool:
         """
@@ -850,9 +1012,21 @@ class AutoFaderControllerV2:
                 pan_decisions = self.auto_panner.calculate_panning(
                     self.selected_channels, self.instrument_types, centroids, band_energy,
                 )
-                applied = self.auto_panner.apply_to_mixer(self.mixer_client, pan_decisions)
+                apply_result = self.auto_panner.apply_to_mixer(self.mixer_client, pan_decisions)
                 self._panner_applied = True
-                logger.info(f"AutoPanner (IMP 7.2): applied panning to {applied} channels")
+                if isinstance(apply_result, dict):
+                    if apply_result.get("blocked"):
+                        logger.info(
+                            "AutoPanner (IMP 7.2): live pan writes blocked; %s commands kept as evidence",
+                            len(apply_result.get("blocked_calls", ())),
+                        )
+                    else:
+                        logger.info(
+                            "AutoPanner (IMP 7.2): no live pan writes; reason=%s",
+                            apply_result.get("reason", "unknown"),
+                        )
+                else:
+                    logger.info(f"AutoPanner (IMP 7.2): applied panning to {apply_result} channels")
             except Exception as e:
                 logger.warning(f"AutoPanner failed: {e}")
 
@@ -869,9 +1043,21 @@ class AutoFaderControllerV2:
                 reverb_decisions = self.auto_reverb.calculate_reverb(
                     self.selected_channels, self.instrument_types, centroids,
                 )
-                applied = self.auto_reverb.apply_to_mixer(self.mixer_client, reverb_decisions)
+                apply_result = self.auto_reverb.apply_to_mixer(self.mixer_client, reverb_decisions)
                 self._reverb_applied = True
-                logger.info(f"AutoReverb (IMP 7.5): applied reverb to {applied} channels")
+                if isinstance(apply_result, dict):
+                    if apply_result.get("blocked"):
+                        logger.info(
+                            "AutoReverb (IMP 7.5): live reverb writes blocked; %s commands kept as evidence",
+                            len(apply_result.get("blocked_calls", ())),
+                        )
+                    else:
+                        logger.info(
+                            "AutoReverb (IMP 7.5): no live reverb writes; reason=%s",
+                            apply_result.get("reason", "unknown"),
+                        )
+                else:
+                    logger.info(f"AutoReverb (IMP 7.5): applied reverb to {apply_result} channels")
             except Exception as e:
                 logger.warning(f"AutoReverb failed: {e}")
 
@@ -1118,7 +1304,9 @@ class AutoFaderControllerV2:
         if not self.mixer_client:
             logger.warning("Mixer client not available")
             return
-        
+
+        self._reset_non_fader_write_telemetry()
+
         logger.info(f"Processing metrics for {len(self.selected_channels)} selected channels")
         
         # #region agent log
@@ -1499,36 +1687,11 @@ class AutoFaderControllerV2:
                     channel_band_energy=channel_band_energy
                 )
                 
-                # Apply EQ adjustments via mixer client
-                for eq_adj in eq_adjustments:
-                    if self.mixer_client and hasattr(self.mixer_client, 'set_eq_band'):
-                        # Find closest EQ band to target frequency
-                        # Wing has 4 parametric bands (1-4) plus low/high shelf
-                        # For 1-3 kHz range, use band 2 or 3 (typically 1-2 kHz and 2-4 kHz)
-                        # Use band 2 for 1-2 kHz, band 3 for 2-4 kHz
-                        if 1000 <= eq_adj.frequency_hz < 2000:
-                            band_num = 2
-                        elif 2000 <= eq_adj.frequency_hz <= 4000:
-                            band_num = 3
-                        else:
-                            band_num = 2  # Default to band 2
-                        
-                        try:
-                            # Set frequency, gain, and Q
-                            self.mixer_client.set_eq_band(
-                                channel=eq_adj.channel_id,
-                                band=band_num,
-                                freq=eq_adj.frequency_hz,
-                                gain=eq_adj.gain_db,
-                                q=eq_adj.q_factor
-                            )
-                            logger.info(f"Spectral masking: Ch{eq_adj.channel_id} EQ band {band_num} "
-                                      f"cut {eq_adj.gain_db:.1f} dB at {eq_adj.frequency_hz:.0f} Hz")
-                        except Exception as e:
-                            logger.error(f"Failed to apply EQ adjustment for Ch{eq_adj.channel_id}: {e}")
-                    elif self.spectral_masking_enabled and not self._warned_missing_eq_support:
-                        logger.warning("Spectral masking enabled but mixer client has no set_eq_band support")
-                        self._warned_missing_eq_support = True
+                self._block_eq_adjustments(
+                    eq_adjustments,
+                    reason="auto_fader_v2_spectral_masking_eq_quarantined",
+                    semantic="spectral_masking_eq_cut",
+                )
 
                 # Optional pan separation if stereo metrics are available.
                 self._apply_pan_separation(vocal_chs, background_chs, all_metrics)
@@ -1539,24 +1702,11 @@ class AutoFaderControllerV2:
                 channel_band_energy=channel_band_energy,
                 channel_priorities=self.channel_priorities,
             )
-            for eq_adj in mirror_adjustments:
-                if self.mixer_client and hasattr(self.mixer_client, 'set_eq_band'):
-                    if 1000 <= eq_adj.frequency_hz < 2000:
-                        band_num = 2
-                    elif 2000 <= eq_adj.frequency_hz <= 4000:
-                        band_num = 3
-                    else:
-                        band_num = 2
-                    try:
-                        self.mixer_client.set_eq_band(
-                            channel=eq_adj.channel_id,
-                            band=band_num,
-                            freq=eq_adj.frequency_hz,
-                            gain=eq_adj.gain_db,
-                            q=eq_adj.q_factor,
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to apply mirror EQ for Ch{eq_adj.channel_id}: {e}")
+            self._block_eq_adjustments(
+                mirror_adjustments,
+                reason="auto_fader_v2_cross_adaptive_eq_quarantined",
+                semantic="cross_adaptive_eq_mirror",
+            )
 
         # Pan separation can also run independently from spectral masking.
         if self.pan_separation_enabled and self.vocal_channels:
@@ -1774,5 +1924,12 @@ class AutoFaderControllerV2:
             "bleed_info": self.latest_bleed_info,
             "hierarchical_mix_enabled": self.hierarchical_mixer.enabled,
             "adaptive_noise_gate_enabled": self.adaptive_noise_gate_enabled,
+            "non_fader_write_policy": self.non_fader_write_policy,
+            "live_non_fader_write_allowed": self.live_non_fader_write_allowed,
+            "last_non_fader_write_attempted": self.last_non_fader_write_attempted,
+            "last_non_fader_write_blocked": self.last_non_fader_write_blocked,
+            "last_non_fader_write_count": self.last_non_fader_write_count,
+            "last_blocked_non_fader_call_count": len(self.last_blocked_non_fader_calls),
+            "last_blocked_non_fader_calls": self.last_blocked_non_fader_calls,
             "dugan": self.dugan_automixer.get_state(),
         }

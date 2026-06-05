@@ -53,6 +53,7 @@ class MixingStationClient:
         self._stop_receiver = False
         
         self.state = {}
+        self.state_timestamps = {}
         self.callbacks = {}
         
         self.is_connected = False
@@ -111,6 +112,7 @@ class MixingStationClient:
                 # Convert to our state format
                 state_key = self._ms_to_state_address(osc_msg.address)
                 self.state[state_key] = osc_msg.params[0] if osc_msg.params else None
+                self.state_timestamps[state_key] = time.time()
                 
             except socket.timeout:
                 logger.error("Mixing Station OSC not responding")
@@ -177,14 +179,17 @@ class MixingStationClient:
         
         if args:
             self.state[state_key] = args[0]
+            self.state_timestamps[state_key] = time.time()
         
-        # Call registered callbacks
-        if address in self.callbacks:
-            for callback in self.callbacks[address]:
-                try:
-                    callback(address, *args)
-                except Exception as e:
-                    logger.error(f"Callback error for {address}: {e}")
+        # Call registered callbacks for both the raw Mixing Station address and
+        # the canonical state key used by the rest of the backend.
+        for callback_address in dict.fromkeys((address, state_key)):
+            if callback_address in self.callbacks:
+                for callback in self.callbacks[callback_address]:
+                    try:
+                        callback(callback_address, *args)
+                    except Exception as e:
+                        logger.error(f"Callback error for {callback_address}: {e}")
         if "*" in self.callbacks:
             for callback in self.callbacks["*"]:
                 try:
@@ -211,6 +216,12 @@ class MixingStationClient:
                             return f'/ch/{ch_num}/mute'
                         elif parts[3] == 'pan':
                             return f'/ch/{ch_num}/pan'
+
+                if parts[2] == 'preamp' and len(parts) > 3:
+                    if parts[3] in {'gain', 'trim'}:
+                        return f'/ch/{ch_num}/in/set/trim'
+                elif parts[2] in {'gain', 'trim'}:
+                    return f'/ch/{ch_num}/in/set/trim'
             
             elif len(parts) >= 2 and parts[0] == 'main':
                 main_num = int(parts[1]) + 1
@@ -224,8 +235,27 @@ class MixingStationClient:
         
         return ms_address
 
+    @staticmethod
+    def _canonical_state_address(state_address: str) -> str:
+        """Normalize equivalent public state keys to the canonical Wing-style key."""
+        if not isinstance(state_address, str) or not state_address.startswith('/ch/'):
+            return state_address
+        parts = state_address.strip('/').split('/')
+        if len(parts) < 3 or parts[0] != 'ch':
+            return state_address
+        try:
+            ch_num = int(parts[1])
+        except (TypeError, ValueError):
+            return state_address
+        if parts[2:] == ['in', 'set', 'trim']:
+            return f'/ch/{ch_num}/in/set/trim'
+        if parts[2:] in (['gain'], ['trim'], ['preamp', 'gain'], ['preamp', 'trim']):
+            return f'/ch/{ch_num}/in/set/trim'
+        return state_address
+
     def _state_to_ms_address(self, state_address: str) -> str:
         """Convert Wing-style state address to Mixing Station address"""
+        state_address = self._canonical_state_address(state_address)
         # /ch/1/fdr -> ch.0.mix.lvl
         if state_address.startswith('/ch/'):
             parts = state_address.split('/')
@@ -239,7 +269,7 @@ class MixingStationClient:
                     return f'ch.{ch_num}.mix.on'
                 elif param == 'pan':
                     return f'ch.{ch_num}.mix.pan'
-                elif param == 'gain':
+                elif parts[3:] == ['in', 'set', 'trim'] or param in {'gain', 'trim'}:
                     return f'ch.{ch_num}.preamp.gain'
         
         elif state_address.startswith('/main/'):
@@ -324,6 +354,7 @@ class MixingStationClient:
         for ch in range(8):
             self.send(f'/ch/{ch+1}/fdr')      # Fader
             self.send(f'/ch/{ch+1}/mute')     # Mute
+            self.send(f'/ch/{ch+1}/in/set/trim')  # Input trim/gain
             time.sleep(0.02)
         
         # Scan mains
@@ -343,7 +374,7 @@ class MixingStationClient:
 
     def set_channel_fader(self, channel: int, value: float):
         """Set channel fader value"""
-        self.send(f"/ch/{channel}/fdr", value)
+        return self.send(f"/ch/{channel}/fdr", value)
 
     def get_channel_mute(self, channel: int) -> Optional[int]:
         """Get channel mute state"""
@@ -355,8 +386,13 @@ class MixingStationClient:
         self.send(f"/ch/{channel}/mute", value)
 
     def set_channel_gain(self, channel: int, value: float):
-        """Set channel input gain"""
-        self.send(f"/ch/{channel}/gain", value)
+        """Set channel input trim/gain using the canonical supervised-write key."""
+        return self.send(f"/ch/{channel}/in/set/trim", value)
+
+    def get_channel_gain(self, channel: int) -> Optional[float]:
+        """Get channel input trim/gain from the canonical cache key."""
+        address = f"/ch/{channel}/in/set/trim"
+        return self.state.get(address)
 
     def get_main_fader(self, main: int = 1) -> Optional[float]:
         """Get main fader value"""
@@ -415,9 +451,21 @@ class MixingStationClient:
 
     def query(self, address: str) -> Optional[Any]:
         """Query a parameter and wait for response"""
+        address = self._canonical_state_address(address)
         self.send(address)
         time.sleep(0.1)
         return self.state.get(address)
+
+    def query_parameter(self, address: str) -> Dict[str, Any]:
+        """Query one parameter and return the server's readback-compatible shape."""
+        canonical_address = self._canonical_state_address(address)
+        value = self.query(canonical_address)
+        return {
+            "status": "received" if value is not None else "readback_unavailable",
+            "address": canonical_address,
+            "value": value,
+            "source": "mixing_station_query",
+        }
 
 
 # Discovery function to find Mixing Station

@@ -40,6 +40,7 @@ PROPOSAL_ONLY_BLOCKED_DOMAINS = {
     "scene_preset",
     "mix_variant",
     "adaptation",
+    "source_identity",
     "arrangement",
     "decision_evidence",
     "memory_learning",
@@ -57,7 +58,60 @@ PROPOSAL_ONLY_CONTRACTS = {
         "value_type": "eq",
         "target_kind": "masking_eq_band",
         "old_value_source": "cached_or_physical_eq_band_read_required_before_promotion",
-        "safety_evidence": ["masking_pair", "frequency_match", "bounded_gain_delta", "sum_bus_check"],
+        "safety_evidence": [
+            "masking_pair",
+            "linked_cut_boost_pair",
+            "frequency_match",
+            "bounded_gain_delta",
+            "current_masking_context_cache_freshness",
+            "source_identity_downstream_trust",
+            "sum_bus_check",
+            "rollback_eq_band_readback",
+        ],
+    },
+    "frequency_separation_proposal": {
+        "value_type": "frequency_split",
+        "target_kind": "source_stem_frequency_lane",
+        "old_value_source": "cached_or_physical_eq_band_and_stem_spectrum_read_required_before_promotion",
+        "safety_evidence": [
+            "current_frequency_context_cache_freshness",
+            "source_stem_contribution",
+            "lane_conflict_pair",
+            "bounded_subtractive_delta",
+            "sum_bus_check",
+            "source_identity_downstream_trust",
+            "rollback_eq_band_readback",
+        ],
+    },
+    "source_identity_confidence_proposal": {
+        "value_type": "source_identity",
+        "target_kind": "source_identity_review",
+        "old_value_source": "classifier_output_and_operator_accepted_label_required_before_promotion",
+        "safety_evidence": [
+            "classifier_source",
+            "match_type",
+            "source_type_confidence",
+            "alternative_margin",
+            "current_source_identity_context_cache_freshness",
+            "operator_acceptance",
+            "downstream_rejection_reasons",
+            "replay_outcome",
+        ],
+    },
+    "source_identity_replay_calibration": {
+        "value_type": "source_identity_calibration",
+        "target_kind": "source_identity_replay_trust_state",
+        "old_value_source": "accepted_rejected_source_identity_replay_outcomes_required_before_promotion",
+        "safety_evidence": [
+            "accepted_rejected_outcomes",
+            "acceptance_rate",
+            "replay_match_rate",
+            "average_predicted_confidence",
+            "current_source_identity_replay_context_cache_freshness",
+            "safety_regression_count",
+            "operator_acceptance",
+            "downstream_trust_state",
+        ],
     },
     "auto_compressor": {
         "value_type": "compressor",
@@ -75,6 +129,8 @@ PROPOSAL_ONLY_CONTRACTS = {
             "gain_reduction_estimate",
             "bounded_makeup_headroom",
             "true_peak_headroom",
+            "current_dynamics_cache_freshness",
+            "source_identity_downstream_trust",
             "bypass_state",
         ],
     },
@@ -86,6 +142,8 @@ PROPOSAL_ONLY_CONTRACTS = {
             "vocal_source_role",
             "sibilance_ratio",
             "sibilance_persistence",
+            "current_dynamics_or_dynamic_eq_cache_freshness",
+            "source_identity_downstream_trust",
             "true_peak_headroom",
         ],
     },
@@ -93,7 +151,30 @@ PROPOSAL_ONLY_CONTRACTS = {
         "value_type": "gate",
         "target_kind": "channel_gate",
         "old_value_source": "cached_or_physical_gate_read_required_before_promotion",
-        "safety_evidence": ["noise_floor", "hysteresis", "source_role", "bleed_risk"],
+        "safety_evidence": [
+            "noise_floor",
+            "hysteresis",
+            "source_role",
+            "bleed_risk",
+            "current_gate_bleed_context_cache_freshness",
+            "source_identity_downstream_trust",
+        ],
+    },
+    "context_aware_gate_agent": {
+        "value_type": "gate",
+        "target_kind": "channel_gate_or_expander",
+        "old_value_source": "cached_or_physical_gate_read_required_before_promotion",
+        "safety_evidence": [
+            "bleed_telemetry",
+            "false_open_risk",
+            "false_close_risk",
+            "chatter_risk",
+            "tail_risk",
+            "current_gate_bleed_context_cache_freshness",
+            "source_identity_downstream_trust",
+            "hysteresis",
+            "rollback_gate_readback",
+        ],
     },
     "auto_panner": {
         "value_type": "pan",
@@ -111,6 +192,8 @@ PROPOSAL_ONLY_CONTRACTS = {
             "stage_position",
             "mono_compatibility",
             "current_pan",
+            "current_pan_cache_freshness",
+            "source_identity_downstream_trust",
         ],
     },
     "phase_alignment": {
@@ -118,6 +201,19 @@ PROPOSAL_ONLY_CONTRACTS = {
         "target_kind": "channel_delay_or_polarity",
         "old_value_source": "cached_or_physical_delay_polarity_read_required_before_promotion",
         "safety_evidence": ["correlation_delta", "gcc_phat_confidence", "polarity_readback", "delay_readback"],
+    },
+    "phase_aware_eq_guard": {
+        "value_type": "phase_eq_guard",
+        "target_kind": "group_phase_before_eq_policy",
+        "old_value_source": "fresh_multichannel_phase_audio_context_required_before_promotion",
+        "safety_evidence": [
+            "current_phase_audio_context_cache_freshness",
+            "group_phase_measurements",
+            "gcc_phat_confidence",
+            "low_frequency_sum_loss",
+            "bleed_risk",
+            "eq_hold_policy",
+        ],
     },
     "auto_fx": {
         "value_type": "fx_send",
@@ -136,6 +232,9 @@ PROPOSAL_ONLY_CONTRACTS = {
             "feedback_risk",
             "intelligibility_risk",
             "dry_wet_bounds",
+            "current_fx_send_return_cache_freshness",
+            "current_fx_parameter_schema_hints",
+            "source_identity_downstream_trust",
         ],
     },
     "master_bus_optimization_proposal": {
@@ -150,6 +249,7 @@ PROPOSAL_ONLY_CONTRACTS = {
             "spectral_tilt",
             "reference_profile",
             "limiter_or_dynamics_proof",
+            "current_main_bus_processing_cache_freshness",
         ],
     },
     "bus_group_balance_proposal": {
@@ -162,9 +262,11 @@ PROPOSAL_ONLY_CONTRACTS = {
             "summed_child_lufs",
             "assignment_readback",
             "current_bus_fader",
+            "current_bus_group_dca_matrix_cache_freshness",
             "true_peak_headroom",
             "main_bus_headroom",
             "feedback_risk",
+            "source_identity_downstream_trust",
         ],
     },
     "mute_management_proposal": {
@@ -174,12 +276,14 @@ PROPOSAL_ONLY_CONTRACTS = {
         "safety_evidence": [
             "source_role",
             "current_mute_state",
+            "current_mute_cache_freshness",
             "auto_muted_by_system",
             "signal_activity",
             "idle_duration",
             "operator_intent",
             "dropout_risk",
             "feedback_risk",
+            "source_identity_downstream_trust",
             "rollback_value",
         ],
     },
@@ -190,12 +294,14 @@ PROPOSAL_ONLY_CONTRACTS = {
         "safety_evidence": [
             "route_diff",
             "current_route_readback",
+            "current_route_cache_freshness",
             "proposed_source_readback",
             "rollback_route",
             "operator_intent",
             "active_performance_guard",
             "destructive_scope_check",
             "current_route_activity",
+            "source_identity_downstream_trust",
         ],
     },
     "scene_preset_management_proposal": {
@@ -204,9 +310,14 @@ PROPOSAL_ONLY_CONTRACTS = {
         "old_value_source": "cached_or_physical_full_state_read_required_before_promotion",
         "safety_evidence": [
             "current_console_state_readback",
+            "current_scene_preset_cache_freshness",
+            "snapshots_scenes_snapshot_cache_freshness",
+            "user_presets_snapshot_cache_freshness",
             "target_preview",
             "scoped_diff",
+            "read_only_scoped_diff_evidence",
             "rollback_snapshot",
+            "read_only_rollback_evidence",
             "operator_intent",
             "active_performance_guard",
             "destructive_scope_check",
@@ -221,8 +332,10 @@ PROPOSAL_ONLY_CONTRACTS = {
             "genre_confidence",
             "task_confidence",
             "arrangement_context",
+            "current_mix_variant_context_cache_freshness",
             "reference_metrics",
             "ayaic_level_planes",
+            "source_identity_downstream_trust",
             "true_peak_headroom",
             "feedback_risk",
             "no_named_artist_style_clone",
@@ -236,6 +349,7 @@ PROPOSAL_ONLY_CONTRACTS = {
         "safety_evidence": [
             "baseline_level",
             "current_level_readback",
+            "current_performance_context_cache_freshness",
             "level_drift",
             "trend_persistence",
             "cooldown",
@@ -244,6 +358,7 @@ PROPOSAL_ONLY_CONTRACTS = {
             "manual_override_guard",
             "rollback_state",
             "latency_budget",
+            "source_identity_downstream_trust",
         ],
     },
     "arrangement_role_proposal": {
@@ -254,12 +369,14 @@ PROPOSAL_ONLY_CONTRACTS = {
             "source_type_confidence",
             "role_confidence",
             "arrangement_context",
+            "current_arrangement_role_context_cache_freshness",
             "inter_channel_context",
             "reference_role",
             "accepted_history",
             "role_persistence",
             "role_ambiguity",
             "masking_impact",
+            "source_identity_downstream_trust",
         ],
     },
     "decision_evidence_packet_proposal": {
@@ -276,6 +393,8 @@ PROPOSAL_ONLY_CONTRACTS = {
             "inter_channel_context",
             "arrangement_context",
             "genre_context",
+            "current_decision_evidence_context_cache_freshness",
+            "source_identity_downstream_trust",
             "readback_state",
             "rollback_plan",
             "true_peak_headroom",
@@ -293,6 +412,8 @@ PROPOSAL_ONLY_CONTRACTS = {
             "decision_evidence_packets",
             "telemetry_sessions",
             "engineer_actions",
+            "current_memory_learning_context_cache_freshness",
+            "source_identity_downstream_trust",
             "reference_comparisons",
             "genre_context",
             "arrangement_context",
@@ -570,6 +691,70 @@ def adapt_agentic_foundation_gain_fader_recommendations(
         output.setdefault("blockers", [])
         output["blockers"] = sorted(set([*output["blockers"], "foundation_preview_requires_explicit_promotion"]))
         outputs.append(output)
+    return outputs
+
+
+def adapt_source_identity_confidence_proposals(
+    proposals: Iterable[Dict[str, Any]],
+    *,
+    pipeline_id: str = MAIN_PIPELINE_ID,
+) -> List[Dict[str, Any]]:
+    """Adapt source-identity review proposals for preview-only display."""
+
+    outputs: List[Dict[str, Any]] = []
+    for proposal in proposals:
+        if not isinstance(proposal, dict):
+            continue
+        evidence = proposal.get("evidence") if isinstance(proposal.get("evidence"), dict) else {}
+        proposed_action = (
+            proposal.get("proposed_action")
+            if isinstance(proposal.get("proposed_action"), dict)
+            else {}
+        )
+        blockers = {
+            "unsupported_value_type:source_identity",
+            "not_in_supervised_fader_gain_executor",
+            "source_identity_requires_operator_acceptance",
+        }
+        raw_blockers = proposal.get("blockers")
+        if isinstance(raw_blockers, list):
+            blockers.update(str(item) for item in raw_blockers)
+        review_reasons = proposed_action.get("review_reasons")
+        if isinstance(review_reasons, list):
+            blockers.update(str(item) for item in review_reasons)
+        downstream_reasons = proposed_action.get("downstream_rejection_reasons")
+        if isinstance(downstream_reasons, list):
+            blockers.update(str(item) for item in downstream_reasons)
+
+        outputs.append(
+            {
+                "id": f"{pipeline_id}:source_identity_confidence:{proposal.get('id')}",
+                "adapter_id": "source_identity_confidence",
+                "pipeline_id": pipeline_id,
+                **_method_contract("source_identity_confidence_proposal"),
+                "title": str(proposal.get("title") or "Source identity review"),
+                "reason": str(
+                    proposal.get("reason")
+                    or "Classifier confidence requires operator review before downstream processing."
+                ),
+                "confidence": proposal.get("confidence"),
+                "risk": _risk_from_severity(proposal.get("severity")),
+                "target": proposal.get("target"),
+                "queue_action": "preview_only_not_queued",
+                "can_import_to_queue": False,
+                "can_apply_live": False,
+                "blockers": sorted(blockers),
+                "proposal_priority": proposal.get("proposal_priority"),
+                "proposed_action": proposed_action,
+                "evidence": {
+                    **evidence,
+                    "live_executor": False,
+                    "requested_change_allowed": False,
+                    "queue_mutation": False,
+                },
+                "source_proposal_id": proposal.get("id"),
+            }
+        )
     return outputs
 
 

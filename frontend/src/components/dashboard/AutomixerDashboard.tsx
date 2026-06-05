@@ -9,7 +9,7 @@ import {
 } from '../../mock/dashboardMock';
 import type { AnalysisCardMock, ChannelDashboardTelemetry, DashboardTab } from '../../mock/dashboardMock';
 import type { Channel, DashboardRuntime, Tone, UiActions, UiState } from '../../types';
-import { dashboardSpectrumTrace, dashboardTelemetryForChannel } from './dashboardTelemetryModel';
+import { dashboardAnalysisCards, dashboardSpectrumTrace, dashboardTelemetryForChannel } from './dashboardTelemetryModel';
 
 const toneColors: Record<Tone, string> = {
   green: '#00d26a',
@@ -332,7 +332,7 @@ function AnalysisCard({ card }: { card: AnalysisCardMock }) {
       <section className="rounded-[4px] border border-line bg-panel p-2.5 shadow-panel">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.13em] text-muted">{card.title}</h3>
-          <SourcePill label="Display-only" tone="yellow" />
+          <SourcePill label={card.sourceLabel ?? 'Display-only'} tone={card.sourceTone ?? 'yellow'} />
         </div>
         <div className="grid grid-cols-[62px_1fr] items-center gap-3">
           <div className="grid h-[62px] w-[62px] place-items-center rounded-full border border-online/40 bg-[repeating-conic-gradient(rgba(0,210,106,.28)_0_8deg,transparent_8deg_16deg)]">
@@ -352,7 +352,7 @@ function AnalysisCard({ card }: { card: AnalysisCardMock }) {
       <section className="rounded-[4px] border border-line bg-panel p-2.5 shadow-panel">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.13em] text-muted">{card.title}</h3>
-          <SourcePill label="Display-only" tone="yellow" />
+          <SourcePill label={card.sourceLabel ?? 'Display-only'} tone={card.sourceTone ?? 'yellow'} />
         </div>
         <div className="flex h-12 items-end gap-1">
           {card.values.map((value, index) => (
@@ -368,7 +368,7 @@ function AnalysisCard({ card }: { card: AnalysisCardMock }) {
     <section className="rounded-[4px] border border-line bg-panel p-2.5 shadow-panel">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.13em] text-muted">{card.title}</h3>
-        <SourcePill label="Display-only" tone="yellow" />
+        <SourcePill label={card.sourceLabel ?? 'Display-only'} tone={card.sourceTone ?? 'yellow'} />
       </div>
       <div className="h-12"><MiniTrace values={card.values} tone={card.accent} filled /></div>
       <div className="mt-2 flex justify-between gap-2 text-[9px]"><b className="truncate text-text">{card.primary}</b><span className="truncate text-muted">{card.secondary}</span></div>
@@ -376,10 +376,12 @@ function AnalysisCard({ card }: { card: AnalysisCardMock }) {
   );
 }
 
-function AnalysisRow() {
+function AnalysisRow({ runtime }: { runtime: DashboardRuntime }) {
+  const cards = dashboardAnalysisCards(runtime, analysisCards);
+
   return (
     <div className="grid h-[100px] grid-cols-6 gap-1">
-      {analysisCards.map(card => <AnalysisCard card={card} key={card.id} />)}
+      {cards.map(card => <AnalysisCard card={card} key={card.id} />)}
     </div>
   );
 }
@@ -401,7 +403,7 @@ export function AutomixerDashboard({
     <div className="grid h-full min-h-0 grid-rows-[145px_333px_100px] gap-1">
       <AnalyticsRow runtime={runtime} />
       <MixerArea actions={actions} channels={normalizedChannels} runtime={runtime} ui={ui} />
-      <AnalysisRow />
+      <AnalysisRow runtime={runtime} />
     </div>
   );
 }

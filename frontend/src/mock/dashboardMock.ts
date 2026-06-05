@@ -29,6 +29,8 @@ export interface AnalysisCardMock {
   values: number[];
   primary: string;
   secondary: string;
+  sourceLabel?: string;
+  sourceTone?: Tone;
 }
 
 export interface DirectorDecisionMock {
@@ -95,11 +97,8 @@ export const analyticsCards: DashboardMetricSpec[] = [
   { id: 'confidence', label: 'AI Confidence', accent: 'green', caption: 'Director consensus' }
 ];
 
-// TODO(WebSocket telemetry): replace these traces with backend meter frames.
-export const masterBusTrace = [58, 64, 52, 69, 61, 74, 66, 80, 63, 76, 70, 84, 68, 78];
-
-// Runtime dashboard DTO spectrum bins override this visual fallback when present.
-// TODO(analyzer metrics): connect phase, dynamics, and LUFS history to analyzer payloads.
+// Runtime dashboard DTO spectrum, phase, dynamics, and LUFS traces override
+// these visual fallbacks when present.
 export const spectrumBins = [28, 42, 36, 58, 76, 64, 48, 82, 70, 55, 43, 61, 78, 66, 51, 34, 47, 72, 86, 62, 40, 30];
 
 export const mixBalanceSegments = [
@@ -138,7 +137,8 @@ export const analysisCards: AnalysisCardMock[] = [
   { id: 'suggestions', title: 'AI Suggestions Over Time', accent: 'purple', values: [20, 48, 36, 72, 54, 68, 42, 80, 58, 70], primary: '23 pending', secondary: '3 blocked safely' }
 ];
 
-// TODO(AI decision stream): replace director decisions and suggestions with backend proposal/event streams.
+// Mock-only fallback rows. Backend task/proposal/event rows render through
+// directorPanelModel when the source is a Backend DTO.
 export const directorDecisions: DirectorDecisionMock[] = [
   { time: '10:30', title: 'Lead Vocal held in front', target: 'CH 12', status: 'Review', tone: 'purple' },
   { time: '10:28', title: 'Snare transient verified', target: 'CH 03', status: 'Safe', tone: 'green' },

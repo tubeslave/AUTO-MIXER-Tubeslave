@@ -3049,14 +3049,22 @@ def apply_autofoh_measurement_corrections(
             continue
         action = actions[0]
         decision = safety_controller.execute(action, RuntimeState.PRE_SHOW_CHECK)
+        decision_payload = dict(decision.payload) if isinstance(decision.payload, dict) else {}
         action_report = {
             "label": label,
             "requested_action": _typed_action_to_dict(action),
             "applied_action": _typed_action_to_dict(decision.action),
             "sent": bool(decision.sent),
+            "blocked": bool(getattr(decision, "blocked", False)),
             "bounded": bool(decision.bounded),
             "allowed": bool(decision.allowed),
             "supported": bool(decision.supported),
+            "write_policy": getattr(decision, "write_policy", "") or decision_payload.get("write_policy", ""),
+            "blocked_reason": decision_payload.get("blocked_reason"),
+            "blocked_calls": list(decision_payload.get("blocked_calls", [])),
+            "live_write_allowed": decision_payload.get("live_write_allowed", bool(decision.sent)),
+            "can_apply_live": decision_payload.get("can_apply_live", bool(decision.sent)),
+            "mutates_mixer": decision_payload.get("mutates_mixer", bool(decision.sent)),
             "message": decision.message,
             "problem": _problem_to_dict(problem),
         }
@@ -3083,6 +3091,7 @@ def apply_autofoh_measurement_corrections(
         "virtual_console_calls": adapter.calls,
         "notes": [
             "All additional offline correction moves in this pass come from measured AutoFOH detector outputs.",
+            "Non-fader/gain AutoFOH actions are retained as blocked proposal evidence and do not mutate the offline console plan.",
             "Lead handoff and cymbal buildup decisions are derived from the same measured analyzer snapshot.",
             "Legacy codex heuristic correction layers are disabled in analyzer-only mode.",
         ],

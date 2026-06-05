@@ -49,13 +49,14 @@ MANUAL_RECOVERY_SCRIPTS = (
 RISKY_WRITE_TOKEN_RE = re.compile(
     r"\b(?:"
     r"set_fader|set_main_fader|set_bus_fader|set_dca_fader|set_dca_level|"
-    r"set_group_fader|set_matrix_fader|set_gain|set_eq|set_eq_band|"
+    r"set_group_fader|set_matrix_fader|set_gain|set_trim|set_input_trim|"
+    r"set_channel_trim|set_preamp_trim|set_preamp_gain|set_eq|set_eq_band|"
     r"set_bus_eq_on|set_bus_eq_band|set_main_eq_on|set_main_eq_band|"
     r"set_matrix_eq_on|set_matrix_eq_band|set_compressor|set_compressor_gain|"
     r"set_bus_compressor|set_bus_compressor_gain|"
     r"set_mute|set_channel_mute|set_bus_mute|set_dca_mute|set_group_mute|"
     r"set_main_mute|set_matrix_mute|"
-    r"set_gate\w*|set_hpf|set_send_level|set_pan|set_delay|set_polarity|"
+    r"set_gate\w*|set_hpf|set_send_level|set_pan|set_channel_pan|set_delay|set_polarity|"
     r"set_bus_pan|set_main_pan|set_fx_model|set_fx_on|set_fx_mix|"
     r"set_fx_parameter|set_fx_return_level|set_insert|set_channel_main_send|"
     r"set_reverb_send|"
@@ -63,13 +64,14 @@ RISKY_WRITE_TOKEN_RE = re.compile(
     r")\s*\("
     r"|['\"](?:"
     r"set_fader|set_main_fader|set_bus_fader|set_dca_fader|set_dca_level|"
-    r"set_group_fader|set_matrix_fader|set_gain|set_eq|set_eq_band|"
+    r"set_group_fader|set_matrix_fader|set_gain|set_trim|set_input_trim|"
+    r"set_channel_trim|set_preamp_trim|set_preamp_gain|set_eq|set_eq_band|"
     r"set_bus_eq_on|set_bus_eq_band|set_main_eq_on|set_main_eq_band|"
     r"set_matrix_eq_on|set_matrix_eq_band|set_compressor|set_compressor_gain|"
     r"set_bus_compressor|set_bus_compressor_gain|"
     r"set_mute|set_channel_mute|set_bus_mute|set_dca_mute|set_group_mute|"
     r"set_main_mute|set_matrix_mute|"
-    r"set_gate|set_hpf|set_send_level|set_pan|"
+    r"set_gate|set_hpf|set_send_level|set_pan|set_channel_pan|"
     r"set_delay|set_polarity|set_bus_pan|set_main_pan|set_fx_model|set_fx_on|"
     r"set_fx_mix|set_fx_parameter|set_fx_return_level|set_insert|"
     r"set_channel_main_send|set_reverb_send|route_output|load_snap|save_snap|reset_eq|"
@@ -161,6 +163,21 @@ def test_static_scan_treats_group_dca_matrix_balance_aliases_as_write_tokens():
     assert RISKY_WRITE_TOKEN_RE.search('"set_matrix_fader"')
 
 
+def test_static_scan_treats_preamp_trim_aliases_as_write_tokens():
+    """Preamp/input-trim aliases can mutate headroom and must stay inventoried."""
+
+    assert RISKY_WRITE_TOKEN_RE.search("client.set_trim(channel, value)")
+    assert RISKY_WRITE_TOKEN_RE.search("client.set_input_trim(channel, value)")
+    assert RISKY_WRITE_TOKEN_RE.search("client.set_channel_trim(channel, value)")
+    assert RISKY_WRITE_TOKEN_RE.search("client.set_preamp_trim(channel, value)")
+    assert RISKY_WRITE_TOKEN_RE.search("client.set_preamp_gain(channel, value)")
+    assert RISKY_WRITE_TOKEN_RE.search("'set_trim'")
+    assert RISKY_WRITE_TOKEN_RE.search('"set_input_trim"')
+    assert RISKY_WRITE_TOKEN_RE.search("'set_channel_trim'")
+    assert RISKY_WRITE_TOKEN_RE.search('"set_preamp_trim"')
+    assert RISKY_WRITE_TOKEN_RE.search("'set_preamp_gain'")
+
+
 def test_static_scan_treats_bus_main_matrix_processing_aliases_as_write_tokens():
     """Bus/main/matrix EQ, dynamics, pan, and send aliases must stay inventoried."""
 
@@ -174,6 +191,7 @@ def test_static_scan_treats_bus_main_matrix_processing_aliases_as_write_tokens()
     assert RISKY_WRITE_TOKEN_RE.search("client.set_bus_compressor_gain(bus, gain)")
     assert RISKY_WRITE_TOKEN_RE.search("client.set_bus_pan(bus, pan)")
     assert RISKY_WRITE_TOKEN_RE.search("client.set_main_pan(main, pan)")
+    assert RISKY_WRITE_TOKEN_RE.search("client.set_channel_pan(channel, pan)")
     assert RISKY_WRITE_TOKEN_RE.search("'set_matrix_eq_band'")
     assert RISKY_WRITE_TOKEN_RE.search('"set_bus_compressor_gain"')
 

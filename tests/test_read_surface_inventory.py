@@ -68,10 +68,14 @@ def test_fx_and_snapshot_read_surfaces_are_not_write_authority():
     fx = get_read_surface("fx_slots_and_inserts")
     snapshots = get_read_surface("snapshots_scenes")
     presets = get_read_surface("user_presets")
+    dlive = get_read_surface("dlive_state")
 
     assert fx is not None
-    assert fx.status == "queryable"
+    assert fx.status == "partial"
+    assert fx.read_mode == "product_snapshot"
+    assert "build_fx_inserts_snapshot" in fx.entrypoints
     assert "get_fx_slot_info" in fx.entrypoints
+    assert "destructive_change_marker" in fx.read_fields
     assert fx.mutates_console_state is False
     assert snapshots is not None
     assert snapshots.status == "partial"
@@ -79,12 +83,121 @@ def test_fx_and_snapshot_read_surfaces_are_not_write_authority():
     assert "build_snapshots_scenes_snapshot" in snapshots.entrypoints
     assert "find_snap_by_name" in snapshots.entrypoints
     assert "destructive_change_marker" in snapshots.read_fields
+    assert "cache_freshness" in snapshots.read_fields
     assert "find_snap_by_name_must_not_load_snapshot" in snapshots.notes
     assert presets is not None
     assert presets.status == "partial"
     assert presets.read_mode == "product_snapshot"
     assert "build_user_presets_snapshot" in presets.entrypoints
     assert "destructive_recall_marker" in presets.read_fields
+    assert "cache_freshness" in presets.read_fields
+    assert dlive is not None
+    assert dlive.status == "partial"
+    assert dlive.read_mode == "product_snapshot"
+    assert "build_dlive_state_snapshot" in dlive.entrypoints
+    assert "get_dlive_state_snapshot" in dlive.entrypoints
+    assert "wing_parity_status" in dlive.read_fields
+    assert "parity" in dlive.blocker.lower()
+
+
+def test_fx_insert_read_surface_tracks_cache_freshness_without_write_authority():
+    fx = get_read_surface("fx_slots_and_inserts")
+
+    assert fx is not None
+    assert fx.status == "partial"
+    assert "cache_freshness" in fx.read_fields
+    assert "fx_parameter_schema" in fx.read_fields
+    assert "cache freshness" in fx.current_coverage
+    assert "semantic schema hints" in fx.current_coverage
+    assert "stale-cache timestamps" not in fx.blocker
+    assert "complete model-specific FX parameter schemas" in fx.blocker
+    assert "FX safety review" in fx.blocker
+    assert fx.mutates_console_state is False
+
+
+def test_bus_main_dca_read_surface_tracks_cache_freshness_without_write_authority():
+    surface = get_read_surface("bus_group_main_dca_state")
+
+    assert surface is not None
+    assert surface.status == "partial"
+    assert "cache_freshness" in surface.read_fields
+    assert "cache freshness" in surface.current_coverage
+    assert "stale-cache timestamps" not in surface.blocker
+    assert "full group membership" in surface.blocker
+    assert "bus/main/DCA safety review" in surface.blocker
+    assert surface.mutates_console_state is False
+
+
+def test_matrix_read_surface_tracks_cached_dynamics_without_write_authority():
+    matrix = get_read_surface("matrix_state")
+
+    assert matrix is not None
+    assert matrix.status == "partial"
+    assert "matrix_dynamics" in matrix.read_fields
+    assert "dynamics" in matrix.current_coverage
+    assert "dynamics" not in matrix.blocker
+    assert matrix.mutates_console_state is False
+
+
+def test_matrix_read_surface_tracks_cached_matrix_sends_without_write_authority():
+    matrix = get_read_surface("matrix_state")
+    routing = get_read_surface("routing_and_sends")
+
+    assert matrix is not None
+    assert "matrix_send_state" in matrix.read_fields
+    assert "channel-to-matrix send rows" in matrix.current_coverage
+    assert "matrix sends" not in matrix.blocker
+    assert "route diff proof" in matrix.blocker
+    assert matrix.mutates_console_state is False
+    assert routing is not None
+    assert "channel_matrix_send_on" in routing.read_fields
+    assert "channel_matrix_send_level" in routing.read_fields
+    assert "channel matrix sends" in routing.current_coverage
+    assert routing.mutates_console_state is False
+
+
+def test_matrix_read_surface_tracks_cache_freshness_without_write_authority():
+    matrix = get_read_surface("matrix_state")
+
+    assert matrix is not None
+    assert "cache_freshness" in matrix.read_fields
+    assert "cache freshness" in matrix.current_coverage
+    assert "stale-cache timestamps" not in matrix.blocker
+    assert "matrix safety review" in matrix.blocker
+    assert matrix.mutates_console_state is False
+
+
+def test_routing_send_read_surface_tracks_cache_freshness_without_write_authority():
+    routing = get_read_surface("routing_and_sends")
+
+    assert routing is not None
+    assert routing.status == "partial"
+    assert "cache_freshness" in routing.read_fields
+    assert "cache freshness" in routing.current_coverage
+    assert "stale-cache timestamps" not in routing.blocker
+    assert "route/send diffing" in routing.blocker
+    assert routing.mutates_console_state is False
+
+
+def test_scene_preset_read_surfaces_track_cache_freshness_without_write_authority():
+    snapshots = get_read_surface("snapshots_scenes")
+    presets = get_read_surface("user_presets")
+
+    assert snapshots is not None
+    assert snapshots.status == "partial"
+    assert "cache_freshness" in snapshots.read_fields
+    assert "cache freshness" in snapshots.current_coverage
+    assert "stale-cache timestamps" not in snapshots.blocker
+    assert "rollback proof" in snapshots.blocker
+    assert snapshots.mutates_console_state is False
+
+    assert presets is not None
+    assert presets.status == "partial"
+    assert "cache_freshness" in presets.read_fields
+    assert "cache freshness" in presets.current_coverage
+    assert "stale-cache timestamps" not in presets.blocker
+    assert "scoped diff" in presets.blocker
+    assert presets.mutates_console_state is False
 
 
 def test_project_goal_console_read_capability_references_inventory():
@@ -94,6 +207,17 @@ def test_project_goal_console_read_capability_references_inventory():
     assert "backend/read_surface_inventory.py" in capability.support_paths
     assert capability.status == "proposal_only"
     assert "partial" in capability.blocker
+
+
+def test_channel_identity_read_surface_tracks_source_patch_without_write_authority():
+    surface = get_read_surface("channel_identity_and_basic_controls")
+
+    assert surface is not None
+    assert "source_patch" in surface.read_fields
+    assert "fallback_source" in surface.read_fields
+    assert "source patch" in surface.current_coverage
+    assert "physical source-patch readback" in surface.blocker
+    assert surface.mutates_console_state is False
 
 
 def test_read_surface_inventory_module_stays_transport_free():

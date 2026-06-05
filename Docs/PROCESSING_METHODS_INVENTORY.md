@@ -38,30 +38,32 @@ emergency-stop proof.
 | Method | Status | Domain | Use now | Not allowed now |
 | --- | --- | --- | --- | --- |
 | Product / Operator State | `canonical` | `evaluation` | Readiness, mode, proposal queue, dashboard state. | Direct mixer writes |
-| AutoSoundcheck Engine | `canonical` guarded | `gain_fader` | Analyze and form recommendations. | Free live executor behavior |
+| AutoSoundcheck Engine | `canonical` guarded | `gain_fader` | Analyze and form recommendations; legacy EQ-enable, compressor-threshold, fader-restore, and mute writes are blocked evidence. | Free live executor behavior |
+| AutoFOH Safety Typed Actions | `quarantined` | `console_control` | Bound action values and emit blocked evidence for non-channel-fader/gain surfaces. | Direct non-fader/gain console apply |
 | Supervised Manual Fader/Gain Gate | `canonical` | `gain_fader` | Only MVP live executor. | EQ, compressor, FX, routing, reset |
 | Auto Fader v1 | `proposal_only` | `gain_fader` | Balance proposals. | Direct live fader automation |
 | LUFS Gain Staging | `proposal_only` | `gain_fader` | Ayaic-style level-plane guidance and offline input-trim render. | Standalone live writer |
 | Live Shared Mix Planner | `proposal_only` | `gain_fader` | Grouped balance proposals. | Routing/name/master-processing writes |
-| Auto EQ | `proposal_only` | `eq` | EQ recommendations and blockers. | Direct `set_eq` in main live pipeline |
+| Auto EQ | `proposal_only` | `eq` | EQ recommendations and blockers; direct apply/reset and AutoFaderV2 masking EQ paths are fail-closed blocked evidence. | Direct `set_eq` in main live pipeline |
 | AutoEQ Audit Validation | `shadow_only` | `eq` | Validate EQ units, phase, IIR stability, splits, export and headroom. | Live EQ apply |
 | Diff-DEQ Dynamic EQ Playbook Bridge | `shadow_only` | `eq` | Import external PEQ+DRC predictions as dry-run research playbook entries. | Model runtime, live EQ/dynamics apply |
-| Cross-Adaptive EQ | `proposal_only` | `eq` | Masking-aware proposal/offline candidate. | Direct live EQ apply |
-| Auto Compressor | `proposal_only` | `dynamics` | Dynamics recommendations. | Direct live compressor apply |
-| Crest-Factor Compressor | `lab` | `dynamics` | Research/proposal candidate. | Live executor |
-| CAIG Auto Gate | `proposal_only` | `gate` | Gate recommendations. | Direct live gate apply |
-| Auto Panner | `lab` | `pan` | Offline/proposal review. | Live pan apply |
-| Phase / Delay Alignment | `proposal_only` | `phase` | Phase/delay recommendations. | Live delay/polarity apply |
+| Cross-Adaptive EQ | `proposal_only` | `eq` | Masking-aware proposal/offline candidate; AutoFaderV2 mirror EQ writes are blocked evidence only. | Direct live EQ apply |
+| Auto Compressor | `proposal_only` | `dynamics` | Dynamics recommendations; direct enable/apply paths are fail-closed blocked evidence. | Direct live compressor apply |
+| Crest-Factor Compressor | `proposal_only` | `dynamics` | Research/proposal candidate; direct apply path is fail-closed blocked evidence. | Live executor |
+| CAIG Auto Gate | `proposal_only` | `gate` | Gate recommendations; CAIG and AutoFaderV2 adaptive gate writes are blocked evidence only. | Direct live gate apply |
+| Auto Panner | `proposal_only` | `pan` | Reviewable pan/adaptive-pan plans; direct apply paths are fail-closed blocked evidence. | Live pan apply |
+| Phase / Delay Alignment | `proposal_only` | `phase` | Phase/delay recommendations; direct apply/reset paths are fail-closed blocked evidence. | Live delay/polarity apply |
 | Phase-Aware EQ Guard | `proposal_only` | `phase` | Group phase-before-EQ guard, delay/polarity proposal records, low-frequency cancellation blocker. | Live delay/polarity/EQ apply |
-| FX / Reverb / Sends | `lab` | `fx` | Offline/lab planning. | Live send/FX apply |
+| FX / Reverb / Sends | `proposal_only` | `fx` | Reviewable FX/reverb plans; `apply_to_mixer` paths are fail-closed blocked evidence. | Live send/FX/reverb apply |
 | Mix Agent Conservative Renderer | `offline_only` | `offline_render` | Conservative offline WAV/report/JSON path. | OSC or live imports |
 | Offline Agent Mix | `offline_only` | `offline_render` | Extended offline render and reference workflow. | OSC or live imports |
 | MuQ / Perceptual Shadow Quality | `shadow_only` | `evaluation` | Scores, warnings, confidence. | Executor authority |
 | ML Processing Graph | `lab` | `evaluation` | Research and shadow analysis. | Live runtime default |
-| Direct AutoEQ Apply | `quarantined` | `eq` | Block and document. | Main live executor |
-| Direct Compressor Apply | `quarantined` | `dynamics` | Block and document. | Main live executor |
+| Direct EQ Apply | `quarantined` | `eq` | Block and document AutoEQ, AutoFaderV2 masking EQ, AutoFOH EQ/notch, and AutoSoundcheck EQ-enable paths. | Main live executor |
+| Direct Compressor Apply | `quarantined` | `dynamics` | Block and document AutoCompressor/CF, server compressor reset helper, AutoFOH compressor, and AutoSoundcheck compressor-threshold paths. | Main live executor |
+| Bus/DCA/Master Fader Apply | `quarantined` | `gain_fader` | Block and document AutoFOH bus, DCA, and master fader actions. | Main live executor |
 | Routing / Snapshot / Reset Writes | `quarantined` | `evaluation` | Block and document. | Processing pipeline executor |
-| Direct FX / Insert Apply | `quarantined` | `fx` | Block and document. | Main live executor |
+| Direct FX / Insert Apply | `quarantined` | `fx` | Block and document; AutoFX/AutoReverb direct apply does not mutate mixer state. | Main live executor |
 | Mix Agent Unsupported Actions | `placeholder` | `dynamics` | Advisory only. | Fake compression/sends/stereo/dynamic EQ apply |
 | Production Mix v1 Package | `placeholder` | `offline_render` | Do not select as entrypoint until restored. | Main/offline executor claim |
 | AI Mixing Pipeline Legacy Skeleton | `deprecated` | `offline_render` | Historical reference only. | Current executor |

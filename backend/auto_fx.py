@@ -57,6 +57,8 @@ class AutoFXPlanner:
     def __init__(self, tempo_bpm: float = 120.0, vocal_priority: bool = True):
         self.tempo_bpm = max(40.0, min(float(tempo_bpm), 240.0))
         self.vocal_priority = bool(vocal_priority)
+        self.live_write_allowed = False
+        self.write_policy = "proposal_only_quarantined"
 
     def create_plan(self, channels: dict[int, str]) -> FXPlan:
         buses = self._default_buses()
@@ -78,51 +80,56 @@ class AutoFXPlanner:
         )
 
     def apply_to_mixer(self, mixer_client: Any, plan: FXPlan) -> dict[str, Any]:
-        """Apply an FX plan to a Wing-like mixer client when supported."""
-        calls: list[dict[str, Any]] = []
-        if not mixer_client:
-            return {"applied": False, "calls": calls, "reason": "no_mixer_client"}
+        """Return blocked apply evidence without mutating a mixer client.
 
+        The FX planner is useful for assisted mixing, but direct FX/send writes are
+        quarantined until a supervised apply contract has physical readback and
+        rollback proof. Keep this method for legacy callers, but fail closed.
+        """
+        blocked_calls = self._build_apply_calls(plan)
+        reason = "fx_direct_apply_quarantined" if mixer_client else "no_mixer_client"
+        return {
+            "applied": False,
+            "blocked": bool(blocked_calls),
+            "calls": [],
+            "blocked_calls": blocked_calls,
+            "reason": reason,
+            "write_policy": self.write_policy,
+            "live_write_allowed": self.live_write_allowed,
+            "can_apply_live": False,
+            "mixer_client_present": mixer_client is not None,
+            "mutates_mixer": False,
+        }
+
+    def _build_apply_calls(self, plan: FXPlan) -> list[dict[str, Any]]:
+        """Build the would-be FX write plan as blocked, reviewable evidence."""
+        calls: list[dict[str, Any]] = []
         for bus in plan.buses:
-            if hasattr(mixer_client, "set_fx_model"):
-                mixer_client.set_fx_model(bus.fx_slot, bus.model)
-                calls.append({"cmd": "set_fx_model", "slot": bus.fx_slot, "model": bus.model})
-            if hasattr(mixer_client, "set_fx_on"):
-                mixer_client.set_fx_on(bus.fx_slot, 1)
-                calls.append({"cmd": "set_fx_on", "slot": bus.fx_slot, "on": 1})
-            if hasattr(mixer_client, "set_fx_mix"):
-                mixer_client.set_fx_mix(bus.fx_slot, 100.0)
-                calls.append({"cmd": "set_fx_mix", "slot": bus.fx_slot, "mix": 100.0})
-            if hasattr(mixer_client, "set_fx_return_level"):
-                mixer_client.set_fx_return_level(bus.bus_id, bus.return_level_db)
-                calls.append({"cmd": "set_fx_return_level", "bus": bus.bus_id, "level_db": bus.return_level_db})
+            calls.append({"cmd": "set_fx_model", "slot": bus.fx_slot, "model": bus.model})
+            calls.append({"cmd": "set_fx_on", "slot": bus.fx_slot, "on": 1})
+            calls.append({"cmd": "set_fx_mix", "slot": bus.fx_slot, "mix": 100.0})
+            calls.append({"cmd": "set_fx_return_level", "bus": bus.bus_id, "level_db": bus.return_level_db})
 
             for parameter, value in self._wing_parameter_map(bus).items():
-                if hasattr(mixer_client, "set_fx_parameter"):
-                    mixer_client.set_fx_parameter(bus.fx_slot, parameter, value)
-                    calls.append({"cmd": "set_fx_parameter", "slot": bus.fx_slot, "parameter": parameter, "value": value})
+                calls.append({
+                    "cmd": "set_fx_parameter",
+                    "slot": bus.fx_slot,
+                    "parameter": parameter,
+                    "value": value,
+                })
 
         for send in plan.sends:
             mode = "POST" if send.post_fader else "PRE"
-            if hasattr(mixer_client, "set_channel_send"):
-                mixer_client.set_channel_send(send.channel_id, send.bus_id, level=send.send_db, on=1, mode=mode)
-                calls.append({
-                    "cmd": "set_channel_send",
-                    "channel": send.channel_id,
-                    "bus": send.bus_id,
-                    "level_db": send.send_db,
-                    "mode": mode,
-                })
-            elif hasattr(mixer_client, "set_send_level"):
-                mixer_client.set_send_level(send.channel_id, send.bus_id, send.send_db)
-                calls.append({
-                    "cmd": "set_send_level",
-                    "channel": send.channel_id,
-                    "bus": send.bus_id,
-                    "level_db": send.send_db,
-                })
+            calls.append({
+                "cmd": "set_channel_send",
+                "channel": send.channel_id,
+                "bus": send.bus_id,
+                "level_db": send.send_db,
+                "on": 1,
+                "mode": mode,
+            })
 
-        return {"applied": bool(calls), "calls": calls}
+        return calls
 
     def _default_buses(self) -> list[FXBusDecision]:
         quarter_ms = 60000.0 / self.tempo_bpm

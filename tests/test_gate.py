@@ -12,11 +12,14 @@ import numpy as np
 import pytest
 
 from auto_gate_caig import (
+    AutoGateController,
     GateState,
+    GateDecision,
     GateFeatures,
     GateSettings,
     FeatureExtractor,
     AdaptiveThreshold,
+    InstrumentGroup,
     live_gate_settings_for_instrument,
 )
 
@@ -108,6 +111,69 @@ class TestGateOpensOnSignal:
         assert features.rms_db < -60.0, (
             f"Silence RMS should be < -60 dB, got {features.rms_db:.1f}"
         )
+
+
+class FakeGateMixerClient:
+    def __init__(self):
+        self.calls = []
+
+    def set_channel_gate(self, channel_id, gain_db):
+        self.calls.append((channel_id, gain_db))
+
+
+class TestAutoGateControllerWritePolicy:
+    """Tests that legacy CAIG mixer-client paths stay fail-closed."""
+
+    def test_process_with_mixer_client_does_not_write_gate(self, sample_rate):
+        mixer = FakeGateMixerClient()
+        controller = AutoGateController(
+            num_channels=2,
+            sample_rate=sample_rate,
+            mixer_client=mixer,
+        )
+        controller.configure_channel(
+            0,
+            "snare",
+            InstrumentGroup.DRUMS,
+            is_drum=True,
+        )
+
+        duration = 0.02
+        t = np.arange(int(sample_rate * duration)) / sample_rate
+        loud_signal = (0.8 * np.sin(2 * np.pi * 1000.0 * t)).astype(np.float32)
+
+        decisions = controller.process({0: loud_signal})
+
+        assert decisions
+        assert mixer.calls == []
+        status = controller.get_status()
+        assert status["live_write_allowed"] is False
+        assert status["write_policy"] == "proposal_only_quarantined"
+        assert status["mixer_client_present"] is True
+        assert status["last_write_attempted"] is True
+        assert status["last_write_blocked"] is True
+        assert status["last_write_count"] == 0
+
+    def test_direct_send_osc_call_is_quarantined(self):
+        mixer = FakeGateMixerClient()
+        controller = AutoGateController(num_channels=1, mixer_client=mixer)
+
+        sent = controller._send_osc(
+            {
+                0: GateDecision(
+                    channel_id=0,
+                    state=GateState.OPEN,
+                    gain_db=0.0,
+                )
+            }
+        )
+
+        assert sent == 0
+        assert mixer.calls == []
+        status = controller.get_status()
+        assert status["last_write_attempted"] is True
+        assert status["last_write_blocked"] is True
+        assert status["last_write_count"] == 0
 
 
 class TestFeatureExtraction:

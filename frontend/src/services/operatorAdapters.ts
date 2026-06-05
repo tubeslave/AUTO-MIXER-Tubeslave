@@ -6,6 +6,7 @@ import type {
   Channel,
   Communication,
   DashboardRuntime,
+  DashboardRuntimeTrace,
   DecisionTraceRecord,
   DeviceRecord,
   DirectorRuntime,
@@ -234,6 +235,98 @@ function firstNumericList(...values: unknown[]): number[] | undefined {
   return undefined;
 }
 
+type DashboardTraceKind = 'phase' | 'dynamics' | 'loudness' | 'generic';
+
+function traceDisplayValue(value: number, kind: DashboardTraceKind): number {
+  if (kind === 'phase' && value >= -1 && value <= 1) {
+    return 50 + value * 38;
+  }
+  if (kind === 'loudness' && value <= 0) {
+    return ((value + 60) / 60) * 100;
+  }
+  return value;
+}
+
+function boundedTrace(values: number[], kind: DashboardTraceKind): number[] {
+  return values.map(value => {
+    const displayValue = traceDisplayValue(value, kind);
+    return Number(Math.max(8, Math.min(88, displayValue)).toFixed(1));
+  });
+}
+
+function optionalText(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    const next = str(value);
+    if (next) return next;
+  }
+  return undefined;
+}
+
+function dashboardRuntimeTrace(
+  values: number[] | undefined,
+  kind: DashboardTraceKind,
+  primary?: string,
+  secondary?: string
+): DashboardRuntimeTrace | undefined {
+  if (!values?.length) return undefined;
+
+  return {
+    values: boundedTrace(values, kind),
+    primary,
+    secondary,
+    sourceLabel: 'Backend analyzer DTO',
+    sourceTone: 'green'
+  };
+}
+
+function adaptDashboardAnalysisTraces(
+  analyzer: UnknownRecord,
+  master: UnknownRecord
+): NonNullable<DashboardRuntime['analysisTraces']> {
+  const traces: NonNullable<DashboardRuntime['analysisTraces']> = {};
+
+  const phase = dashboardRuntimeTrace(
+    firstNumericList(analyzer.phase_history, analyzer.phaseHistory, analyzer.phase_scope, analyzer.phaseScope),
+    'phase',
+    optionalText(analyzer.phase_label, analyzer.phase_status),
+    optionalText(analyzer.phase_summary, analyzer.phase_source)
+  );
+  if (phase) traces.phase = phase;
+
+  const correlation = dashboardRuntimeTrace(
+    firstNumericList(analyzer.correlation_history, analyzer.correlationHistory, analyzer.correlation_trace),
+    'phase',
+    optionalText(analyzer.correlation_label, analyzer.correlation_status),
+    optionalText(analyzer.correlation_summary, analyzer.mono_status)
+  );
+  if (correlation) traces.correlation = correlation;
+
+  const dynamics = dashboardRuntimeTrace(
+    firstNumericList(analyzer.dynamics_history, analyzer.dynamicsHistory, analyzer.gain_reduction_history, analyzer.gr_history),
+    'dynamics',
+    optionalText(analyzer.dynamics_label, analyzer.gain_reduction_label),
+    optionalText(analyzer.dynamics_summary, analyzer.transient_status)
+  );
+  if (dynamics) traces.dynamics = dynamics;
+
+  const loudness = dashboardRuntimeTrace(
+    firstNumericList(
+      analyzer.lufs_history,
+      analyzer.loudness_history,
+      analyzer.integrated_lufs_history,
+      analyzer.short_term_lufs_history,
+      master.lufs_history,
+      master.short_term_lufs_history
+    ),
+    'loudness',
+    optionalText(analyzer.lufs_label, analyzer.loudness_label),
+    optionalText(analyzer.lufs_summary, analyzer.loudness_summary)
+  );
+  if (loudness) traces.loudness = loudness;
+
+  return traces;
+}
+
 function busTone(group: string): Tone {
   const normalized = group.toUpperCase();
   if (normalized.includes('VOCAL')) return 'purple';
@@ -261,7 +354,8 @@ function toneForModuleStatus(status: string, canWriteLive: boolean): Tone {
   if (normalized === 'canonical') return 'blue';
   if (normalized === 'proposal_only' || normalized === 'shadow_only' || normalized === 'offline_only') return 'yellow';
   if (normalized === 'lab' || normalized === 'lab_only') return 'purple';
-  if (normalized === 'blocked' || normalized === 'placeholder' || normalized === 'quarantined') return 'red';
+  if (normalized.includes('blocked') || normalized.includes('quarantined')) return 'red';
+  if (normalized === 'placeholder') return 'red';
   if (normalized === 'deprecated') return 'muted';
   return canWriteLive ? 'yellow' : 'blue';
 }
@@ -521,7 +615,56 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     };
   });
 
-  return [...moduleRows, ...surfaceRows, ...coverageRows];
+  const readiness = asRecord(data.autonomy_promotion_readiness);
+  const readinessRows = asArray(readiness.rows).map(row => {
+    const targetId = str(row.id, 'unknown_promotion_target');
+    const status = str(row.status, 'unknown');
+    const blockers = Array.isArray(row.blockers)
+      ? row.blockers.map(item => String(item)).filter(Boolean)
+      : [];
+    const nextRequired = Array.isArray(row.next_required_evidence)
+      ? row.next_required_evidence.map(item => String(item)).filter(Boolean)
+      : [];
+    const evidenceRequirements = Array.isArray(row.evidence_requirement_ids)
+      ? row.evidence_requirement_ids.map(item => String(item)).filter(Boolean)
+      : [];
+    const readSurfaceStatuses = Array.isArray(row.read_surface_statuses)
+      ? row.read_surface_statuses.map(item => String(item)).filter(Boolean)
+      : [];
+    const writeSurfaceStatuses = Array.isArray(row.write_surface_statuses)
+      ? row.write_surface_statuses.map(item => String(item)).filter(Boolean)
+      : [];
+    const profileTags = [
+      str(row.target_mode),
+      str(row.safety_status),
+      ...readSurfaceStatuses,
+      ...writeSurfaceStatuses
+    ].filter(Boolean);
+    const evidenceText = evidenceRequirements.length
+      ? `Evidence: ${evidenceRequirements.join(', ')}`
+      : '';
+    const nextStep = [...nextRequired, evidenceText].filter(Boolean).join(' / ')
+      || 'Collect proof before promotion.';
+    return {
+      moduleId: `promotion_readiness:${targetId}`,
+      label: str(row.label, targetId),
+      domain: 'promotion_readiness',
+      status,
+      entrypoint: str(row.action_family, 'unknown_action_family'),
+      module: str(row.safety_row_id, 'no_safety_row'),
+      uiSurface: 'Autonomy promotion readiness',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: profileTags,
+      blockedReason: blockers.length
+        ? blockers.join(', ')
+        : 'Static readiness row; apply authority remains in Product Layer safety gates.',
+      nextStep,
+      tone: toneForModuleStatus(status, false)
+    };
+  });
+
+  return [...moduleRows, ...surfaceRows, ...coverageRows, ...readinessRows];
 }
 
 export function adaptTelemetryAlertsSnapshot(payload: unknown): TelemetryAlertsSnapshot {
@@ -826,6 +969,7 @@ export function adaptDashboardRuntime(
     dash.spectrum_bins,
     master.spectrum_bins
   );
+  const analysisTraces = adaptDashboardAnalysisTraces(analyzer, master);
 
   return {
     integratedLufs: metricNum(master.integrated_lufs, -14.2),
@@ -840,7 +984,8 @@ export function adaptDashboardRuntime(
     appliedDecisions: Math.trunc(metricNum(decisionSummary.applied_count, 0)),
     blockedDecisions: Math.trunc(metricNum(decisionSummary.blocked_count, 0)),
     sourceLabel: 'Backend',
-    spectrumBins
+    spectrumBins,
+    ...(Object.keys(analysisTraces).length ? { analysisTraces } : {})
   };
 }
 

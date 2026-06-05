@@ -10,7 +10,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import math
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+
+try:
+    from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
 
 BUS_GROUP_METHOD_ID = "bus_group_balance_proposal"
@@ -133,6 +138,11 @@ class BusGroupBalanceAnalysisInput:
     target_plane_lufs: Optional[float] = None
     confidence: float = 0.75
     persistence_cycles: int = 1
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
+    source_identity_trust_state: str = "not_provided"
+    source_identity_trust_confidence: float = 0.0
+    source_identity_replay_outcome_count: int = 0
+    source_identity_calibration_freshness: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -232,11 +242,52 @@ def _bounded_delta(desired_delta: float, current_fader: Optional[float], headroo
 
 def _severity(desired_delta: float, headroom: float, blockers: Iterable[str]) -> str:
     blocker_set = set(blockers)
-    if "true_peak_headroom_insufficient_for_bus_up" in blocker_set or abs(desired_delta) >= 5.0:
+    if (
+        "source_identity_blocked_from_downstream_trust" in blocker_set
+        or "source_identity_replay_context_not_fresh" in blocker_set
+        or "true_peak_headroom_insufficient_for_bus_up" in blocker_set
+        or abs(desired_delta) >= 5.0
+    ):
         return "high"
+    if (
+        "source_identity_not_trusted_for_downstream" in blocker_set
+        or "source_identity_trust_state_unknown" in blocker_set
+    ):
+        return "medium"
     if abs(desired_delta) >= 1.5 or headroom <= 1.5:
         return "medium"
     return "low"
+
+
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "missing_fields",
+        "untimestamped_present_fields",
+        "stale_after_sec",
+        "read_only",
+        "live_write",
+        "queries_console",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = True
+    normalized.setdefault("status", _freshness_status(payload))
+    return normalized
 
 
 def analyze_bus_group_balance_need(
@@ -267,6 +318,16 @@ def analyze_bus_group_balance_need(
     dominant_child_share = _clip01(analysis.dominant_child_share)
     confidence_input = _clip01(analysis.confidence)
     persistence = max(1, int(analysis.persistence_cycles or 1))
+    current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
+    current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    source_identity_trust = evaluate_source_identity_downstream_trust(
+        source_id=str(analysis.bus_id),
+        source_type=str(analysis.source_role or family or "unknown"),
+        trust_state=analysis.source_identity_trust_state,
+        trust_confidence=analysis.source_identity_trust_confidence,
+        replay_outcome_count=analysis.source_identity_replay_outcome_count,
+        current_state_cache_freshness=analysis.source_identity_calibration_freshness,
+    )
 
     blockers = []
     if bus_kind not in SUPPORTED_BUS_KINDS:
@@ -289,6 +350,9 @@ def analyze_bus_group_balance_need(
         blockers.append("fader_ceiling_would_be_exceeded")
     if abs(suggested_delta) < MIN_DELTA_DB:
         blockers.append("bus_balance_change_not_needed")
+    if current_state_freshness_status not in {"fresh", "not_provided"}:
+        blockers.append("bus_group_current_state_cache_not_fresh")
+    blockers.extend(source_identity_trust.blockers)
 
     summed_child_lufs = None
     child_to_bus_delta = None
@@ -337,6 +401,9 @@ def analyze_bus_group_balance_need(
         "current_fader_db": current_fader,
         "target_fader_db": target_fader,
         "persistence_cycles": persistence,
+        "current_state_cache_freshness_status": current_state_freshness_status,
+        "current_state_cache_freshness": current_state_freshness,
+        "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
         "ayaic_level_plane": True,
     }

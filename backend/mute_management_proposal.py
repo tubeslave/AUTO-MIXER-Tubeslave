@@ -10,7 +10,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import math
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+
+try:
+    from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
 
 MUTE_METHOD_ID = "mute_management_proposal"
@@ -93,6 +98,11 @@ class MuteManagementAnalysisInput:
     dropout_risk: float = 0.0
     operator_intent: str = ""
     persistence_cycles: int = 1
+    current_state_cache_freshness: Optional[Dict[str, Any]] = None
+    source_identity_trust_state: str = "not_provided"
+    source_identity_trust_confidence: float = 0.0
+    source_identity_replay_outcome_count: int = 0
+    source_identity_calibration_freshness: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -177,6 +187,13 @@ def _is_active(rms_dbfs: float, peak_dbfs: float, recent_signal_cycles: int) -> 
 
 def _severity(action_type: str, feedback_risk: float, blockers: Iterable[str]) -> str:
     blocker_set = set(blockers)
+    if (
+        "source_identity_blocked_from_downstream_trust" in blocker_set
+        or "source_identity_replay_context_not_fresh" in blocker_set
+    ):
+        return "high"
+    if "source_identity_not_trusted_for_downstream" in blocker_set:
+        return "medium"
     if action_type == "emergency_mute_proposal" or feedback_risk >= HIGH_FEEDBACK_RISK:
         return "high"
     if "manual_mute_authority_required" in blocker_set or "critical_source_manual_only" in blocker_set:
@@ -184,6 +201,37 @@ def _severity(action_type: str, feedback_risk: float, blockers: Iterable[str]) -
     if action_type == "unmute_proposal":
         return "medium"
     return "low"
+
+
+def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
+    if not isinstance(payload, Mapping):
+        return "not_provided"
+    return str(payload.get("status") or "unknown").strip().lower() or "unknown"
+
+
+def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {"status": "not_provided", "provided": False}
+    allowed_keys = (
+        "status",
+        "source",
+        "field_count",
+        "fresh_field_count",
+        "stale_field_count",
+        "unknown_field_count",
+        "missing_field_count",
+        "stale_fields",
+        "missing_fields",
+        "untimestamped_present_fields",
+        "stale_after_sec",
+        "read_only",
+        "live_write",
+        "queries_console",
+    )
+    normalized = {key: payload.get(key) for key in allowed_keys if key in payload}
+    normalized["provided"] = True
+    normalized.setdefault("status", _freshness_status(payload))
+    return normalized
 
 
 def analyze_mute_management_need(
@@ -209,6 +257,16 @@ def analyze_mute_management_need(
     operator_intent = str(analysis.operator_intent or "").strip().lower()
     persistence = max(1, int(analysis.persistence_cycles or 1))
     cue_seconds = None if analysis.expected_next_cue_sec is None else max(0.0, _safe_float(analysis.expected_next_cue_sec))
+    current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
+    current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    source_identity_trust = evaluate_source_identity_downstream_trust(
+        source_id=f"ch:{channel}",
+        source_type=str(analysis.source_role or "unknown"),
+        trust_state=analysis.source_identity_trust_state,
+        trust_confidence=analysis.source_identity_trust_confidence,
+        replay_outcome_count=analysis.source_identity_replay_outcome_count,
+        current_state_cache_freshness=analysis.source_identity_calibration_freshness,
+    )
 
     idle = _is_idle(rms, peak, idle_seconds)
     active = _is_active(rms, peak, recent_signal_cycles)
@@ -254,6 +312,9 @@ def analyze_mute_management_need(
         blockers.append("upcoming_cue_too_close_for_mute")
     if action_type == "unmute_proposal" and feedback_risk >= HIGH_FEEDBACK_RISK:
         blockers.append("feedback_risk_high_for_unmute")
+    if current_state_freshness_status not in {"fresh", "not_provided"}:
+        blockers.append("mute_current_state_cache_not_fresh")
+    blockers.extend(source_identity_trust.blockers)
 
     changed = proposed_muted != current_muted
     if not changed and "mute_state_change_not_needed" not in blockers:
@@ -297,6 +358,9 @@ def analyze_mute_management_need(
         "idle_signal": idle,
         "active_signal": active,
         "persistence_cycles": persistence,
+        "current_state_cache_freshness_status": current_state_freshness_status,
+        "current_state_cache_freshness": current_state_freshness,
+        "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
         "manual_mute_authority_preserved": True,
     }

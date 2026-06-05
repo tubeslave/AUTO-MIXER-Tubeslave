@@ -1,5 +1,5 @@
 import type { Channel, DashboardRuntime, Tone } from '../../types';
-import type { ChannelDashboardTelemetry } from '../../mock/dashboardMock';
+import type { AnalysisCardMock, ChannelDashboardTelemetry } from '../../mock/dashboardMock';
 
 function finiteNumber(value: unknown): value is number {
   return Number.isFinite(value);
@@ -27,6 +27,14 @@ function fallbackSpectrum(values: number[]): number[] {
   return values.map((value, index) => tracePoint(value + (index % 3) * 4));
 }
 
+function backendTone(label: string): Tone {
+  return label.toLowerCase().includes('backend') ? 'green' : 'blue';
+}
+
+function backendLabel(label: string): string {
+  return label.toLowerCase().includes('backend') ? 'Backend DTO' : label;
+}
+
 export function dashboardSpectrumTrace(
   runtime: Pick<DashboardRuntime, 'sourceLabel' | 'spectrumBins'>,
   fallback: number[]
@@ -51,6 +59,32 @@ export function dashboardSpectrumTrace(
     sourceTone: 'yellow',
     caption: 'Display-only analyzer trace'
   };
+}
+
+export function dashboardAnalysisCards(
+  runtime: Pick<DashboardRuntime, 'sourceLabel' | 'analysisTraces'>,
+  fallbackCards: AnalysisCardMock[]
+): AnalysisCardMock[] {
+  return fallbackCards.map(card => {
+    const runtimeTrace = runtime.analysisTraces?.[card.id as keyof NonNullable<DashboardRuntime['analysisTraces']>];
+    const runtimeValues = Array.isArray(runtimeTrace?.values)
+      ? runtimeTrace.values.filter(value => Number.isFinite(value)).map(tracePoint)
+      : [];
+
+    if (!runtimeValues.length) {
+      return card;
+    }
+
+    const sourceLabel = backendLabel(runtimeTrace?.sourceLabel ?? runtime.sourceLabel);
+    return {
+      ...card,
+      values: runtimeValues,
+      primary: runtimeTrace?.primary || card.primary,
+      secondary: runtimeTrace?.secondary || card.secondary,
+      sourceLabel,
+      sourceTone: runtimeTrace?.sourceTone ?? backendTone(sourceLabel)
+    };
+  });
 }
 
 export function dashboardTelemetryForChannel(
