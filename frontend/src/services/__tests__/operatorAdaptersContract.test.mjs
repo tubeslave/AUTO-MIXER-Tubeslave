@@ -530,8 +530,8 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
           snapshot_status: 'fixture_evidence_incomplete',
           surface_count: 10,
           surface_with_fixture_count: 10,
-          declared_fixture_path_count: 15,
-          declared_test_name_count: 40,
+          declared_fixture_path_count: 16,
+          declared_test_name_count: 43,
           physical_gap_surface_count: 10,
           summary_recomputed_from_rows: true,
           fixture_declaration_validation: true,
@@ -873,6 +873,62 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             minimum_preset_count: 1,
             violations: [],
           },
+          dlive_state_physical_readback_contract: {
+            available: true,
+            status: 'passed',
+            schema_id: 'dlive_state_physical_readback.v1',
+            contract_status: 'contract_ready_physical_fixture_missing',
+            surface_id: 'dlive_state',
+            remediation_action_id: 'remediate_dlive_state',
+            physical_readback_surface_id: 'dlive_state',
+            physical_readback_action_id: 'remediate_dlive_state',
+            artifact_required: true,
+            physical_fixture_gap_remains: true,
+            accepted_as_physical_fixture_candidate: false,
+            read_only: true,
+            live_write: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            midi_send_allowed: false,
+            tcp_send_allowed: false,
+            dlive_write_allowed: false,
+            dlive_apply_allowed: false,
+            target_consistency: true,
+            fixture_physical_gap_declared: true,
+            remediation_physical_gap_declared: true,
+            promotion_families_requiring_surface: [
+              'fader',
+              'gain',
+              'mute',
+              'routing',
+              'performance_adaptation',
+            ],
+            required_channel_fields: [
+              'channel',
+              'cached_channel_name',
+              'fader_raw_14bit',
+            ],
+            required_midi_state_fields: [
+              'midi_base_channel',
+              'raw_state_key_count',
+            ],
+            required_parity_fields: [
+              'wing_surface_equivalent',
+              'mapping_status',
+            ],
+            required_coverage_flags: ['channel_identity', 'wing_parity_mapping'],
+            required_false_safety_flags: [
+              'live_write',
+              'midi_send_allowed',
+              'tcp_send_allowed',
+              'dlive_write_allowed',
+            ],
+            allowed_sources: ['physical_readback', 'dlive_physical_readback'],
+            accepted_row_statuses: ['verified_from_physical_readback'],
+            forbidden_mutation_evidence_fields: ['midi_send_events'],
+            minimum_channel_count: 1,
+            violations: [],
+          },
         },
       },
     },
@@ -963,6 +1019,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'routing_sends_physical_readback_contract',
       'snapshots_scenes_physical_readback_contract',
       'user_presets_physical_readback_contract',
+      'dlive_state_physical_readback_contract',
       'read_surface_remediation_plan',
       'autonomy_evidence:fader_supervised_promotion',
       'autonomy_evidence:gain_trim_supervised_promotion',
@@ -1050,7 +1107,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'next_readback_target:raw_mixer_state_cache',
     'source_next_readback_target:raw_mixer_state_cache',
     'next_readback_gate:true',
-    'fixture_tests:40',
+    'fixture_tests:43',
     'contract_gap:true',
     'raw_contract_available:true',
     'raw_contract_status:contract_ready_physical_fixture_missing',
@@ -1106,13 +1163,19 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'presets_contract_gap:true',
     'presets_contract_live_authority:false',
     'presets_contract_target_gate:true',
+    'dlive_contract_available:true',
+    'dlive_contract_status:contract_ready_physical_fixture_missing',
+    'dlive_contract_schema:dlive_state_physical_readback.v1',
+    'dlive_contract_gap:true',
+    'dlive_contract_live_authority:false',
+    'dlive_contract_target_gate:true',
   ]);
   assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
   assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
   assert.match(proofEvidence.nextStep, /age:120s stale_after:86400s stale:false/);
   assert.match(proofEvidence.nextStep, /read_surface_gaps:10/);
-  assert.match(proofEvidence.nextStep, /fixture_paths:15/);
-  assert.match(proofEvidence.nextStep, /test_names:40/);
+  assert.match(proofEvidence.nextStep, /fixture_paths:16/);
+  assert.match(proofEvidence.nextStep, /test_names:43/);
   assert.match(proofEvidence.nextStep, /contract_gap:true/);
   assert.match(proofEvidence.nextStep, /gap_surfaces:raw_mixer_state_cache/);
   assert.match(proofEvidence.nextStep, /next_readback:raw_mixer_state_cache/);
@@ -1154,6 +1217,10 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /presets_contract_gap:true/);
   assert.match(proofEvidence.nextStep, /presets_contract_live_authority:false/);
   assert.match(proofEvidence.nextStep, /presets_contract_target_gate:true/);
+  assert.match(proofEvidence.nextStep, /dlive_contract:contract_ready_physical_fixture_missing/);
+  assert.match(proofEvidence.nextStep, /dlive_contract_gap:true/);
+  assert.match(proofEvidence.nextStep, /dlive_contract_live_authority:false/);
+  assert.match(proofEvidence.nextStep, /dlive_contract_target_gate:true/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
 
   const rawMixerContract = rows.find(row => row.moduleId === 'raw_mixer_state_physical_readback_contract');
@@ -1469,6 +1536,49 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(userPresetsContract.nextStep, /live_authority:false/);
   assert.match(userPresetsContract.nextStep, /target_consistency:true/);
 
+  const dliveStateContract = rows.find(row => row.moduleId === 'dlive_state_physical_readback_contract');
+  assert.equal(dliveStateContract.domain, 'read_surface_contract');
+  assert.equal(dliveStateContract.canWriteLive, false);
+  assert.deepEqual(dliveStateContract.liveWriteKinds, []);
+  assert.equal(dliveStateContract.status, 'contract_ready_physical_fixture_missing');
+  assert.equal(dliveStateContract.entrypoint, 'dlive_state_physical_readback_contract');
+  assert.equal(dliveStateContract.module, 'remediate_dlive_state');
+  assert.equal(dliveStateContract.tone, 'yellow');
+  assert.deepEqual(dliveStateContract.pipelineProfiles, [
+    'available:true',
+    'schema:dlive_state_physical_readback.v1',
+    'surface:dlive_state',
+    'physical_readback:dlive_state',
+    'physical_action:remediate_dlive_state',
+    'physical_gap_remains:true',
+    'live_authority:false',
+    'target_consistency:true',
+    'midi_send_allowed:false',
+    'tcp_send_allowed:false',
+    'dlive_write_allowed:false',
+    'dlive_apply_allowed:false',
+    'promotion_families:fader|gain|mute|routing|performance_adaptation',
+    'channels:channel|cached_channel_name|fader_raw_14bit',
+    'midi_state:midi_base_channel|raw_state_key_count',
+    'parity:wing_surface_equivalent|mapping_status',
+    'coverage:channel_identity|wing_parity_mapping',
+    'false_safety:live_write|midi_send_allowed|tcp_send_allowed|dlive_write_allowed',
+  ]);
+  assert.match(dliveStateContract.blockedReason, /physical readback and WING parity fixture evidence is still missing/);
+  assert.match(dliveStateContract.nextStep, /physical_readback:dlive_state/);
+  assert.match(dliveStateContract.nextStep, /physical_action:remediate_dlive_state/);
+  assert.match(dliveStateContract.nextStep, /families:fader,gain,mute,routing,performance_adaptation/);
+  assert.match(dliveStateContract.nextStep, /channels:channel,cached_channel_name,fader_raw_14bit/);
+  assert.match(dliveStateContract.nextStep, /midi_state:midi_base_channel,raw_state_key_count/);
+  assert.match(dliveStateContract.nextStep, /parity:wing_surface_equivalent,mapping_status/);
+  assert.match(dliveStateContract.nextStep, /coverage:channel_identity,wing_parity_mapping/);
+  assert.match(dliveStateContract.nextStep, /midi_send_allowed:false/);
+  assert.match(dliveStateContract.nextStep, /tcp_send_allowed:false/);
+  assert.match(dliveStateContract.nextStep, /dlive_write_allowed:false/);
+  assert.match(dliveStateContract.nextStep, /dlive_apply_allowed:false/);
+  assert.match(dliveStateContract.nextStep, /live_authority:false/);
+  assert.match(dliveStateContract.nextStep, /target_consistency:true/);
+
   const readRemediation = rows.find(row => row.moduleId === 'read_surface_remediation_plan');
   assert.equal(readRemediation.domain, 'read_surface_remediation');
   assert.equal(readRemediation.canWriteLive, false);
@@ -1632,7 +1742,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 10);
+  assert.equal(rows.length, 11);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -1708,6 +1818,12 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'presets_contract_gap:false',
     'presets_contract_live_authority:false',
     'presets_contract_target_gate:false',
+    'dlive_contract_available:false',
+    'dlive_contract_status:missing',
+    'dlive_contract_schema:',
+    'dlive_contract_gap:false',
+    'dlive_contract_live_authority:false',
+    'dlive_contract_target_gate:false',
   ]);
 
   assert.equal(rows[1].moduleId, 'raw_mixer_state_physical_readback_contract');
@@ -1772,6 +1888,13 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.equal(rows[9].canWriteLive, false);
   assert.deepEqual(rows[9].liveWriteKinds, []);
   assert.match(rows[9].blockedReason, /contract is missing/);
+
+  assert.equal(rows[10].moduleId, 'dlive_state_physical_readback_contract');
+  assert.equal(rows[10].domain, 'read_surface_contract');
+  assert.equal(rows[10].status, 'contract_missing');
+  assert.equal(rows[10].canWriteLive, false);
+  assert.deepEqual(rows[10].liveWriteKinds, []);
+  assert.match(rows[10].blockedReason, /contract is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

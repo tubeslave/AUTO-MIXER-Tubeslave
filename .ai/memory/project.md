@@ -83,6 +83,7 @@
 - Routing/sends physical readback needs its own schema contract before routing, FX-send/insert, bus/matrix balance, scene/preset, mix-balance, or performance-adaptation proof artifacts are trusted; contract visibility must preserve `physical_fixture_gap_remains=true` and normalize live-authority claims to false.
 - Snapshots/scenes physical readback needs its own schema contract before scene/preset, routing, mix-balance, or performance-adaptation proof artifacts are trusted; contract visibility must preserve `physical_fixture_gap_remains=true`, `scene_load_allowed=false`, `scene_save_allowed=false`, and normalize live-authority claims to false.
 - User-presets physical readback needs its own schema contract before scene/preset, routing, mix-balance, or performance-adaptation proof artifacts are trusted; contract visibility must preserve `physical_fixture_gap_remains=true`, `preset_recall_allowed=false`, `preset_store_allowed=false`, and normalize live-authority claims to false.
+- dLive-state physical readback needs its own schema contract before dLive/WING parity, fader, gain, mute, routing, scene/preset, mix-balance, or performance-adaptation proof artifacts are trusted; contract visibility must preserve `physical_fixture_gap_remains=true`, `midi_send_allowed=false`, `tcp_send_allowed=false`, `dlive_write_allowed=false`, and normalize live-authority claims to false.
 
 ## Memory Pipeline Lessons
 

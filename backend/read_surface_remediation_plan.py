@@ -24,6 +24,10 @@ try:
         CHANNEL_PROCESSING_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         CHANNEL_PROCESSING_SURFACE_ID,
     )
+    from dlive_state_physical_readback_contract import (
+        DLIVE_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        DLIVE_STATE_SURFACE_ID,
+    )
     from fx_slots_inserts_physical_readback_contract import (
         FX_SLOTS_INSERTS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         FX_SLOTS_INSERTS_SURFACE_ID,
@@ -62,6 +66,10 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.channel_processing_physical_readback_contract import (
         CHANNEL_PROCESSING_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         CHANNEL_PROCESSING_SURFACE_ID,
+    )
+    from backend.dlive_state_physical_readback_contract import (
+        DLIVE_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        DLIVE_STATE_SURFACE_ID,
     )
     from backend.fx_slots_inserts_physical_readback_contract import (
         FX_SLOTS_INSERTS_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
@@ -271,6 +279,11 @@ def _expected_artifacts(surface: ReadSurface, *, physical_readback_gap: bool) ->
             artifacts.append(
                 "User presets physical readback artifact validated by "
                 f"{USER_PRESETS_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
+            )
+        if surface.id == DLIVE_STATE_SURFACE_ID:
+            artifacts.append(
+                "dLive state and WING parity physical readback artifact validated by "
+                f"{DLIVE_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
             )
     return tuple(artifacts)
 

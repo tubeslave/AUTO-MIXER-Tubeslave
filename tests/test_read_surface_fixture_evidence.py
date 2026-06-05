@@ -183,6 +183,16 @@ def test_read_surface_fixture_evidence_snapshot_tracks_cached_dto_fixtures_only(
     )
     assert "scoped_diff_fixture_missing" in surfaces["user_presets"]["remaining_gaps"]
     assert "rollback_diff_fixture_missing" in surfaces["user_presets"]["remaining_gaps"]
+    assert (
+        "test_dlive_state_contract_validates_minimal_physical_artifact"
+        in surfaces["dlive_state"]["test_names"]
+    )
+    assert (
+        "physical_readback_artifact_contract"
+        in surfaces["dlive_state"]["covered_contracts"]
+    )
+    assert "coverage_flags" in surfaces["dlive_state"]["covered_contracts"]
+    assert "tcp_send_blocked" in surfaces["dlive_state"]["covered_contracts"]
     assert "dlive_wing_parity_mapping_missing" in surfaces["dlive_state"]["remaining_gaps"]
     assert surfaces["dlive_state"]["full_autonomous_ready"] is False
 
@@ -230,6 +240,7 @@ def test_console_read_goal_references_fixture_evidence_without_widening_live_sco
     assert "routing_sends_physical_readback_contract" in row.method_ids
     assert "snapshots_scenes_physical_readback_contract" in row.method_ids
     assert "user_presets_physical_readback_contract" in row.method_ids
+    assert "dlive_state_physical_readback_contract" in row.method_ids
     assert "backend/read_surface_fixture_evidence.py" in row.support_paths
     assert "backend/raw_mixer_state_physical_readback_contract.py" in row.support_paths
     assert "backend/channel_basic_controls_physical_readback_contract.py" in row.support_paths
@@ -240,6 +251,7 @@ def test_console_read_goal_references_fixture_evidence_without_widening_live_sco
     assert "backend/routing_sends_physical_readback_contract.py" in row.support_paths
     assert "backend/snapshots_scenes_physical_readback_contract.py" in row.support_paths
     assert "backend/user_presets_physical_readback_contract.py" in row.support_paths
+    assert "backend/dlive_state_physical_readback_contract.py" in row.support_paths
     assert row.current_live_write_kinds == ()
     assert "physical fixtures" in row.next_step
 

@@ -91,6 +91,24 @@ from backend.channel_processing_physical_readback_contract import (  # noqa: E40
     MINIMUM_EQ_BAND_COUNT,
     build_channel_processing_physical_readback_contract,
 )
+from backend.dlive_state_physical_readback_contract import (  # noqa: E402
+    DLIVE_STATE_FORBIDDEN_MUTATION_EVIDENCE_FIELDS,
+    DLIVE_STATE_PHYSICAL_READBACK_ARTIFACT_TYPE,
+    DLIVE_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+    DLIVE_STATE_PHYSICAL_READBACK_SCHEMA_ID,
+    DLIVE_STATE_PHYSICAL_READBACK_SOURCES,
+    DLIVE_STATE_REMEDIATION_ACTION_ID,
+    DLIVE_STATE_REQUIRED_CHANNEL_FIELDS,
+    DLIVE_STATE_REQUIRED_COVERAGE_FLAGS,
+    DLIVE_STATE_REQUIRED_FALSE_SAFETY_FLAGS,
+    DLIVE_STATE_REQUIRED_MIDI_STATE_FIELDS,
+    DLIVE_STATE_REQUIRED_PARITY_FIELDS,
+    DLIVE_STATE_REQUIRED_TOP_LEVEL_FIELDS,
+    DLIVE_STATE_SURFACE_ID,
+    DLIVE_STATE_VERIFIED_PHYSICAL_STATUSES,
+    MINIMUM_DLIVE_STATE_CHANNEL_COUNT,
+    build_dlive_state_physical_readback_contract,
+)
 from backend.fx_slots_inserts_physical_readback_contract import (  # noqa: E402
     FX_INSERT_POSITIONS,
     FX_INSERT_REQUIRED_COVERAGE_FLAGS,
@@ -408,6 +426,7 @@ def build_checks(
                 "tests/test_routing_sends_physical_readback_contract.py",
                 "tests/test_snapshots_scenes_physical_readback_contract.py",
                 "tests/test_user_presets_physical_readback_contract.py",
+                "tests/test_dlive_state_physical_readback_contract.py",
                 "-q",
                 "--tb=short",
             ),
@@ -3221,6 +3240,216 @@ def validate_user_presets_physical_readback_contract_snapshot() -> CheckResult:
     )
 
 
+def validate_dlive_state_physical_readback_contract_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "dlive_state_readback_contract_is_schema_only_no_midi_tcp_or_dlive_write_authority",
+    }
+    violations: list[str] = []
+
+    try:
+        fixture_snapshot = build_read_surface_fixture_evidence_snapshot()
+        remediation_plan = build_read_surface_remediation_plan(
+            fixture_evidence_snapshot=fixture_snapshot
+        )
+        contract = build_dlive_state_physical_readback_contract()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        fixture_snapshot = {}
+        remediation_plan = {}
+        contract = {}
+        violations.append(f"dlive_state_readback_contract_build_error:{type(exc).__name__}")
+
+    fixture_summary = (
+        fixture_snapshot.get("summary")
+        if isinstance(fixture_snapshot.get("summary"), Mapping)
+        else {}
+    )
+    remediation_actions = (
+        remediation_plan.get("actions")
+        if isinstance(remediation_plan.get("actions"), list)
+        else []
+    )
+    safety = contract.get("safety") if isinstance(contract.get("safety"), Mapping) else {}
+    contract_summary = (
+        contract.get("summary") if isinstance(contract.get("summary"), Mapping) else {}
+    )
+    artifact_contract = (
+        contract.get("artifact_contract")
+        if isinstance(contract.get("artifact_contract"), Mapping)
+        else {}
+    )
+
+    if contract.get("type") != "dlive_state_physical_readback_contract":
+        violations.append("dlive_state_readback_contract_type_mismatch")
+    if contract.get("method_id") != DLIVE_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID:
+        violations.append("dlive_state_readback_contract_method_id_mismatch")
+    if contract.get("schema_id") != DLIVE_STATE_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("dlive_state_readback_contract_schema_id_mismatch")
+    if contract.get("status") != "contract_ready_physical_fixture_missing":
+        violations.append("dlive_state_readback_contract_status_mismatch")
+    if contract.get("surface_id") != DLIVE_STATE_SURFACE_ID:
+        violations.append("dlive_state_readback_contract_surface_id_mismatch")
+    if contract.get("remediation_action_id") != DLIVE_STATE_REMEDIATION_ACTION_ID:
+        violations.append("dlive_state_readback_contract_action_id_mismatch")
+
+    if safety.get("read_only") is not True:
+        violations.append("dlive_state_readback_contract_read_only_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+        "midi_send_allowed",
+        "tcp_send_allowed",
+        "dlive_write_allowed",
+        "dlive_apply_allowed",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"dlive_state_readback_contract_{key}_not_false")
+
+    if artifact_contract.get("type") != DLIVE_STATE_PHYSICAL_READBACK_ARTIFACT_TYPE:
+        violations.append("dlive_state_readback_artifact_type_mismatch")
+    if artifact_contract.get("schema_id") != DLIVE_STATE_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("dlive_state_readback_artifact_schema_id_mismatch")
+    if artifact_contract.get("minimum_channel_count") != MINIMUM_DLIVE_STATE_CHANNEL_COUNT:
+        violations.append("dlive_state_readback_artifact_minimum_channel_count_mismatch")
+
+    expected_lists = {
+        "required_top_level_fields": DLIVE_STATE_REQUIRED_TOP_LEVEL_FIELDS,
+        "required_channel_fields": DLIVE_STATE_REQUIRED_CHANNEL_FIELDS,
+        "required_midi_state_fields": DLIVE_STATE_REQUIRED_MIDI_STATE_FIELDS,
+        "required_parity_fields": DLIVE_STATE_REQUIRED_PARITY_FIELDS,
+        "required_coverage_flags": DLIVE_STATE_REQUIRED_COVERAGE_FLAGS,
+        "required_false_safety_flags": DLIVE_STATE_REQUIRED_FALSE_SAFETY_FLAGS,
+    }
+    list_details: dict[str, list[object]] = {}
+    for key, expected in expected_lists.items():
+        value = artifact_contract.get(key)
+        if not isinstance(value, list) or value != list(expected):
+            violations.append(f"dlive_state_readback_{key}_mismatch")
+            list_details[key] = []
+        else:
+            list_details[key] = list(value)
+
+    allowed_sources = artifact_contract.get("allowed_sources")
+    if not isinstance(allowed_sources, list):
+        allowed_sources = []
+        violations.append("dlive_state_readback_allowed_sources_missing")
+    elif list(allowed_sources) != list(DLIVE_STATE_PHYSICAL_READBACK_SOURCES):
+        violations.append("dlive_state_readback_allowed_sources_mismatch")
+    if "mixer_state_cache" in allowed_sources or "cache" in allowed_sources:
+        violations.append("dlive_state_readback_allows_cached_source")
+
+    accepted_statuses = artifact_contract.get("accepted_row_statuses")
+    if (
+        not isinstance(accepted_statuses, list)
+        or accepted_statuses != list(DLIVE_STATE_VERIFIED_PHYSICAL_STATUSES)
+    ):
+        violations.append("dlive_state_readback_accepted_statuses_mismatch")
+        accepted_statuses = []
+    forbidden_mutation_fields = artifact_contract.get("forbidden_mutation_evidence_fields")
+    if (
+        not isinstance(forbidden_mutation_fields, list)
+        or forbidden_mutation_fields
+        != list(DLIVE_STATE_FORBIDDEN_MUTATION_EVIDENCE_FIELDS)
+    ):
+        violations.append("dlive_state_readback_forbidden_mutation_fields_mismatch")
+        forbidden_mutation_fields = []
+
+    physical_gap_ids = fixture_summary.get("physical_fixture_missing_surface_ids")
+    if not isinstance(physical_gap_ids, list):
+        physical_gap_ids = []
+        violations.append("dlive_state_fixture_physical_gap_ids_missing")
+    if DLIVE_STATE_SURFACE_ID not in physical_gap_ids:
+        violations.append("dlive_state_fixture_gap_not_declared")
+
+    remediation_action = {}
+    for action in remediation_actions:
+        if isinstance(action, Mapping) and action.get("surface_id") == DLIVE_STATE_SURFACE_ID:
+            remediation_action = dict(action)
+            break
+    if not remediation_action:
+        violations.append("dlive_state_remediation_action_missing")
+    elif remediation_action.get("id") != DLIVE_STATE_REMEDIATION_ACTION_ID:
+        violations.append("dlive_state_remediation_action_id_mismatch")
+    if remediation_action and remediation_action.get("physical_readback_gap") is not True:
+        violations.append("dlive_state_remediation_physical_gap_not_true")
+
+    if contract_summary.get("physical_readback_surface_id") != DLIVE_STATE_SURFACE_ID:
+        violations.append("dlive_state_contract_surface_summary_mismatch")
+    if contract_summary.get("physical_readback_action_id") != DLIVE_STATE_REMEDIATION_ACTION_ID:
+        violations.append("dlive_state_contract_action_summary_mismatch")
+    if contract_summary.get("artifact_required") is not True:
+        violations.append("dlive_state_contract_artifact_required_not_true")
+    if contract_summary.get("physical_fixture_gap_remains") is not True:
+        violations.append("dlive_state_contract_physical_gap_not_true")
+    if contract_summary.get("accepted_as_physical_fixture_candidate") is not False:
+        violations.append("dlive_state_contract_candidate_not_false")
+    if contract_summary.get("live_authority_granted") is not False:
+        violations.append("dlive_state_contract_live_authority_not_false")
+    promotion_families = contract_summary.get("promotion_families_requiring_surface")
+    if not isinstance(promotion_families, list):
+        promotion_families = []
+        violations.append("dlive_state_promotion_families_missing")
+    for family in ("fader", "gain", "mute", "routing", "performance_adaptation"):
+        if family not in promotion_families:
+            violations.append(f"dlive_state_promotion_family_missing:{family}")
+
+    detail["contract_status"] = contract.get("status")
+    detail["schema_id"] = contract.get("schema_id")
+    detail["surface_id"] = contract.get("surface_id")
+    detail["remediation_action_id"] = contract.get("remediation_action_id")
+    detail["physical_readback_surface_id"] = contract_summary.get("physical_readback_surface_id")
+    detail["physical_readback_action_id"] = contract_summary.get("physical_readback_action_id")
+    detail["fixture_physical_gap_declared"] = DLIVE_STATE_SURFACE_ID in physical_gap_ids
+    detail["remediation_physical_gap_declared"] = bool(
+        remediation_action and remediation_action.get("physical_readback_gap") is True
+    )
+    detail["artifact_required"] = contract_summary.get("artifact_required")
+    detail["physical_fixture_gap_remains"] = contract_summary.get("physical_fixture_gap_remains")
+    detail["accepted_as_physical_fixture_candidate"] = contract_summary.get(
+        "accepted_as_physical_fixture_candidate"
+    )
+    detail["live_authority_granted"] = contract_summary.get("live_authority_granted")
+    detail["promotion_families_requiring_surface"] = list(promotion_families)
+    detail["required_top_level_field_count"] = len(
+        list_details.get("required_top_level_fields", [])
+    )
+    detail["required_channel_fields"] = list(
+        list_details.get("required_channel_fields", [])
+    )
+    detail["required_midi_state_fields"] = list(
+        list_details.get("required_midi_state_fields", [])
+    )
+    detail["required_parity_fields"] = list(
+        list_details.get("required_parity_fields", [])
+    )
+    detail["required_coverage_flags"] = list(
+        list_details.get("required_coverage_flags", [])
+    )
+    detail["required_false_safety_flags"] = list(
+        list_details.get("required_false_safety_flags", [])
+    )
+    detail["minimum_channel_count"] = int(
+        artifact_contract.get("minimum_channel_count") or 0
+    )
+    detail["allowed_sources"] = list(allowed_sources)
+    detail["accepted_row_statuses"] = list(accepted_statuses)
+    detail["forbidden_mutation_evidence_fields"] = list(forbidden_mutation_fields)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="dlive_state_physical_readback_contract_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_supervised_proof_report_gain_dry_run(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -4615,6 +4844,101 @@ def user_presets_readback_contract_summary(
     return None
 
 
+def dlive_state_readback_contract_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "dlive_state_physical_readback_contract_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        allowed_sources = detail.get("allowed_sources")
+        accepted_statuses = detail.get("accepted_row_statuses")
+        forbidden_mutation_fields = detail.get("forbidden_mutation_evidence_fields")
+        required_false_flags = detail.get("required_false_safety_flags")
+        promotion_families = detail.get("promotion_families_requiring_surface")
+        required_channel_fields = detail.get("required_channel_fields")
+        required_midi_state_fields = detail.get("required_midi_state_fields")
+        required_parity_fields = detail.get("required_parity_fields")
+        required_coverage_flags = detail.get("required_coverage_flags")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "live_widening_allowed": False,
+            "full_autonomous_ready": False,
+            "midi_send_allowed": False,
+            "tcp_send_allowed": False,
+            "dlive_write_allowed": False,
+            "dlive_apply_allowed": False,
+            "schema_id": detail.get("schema_id"),
+            "contract_status": detail.get("contract_status"),
+            "surface_id": detail.get("surface_id"),
+            "remediation_action_id": detail.get("remediation_action_id"),
+            "physical_readback_surface_id": detail.get("physical_readback_surface_id"),
+            "physical_readback_action_id": detail.get("physical_readback_action_id"),
+            "fixture_physical_gap_declared": detail.get("fixture_physical_gap_declared") is True,
+            "remediation_physical_gap_declared": (
+                detail.get("remediation_physical_gap_declared") is True
+            ),
+            "artifact_required": detail.get("artifact_required") is True,
+            "physical_fixture_gap_remains": detail.get("physical_fixture_gap_remains") is True,
+            "accepted_as_physical_fixture_candidate": (
+                detail.get("accepted_as_physical_fixture_candidate") is True
+            ),
+            "live_authority_granted": detail.get("live_authority_granted") is True,
+            "promotion_families_requiring_surface": (
+                list(promotion_families) if isinstance(promotion_families, list) else []
+            ),
+            "required_top_level_field_count": int(detail.get("required_top_level_field_count") or 0),
+            "required_channel_fields": (
+                list(required_channel_fields)
+                if isinstance(required_channel_fields, list)
+                else []
+            ),
+            "required_midi_state_fields": (
+                list(required_midi_state_fields)
+                if isinstance(required_midi_state_fields, list)
+                else []
+            ),
+            "required_parity_fields": (
+                list(required_parity_fields)
+                if isinstance(required_parity_fields, list)
+                else []
+            ),
+            "required_coverage_flags": (
+                list(required_coverage_flags)
+                if isinstance(required_coverage_flags, list)
+                else []
+            ),
+            "required_false_safety_flags": (
+                list(required_false_flags) if isinstance(required_false_flags, list) else []
+            ),
+            "minimum_channel_count": int(detail.get("minimum_channel_count") or 0),
+            "allowed_sources": list(allowed_sources) if isinstance(allowed_sources, list) else [],
+            "accepted_row_statuses": (
+                list(accepted_statuses) if isinstance(accepted_statuses, list) else []
+            ),
+            "forbidden_mutation_evidence_fields": (
+                list(forbidden_mutation_fields)
+                if isinstance(forbidden_mutation_fields, list)
+                else []
+            ),
+            "target_consistency": (
+                detail.get("physical_readback_surface_id") == detail.get("surface_id")
+                and detail.get("physical_readback_action_id")
+                == detail.get("remediation_action_id")
+                and detail.get("fixture_physical_gap_declared") is True
+                and detail.get("remediation_physical_gap_declared") is True
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "next_wing_proof_plan_schema":
@@ -4657,6 +4981,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     routing_sends_contract = routing_sends_readback_contract_summary(results)
     snapshots_scenes_contract = snapshots_scenes_readback_contract_summary(results)
     user_presets_contract = user_presets_readback_contract_summary(results)
+    dlive_state_contract = dlive_state_readback_contract_summary(results)
     next_plan = next_wing_proof_plan_summary(results)
     summary = {
         "type": "no_wing_release_check",
@@ -4695,6 +5020,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["snapshots_scenes_physical_readback_contract"] = snapshots_scenes_contract
     if user_presets_contract is not None:
         summary["user_presets_physical_readback_contract"] = user_presets_contract
+    if dlive_state_contract is not None:
+        summary["dlive_state_physical_readback_contract"] = dlive_state_contract
     if next_plan is not None:
         summary["next_wing_proof_plan"] = next_plan
     summary_path = run_dir / "summary.json"
@@ -5377,6 +5704,55 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(user_presets_contract['violations'])}`",
             ]
         )
+    if dlive_state_contract is not None:
+        lines.extend(
+            [
+                "",
+                "## dLive State Physical Readback Contract",
+                "",
+                f"- schema_check: `{dlive_state_contract['status']}`",
+                f"- read_only: `{str(dlive_state_contract['read_only']).lower()}`",
+                f"- live_write: `{str(dlive_state_contract['live_write']).lower()}`",
+                "- midi_send_allowed: "
+                f"`{str(dlive_state_contract['midi_send_allowed']).lower()}`",
+                "- tcp_send_allowed: "
+                f"`{str(dlive_state_contract['tcp_send_allowed']).lower()}`",
+                "- dlive_write_allowed: "
+                f"`{str(dlive_state_contract['dlive_write_allowed']).lower()}`",
+                f"- schema_id: `{dlive_state_contract['schema_id']}`",
+                f"- contract_status: `{dlive_state_contract['contract_status']}`",
+                f"- surface_id: `{dlive_state_contract['surface_id']}`",
+                f"- remediation_action_id: `{dlive_state_contract['remediation_action_id']}`",
+                "- physical_readback_surface_id: "
+                f"`{dlive_state_contract['physical_readback_surface_id']}`",
+                "- physical_readback_action_id: "
+                f"`{dlive_state_contract['physical_readback_action_id']}`",
+                "- fixture_physical_gap_declared: "
+                f"`{str(dlive_state_contract['fixture_physical_gap_declared']).lower()}`",
+                "- remediation_physical_gap_declared: "
+                f"`{str(dlive_state_contract['remediation_physical_gap_declared']).lower()}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(dlive_state_contract['physical_fixture_gap_remains']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(dlive_state_contract['live_authority_granted']).lower()}`",
+                "- promotion_families_requiring_surface: "
+                f"`{json.dumps(dlive_state_contract['promotion_families_requiring_surface'])}`",
+                "- required_channel_fields: "
+                f"`{json.dumps(dlive_state_contract['required_channel_fields'])}`",
+                "- required_midi_state_fields: "
+                f"`{json.dumps(dlive_state_contract['required_midi_state_fields'])}`",
+                "- required_parity_fields: "
+                f"`{json.dumps(dlive_state_contract['required_parity_fields'])}`",
+                "- required_coverage_flags: "
+                f"`{json.dumps(dlive_state_contract['required_coverage_flags'])}`",
+                "- required_false_safety_flags: "
+                f"`{json.dumps(dlive_state_contract['required_false_safety_flags'])}`",
+                f"- minimum_channel_count: `{dlive_state_contract['minimum_channel_count']}`",
+                "- target_consistency: "
+                f"`{str(dlive_state_contract['target_consistency']).lower()}`",
+                f"- violations: `{json.dumps(dlive_state_contract['violations'])}`",
+            ]
+        )
     if next_plan is not None:
         lines.extend(
             [
@@ -5517,6 +5893,15 @@ def run_release_checks(
             results.append(user_presets_contract_result)
             if (
                 user_presets_contract_result.status != "passed"
+                and not continue_on_failure
+            ):
+                break
+            dlive_state_contract_result = (
+                validate_dlive_state_physical_readback_contract_snapshot()
+            )
+            results.append(dlive_state_contract_result)
+            if (
+                dlive_state_contract_result.status != "passed"
                 and not continue_on_failure
             ):
                 break

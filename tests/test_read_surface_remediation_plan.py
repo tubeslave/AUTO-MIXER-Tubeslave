@@ -159,6 +159,19 @@ def test_plan_creates_actions_for_current_partial_and_missing_read_surfaces():
     assert presets["requires_connection"] is False
     assert presets["mutates_console_state"] is False
 
+    dlive_state = actions["dlive_state"]
+    assert dlive_state["action_type"] == "complete_read_dto"
+    assert dlive_state["physical_readback_gap"] is True
+    assert dlive_state["next_physical_readback_target"] is False
+    assert "dlive_wing_parity_mapping" in dlive_state["missing_contracts"]
+    assert "physical_readback_fixture" in dlive_state["missing_contracts"]
+    assert "dlive_wing_parity_mapping_missing" in dlive_state["fixture_remaining_gaps"]
+    assert any(
+        "dlive_state_physical_readback_contract" in artifact
+        for artifact in dlive_state["expected_artifacts"]
+    )
+    assert dlive_state["mutates_console_state"] is False
+
 
 def test_complete_surfaces_return_complete_status_without_actions():
     surface = ReadSurface(

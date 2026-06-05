@@ -16,6 +16,7 @@ from tools.no_wing_release_check import (
     channel_basic_controls_readback_contract_summary,
     channel_processing_readback_contract_summary,
     current_supervised_live_write_kinds,
+    dlive_state_readback_contract_summary,
     fx_slots_inserts_readback_contract_summary,
     gain_proof_artifact_root_for_run,
     matrix_state_readback_contract_summary,
@@ -34,6 +35,7 @@ from tools.no_wing_release_check import (
     validate_bus_group_main_dca_physical_readback_contract_snapshot,
     validate_channel_basic_controls_physical_readback_contract_snapshot,
     validate_channel_processing_physical_readback_contract_snapshot,
+    validate_dlive_state_physical_readback_contract_snapshot,
     validate_fx_slots_inserts_physical_readback_contract_snapshot,
     validate_matrix_state_physical_readback_contract_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
@@ -1089,6 +1091,38 @@ def test_no_wing_release_check_validates_user_presets_readback_contract_snapshot
     assert result.detail["violations"] == []
 
 
+def test_no_wing_release_check_validates_dlive_state_readback_contract_snapshot():
+    result = validate_dlive_state_physical_readback_contract_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert result.detail["schema_id"] == "dlive_state_physical_readback.v1"
+    assert result.detail["surface_id"] == "dlive_state"
+    assert result.detail["remediation_action_id"] == "remediate_dlive_state"
+    assert result.detail["physical_readback_surface_id"] == "dlive_state"
+    assert result.detail["physical_readback_action_id"] == "remediate_dlive_state"
+    assert result.detail["fixture_physical_gap_declared"] is True
+    assert result.detail["remediation_physical_gap_declared"] is True
+    assert result.detail["artifact_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert "physical_readback" in result.detail["allowed_sources"]
+    assert "mixer_state_cache" not in result.detail["allowed_sources"]
+    assert "verified_from_physical_readback" in result.detail["accepted_row_statuses"]
+    assert "midi_send_events" in result.detail["forbidden_mutation_evidence_fields"]
+    assert "fader_raw_14bit" in result.detail["required_channel_fields"]
+    assert "midi_base_channel" in result.detail["required_midi_state_fields"]
+    assert "wing_surface_equivalent" in result.detail["required_parity_fields"]
+    assert "wing_parity_mapping" in result.detail["required_coverage_flags"]
+    assert "midi_send_allowed" in result.detail["required_false_safety_flags"]
+    assert "tcp_send_allowed" in result.detail["required_false_safety_flags"]
+    assert "dlive_write_allowed" in result.detail["required_false_safety_flags"]
+    assert result.detail["minimum_channel_count"] == 1
+    assert "performance_adaptation" in result.detail["promotion_families_requiring_surface"]
+    assert result.detail["violations"] == []
+
+
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_frontend=False, quick=True)
 
@@ -1129,6 +1163,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "tests/test_routing_sends_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_snapshots_scenes_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_user_presets_physical_readback_contract.py" in fixture_check.command
+    assert "tests/test_dlive_state_physical_readback_contract.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command
@@ -1603,6 +1638,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "routing_sends_physical_readback_contract_schema" in result_names
     assert "snapshots_scenes_physical_readback_contract_schema" in result_names
     assert "user_presets_physical_readback_contract_schema" in result_names
+    assert "dlive_state_physical_readback_contract_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
@@ -1641,6 +1677,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "user_presets_physical_readback_contract_schema"
     )
     assert result_names.index("user_presets_physical_readback_contract_schema") < result_names.index(
+        "dlive_state_physical_readback_contract_schema"
+    )
+    assert result_names.index("dlive_state_physical_readback_contract_schema") < result_names.index(
         "backend_pytest"
     )
     assert result_names.index("supervised_proof_artifact_report") < result_names.index(
@@ -3183,6 +3222,106 @@ def test_no_wing_release_check_summary_embeds_user_presets_readback_contract(tmp
     assert "## User Presets Physical Readback Contract" in markdown_summary
     assert "preset_recall_allowed: `false`" in markdown_summary
     assert "preset_store_allowed: `false`" in markdown_summary
+    assert "physical_fixture_gap_remains: `true`" in markdown_summary
+    assert "live_authority_granted: `false`" in markdown_summary
+    assert "target_consistency: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_dlive_state_readback_contract(tmp_path):
+    result = CheckResult(
+        name="dlive_state_physical_readback_contract_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "contract_status": "contract_ready_physical_fixture_missing",
+            "schema_id": "dlive_state_physical_readback.v1",
+            "surface_id": "dlive_state",
+            "remediation_action_id": "remediate_dlive_state",
+            "physical_readback_surface_id": "dlive_state",
+            "physical_readback_action_id": "remediate_dlive_state",
+            "fixture_physical_gap_declared": True,
+            "remediation_physical_gap_declared": True,
+            "artifact_required": True,
+            "physical_fixture_gap_remains": True,
+            "accepted_as_physical_fixture_candidate": False,
+            "live_authority_granted": False,
+            "promotion_families_requiring_surface": [
+                "fader",
+                "gain",
+                "mute",
+                "routing",
+                "performance_adaptation",
+            ],
+            "required_top_level_field_count": 12,
+            "required_channel_fields": [
+                "channel",
+                "cached_channel_name",
+                "fader_raw_14bit",
+            ],
+            "required_midi_state_fields": [
+                "midi_base_channel",
+                "raw_state_key_count",
+            ],
+            "required_parity_fields": [
+                "wing_surface_equivalent",
+                "mapping_status",
+            ],
+            "required_coverage_flags": [
+                "channel_identity",
+                "wing_parity_mapping",
+            ],
+            "required_false_safety_flags": [
+                "live_write",
+                "midi_send_allowed",
+                "tcp_send_allowed",
+                "dlive_write_allowed",
+            ],
+            "minimum_channel_count": 1,
+            "allowed_sources": [
+                "physical_readback",
+                "dlive_physical_readback",
+            ],
+            "accepted_row_statuses": ["verified_from_physical_readback"],
+            "forbidden_mutation_evidence_fields": [
+                "midi_send_events",
+                "tcp_send_events",
+                "dlive_write_events",
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert dlive_state_readback_contract_summary([result]) == summary[
+        "dlive_state_physical_readback_contract"
+    ]
+    contract = json_summary["dlive_state_physical_readback_contract"]
+    assert contract["read_only"] is True
+    assert contract["live_write"] is False
+    assert contract["midi_send_allowed"] is False
+    assert contract["tcp_send_allowed"] is False
+    assert contract["dlive_write_allowed"] is False
+    assert contract["physical_fixture_gap_remains"] is True
+    assert contract["accepted_as_physical_fixture_candidate"] is False
+    assert contract["live_authority_granted"] is False
+    assert contract["target_consistency"] is True
+    assert contract["surface_id"] == "dlive_state"
+    assert "performance_adaptation" in contract["promotion_families_requiring_surface"]
+    assert "fader_raw_14bit" in contract["required_channel_fields"]
+    assert "midi_base_channel" in contract["required_midi_state_fields"]
+    assert "wing_surface_equivalent" in contract["required_parity_fields"]
+    assert "wing_parity_mapping" in contract["required_coverage_flags"]
+    assert "midi_send_allowed" in contract["required_false_safety_flags"]
+    assert contract["minimum_channel_count"] == 1
+    assert "## dLive State Physical Readback Contract" in markdown_summary
+    assert "midi_send_allowed: `false`" in markdown_summary
+    assert "tcp_send_allowed: `false`" in markdown_summary
+    assert "dlive_write_allowed: `false`" in markdown_summary
     assert "physical_fixture_gap_remains: `true`" in markdown_summary
     assert "live_authority_granted: `false`" in markdown_summary
     assert "target_consistency: `true`" in markdown_summary

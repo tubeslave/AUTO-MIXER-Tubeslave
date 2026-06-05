@@ -249,15 +249,24 @@ FIXTURE_EVIDENCE_BY_SURFACE: Dict[str, Dict[str, Tuple[str, ...]]] = {
         ),
     },
     "dlive_state": {
-        "fixture_paths": ("tests/test_operator_product_state.py",),
+        "fixture_paths": (
+            "tests/test_operator_product_state.py",
+            "tests/test_dlive_state_physical_readback_contract.py",
+        ),
         "test_names": (
             "test_dlive_state_snapshot_publishes_cached_midi_tcp_state_without_queries",
             "test_dlive_state_snapshot_marks_missing_cache_without_queries",
+            "test_dlive_state_contract_describes_future_physical_artifact",
+            "test_dlive_state_contract_validates_minimal_physical_artifact",
+            "test_dlive_state_contract_rejects_live_or_cached_claims",
         ),
         "covered_contracts": (
             "cached_dlive_midi_state",
             "dlive_apply_blocked",
             "midi_send_blocked",
+            "tcp_send_blocked",
+            "physical_readback_artifact_contract",
+            "coverage_flags",
             "no_console_query",
         ),
     },

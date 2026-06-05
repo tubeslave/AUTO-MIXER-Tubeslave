@@ -1933,8 +1933,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     "snapshot_status": "fixture_evidence_incomplete",
                     "surface_count": 10,
                     "surface_with_fixture_count": 10,
-                    "declared_fixture_path_count": 15,
-                    "declared_test_name_count": 40,
+                    "declared_fixture_path_count": 16,
+                    "declared_test_name_count": 43,
                     "physical_gap_surface_count": 10,
                     "summary_recomputed_from_rows": True,
                     "fixture_declaration_validation": True,
@@ -2453,6 +2453,72 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "dlive_state_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "dlive_state_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "physical_readback_surface_id": "dlive_state",
+                    "physical_readback_action_id": "remediate_dlive_state",
+                    "fixture_physical_gap_declared": True,
+                    "remediation_physical_gap_declared": True,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "midi_send_allowed": False,
+                    "tcp_send_allowed": False,
+                    "dlive_write_allowed": False,
+                    "dlive_apply_allowed": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "fader",
+                        "gain",
+                        "mute",
+                        "routing",
+                        "performance_adaptation",
+                    ],
+                    "required_channel_fields": [
+                        "channel",
+                        "cached_channel_name",
+                        "fader_raw_14bit",
+                    ],
+                    "required_midi_state_fields": [
+                        "midi_base_channel",
+                        "raw_state_key_count",
+                    ],
+                    "required_parity_fields": [
+                        "wing_surface_equivalent",
+                        "mapping_status",
+                    ],
+                    "required_coverage_flags": [
+                        "channel_identity",
+                        "wing_parity_mapping",
+                    ],
+                    "required_false_safety_flags": [
+                        "live_write",
+                        "midi_send_allowed",
+                        "tcp_send_allowed",
+                        "dlive_write_allowed",
+                    ],
+                    "minimum_channel_count": 1,
+                    "allowed_sources": ["physical_readback", "dlive_physical_readback"],
+                    "accepted_row_statuses": ["verified_from_physical_readback"],
+                    "forbidden_mutation_evidence_fields": [
+                        "midi_send_events",
+                        "tcp_send_events",
+                        "dlive_write_events",
+                    ],
+                    "violations": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -2482,8 +2548,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     proof_quality = payload["summary"]["read_surface_proof_quality"]
     assert proof_quality["available"] is True
     assert proof_quality["summary_path"] == str(latest_dir / "summary.json")
-    assert proof_quality["declared_fixture_path_count"] == 15
-    assert proof_quality["declared_test_name_count"] == 40
+    assert proof_quality["declared_fixture_path_count"] == 16
+    assert proof_quality["declared_test_name_count"] == 43
     assert proof_quality["physical_gap_surface_count"] == 10
     assert proof_quality["summary_recomputed_from_rows"] is True
     assert proof_quality["fixture_declaration_validation"] is True
@@ -2770,6 +2836,39 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert presets_contract["minimum_preset_count"] == 1
     assert "physical_readback" in presets_contract["allowed_sources"]
     assert "preset_store_events" in presets_contract[
+        "forbidden_mutation_evidence_fields"
+    ]
+    dlive_contract = proof_quality["dlive_state_physical_readback_contract"]
+    assert dlive_contract["available"] is True
+    assert dlive_contract["status"] == "passed"
+    assert dlive_contract["schema_id"] == "dlive_state_physical_readback.v1"
+    assert dlive_contract["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert dlive_contract["surface_id"] == "dlive_state"
+    assert dlive_contract["remediation_action_id"] == "remediate_dlive_state"
+    assert dlive_contract["artifact_required"] is True
+    assert dlive_contract["physical_fixture_gap_remains"] is True
+    assert dlive_contract["accepted_as_physical_fixture_candidate"] is False
+    assert dlive_contract["live_authority_granted"] is False
+    assert dlive_contract["full_autonomous_ready"] is False
+    assert dlive_contract["midi_send_allowed"] is False
+    assert dlive_contract["tcp_send_allowed"] is False
+    assert dlive_contract["dlive_write_allowed"] is False
+    assert dlive_contract["fixture_physical_gap_declared"] is True
+    assert dlive_contract["remediation_physical_gap_declared"] is True
+    assert dlive_contract["target_consistency"] is True
+    assert "performance_adaptation" in dlive_contract[
+        "promotion_families_requiring_surface"
+    ]
+    assert "fader_raw_14bit" in dlive_contract["required_channel_fields"]
+    assert "midi_base_channel" in dlive_contract["required_midi_state_fields"]
+    assert "wing_surface_equivalent" in dlive_contract["required_parity_fields"]
+    assert "wing_parity_mapping" in dlive_contract["required_coverage_flags"]
+    assert "midi_send_allowed" in dlive_contract["required_false_safety_flags"]
+    assert "tcp_send_allowed" in dlive_contract["required_false_safety_flags"]
+    assert "dlive_write_allowed" in dlive_contract["required_false_safety_flags"]
+    assert dlive_contract["minimum_channel_count"] == 1
+    assert "physical_readback" in dlive_contract["allowed_sources"]
+    assert "midi_send_events" in dlive_contract[
         "forbidden_mutation_evidence_fields"
     ]
     overlay = payload["autonomy_evidence_overlay"]
@@ -3074,6 +3173,40 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["preset_contract_claimed_live_authority"],
                 },
+                "dlive_state_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "dlive_state_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "physical_readback_surface_id": "dlive_state",
+                    "physical_readback_action_id": "remediate_dlive_state",
+                    "fixture_physical_gap_declared": False,
+                    "remediation_physical_gap_declared": False,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "midi_send_allowed": True,
+                    "tcp_send_allowed": True,
+                    "dlive_write_allowed": True,
+                    "dlive_apply_allowed": True,
+                    "target_consistency": False,
+                    "promotion_families_requiring_surface": ["performance_adaptation"],
+                    "required_channel_fields": ["channel"],
+                    "required_midi_state_fields": ["midi_base_channel"],
+                    "required_parity_fields": ["wing_surface_equivalent"],
+                    "required_coverage_flags": [],
+                    "required_false_safety_flags": ["live_write"],
+                    "minimum_channel_count": 0,
+                    "allowed_sources": ["physical_readback", "mixer_state_cache"],
+                    "accepted_row_statuses": ["verified_from_cache"],
+                    "forbidden_mutation_evidence_fields": [],
+                    "violations": ["dlive_contract_claimed_live_authority"],
+                },
             }
         ),
         encoding="utf-8",
@@ -3249,6 +3382,36 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert presets_contract["required_false_safety_flags"] == ["live_write"]
     assert presets_contract["minimum_preset_count"] == 0
     assert "preset_contract_claimed_live_authority" in presets_contract["violations"]
+    dlive_contract = payload["summary"]["read_surface_proof_quality"][
+        "dlive_state_physical_readback_contract"
+    ]
+    assert dlive_contract["available"] is True
+    assert dlive_contract["surface_id"] == "dlive_state"
+    assert dlive_contract["physical_readback_surface_id"] == "dlive_state"
+    assert dlive_contract["target_consistency"] is False
+    assert dlive_contract["accepted_as_physical_fixture_candidate"] is False
+    assert dlive_contract["read_only"] is True
+    assert dlive_contract["live_write"] is False
+    assert dlive_contract["live_authority_granted"] is False
+    assert dlive_contract["full_autonomous_ready"] is False
+    assert dlive_contract["midi_send_allowed"] is False
+    assert dlive_contract["tcp_send_allowed"] is False
+    assert dlive_contract["dlive_write_allowed"] is False
+    assert dlive_contract["dlive_apply_allowed"] is False
+    assert dlive_contract["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert dlive_contract["source_live_write_claimed"] is True
+    assert dlive_contract["source_live_authority_granted_claimed"] is True
+    assert dlive_contract["source_full_autonomous_ready_claimed"] is True
+    assert dlive_contract["source_midi_send_allowed_claimed"] is True
+    assert dlive_contract["source_tcp_send_allowed_claimed"] is True
+    assert dlive_contract["source_dlive_write_allowed_claimed"] is True
+    assert dlive_contract["source_dlive_apply_allowed_claimed"] is True
+    assert dlive_contract["promotion_families_requiring_surface"] == [
+        "performance_adaptation"
+    ]
+    assert dlive_contract["required_false_safety_flags"] == ["live_write"]
+    assert dlive_contract["minimum_channel_count"] == 0
+    assert "dlive_contract_claimed_live_authority" in dlive_contract["violations"]
     assert "set_gain" not in set(_walk_keys(payload))
 
 

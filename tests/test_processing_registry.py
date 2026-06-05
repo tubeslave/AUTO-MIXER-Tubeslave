@@ -435,6 +435,26 @@ def test_registry_snapshot_can_hide_full_method_inventory():
         ]
         is True
     )
+    assert (
+        snapshot["dlive_state_physical_readback_contract"]["type"]
+        == "dlive_state_physical_readback_contract"
+    )
+    assert snapshot["dlive_state_physical_readback_contract"]["safety"]["live_write"] is False
+    assert snapshot["dlive_state_physical_readback_contract"]["safety"][
+        "midi_send_allowed"
+    ] is False
+    assert snapshot["dlive_state_physical_readback_contract"]["safety"][
+        "tcp_send_allowed"
+    ] is False
+    assert snapshot["dlive_state_physical_readback_contract"]["safety"][
+        "dlive_write_allowed"
+    ] is False
+    assert (
+        snapshot["dlive_state_physical_readback_contract"]["summary"][
+            "physical_fixture_gap_remains"
+        ]
+        is True
+    )
     assert snapshot["project_goal_capability_matrix"]["type"] == "project_goal_capability_matrix"
     assert snapshot["project_goal_capability_matrix"]["safety"][
         "live_widening_allowed"

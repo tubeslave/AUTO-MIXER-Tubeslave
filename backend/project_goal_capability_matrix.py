@@ -490,6 +490,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "routing_sends_physical_readback_contract",
             "snapshots_scenes_physical_readback_contract",
             "user_presets_physical_readback_contract",
+            "dlive_state_physical_readback_contract",
         ),
         support_paths=(
             "backend/read_surface_inventory.py",
@@ -504,6 +505,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/routing_sends_physical_readback_contract.py",
             "backend/snapshots_scenes_physical_readback_contract.py",
             "backend/user_presets_physical_readback_contract.py",
+            "backend/dlive_state_physical_readback_contract.py",
             "backend/wing_client.py",
             "backend/dlive_client.py",
         ),

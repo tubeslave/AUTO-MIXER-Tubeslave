@@ -21,6 +21,9 @@ try:
     from channel_processing_physical_readback_contract import (
         build_channel_processing_physical_readback_contract,
     )
+    from dlive_state_physical_readback_contract import (
+        build_dlive_state_physical_readback_contract,
+    )
     from fx_slots_inserts_physical_readback_contract import (
         build_fx_slots_inserts_physical_readback_contract,
     )
@@ -56,6 +59,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.channel_processing_physical_readback_contract import (
         build_channel_processing_physical_readback_contract,
+    )
+    from backend.dlive_state_physical_readback_contract import (
+        build_dlive_state_physical_readback_contract,
     )
     from backend.fx_slots_inserts_physical_readback_contract import (
         build_fx_slots_inserts_physical_readback_contract,
@@ -628,6 +634,31 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "no_live_writes",
             "does_not_query_console",
             "does_not_recall_or_store_presets",
+        ),
+    ),
+    ProcessingMethod(
+        id="dlive_state_physical_readback_contract",
+        label="dLive State Physical Readback Contract",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Transport-free schema contract for dLive cached state, MIDI/TCP "
+            "state counts, and WING parity physical readback artifacts."
+        ),
+        module="backend/dlive_state_physical_readback_contract.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="contract_only_dlive_state_physical_readback_artifact_missing",
+        promotion_next=(
+            "capture an operator-run dLive state readback and WING parity "
+            "artifact before closing the dLive parity fixture gap"
+        ),
+        notes=(
+            "transport_free",
+            "readback_contract_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "midi_tcp_writes_blocked",
         ),
     ),
     ProcessingMethod(
@@ -1593,6 +1624,14 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, read-surface remediation artifact contract",
         "next_step": "Use only to validate separately captured user-preset readback; do not infer live authority.",
     },
+    "dlive_state_physical_readback_contract": {
+        "entrypoint": (
+            "build_dlive_state_physical_readback_contract / "
+            "validate_dlive_state_physical_readback_artifact"
+        ),
+        "ui_surface": "Processing registry, read-surface remediation artifact contract",
+        "next_step": "Use only to validate separately captured dLive state/parity readback; do not infer live authority.",
+    },
     "auto_fader_v1": {
         "entrypoint": "main_pipeline_preview proposal adapter",
         "ui_surface": "Task Queue preview/proposal rows",
@@ -1832,6 +1871,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "user_presets_physical_readback_contract": (
             build_user_presets_physical_readback_contract()
+        ),
+        "dlive_state_physical_readback_contract": (
+            build_dlive_state_physical_readback_contract()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),
