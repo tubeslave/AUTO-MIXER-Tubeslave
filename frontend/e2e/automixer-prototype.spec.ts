@@ -1059,7 +1059,19 @@ test.describe('Automixer backend Product Layer adapter', () => {
                 summary_recomputed_from_rows: true,
                 fixture_declaration_validation: true,
                 contract_gap_consistency_enforced: true,
-                full_autonomous_ready: false
+                full_autonomous_ready: false,
+                physical_fixture_missing_surface_ids: [
+                  'raw_mixer_state_cache',
+                  'channel_identity_and_basic_controls',
+                  'channel_eq_dynamics_gate',
+                  'bus_group_main_dca_state',
+                  'matrix_state',
+                  'fx_slots_and_inserts',
+                  'routing_and_sends',
+                  'snapshots_scenes',
+                  'user_presets',
+                  'dlive_state'
+                ]
               }
             }
           },
@@ -1335,6 +1347,7 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('artifact_available').first()).toBeVisible();
     await expect(page.getByText('age:180s stale_after:86400s stale:false').first()).toBeVisible();
     await expect(page.getByText('read_surface_gaps:10; fixture_paths:10; test_names:25').first()).toBeVisible();
+    await expect(page.getByText('gap_surfaces:raw_mixer_state_cache').first()).toBeVisible();
     await expect(page.getByText('Autonomy proof evidence: Fader').first()).toBeVisible();
     await expect(page.getByText('Autonomy proof evidence: Gain').first()).toBeVisible();
     await expect(page.getByText('dry_run_only').first()).toBeVisible();
@@ -1346,6 +1359,8 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('Metadata available').first()).toBeVisible();
     await expect(page.getByText('Read-surface gaps').first()).toBeVisible();
     await expect(page.getByText('10 physical gaps').first()).toBeVisible();
+    await expect(page.getByText('Gap surfaces').first()).toBeVisible();
+    await expect(page.getByText('raw_mixer_state_cache +9').first()).toBeVisible();
     await expect(page.getByText('Fixture tests').first()).toBeVisible();
     await expect(page.getByText('25 declared tests').first()).toBeVisible();
     await expect(page.getByText('Contract/gap gate').first()).toBeVisible();

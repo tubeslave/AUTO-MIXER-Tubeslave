@@ -137,6 +137,15 @@ function profileValue(row: ModuleStatusRecord | undefined, prefix: string) {
     ?.slice(prefix.length) ?? '';
 }
 
+function compactReadSurfaceGapLabel(gapIds: string[], gapCount: number | null) {
+  if (!gapIds.length) {
+    if (gapCount && gapCount > 0) return `${gapCount} surfaces unlisted`;
+    return 'None listed';
+  }
+  const remaining = Math.max(0, (gapCount ?? gapIds.length) - 1);
+  return remaining > 0 ? `${gapIds[0]} +${remaining}` : gapIds[0];
+}
+
 function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
   const proof = modules.find(row => row.moduleId === 'supervised_proof_evidence');
   const overlayRows = modules.filter(row => row.domain === 'autonomy_evidence_overlay');
@@ -145,7 +154,8 @@ function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
       { label: 'Proof evidence', value: 'Missing', tone: 'yellow' as const },
       { label: 'Proof freshness', value: 'No artifact', tone: 'yellow' as const },
       { label: 'Autonomy overlay', value: overlayRows.length ? `${overlayRows.length} rows` : 'Missing', tone: overlayRows.length ? 'yellow' as const : 'muted' as const },
-      { label: 'Read-surface proof', value: 'Missing', tone: 'muted' as const }
+      { label: 'Read-surface proof', value: 'Missing', tone: 'muted' as const },
+      { label: 'Gap surfaces', value: 'None listed', tone: 'muted' as const }
     ];
   }
   const stale = profileValue(proof, 'stale:') === 'true';
@@ -158,6 +168,10 @@ function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
   const fixtureTestCount = Number.parseInt(fixtureTestText, 10);
   const hasFixtureTestCount = Number.isFinite(fixtureTestCount);
   const contractGapEnforced = profileValue(proof, 'contract_gap:') === 'true';
+  const gapSurfaceIds = profileValue(proof, 'read_surface_gap_ids:')
+    .split('|')
+    .map(value => value.trim())
+    .filter(Boolean);
   const readSurfaceGapValue = hasReadSurfaceGapCount
     ? `${readSurfaceGapCount} physical gaps`
     : 'Unknown';
@@ -177,6 +191,7 @@ function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
     { label: 'Autonomy overlay', value: `${readableStatus(overlayStatus)} (${overlayRows.length})`, tone: overlayRows.length ? 'blue' as const : 'yellow' as const },
     { label: 'Read-surface proof', value: readSurfaceQualityAvailable ? 'Metadata available' : 'Missing', tone: readSurfaceProofTone },
     { label: 'Read-surface gaps', value: readSurfaceGapValue, tone: readSurfaceGapTone },
+    { label: 'Gap surfaces', value: compactReadSurfaceGapLabel(gapSurfaceIds, hasReadSurfaceGapCount ? readSurfaceGapCount : null), tone: gapSurfaceIds.length ? 'yellow' as const : 'muted' as const },
     { label: 'Fixture tests', value: hasFixtureTestCount ? `${fixtureTestCount} declared tests` : 'Unknown', tone: readSurfaceQualityAvailable ? 'blue' as const : 'muted' as const },
     { label: 'Contract/gap gate', value: contractGapEnforced ? 'Enforced' : 'Missing', tone: contractGapEnforced ? 'green' as const : 'yellow' as const }
   ];
