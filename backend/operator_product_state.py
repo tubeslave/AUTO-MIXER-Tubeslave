@@ -3484,6 +3484,40 @@ def _proof_report_freshness(
     }
 
 
+def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any]:
+    summary_path = report_path.parent / "summary.json"
+    summary = _read_json_file(summary_path)
+    read_surface = (
+        summary.get("read_surface_fixture_evidence")
+        if isinstance(summary.get("read_surface_fixture_evidence"), dict)
+        else {}
+    )
+    available = bool(read_surface)
+    physical_missing = _string_list_value(read_surface.get("physical_fixture_missing_surface_ids"))
+    physical_gap_count = _safe_int_value(read_surface.get("physical_gap_surface_count"), len(physical_missing))
+    source_full_autonomous_ready = read_surface.get("full_autonomous_ready") is True
+    return {
+        "available": available,
+        "summary_path": str(summary_path) if summary_path.exists() else None,
+        "status": str(read_surface.get("status") or "missing"),
+        "snapshot_status": read_surface.get("snapshot_status"),
+        "surface_count": _safe_int_value(read_surface.get("surface_count")),
+        "surface_with_fixture_count": _safe_int_value(read_surface.get("surface_with_fixture_count")),
+        "declared_fixture_path_count": _safe_int_value(read_surface.get("declared_fixture_path_count")),
+        "declared_test_name_count": _safe_int_value(read_surface.get("declared_test_name_count")),
+        "physical_gap_surface_count": physical_gap_count,
+        "summary_recomputed_from_rows": read_surface.get("summary_recomputed_from_rows") is True,
+        "fixture_declaration_validation": read_surface.get("fixture_declaration_validation") is True,
+        "contract_gap_consistency_enforced": read_surface.get("contract_gap_consistency_enforced") is True,
+        "read_only": True,
+        "live_write": False,
+        "full_autonomous_ready": False,
+        "source_full_autonomous_ready_claimed": source_full_autonomous_ready,
+        "physical_fixture_missing_surface_ids": physical_missing,
+        "violations": _string_list_value(read_surface.get("violations")),
+    }
+
+
 def _empty_autonomy_evidence_overlay(*, generated_at: str, report_path: Optional[Path] = None) -> Dict[str, Any]:
     rows = []
     for value_type, target_id in (
@@ -3702,6 +3736,7 @@ def build_supervised_proof_evidence_snapshot(server: Any) -> Dict[str, Any]:
         report_path=report_path,
     )
     report_summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    read_surface_proof_quality = _read_surface_proof_quality_from_summary(report_path)
     freshness = _proof_report_freshness(
         report,
         report_path=report_path,
@@ -3721,6 +3756,7 @@ def build_supervised_proof_evidence_snapshot(server: Any) -> Dict[str, Any]:
             "invalid_summary_count": _safe_int_value(report_summary.get("invalid_summary_count")),
             "overlay_status": overlay["status"],
             "overlay_row_count": len(overlay["rows"]),
+            "read_surface_proof_quality": read_surface_proof_quality,
         },
         "autonomy_evidence_overlay": overlay,
     }

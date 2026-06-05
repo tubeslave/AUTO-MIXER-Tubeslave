@@ -741,9 +741,20 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const stale = Boolean(proofSummary.latest_report_stale);
     const ageSec = Math.max(0, num(proofSummary.latest_report_age_sec, 0));
     const staleAfterSec = Math.max(0, num(proofSummary.stale_after_sec, 0));
+    const proofQuality = asRecord(proofSummary.read_surface_proof_quality);
+    const proofQualityAvailable = Boolean(proofQuality.available);
+    const physicalGapSurfaceCount = Math.trunc(num(proofQuality.physical_gap_surface_count, 0));
+    const declaredFixturePathCount = Math.trunc(num(proofQuality.declared_fixture_path_count, 0));
+    const declaredTestNameCount = Math.trunc(num(proofQuality.declared_test_name_count, 0));
+    const summaryRecomputed = Boolean(proofQuality.summary_recomputed_from_rows);
+    const fixtureDeclarationValidation = Boolean(proofQuality.fixture_declaration_validation);
+    const contractGapConsistency = Boolean(proofQuality.contract_gap_consistency_enforced);
     const freshnessText = available
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
+    const proofQualityText = proofQualityAvailable
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}`
+      : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
       : 'no_current_evidence';
@@ -763,6 +774,10 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `artifacts:${artifactCount}`,
         `invalid:${invalidCount}`,
         `stale:${stale}`,
+        `read_surface_quality:${proofQualityAvailable}`,
+        `read_surface_gaps:${physicalGapSurfaceCount}`,
+        `fixture_tests:${declaredTestNameCount}`,
+        `contract_gap:${contractGapConsistency}`,
       ],
       blockedReason: available
         ? stale
@@ -770,7 +785,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
           : 'Read-only artifact source; safety is normalized before cockpit display.'
         : 'No supervised proof report artifact found.',
       nextStep: available
-        ? `Latest report status: ${str(proofSummary.latest_report_status, 'unknown')}; overlay: ${overlayStatus}; artifacts: ${artifactCount}; invalid: ${invalidCount}; ${freshnessText}.`
+        ? `Latest report status: ${str(proofSummary.latest_report_status, 'unknown')}; overlay: ${overlayStatus}; artifacts: ${artifactCount}; invalid: ${invalidCount}; ${freshnessText}; ${proofQualityText}.`
         : 'Run no-WING supervised proof checks or point Product Layer at an existing report artifact.',
       tone: invalidCount > 0 ? 'red' : stale || !available ? 'yellow' : 'blue'
     }];

@@ -58,6 +58,7 @@
 - no-WING read-surface fixture evidence rows must validate declared `tests/...` files and pytest function names at the release gate; stale fixture declarations are missing evidence, not proof.
 - no-WING read-surface fixture evidence must keep row status, covered contracts, and remaining gaps internally consistent: cached DTO fixture coverage is partial until physical readback and hardware parity gaps are cleared.
 - no-WING summaries should expose read-surface proof quality directly: declaration counts, row-summary recomputation, declaration validation, and contract/gap consistency enforcement belong in the top-level summary, not only verbose result details.
+- Product Layer supervised proof evidence may read sibling no-WING `summary.json` as read-only metadata, but it must normalize proof-quality fields and keep physical readback gaps separate from promotion readiness.
 
 ## Memory Pipeline Lessons
 

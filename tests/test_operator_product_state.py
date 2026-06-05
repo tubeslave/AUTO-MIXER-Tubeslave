@@ -1923,6 +1923,35 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     latest_report = latest_dir / "supervised_proof_artifact_report.json"
     old_report.write_text(json.dumps(proof_report_with_autonomy_overlay("old")), encoding="utf-8")
     latest_report.write_text(json.dumps(proof_report_with_autonomy_overlay("ok")), encoding="utf-8")
+    (latest_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "type": "no_wing_release_check",
+                "status": "passed",
+                "read_surface_fixture_evidence": {
+                    "status": "passed",
+                    "snapshot_status": "fixture_evidence_incomplete",
+                    "surface_count": 10,
+                    "surface_with_fixture_count": 10,
+                    "declared_fixture_path_count": 10,
+                    "declared_test_name_count": 25,
+                    "physical_gap_surface_count": 10,
+                    "summary_recomputed_from_rows": True,
+                    "fixture_declaration_validation": True,
+                    "contract_gap_consistency_enforced": True,
+                    "read_only": True,
+                    "live_write": False,
+                    "full_autonomous_ready": True,
+                    "physical_fixture_missing_surface_ids": [
+                        "raw_mixer_state_cache",
+                        "channel_identity_and_basic_controls",
+                    ],
+                    "violations": [],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     old_time = time.time() - 100
     latest_time = time.time()
     os.utime(old_report, (old_time, old_time))
@@ -1945,6 +1974,21 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert payload["summary"]["latest_report_stale"] is False
     assert payload["summary"]["latest_report_age_sec"] is not None
     assert payload["summary"]["stale_after_sec"] == 24 * 60 * 60
+    proof_quality = payload["summary"]["read_surface_proof_quality"]
+    assert proof_quality["available"] is True
+    assert proof_quality["summary_path"] == str(latest_dir / "summary.json")
+    assert proof_quality["declared_fixture_path_count"] == 10
+    assert proof_quality["declared_test_name_count"] == 25
+    assert proof_quality["physical_gap_surface_count"] == 10
+    assert proof_quality["summary_recomputed_from_rows"] is True
+    assert proof_quality["fixture_declaration_validation"] is True
+    assert proof_quality["contract_gap_consistency_enforced"] is True
+    assert proof_quality["full_autonomous_ready"] is False
+    assert proof_quality["source_full_autonomous_ready_claimed"] is True
+    assert proof_quality["physical_fixture_missing_surface_ids"] == [
+        "raw_mixer_state_cache",
+        "channel_identity_and_basic_controls",
+    ]
     overlay = payload["autonomy_evidence_overlay"]
     assert overlay["source_report_available"] is True
     assert overlay["source_report_path"] == str(latest_report)

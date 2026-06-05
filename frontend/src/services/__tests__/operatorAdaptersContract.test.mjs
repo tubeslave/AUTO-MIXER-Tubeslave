@@ -504,6 +504,22 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
         invalid_summary_count: 0,
         overlay_status: 'dry_run_only',
         overlay_row_count: 2,
+        read_surface_proof_quality: {
+          available: true,
+          status: 'passed',
+          snapshot_status: 'fixture_evidence_incomplete',
+          surface_count: 10,
+          surface_with_fixture_count: 10,
+          declared_fixture_path_count: 10,
+          declared_test_name_count: 25,
+          physical_gap_surface_count: 10,
+          summary_recomputed_from_rows: true,
+          fixture_declaration_validation: true,
+          contract_gap_consistency_enforced: true,
+          read_only: true,
+          live_write: false,
+          full_autonomous_ready: false,
+        },
       },
     },
     autonomy_evidence_overlay: {
@@ -636,10 +652,18 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'artifacts:1',
     'invalid:0',
     'stale:false',
+    'read_surface_quality:true',
+    'read_surface_gaps:10',
+    'fixture_tests:25',
+    'contract_gap:true',
   ]);
   assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
   assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
   assert.match(proofEvidence.nextStep, /age:120s stale_after:86400s stale:false/);
+  assert.match(proofEvidence.nextStep, /read_surface_gaps:10/);
+  assert.match(proofEvidence.nextStep, /fixture_paths:10/);
+  assert.match(proofEvidence.nextStep, /test_names:25/);
+  assert.match(proofEvidence.nextStep, /contract_gap:true/);
 
   const faderOverlay = rows.find(row => row.moduleId === 'autonomy_evidence:fader_supervised_promotion');
   assert.equal(faderOverlay.domain, 'autonomy_evidence_overlay');
@@ -793,6 +817,10 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'artifacts:1',
     'invalid:0',
     'stale:true',
+    'read_surface_quality:false',
+    'read_surface_gaps:0',
+    'fixture_tests:0',
+    'contract_gap:false',
   ]);
 });
 
