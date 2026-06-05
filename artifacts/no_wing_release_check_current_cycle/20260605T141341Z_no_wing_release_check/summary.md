@@ -1,0 +1,480 @@
+# No-WING Release Check
+
+- generated_at: `2026-06-05T14:13:41Z`
+- status: `passed`
+- connection_policy: `no_hardware_no_network_no_live_writes`
+- live_write: `false`
+
+## Checks
+
+- `backend_port_free`: `passed`
+- `write_surface_static_scan`: `passed`
+- `read_surface_fixture_evidence`: `passed`
+- `read_surface_fixture_evidence_schema`: `passed`
+- `read_surface_remediation_plan_schema`: `passed`
+- `raw_mixer_state_physical_readback_contract_schema`: `passed`
+- `channel_basic_controls_physical_readback_contract_schema`: `passed`
+- `channel_processing_physical_readback_contract_schema`: `passed`
+- `bus_group_main_dca_physical_readback_contract_schema`: `passed`
+- `matrix_state_physical_readback_contract_schema`: `passed`
+- `fx_slots_inserts_physical_readback_contract_schema`: `passed`
+- `routing_sends_physical_readback_contract_schema`: `passed`
+- `snapshots_scenes_physical_readback_contract_schema`: `passed`
+- `user_presets_physical_readback_contract_schema`: `passed`
+- `dlive_state_physical_readback_contract_schema`: `passed`
+- `backend_pytest`: `passed`
+- `offline_operator_validation_harness`: `passed`
+- `gain_dry_run_proof`: `passed`
+- `supervised_proof_artifact_report`: `passed`
+- `supervised_proof_report_gain_dry_run_schema`: `passed`
+- `autonomy_evidence_overlay_schema`: `passed`
+- `next_wing_proof_plan_schema`: `passed`
+- `supervised_proof_report_gap_rollup_schema`: `passed`
+- `memory_lint`: `passed`
+- `diff_check`: `passed`
+
+## Autonomy Gap Rollup
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- full_autonomous_ready: `false`
+- full_auto_gap_bucket_counts: `{"autonomy_mode": 22, "capability": 2, "evidence_requirement": 24, "proof": 78, "read_surface": 14, "safety": 16, "write_surface": 19}`
+- evidence_requirement_ids_by_action_family: `{"bus_group_matrix": ["bus_group_assignment_cache_freshness", "bus_group_fader_readback", "matrix_send_readback", "main_bus_true_peak_headroom", "bus_group_physical_fixture", "hardware_readback_and_rollback_proof"], "mute": ["current_mute_cache_freshness", "mute_owner_intent_evidence", "signal_return_or_idle_window_evidence", "manual_mute_authority_review", "mute_physical_fixture", "hardware_readback_rollback_and_emergency_proof"], "routing": ["current_route_cache_freshness", "route_diff_evidence", "source_identity_downstream_trust", "routing_physical_fixture", "hardware_readback_and_rollback_proof"], "scene_preset": ["current_scene_preset_cache_freshness", "snapshots_scenes_snapshot_cache_freshness", "user_presets_snapshot_cache_freshness", "read_only_scoped_diff_evidence", "read_only_rollback_evidence", "scene_preset_physical_fixture", "hardware_readback_and_rollback_proof"]}`
+- next_required_evidence_by_action_family: `{"bus_group_matrix": ["Add bus/group/matrix safety review with true-peak headroom, assignment/fader readback, rollback, fake-mixer, real-WING, and emergency-stop proof before any supervised candidate.", "Keep direct imports behind supervised gates and include any new transport client in this inventory.", "Add physical-query fixture snapshots, full group membership proof, matrix-send evidence, WING/dLive parity mapping, and safety review before bus/DCA/group balance proposals become live candidates.", "Add physical-query matrix fixtures, route diff proof, WING/dLive parity mapping, and matrix safety review before master/matrix optimization claims."], "compressor": ["Split recommendation code from executor code and add fail-closed tests before any promotion.", "Route blocked compressor evidence to operator review before any supervised dynamics promotion.", "Use compressor proposal adapter and require dynamics readback, makeup/headroom and rollback proof before any live apply.", "Add physical-query fixture snapshots and parity evidence before promoting EQ/dynamics/gate proposals."], "eq": ["Keep EQ in offline/proposal mode until filter package audit and fake-mixer proof are complete.", "Route blocked EQ evidence to operator review before any supervised EQ promotion.", "Use EQ proposal DTOs and require filter audit, feedback safety, readback and rollback proof before any live apply.", "Add physical-query fixture snapshots and parity evidence before promoting EQ/dynamics/gate proposals."], "fader": ["Repeat controlled WING proof across representative channels with connection-loss and emergency-stop reset evidence.", "Keep as the only live executor; do not add EQ/dynamics/routing/FX here without separate proof.", "Continue feeding proposal evidence and rollback values into the queue.", "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."], "fx_send_insert": ["Add offline FX plan evaluation before any operator-facing proposal.", "Keep direct FX sends quarantined; route useful FX behavior into explainable FX plans with physical proof requirements.", "Expand FX-model parameter schemas, add physical fixture snapshots, scoped insert diff artifacts, and FX safety review before FX proposals become live candidates.", "Add physical-query fixtures and route/send diff schema before any routing or send proposal can become queueable."], "gain": ["One small supervised gain-down proof with physical pre-read, apply readback, rollback readback, and blocked unsafe follow-up.", "Keep as the only live executor; do not add EQ/dynamics/routing/FX here without separate proof.", "Continue feeding proposal evidence and rollback values into the queue.", "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."], "gate": ["Feed real telemetry/replay sessions into bleed metrics; keep live gate writes blocked.", "Connect real telemetry and offline bleed fixtures, but keep gate apply blocked.", "Keep direct gate sends quarantined; route all gate/HPF/send outputs to proposal-only contracts with physical proof requirements.", "Add physical-query fixture snapshots and parity evidence before promoting EQ/dynamics/gate proposals."], "mute": ["Add fresh mute-state intent, owner, signal-return, physical readback, rollback, fake-mixer, real-WING, and emergency-stop proof before any supervised mute candidate.", "Keep direct imports behind supervised gates and include any new transport client in this inventory.", "Convert commands into operator proposal intents and blocked reasons.", "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."], "pan_phase_delay": ["Define read-only stage-position DTO and proposal schema before fake-mixer proof.", "Keep stage-position and pan/phase outputs as evidence until separate hardware readback and rollback proof.", "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."], "routing": ["Keep manual-only runbooks; no automated promotion without separate ADR.", "Keep manual scripts lab-only or migrate to explicit operator runbooks with preview diffs.", "Add physical-query fixtures and route/send diff schema before any routing or send proposal can become queueable."], "scene_preset": ["Keep manual-only runbooks; no automated promotion without separate ADR.", "Keep manual scripts lab-only or migrate to explicit operator runbooks with preview diffs.", "Keep scene apply blocked; add read-only scene diff artifacts, rollback evidence, and physical fixtures before any automation.", "Add physical-query fixtures and preset diff artifacts before any preset recall/store proposal can become queueable."]}`
+- supervised_current_live_write_kinds: `["fader", "gain"]`
+- policy_supervised_live_write_kinds: `["fader", "gain"]`
+- violations: `[]`
+
+## Autonomy Evidence Overlay
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- live_widening_allowed: `false`
+- automatic_safety_update_allowed: `false`
+- full_autonomous_ready: `false`
+- operator_required: `true`
+- overlay_status: `dry_run_only`
+- row_count: `2`
+- status_counts: `{"dry_run_only": 1, "manual_safety_review_candidate": 0, "no_current_evidence": 1, "remediation_required": 0}`
+- dry_run_only_target_ids: `["gain_trim_supervised_promotion"]`
+- manual_safety_review_candidate_target_ids: `[]`
+- violations: `[]`
+
+## Supervised Gain Dry-Run Proof
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- promotion_allowed: `false`
+- autonomous_ready: `false`
+- gain_dry_run_row_count: `1`
+- dry_run_ready_proof_ids: `["20260605T141343Z_gain_proof_dry_run_ch1"]`
+- violations: `[]`
+
+## Read Surface Fixture Evidence
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- full_autonomous_ready: `false`
+- snapshot_status: `fixture_evidence_incomplete`
+- surface_count: `10`
+- surface_with_fixture_count: `10`
+- declared_fixture_path_count: `20`
+- declared_test_name_count: `55`
+- physical_gap_surface_count: `10`
+- summary_recomputed_from_rows: `true`
+- fixture_declaration_validation: `true`
+- contract_gap_consistency_enforced: `true`
+- status_counts: `{"fixture_evidence_present": 0, "missing_fixture_evidence": 0, "partial_fixture_evidence": 10}`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- violations: `[]`
+
+## Read Surface Remediation Plan
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- plan_status: `read_remediation_required`
+- action_count: `10`
+- incomplete_surface_count: `10`
+- physical_gap_surface_count: `10`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- next_physical_readback_action_id: `remediate_raw_mixer_state_cache`
+- next_physical_readback_target_action_ids: `["remediate_raw_mixer_state_cache"]`
+- target_action_consistency: `true`
+- violations: `[]`
+
+## Raw Mixer State Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `raw_mixer_state_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `raw_mixer_state_cache`
+- remediation_action_id: `remediate_raw_mixer_state_cache`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- next_physical_readback_action_id: `remediate_raw_mixer_state_cache`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- required_top_level_field_count: `10`
+- required_row_field_count: `5`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_row_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Channel Basic Controls Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `channel_basic_controls_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `channel_identity_and_basic_controls`
+- remediation_action_id: `remediate_channel_identity_and_basic_controls`
+- physical_readback_surface_id: `channel_identity_and_basic_controls`
+- physical_readback_action_id: `remediate_channel_identity_and_basic_controls`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "pan_phase_delay"]`
+- required_top_level_field_count: `10`
+- required_channel_field_count: `8`
+- required_identity_fields: `["source_name", "source_role", "input_source"]`
+- required_control_fields: `["fader_db", "trim_db", "mute", "pan"]`
+- required_coverage_flags: `["identity", "basic_controls", "cache_matches_physical_readback"]`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_channel_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "mute_write_events", "pan_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Channel Processing Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `channel_processing_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `channel_eq_dynamics_gate`
+- remediation_action_id: `remediate_channel_eq_dynamics_gate`
+- physical_readback_surface_id: `channel_eq_dynamics_gate`
+- physical_readback_action_id: `remediate_channel_eq_dynamics_gate`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["eq", "compressor", "gate", "deessing", "frequency_separation", "cross_channel_unmasking"]`
+- required_top_level_field_count: `10`
+- required_channel_field_count: `10`
+- required_hpf_fields: `["enabled", "frequency_hz"]`
+- required_eq_fields: `["enabled", "bands"]`
+- required_eq_band_fields: `["band", "frequency_hz", "gain_db", "q"]`
+- required_compressor_fields: `["enabled", "model", "threshold_db", "ratio", "attack_ms", "release_ms", "makeup_db", "mix_pct", "detector", "gain_reduction_db"]`
+- required_gate_fields: `["enabled", "model", "threshold_db", "range_db", "attack_ms", "hold_ms", "release_ms", "accent", "ratio"]`
+- required_coverage_flags: `["hpf", "eq", "compressor", "gate", "cache_matches_physical_readback"]`
+- minimum_eq_band_count: `4`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_channel_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "eq_write_events", "compressor_write_events", "gate_write_events", "hpf_write_events", "reset_channel_processing_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Bus Group Main DCA Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `bus_group_main_dca_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `bus_group_main_dca_state`
+- remediation_action_id: `remediate_bus_group_main_dca_state`
+- physical_readback_surface_id: `bus_group_main_dca_state`
+- physical_readback_action_id: `remediate_bus_group_main_dca_state`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["bus_group_matrix", "dca", "master_bus", "mix_balance", "performance_adaptation"]`
+- required_top_level_field_count: `14`
+- required_bus_field_count: `9`
+- required_main_field_count: `8`
+- required_dca_field_count: `8`
+- required_bus_control_fields: `["fader_db", "mute", "pan", "width", "mono"]`
+- required_main_control_fields: `["fader_db", "mute", "pan"]`
+- required_dca_control_fields: `["fader_db", "mute", "monitor"]`
+- required_bus_assignment_fields: `["dca_assignments", "main_send_on", "main_send_level_db", "main_send_pre"]`
+- required_dca_assignment_fields: `["member_channels", "member_buses"]`
+- required_metering_fields: `["lufs", "true_peak_dbtp", "headroom_db"]`
+- required_bus_coverage_flags: `["controls", "assignments", "metering", "cache_matches_physical_readback"]`
+- required_main_coverage_flags: `["controls", "metering", "cache_matches_physical_readback"]`
+- required_dca_coverage_flags: `["identity", "controls", "assignments", "cache_matches_physical_readback"]`
+- minimum_bus_count: `1`
+- minimum_main_count: `1`
+- minimum_dca_count: `1`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_surface_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "bus_write_events", "group_write_events", "dca_write_events", "main_bus_write_events", "matrix_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Matrix State Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `matrix_state_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `matrix_state`
+- remediation_action_id: `remediate_matrix_state`
+- physical_readback_surface_id: `matrix_state`
+- physical_readback_action_id: `remediate_matrix_state`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["bus_group_matrix", "fx_send_insert", "master_bus", "mix_balance", "routing", "performance_adaptation"]`
+- required_top_level_field_count: `10`
+- required_matrix_field_count: `11`
+- required_control_fields: `["fader_db", "mute", "pan"]`
+- required_eq_fields: `["enabled", "bands"]`
+- required_eq_band_fields: `["band", "frequency_hz", "gain_db", "q"]`
+- required_dynamics_fields: `["enabled", "model", "threshold_db", "ratio", "knee", "detector", "attack_ms", "release_ms", "makeup_db", "mix_pct", "gain_reduction_db"]`
+- required_insert_fields: `["pre_insert_on", "pre_insert_slot", "pre_insert_status", "post_insert_on", "post_insert_slot", "post_insert_status", "post_insert_mode", "post_insert_weight"]`
+- required_metering_fields: `["lufs", "true_peak_dbtp", "headroom_db"]`
+- required_coverage_flags: `["controls", "eq", "dynamics", "inserts", "metering", "cache_matches_physical_readback"]`
+- minimum_matrix_count: `1`
+- minimum_eq_band_count: `8`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_matrix_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "matrix_write_events", "matrix_send_write_events", "matrix_eq_write_events", "matrix_dynamics_write_events", "matrix_insert_write_events", "routing_write_events", "fx_send_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## FX Slots Inserts Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `fx_slots_inserts_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `fx_slots_and_inserts`
+- remediation_action_id: `remediate_fx_slots_and_inserts`
+- physical_readback_surface_id: `fx_slots_and_inserts`
+- physical_readback_action_id: `remediate_fx_slots_and_inserts`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fx_send_insert", "routing", "mix_balance", "performance_adaptation"]`
+- required_top_level_field_count: `12`
+- required_fx_slot_field_count: `16`
+- required_fx_slot_fields: `["slot", "slot_number", "readback_status", "readback_source", "captured_at", "model", "on", "mix", "source", "mode", "assigned_channel", "assigned_position", "active", "parameters", "parameter_schema", "coverage"]`
+- required_parameter_fields: `["parameter_index", "value", "schema_status", "schema_family", "schema_source", "semantic_name", "unit", "safe_range"]`
+- required_parameter_safe_range_fields: `["min", "max"]`
+- required_parameter_schema_fields: `["status", "schema_family", "schema_source", "mapped_parameter_count", "generic_parameter_count", "cached_parameter_count", "physical_model_schema_verified", "live_write_authority"]`
+- required_fx_slot_coverage_flags: `["identity", "assignment", "parameters", "parameter_schema", "cache_matches_physical_readback"]`
+- required_insert_fields: `["target_type", "target", "position", "readback_status", "readback_source", "captured_at", "on", "slot", "status", "mode", "weight", "linked_fx_slot", "active", "insert_assignment_policy", "destructive_change_marker", "coverage"]`
+- required_insert_coverage_flags: `["assignment", "status", "scoped_diff_marker", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready"]`
+- minimum_fx_slot_count: `1`
+- minimum_fx_parameter_count: `4`
+- minimum_insert_count: `1`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_row_statuses: `["verified_from_physical_readback"]`
+- allowed_insert_target_types: `["channel", "bus", "main", "matrix"]`
+- allowed_insert_positions: `["pre", "post"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "fx_write_events", "fx_slot_write_events", "fx_parameter_write_events", "fx_send_write_events", "insert_write_events", "insert_assignment_write_events", "routing_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Routing Sends Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `routing_sends_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `routing_and_sends`
+- remediation_action_id: `remediate_routing_and_sends`
+- physical_readback_surface_id: `routing_and_sends`
+- physical_readback_action_id: `remediate_routing_and_sends`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["routing", "fx_send_insert", "bus_group_matrix", "scene_preset", "mix_balance", "performance_adaptation"]`
+- required_top_level_field_count: `18`
+- required_static_route_field_count: `13`
+- required_static_route_fields: `["start", "end", "role", "tap_point", "label_short", "label_full", "required", "wing_routing_hint", "used_by", "readback_status", "readback_source", "captured_at", "coverage"]`
+- required_bus_send_fields: `["channel", "send", "target_bus", "readback_status", "readback_source", "captured_at", "on", "level_db", "pre_on", "mode", "plink", "pan", "active", "destructive_change_marker", "coverage"]`
+- required_main_send_fields: `["channel", "main", "readback_status", "readback_source", "captured_at", "on", "level_db", "pre", "active", "destructive_change_marker", "coverage"]`
+- required_matrix_send_fields: `["channel", "send", "target_matrix", "readback_status", "readback_source", "captured_at", "on", "level_db", "active", "destructive_change_marker", "coverage"]`
+- required_output_route_fields: `["output_group", "output_number", "readback_status", "readback_source", "captured_at", "source_group", "source_channel", "destructive_change_marker", "coverage"]`
+- required_static_route_coverage_flags: `["identity", "static_config_match", "physical_route_mapping", "scoped_diff_marker"]`
+- required_send_coverage_flags: `["assignment", "level", "mode", "scoped_diff_marker", "cache_matches_physical_readback"]`
+- required_output_route_coverage_flags: `["assignment", "source", "scoped_diff_marker", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready"]`
+- minimum_static_dante_route_count: `1`
+- minimum_channel_bus_send_count: `1`
+- minimum_channel_main_send_count: `1`
+- minimum_channel_matrix_send_count: `1`
+- minimum_output_route_count: `1`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_row_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "routing_write_events", "route_write_events", "send_write_events", "bus_send_write_events", "main_send_write_events", "matrix_send_write_events", "output_route_write_events", "dante_patch_write_events", "scene_recall_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Snapshots Scenes Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- scene_load_allowed: `false`
+- scene_save_allowed: `false`
+- schema_id: `snapshots_scenes_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `snapshots_scenes`
+- remediation_action_id: `remediate_snapshots_scenes`
+- physical_readback_surface_id: `snapshots_scenes`
+- physical_readback_action_id: `remediate_snapshots_scenes`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["scene_preset", "routing", "mix_balance", "performance_adaptation"]`
+- required_snapshot_fields: `["snapshot_index", "snapshot_name", "readback_status", "readback_source", "captured_at", "active", "scene_load_policy", "scene_save_policy", "destructive_change_marker", "destructive_persistence_marker", "scene_content_fingerprint", "scoped_diff_marker", "rollback_reference", "coverage"]`
+- required_coverage_flags: `["catalog_identity", "active_scene", "scene_content_fingerprint", "scoped_diff_marker", "rollback_reference", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready", "scene_load_allowed", "scene_save_allowed"]`
+- minimum_snapshot_count: `1`
+- target_consistency: `true`
+- violations: `[]`
+
+## User Presets Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- preset_recall_allowed: `false`
+- preset_store_allowed: `false`
+- schema_id: `user_presets_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `user_presets`
+- remediation_action_id: `remediate_user_presets`
+- physical_readback_surface_id: `user_presets`
+- physical_readback_action_id: `remediate_user_presets`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["scene_preset", "routing", "mix_balance", "performance_adaptation"]`
+- required_preset_fields: `["preset_index", "preset_name", "preset_scope", "target_type", "target_label", "readback_status", "readback_source", "captured_at", "preset_recall_policy", "preset_store_policy", "destructive_recall_marker", "destructive_store_marker", "preset_content_fingerprint", "scoped_diff_marker", "rollback_reference", "coverage"]`
+- required_coverage_flags: `["catalog_identity", "scope", "target", "preset_content_fingerprint", "scoped_diff_marker", "rollback_reference", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready", "preset_recall_allowed", "preset_store_allowed"]`
+- minimum_preset_count: `1`
+- target_consistency: `true`
+- violations: `[]`
+
+## dLive State Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- midi_send_allowed: `false`
+- tcp_send_allowed: `false`
+- dlive_write_allowed: `false`
+- schema_id: `dlive_state_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `dlive_state`
+- remediation_action_id: `remediate_dlive_state`
+- physical_readback_surface_id: `dlive_state`
+- physical_readback_action_id: `remediate_dlive_state`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "bus_group_matrix", "routing", "scene_preset", "mix_balance", "performance_adaptation"]`
+- required_channel_fields: `["channel", "cached_channel_name", "fader_raw_14bit", "fader_db", "mute", "raw_note_velocity", "midi_base_channel", "readback_status", "readback_source", "captured_at", "coverage"]`
+- required_midi_state_fields: `["midi_base_channel", "raw_state_key_count", "raw_note_event_count", "raw_cc_event_count", "raw_pitchbend_event_count", "tcp_session_status", "midi_transport_status", "readback_status", "readback_source", "captured_at", "coverage"]`
+- required_parity_fields: `["wing_surface_equivalent", "mapping_status", "channel_identity_parity", "fader_scale_parity", "mute_state_parity", "midi_velocity_parity", "unsupported_field_policy", "coverage"]`
+- required_coverage_flags: `["channel_identity", "fader_scale", "mute_state", "raw_midi_state", "midi_base_channel", "wing_parity_mapping", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready", "midi_send_allowed", "tcp_send_allowed", "dlive_write_allowed", "dlive_apply_allowed"]`
+- minimum_channel_count: `1`
+- target_consistency: `true`
+- violations: `[]`
+
+## Next WING Proof Plan
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- execution_allowed_by_plan: `false`
+- operator_required: `true`
+- full_autonomous_ready: `false`
+- plan_status: `operator_proof_required`
+- step_count: `4`
+- planned_value_types: `["fader", "gain"]`
+- planned_channels: `[3, 2, 8, 16]`
+- global_blockers: `["operator_must_approve_and_execute_manually", "proof_plan_does_not_contact_mixer", "safety_matrix_review_required_after_artifacts"]`
+- violations: `[]`
