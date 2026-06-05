@@ -14,9 +14,17 @@ from typing import Any, Dict, Iterable, Mapping, Tuple
 try:
     from read_surface_inventory import ReadSurface, iter_read_surfaces
     from read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
+    from raw_mixer_state_physical_readback_contract import (
+        RAW_MIXER_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        RAW_MIXER_STATE_SURFACE_ID,
+    )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.read_surface_inventory import ReadSurface, iter_read_surfaces
     from backend.read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
+    from backend.raw_mixer_state_physical_readback_contract import (
+        RAW_MIXER_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        RAW_MIXER_STATE_SURFACE_ID,
+    )
 
 
 READ_SURFACE_REMEDIATION_METHOD_ID = "read_surface_remediation_plan"
@@ -155,6 +163,11 @@ def _expected_artifacts(surface: ReadSurface, *, physical_readback_gap: bool) ->
         artifacts.append(
             f"Physical readback fixture for {surface.id} proving cached or queryable evidence matches console state."
         )
+        if surface.id == RAW_MIXER_STATE_SURFACE_ID:
+            artifacts.append(
+                "Raw mixer-state physical readback artifact validated by "
+                f"{RAW_MIXER_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
+            )
     return tuple(artifacts)
 
 

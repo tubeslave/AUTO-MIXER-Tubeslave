@@ -216,6 +216,7 @@ def build_checks(
                 "-m",
                 "pytest",
                 "tests/test_read_surface_fixture_evidence.py",
+                "tests/test_raw_mixer_state_physical_readback_contract.py",
                 "-q",
                 "--tb=short",
             ),

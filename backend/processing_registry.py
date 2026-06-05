@@ -18,6 +18,9 @@ try:
     from read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
     from read_surface_inventory import build_read_surface_inventory_snapshot
     from read_surface_remediation_plan import build_read_surface_remediation_plan
+    from raw_mixer_state_physical_readback_contract import (
+        build_raw_mixer_state_physical_readback_contract,
+    )
     from safety_coverage_matrix import build_safety_coverage_matrix_snapshot
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
@@ -27,6 +30,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
     from backend.read_surface_inventory import build_read_surface_inventory_snapshot
     from backend.read_surface_remediation_plan import build_read_surface_remediation_plan
+    from backend.raw_mixer_state_physical_readback_contract import (
+        build_raw_mixer_state_physical_readback_contract,
+    )
     from backend.safety_coverage_matrix import build_safety_coverage_matrix_snapshot
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
 
@@ -356,6 +362,30 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "fixture_evidence_only",
             "no_live_writes",
             "does_not_execute_tests",
+        ),
+    ),
+    ProcessingMethod(
+        id="raw_mixer_state_physical_readback_contract",
+        label="Raw Mixer State Physical Readback Contract",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Transport-free schema contract for the raw mixer-state physical "
+            "readback artifact targeted by read-surface remediation."
+        ),
+        module="backend/raw_mixer_state_physical_readback_contract.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="contract_only_physical_readback_artifact_missing",
+        promotion_next=(
+            "capture an operator-run physical readback artifact matching this "
+            "contract before closing the raw mixer-state fixture gap"
+        ),
+        notes=(
+            "transport_free",
+            "readback_contract_only",
+            "no_live_writes",
+            "does_not_query_console",
         ),
     ),
     ProcessingMethod(
@@ -1249,6 +1279,14 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, console read coverage remediation",
         "next_step": "Use only to plan read DTO and fixture work; do not query or mutate a live console from this plan.",
     },
+    "raw_mixer_state_physical_readback_contract": {
+        "entrypoint": (
+            "build_raw_mixer_state_physical_readback_contract / "
+            "validate_raw_mixer_state_physical_readback_artifact"
+        ),
+        "ui_surface": "Processing registry, read-surface remediation artifact contract",
+        "next_step": "Use only to validate a separately captured physical readback artifact; do not infer live authority.",
+    },
     "auto_fader_v1": {
         "entrypoint": "main_pipeline_preview proposal adapter",
         "ui_surface": "Task Queue preview/proposal rows",
@@ -1464,6 +1502,7 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         "read_surface_inventory": build_read_surface_inventory_snapshot(),
         "read_surface_remediation_plan": build_read_surface_remediation_plan(),
         "read_surface_fixture_evidence": build_read_surface_fixture_evidence_snapshot(),
+        "raw_mixer_state_physical_readback_contract": build_raw_mixer_state_physical_readback_contract(),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),
         "methods": methods if include_methods else [],

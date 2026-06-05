@@ -327,6 +327,17 @@ def test_registry_snapshot_can_hide_full_method_inventory():
     assert snapshot["read_surface_remediation_plan"]["type"] == "read_surface_remediation_plan"
     assert snapshot["read_surface_remediation_plan"]["safety"]["live_write"] is False
     assert snapshot["read_surface_remediation_plan"]["summary"]["incomplete_surface_count"] >= 1
+    assert (
+        snapshot["raw_mixer_state_physical_readback_contract"]["type"]
+        == "raw_mixer_state_physical_readback_contract"
+    )
+    assert snapshot["raw_mixer_state_physical_readback_contract"]["safety"]["live_write"] is False
+    assert (
+        snapshot["raw_mixer_state_physical_readback_contract"]["summary"][
+            "physical_fixture_gap_remains"
+        ]
+        is True
+    )
     assert snapshot["project_goal_capability_matrix"]["type"] == "project_goal_capability_matrix"
     assert snapshot["project_goal_capability_matrix"]["safety"][
         "live_widening_allowed"

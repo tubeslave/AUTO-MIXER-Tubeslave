@@ -56,6 +56,10 @@ def test_plan_creates_actions_for_current_partial_and_missing_read_surfaces():
     assert raw_cache["next_physical_readback_target"] is True
     assert "physical_readback_fixture" in raw_cache["missing_contracts"]
     assert "physical_readback_fixture_missing" in raw_cache["fixture_remaining_gaps"]
+    assert any(
+        "raw_mixer_state_physical_readback_contract" in artifact
+        for artifact in raw_cache["expected_artifacts"]
+    )
     assert raw_cache["mutates_console_state"] is False
 
     channel_processing = actions["channel_eq_dynamics_gate"]

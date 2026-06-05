@@ -404,6 +404,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     )
     fixture_check = next(check for check in checks if check.name == "read_surface_fixture_evidence")
     assert "tests/test_read_surface_fixture_evidence.py" in fixture_check.command
+    assert "tests/test_raw_mixer_state_physical_readback_contract.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command

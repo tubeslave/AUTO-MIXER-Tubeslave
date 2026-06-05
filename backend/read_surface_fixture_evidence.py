@@ -52,12 +52,22 @@ class ReadSurfaceFixtureEvidence:
 
 FIXTURE_EVIDENCE_BY_SURFACE: Dict[str, Dict[str, Tuple[str, ...]]] = {
     "raw_mixer_state_cache": {
-        "fixture_paths": ("tests/test_read_surface_inventory.py",),
+        "fixture_paths": (
+            "tests/test_read_surface_inventory.py",
+            "tests/test_raw_mixer_state_physical_readback_contract.py",
+        ),
         "test_names": (
             "test_read_surface_inventory_is_read_only_and_unique",
             "test_partial_and_missing_surfaces_block_full_readiness_claim",
+            "test_raw_mixer_state_contract_describes_future_physical_artifact",
+            "test_raw_mixer_state_contract_validates_minimal_physical_artifact",
+            "test_raw_mixer_state_contract_rejects_live_or_cached_claims",
         ),
-        "covered_contracts": ("inventory_row_validation", "read_only_safety_flags"),
+        "covered_contracts": (
+            "inventory_row_validation",
+            "read_only_safety_flags",
+            "physical_readback_artifact_contract",
+        ),
     },
     "channel_identity_and_basic_controls": {
         "fixture_paths": ("tests/test_operator_product_state.py",),

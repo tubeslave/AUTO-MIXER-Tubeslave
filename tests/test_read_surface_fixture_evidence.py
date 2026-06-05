@@ -46,6 +46,16 @@ def test_read_surface_fixture_evidence_snapshot_tracks_cached_dto_fixtures_only(
     )
     assert "channel_identity_and_basic_controls" in surfaces
     assert (
+        "physical_readback_artifact_contract"
+        in surfaces["raw_mixer_state_cache"]["covered_contracts"]
+    )
+    assert (
+        "test_raw_mixer_state_contract_validates_minimal_physical_artifact"
+        in surfaces["raw_mixer_state_cache"]["test_names"]
+    )
+    assert "physical_readback_fixture" not in surfaces["raw_mixer_state_cache"]["covered_contracts"]
+    assert "physical_readback_fixture_missing" in surfaces["raw_mixer_state_cache"]["remaining_gaps"]
+    assert (
         "test_channel_inventory_publishes_cached_source_patch_readback_only"
         in surfaces["channel_identity_and_basic_controls"]["test_names"]
     )
@@ -153,7 +163,9 @@ def test_console_read_goal_references_fixture_evidence_without_widening_live_sco
     assert row is not None
     assert row.status == "proposal_only"
     assert "read_surface_fixture_evidence" in row.method_ids
+    assert "raw_mixer_state_physical_readback_contract" in row.method_ids
     assert "backend/read_surface_fixture_evidence.py" in row.support_paths
+    assert "backend/raw_mixer_state_physical_readback_contract.py" in row.support_paths
     assert row.current_live_write_kinds == ()
     assert "physical fixtures" in row.next_step
 
