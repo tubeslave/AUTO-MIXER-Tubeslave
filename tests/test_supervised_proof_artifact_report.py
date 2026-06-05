@@ -227,6 +227,28 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     assert gap_rollup["full_auto_gap_bucket_counts"]["read_surface"] > 0
     assert gap_rollup["full_auto_gap_bucket_counts"]["write_surface"] > 0
     assert "scene_preset_supervised_promotion" in gap_rollup["full_auto_gap_target_ids_by_bucket"]["read_surface"]
+    assert gap_rollup["evidence_requirement_ids_by_action_family"]["bus_group_matrix"] == [
+        "bus_group_assignment_cache_freshness",
+        "bus_group_fader_readback",
+        "matrix_send_readback",
+        "main_bus_true_peak_headroom",
+        "bus_group_physical_fixture",
+        "hardware_readback_and_rollback_proof",
+    ]
+    assert gap_rollup["evidence_requirement_ids_by_action_family"]["mute"] == [
+        "current_mute_cache_freshness",
+        "mute_owner_intent_evidence",
+        "signal_return_or_idle_window_evidence",
+        "manual_mute_authority_review",
+        "mute_physical_fixture",
+        "hardware_readback_rollback_and_emergency_proof",
+    ]
+    assert "Add bus/group/matrix safety review" in (
+        gap_rollup["next_required_evidence_by_action_family"]["bus_group_matrix"][0]
+    )
+    assert "fresh mute-state intent" in (
+        gap_rollup["next_required_evidence_by_action_family"]["mute"][0]
+    )
     assert gap_rollup["supervised_live_apply_allowed"] is True
     assert gap_rollup["supervised_current_live_write_kinds"] == ["fader", "gain"]
     assert "Full Autonomous remains blocked" in gap_rollup["claim"]

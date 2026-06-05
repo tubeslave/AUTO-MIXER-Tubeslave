@@ -567,6 +567,23 @@ def _declared_pytest_functions(path: Path) -> set[str]:
     }
 
 
+def _string_list_map(value: Any) -> tuple[dict[str, list[str]], bool]:
+    if not isinstance(value, Mapping):
+        return {}, False
+    normalized: dict[str, list[str]] = {}
+    for key, raw_items in value.items():
+        if not isinstance(key, str) or not key:
+            return {}, False
+        if not isinstance(raw_items, list):
+            return {}, False
+        items = [str(item) for item in raw_items if isinstance(item, str) and item]
+        if len(items) != len(raw_items):
+            return {}, False
+        if items:
+            normalized[key] = items
+    return normalized, True
+
+
 def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -611,6 +628,20 @@ def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResul
         if not isinstance(rollup_counts, Mapping):
             violations.append("autonomy_gap_rollup_bucket_counts_missing")
             rollup_counts = {}
+        evidence_by_family, evidence_by_family_valid = _string_list_map(
+            rollup.get("evidence_requirement_ids_by_action_family")
+        )
+        next_by_family, next_by_family_valid = _string_list_map(
+            rollup.get("next_required_evidence_by_action_family")
+        )
+        if not evidence_by_family_valid:
+            violations.append("autonomy_gap_rollup_evidence_by_family_missing")
+        if not next_by_family_valid:
+            violations.append("autonomy_gap_rollup_next_by_family_missing")
+        if int(rollup_counts.get("evidence_requirement") or 0) > 0 and not evidence_by_family:
+            violations.append("autonomy_gap_rollup_evidence_by_family_empty")
+        if int(rollup_counts.get("evidence_requirement") or 0) > 0 and not next_by_family:
+            violations.append("autonomy_gap_rollup_next_by_family_empty")
         if gate_summary.get("autonomous_apply_allowed_modes") != []:
             violations.append("mode_gate_autonomous_apply_modes_not_empty")
         blocked_modes = gate_summary.get("blocked_modes")
@@ -631,6 +662,8 @@ def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResul
 
         detail["autonomy_gap_rollup_present"] = bool(rollup)
         detail["full_auto_gap_bucket_counts"] = dict(rollup_counts)
+        detail["evidence_requirement_ids_by_action_family"] = evidence_by_family
+        detail["next_required_evidence_by_action_family"] = next_by_family
         detail["supervised_current_live_write_kinds"] = list(supervised_write_kinds)
         detail["policy_supervised_live_write_kinds"] = list(current_supervised_live_write_kinds())
         detail["unexpected_supervised_live_write_kinds"] = unexpected_write_kinds
@@ -1496,6 +1529,8 @@ def autonomy_gap_rollup_summary(results: Sequence[CheckResult]) -> dict[str, obj
             continue
         detail = result.detail if isinstance(result.detail, Mapping) else {}
         counts = detail.get("full_auto_gap_bucket_counts")
+        evidence_by_family = detail.get("evidence_requirement_ids_by_action_family")
+        next_by_family = detail.get("next_required_evidence_by_action_family")
         supervised_kinds = detail.get("supervised_current_live_write_kinds")
         policy_kinds = detail.get("policy_supervised_live_write_kinds")
         unexpected_kinds = detail.get("unexpected_supervised_live_write_kinds")
@@ -1507,6 +1542,12 @@ def autonomy_gap_rollup_summary(results: Sequence[CheckResult]) -> dict[str, obj
             "full_autonomous_ready": False,
             "autonomy_gap_rollup_present": bool(detail.get("autonomy_gap_rollup_present")),
             "full_auto_gap_bucket_counts": dict(counts) if isinstance(counts, Mapping) else {},
+            "evidence_requirement_ids_by_action_family": dict(evidence_by_family)
+            if isinstance(evidence_by_family, Mapping)
+            else {},
+            "next_required_evidence_by_action_family": dict(next_by_family)
+            if isinstance(next_by_family, Mapping)
+            else {},
             "supervised_current_live_write_kinds": list(supervised_kinds) if isinstance(supervised_kinds, list) else [],
             "policy_supervised_live_write_kinds": list(policy_kinds) if isinstance(policy_kinds, list) else [],
             "unexpected_supervised_live_write_kinds": list(unexpected_kinds)
@@ -1806,6 +1847,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- full_autonomous_ready: `{str(gap_rollup['full_autonomous_ready']).lower()}`",
                 "- full_auto_gap_bucket_counts: "
                 f"`{json.dumps(gap_rollup['full_auto_gap_bucket_counts'], sort_keys=True)}`",
+                "- evidence_requirement_ids_by_action_family: "
+                f"`{json.dumps(gap_rollup['evidence_requirement_ids_by_action_family'], sort_keys=True)}`",
+                "- next_required_evidence_by_action_family: "
+                f"`{json.dumps(gap_rollup['next_required_evidence_by_action_family'], sort_keys=True)}`",
                 "- supervised_current_live_write_kinds: "
                 f"`{json.dumps(gap_rollup['supervised_current_live_write_kinds'])}`",
                 "- policy_supervised_live_write_kinds: "

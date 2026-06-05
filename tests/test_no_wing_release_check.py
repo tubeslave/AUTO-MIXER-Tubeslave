@@ -494,7 +494,33 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "full_autonomous_ready": False,
                 "source": "autonomy_mode_transition_gate.rows[mode=auto]",
                 "full_autonomous_blocked": True,
-                "full_auto_gap_bucket_counts": {"read_surface": 1},
+                "full_auto_gap_bucket_counts": {"read_surface": 1, "evidence_requirement": 12},
+                "evidence_requirement_ids_by_action_family": {
+                    "bus_group_matrix": [
+                        "bus_group_assignment_cache_freshness",
+                        "bus_group_fader_readback",
+                        "matrix_send_readback",
+                        "main_bus_true_peak_headroom",
+                        "bus_group_physical_fixture",
+                        "hardware_readback_and_rollback_proof",
+                    ],
+                    "mute": [
+                        "current_mute_cache_freshness",
+                        "mute_owner_intent_evidence",
+                        "signal_return_or_idle_window_evidence",
+                        "manual_mute_authority_review",
+                        "mute_physical_fixture",
+                        "hardware_readback_rollback_and_emergency_proof",
+                    ],
+                },
+                "next_required_evidence_by_action_family": {
+                    "bus_group_matrix": [
+                        "Add bus/group/matrix safety review before promotion.",
+                    ],
+                    "mute": [
+                        "Add fresh mute-state intent and physical proof before promotion.",
+                    ],
+                },
                 "supervised_current_live_write_kinds": ["fader", "gain"],
                 "next_required_evidence": [
                     "Reduce every Full Autonomous readiness gap bucket to zero before reviewing auto mode.",
@@ -657,7 +683,27 @@ def test_no_wing_release_check_validates_proof_report_gap_rollup_schema(tmp_path
 
     assert result.status == "passed"
     assert result.detail["autonomy_gap_rollup_present"] is True
-    assert result.detail["full_auto_gap_bucket_counts"] == {"read_surface": 1}
+    assert result.detail["full_auto_gap_bucket_counts"] == {
+        "read_surface": 1,
+        "evidence_requirement": 12,
+    }
+    assert result.detail["evidence_requirement_ids_by_action_family"]["bus_group_matrix"] == [
+        "bus_group_assignment_cache_freshness",
+        "bus_group_fader_readback",
+        "matrix_send_readback",
+        "main_bus_true_peak_headroom",
+        "bus_group_physical_fixture",
+        "hardware_readback_and_rollback_proof",
+    ]
+    assert result.detail["evidence_requirement_ids_by_action_family"]["mute"] == [
+        "current_mute_cache_freshness",
+        "mute_owner_intent_evidence",
+        "signal_return_or_idle_window_evidence",
+        "manual_mute_authority_review",
+        "mute_physical_fixture",
+        "hardware_readback_rollback_and_emergency_proof",
+    ]
+    assert "bus_group_matrix" in result.detail["next_required_evidence_by_action_family"]
     assert result.detail["supervised_current_live_write_kinds"] == ["fader", "gain"]
     assert result.detail["policy_supervised_live_write_kinds"] == ["fader", "gain"]
 
@@ -816,6 +862,8 @@ def test_no_wing_release_check_rejects_missing_proof_report_gap_rollup(tmp_path)
     assert "autonomy_gap_rollup_read_only_not_true" in result.detail["violations"]
     assert "autonomy_gap_rollup_bucket_counts_missing" in result.detail["violations"]
     assert "autonomy_gap_rollup_source_not_auto_mode_gate_row" in result.detail["violations"]
+    assert "autonomy_gap_rollup_evidence_by_family_missing" in result.detail["violations"]
+    assert "autonomy_gap_rollup_next_by_family_missing" in result.detail["violations"]
 
 
 def test_no_wing_release_check_rejects_misleading_proof_report_gap_rollup_claims(tmp_path):
@@ -1434,7 +1482,25 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
         duration_sec=1.0,
         detail={
             "autonomy_gap_rollup_present": True,
-            "full_auto_gap_bucket_counts": {"read_surface": 14, "write_surface": 19},
+            "full_auto_gap_bucket_counts": {
+                "read_surface": 14,
+                "write_surface": 19,
+                "evidence_requirement": 12,
+            },
+            "evidence_requirement_ids_by_action_family": {
+                "bus_group_matrix": [
+                    "bus_group_assignment_cache_freshness",
+                    "bus_group_fader_readback",
+                ],
+                "mute": [
+                    "current_mute_cache_freshness",
+                    "mute_owner_intent_evidence",
+                ],
+            },
+            "next_required_evidence_by_action_family": {
+                "bus_group_matrix": ["Add bus/group/matrix safety review before promotion."],
+                "mute": ["Add fresh mute-state intent before promotion."],
+            },
             "supervised_current_live_write_kinds": ["fader", "gain"],
             "policy_supervised_live_write_kinds": ["fader", "gain"],
             "unexpected_supervised_live_write_kinds": [],
@@ -1450,12 +1516,25 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
     assert json_summary["autonomy_gap_rollup"]["full_auto_gap_bucket_counts"] == {
         "read_surface": 14,
         "write_surface": 19,
+        "evidence_requirement": 12,
     }
+    assert json_summary["autonomy_gap_rollup"]["evidence_requirement_ids_by_action_family"][
+        "bus_group_matrix"
+    ] == [
+        "bus_group_assignment_cache_freshness",
+        "bus_group_fader_readback",
+    ]
+    assert json_summary["autonomy_gap_rollup"]["next_required_evidence_by_action_family"][
+        "mute"
+    ] == ["Add fresh mute-state intent before promotion."]
     assert json_summary["autonomy_gap_rollup"]["live_write"] is False
     assert json_summary["autonomy_gap_rollup"]["full_autonomous_ready"] is False
     assert "## Autonomy Gap Rollup" in markdown_summary
     assert "full_auto_gap_bucket_counts" in markdown_summary
     assert '"read_surface": 14' in markdown_summary
+    assert "evidence_requirement_ids_by_action_family" in markdown_summary
+    assert "bus_group_assignment_cache_freshness" in markdown_summary
+    assert "next_required_evidence_by_action_family" in markdown_summary
     assert 'supervised_current_live_write_kinds: `["fader", "gain"]`' in markdown_summary
 
 

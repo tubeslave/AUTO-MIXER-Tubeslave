@@ -27,6 +27,7 @@ from backend.supervised_proof_artifact_evaluator import (  # noqa: E402
 )
 from backend.autonomy_evidence_overlay import build_autonomy_evidence_overlay  # noqa: E402
 from backend.autonomy_mode_transition_gate import build_autonomy_mode_transition_gate  # noqa: E402
+from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot  # noqa: E402
 from backend.supervised_promotion_evidence import build_supervised_promotion_evidence_snapshot  # noqa: E402
 from backend.supervised_proof_remediation_plan import build_supervised_proof_remediation_plan  # noqa: E402
 from backend.supervised_wing_proof_plan import build_supervised_wing_proof_plan  # noqa: E402
@@ -129,11 +130,34 @@ def _gap_targets_by_bucket(value: Any) -> dict[str, list[str]]:
     return normalized
 
 
+def _string_list_map(value: Any) -> dict[str, list[str]]:
+    if not isinstance(value, Mapping):
+        return {}
+    normalized: dict[str, list[str]] = {}
+    for key, raw_items in value.items():
+        items = _string_list(raw_items)
+        if items:
+            normalized[str(key)] = items
+    return normalized
+
+
+def _promotion_gap_summary(report: Mapping[str, Any]) -> Mapping[str, Any]:
+    readiness = report.get("autonomy_promotion_readiness")
+    if not isinstance(readiness, Mapping):
+        readiness = build_autonomy_promotion_readiness_snapshot()
+    summary = readiness.get("summary") if isinstance(readiness.get("summary"), Mapping) else {}
+    gap_summary = summary.get("promotion_gap_summary")
+    return gap_summary if isinstance(gap_summary, Mapping) else {}
+
+
 def build_autonomy_gap_rollup(report: Mapping[str, Any]) -> dict[str, Any]:
     auto_row = _mode_gate_row(report, "auto")
     supervised_row = _mode_gate_row(report, "supervised")
+    gap_summary = _promotion_gap_summary(report)
     gap_counts = _gap_bucket_counts(auto_row.get("readiness_gap_bucket_counts"))
     gap_targets = _gap_targets_by_bucket(auto_row.get("readiness_gap_target_ids_by_bucket"))
+    evidence_by_family = _string_list_map(gap_summary.get("evidence_requirement_ids_by_action_family"))
+    next_by_family = _string_list_map(gap_summary.get("next_required_evidence_by_action_family"))
     supervised_live_write_kinds = _string_list(supervised_row.get("current_live_write_kinds"))
 
     return {
@@ -145,6 +169,8 @@ def build_autonomy_gap_rollup(report: Mapping[str, Any]) -> dict[str, Any]:
         "full_autonomous_blocked": True,
         "full_auto_gap_bucket_counts": gap_counts,
         "full_auto_gap_target_ids_by_bucket": gap_targets,
+        "evidence_requirement_ids_by_action_family": evidence_by_family,
+        "next_required_evidence_by_action_family": next_by_family,
         "supervised_live_apply_allowed": bool(supervised_row.get("live_apply_allowed")),
         "supervised_current_live_write_kinds": supervised_live_write_kinds,
         "next_required_evidence": [
