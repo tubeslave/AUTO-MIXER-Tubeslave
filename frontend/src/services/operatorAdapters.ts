@@ -803,6 +803,48 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     }];
   })() : [];
 
+  const readSurfaceRemediation = asRecord(data.read_surface_remediation_plan);
+  const readSurfaceRemediationRows: ModuleStatusRecord[] = Object.keys(readSurfaceRemediation).length ? (() => {
+    const summary = asRecord(readSurfaceRemediation.summary);
+    const status = str(readSurfaceRemediation.status, 'unknown');
+    const actionCount = Math.trunc(num(summary.action_count, 0));
+    const incompleteCount = Math.trunc(num(summary.incomplete_surface_count, actionCount));
+    const physicalGapIds = stringList(summary.physical_fixture_missing_surface_ids);
+    const nextPhysicalReadback = str(summary.next_physical_readback_surface_id, physicalGapIds[0] ?? '');
+    const nextActionId = str(summary.next_physical_readback_action_id, '');
+    const globalBlockers = stringList(summary.global_blockers);
+    const nextGlobalStep = str(summary.next_global_step, 'Review read-surface remediation before autonomous promotion.');
+    const planAvailable = status === 'read_remediation_required' || status === 'read_coverage_complete';
+    return [{
+      moduleId: 'read_surface_remediation_plan',
+      label: 'Read surface remediation plan',
+      domain: 'read_surface_remediation',
+      status,
+      entrypoint: 'build_read_surface_remediation_plan',
+      module: nextActionId || 'no_next_physical_action',
+      uiSurface: 'Read-surface remediation plan',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${planAvailable}`,
+        `actions:${actionCount}`,
+        `incomplete:${incompleteCount}`,
+        `physical_gaps:${physicalGapIds.length}`,
+        `next_physical_readback:${nextPhysicalReadback}`,
+        `next_action:${nextActionId}`,
+      ],
+      blockedReason: globalBlockers.length
+        ? globalBlockers.join(', ')
+        : 'Read-surface remediation is complete or has no current blockers.',
+      nextStep: [
+        nextPhysicalReadback ? `next_physical_readback:${nextPhysicalReadback}` : '',
+        nextActionId ? `next_action:${nextActionId}` : '',
+        nextGlobalStep,
+      ].filter(Boolean).join(' / '),
+      tone: status === 'read_coverage_complete' ? 'green' : 'yellow'
+    }];
+  })() : [];
+
   const overlay = asRecord(data.autonomy_evidence_overlay);
   const overlayRows = asArray(overlay.rows).map(row => {
     const valueType = str(row.value_type, 'unknown');
@@ -900,6 +942,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     ...modeGateRows,
     ...readinessRows,
     ...proofEvidenceRows,
+    ...readSurfaceRemediationRows,
     ...overlayRows,
     ...gapRows
   ];

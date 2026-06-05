@@ -537,6 +537,34 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
         },
       },
     },
+    read_surface_remediation_plan: {
+      type: 'read_surface_remediation_plan',
+      status: 'read_remediation_required',
+      safety: {
+        read_only: true,
+        live_write: false,
+        mutates_console_state: false,
+        live_widening_allowed: false,
+        full_autonomous_ready: false,
+      },
+      summary: {
+        surface_count: 10,
+        incomplete_surface_count: 10,
+        action_count: 10,
+        physical_fixture_missing_surface_ids: [
+          'raw_mixer_state_cache',
+          'channel_identity_and_basic_controls',
+        ],
+        next_physical_readback_surface_id: 'raw_mixer_state_cache',
+        next_physical_readback_action_id: 'remediate_raw_mixer_state_cache',
+        global_blockers: [
+          'full_console_read_coverage_incomplete',
+          'physical_readback_fixtures_incomplete',
+          'read_surface_remediation_does_not_contact_mixer',
+        ],
+        next_global_step: 'Complete read DTOs and physical fixtures before broad autonomous console control.',
+      },
+    },
     autonomy_evidence_overlay: {
       rows: [
         {
@@ -587,6 +615,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'mode_gate:auto',
       'promotion_readiness:scene_preset_supervised_promotion',
       'supervised_proof_evidence',
+      'read_surface_remediation_plan',
       'autonomy_evidence:fader_supervised_promotion',
       'autonomy_evidence:gain_trim_supervised_promotion',
       'promotion_gap:autonomy_mode',
@@ -688,6 +717,24 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /source_next_readback:raw_mixer_state_cache/);
   assert.match(proofEvidence.nextStep, /next_readback_gate:true/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
+
+  const readRemediation = rows.find(row => row.moduleId === 'read_surface_remediation_plan');
+  assert.equal(readRemediation.domain, 'read_surface_remediation');
+  assert.equal(readRemediation.canWriteLive, false);
+  assert.deepEqual(readRemediation.liveWriteKinds, []);
+  assert.equal(readRemediation.status, 'read_remediation_required');
+  assert.equal(readRemediation.module, 'remediate_raw_mixer_state_cache');
+  assert.deepEqual(readRemediation.pipelineProfiles, [
+    'available:true',
+    'actions:10',
+    'incomplete:10',
+    'physical_gaps:2',
+    'next_physical_readback:raw_mixer_state_cache',
+    'next_action:remediate_raw_mixer_state_cache',
+  ]);
+  assert.match(readRemediation.blockedReason, /physical_readback_fixtures_incomplete/);
+  assert.match(readRemediation.nextStep, /next_physical_readback:raw_mixer_state_cache/);
+  assert.match(readRemediation.nextStep, /next_action:remediate_raw_mixer_state_cache/);
 
   const faderOverlay = rows.find(row => row.moduleId === 'autonomy_evidence:fader_supervised_promotion');
   assert.equal(faderOverlay.domain, 'autonomy_evidence_overlay');

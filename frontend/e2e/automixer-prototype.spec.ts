@@ -1078,6 +1078,34 @@ test.describe('Automixer backend Product Layer adapter', () => {
               }
             }
           },
+          read_surface_remediation_plan: {
+            type: 'read_surface_remediation_plan',
+            status: 'read_remediation_required',
+            safety: {
+              read_only: true,
+              live_write: false,
+              mutates_console_state: false,
+              live_widening_allowed: false,
+              full_autonomous_ready: false
+            },
+            summary: {
+              surface_count: 10,
+              incomplete_surface_count: 10,
+              action_count: 10,
+              physical_fixture_missing_surface_ids: [
+                'raw_mixer_state_cache',
+                'channel_identity_and_basic_controls'
+              ],
+              next_physical_readback_surface_id: 'raw_mixer_state_cache',
+              next_physical_readback_action_id: 'remediate_raw_mixer_state_cache',
+              global_blockers: [
+                'full_console_read_coverage_incomplete',
+                'physical_readback_fixtures_incomplete',
+                'read_surface_remediation_does_not_contact_mixer'
+              ],
+              next_global_step: 'Complete read DTOs and physical fixtures before broad autonomous console control.'
+            }
+          },
           autonomy_evidence_overlay: {
             rows: [
               {
@@ -1354,6 +1382,10 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('next_readback:raw_mixer_state_cache').first()).toBeVisible();
     await expect(page.getByText('source_next_readback:raw_mixer_state_cache').first()).toBeVisible();
     await expect(page.getByText('next_readback_gate:true').first()).toBeVisible();
+    await expect(page.getByText('Read surface remediation plan').first()).toBeVisible();
+    await expect(page.getByText('read_remediation_required').first()).toBeVisible();
+    await expect(page.getByText('next_physical_readback:raw_mixer_state_cache').first()).toBeVisible();
+    await expect(page.getByText('next_action:remediate_raw_mixer_state_cache').first()).toBeVisible();
     await expect(page.getByText('Autonomy proof evidence: Fader').first()).toBeVisible();
     await expect(page.getByText('Autonomy proof evidence: Gain').first()).toBeVisible();
     await expect(page.getByText('dry_run_only').first()).toBeVisible();
