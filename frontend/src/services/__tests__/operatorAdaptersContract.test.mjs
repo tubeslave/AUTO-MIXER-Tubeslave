@@ -787,6 +787,40 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             forbidden_mutation_evidence_fields: ['manual_write_events', 'dca_write_events'],
             violations: [],
           },
+          bus_group_main_dca_physical_readback_artifact_intake: {
+            available: true,
+            status: 'passed',
+            schema_id: 'bus_group_main_dca_physical_readback.v1',
+            intake_status: 'operator_artifact_missing',
+            surface_id: 'bus_group_main_dca_state',
+            remediation_action_id: 'remediate_bus_group_main_dca_state',
+            required_contract_method_id: 'bus_group_main_dca_physical_readback_contract',
+            artifact_count: 0,
+            valid_candidate_count: 0,
+            invalid_candidate_count: 0,
+            valid_bus_count: 0,
+            valid_main_count: 0,
+            valid_dca_count: 0,
+            accepted_as_physical_fixture_candidate: false,
+            operator_review_required: true,
+            physical_fixture_gap_remains: true,
+            fixture_closure_allowed_by_intake: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            target_consistency: true,
+            promotion_families_requiring_surface: [
+              'bus_group_matrix',
+              'dca',
+              'master_bus',
+              'mix_balance',
+              'performance_adaptation',
+            ],
+            artifact_search_roots: ['artifacts/read_surface_physical_readback/bus_group_main_dca'],
+            artifact_source_ids: [],
+            blocked_by: ['operator_must_capture_bus_group_main_dca_physical_readback_artifact'],
+            intake_violations: [],
+            violations: [],
+          },
           matrix_state_physical_readback_contract: {
             available: true,
             status: 'passed',
@@ -1139,6 +1173,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'channel_processing_physical_readback_contract',
       'channel_processing_physical_readback_artifact_intake',
       'bus_group_main_dca_physical_readback_contract',
+      'bus_group_main_dca_physical_readback_artifact_intake',
       'matrix_state_physical_readback_contract',
       'fx_slots_inserts_physical_readback_contract',
       'routing_sends_physical_readback_contract',
@@ -1296,6 +1331,19 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'bus_contract_gap:true',
     'bus_contract_live_authority:false',
     'bus_contract_target_gate:true',
+    'bus_intake_available:true',
+    'bus_intake_status:operator_artifact_missing',
+    'bus_intake_artifacts:0',
+    'bus_intake_valid:0',
+    'bus_intake_invalid:0',
+    'bus_intake_valid_buses:0',
+    'bus_intake_valid_mains:0',
+    'bus_intake_valid_dcas:0',
+    'bus_intake_candidate:false',
+    'bus_intake_gap:true',
+    'bus_intake_closure_allowed:false',
+    'bus_intake_live_authority:false',
+    'bus_intake_target_gate:true',
     'matrix_contract_available:true',
     'matrix_contract_status:contract_ready_physical_fixture_missing',
     'matrix_contract_schema:matrix_state_physical_readback.v1',
@@ -1374,6 +1422,13 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /bus_contract_gap:true/);
   assert.match(proofEvidence.nextStep, /bus_contract_live_authority:false/);
   assert.match(proofEvidence.nextStep, /bus_contract_target_gate:true/);
+  assert.match(proofEvidence.nextStep, /bus_intake:operator_artifact_missing/);
+  assert.match(proofEvidence.nextStep, /bus_intake_valid_buses:0/);
+  assert.match(proofEvidence.nextStep, /bus_intake_valid_mains:0/);
+  assert.match(proofEvidence.nextStep, /bus_intake_valid_dcas:0/);
+  assert.match(proofEvidence.nextStep, /bus_intake_gap:true/);
+  assert.match(proofEvidence.nextStep, /bus_intake_live_authority:false/);
+  assert.match(proofEvidence.nextStep, /bus_intake_target_gate:true/);
   assert.match(proofEvidence.nextStep, /matrix_contract:contract_ready_physical_fixture_missing/);
   assert.match(proofEvidence.nextStep, /matrix_contract_gap:true/);
   assert.match(proofEvidence.nextStep, /matrix_contract_live_authority:false/);
@@ -1654,6 +1709,49 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(busMainDcaContract.nextStep, /metering:lufs,true_peak_dbtp,headroom_db/);
   assert.match(busMainDcaContract.nextStep, /live_authority:false/);
   assert.match(busMainDcaContract.nextStep, /target_consistency:true/);
+
+  const busMainDcaIntake = rows.find(row => row.moduleId === 'bus_group_main_dca_physical_readback_artifact_intake');
+  assert.equal(busMainDcaIntake.domain, 'read_surface_artifact_intake');
+  assert.equal(busMainDcaIntake.canWriteLive, false);
+  assert.deepEqual(busMainDcaIntake.liveWriteKinds, []);
+  assert.equal(busMainDcaIntake.status, 'operator_artifact_missing');
+  assert.equal(
+    busMainDcaIntake.entrypoint,
+    'build_bus_group_main_dca_physical_readback_artifact_intake',
+  );
+  assert.equal(busMainDcaIntake.module, 'remediate_bus_group_main_dca_state');
+  assert.equal(busMainDcaIntake.tone, 'yellow');
+  assert.deepEqual(busMainDcaIntake.pipelineProfiles, [
+    'available:true',
+    'schema:bus_group_main_dca_physical_readback.v1',
+    'surface:bus_group_main_dca_state',
+    'action:remediate_bus_group_main_dca_state',
+    'artifacts:0',
+    'valid:0',
+    'invalid:0',
+    'valid_buses:0',
+    'valid_mains:0',
+    'valid_dcas:0',
+    'candidate:false',
+    'operator_review:true',
+    'physical_gap_remains:true',
+    'fixture_closure_allowed:false',
+    'live_authority:false',
+    'target_consistency:true',
+    'promotion_families:bus_group_matrix|dca|master_bus|mix_balance|performance_adaptation',
+  ]);
+  assert.match(
+    busMainDcaIntake.blockedReason,
+    /operator_must_capture_bus_group_main_dca_physical_readback_artifact/,
+  );
+  assert.match(busMainDcaIntake.nextStep, /surface:bus_group_main_dca_state/);
+  assert.match(busMainDcaIntake.nextStep, /artifacts:0/);
+  assert.match(busMainDcaIntake.nextStep, /valid_buses:0/);
+  assert.match(busMainDcaIntake.nextStep, /valid_mains:0/);
+  assert.match(busMainDcaIntake.nextStep, /valid_dcas:0/);
+  assert.match(busMainDcaIntake.nextStep, /operator_review:true/);
+  assert.match(busMainDcaIntake.nextStep, /fixture_closure_allowed:false/);
+  assert.match(busMainDcaIntake.nextStep, /live_authority:false/);
 
   const matrixStateContract = rows.find(row => row.moduleId === 'matrix_state_physical_readback_contract');
   assert.equal(matrixStateContract.domain, 'read_surface_contract');
@@ -2054,7 +2152,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 15);
+  assert.equal(rows.length, 16);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -2138,6 +2236,19 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'bus_contract_gap:false',
     'bus_contract_live_authority:false',
     'bus_contract_target_gate:false',
+    'bus_intake_available:false',
+    'bus_intake_status:missing',
+    'bus_intake_artifacts:0',
+    'bus_intake_valid:0',
+    'bus_intake_invalid:0',
+    'bus_intake_valid_buses:0',
+    'bus_intake_valid_mains:0',
+    'bus_intake_valid_dcas:0',
+    'bus_intake_candidate:false',
+    'bus_intake_gap:false',
+    'bus_intake_closure_allowed:false',
+    'bus_intake_live_authority:false',
+    'bus_intake_target_gate:false',
     'matrix_contract_available:false',
     'matrix_contract_status:missing',
     'matrix_contract_schema:',
@@ -2233,47 +2344,54 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.deepEqual(rows[8].liveWriteKinds, []);
   assert.match(rows[8].blockedReason, /contract is missing/);
 
-  assert.equal(rows[9].moduleId, 'matrix_state_physical_readback_contract');
-  assert.equal(rows[9].domain, 'read_surface_contract');
-  assert.equal(rows[9].status, 'contract_missing');
+  assert.equal(rows[9].moduleId, 'bus_group_main_dca_physical_readback_artifact_intake');
+  assert.equal(rows[9].domain, 'read_surface_artifact_intake');
+  assert.equal(rows[9].status, 'intake_missing');
   assert.equal(rows[9].canWriteLive, false);
   assert.deepEqual(rows[9].liveWriteKinds, []);
-  assert.match(rows[9].blockedReason, /contract is missing/);
+  assert.match(rows[9].blockedReason, /artifact intake is missing/);
 
-  assert.equal(rows[10].moduleId, 'fx_slots_inserts_physical_readback_contract');
+  assert.equal(rows[10].moduleId, 'matrix_state_physical_readback_contract');
   assert.equal(rows[10].domain, 'read_surface_contract');
   assert.equal(rows[10].status, 'contract_missing');
   assert.equal(rows[10].canWriteLive, false);
   assert.deepEqual(rows[10].liveWriteKinds, []);
   assert.match(rows[10].blockedReason, /contract is missing/);
 
-  assert.equal(rows[11].moduleId, 'routing_sends_physical_readback_contract');
+  assert.equal(rows[11].moduleId, 'fx_slots_inserts_physical_readback_contract');
   assert.equal(rows[11].domain, 'read_surface_contract');
   assert.equal(rows[11].status, 'contract_missing');
   assert.equal(rows[11].canWriteLive, false);
   assert.deepEqual(rows[11].liveWriteKinds, []);
   assert.match(rows[11].blockedReason, /contract is missing/);
 
-  assert.equal(rows[12].moduleId, 'snapshots_scenes_physical_readback_contract');
+  assert.equal(rows[12].moduleId, 'routing_sends_physical_readback_contract');
   assert.equal(rows[12].domain, 'read_surface_contract');
   assert.equal(rows[12].status, 'contract_missing');
   assert.equal(rows[12].canWriteLive, false);
   assert.deepEqual(rows[12].liveWriteKinds, []);
   assert.match(rows[12].blockedReason, /contract is missing/);
 
-  assert.equal(rows[13].moduleId, 'user_presets_physical_readback_contract');
+  assert.equal(rows[13].moduleId, 'snapshots_scenes_physical_readback_contract');
   assert.equal(rows[13].domain, 'read_surface_contract');
   assert.equal(rows[13].status, 'contract_missing');
   assert.equal(rows[13].canWriteLive, false);
   assert.deepEqual(rows[13].liveWriteKinds, []);
   assert.match(rows[13].blockedReason, /contract is missing/);
 
-  assert.equal(rows[14].moduleId, 'dlive_state_physical_readback_contract');
+  assert.equal(rows[14].moduleId, 'user_presets_physical_readback_contract');
   assert.equal(rows[14].domain, 'read_surface_contract');
   assert.equal(rows[14].status, 'contract_missing');
   assert.equal(rows[14].canWriteLive, false);
   assert.deepEqual(rows[14].liveWriteKinds, []);
   assert.match(rows[14].blockedReason, /contract is missing/);
+
+  assert.equal(rows[15].moduleId, 'dlive_state_physical_readback_contract');
+  assert.equal(rows[15].domain, 'read_surface_contract');
+  assert.equal(rows[15].status, 'contract_missing');
+  assert.equal(rows[15].canWriteLive, false);
+  assert.deepEqual(rows[15].liveWriteKinds, []);
+  assert.match(rows[15].blockedReason, /contract is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

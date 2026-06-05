@@ -15,6 +15,9 @@ try:
     from bus_group_main_dca_physical_readback_contract import (
         build_bus_group_main_dca_physical_readback_contract,
     )
+    from bus_group_main_dca_physical_readback_artifact_intake import (
+        build_bus_group_main_dca_physical_readback_artifact_intake,
+    )
     from channel_basic_controls_physical_readback_contract import (
         build_channel_basic_controls_physical_readback_contract,
     )
@@ -65,6 +68,9 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.bus_group_main_dca_physical_readback_contract import (
         build_bus_group_main_dca_physical_readback_contract,
+    )
+    from backend.bus_group_main_dca_physical_readback_artifact_intake import (
+        build_bus_group_main_dca_physical_readback_artifact_intake,
     )
     from backend.channel_basic_controls_physical_readback_contract import (
         build_channel_basic_controls_physical_readback_contract,
@@ -636,6 +642,31 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "readback_contract_only",
             "no_live_writes",
             "does_not_query_console",
+        ),
+    ),
+    ProcessingMethod(
+        id="bus_group_main_dca_physical_readback_artifact_intake",
+        label="Bus / Main / DCA Physical Readback Artifact Intake",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Read-only intake snapshot for separately captured bus, main, "
+            "and DCA physical readback artifacts."
+        ),
+        module="backend/bus_group_main_dca_physical_readback_artifact_intake.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="artifact_intake_only_bus_group_main_dca_operator_review_required",
+        promotion_next=(
+            "operator reviews any valid bus/group/main/DCA candidate before "
+            "closing the physical fixture gap"
+        ),
+        notes=(
+            "transport_free",
+            "artifact_intake_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "fixture_closure_allowed_by_intake_false",
         ),
     ),
     ProcessingMethod(
@@ -1728,6 +1759,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, read-surface remediation artifact contract",
         "next_step": "Use only to validate separately captured bus/group/main/DCA readback; do not infer live authority.",
     },
+    "bus_group_main_dca_physical_readback_artifact_intake": {
+        "entrypoint": "build_bus_group_main_dca_physical_readback_artifact_intake",
+        "ui_surface": "Processing registry, bus/group/main/DCA physical artifact intake",
+        "next_step": "Use only to surface operator-captured bus/group/main/DCA candidates; manual review still gates fixture closure.",
+    },
     "matrix_state_physical_readback_contract": {
         "entrypoint": (
             "build_matrix_state_physical_readback_contract / "
@@ -2012,6 +2048,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "bus_group_main_dca_physical_readback_contract": (
             build_bus_group_main_dca_physical_readback_contract()
+        ),
+        "bus_group_main_dca_physical_readback_artifact_intake": (
+            build_bus_group_main_dca_physical_readback_artifact_intake()
         ),
         "matrix_state_physical_readback_contract": (
             build_matrix_state_physical_readback_contract()

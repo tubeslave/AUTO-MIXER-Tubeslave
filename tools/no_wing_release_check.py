@@ -53,6 +53,11 @@ from backend.bus_group_main_dca_physical_readback_contract import (  # noqa: E40
     BUS_GROUP_MAIN_DCA_VERIFIED_PHYSICAL_STATUSES,
     build_bus_group_main_dca_physical_readback_contract,
 )
+from backend.bus_group_main_dca_physical_readback_artifact_intake import (  # noqa: E402
+    BUS_GROUP_MAIN_DCA_INTAKE_STATUSES,
+    BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_ARTIFACT_INTAKE_METHOD_ID,
+    build_bus_group_main_dca_physical_readback_artifact_intake,
+)
 from backend.channel_basic_controls_physical_readback_contract import (  # noqa: E402
     CHANNEL_BASIC_CONTROLS_FORBIDDEN_MUTATION_EVIDENCE_FIELDS,
     CHANNEL_BASIC_CONTROLS_PHYSICAL_READBACK_ARTIFACT_TYPE,
@@ -443,6 +448,7 @@ def build_checks(
                 "tests/test_channel_processing_physical_readback_contract.py",
                 "tests/test_channel_processing_physical_readback_artifact_intake.py",
                 "tests/test_bus_group_main_dca_physical_readback_contract.py",
+                "tests/test_bus_group_main_dca_physical_readback_artifact_intake.py",
                 "tests/test_matrix_state_physical_readback_contract.py",
                 "tests/test_fx_slots_inserts_physical_readback_contract.py",
                 "tests/test_routing_sends_physical_readback_contract.py",
@@ -2764,6 +2770,166 @@ def validate_bus_group_main_dca_physical_readback_contract_snapshot() -> CheckRe
     finished = datetime.now(timezone.utc)
     return CheckResult(
         name="bus_group_main_dca_physical_readback_contract_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def validate_bus_group_main_dca_physical_readback_artifact_intake_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "bus_group_main_dca_artifact_intake_is_read_only_operator_review_gate",
+    }
+    violations: list[str] = []
+
+    try:
+        intake = build_bus_group_main_dca_physical_readback_artifact_intake()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        intake = {}
+        violations.append(f"bus_group_main_dca_artifact_intake_build_error:{type(exc).__name__}")
+
+    safety = intake.get("safety") if isinstance(intake.get("safety"), Mapping) else {}
+    summary = intake.get("summary") if isinstance(intake.get("summary"), Mapping) else {}
+    artifacts = intake.get("artifacts") if isinstance(intake.get("artifacts"), list) else []
+
+    if intake.get("type") != "bus_group_main_dca_physical_readback_artifact_intake":
+        violations.append("bus_group_main_dca_artifact_intake_type_mismatch")
+    if intake.get("method_id") != BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_ARTIFACT_INTAKE_METHOD_ID:
+        violations.append("bus_group_main_dca_artifact_intake_method_id_mismatch")
+    if intake.get("required_contract_method_id") != BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_CONTRACT_METHOD_ID:
+        violations.append("bus_group_main_dca_artifact_intake_required_contract_mismatch")
+    if intake.get("schema_id") != BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("bus_group_main_dca_artifact_intake_schema_id_mismatch")
+    if intake.get("status") not in BUS_GROUP_MAIN_DCA_INTAKE_STATUSES:
+        violations.append("bus_group_main_dca_artifact_intake_status_unknown")
+    if intake.get("surface_id") != BUS_GROUP_MAIN_DCA_SURFACE_ID:
+        violations.append("bus_group_main_dca_artifact_intake_surface_id_mismatch")
+    if intake.get("remediation_action_id") != BUS_GROUP_MAIN_DCA_REMEDIATION_ACTION_ID:
+        violations.append("bus_group_main_dca_artifact_intake_action_id_mismatch")
+
+    for key in ("read_only", "operator_required"):
+        if safety.get(key) is not True:
+            violations.append(f"bus_group_main_dca_artifact_intake_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_intake",
+        "fixture_closure_allowed_by_intake",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"bus_group_main_dca_artifact_intake_{key}_not_false")
+
+    artifact_count = summary.get("artifact_count")
+    valid_count = summary.get("valid_candidate_count")
+    invalid_count = summary.get("invalid_candidate_count")
+    valid_bus_count = summary.get("valid_bus_count")
+    valid_main_count = summary.get("valid_main_count")
+    valid_dca_count = summary.get("valid_dca_count")
+    if not isinstance(artifact_count, int) or artifact_count != len(artifacts):
+        violations.append("bus_group_main_dca_artifact_intake_artifact_count_mismatch")
+        artifact_count = len(artifacts)
+    if not isinstance(valid_count, int):
+        violations.append("bus_group_main_dca_artifact_intake_valid_count_missing")
+        valid_count = 0
+    if not isinstance(invalid_count, int):
+        violations.append("bus_group_main_dca_artifact_intake_invalid_count_missing")
+        invalid_count = 0
+    if not isinstance(valid_bus_count, int):
+        violations.append("bus_group_main_dca_artifact_intake_valid_bus_count_missing")
+        valid_bus_count = 0
+    if not isinstance(valid_main_count, int):
+        violations.append("bus_group_main_dca_artifact_intake_valid_main_count_missing")
+        valid_main_count = 0
+    if not isinstance(valid_dca_count, int):
+        violations.append("bus_group_main_dca_artifact_intake_valid_dca_count_missing")
+        valid_dca_count = 0
+    if valid_count + invalid_count != artifact_count:
+        violations.append("bus_group_main_dca_artifact_intake_candidate_count_mismatch")
+    if invalid_count:
+        violations.append("bus_group_main_dca_artifact_intake_invalid_candidate_present")
+
+    if summary.get("operator_review_required") is not True:
+        violations.append("bus_group_main_dca_artifact_intake_operator_review_not_true")
+    if summary.get("physical_fixture_gap_remains") is not True:
+        violations.append("bus_group_main_dca_artifact_intake_physical_gap_not_true")
+    if summary.get("fixture_closure_allowed_by_intake") is not False:
+        violations.append("bus_group_main_dca_artifact_intake_fixture_closure_not_false")
+    if summary.get("live_authority_granted") is not False:
+        violations.append("bus_group_main_dca_artifact_intake_live_authority_not_false")
+    if summary.get("full_autonomous_ready") is not False:
+        violations.append("bus_group_main_dca_artifact_intake_full_autonomous_not_false")
+    if summary.get("accepted_as_physical_fixture_candidate") is not bool(valid_count):
+        violations.append("bus_group_main_dca_artifact_intake_candidate_flag_mismatch")
+
+    promotion_families = summary.get("promotion_families_requiring_surface")
+    if not isinstance(promotion_families, list):
+        promotion_families = []
+        violations.append("bus_group_main_dca_artifact_intake_promotion_families_missing")
+    for family in (
+        "bus_group_matrix",
+        "dca",
+        "master_bus",
+        "mix_balance",
+        "performance_adaptation",
+    ):
+        if family not in promotion_families:
+            violations.append(f"bus_group_main_dca_artifact_intake_promotion_family_missing:{family}")
+
+    intake_violations = (
+        list(summary.get("violations")) if isinstance(summary.get("violations"), list) else []
+    )
+    artifact_source_ids = [
+        row.get("source_id")
+        for row in artifacts
+        if isinstance(row, Mapping) and isinstance(row.get("source_id"), str)
+    ]
+    detail["intake_status"] = intake.get("status")
+    detail["schema_id"] = intake.get("schema_id")
+    detail["surface_id"] = intake.get("surface_id")
+    detail["remediation_action_id"] = intake.get("remediation_action_id")
+    detail["required_contract_method_id"] = intake.get("required_contract_method_id")
+    detail["artifact_search_roots"] = (
+        list(summary.get("artifact_search_roots"))
+        if isinstance(summary.get("artifact_search_roots"), list)
+        else []
+    )
+    detail["artifact_count"] = artifact_count
+    detail["valid_candidate_count"] = valid_count
+    detail["invalid_candidate_count"] = invalid_count
+    detail["valid_bus_count"] = valid_bus_count
+    detail["valid_main_count"] = valid_main_count
+    detail["valid_dca_count"] = valid_dca_count
+    detail["accepted_as_physical_fixture_candidate"] = summary.get(
+        "accepted_as_physical_fixture_candidate"
+    )
+    detail["operator_review_required"] = summary.get("operator_review_required")
+    detail["physical_fixture_gap_remains"] = summary.get("physical_fixture_gap_remains")
+    detail["fixture_closure_allowed_by_intake"] = summary.get(
+        "fixture_closure_allowed_by_intake"
+    )
+    detail["live_authority_granted"] = summary.get("live_authority_granted")
+    detail["full_autonomous_ready"] = summary.get("full_autonomous_ready")
+    detail["promotion_families_requiring_surface"] = list(promotion_families)
+    detail["latest_valid_candidate_source_id"] = summary.get("latest_valid_candidate_source_id")
+    detail["latest_valid_candidate_captured_at"] = summary.get(
+        "latest_valid_candidate_captured_at"
+    )
+    detail["blocked_by"] = (
+        list(summary.get("blocked_by")) if isinstance(summary.get("blocked_by"), list) else []
+    )
+    detail["artifact_source_ids"] = artifact_source_ids
+    detail["intake_violations"] = intake_violations
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="bus_group_main_dca_physical_readback_artifact_intake_schema",
         status="passed" if not violations else "failed",
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -5186,6 +5352,81 @@ def bus_group_main_dca_readback_contract_summary(
     return None
 
 
+def bus_group_main_dca_readback_artifact_intake_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "bus_group_main_dca_physical_readback_artifact_intake_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        artifact_search_roots = detail.get("artifact_search_roots")
+        blocked_by = detail.get("blocked_by")
+        artifact_source_ids = detail.get("artifact_source_ids")
+        intake_violations = detail.get("intake_violations")
+        promotion_families = detail.get("promotion_families_requiring_surface")
+        violations = detail.get("violations")
+        source_candidate_claimed = detail.get("accepted_as_physical_fixture_candidate") is True
+        operator_review_required = detail.get("operator_review_required") is True
+        physical_fixture_gap_remains = detail.get("physical_fixture_gap_remains") is True
+        unsafe_claimed = (
+            detail.get("fixture_closure_allowed_by_intake") is True
+            or detail.get("live_authority_granted") is True
+            or detail.get("full_autonomous_ready") is True
+        )
+        candidate_accepted = (
+            result.status == "passed"
+            and source_candidate_claimed
+            and operator_review_required
+            and physical_fixture_gap_remains
+            and not unsafe_claimed
+        )
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_intake": False,
+            "fixture_closure_allowed_by_intake": False,
+            "live_widening_allowed": False,
+            "full_autonomous_ready": False,
+            "schema_id": detail.get("schema_id"),
+            "intake_status": detail.get("intake_status"),
+            "surface_id": detail.get("surface_id"),
+            "remediation_action_id": detail.get("remediation_action_id"),
+            "required_contract_method_id": detail.get("required_contract_method_id"),
+            "artifact_search_roots": (
+                list(artifact_search_roots) if isinstance(artifact_search_roots, list) else []
+            ),
+            "artifact_count": int(detail.get("artifact_count") or 0),
+            "valid_candidate_count": int(detail.get("valid_candidate_count") or 0),
+            "invalid_candidate_count": int(detail.get("invalid_candidate_count") or 0),
+            "valid_bus_count": int(detail.get("valid_bus_count") or 0),
+            "valid_main_count": int(detail.get("valid_main_count") or 0),
+            "valid_dca_count": int(detail.get("valid_dca_count") or 0),
+            "accepted_as_physical_fixture_candidate": candidate_accepted,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "live_authority_granted": False,
+            "promotion_families_requiring_surface": (
+                list(promotion_families) if isinstance(promotion_families, list) else []
+            ),
+            "latest_valid_candidate_source_id": detail.get("latest_valid_candidate_source_id"),
+            "latest_valid_candidate_captured_at": detail.get("latest_valid_candidate_captured_at"),
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "artifact_source_ids": (
+                list(artifact_source_ids) if isinstance(artifact_source_ids, list) else []
+            ),
+            "intake_violations": (
+                list(intake_violations) if isinstance(intake_violations, list) else []
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def matrix_state_readback_contract_summary(
     results: Sequence[CheckResult],
 ) -> dict[str, object] | None:
@@ -5857,6 +6098,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     channel_processing_contract = channel_processing_readback_contract_summary(results)
     channel_processing_intake = channel_processing_readback_artifact_intake_summary(results)
     bus_group_main_dca_contract = bus_group_main_dca_readback_contract_summary(results)
+    bus_group_main_dca_intake = bus_group_main_dca_readback_artifact_intake_summary(results)
     matrix_state_contract = matrix_state_readback_contract_summary(results)
     fx_slots_inserts_contract = fx_slots_inserts_readback_contract_summary(results)
     routing_sends_contract = routing_sends_readback_contract_summary(results)
@@ -5901,6 +6143,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         )
     if bus_group_main_dca_contract is not None:
         summary["bus_group_main_dca_physical_readback_contract"] = bus_group_main_dca_contract
+    if bus_group_main_dca_intake is not None:
+        summary["bus_group_main_dca_physical_readback_artifact_intake"] = (
+            bus_group_main_dca_intake
+        )
     if matrix_state_contract is not None:
         summary["matrix_state_physical_readback_contract"] = matrix_state_contract
     if fx_slots_inserts_contract is not None:
@@ -6467,6 +6713,58 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(bus_group_main_dca_contract['violations'])}`",
             ]
         )
+    if bus_group_main_dca_intake is not None:
+        lines.extend(
+            [
+                "",
+                "## Bus Group Main DCA Physical Readback Artifact Intake",
+                "",
+                f"- schema_check: `{bus_group_main_dca_intake['status']}`",
+                f"- read_only: `{str(bus_group_main_dca_intake['read_only']).lower()}`",
+                f"- live_write: `{str(bus_group_main_dca_intake['live_write']).lower()}`",
+                f"- mutates_console_state: `{str(bus_group_main_dca_intake['mutates_console_state']).lower()}`",
+                f"- queries_console: `{str(bus_group_main_dca_intake['queries_console']).lower()}`",
+                f"- executes_tests: `{str(bus_group_main_dca_intake['executes_tests']).lower()}`",
+                f"- operator_required: `{str(bus_group_main_dca_intake['operator_required']).lower()}`",
+                "- execution_allowed_by_intake: "
+                f"`{str(bus_group_main_dca_intake['execution_allowed_by_intake']).lower()}`",
+                "- fixture_closure_allowed_by_intake: "
+                f"`{str(bus_group_main_dca_intake['fixture_closure_allowed_by_intake']).lower()}`",
+                "- live_widening_allowed: "
+                f"`{str(bus_group_main_dca_intake['live_widening_allowed']).lower()}`",
+                f"- full_autonomous_ready: `{str(bus_group_main_dca_intake['full_autonomous_ready']).lower()}`",
+                f"- intake_status: `{bus_group_main_dca_intake['intake_status']}`",
+                f"- schema_id: `{bus_group_main_dca_intake['schema_id']}`",
+                f"- surface_id: `{bus_group_main_dca_intake['surface_id']}`",
+                f"- remediation_action_id: `{bus_group_main_dca_intake['remediation_action_id']}`",
+                "- required_contract_method_id: "
+                f"`{bus_group_main_dca_intake['required_contract_method_id']}`",
+                f"- artifact_count: `{bus_group_main_dca_intake['artifact_count']}`",
+                f"- valid_candidate_count: `{bus_group_main_dca_intake['valid_candidate_count']}`",
+                f"- invalid_candidate_count: `{bus_group_main_dca_intake['invalid_candidate_count']}`",
+                f"- valid_bus_count: `{bus_group_main_dca_intake['valid_bus_count']}`",
+                f"- valid_main_count: `{bus_group_main_dca_intake['valid_main_count']}`",
+                f"- valid_dca_count: `{bus_group_main_dca_intake['valid_dca_count']}`",
+                "- accepted_as_physical_fixture_candidate: "
+                f"`{str(bus_group_main_dca_intake['accepted_as_physical_fixture_candidate']).lower()}`",
+                "- operator_review_required: "
+                f"`{str(bus_group_main_dca_intake['operator_review_required']).lower()}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(bus_group_main_dca_intake['physical_fixture_gap_remains']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(bus_group_main_dca_intake['live_authority_granted']).lower()}`",
+                "- promotion_families_requiring_surface: "
+                f"`{json.dumps(bus_group_main_dca_intake['promotion_families_requiring_surface'])}`",
+                "- artifact_search_roots: "
+                f"`{json.dumps(bus_group_main_dca_intake['artifact_search_roots'])}`",
+                "- artifact_source_ids: "
+                f"`{json.dumps(bus_group_main_dca_intake['artifact_source_ids'])}`",
+                f"- blocked_by: `{json.dumps(bus_group_main_dca_intake['blocked_by'])}`",
+                "- intake_violations: "
+                f"`{json.dumps(bus_group_main_dca_intake['intake_violations'])}`",
+                f"- violations: `{json.dumps(bus_group_main_dca_intake['violations'])}`",
+            ]
+        )
     if matrix_state_contract is not None:
         lines.extend(
             [
@@ -6946,6 +7244,15 @@ def run_release_checks(
             results.append(bus_group_main_dca_contract_result)
             if (
                 bus_group_main_dca_contract_result.status != "passed"
+                and not continue_on_failure
+            ):
+                break
+            bus_group_main_dca_intake_result = (
+                validate_bus_group_main_dca_physical_readback_artifact_intake_snapshot()
+            )
+            results.append(bus_group_main_dca_intake_result)
+            if (
+                bus_group_main_dca_intake_result.status != "passed"
                 and not continue_on_failure
             ):
                 break

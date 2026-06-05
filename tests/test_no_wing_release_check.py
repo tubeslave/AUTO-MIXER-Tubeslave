@@ -11,6 +11,7 @@ from tools.no_wing_release_check import (
     CommandCheck,
     autonomy_evidence_overlay_summary,
     autonomy_gap_rollup_summary,
+    bus_group_main_dca_readback_artifact_intake_summary,
     bus_group_main_dca_readback_contract_summary,
     build_checks,
     channel_basic_controls_readback_artifact_intake_summary,
@@ -36,6 +37,7 @@ from tools.no_wing_release_check import (
     user_presets_readback_contract_summary,
     validate_repo_local_commands,
     validate_no_live_commands,
+    validate_bus_group_main_dca_physical_readback_artifact_intake_snapshot,
     validate_bus_group_main_dca_physical_readback_contract_snapshot,
     validate_channel_basic_controls_physical_readback_artifact_intake_snapshot,
     validate_channel_basic_controls_physical_readback_contract_snapshot,
@@ -989,6 +991,87 @@ def test_no_wing_release_check_rejects_bus_group_main_dca_contract_drift(monkeyp
     ]
 
 
+def test_no_wing_release_check_validates_bus_group_main_dca_artifact_intake_snapshot():
+    result = validate_bus_group_main_dca_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["intake_status"] == "operator_artifact_missing"
+    assert result.detail["schema_id"] == "bus_group_main_dca_physical_readback.v1"
+    assert result.detail["surface_id"] == "bus_group_main_dca_state"
+    assert result.detail["remediation_action_id"] == "remediate_bus_group_main_dca_state"
+    assert (
+        result.detail["required_contract_method_id"]
+        == "bus_group_main_dca_physical_readback_contract"
+    )
+    assert result.detail["artifact_count"] == 0
+    assert result.detail["valid_candidate_count"] == 0
+    assert result.detail["invalid_candidate_count"] == 0
+    assert result.detail["valid_bus_count"] == 0
+    assert result.detail["valid_main_count"] == 0
+    assert result.detail["valid_dca_count"] == 0
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["operator_review_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["fixture_closure_allowed_by_intake"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["promotion_families_requiring_surface"] == [
+        "bus_group_matrix",
+        "dca",
+        "master_bus",
+        "mix_balance",
+        "performance_adaptation",
+    ]
+    assert (
+        "operator_must_capture_bus_group_main_dca_physical_readback_artifact"
+        in result.detail["blocked_by"]
+    )
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_bus_group_main_dca_artifact_intake_authority(
+    monkeypatch,
+):
+    intake = release_check.build_bus_group_main_dca_physical_readback_artifact_intake()
+    corrupted = json.loads(json.dumps(intake))
+    corrupted["safety"]["live_write"] = True
+    corrupted["safety"]["fixture_closure_allowed_by_intake"] = True
+    corrupted["summary"]["physical_fixture_gap_remains"] = False
+    corrupted["summary"]["fixture_closure_allowed_by_intake"] = True
+    corrupted["summary"]["live_authority_granted"] = True
+    corrupted["summary"]["full_autonomous_ready"] = True
+
+    monkeypatch.setattr(
+        release_check,
+        "build_bus_group_main_dca_physical_readback_artifact_intake",
+        lambda: corrupted,
+    )
+
+    result = validate_bus_group_main_dca_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "failed"
+    assert "bus_group_main_dca_artifact_intake_live_write_not_false" in result.detail[
+        "violations"
+    ]
+    assert (
+        "bus_group_main_dca_artifact_intake_fixture_closure_allowed_by_intake_not_false"
+        in result.detail["violations"]
+    )
+    assert "bus_group_main_dca_artifact_intake_physical_gap_not_true" in result.detail[
+        "violations"
+    ]
+    assert (
+        "bus_group_main_dca_artifact_intake_fixture_closure_not_false"
+        in result.detail["violations"]
+    )
+    assert "bus_group_main_dca_artifact_intake_live_authority_not_false" in result.detail[
+        "violations"
+    ]
+    assert "bus_group_main_dca_artifact_intake_full_autonomous_not_false" in result.detail[
+        "violations"
+    ]
+
+
 def test_no_wing_release_check_validates_matrix_state_readback_contract_snapshot():
     result = validate_matrix_state_physical_readback_contract_snapshot()
 
@@ -1431,6 +1514,10 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         in fixture_check.command
     )
     assert "tests/test_bus_group_main_dca_physical_readback_contract.py" in fixture_check.command
+    assert (
+        "tests/test_bus_group_main_dca_physical_readback_artifact_intake.py"
+        in fixture_check.command
+    )
     assert "tests/test_matrix_state_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_fx_slots_inserts_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_routing_sends_physical_readback_contract.py" in fixture_check.command
@@ -1910,6 +1997,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "channel_processing_physical_readback_contract_schema" in result_names
     assert "channel_processing_physical_readback_artifact_intake_schema" in result_names
     assert "bus_group_main_dca_physical_readback_contract_schema" in result_names
+    assert "bus_group_main_dca_physical_readback_artifact_intake_schema" in result_names
     assert "matrix_state_physical_readback_contract_schema" in result_names
     assert "fx_slots_inserts_physical_readback_contract_schema" in result_names
     assert "routing_sends_physical_readback_contract_schema" in result_names
@@ -1953,6 +2041,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "bus_group_main_dca_physical_readback_contract_schema"
     )
     assert result_names.index("bus_group_main_dca_physical_readback_contract_schema") < result_names.index(
+        "bus_group_main_dca_physical_readback_artifact_intake_schema"
+    )
+    assert result_names.index("bus_group_main_dca_physical_readback_artifact_intake_schema") < result_names.index(
         "matrix_state_physical_readback_contract_schema"
     )
     assert result_names.index("matrix_state_physical_readback_contract_schema") < result_names.index(
@@ -3409,6 +3500,137 @@ def test_no_wing_release_check_summary_embeds_bus_group_main_dca_readback_contra
     assert "live_authority_granted: `false`" in markdown_summary
     assert "minimum_bus_count: `1`" in markdown_summary
     assert "target_consistency: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_bus_group_main_dca_artifact_intake(tmp_path):
+    result = CheckResult(
+        name="bus_group_main_dca_physical_readback_artifact_intake_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "intake_status": "operator_artifact_missing",
+            "schema_id": "bus_group_main_dca_physical_readback.v1",
+            "surface_id": "bus_group_main_dca_state",
+            "remediation_action_id": "remediate_bus_group_main_dca_state",
+            "required_contract_method_id": "bus_group_main_dca_physical_readback_contract",
+            "artifact_search_roots": [
+                "artifacts/read_surface_physical_readback/bus_group_main_dca",
+            ],
+            "artifact_count": 0,
+            "valid_candidate_count": 0,
+            "invalid_candidate_count": 0,
+            "valid_bus_count": 0,
+            "valid_main_count": 0,
+            "valid_dca_count": 0,
+            "accepted_as_physical_fixture_candidate": False,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_closure_allowed_by_intake": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "promotion_families_requiring_surface": [
+                "bus_group_matrix",
+                "dca",
+                "master_bus",
+                "mix_balance",
+                "performance_adaptation",
+            ],
+            "latest_valid_candidate_source_id": None,
+            "latest_valid_candidate_captured_at": None,
+            "blocked_by": [
+                "operator_must_capture_bus_group_main_dca_physical_readback_artifact",
+            ],
+            "artifact_source_ids": [],
+            "intake_violations": [],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert bus_group_main_dca_readback_artifact_intake_summary([result]) == summary[
+        "bus_group_main_dca_physical_readback_artifact_intake"
+    ]
+    intake = json_summary["bus_group_main_dca_physical_readback_artifact_intake"]
+    assert intake["read_only"] is True
+    assert intake["live_write"] is False
+    assert intake["mutates_console_state"] is False
+    assert intake["queries_console"] is False
+    assert intake["executes_tests"] is False
+    assert intake["operator_required"] is True
+    assert intake["execution_allowed_by_intake"] is False
+    assert intake["fixture_closure_allowed_by_intake"] is False
+    assert intake["full_autonomous_ready"] is False
+    assert intake["intake_status"] == "operator_artifact_missing"
+    assert intake["artifact_count"] == 0
+    assert intake["valid_bus_count"] == 0
+    assert intake["valid_main_count"] == 0
+    assert intake["valid_dca_count"] == 0
+    assert intake["accepted_as_physical_fixture_candidate"] is False
+    assert intake["operator_review_required"] is True
+    assert intake["physical_fixture_gap_remains"] is True
+    assert intake["live_authority_granted"] is False
+    assert intake["promotion_families_requiring_surface"] == [
+        "bus_group_matrix",
+        "dca",
+        "master_bus",
+        "mix_balance",
+        "performance_adaptation",
+    ]
+    assert "## Bus Group Main DCA Physical Readback Artifact Intake" in markdown_summary
+    assert "fixture_closure_allowed_by_intake: `false`" in markdown_summary
+    assert "operator_review_required: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_bus_group_main_dca_intake_summary_normalizes_authority_claims():
+    result = CheckResult(
+        name="bus_group_main_dca_physical_readback_artifact_intake_schema",
+        status="failed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "intake_status": "valid_operator_artifact_available",
+            "schema_id": "bus_group_main_dca_physical_readback.v1",
+            "surface_id": "bus_group_main_dca_state",
+            "remediation_action_id": "remediate_bus_group_main_dca_state",
+            "required_contract_method_id": "bus_group_main_dca_physical_readback_contract",
+            "artifact_count": 1,
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "valid_bus_count": 8,
+            "valid_main_count": 1,
+            "valid_dca_count": 8,
+            "accepted_as_physical_fixture_candidate": True,
+            "operator_review_required": False,
+            "physical_fixture_gap_remains": False,
+            "fixture_closure_allowed_by_intake": True,
+            "live_authority_granted": True,
+            "full_autonomous_ready": True,
+            "promotion_families_requiring_surface": ["dca"],
+            "blocked_by": [],
+            "artifact_source_ids": ["unsafe-bus.json"],
+            "intake_violations": [],
+            "violations": ["bus_group_main_dca_artifact_intake_live_authority_not_false"],
+        },
+    )
+
+    summary = bus_group_main_dca_readback_artifact_intake_summary([result])
+
+    assert summary["status"] == "failed"
+    assert summary["accepted_as_physical_fixture_candidate"] is False
+    assert summary["operator_review_required"] is True
+    assert summary["physical_fixture_gap_remains"] is True
+    assert summary["fixture_closure_allowed_by_intake"] is False
+    assert summary["live_authority_granted"] is False
+    assert summary["full_autonomous_ready"] is False
+    assert summary["violations"] == [
+        "bus_group_main_dca_artifact_intake_live_authority_not_false"
+    ]
 
 
 def test_no_wing_release_check_summary_embeds_matrix_state_readback_contract(tmp_path):

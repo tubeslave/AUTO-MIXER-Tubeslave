@@ -884,6 +884,27 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const busMainDcaContractBusAssignments = stringList(busMainDcaContract.required_bus_assignment_fields);
     const busMainDcaContractDcaAssignments = stringList(busMainDcaContract.required_dca_assignment_fields);
     const busMainDcaContractMetering = stringList(busMainDcaContract.required_metering_fields);
+    const busMainDcaIntake = asRecord(proofQuality.bus_group_main_dca_physical_readback_artifact_intake);
+    const busMainDcaIntakeAvailable = Boolean(busMainDcaIntake.available);
+    const busMainDcaIntakeStatus = str(busMainDcaIntake.intake_status, str(busMainDcaIntake.status, 'missing'));
+    const busMainDcaIntakeSchemaId = str(busMainDcaIntake.schema_id, '');
+    const busMainDcaIntakeSurfaceId = str(busMainDcaIntake.surface_id, '');
+    const busMainDcaIntakeActionId = str(busMainDcaIntake.remediation_action_id, '');
+    const busMainDcaIntakeArtifactCount = Math.trunc(num(busMainDcaIntake.artifact_count, 0));
+    const busMainDcaIntakeValidCount = Math.trunc(num(busMainDcaIntake.valid_candidate_count, 0));
+    const busMainDcaIntakeInvalidCount = Math.trunc(num(busMainDcaIntake.invalid_candidate_count, 0));
+    const busMainDcaIntakeValidBusCount = Math.trunc(num(busMainDcaIntake.valid_bus_count, 0));
+    const busMainDcaIntakeValidMainCount = Math.trunc(num(busMainDcaIntake.valid_main_count, 0));
+    const busMainDcaIntakeValidDcaCount = Math.trunc(num(busMainDcaIntake.valid_dca_count, 0));
+    const busMainDcaIntakeCandidate = busMainDcaIntake.accepted_as_physical_fixture_candidate === true;
+    const busMainDcaIntakeOperatorReview = busMainDcaIntake.operator_review_required === true;
+    const busMainDcaIntakeGapRemains = busMainDcaIntake.physical_fixture_gap_remains === true;
+    const busMainDcaIntakeClosureAllowed = busMainDcaIntake.fixture_closure_allowed_by_intake === true;
+    const busMainDcaIntakeLiveAuthority = busMainDcaIntake.live_authority_granted === true;
+    const busMainDcaIntakeTargetConsistency = busMainDcaIntake.target_consistency === true;
+    const busMainDcaIntakePromotionFamilies = stringList(busMainDcaIntake.promotion_families_requiring_surface);
+    const busMainDcaIntakeBlockedBy = stringList(busMainDcaIntake.blocked_by);
+    const busMainDcaIntakeSources = stringList(busMainDcaIntake.artifact_source_ids);
     const matrixStateContract = asRecord(proofQuality.matrix_state_physical_readback_contract);
     const matrixStateContractAvailable = Boolean(matrixStateContract.available);
     const matrixStateContractStatus = str(matrixStateContract.contract_status, str(matrixStateContract.status, 'missing'));
@@ -999,7 +1020,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; capture_plan:${readSurfaceCapturePlanStatus || 'missing'}; capture_steps:${readSurfaceCapturePlanStepCount}; capture_execution:${readSurfaceCapturePlanExecutionAllowed}; capture_target_gate:${readSurfaceCapturePlanTargetConsistency}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; raw_intake:${rawMixerIntakeStatus || 'missing'}; raw_intake_artifacts:${rawMixerIntakeArtifactCount}; raw_intake_valid:${rawMixerIntakeValidCount}; raw_intake_invalid:${rawMixerIntakeInvalidCount}; raw_intake_candidate:${rawMixerIntakeCandidate}; raw_intake_closure:${rawMixerIntakeClosureAllowed}; raw_intake_target_gate:${rawMixerIntakeTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; channel_intake:${channelBasicIntakeStatus || 'missing'}; channel_intake_artifacts:${channelBasicIntakeArtifactCount}; channel_intake_valid:${channelBasicIntakeValidCount}; channel_intake_invalid:${channelBasicIntakeInvalidCount}; channel_intake_valid_channels:${channelBasicIntakeValidChannelCount}; channel_intake_candidate:${channelBasicIntakeCandidate}; channel_intake_gap:${channelBasicIntakeGapRemains}; channel_intake_closure:${channelBasicIntakeClosureAllowed}; channel_intake_live_authority:${channelBasicIntakeLiveAuthority}; channel_intake_target_gate:${channelBasicIntakeTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; processing_intake:${channelProcessingIntakeStatus || 'missing'}; processing_intake_artifacts:${channelProcessingIntakeArtifactCount}; processing_intake_valid:${channelProcessingIntakeValidCount}; processing_intake_invalid:${channelProcessingIntakeInvalidCount}; processing_intake_valid_channels:${channelProcessingIntakeValidChannelCount}; processing_intake_candidate:${channelProcessingIntakeCandidate}; processing_intake_gap:${channelProcessingIntakeGapRemains}; processing_intake_closure:${channelProcessingIntakeClosureAllowed}; processing_intake_live_authority:${channelProcessingIntakeLiveAuthority}; processing_intake_target_gate:${channelProcessingIntakeTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}; scenes_contract:${snapshotsScenesContractStatus || 'missing'}; scenes_contract_gap:${snapshotsScenesContractGapRemains}; scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}; scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}; presets_contract:${userPresetsContractStatus || 'missing'}; presets_contract_gap:${userPresetsContractGapRemains}; presets_contract_live_authority:${userPresetsContractLiveAuthority}; presets_contract_target_gate:${userPresetsContractTargetConsistency}; dlive_contract:${dliveStateContractStatus || 'missing'}; dlive_contract_gap:${dliveStateContractGapRemains}; dlive_contract_live_authority:${dliveStateContractLiveAuthority}; dlive_contract_target_gate:${dliveStateContractTargetConsistency}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; capture_plan:${readSurfaceCapturePlanStatus || 'missing'}; capture_steps:${readSurfaceCapturePlanStepCount}; capture_execution:${readSurfaceCapturePlanExecutionAllowed}; capture_target_gate:${readSurfaceCapturePlanTargetConsistency}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; raw_intake:${rawMixerIntakeStatus || 'missing'}; raw_intake_artifacts:${rawMixerIntakeArtifactCount}; raw_intake_valid:${rawMixerIntakeValidCount}; raw_intake_invalid:${rawMixerIntakeInvalidCount}; raw_intake_candidate:${rawMixerIntakeCandidate}; raw_intake_closure:${rawMixerIntakeClosureAllowed}; raw_intake_target_gate:${rawMixerIntakeTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; channel_intake:${channelBasicIntakeStatus || 'missing'}; channel_intake_artifacts:${channelBasicIntakeArtifactCount}; channel_intake_valid:${channelBasicIntakeValidCount}; channel_intake_invalid:${channelBasicIntakeInvalidCount}; channel_intake_valid_channels:${channelBasicIntakeValidChannelCount}; channel_intake_candidate:${channelBasicIntakeCandidate}; channel_intake_gap:${channelBasicIntakeGapRemains}; channel_intake_closure:${channelBasicIntakeClosureAllowed}; channel_intake_live_authority:${channelBasicIntakeLiveAuthority}; channel_intake_target_gate:${channelBasicIntakeTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; processing_intake:${channelProcessingIntakeStatus || 'missing'}; processing_intake_artifacts:${channelProcessingIntakeArtifactCount}; processing_intake_valid:${channelProcessingIntakeValidCount}; processing_intake_invalid:${channelProcessingIntakeInvalidCount}; processing_intake_valid_channels:${channelProcessingIntakeValidChannelCount}; processing_intake_candidate:${channelProcessingIntakeCandidate}; processing_intake_gap:${channelProcessingIntakeGapRemains}; processing_intake_closure:${channelProcessingIntakeClosureAllowed}; processing_intake_live_authority:${channelProcessingIntakeLiveAuthority}; processing_intake_target_gate:${channelProcessingIntakeTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; bus_intake:${busMainDcaIntakeStatus || 'missing'}; bus_intake_artifacts:${busMainDcaIntakeArtifactCount}; bus_intake_valid:${busMainDcaIntakeValidCount}; bus_intake_invalid:${busMainDcaIntakeInvalidCount}; bus_intake_valid_buses:${busMainDcaIntakeValidBusCount}; bus_intake_valid_mains:${busMainDcaIntakeValidMainCount}; bus_intake_valid_dcas:${busMainDcaIntakeValidDcaCount}; bus_intake_candidate:${busMainDcaIntakeCandidate}; bus_intake_gap:${busMainDcaIntakeGapRemains}; bus_intake_closure:${busMainDcaIntakeClosureAllowed}; bus_intake_live_authority:${busMainDcaIntakeLiveAuthority}; bus_intake_target_gate:${busMainDcaIntakeTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}; scenes_contract:${snapshotsScenesContractStatus || 'missing'}; scenes_contract_gap:${snapshotsScenesContractGapRemains}; scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}; scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}; presets_contract:${userPresetsContractStatus || 'missing'}; presets_contract_gap:${userPresetsContractGapRemains}; presets_contract_live_authority:${userPresetsContractLiveAuthority}; presets_contract_target_gate:${userPresetsContractTargetConsistency}; dlive_contract:${dliveStateContractStatus || 'missing'}; dlive_contract_gap:${dliveStateContractGapRemains}; dlive_contract_live_authority:${dliveStateContractLiveAuthority}; dlive_contract_target_gate:${dliveStateContractTargetConsistency}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
@@ -1090,6 +1111,19 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `bus_contract_gap:${busMainDcaContractGapRemains}`,
         `bus_contract_live_authority:${busMainDcaContractLiveAuthority}`,
         `bus_contract_target_gate:${busMainDcaContractTargetConsistency}`,
+        `bus_intake_available:${busMainDcaIntakeAvailable}`,
+        `bus_intake_status:${busMainDcaIntakeStatus}`,
+        `bus_intake_artifacts:${busMainDcaIntakeArtifactCount}`,
+        `bus_intake_valid:${busMainDcaIntakeValidCount}`,
+        `bus_intake_invalid:${busMainDcaIntakeInvalidCount}`,
+        `bus_intake_valid_buses:${busMainDcaIntakeValidBusCount}`,
+        `bus_intake_valid_mains:${busMainDcaIntakeValidMainCount}`,
+        `bus_intake_valid_dcas:${busMainDcaIntakeValidDcaCount}`,
+        `bus_intake_candidate:${busMainDcaIntakeCandidate}`,
+        `bus_intake_gap:${busMainDcaIntakeGapRemains}`,
+        `bus_intake_closure_allowed:${busMainDcaIntakeClosureAllowed}`,
+        `bus_intake_live_authority:${busMainDcaIntakeLiveAuthority}`,
+        `bus_intake_target_gate:${busMainDcaIntakeTargetConsistency}`,
         `matrix_contract_available:${matrixStateContractAvailable}`,
         `matrix_contract_status:${matrixStateContractStatus}`,
         `matrix_contract_schema:${matrixStateContractSchemaId}`,
@@ -1518,6 +1552,63 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         : busMainDcaContractGapRemains
           ? 'yellow'
           : 'green'
+    });
+    rows.push({
+      moduleId: 'bus_group_main_dca_physical_readback_artifact_intake',
+      label: 'Bus/main/DCA readback artifact intake',
+      domain: 'read_surface_artifact_intake',
+      status: busMainDcaIntakeAvailable ? busMainDcaIntakeStatus || 'intake_available' : 'intake_missing',
+      entrypoint: 'build_bus_group_main_dca_physical_readback_artifact_intake',
+      module: busMainDcaIntakeActionId || 'no_intake_action',
+      uiSurface: 'Read-surface physical artifact intake',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${busMainDcaIntakeAvailable}`,
+        `schema:${busMainDcaIntakeSchemaId}`,
+        `surface:${busMainDcaIntakeSurfaceId}`,
+        `action:${busMainDcaIntakeActionId}`,
+        `artifacts:${busMainDcaIntakeArtifactCount}`,
+        `valid:${busMainDcaIntakeValidCount}`,
+        `invalid:${busMainDcaIntakeInvalidCount}`,
+        `valid_buses:${busMainDcaIntakeValidBusCount}`,
+        `valid_mains:${busMainDcaIntakeValidMainCount}`,
+        `valid_dcas:${busMainDcaIntakeValidDcaCount}`,
+        `candidate:${busMainDcaIntakeCandidate}`,
+        `operator_review:${busMainDcaIntakeOperatorReview}`,
+        `physical_gap_remains:${busMainDcaIntakeGapRemains}`,
+        `fixture_closure_allowed:${busMainDcaIntakeClosureAllowed}`,
+        `live_authority:${busMainDcaIntakeLiveAuthority}`,
+        `target_consistency:${busMainDcaIntakeTargetConsistency}`,
+        busMainDcaIntakePromotionFamilies.length ? `promotion_families:${busMainDcaIntakePromotionFamilies.join('|')}` : '',
+        busMainDcaIntakeSources.length ? `sources:${busMainDcaIntakeSources.join(',')}` : '',
+      ].filter(Boolean),
+      blockedReason: busMainDcaIntakeAvailable
+        ? busMainDcaIntakeBlockedBy.length
+          ? busMainDcaIntakeBlockedBy.join(', ')
+          : 'Bus/group/main/DCA artifact intake is present; manual review still gates fixture closure.'
+        : 'Bus/group/main/DCA physical artifact intake is missing from proof summary.',
+      nextStep: busMainDcaIntakeAvailable
+        ? [
+            busMainDcaIntakeSurfaceId ? `surface:${busMainDcaIntakeSurfaceId}` : '',
+            busMainDcaIntakeActionId ? `action:${busMainDcaIntakeActionId}` : '',
+            `artifacts:${busMainDcaIntakeArtifactCount}`,
+            `valid:${busMainDcaIntakeValidCount}`,
+            `invalid:${busMainDcaIntakeInvalidCount}`,
+            `valid_buses:${busMainDcaIntakeValidBusCount}`,
+            `valid_mains:${busMainDcaIntakeValidMainCount}`,
+            `valid_dcas:${busMainDcaIntakeValidDcaCount}`,
+            `candidate:${busMainDcaIntakeCandidate}`,
+            `operator_review:${busMainDcaIntakeOperatorReview}`,
+            `fixture_closure_allowed:${busMainDcaIntakeClosureAllowed}`,
+            `live_authority:${busMainDcaIntakeLiveAuthority}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with bus/group/main/DCA artifact-intake validation.',
+      tone: !busMainDcaIntakeAvailable || busMainDcaIntakeInvalidCount > 0 || busMainDcaIntakeClosureAllowed || busMainDcaIntakeLiveAuthority || !busMainDcaIntakeTargetConsistency
+        ? 'yellow'
+        : busMainDcaIntakeCandidate
+          ? 'yellow'
+          : 'yellow'
     });
     rows.push({
       moduleId: 'matrix_state_physical_readback_contract',
