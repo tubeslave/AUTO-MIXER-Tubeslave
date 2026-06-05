@@ -383,6 +383,35 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       ],
     },
     autonomy_promotion_readiness: {
+      summary: {
+        promotion_gap_summary: {
+          read_only: true,
+          live_write: false,
+          full_autonomous_ready: false,
+          gap_bucket_counts: {
+            autonomy_mode: 1,
+            read_surface: 1,
+            write_surface: 1,
+            evidence_requirement: 3,
+            proof: 0,
+          },
+          blocked_target_ids_by_bucket: {
+            autonomy_mode: ['scene_preset_supervised_promotion'],
+            read_surface: ['scene_preset_supervised_promotion'],
+            write_surface: ['scene_preset_supervised_promotion'],
+          },
+          evidence_requirement_ids_by_action_family: {
+            scene_preset: [
+              'current_scene_preset_cache_freshness',
+              'read_only_scoped_diff_evidence',
+              'read_only_rollback_evidence',
+            ],
+          },
+          next_required_evidence_by_action_family: {
+            scene_preset: ['Keep scene apply blocked.'],
+          },
+        },
+      },
       rows: [
         {
           id: 'scene_preset_supervised_promotion',
@@ -419,6 +448,10 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'write_surface:legacy_ws_to_osc_router',
       'safety_coverage:gain_supervised',
       'promotion_readiness:scene_preset_supervised_promotion',
+      'promotion_gap:autonomy_mode',
+      'promotion_gap:read_surface',
+      'promotion_gap:write_surface',
+      'promotion_gap:evidence_requirement',
     ],
   );
 
@@ -442,7 +475,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.equal(gainCoverage.blockedReason, 'Physical WING gain proof is not complete.');
   assert.equal(gainCoverage.tone, 'blue');
 
-  const scenePresetReadiness = rows[4];
+  const scenePresetReadiness = rows.find(row => row.moduleId === 'promotion_readiness:scene_preset_supervised_promotion');
   assert.equal(scenePresetReadiness.domain, 'promotion_readiness');
   assert.equal(scenePresetReadiness.canWriteLive, false);
   assert.deepEqual(scenePresetReadiness.liveWriteKinds, []);
@@ -452,6 +485,21 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.equal(scenePresetReadiness.tone, 'red');
   assert.match(scenePresetReadiness.blockedReason, /safety_status_blocked/);
   assert.match(scenePresetReadiness.nextStep, /read_only_scoped_diff_evidence/);
+
+  const readSurfaceGap = rows.find(row => row.moduleId === 'promotion_gap:read_surface');
+  assert.equal(readSurfaceGap.domain, 'promotion_gap');
+  assert.equal(readSurfaceGap.canWriteLive, false);
+  assert.deepEqual(readSurfaceGap.liveWriteKinds, []);
+  assert.equal(readSurfaceGap.status, 'blocked');
+  assert.equal(readSurfaceGap.entrypoint, 'read_surface');
+  assert.equal(readSurfaceGap.tone, 'red');
+  assert.match(readSurfaceGap.blockedReason, /scene_preset_supervised_promotion/);
+
+  const evidenceGap = rows.find(row => row.moduleId === 'promotion_gap:evidence_requirement');
+  assert.equal(evidenceGap.canWriteLive, false);
+  assert.equal(evidenceGap.module, 'all_promotion_targets');
+  assert.match(evidenceGap.nextStep, /read_only_scoped_diff_evidence/);
+  assert.match(evidenceGap.nextStep, /Keep scene apply blocked/);
 });
 
 test('adaptTelemetryAlertsSnapshot maps generated alert artifacts as read-only evidence', async () => {

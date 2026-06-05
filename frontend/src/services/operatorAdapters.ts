@@ -114,6 +114,12 @@ function str(value: unknown, fallback = ''): string {
   return next || fallback;
 }
 
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map(item => String(item)).filter(Boolean)
+    : [];
+}
+
 function timeLabel(value: unknown, fallback = 'now'): string {
   const raw = str(value);
   if (!raw) return fallback;
@@ -358,6 +364,14 @@ function toneForModuleStatus(status: string, canWriteLive: boolean): Tone {
   if (normalized === 'placeholder') return 'red';
   if (normalized === 'deprecated') return 'muted';
   return canWriteLive ? 'yellow' : 'blue';
+}
+
+function titleFromToken(value: string): string {
+  return value
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 function toneForTelemetrySeverity(severity: string): Tone {
@@ -616,24 +630,16 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
   });
 
   const readiness = asRecord(data.autonomy_promotion_readiness);
+  const readinessSummary = asRecord(readiness.summary);
+  const gapSummary = asRecord(readinessSummary.promotion_gap_summary);
   const readinessRows = asArray(readiness.rows).map(row => {
     const targetId = str(row.id, 'unknown_promotion_target');
     const status = str(row.status, 'unknown');
-    const blockers = Array.isArray(row.blockers)
-      ? row.blockers.map(item => String(item)).filter(Boolean)
-      : [];
-    const nextRequired = Array.isArray(row.next_required_evidence)
-      ? row.next_required_evidence.map(item => String(item)).filter(Boolean)
-      : [];
-    const evidenceRequirements = Array.isArray(row.evidence_requirement_ids)
-      ? row.evidence_requirement_ids.map(item => String(item)).filter(Boolean)
-      : [];
-    const readSurfaceStatuses = Array.isArray(row.read_surface_statuses)
-      ? row.read_surface_statuses.map(item => String(item)).filter(Boolean)
-      : [];
-    const writeSurfaceStatuses = Array.isArray(row.write_surface_statuses)
-      ? row.write_surface_statuses.map(item => String(item)).filter(Boolean)
-      : [];
+    const blockers = stringList(row.blockers);
+    const nextRequired = stringList(row.next_required_evidence);
+    const evidenceRequirements = stringList(row.evidence_requirement_ids);
+    const readSurfaceStatuses = stringList(row.read_surface_statuses);
+    const writeSurfaceStatuses = stringList(row.write_surface_statuses);
     const profileTags = [
       str(row.target_mode),
       str(row.safety_status),
@@ -664,7 +670,53 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     };
   });
 
-  return [...moduleRows, ...surfaceRows, ...coverageRows, ...readinessRows];
+  const gapCounts = asRecord(gapSummary.gap_bucket_counts);
+  const blockedByBucket = asRecord(gapSummary.blocked_target_ids_by_bucket);
+  const evidenceByFamily = asRecord(gapSummary.evidence_requirement_ids_by_action_family);
+  const nextByFamily = asRecord(gapSummary.next_required_evidence_by_action_family);
+  const evidenceText = Object.entries(evidenceByFamily)
+    .map(([family, values]) => {
+      const ids = stringList(values);
+      return ids.length ? `${family}: ${ids.join(', ')}` : '';
+    })
+    .filter(Boolean)
+    .join(' / ');
+  const nextEvidenceText = Object.entries(nextByFamily)
+    .map(([family, values]) => {
+      const ids = stringList(values);
+      return ids.length ? `${family}: ${ids.join(', ')}` : '';
+    })
+    .filter(Boolean)
+    .join(' / ');
+  const gapRows: ModuleStatusRecord[] = [];
+  Object.entries(gapCounts).forEach(([bucket, rawCount]) => {
+    const count = Math.trunc(num(rawCount, 0));
+    if (count <= 0) return;
+    const blockedTargets = stringList(blockedByBucket[bucket]);
+    const nextStep = [
+      bucket === 'evidence_requirement' && evidenceText ? `Evidence: ${evidenceText}` : '',
+      nextEvidenceText ? `Next: ${nextEvidenceText}` : 'Review promotion blockers before widening automation.'
+    ].filter(Boolean).join(' / ');
+    gapRows.push({
+      moduleId: `promotion_gap:${bucket}`,
+      label: `Autonomy gap: ${titleFromToken(bucket)}`,
+      domain: 'promotion_gap',
+      status: 'blocked',
+      entrypoint: bucket,
+      module: blockedTargets.length ? blockedTargets.join(', ') : 'all_promotion_targets',
+      uiSurface: 'Autonomy promotion gap summary',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [`gap_count:${count}`, ...blockedTargets],
+      blockedReason: blockedTargets.length
+        ? `${count} gap(s): ${blockedTargets.join(', ')}`
+        : `${count} promotion evidence gap(s).`,
+      nextStep,
+      tone: 'red'
+    });
+  });
+
+  return [...moduleRows, ...surfaceRows, ...coverageRows, ...readinessRows, ...gapRows];
 }
 
 export function adaptTelemetryAlertsSnapshot(payload: unknown): TelemetryAlertsSnapshot {

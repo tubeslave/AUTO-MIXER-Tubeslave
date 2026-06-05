@@ -42,6 +42,17 @@ REQUIRED_FULL_PROOF_FIELDS = (
     "emergency_stop_proof",
 )
 
+GAP_BUCKETS = (
+    "capability",
+    "safety",
+    "proof",
+    "read_surface",
+    "write_surface",
+    "autonomy_mode",
+    "evidence_requirement",
+    "other",
+)
+
 
 @dataclass(frozen=True)
 class PromotionTarget:
@@ -231,6 +242,63 @@ def _safety_full_proof_passed(row: Any) -> bool:
     return bool(row) and all(getattr(row, field_name) == "passed" for field_name in REQUIRED_FULL_PROOF_FIELDS)
 
 
+def _gap_bucket(blocker: str) -> str:
+    if blocker.startswith("capability_"):
+        return "capability"
+    if blocker.startswith("safety_"):
+        return "safety"
+    if blocker.startswith("read_surface_"):
+        return "read_surface"
+    if blocker.startswith("write_surface_") or blocker == "no_allowed_live_write_surface":
+        return "write_surface"
+    if blocker.startswith("mode_") or blocker == "not_autonomous_ready":
+        return "autonomy_mode"
+    if any(blocker.startswith(f"{field_name}_") for field_name in REQUIRED_FULL_PROOF_FIELDS):
+        return "proof"
+    return "other"
+
+
+def _append_unique(target: Dict[str, list], key: str, values: Iterable[str]) -> None:
+    bucket = target.setdefault(key, [])
+    for value in values:
+        if value and value not in bucket:
+            bucket.append(value)
+
+
+def _promotion_gap_summary(rows: Tuple["PromotionReadinessRow", ...]) -> Dict[str, Any]:
+    bucket_counts: Dict[str, int] = {bucket: 0 for bucket in GAP_BUCKETS}
+    blocked_target_ids_by_bucket: Dict[str, list] = {bucket: [] for bucket in GAP_BUCKETS}
+    evidence_by_action_family: Dict[str, list] = {}
+    next_by_action_family: Dict[str, list] = {}
+
+    for row in rows:
+        row_buckets = set()
+        for blocker in row.blockers:
+            bucket = _gap_bucket(blocker)
+            bucket_counts[bucket] += 1
+            row_buckets.add(bucket)
+        if row.evidence_requirement_ids:
+            bucket_counts["evidence_requirement"] += len(row.evidence_requirement_ids)
+            row_buckets.add("evidence_requirement")
+            _append_unique(evidence_by_action_family, row.action_family, row.evidence_requirement_ids)
+        _append_unique(next_by_action_family, row.action_family, row.next_required_evidence)
+        for bucket in row_buckets:
+            _append_unique(blocked_target_ids_by_bucket, bucket, (row.id,))
+
+    return {
+        "read_only": True,
+        "live_write": False,
+        "full_autonomous_ready": False,
+        "gap_bucket_counts": bucket_counts,
+        "blocked_target_ids_by_bucket": {
+            bucket: ids for bucket, ids in blocked_target_ids_by_bucket.items() if ids
+        },
+        "evidence_requirement_ids_by_action_family": evidence_by_action_family,
+        "next_required_evidence_by_action_family": next_by_action_family,
+        "claim": "promotion gaps are aggregated for planning only; this summary grants no live authority",
+    }
+
+
 def _target_readiness(target: PromotionTarget, *, full_autonomous_blocked: bool) -> PromotionReadinessRow:
     capabilities = _capabilities(target.capability_ids)
     safety = get_safety_coverage_row(target.safety_row_id) if target.safety_row_id else None
@@ -369,6 +437,7 @@ def build_autonomy_promotion_readiness_snapshot() -> Dict[str, Any]:
                 "real_wing_and_emergency_stop_proof_incomplete",
             ],
             "next_global_step": "Run proof gates per action family before widening supervised or autonomous live writes.",
+            "promotion_gap_summary": _promotion_gap_summary(rows),
         },
         "rows": [row.to_dict() for row in rows],
     }

@@ -145,3 +145,36 @@ def test_readiness_snapshot_serializes_evidence_requirement_ids():
         "scene_preset_physical_fixture",
         "hardware_readback_and_rollback_proof",
     ]
+
+
+def test_readiness_snapshot_groups_autonomy_gaps_without_granting_authority():
+    snapshot = build_autonomy_promotion_readiness_snapshot()
+    gap_summary = snapshot["summary"]["promotion_gap_summary"]
+
+    assert gap_summary["read_only"] is True
+    assert gap_summary["live_write"] is False
+    assert gap_summary["full_autonomous_ready"] is False
+    assert gap_summary["gap_bucket_counts"]["autonomy_mode"] >= snapshot["summary"]["target_count"]
+    assert gap_summary["gap_bucket_counts"]["proof"] > 0
+    assert gap_summary["gap_bucket_counts"]["read_surface"] > 0
+    assert gap_summary["gap_bucket_counts"]["write_surface"] > 0
+    assert gap_summary["gap_bucket_counts"]["evidence_requirement"] >= 12
+
+    blocked_by_bucket = gap_summary["blocked_target_ids_by_bucket"]
+    assert "fader_supervised_promotion" in blocked_by_bucket["autonomy_mode"]
+    assert "scene_preset_supervised_promotion" in blocked_by_bucket["read_surface"]
+    assert "scene_preset_supervised_promotion" in blocked_by_bucket["write_surface"]
+    assert "routing_supervised_promotion" in blocked_by_bucket["safety"]
+
+    evidence_by_family = gap_summary["evidence_requirement_ids_by_action_family"]
+    assert evidence_by_family["routing"] == [
+        "current_route_cache_freshness",
+        "route_diff_evidence",
+        "source_identity_downstream_trust",
+        "routing_physical_fixture",
+        "hardware_readback_and_rollback_proof",
+    ]
+    assert "read_only_scoped_diff_evidence" in evidence_by_family["scene_preset"]
+
+    next_by_family = gap_summary["next_required_evidence_by_action_family"]
+    assert any("Keep scene apply blocked" in item for item in next_by_family["scene_preset"])

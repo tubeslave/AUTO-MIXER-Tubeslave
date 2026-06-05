@@ -56,6 +56,8 @@ class AutonomyModeGateRow:
     current_live_write_kinds: Tuple[str, ...]
     promotion_target_ids: Tuple[str, ...]
     evidence_statuses: Tuple[str, ...]
+    readiness_gap_bucket_counts: Dict[str, int]
+    readiness_gap_target_ids_by_bucket: Dict[str, Tuple[str, ...]]
     blockers: Tuple[str, ...]
     next_required_actions: Tuple[str, ...]
 
@@ -73,10 +75,14 @@ class AutonomyModeGateRow:
             "current_live_write_kinds",
             "promotion_target_ids",
             "evidence_statuses",
+            "readiness_gap_target_ids_by_bucket",
             "blockers",
             "next_required_actions",
         ):
-            payload[key] = list(payload[key])
+            if key == "readiness_gap_target_ids_by_bucket":
+                payload[key] = {bucket: list(ids) for bucket, ids in payload[key].items()}
+            else:
+                payload[key] = list(payload[key])
         return payload
 
 
@@ -147,6 +153,45 @@ def _proof_overlay_blockers(overlay: Mapping[str, Any]) -> Tuple[str, ...]:
     return tuple(blockers)
 
 
+def _promotion_gap_summary(readiness: Mapping[str, Any]) -> Mapping[str, Any]:
+    summary = readiness.get("summary") if isinstance(readiness.get("summary"), Mapping) else {}
+    gap_summary = summary.get("promotion_gap_summary")
+    return gap_summary if isinstance(gap_summary, Mapping) else {}
+
+
+def _gap_bucket_counts(gap_summary: Mapping[str, Any]) -> Dict[str, int]:
+    counts = gap_summary.get("gap_bucket_counts")
+    if not isinstance(counts, Mapping):
+        return {}
+    return {
+        str(bucket): max(0, int(count or 0))
+        for bucket, count in counts.items()
+        if int(count or 0) > 0
+    }
+
+
+def _gap_target_ids_by_bucket(gap_summary: Mapping[str, Any]) -> Dict[str, Tuple[str, ...]]:
+    targets = gap_summary.get("blocked_target_ids_by_bucket")
+    if not isinstance(targets, Mapping):
+        return {}
+    normalized: Dict[str, Tuple[str, ...]] = {}
+    for bucket, values in targets.items():
+        if not isinstance(values, list):
+            continue
+        ids = tuple(str(value) for value in values if value)
+        if ids:
+            normalized[str(bucket)] = ids
+    return normalized
+
+
+def _gap_bucket_blockers(gap_bucket_counts: Mapping[str, int]) -> Tuple[str, ...]:
+    return tuple(
+        f"readiness_gap_{bucket}"
+        for bucket, count in gap_bucket_counts.items()
+        if count > 0
+    )
+
+
 def _row_for_mode(
     mode: str,
     *,
@@ -159,6 +204,9 @@ def _row_for_mode(
     project_mode = policy.get("project_mode") if isinstance(policy.get("project_mode"), Mapping) else {}
     capabilities = policy.get("capabilities") if isinstance(policy.get("capabilities"), Mapping) else {}
     readiness_rows = _readiness_rows_by_id(readiness)
+    gap_summary = _promotion_gap_summary(readiness)
+    gap_bucket_counts = _gap_bucket_counts(gap_summary)
+    gap_target_ids_by_bucket = _gap_target_ids_by_bucket(gap_summary)
     overlay_rows = _overlay_rows_by_target(overlay)
     blockers = []
     next_actions = []
@@ -201,6 +249,7 @@ def _row_for_mode(
             if item
         )
         blockers.extend(_proof_overlay_blockers(overlay))
+        blockers.extend(_gap_bucket_blockers(gap_bucket_counts))
         next_actions.append("Complete all supervised proof gates before Full Autonomous mode can be reviewed.")
 
     if mode != MODE_AUTO:
@@ -223,6 +272,8 @@ def _row_for_mode(
         current_live_write_kinds=current_live_write_kinds if live_apply_allowed else (),
         promotion_target_ids=target_ids,
         evidence_statuses=_unique(evidence_statuses),
+        readiness_gap_bucket_counts=gap_bucket_counts,
+        readiness_gap_target_ids_by_bucket=gap_target_ids_by_bucket,
         blockers=_unique(tuple(blockers)),
         next_required_actions=_unique(tuple(next_actions)),
     )

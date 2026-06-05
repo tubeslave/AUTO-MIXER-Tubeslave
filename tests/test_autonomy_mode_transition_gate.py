@@ -82,6 +82,11 @@ def test_gate_keeps_analysis_and_assist_available_while_auto_is_blocked():
     assert rows["auto"]["status"] == "blocked"
     assert rows["auto"]["runtime_entry_allowed"] is False
     assert rows["auto"]["autonomous_apply_allowed"] is False
+    assert rows["auto"]["readiness_gap_bucket_counts"]["read_surface"] > 0
+    assert rows["auto"]["readiness_gap_bucket_counts"]["write_surface"] > 0
+    assert "readiness_gap_read_surface" in rows["auto"]["blockers"]
+    assert "readiness_gap_write_surface" in rows["auto"]["blockers"]
+    assert "scene_preset_supervised_promotion" in rows["auto"]["readiness_gap_target_ids_by_bucket"]["read_surface"]
     assert gate["summary"]["autonomous_apply_allowed_modes"] == []
 
 
@@ -104,6 +109,8 @@ def test_gate_reports_supervised_as_limited_and_blocks_expansion_from_proof_over
     assert "manual_safety_review_candidate" in supervised["evidence_statuses"]
     assert "proof_remediation_required_before_promotion" in supervised["blockers"]
     assert "supervised_mode_is_narrow_fader_gain_only" in supervised["blockers"]
+    assert supervised["readiness_gap_bucket_counts"]["read_surface"] > 0
+    assert "readiness_gap_read_surface" not in supervised["blockers"]
     assert "supervised" in gate["summary"]["live_apply_allowed_modes"]
     assert gate["summary"]["blocked_modes"] == ["auto"]
 
@@ -122,3 +129,5 @@ def test_gate_blocks_supervised_when_static_policy_has_no_live_target_even_with_
     assert rows["supervised"]["status"] == "blocked"
     assert rows["supervised"]["runtime_entry_allowed"] is False
     assert rows["supervised"]["live_apply_allowed"] is False
+    assert rows["supervised"]["readiness_gap_bucket_counts"] == {}
+    assert rows["supervised"]["readiness_gap_target_ids_by_bucket"] == {}
