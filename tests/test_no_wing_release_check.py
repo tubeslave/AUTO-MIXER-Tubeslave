@@ -148,6 +148,42 @@ def test_no_wing_release_check_rejects_read_surface_fixture_summary_row_drift(mo
     assert "read_surface_fixture_physical_missing_surface_ids_mismatch" in result.detail["violations"]
 
 
+def test_no_wing_release_check_rejects_read_surface_fixture_stale_declarations(monkeypatch):
+    snapshot = release_check.build_read_surface_fixture_evidence_snapshot()
+    corrupted = json.loads(json.dumps(snapshot))
+
+    channel_row = next(
+        row
+        for row in corrupted["surfaces"]
+        if row["surface_id"] == "channel_identity_and_basic_controls"
+    )
+    channel_row["fixture_paths"] = ["tests/missing_read_surface_fixture.py"]
+    channel_row["test_names"] = ["test_missing_read_surface_fixture"]
+
+    raw_row = next(row for row in corrupted["surfaces"] if row["surface_id"] == "raw_mixer_state_cache")
+    raw_row["fixture_paths"] = ["backend/server.py"]
+    raw_row["test_names"] = ["test_read_surface_inventory_is_read_only_and_unique"]
+
+    dlive_row = next(row for row in corrupted["surfaces"] if row["surface_id"] == "dlive_state")
+    dlive_row["status"] = "missing_fixture_evidence"
+
+    monkeypatch.setattr(
+        release_check,
+        "build_read_surface_fixture_evidence_snapshot",
+        lambda: corrupted,
+    )
+
+    result = validate_read_surface_fixture_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert "read_surface_fixture_row_channel_identity_and_basic_controls_fixture_path_missing" in result.detail["violations"]
+    assert "read_surface_fixture_row_channel_identity_and_basic_controls_test_name_missing" in result.detail["violations"]
+    assert "read_surface_fixture_row_raw_mixer_state_cache_fixture_path_not_tests" in result.detail["violations"]
+    assert "read_surface_fixture_row_raw_mixer_state_cache_test_name_missing" in result.detail["violations"]
+    assert "read_surface_fixture_row_dlive_state_missing_status_has_fixture_paths" in result.detail["violations"]
+    assert "read_surface_fixture_row_dlive_state_missing_status_has_test_names" in result.detail["violations"]
+
+
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_frontend=False, quick=True)
 

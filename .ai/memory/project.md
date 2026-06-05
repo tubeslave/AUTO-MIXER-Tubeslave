@@ -55,6 +55,7 @@
 - Proof-report artifacts need freshness metadata in Product Layer and cockpit rows; stale proof remains read-only evidence and should trigger rerun/review before any promotion discussion.
 - Settings proof-evidence visibility should show source freshness and autonomy overlay status as read-only operator evidence; browser/e2e coverage must keep no-live-write command assertions in the same path.
 - no-WING read-surface fixture evidence summaries must be recomputed from row data at the release gate; stale or malformed summary counts should fail validation while keeping physical readback gaps visible.
+- no-WING read-surface fixture evidence rows must validate declared `tests/...` files and pytest function names at the release gate; stale fixture declarations are missing evidence, not proof.
 
 ## Memory Pipeline Lessons
 

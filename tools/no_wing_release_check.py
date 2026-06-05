@@ -10,6 +10,7 @@ write commands.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import re
@@ -470,6 +471,16 @@ def _json_object_from_path(path: Path) -> tuple[Mapping[str, Any] | None, str | 
     return payload, None
 
 
+def _declared_pytest_functions(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.startswith("test_")
+    }
+
+
 def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -580,6 +591,9 @@ def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
     expected_status_counts = {status: 0 for status in sorted(FIXTURE_EVIDENCE_STATUSES)}
     expected_physical_missing: list[str] = []
     expected_surface_with_fixture_count = 0
+    declared_tests_by_path: dict[str, set[str]] = {}
+    declared_fixture_path_count = 0
+    declared_test_name_count = 0
     for index, row in enumerate(surfaces):
         if not isinstance(row, Mapping):
             violations.append(f"read_surface_fixture_row_{index}_not_object")
@@ -602,6 +616,69 @@ def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
             violations.append(f"read_surface_fixture_row_{surface_id}_remaining_gaps_missing")
         if "physical_readback_fixture_missing" in remaining_gaps:
             expected_physical_missing.append(surface_id)
+        fixture_paths_value = row.get("fixture_paths")
+        if not isinstance(fixture_paths_value, list):
+            fixture_paths: list[object] = []
+            violations.append(f"read_surface_fixture_row_{surface_id}_fixture_paths_not_list")
+        else:
+            fixture_paths = list(fixture_paths_value)
+        test_names_value = row.get("test_names")
+        if not isinstance(test_names_value, list):
+            test_names: list[object] = []
+            violations.append(f"read_surface_fixture_row_{surface_id}_test_names_not_list")
+        else:
+            test_names = list(test_names_value)
+        declared_fixture_path_count += len(fixture_paths)
+        declared_test_name_count += len(test_names)
+        if status == "missing_fixture_evidence":
+            if fixture_paths:
+                violations.append(f"read_surface_fixture_row_{surface_id}_missing_status_has_fixture_paths")
+            if test_names:
+                violations.append(f"read_surface_fixture_row_{surface_id}_missing_status_has_test_names")
+            continue
+        if not fixture_paths:
+            violations.append(f"read_surface_fixture_row_{surface_id}_fixture_paths_missing")
+        if not test_names:
+            violations.append(f"read_surface_fixture_row_{surface_id}_test_names_missing")
+        available_tests: set[str] = set()
+        for value in fixture_paths:
+            if not isinstance(value, str) or not value.strip():
+                violations.append(f"read_surface_fixture_row_{surface_id}_fixture_path_invalid")
+                continue
+            relative_path = value.strip()
+            path_parts = Path(relative_path).parts
+            if Path(relative_path).is_absolute() or ".." in path_parts or not path_parts or path_parts[0] != "tests":
+                violations.append(f"read_surface_fixture_row_{surface_id}_fixture_path_not_tests")
+                continue
+            fixture_path = REPO_ROOT / relative_path
+            try:
+                resolved_fixture_path = fixture_path.resolve()
+                resolved_repo_root = REPO_ROOT.resolve()
+                if resolved_fixture_path != resolved_repo_root and resolved_repo_root not in resolved_fixture_path.parents:
+                    violations.append(f"read_surface_fixture_row_{surface_id}_fixture_path_escapes_repo")
+                    continue
+            except OSError:
+                violations.append(f"read_surface_fixture_row_{surface_id}_fixture_path_unresolvable")
+                continue
+            if not fixture_path.exists():
+                violations.append(f"read_surface_fixture_row_{surface_id}_fixture_path_missing")
+                continue
+            if not fixture_path.is_file():
+                violations.append(f"read_surface_fixture_row_{surface_id}_fixture_path_not_file")
+                continue
+            if relative_path not in declared_tests_by_path:
+                try:
+                    declared_tests_by_path[relative_path] = _declared_pytest_functions(fixture_path)
+                except (OSError, SyntaxError, UnicodeDecodeError):
+                    declared_tests_by_path[relative_path] = set()
+                    violations.append(f"read_surface_fixture_row_{surface_id}_fixture_path_unreadable")
+            available_tests.update(declared_tests_by_path[relative_path])
+        for value in test_names:
+            if not isinstance(value, str) or not value.startswith("test_"):
+                violations.append(f"read_surface_fixture_row_{surface_id}_test_name_invalid")
+                continue
+            if value not in available_tests:
+                violations.append(f"read_surface_fixture_row_{surface_id}_test_name_missing")
 
     normalized_status_counts = {status: 0 for status in sorted(FIXTURE_EVIDENCE_STATUSES)}
     for key, value in status_counts.items():
@@ -652,6 +729,8 @@ def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
     detail["surface_with_fixture_count"] = summary_surface_with_fixture_count
     detail["status_counts"] = dict(status_counts)
     detail["physical_fixture_missing_surface_ids"] = list(physical_missing)
+    detail["declared_fixture_path_count"] = declared_fixture_path_count
+    detail["declared_test_name_count"] = declared_test_name_count
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)
     return CheckResult(
