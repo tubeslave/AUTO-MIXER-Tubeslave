@@ -438,6 +438,51 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
         },
       ],
     },
+    autonomy_mode_transition_gate: {
+      rows: [
+        {
+          mode: 'analyze',
+          project_mode_name: 'Analysis Mode',
+          status: 'available',
+          runtime_entry_allowed: true,
+          proposal_creation_allowed: false,
+          live_apply_allowed: false,
+          current_live_write_kinds: [],
+          blockers: ['mode_has_no_live_apply_authority'],
+          next_required_actions: [],
+          readiness_gap_bucket_counts: {},
+        },
+        {
+          mode: 'supervised',
+          project_mode_name: 'Supervised AutoMix Mode',
+          status: 'limited_available',
+          runtime_entry_allowed: true,
+          proposal_creation_allowed: true,
+          live_apply_allowed: true,
+          current_live_write_kinds: ['fader', 'gain'],
+          blockers: ['supervised_mode_is_narrow_fader_gain_only'],
+          next_required_actions: ['Keep physical proof review manual.'],
+          readiness_gap_bucket_counts: {
+            read_surface: 1,
+          },
+        },
+        {
+          mode: 'auto',
+          project_mode_name: 'Full Autonomous Mixing Mode',
+          status: 'blocked',
+          runtime_entry_allowed: false,
+          proposal_creation_allowed: true,
+          live_apply_allowed: false,
+          current_live_write_kinds: [],
+          blockers: ['readiness_gap_read_surface', 'full_autonomous_mode_remains_blocked'],
+          next_required_actions: ['Complete all supervised proof gates before Full Autonomous mode can be reviewed.'],
+          readiness_gap_bucket_counts: {
+            read_surface: 14,
+            write_surface: 19,
+          },
+        },
+      ],
+    },
   });
 
   assert.deepEqual(
@@ -447,6 +492,9 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'write_surface:product_layer_fader_gain_apply',
       'write_surface:legacy_ws_to_osc_router',
       'safety_coverage:gain_supervised',
+      'mode_gate:analyze',
+      'mode_gate:supervised',
+      'mode_gate:auto',
       'promotion_readiness:scene_preset_supervised_promotion',
       'promotion_gap:autonomy_mode',
       'promotion_gap:read_surface',
@@ -474,6 +522,32 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.equal(gainCoverage.canWriteLive, false);
   assert.equal(gainCoverage.blockedReason, 'Physical WING gain proof is not complete.');
   assert.equal(gainCoverage.tone, 'blue');
+
+  const analysisMode = rows.find(row => row.moduleId === 'mode_gate:analyze');
+  assert.equal(analysisMode.domain, 'autonomy_mode_gate');
+  assert.equal(analysisMode.label, 'Analysis Mode');
+  assert.equal(analysisMode.canWriteLive, false);
+  assert.deepEqual(analysisMode.liveWriteKinds, []);
+  assert.equal(analysisMode.tone, 'green');
+  assert.match(analysisMode.blockedReason, /mode_has_no_live_apply_authority/);
+
+  const supervisedMode = rows.find(row => row.moduleId === 'mode_gate:supervised');
+  assert.equal(supervisedMode.label, 'Supervised AutoMix Mode');
+  assert.equal(supervisedMode.status, 'limited_available');
+  assert.equal(supervisedMode.canWriteLive, false);
+  assert.deepEqual(supervisedMode.liveWriteKinds, []);
+  assert.equal(supervisedMode.tone, 'yellow');
+  assert.match(supervisedMode.module, /policy:fader,gain/);
+  assert.match(supervisedMode.nextStep, /Current policy live-write kinds: fader, gain/);
+
+  const autoMode = rows.find(row => row.moduleId === 'mode_gate:auto');
+  assert.equal(autoMode.label, 'Full Autonomous Mixing Mode');
+  assert.equal(autoMode.status, 'blocked');
+  assert.equal(autoMode.canWriteLive, false);
+  assert.deepEqual(autoMode.liveWriteKinds, []);
+  assert.equal(autoMode.tone, 'red');
+  assert.match(autoMode.blockedReason, /full_autonomous_mode_remains_blocked/);
+  assert.match(autoMode.nextStep, /Full Auto gaps: read_surface:14, write_surface:19/);
 
   const scenePresetReadiness = rows.find(row => row.moduleId === 'promotion_readiness:scene_preset_supervised_promotion');
   assert.equal(scenePresetReadiness.domain, 'promotion_readiness');
@@ -599,6 +673,18 @@ test('Settings bottom section grid has one column per read-only section card', a
   for (const title of sectionTitles) {
     assert.match(source, new RegExp(`<Panel title="${title}"`));
   }
+});
+
+test('Settings Mode Policy panel summarizes read-only mode gate rows', async () => {
+  const source = await fs.readFile(path.join(srcRoot, 'views/SettingsView.tsx'), 'utf8');
+
+  assert.match(source, /function modePolicyRows/);
+  assert.match(source, /modeGateRow\(modules, 'supervised'\)/);
+  assert.match(source, /modeGateRow\(modules, 'auto'\)/);
+  assert.match(source, /current_write:/);
+  assert.match(source, /Full Auto/);
+  assert.match(source, /<Panel title="Mode Policy">/);
+  assert.match(source, /rows=\{modeRows\.slice\(0, 2\)\}/);
 });
 
 test('directorDecisionRows preserves backend task status instead of forcing applied', async () => {

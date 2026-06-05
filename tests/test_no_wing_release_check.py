@@ -4,14 +4,19 @@ from pathlib import Path
 
 import pytest
 
+from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_status
 from tools import no_wing_release_check as release_check
 from tools.no_wing_release_check import (
     CheckResult,
     CommandCheck,
+    autonomy_gap_rollup_summary,
     build_checks,
+    current_supervised_live_write_kinds,
+    proof_report_path_for_run,
     run_command_check,
     run_release_checks,
     validate_no_live_commands,
+    validate_supervised_proof_report_gap_rollup,
     write_summary,
 )
 
@@ -72,6 +77,29 @@ def test_no_wing_release_check_can_disable_command_timeouts(tmp_path):
     assert all(check.timeout_sec is None for check in checks)
 
 
+def test_no_wing_release_check_allows_configured_git_binary(tmp_path, monkeypatch):
+    monkeypatch.setenv("AUTOMIXER_GIT_BIN", "/custom/git")
+
+    checks = build_checks(run_dir=tmp_path, include_frontend=False)
+    diff_check = next(check for check in checks if check.name == "diff_check")
+
+    assert diff_check.command == ("/custom/git", "diff", "--check")
+
+
+def test_no_wing_release_check_derives_supervised_boundary_from_operator_policy():
+    policy_status = build_operator_mode_status(
+        mode=MODE_SUPERVISED,
+        connection_mode="wing",
+        wing_boundary_active=True,
+        auto_mode_unlocked=False,
+    )
+
+    assert current_supervised_live_write_kinds() == tuple(
+        policy_status["capabilities"]["allowed_live_write_kinds"]
+    )
+    assert current_supervised_live_write_kinds() == ("fader", "gain")
+
+
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_frontend=False, quick=True)
 
@@ -95,6 +123,141 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command
+    assert str(proof_report_path_for_run(tmp_path)) in report_check.command
+
+
+def valid_proof_report_with_gap_rollup() -> dict:
+    return {
+        "type": "supervised_proof_artifact_report",
+        "summary": {
+            "autonomy_gap_rollup": {
+                "read_only": True,
+                "live_write": False,
+                "live_widening_allowed": False,
+                "full_autonomous_ready": False,
+                "source": "autonomy_mode_transition_gate.rows[mode=auto]",
+                "full_autonomous_blocked": True,
+                "full_auto_gap_bucket_counts": {"read_surface": 1},
+                "supervised_current_live_write_kinds": ["fader", "gain"],
+                "next_required_evidence": [
+                    "Reduce every Full Autonomous readiness gap bucket to zero before reviewing auto mode.",
+                    "Keep live apply limited to current supervised write kinds until physical readback and rollback evidence exists.",
+                ],
+                "claim": (
+                    "Full Autonomous remains blocked; this rollup is report-only and does not widen "
+                    "the current supervised fader/gain live-write boundary."
+                ),
+            }
+        },
+        "autonomy_mode_transition_gate": {
+            "summary": {
+                "autonomous_apply_allowed_modes": [],
+                "blocked_modes": ["auto"],
+            }
+        },
+    }
+
+
+def test_no_wing_release_check_validates_proof_report_gap_rollup_schema(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    report_path.write_text(json.dumps(valid_proof_report_with_gap_rollup()), encoding="utf-8")
+
+    result = validate_supervised_proof_report_gap_rollup(report_path)
+
+    assert result.status == "passed"
+    assert result.detail["autonomy_gap_rollup_present"] is True
+    assert result.detail["full_auto_gap_bucket_counts"] == {"read_surface": 1}
+    assert result.detail["supervised_current_live_write_kinds"] == ["fader", "gain"]
+    assert result.detail["policy_supervised_live_write_kinds"] == ["fader", "gain"]
+
+
+def test_no_wing_release_check_rejects_missing_proof_report_gap_rollup(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "type": "supervised_proof_artifact_report",
+                "summary": {},
+                "autonomy_mode_transition_gate": {
+                    "summary": {"autonomous_apply_allowed_modes": [], "blocked_modes": ["auto"]}
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_supervised_proof_report_gap_rollup(report_path)
+
+    assert result.status == "failed"
+    assert "autonomy_gap_rollup_read_only_not_true" in result.detail["violations"]
+    assert "autonomy_gap_rollup_bucket_counts_missing" in result.detail["violations"]
+    assert "autonomy_gap_rollup_source_not_auto_mode_gate_row" in result.detail["violations"]
+
+
+def test_no_wing_release_check_rejects_misleading_proof_report_gap_rollup_claims(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    rollup = payload["summary"]["autonomy_gap_rollup"]
+    rollup["source"] = "manual_summary"
+    rollup["claim"] = "Full Autonomous is ready for wider live apply."
+    rollup["next_required_evidence"] = []
+    rollup["supervised_current_live_write_kinds"] = ["fader", "gain", "eq"]
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_gap_rollup(report_path)
+
+    assert result.status == "failed"
+    assert "autonomy_gap_rollup_source_not_auto_mode_gate_row" in result.detail["violations"]
+    assert "autonomy_gap_rollup_claim_does_not_preserve_auto_block" in result.detail["violations"]
+    assert "autonomy_gap_rollup_claim_does_not_preserve_live_boundary" in result.detail["violations"]
+    assert "autonomy_gap_rollup_next_required_evidence_missing" in result.detail["violations"]
+    assert "autonomy_gap_rollup_unexpected_supervised_live_write_kinds" in result.detail["violations"]
+    assert result.detail["unexpected_supervised_live_write_kinds"] == ["eq"]
+
+
+def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, monkeypatch):
+    def fake_free_port(port: int, host: str = "127.0.0.1") -> CheckResult:
+        return CheckResult(
+            name="backend_port_free",
+            status="passed",
+            started_at="2026-06-05T00:00:00Z",
+            finished_at="2026-06-05T00:00:00Z",
+            duration_sec=0.0,
+            detail={"host": host, "port": port, "listener_detected": False},
+        )
+
+    def fake_command_check(check: CommandCheck, log_dir: Path) -> CheckResult:
+        if check.name == "supervised_proof_artifact_report":
+            report_path = proof_report_path_for_run(log_dir.parent)
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(json.dumps(valid_proof_report_with_gap_rollup()), encoding="utf-8")
+        return CheckResult(
+            name=check.name,
+            status="passed",
+            started_at="2026-06-05T00:00:00Z",
+            finished_at="2026-06-05T00:00:00Z",
+            duration_sec=0.0,
+            command=check.shell_display(),
+            cwd=check.cwd,
+            returncode=0,
+        )
+
+    monkeypatch.setattr(release_check, "check_port_free", fake_free_port)
+    monkeypatch.setattr(release_check, "run_command_check", fake_command_check)
+
+    summary = run_release_checks(
+        artifact_root=tmp_path,
+        include_frontend=False,
+        quick=True,
+        command_timeout_sec=None,
+    )
+
+    result_names = [result["name"] for result in summary["results"]]
+    assert summary["status"] == "passed"
+    assert "supervised_proof_report_gap_rollup_schema" in result_names
+    assert result_names.index("supervised_proof_artifact_report") < result_names.index(
+        "supervised_proof_report_gap_rollup_schema"
+    )
 
 
 def test_no_wing_release_check_rejects_forbidden_live_command():
@@ -609,6 +772,40 @@ def test_no_wing_release_check_summary_reports_failed_checks(tmp_path):
     assert summary["failed_checks"] == ["example_check"]
     assert json.loads((tmp_path / "summary.json").read_text())["status"] == "failed"
     assert "`example_check`: `failed`" in (tmp_path / "summary.md").read_text()
+
+
+def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
+    result = CheckResult(
+        name="supervised_proof_report_gap_rollup_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "autonomy_gap_rollup_present": True,
+            "full_auto_gap_bucket_counts": {"read_surface": 14, "write_surface": 19},
+            "supervised_current_live_write_kinds": ["fader", "gain"],
+            "policy_supervised_live_write_kinds": ["fader", "gain"],
+            "unexpected_supervised_live_write_kinds": [],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert autonomy_gap_rollup_summary([result]) == summary["autonomy_gap_rollup"]
+    assert json_summary["autonomy_gap_rollup"]["full_auto_gap_bucket_counts"] == {
+        "read_surface": 14,
+        "write_surface": 19,
+    }
+    assert json_summary["autonomy_gap_rollup"]["live_write"] is False
+    assert json_summary["autonomy_gap_rollup"]["full_autonomous_ready"] is False
+    assert "## Autonomy Gap Rollup" in markdown_summary
+    assert "full_auto_gap_bucket_counts" in markdown_summary
+    assert '"read_surface": 14' in markdown_summary
+    assert 'supervised_current_live_write_kinds: `["fader", "gain"]`' in markdown_summary
 
 
 def test_no_wing_release_check_records_command_timeout(tmp_path):

@@ -88,6 +88,12 @@ def test_gate_keeps_analysis_and_assist_available_while_auto_is_blocked():
     assert "readiness_gap_write_surface" in rows["auto"]["blockers"]
     assert "scene_preset_supervised_promotion" in rows["auto"]["readiness_gap_target_ids_by_bucket"]["read_surface"]
     assert gate["summary"]["autonomous_apply_allowed_modes"] == []
+    assert gate["summary"]["full_auto_readiness_gap_bucket_counts"]["read_surface"] > 0
+    assert gate["summary"]["full_auto_readiness_gap_bucket_counts"]["write_surface"] > 0
+    assert (
+        "scene_preset_supervised_promotion"
+        in gate["summary"]["full_auto_readiness_gap_target_ids_by_bucket"]["read_surface"]
+    )
 
 
 def test_gate_reports_supervised_as_limited_and_blocks_expansion_from_proof_overlay():
@@ -112,6 +118,8 @@ def test_gate_reports_supervised_as_limited_and_blocks_expansion_from_proof_over
     assert supervised["readiness_gap_bucket_counts"]["read_surface"] > 0
     assert "readiness_gap_read_surface" not in supervised["blockers"]
     assert "supervised" in gate["summary"]["live_apply_allowed_modes"]
+    assert gate["summary"]["supervised_current_live_write_kinds"] == ["fader", "gain"]
+    assert "fader_supervised_promotion" in gate["summary"]["supervised_promotion_target_ids"]
     assert gate["summary"]["blocked_modes"] == ["auto"]
 
 

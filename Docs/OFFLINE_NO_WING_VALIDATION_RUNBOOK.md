@@ -84,6 +84,10 @@ The no-WING validation can be treated as passed only if:
 - `tools/no_wing_release_check.py` status is `passed` for release-style handoff;
 - `connection_policy` is `no_hardware_no_network_no_live_writes`;
 - `live_write` is `false`;
+- `supervised_proof_report_gap_rollup_schema` is `passed`;
+- `summary.json` and `summary.md` expose the read-only Autonomy Gap Rollup with
+  Full Autonomous still not ready and Supervised live-write kinds matching the
+  current operator-mode policy;
 - Analyze, Assist, and Auto have zero simulated apply count;
 - Supervised proposals have simulated readback and rollback proof;
 - unsupported/upward changes are blocked in tests;

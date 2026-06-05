@@ -19,13 +19,20 @@ import sys
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_status  # noqa: E402
+
 DEFAULT_ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "no_wing_release_check"
 DEFAULT_BACKEND_PORT = 8765
 DEFAULT_COMMAND_TIMEOUT_SEC = 900
+AUTONOMY_GAP_ROLLUP_SOURCE = "autonomy_mode_transition_gate.rows[mode=auto]"
+DEFAULT_HOMEBREW_GIT = Path("/opt/homebrew/bin/git")
 
 FORBIDDEN_COMMAND_TOKENS = (
     "wing_operator_proposal_validation_runner.py",
@@ -121,6 +128,26 @@ def compact_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
+def git_executable() -> str:
+    configured = os.environ.get("AUTOMIXER_GIT_BIN")
+    if configured:
+        return configured
+    if DEFAULT_HOMEBREW_GIT.exists():
+        return str(DEFAULT_HOMEBREW_GIT)
+    return "git"
+
+
+def current_supervised_live_write_kinds() -> tuple[str, ...]:
+    status = build_operator_mode_status(
+        mode=MODE_SUPERVISED,
+        connection_mode="wing",
+        wing_boundary_active=True,
+        auto_mode_unlocked=False,
+    )
+    capabilities = status.get("capabilities") if isinstance(status.get("capabilities"), Mapping) else {}
+    return tuple(str(kind) for kind in capabilities.get("allowed_live_write_kinds", ()) if kind)
+
+
 @dataclass(frozen=True)
 class CommandCheck:
     name: str
@@ -158,7 +185,7 @@ def build_checks(
     command_timeout_sec: float | None = DEFAULT_COMMAND_TIMEOUT_SEC,
 ) -> list[CommandCheck]:
     offline_artifact_root = (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "offline_validation"
-    proof_report_path = (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "supervised_proof_artifact_report.json"
+    proof_report_path = proof_report_path_for_run(run_dir)
     checks = [
         CommandCheck(
             name="write_surface_static_scan",
@@ -255,13 +282,17 @@ def build_checks(
     checks.append(
         CommandCheck(
             name="diff_check",
-            command=("git", "diff", "--check"),
+            command=(git_executable(), "diff", "--check"),
             cwd=str(repo_root),
         )
     )
     if command_timeout_sec is not None:
         checks = [replace(check, timeout_sec=command_timeout_sec) for check in checks]
     return checks
+
+
+def proof_report_path_for_run(run_dir: Path | None) -> Path:
+    return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "supervised_proof_artifact_report.json"
 
 
 def validate_no_live_commands(checks: Iterable[CommandCheck]) -> None:
@@ -380,8 +411,128 @@ def run_command_check(check: CommandCheck, log_dir: Path) -> CheckResult:
     )
 
 
+def _json_object_from_path(path: Path) -> tuple[Mapping[str, Any] | None, str | None]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, "missing_report"
+    except json.JSONDecodeError:
+        return None, "invalid_json"
+    if not isinstance(payload, Mapping):
+        return None, "json_payload_not_object"
+    return payload, None
+
+
+def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    payload, load_error = _json_object_from_path(report_path)
+    detail: dict[str, object] = {
+        "report_path": str(report_path),
+        "policy": "supervised_proof_report_must_expose_read_only_autonomy_gap_rollup",
+    }
+    violations: list[str] = []
+
+    if load_error is not None:
+        violations.append(load_error)
+    else:
+        assert payload is not None
+        summary = payload.get("summary") if isinstance(payload.get("summary"), Mapping) else {}
+        rollup = summary.get("autonomy_gap_rollup") if isinstance(summary.get("autonomy_gap_rollup"), Mapping) else {}
+        mode_gate = (
+            payload.get("autonomy_mode_transition_gate")
+            if isinstance(payload.get("autonomy_mode_transition_gate"), Mapping)
+            else {}
+        )
+        gate_summary = mode_gate.get("summary") if isinstance(mode_gate.get("summary"), Mapping) else {}
+
+        expected_false = ("live_write", "live_widening_allowed", "full_autonomous_ready")
+        for key in expected_false:
+            if rollup.get(key) is not False:
+                violations.append(f"autonomy_gap_rollup_{key}_not_false")
+        if rollup.get("read_only") is not True:
+            violations.append("autonomy_gap_rollup_read_only_not_true")
+        if rollup.get("full_autonomous_blocked") is not True:
+            violations.append("autonomy_gap_rollup_full_autonomous_blocked_not_true")
+        if rollup.get("source") != AUTONOMY_GAP_ROLLUP_SOURCE:
+            violations.append("autonomy_gap_rollup_source_not_auto_mode_gate_row")
+        claim = rollup.get("claim")
+        if not isinstance(claim, str) or "Full Autonomous remains blocked" not in claim:
+            violations.append("autonomy_gap_rollup_claim_does_not_preserve_auto_block")
+        if not isinstance(claim, str) or "does not widen" not in claim:
+            violations.append("autonomy_gap_rollup_claim_does_not_preserve_live_boundary")
+        next_required_evidence = rollup.get("next_required_evidence")
+        if not isinstance(next_required_evidence, list) or not next_required_evidence:
+            violations.append("autonomy_gap_rollup_next_required_evidence_missing")
+        rollup_counts = rollup.get("full_auto_gap_bucket_counts")
+        if not isinstance(rollup_counts, Mapping):
+            violations.append("autonomy_gap_rollup_bucket_counts_missing")
+            rollup_counts = {}
+        if gate_summary.get("autonomous_apply_allowed_modes") != []:
+            violations.append("mode_gate_autonomous_apply_modes_not_empty")
+        blocked_modes = gate_summary.get("blocked_modes")
+        if not isinstance(blocked_modes, list):
+            blocked_modes = []
+        if "auto" not in blocked_modes:
+            violations.append("mode_gate_auto_not_blocked")
+        supervised_write_kinds = rollup.get("supervised_current_live_write_kinds")
+        if not isinstance(supervised_write_kinds, list):
+            supervised_write_kinds = []
+        unexpected_write_kinds = [
+            str(kind)
+            for kind in supervised_write_kinds
+            if str(kind) not in current_supervised_live_write_kinds()
+        ]
+        if unexpected_write_kinds:
+            violations.append("autonomy_gap_rollup_unexpected_supervised_live_write_kinds")
+
+        detail["autonomy_gap_rollup_present"] = bool(rollup)
+        detail["full_auto_gap_bucket_counts"] = dict(rollup_counts)
+        detail["supervised_current_live_write_kinds"] = list(supervised_write_kinds)
+        detail["policy_supervised_live_write_kinds"] = list(current_supervised_live_write_kinds())
+        detail["unexpected_supervised_live_write_kinds"] = unexpected_write_kinds
+
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="supervised_proof_report_gap_rollup_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def autonomy_gap_rollup_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "supervised_proof_report_gap_rollup_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        counts = detail.get("full_auto_gap_bucket_counts")
+        supervised_kinds = detail.get("supervised_current_live_write_kinds")
+        policy_kinds = detail.get("policy_supervised_live_write_kinds")
+        unexpected_kinds = detail.get("unexpected_supervised_live_write_kinds")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "full_autonomous_ready": False,
+            "autonomy_gap_rollup_present": bool(detail.get("autonomy_gap_rollup_present")),
+            "full_auto_gap_bucket_counts": dict(counts) if isinstance(counts, Mapping) else {},
+            "supervised_current_live_write_kinds": list(supervised_kinds) if isinstance(supervised_kinds, list) else [],
+            "policy_supervised_live_write_kinds": list(policy_kinds) if isinstance(policy_kinds, list) else [],
+            "unexpected_supervised_live_write_kinds": list(unexpected_kinds)
+            if isinstance(unexpected_kinds, list)
+            else [],
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at: str) -> dict[str, object]:
     failed = [result.name for result in results if result.status != "passed"]
+    gap_rollup = autonomy_gap_rollup_summary(results)
     summary = {
         "type": "no_wing_release_check",
         "generated_at": generated_at,
@@ -391,6 +542,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         "failed_checks": failed,
         "results": [asdict(result) for result in results],
     }
+    if gap_rollup is not None:
+        summary["autonomy_gap_rollup"] = gap_rollup
     summary_path = run_dir / "summary.json"
     _write_text(summary_path, json.dumps(summary, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
 
@@ -407,6 +560,25 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     ]
     for result in results:
         lines.append(f"- `{result.name}`: `{result.status}`")
+    if gap_rollup is not None:
+        lines.extend(
+            [
+                "",
+                "## Autonomy Gap Rollup",
+                "",
+                f"- schema_check: `{gap_rollup['status']}`",
+                f"- read_only: `{str(gap_rollup['read_only']).lower()}`",
+                f"- live_write: `{str(gap_rollup['live_write']).lower()}`",
+                f"- full_autonomous_ready: `{str(gap_rollup['full_autonomous_ready']).lower()}`",
+                "- full_auto_gap_bucket_counts: "
+                f"`{json.dumps(gap_rollup['full_auto_gap_bucket_counts'], sort_keys=True)}`",
+                "- supervised_current_live_write_kinds: "
+                f"`{json.dumps(gap_rollup['supervised_current_live_write_kinds'])}`",
+                "- policy_supervised_live_write_kinds: "
+                f"`{json.dumps(gap_rollup['policy_supervised_live_write_kinds'])}`",
+                f"- violations: `{json.dumps(gap_rollup['violations'])}`",
+            ]
+        )
     if failed:
         lines.extend(["", "## Failed Checks", ""])
         lines.extend(f"- `{name}`" for name in failed)
@@ -427,6 +599,7 @@ def run_release_checks(
     generated_at = utc_now()
     run_dir = artifact_root / f"{compact_stamp()}_no_wing_release_check"
     log_dir = run_dir / "logs"
+    proof_report_path = proof_report_path_for_run(run_dir)
 
     checks = build_checks(
         run_dir=run_dir,
@@ -449,6 +622,11 @@ def run_release_checks(
         results.append(result)
         if result.status != "passed" and not continue_on_failure:
             break
+        if check.name == "supervised_proof_artifact_report" and result.status == "passed":
+            artifact_result = validate_supervised_proof_report_gap_rollup(proof_report_path)
+            results.append(artifact_result)
+            if artifact_result.status != "passed" and not continue_on_failure:
+                break
 
     summary = write_summary(run_dir, results, generated_at=generated_at)
     summary["run_dir"] = str(run_dir)

@@ -366,6 +366,14 @@ function toneForModuleStatus(status: string, canWriteLive: boolean): Tone {
   return canWriteLive ? 'yellow' : 'blue';
 }
 
+function toneForModeGateStatus(status: string): Tone {
+  const normalized = status.toLowerCase();
+  if (normalized === 'available') return 'green';
+  if (normalized === 'limited_available') return 'yellow';
+  if (normalized.includes('blocked')) return 'red';
+  return 'blue';
+}
+
 function titleFromToken(value: string): string {
   return value
     .split(/[_-]+/)
@@ -632,6 +640,49 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
   const readiness = asRecord(data.autonomy_promotion_readiness);
   const readinessSummary = asRecord(readiness.summary);
   const gapSummary = asRecord(readinessSummary.promotion_gap_summary);
+  const modeGate = asRecord(data.autonomy_mode_transition_gate);
+  const modeGateRows = asArray(modeGate.rows).map(row => {
+    const mode = str(row.mode, 'unknown_mode');
+    const status = str(row.status, 'unknown');
+    const blockers = stringList(row.blockers);
+    const nextActions = stringList(row.next_required_actions);
+    const writeKinds = stringList(row.current_live_write_kinds);
+    const gapCounts = asRecord(row.readiness_gap_bucket_counts);
+    const gapText = Object.entries(gapCounts)
+      .map(([bucket, rawCount]) => {
+        const count = Math.trunc(num(rawCount, 0));
+        return count > 0 ? `${bucket}:${count}` : '';
+      })
+      .filter(Boolean)
+      .join(', ');
+    const nextStep = [
+      nextActions.join(' / '),
+      writeKinds.length ? `Current policy live-write kinds: ${writeKinds.join(', ')}` : '',
+      gapText ? `Full Auto gaps: ${gapText}` : '',
+    ].filter(Boolean).join(' / ') || 'Mode gate is read-only.';
+    return {
+      moduleId: `mode_gate:${mode}`,
+      label: str(row.project_mode_name, `Mode gate: ${titleFromToken(mode)}`),
+      domain: 'autonomy_mode_gate',
+      status,
+      entrypoint: mode,
+      module: writeKinds.length ? `policy:${writeKinds.join(',')}` : 'no_current_write_authority',
+      uiSurface: 'Autonomy mode transition gate',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `runtime_entry:${Boolean(row.runtime_entry_allowed)}`,
+        `proposal_creation:${Boolean(row.proposal_creation_allowed)}`,
+        `live_apply:${Boolean(row.live_apply_allowed)}`,
+        ...writeKinds.map(kind => `current_write:${kind}`),
+      ],
+      blockedReason: blockers.length
+        ? blockers.join(', ')
+        : 'Mode gate is status-only and does not change runtime mode.',
+      nextStep,
+      tone: toneForModeGateStatus(status)
+    };
+  });
   const readinessRows = asArray(readiness.rows).map(row => {
     const targetId = str(row.id, 'unknown_promotion_target');
     const status = str(row.status, 'unknown');
@@ -716,7 +767,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     });
   });
 
-  return [...moduleRows, ...surfaceRows, ...coverageRows, ...readinessRows, ...gapRows];
+  return [...moduleRows, ...surfaceRows, ...coverageRows, ...modeGateRows, ...readinessRows, ...gapRows];
 }
 
 export function adaptTelemetryAlertsSnapshot(payload: unknown): TelemetryAlertsSnapshot {

@@ -1,0 +1,138 @@
+{
+  "connection_policy": "no_hardware_no_network_no_live_writes",
+  "failed_checks": [],
+  "generated_at": "2026-06-05T07:20:22Z",
+  "live_write": false,
+  "results": [
+    {
+      "command": null,
+      "cwd": null,
+      "detail": {
+        "host": "127.0.0.1",
+        "listener_detected": false,
+        "policy": "port_must_not_have_unexpected_listener",
+        "port": 8765
+      },
+      "duration_sec": 0.0,
+      "finished_at": "2026-06-05T07:20:22Z",
+      "name": "backend_port_free",
+      "returncode": null,
+      "started_at": "2026-06-05T07:20:22Z",
+      "status": "passed",
+      "stderr_log": null,
+      "stdout_log": null
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 -m pytest tests/test_write_surface_inventory_static_scan.py -q --tb=short",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.479,
+      "finished_at": "2026-06-05T07:20:23Z",
+      "name": "write_surface_static_scan",
+      "returncode": 0,
+      "started_at": "2026-06-05T07:20:22Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/write_surface_static_scan.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/write_surface_static_scan.stdout.log"
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 -m pytest tests/test_offline_validation_harness.py -q --tb=short -q",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.284,
+      "finished_at": "2026-06-05T07:20:23Z",
+      "name": "backend_pytest",
+      "returncode": 0,
+      "started_at": "2026-06-05T07:20:23Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/backend_pytest.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/backend_pytest.stdout.log"
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 tools/offline_operator_validation_harness.py --artifact-root artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/offline_validation",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.102,
+      "finished_at": "2026-06-05T07:20:23Z",
+      "name": "offline_operator_validation_harness",
+      "returncode": 0,
+      "started_at": "2026-06-05T07:20:23Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/offline_operator_validation_harness.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/offline_operator_validation_harness.stdout.log"
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 tools/evaluate_supervised_proof_artifacts.py --artifact-root artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/offline_validation --output artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/supervised_proof_artifact_report.json --quiet",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.057,
+      "finished_at": "2026-06-05T07:20:23Z",
+      "name": "supervised_proof_artifact_report",
+      "returncode": 0,
+      "started_at": "2026-06-05T07:20:23Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/supervised_proof_artifact_report.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/supervised_proof_artifact_report.stdout.log"
+    },
+    {
+      "command": null,
+      "cwd": null,
+      "detail": {
+        "autonomy_gap_rollup_present": true,
+        "full_auto_gap_bucket_counts": {
+          "autonomy_mode": 22,
+          "capability": 1,
+          "evidence_requirement": 12,
+          "proof": 62,
+          "read_surface": 14,
+          "safety": 14,
+          "write_surface": 19
+        },
+        "policy": "supervised_proof_report_must_expose_read_only_autonomy_gap_rollup",
+        "report_path": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/supervised_proof_artifact_report.json",
+        "supervised_current_live_write_kinds": [
+          "fader",
+          "gain"
+        ],
+        "unexpected_supervised_live_write_kinds": [],
+        "violations": []
+      },
+      "duration_sec": 0.0,
+      "finished_at": "2026-06-05T07:20:23Z",
+      "name": "supervised_proof_report_gap_rollup_schema",
+      "returncode": null,
+      "started_at": "2026-06-05T07:20:23Z",
+      "status": "passed",
+      "stderr_log": null,
+      "stdout_log": null
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 tools/memory/memory_lint.py",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.039,
+      "finished_at": "2026-06-05T07:20:23Z",
+      "name": "memory_lint",
+      "returncode": 0,
+      "started_at": "2026-06-05T07:20:23Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/memory_lint.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/memory_lint.stdout.log"
+    },
+    {
+      "command": "/opt/homebrew/bin/git diff --check",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.052,
+      "finished_at": "2026-06-05T07:20:23Z",
+      "name": "diff_check",
+      "returncode": 0,
+      "started_at": "2026-06-05T07:20:23Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/diff_check.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T072022Z_no_wing_release_check/logs/diff_check.stdout.log"
+    }
+  ],
+  "status": "passed",
+  "type": "no_wing_release_check"
+}

@@ -98,6 +98,38 @@ function telemetryAlertRows(alerts: TelemetryAlertsSnapshot) {
   ];
 }
 
+function readableStatus(value: string) {
+  return value
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function modeGateRow(rows: ModuleStatusRecord[], mode: string) {
+  return rows.find(row => row.moduleId === `mode_gate:${mode}`);
+}
+
+function modeGateWriteKinds(row?: ModuleStatusRecord) {
+  if (!row) return [];
+  return row.pipelineProfiles
+    .filter(profile => profile.startsWith('current_write:'))
+    .map(profile => profile.replace('current_write:', ''))
+    .filter(Boolean);
+}
+
+function modePolicyRows(ui: UiState, modules: ModuleStatusRecord[], writeScope: string) {
+  const supervised = modeGateRow(modules, 'supervised');
+  const auto = modeGateRow(modules, 'auto');
+  const supervisedWriteKinds = modeGateWriteKinds(supervised);
+  return [
+    { label: 'Current mode', value: ui.mode, tone: ui.mode === 'Supervised' ? 'yellow' as const : ui.mode === 'Auto' ? 'red' as const : 'blue' as const },
+    { label: 'Supervised gate', value: supervised ? readableStatus(supervised.status) : 'Unknown', tone: supervised?.tone ?? 'yellow' as const },
+    { label: 'Supervised scope', value: supervisedWriteKinds.length ? supervisedWriteKinds.join(', ') : writeScope, tone: supervisedWriteKinds.length ? 'yellow' as const : 'red' as const },
+    { label: 'Full Auto', value: auto ? readableStatus(auto.status) : 'Unknown', tone: auto?.tone ?? 'red' as const }
+  ];
+}
+
 function ModuleStatusTable({
   rows,
   onFocus
@@ -157,6 +189,7 @@ function SettingsInspector({
   const liveModuleCount = modules.filter(row => row.canWriteLive).length;
   const reviewOnlyCount = modules.filter(row => !row.canWriteLive).length;
   const quarantinedCount = modules.filter(row => row.status.includes('quarantined') || row.pipelineProfiles.includes('quarantine')).length;
+  const modeRows = modePolicyRows(ui, modules, writeScope);
   const rowsBySection: Record<string, { label: string; value: string; tone?: Tone }[]> = {
     'Backend Policy': [
       { label: 'Connection', value: backend.statusLabel, tone: backend.statusTone },
@@ -183,12 +216,7 @@ function SettingsInspector({
       { label: 'Fader ceiling', value: '0 dB', tone: 'yellow' },
       { label: 'Snapshot', value: 'Required', tone: 'yellow' }
     ],
-    'Mode Policy': [
-      { label: 'Current mode', value: ui.mode, tone: ui.mode === 'Supervised' ? 'yellow' : ui.mode === 'Auto' ? 'red' : 'blue' },
-      { label: 'Create proposals', value: backend.canCreateProposals ? 'Allowed' : 'Blocked', tone: backend.canCreateProposals ? 'green' : 'yellow' },
-      { label: 'Auto apply', value: 'Disabled', tone: 'red' },
-      { label: 'Analyze/Assist apply', value: 'Blocked', tone: 'red' }
-    ],
+    'Mode Policy': modeRows,
     'Write Policy': [
       { label: 'Apply path', value: backend.applyPath, tone: backend.canApplyToConsole ? 'yellow' : 'blue' },
       { label: 'Console apply', value: backend.canApplyToConsole ? 'Supervised' : 'Blocked', tone: backend.canApplyToConsole ? 'yellow' : 'red' },
@@ -265,6 +293,7 @@ export function Settings(ui: UiState, actions: UiActions, data: OperatorViewData
   const connectionTone = connectionToneFor(backend.connectionState);
   const modules = moduleStatusRows(data);
   const telemetryAlerts = data.telemetryAlerts;
+  const modeRows = modePolicyRows(ui, modules, writeScope);
   const approvalLabel = backend.canApplyToConsole
     ? (backend.requiresApproval ? 'Required' : 'Not required')
     : 'No apply';
@@ -340,7 +369,7 @@ export function Settings(ui: UiState, actions: UiActions, data: OperatorViewData
       </div>
       <div className="grid grid-cols-6 gap-2">
         <Panel title="Mix Defaults"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Mix Defaults')} type="button"><TechnicalChecklist rows={[{ label: 'LUFS target', value: '-14 LUFS', tone: 'blue' }, { label: 'Safety margin', value: 'High', tone: 'yellow' }]} /></button></Panel>
-        <Panel title="Mode Policy"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Mode Policy')} type="button"><TechnicalChecklist rows={[{ label: 'Current mode', value: ui.mode, tone: backend.canApplyToConsole ? 'yellow' : 'blue' }, { label: 'Create proposals', value: backend.canCreateProposals ? 'Allowed' : 'Blocked', tone: backend.canCreateProposals ? 'green' : 'yellow' }]} /></button></Panel>
+        <Panel title="Mode Policy"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Mode Policy')} type="button"><TechnicalChecklist rows={modeRows.slice(0, 2)} /></button></Panel>
         <Panel title="Write Policy"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Write Policy')} type="button"><TechnicalChecklist rows={[{ label: 'Console apply', value: backend.canApplyToConsole ? 'Supervised' : 'Blocked', tone: backend.canApplyToConsole ? 'yellow' : 'red' }, { label: 'Scope', value: writeScope, tone: backend.writeScope.length ? 'yellow' : 'red' }]} /></button></Panel>
         <Panel title="Module Status"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Module Status')} type="button"><TechnicalChecklist rows={[{ label: 'Modules', value: String(modules.length), tone: 'blue' }, { label: 'Live writes', value: String(modules.filter(row => row.canWriteLive).length), tone: 'yellow' }]} /></button></Panel>
         <Panel title="Audit"><button className="mb-2 w-full text-left" onClick={() => actions.selectSettingsSection('Audit')} type="button"><TechnicalChecklist rows={[{ label: 'Decision log', value: data.logs.length ? 'On' : 'Empty', tone: data.logs.length ? 'green' : 'yellow' }, { label: 'Telemetry alerts', value: String(telemetryAlerts.alertCount), tone: telemetryAlertTone(telemetryAlerts) }, { label: 'Console diff', value: 'Read-only', tone: 'blue' }]} /></button></Panel>

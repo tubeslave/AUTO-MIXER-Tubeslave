@@ -334,6 +334,14 @@ def test_registry_snapshot_can_hide_full_method_inventory():
     assert snapshot["autonomy_promotion_readiness"]["type"] == "autonomy_promotion_readiness"
     assert snapshot["autonomy_promotion_readiness"]["safety"]["live_widening_allowed"] is False
     assert snapshot["autonomy_promotion_readiness"]["summary"]["autonomous_ready_target_ids"] == []
+    assert snapshot["autonomy_mode_transition_gate"]["type"] == "autonomy_mode_transition_gate"
+    assert snapshot["autonomy_mode_transition_gate"]["safety"]["live_write"] is False
+    assert snapshot["autonomy_mode_transition_gate"]["summary"]["autonomous_apply_allowed_modes"] == []
+    assert snapshot["autonomy_mode_transition_gate"]["summary"]["supervised_current_live_write_kinds"] == [
+        "fader",
+        "gain",
+    ]
+    assert "auto" in snapshot["autonomy_mode_transition_gate"]["summary"]["blocked_modes"]
     assert "deessing" not in snapshot["project_goal_capability_matrix"]["summary"][
         "missing_capability_ids"
     ]

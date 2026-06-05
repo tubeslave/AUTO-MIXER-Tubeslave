@@ -85,6 +85,79 @@ def _row_with_path(path: Path, payload: Mapping[str, Any], *, require_physical: 
     return result
 
 
+def _mode_gate_rows(report: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    gate = report.get("autonomy_mode_transition_gate")
+    if not isinstance(gate, Mapping):
+        return []
+    rows = gate.get("rows")
+    if not isinstance(rows, list):
+        return []
+    return [row for row in rows if isinstance(row, Mapping)]
+
+
+def _mode_gate_row(report: Mapping[str, Any], mode: str) -> Mapping[str, Any]:
+    for row in _mode_gate_rows(report):
+        if row.get("mode") == mode:
+            return row
+    return {}
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item]
+
+
+def _gap_bucket_counts(value: Any) -> dict[str, int]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {
+        str(bucket): max(0, int(count or 0))
+        for bucket, count in value.items()
+        if int(count or 0) > 0
+    }
+
+
+def _gap_targets_by_bucket(value: Any) -> dict[str, list[str]]:
+    if not isinstance(value, Mapping):
+        return {}
+    normalized: dict[str, list[str]] = {}
+    for bucket, target_ids in value.items():
+        targets = _string_list(target_ids)
+        if targets:
+            normalized[str(bucket)] = targets
+    return normalized
+
+
+def build_autonomy_gap_rollup(report: Mapping[str, Any]) -> dict[str, Any]:
+    auto_row = _mode_gate_row(report, "auto")
+    supervised_row = _mode_gate_row(report, "supervised")
+    gap_counts = _gap_bucket_counts(auto_row.get("readiness_gap_bucket_counts"))
+    gap_targets = _gap_targets_by_bucket(auto_row.get("readiness_gap_target_ids_by_bucket"))
+    supervised_live_write_kinds = _string_list(supervised_row.get("current_live_write_kinds"))
+
+    return {
+        "read_only": True,
+        "live_write": False,
+        "live_widening_allowed": False,
+        "full_autonomous_ready": False,
+        "source": "autonomy_mode_transition_gate.rows[mode=auto]",
+        "full_autonomous_blocked": True,
+        "full_auto_gap_bucket_counts": gap_counts,
+        "full_auto_gap_target_ids_by_bucket": gap_targets,
+        "supervised_live_apply_allowed": bool(supervised_row.get("live_apply_allowed")),
+        "supervised_current_live_write_kinds": supervised_live_write_kinds,
+        "next_required_evidence": [
+            "Reduce every Full Autonomous readiness gap bucket to zero before reviewing auto mode.",
+            "Keep live apply limited to current supervised write kinds until physical readback and rollback evidence exists.",
+        ],
+        "claim": (
+            "Full Autonomous remains blocked; this rollup is report-only and does not widen "
+            "the current supervised fader/gain live-write boundary."
+        ),
+    }
+
+
 def build_supervised_proof_artifact_report(
     summary_paths: Iterable[Path],
     *,
@@ -235,6 +308,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     report["promotion_evidence"] = build_supervised_promotion_evidence_snapshot(report)
     report["autonomy_evidence_overlay"] = build_autonomy_evidence_overlay(report)
     report["autonomy_mode_transition_gate"] = build_autonomy_mode_transition_gate(report)
+    report["summary"]["autonomy_gap_rollup"] = build_autonomy_gap_rollup(report)
     report["next_wing_proof_plan"] = build_supervised_wing_proof_plan(report["promotion_evidence"])
     output_path = args.output or DEFAULT_OUTPUT_ROOT / f"{compact_stamp()}_supervised_proof_artifact_report" / "report.json"
     report["report_path"] = str(output_path)

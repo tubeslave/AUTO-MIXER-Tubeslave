@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 try:
+    from autonomy_mode_transition_gate import build_autonomy_mode_transition_gate
     from autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
     from project_goal_capability_matrix import build_project_goal_capability_matrix_snapshot
     from read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
@@ -20,6 +21,7 @@ try:
     from safety_coverage_matrix import build_safety_coverage_matrix_snapshot
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
+    from backend.autonomy_mode_transition_gate import build_autonomy_mode_transition_gate
     from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
     from backend.project_goal_capability_matrix import build_project_goal_capability_matrix_snapshot
     from backend.read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
@@ -1425,6 +1427,10 @@ def build_module_status_map() -> List[Dict[str, Any]]:
 def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[str, Any]:
     methods = [method.to_dict() for method in PROCESSING_METHODS]
     profiles = [profile.to_dict() for profile in PIPELINE_PROFILES]
+    autonomy_promotion_readiness = build_autonomy_promotion_readiness_snapshot()
+    autonomy_mode_transition_gate = build_autonomy_mode_transition_gate(
+        {"autonomy_promotion_readiness": autonomy_promotion_readiness}
+    )
     status_counts: Dict[str, int] = {status: 0 for status in sorted(PROCESSING_STATUSES)}
     domain_counts: Dict[str, int] = {domain: 0 for domain in sorted(PROCESSING_DOMAINS)}
     for method in PROCESSING_METHODS:
@@ -1453,7 +1459,8 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         "pipeline_profiles": profiles,
         "module_status_map": build_module_status_map(),
         "project_goal_capability_matrix": build_project_goal_capability_matrix_snapshot(),
-        "autonomy_promotion_readiness": build_autonomy_promotion_readiness_snapshot(),
+        "autonomy_promotion_readiness": autonomy_promotion_readiness,
+        "autonomy_mode_transition_gate": autonomy_mode_transition_gate,
         "read_surface_inventory": build_read_surface_inventory_snapshot(),
         "read_surface_remediation_plan": build_read_surface_remediation_plan(),
         "read_surface_fixture_evidence": build_read_surface_fixture_evidence_snapshot(),

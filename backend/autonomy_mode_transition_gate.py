@@ -192,6 +192,14 @@ def _gap_bucket_blockers(gap_bucket_counts: Mapping[str, int]) -> Tuple[str, ...
     )
 
 
+def _row_for_summary(rows: Tuple["AutonomyModeGateRow", ...], mode: str) -> "AutonomyModeGateRow":
+    return next(row for row in rows if row.mode == mode)
+
+
+def _target_ids_by_bucket_for_summary(values: Mapping[str, Tuple[str, ...]]) -> Dict[str, list[str]]:
+    return {bucket: list(target_ids) for bucket, target_ids in values.items()}
+
+
 def _row_for_mode(
     mode: str,
     *,
@@ -307,6 +315,8 @@ def build_autonomy_mode_transition_gate(
     entry_allowed = [row.mode for row in rows if row.runtime_entry_allowed]
     live_apply_modes = [row.mode for row in rows if row.live_apply_allowed]
     blocked_modes = [row.mode for row in rows if row.status == "blocked"]
+    auto_row = _row_for_summary(rows, MODE_AUTO)
+    supervised_row = _row_for_summary(rows, MODE_SUPERVISED)
 
     return {
         "type": "autonomy_mode_transition_gate",
@@ -327,6 +337,12 @@ def build_autonomy_mode_transition_gate(
             "live_apply_allowed_modes": live_apply_modes,
             "blocked_modes": blocked_modes,
             "autonomous_apply_allowed_modes": [],
+            "full_auto_readiness_gap_bucket_counts": dict(auto_row.readiness_gap_bucket_counts),
+            "full_auto_readiness_gap_target_ids_by_bucket": _target_ids_by_bucket_for_summary(
+                auto_row.readiness_gap_target_ids_by_bucket
+            ),
+            "supervised_current_live_write_kinds": list(supervised_row.current_live_write_kinds),
+            "supervised_promotion_target_ids": list(supervised_row.promotion_target_ids),
             "global_blockers": [
                 "mode_gate_does_not_change_runtime_mode",
                 "supervised_mode_limited_to_existing_policy",
