@@ -518,6 +518,25 @@ def test_safety_coverage_matrix_records_live_proof_gaps():
 
     assert get_safety_coverage_row("fader_supervised").live_allowed is True
     assert get_safety_coverage_row("gain_supervised").live_allowed is False
+    bus = get_safety_coverage_row("bus_group_matrix")
+    mute = get_safety_coverage_row("mute_supervised")
+
+    assert bus is not None
+    assert bus.status == "quarantined"
+    assert bus.live_allowed is False
+    assert bus.action_type == "bus_group_matrix"
+    assert bus.fake_mixer_proof == "missing"
+    assert bus.real_wing_proof == "missing"
+    assert "true-peak headroom" in bus.next_required_evidence
+    assert "no_bus_dca_matrix_live_writes" in bus.notes
+
+    assert mute is not None
+    assert mute.status == "quarantined"
+    assert mute.live_allowed is False
+    assert mute.action_type == "mute"
+    assert mute.pre_read == "missing"
+    assert mute.rollback_readback == "missing"
+    assert "manual_mute_authority_preserved" in mute.notes
     assert get_safety_coverage_row("gain_supervised").real_wing_proof == "missing"
     assert get_safety_coverage_row("routing_snapshots_scenes").status == "blocked"
 

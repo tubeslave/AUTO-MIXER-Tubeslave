@@ -216,6 +216,58 @@ SAFETY_COVERAGE_ROWS: Tuple[SafetyCoverageRow, ...] = (
         current_blocker="FX/color logic is useful as an explainable plan, not a live write path.",
         next_required_evidence="Add offline FX plan evaluation before any operator-facing proposal.",
     ),
+    SafetyCoverageRow(
+        id="bus_group_matrix",
+        label="Bus / group / DCA / matrix",
+        action_type="bus_group_matrix",
+        status="quarantined",
+        live_allowed=False,
+        canonical_gate="blocked from canonical live runtime",
+        unit_tests="partial",
+        offline_harness="partial",
+        fake_mixer_proof="missing",
+        real_wing_proof="missing",
+        pre_read="missing",
+        apply_readback="missing",
+        rollback_readback="missing",
+        emergency_stop_proof="missing",
+        current_blocker=(
+            "Bus, group, DCA, matrix, and master-bus writes can reshape the "
+            "whole mix and have no supervised physical readback or rollback proof."
+        ),
+        next_required_evidence=(
+            "Add bus/group/matrix safety review with true-peak headroom, "
+            "assignment/fader readback, rollback, fake-mixer, real-WING, and "
+            "emergency-stop proof before any supervised candidate."
+        ),
+        notes=("broad_balance_surface", "no_bus_dca_matrix_live_writes"),
+    ),
+    SafetyCoverageRow(
+        id="mute_supervised",
+        label="Mute / unmute",
+        action_type="mute",
+        status="quarantined",
+        live_allowed=False,
+        canonical_gate="blocked from canonical live runtime",
+        unit_tests="partial",
+        offline_harness="partial",
+        fake_mixer_proof="missing",
+        real_wing_proof="missing",
+        pre_read="missing",
+        apply_readback="missing",
+        rollback_readback="missing",
+        emergency_stop_proof="missing",
+        current_blocker=(
+            "Mute and unmute automation can drop sources or reopen unsafe "
+            "channels without fresh intent, ownership, readback, and rollback proof."
+        ),
+        next_required_evidence=(
+            "Add fresh mute-state intent, owner, signal-return, physical readback, "
+            "rollback, fake-mixer, real-WING, and emergency-stop proof before "
+            "any supervised mute candidate."
+        ),
+        notes=("manual_mute_authority_preserved", "no_mute_live_writes"),
+    ),
 )
 
 

@@ -75,6 +75,7 @@ def test_broad_console_surfaces_are_blocked_by_missing_proof_or_manual_only_poli
     routing = rows["routing_supervised_promotion"]
     scene_preset = rows["scene_preset_supervised_promotion"]
     bus = rows["bus_group_matrix_supervised_promotion"]
+    mute = rows["mute_supervised_promotion"]
 
     assert eq.supervised_live_allowed is False
     assert "safety_live_not_allowed" in eq.blockers
@@ -115,9 +116,26 @@ def test_broad_console_surfaces_are_blocked_by_missing_proof_or_manual_only_poli
     assert "read_surface_snapshots_scenes_partial" in scene_preset.blockers
     assert "read_surface_user_presets_partial" in scene_preset.blockers
 
+    assert bus.status == "manual_only_blocked"
     assert bus.supervised_live_allowed is False
-    assert "safety_coverage_row_missing" in bus.blockers
+    assert bus.safety_row_id == "bus_group_matrix"
+    assert bus.safety_status == "quarantined"
+    assert "safety_coverage_row_missing" not in bus.blockers
+    assert "safety_status_quarantined" in bus.blockers
+    assert "real_wing_proof_missing" in bus.blockers
+    assert "rollback_readback_missing" in bus.blockers
+    assert "emergency_stop_proof_missing" in bus.blockers
     assert "write_surface_mixer_transport_clients_quarantined" in bus.blockers
+
+    assert mute.status == "manual_only_blocked"
+    assert mute.supervised_live_allowed is False
+    assert mute.autonomous_ready is False
+    assert mute.safety_row_id == "mute_supervised"
+    assert mute.safety_status == "quarantined"
+    assert "safety_coverage_row_missing" not in mute.blockers
+    assert "safety_status_quarantined" in mute.blockers
+    assert "read_surface_channel_identity_and_basic_controls_partial" in mute.blockers
+    assert "write_surface_voice_ai_direct_commands_quarantined" in mute.blockers
 
 
 def test_no_readiness_row_widens_live_write_authority():
