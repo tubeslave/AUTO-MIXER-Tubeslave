@@ -755,11 +755,13 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       proofQuality.next_physical_readback_surface_id,
       physicalGapSurfaceIds[0] ?? '',
     );
+    const sourceNextPhysicalReadbackSurfaceId = str(proofQuality.source_next_physical_readback_surface_id, '');
+    const nextPhysicalReadbackTargetConsistent = proofQuality.next_physical_readback_target_consistent === true;
     const freshnessText = available
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
@@ -784,6 +786,8 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `read_surface_gaps:${physicalGapSurfaceCount}`,
         `read_surface_gap_ids:${physicalGapSurfaceText}`,
         `next_readback_target:${nextPhysicalReadbackSurfaceId}`,
+        `source_next_readback_target:${sourceNextPhysicalReadbackSurfaceId}`,
+        `next_readback_gate:${nextPhysicalReadbackTargetConsistent}`,
         `fixture_tests:${declaredTestNameCount}`,
         `contract_gap:${contractGapConsistency}`,
       ],

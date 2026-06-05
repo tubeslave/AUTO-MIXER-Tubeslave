@@ -64,6 +64,7 @@
 - Product Layer read-surface proof quality should expose `next_physical_readback_surface_id` as read-only planning evidence; frontend surfaces must not infer this as hardware permission or readiness.
 - Codex autoloop reports should keep `## Три обязательных вопроса` directly adjacent to `## Объяснение простым языком`; extra top-level evidence belongs earlier so the operator-facing ending stays predictable.
 - no-WING read-surface summaries should include `next_physical_readback_surface_id` and fail validation if it drifts from the first `physical_fixture_missing_surface_ids` entry.
+- Product Layer should expose read-surface next-target consistency separately from the target label so malformed no-WING proof artifacts stay visible without granting live authority.
 
 ## Memory Pipeline Lessons
 

@@ -1072,7 +1072,9 @@ test.describe('Automixer backend Product Layer adapter', () => {
                   'user_presets',
                   'dlive_state'
                 ],
-                next_physical_readback_surface_id: 'raw_mixer_state_cache'
+                next_physical_readback_surface_id: 'raw_mixer_state_cache',
+                source_next_physical_readback_surface_id: 'raw_mixer_state_cache',
+                next_physical_readback_target_consistent: true
               }
             }
           },
@@ -1350,6 +1352,8 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('read_surface_gaps:10; fixture_paths:10; test_names:25').first()).toBeVisible();
     await expect(page.getByText('gap_surfaces:raw_mixer_state_cache').first()).toBeVisible();
     await expect(page.getByText('next_readback:raw_mixer_state_cache').first()).toBeVisible();
+    await expect(page.getByText('source_next_readback:raw_mixer_state_cache').first()).toBeVisible();
+    await expect(page.getByText('next_readback_gate:true').first()).toBeVisible();
     await expect(page.getByText('Autonomy proof evidence: Fader').first()).toBeVisible();
     await expect(page.getByText('Autonomy proof evidence: Gain').first()).toBeVisible();
     await expect(page.getByText('dry_run_only').first()).toBeVisible();
@@ -1365,6 +1369,8 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('raw_mixer_state_cache +9').first()).toBeVisible();
     await expect(page.getByText('Next read proof').first()).toBeVisible();
     await expect(page.getByText('raw_mixer_state_cache', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Read target gate').first()).toBeVisible();
+    await expect(page.getByText('Consistent').first()).toBeVisible();
     await expect(page.getByText('Fixture tests').first()).toBeVisible();
     await expect(page.getByText('25 declared tests').first()).toBeVisible();
     await expect(page.getByText('Contract/gap gate').first()).toBeVisible();

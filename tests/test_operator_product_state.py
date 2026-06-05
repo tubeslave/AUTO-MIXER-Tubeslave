@@ -1946,6 +1946,7 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                         "raw_mixer_state_cache",
                         "channel_identity_and_basic_controls",
                     ],
+                    "next_physical_readback_surface_id": "raw_mixer_state_cache",
                     "violations": [],
                 },
             }
@@ -1990,6 +1991,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
         "channel_identity_and_basic_controls",
     ]
     assert proof_quality["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert proof_quality["source_next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert proof_quality["next_physical_readback_target_consistent"] is True
     overlay = payload["autonomy_evidence_overlay"]
     assert overlay["source_report_available"] is True
     assert overlay["source_report_path"] == str(latest_report)
@@ -2009,6 +2012,54 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert "source_autonomous_ready_normalized_false" in rows["gain"]["blockers"]
     assert rows["gain"]["dry_run_ready_proof_ids"] == ["gain-proof-dry-run"]
     assert rows["fader"]["status"] == "no_current_evidence"
+    assert "set_gain" not in set(_walk_keys(payload))
+
+
+def test_supervised_proof_evidence_snapshot_marks_mismatched_next_readback_target(
+    server, tmp_path
+):
+    latest_dir = tmp_path / "latest"
+    latest_dir.mkdir()
+    latest_report = latest_dir / "supervised_proof_artifact_report.json"
+    latest_report.write_text(json.dumps(proof_report_with_autonomy_overlay("ok")), encoding="utf-8")
+    (latest_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "type": "no_wing_release_check",
+                "status": "passed",
+                "read_surface_fixture_evidence": {
+                    "status": "passed",
+                    "snapshot_status": "fixture_evidence_incomplete",
+                    "physical_gap_surface_count": 2,
+                    "summary_recomputed_from_rows": True,
+                    "fixture_declaration_validation": True,
+                    "contract_gap_consistency_enforced": True,
+                    "read_only": True,
+                    "live_write": False,
+                    "full_autonomous_ready": False,
+                    "physical_fixture_missing_surface_ids": [
+                        "raw_mixer_state_cache",
+                        "channel_identity_and_basic_controls",
+                    ],
+                    "next_physical_readback_surface_id": "dlive_state",
+                    "violations": [],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    server.config["supervised_proof_evidence"] = {"artifact_root": str(tmp_path)}
+
+    payload = build_supervised_proof_evidence_snapshot(server)
+
+    proof_quality = payload["summary"]["read_surface_proof_quality"]
+    assert proof_quality["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert proof_quality["source_next_physical_readback_surface_id"] == "dlive_state"
+    assert proof_quality["next_physical_readback_target_consistent"] is False
+    assert proof_quality["full_autonomous_ready"] is False
+    assert proof_quality["read_only"] is True
+    assert proof_quality["live_write"] is False
+    assert payload["safety"]["live_write"] is False
     assert "set_gain" not in set(_walk_keys(payload))
 
 

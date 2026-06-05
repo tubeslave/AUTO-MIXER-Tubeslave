@@ -3495,7 +3495,19 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
     available = bool(read_surface)
     physical_missing = _string_list_value(read_surface.get("physical_fixture_missing_surface_ids"))
     physical_gap_count = _safe_int_value(read_surface.get("physical_gap_surface_count"), len(physical_missing))
-    next_physical_readback_surface_id = physical_missing[0] if physical_missing else None
+    expected_next_physical_readback_surface_id = physical_missing[0] if physical_missing else None
+    source_next_value = read_surface.get("next_physical_readback_surface_id")
+    source_next_physical_readback_surface_id = (
+        source_next_value if isinstance(source_next_value, str) and source_next_value else None
+    )
+    next_physical_readback_target_consistent = (
+        source_next_physical_readback_surface_id == expected_next_physical_readback_surface_id
+    )
+    next_physical_readback_surface_id = (
+        source_next_physical_readback_surface_id
+        if next_physical_readback_target_consistent
+        else expected_next_physical_readback_surface_id
+    )
     source_full_autonomous_ready = read_surface.get("full_autonomous_ready") is True
     return {
         "available": available,
@@ -3516,6 +3528,8 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
         "source_full_autonomous_ready_claimed": source_full_autonomous_ready,
         "physical_fixture_missing_surface_ids": physical_missing,
         "next_physical_readback_surface_id": next_physical_readback_surface_id,
+        "source_next_physical_readback_surface_id": source_next_physical_readback_surface_id,
+        "next_physical_readback_target_consistent": next_physical_readback_target_consistent,
         "violations": _string_list_value(read_surface.get("violations")),
     }
 
