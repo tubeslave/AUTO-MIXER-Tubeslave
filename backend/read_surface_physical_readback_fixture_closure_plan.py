@@ -8,16 +8,18 @@ console state, close physical fixture gaps, or grant live authority.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, Mapping, Tuple
+from typing import Any, Dict, List, Mapping, Tuple
 
 try:
     from read_surface_physical_readback_fixture_acceptance_ledger import (
         READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_METHOD_ID,
+        READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_STATUSES,
         build_read_surface_physical_readback_fixture_acceptance_ledger,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.read_surface_physical_readback_fixture_acceptance_ledger import (
         READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_METHOD_ID,
+        READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_STATUSES,
         build_read_surface_physical_readback_fixture_acceptance_ledger,
     )
 
@@ -30,6 +32,26 @@ READ_SURFACE_PHYSICAL_READBACK_FIXTURE_CLOSURE_PLAN_STATUSES = {
     "fixture_closure_replacement_required",
     "manual_fixture_closure_candidate_available",
 }
+REQUIRED_ACCEPTANCE_LEDGER_TYPE = "read_surface_physical_readback_fixture_acceptance_ledger"
+REQUIRED_CLOSURE_RECORD_FIELDS = (
+    "review_id",
+    "surface_id",
+    "artifact_source_id",
+    "required_contract_method_id",
+    "reviewed_by",
+    "reviewed_at",
+)
+REQUIRED_LEDGER_FALSE_SAFETY_FLAGS = (
+    "live_write",
+    "mutates_console_state",
+    "queries_console",
+    "executes_tests",
+    "execution_allowed_by_acceptance",
+    "fixture_closure_allowed_by_acceptance",
+    "live_widening_allowed",
+    "live_authority_granted",
+    "full_autonomous_ready",
+)
 
 
 def _utc_now() -> str:
@@ -52,15 +74,196 @@ def _string_list(value: Any) -> Tuple[str, ...]:
     return tuple(item for item in value if isinstance(item, str) and item)
 
 
-def _accepted_records(ledger: Mapping[str, Any]) -> Tuple[Mapping[str, Any], ...]:
+def _summary_int(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def _is_utc_timestamp(value: str) -> bool:
+    if not value:
+        return False
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        return False
+    return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
+
+
+def _record_id(record: Mapping[str, Any], index: int) -> str:
+    explicit = record.get("review_id")
+    if isinstance(explicit, str) and explicit:
+        return explicit
+    surface_id = record.get("surface_id")
+    artifact_source_id = record.get("artifact_source_id")
+    return (
+        f"{surface_id if isinstance(surface_id, str) and surface_id else 'unknown_surface'}:"
+        f"{artifact_source_id if isinstance(artifact_source_id, str) and artifact_source_id else 'unknown_artifact'}:"
+        f"{index}"
+    )
+
+
+def _closure_record_basic_violations(record: Mapping[str, Any]) -> Tuple[str, ...]:
+    violations = []
+    for field in REQUIRED_CLOSURE_RECORD_FIELDS:
+        if not isinstance(record.get(field), str) or not record.get(field):
+            violations.append(f"fixture_closure_record_{field}_missing")
+    reviewed_at = record.get("reviewed_at")
+    if isinstance(reviewed_at, str) and reviewed_at and not _is_utc_timestamp(reviewed_at):
+        violations.append("fixture_closure_record_reviewed_at_invalid")
+    if record.get("valid") is not True:
+        violations.append("fixture_closure_record_not_valid")
+    if record.get("candidate_present") is not True:
+        violations.append("fixture_closure_record_candidate_missing")
+    if record.get("fixture_closure_allowed_by_acceptance") is not False:
+        violations.append("fixture_closure_record_acceptance_closure_not_false")
+    if record.get("live_authority_granted") is not False:
+        violations.append("fixture_closure_record_live_authority_not_false")
+    if record.get("full_autonomous_ready") is not False:
+        violations.append("fixture_closure_record_full_autonomous_not_false")
+    return tuple(violations)
+
+
+def _accepted_record_violations(record: Mapping[str, Any]) -> Tuple[str, ...]:
+    violations = list(_closure_record_basic_violations(record))
+    if record.get("decision") != "accepted":
+        violations.append("fixture_closure_record_acceptance_decision_mismatch")
+    if record.get("operator_rejected_review_candidate") is not False:
+        violations.append("fixture_closure_record_conflicting_review_flags")
+    return tuple(violations)
+
+
+def _accepted_record_replacement_ids(
+    records: Tuple[Mapping[str, Any], ...],
+) -> Tuple[str, ...]:
+    return tuple(
+        _record_id(record, index)
+        for index, record in enumerate(records)
+        if record.get("operator_accepted_review_candidate") is True
+        and _accepted_record_violations(record)
+    )
+
+
+def _ledger_envelope_violations(ledger: Mapping[str, Any]) -> Tuple[str, ...]:
+    violations = []
+    if ledger.get("type") != REQUIRED_ACCEPTANCE_LEDGER_TYPE:
+        violations.append("ledger_envelope_type_mismatch")
+    generated_at = ledger.get("generated_at")
+    if not isinstance(generated_at, str) or not _is_utc_timestamp(generated_at):
+        violations.append("ledger_envelope_generated_at_invalid")
+    if ledger.get("method_id") != READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_METHOD_ID:
+        violations.append("ledger_envelope_method_id_mismatch")
+    if ledger.get("status") not in READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_STATUSES:
+        violations.append("ledger_envelope_status_unknown")
+    safety = _mapping(ledger.get("safety"))
+    if safety.get("read_only") is not True:
+        violations.append("ledger_envelope_read_only_not_true")
+    for flag in REQUIRED_LEDGER_FALSE_SAFETY_FLAGS:
+        if safety.get(flag) is not False:
+            violations.append(f"ledger_envelope_{flag}_not_false")
+    return tuple(violations)
+
+
+def _ledger_summary_count_violations(
+    summary: Mapping[str, Any],
+    *,
+    records: Tuple[Mapping[str, Any], ...],
+    invalid_record_ids: Tuple[str, ...],
+    unreviewed_surface_ids: Tuple[str, ...],
+) -> Tuple[str, ...]:
+    expected_counts = {
+        "acceptance_record_count": len(records),
+        "accepted_record_count": sum(
+            1
+            for record in records
+            if record.get("valid") is True
+            and record.get("operator_accepted_review_candidate") is True
+        ),
+        "rejected_record_count": sum(
+            1
+            for record in records
+            if record.get("valid") is True
+            and record.get("operator_rejected_review_candidate") is True
+        ),
+        "invalid_record_count": len(invalid_record_ids),
+        "unreviewed_candidate_count": len(unreviewed_surface_ids),
+    }
+    return tuple(
+        f"ledger_summary_{key}_mismatch"
+        for key, expected in expected_counts.items()
+        if _summary_int(summary.get(key)) != expected
+    )
+
+
+def _surface_ids_for_decision(
+    records: Tuple[Mapping[str, Any], ...],
+    *,
+    accepted: bool,
+) -> Tuple[str, ...]:
+    flag = (
+        "operator_accepted_review_candidate"
+        if accepted
+        else "operator_rejected_review_candidate"
+    )
+    return tuple(
+        record["surface_id"]
+        for record in records
+        if record.get("valid") is True
+        and record.get(flag) is True
+        and isinstance(record.get("surface_id"), str)
+        and record.get("surface_id")
+    )
+
+
+def _ledger_summary_surface_id_violations(
+    summary: Mapping[str, Any],
+    *,
+    records: Tuple[Mapping[str, Any], ...],
+) -> Tuple[str, ...]:
+    expected = {
+        "accepted_surface_ids": _surface_ids_for_decision(records, accepted=True),
+        "rejected_surface_ids": _surface_ids_for_decision(records, accepted=False),
+    }
+    return tuple(
+        f"ledger_summary_{key}_mismatch"
+        for key, surface_ids in expected.items()
+        if _string_list(summary.get(key)) != surface_ids
+    )
+
+
+def _ambiguous_surface_review_record_ids(
+    records: Tuple[Mapping[str, Any], ...],
+) -> Tuple[str, ...]:
+    record_ids_by_surface: Dict[str, List[str]] = {}
+    for index, record in enumerate(records):
+        if _closure_record_basic_violations(record):
+            continue
+        decision = record.get("decision")
+        if decision not in {"accepted", "rejected"}:
+            continue
+        surface_id = record.get("surface_id")
+        if not isinstance(surface_id, str) or not surface_id:
+            continue
+        record_ids_by_surface.setdefault(surface_id, []).append(_record_id(record, index))
+    return tuple(
+        record_id
+        for record_ids in record_ids_by_surface.values()
+        if len(record_ids) > 1
+        for record_id in record_ids
+    )
+
+
+def _accepted_records(
+    records: Tuple[Mapping[str, Any], ...],
+) -> Tuple[Mapping[str, Any], ...]:
     return tuple(
         record
-        for record in _record_list(ledger.get("records"))
-        if record.get("valid") is True
-        and record.get("operator_accepted_review_candidate") is True
-        and record.get("fixture_closure_allowed_by_acceptance") is False
-        and record.get("live_authority_granted") is False
-        and record.get("full_autonomous_ready") is False
+        for record in records
+        if record.get("operator_accepted_review_candidate") is True
+        and not _accepted_record_violations(record)
     )
 
 
@@ -92,10 +295,38 @@ def build_read_surface_physical_readback_fixture_closure_plan(
     )
     summary = _mapping(ledger.get("summary"))
     records = _record_list(ledger.get("records"))
-    accepted_records = _accepted_records(ledger)
-    closure_candidates = tuple(_closure_candidate(record) for record in accepted_records)
-    invalid_record_ids = _string_list(summary.get("invalid_record_ids"))
+    ledger_invalid_record_ids = _string_list(summary.get("invalid_record_ids"))
     unreviewed_surface_ids = _string_list(summary.get("unreviewed_candidate_surface_ids"))
+    ledger_envelope_violations = _ledger_envelope_violations(ledger)
+    accepted_record_replacement_ids = _accepted_record_replacement_ids(records)
+    ambiguous_surface_review_record_ids = _ambiguous_surface_review_record_ids(records)
+    ledger_summary_count_violations = _ledger_summary_count_violations(
+        summary,
+        records=records,
+        invalid_record_ids=ledger_invalid_record_ids,
+        unreviewed_surface_ids=unreviewed_surface_ids,
+    )
+    ledger_summary_surface_id_violations = _ledger_summary_surface_id_violations(
+        summary,
+        records=records,
+    )
+    invalid_record_ids = tuple(
+        dict.fromkeys(
+            (
+                *ledger_invalid_record_ids,
+                *ledger_envelope_violations,
+                *accepted_record_replacement_ids,
+                *ambiguous_surface_review_record_ids,
+                *ledger_summary_count_violations,
+                *ledger_summary_surface_id_violations,
+            )
+        )
+    )
+    accepted_records = _accepted_records(records)
+    closure_candidate_records = () if invalid_record_ids else accepted_records
+    closure_candidates = tuple(
+        _closure_candidate(record) for record in closure_candidate_records
+    )
     rejected_surface_ids = _string_list(summary.get("rejected_surface_ids"))
 
     if invalid_record_ids:

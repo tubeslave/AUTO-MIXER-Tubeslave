@@ -96,6 +96,346 @@ def test_fixture_closure_plan_surfaces_manual_candidate_without_closing_gap():
     assert candidate["full_autonomous_ready"] is False
 
 
+def test_fixture_closure_plan_rejects_incomplete_accepted_ledger_records():
+    spec, ledger = _accepted_ledger()
+    forged_ledger = {
+        **ledger,
+        "records": [
+            {
+                **ledger["records"][0],
+                "review_id": "accepted-without-source",
+                "artifact_source_id": "",
+            },
+            {
+                **ledger["records"][0],
+                "review_id": "accepted-with-local-time",
+                "reviewed_at": "2026-06-05 21:10:00",
+            },
+        ],
+        "summary": {
+            **ledger["summary"],
+            "acceptance_record_count": 2,
+            "invalid_record_ids": [],
+            "accepted_record_count": 2,
+            "accepted_surface_ids": [spec["surface_id"], spec["surface_id"]],
+            "unreviewed_candidate_surface_ids": [],
+        },
+    }
+
+    plan = build_read_surface_physical_readback_fixture_closure_plan(
+        acceptance_ledger=forged_ledger
+    )
+
+    assert plan["status"] == "fixture_closure_replacement_required"
+    assert plan["summary"]["closure_candidate_count"] == 0
+    assert plan["summary"]["invalid_record_ids"] == [
+        "accepted-without-source",
+        "accepted-with-local-time",
+    ]
+    assert "operator_must_replace_invalid_acceptance_records_before_fixture_closure" in plan[
+        "summary"
+    ]["blocked_by"]
+    assert plan["closure_candidates"] == []
+    assert plan["summary"]["physical_fixture_gap_remains"] is True
+    assert plan["summary"]["fixture_update_allowed_by_plan"] is False
+    assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
+
+
+def test_fixture_closure_plan_rejects_accepted_record_decision_mismatch():
+    spec, ledger = _accepted_ledger()
+    forged_ledger = {
+        **ledger,
+        "records": [
+            {
+                **ledger["records"][0],
+                "review_id": "accepted-flag-rejected-decision",
+                "decision": "rejected",
+            },
+        ],
+        "summary": {
+            **ledger["summary"],
+            "invalid_record_ids": [],
+            "accepted_surface_ids": [spec["surface_id"]],
+            "unreviewed_candidate_surface_ids": [],
+        },
+    }
+
+    plan = build_read_surface_physical_readback_fixture_closure_plan(
+        acceptance_ledger=forged_ledger
+    )
+
+    assert plan["status"] == "fixture_closure_replacement_required"
+    assert plan["summary"]["invalid_record_ids"] == [
+        "accepted-flag-rejected-decision"
+    ]
+    assert plan["summary"]["closure_candidate_count"] == 0
+    assert plan["summary"]["closure_candidate_surface_ids"] == []
+    assert plan["closure_candidates"] == []
+    assert "operator_must_replace_invalid_acceptance_records_before_fixture_closure" in plan[
+        "summary"
+    ]["blocked_by"]
+    assert plan["summary"]["fixture_update_allowed_by_plan"] is False
+    assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
+    assert plan["summary"]["live_authority_granted"] is False
+
+
+def test_fixture_closure_plan_rejects_accepted_record_without_candidate_link():
+    spec, ledger = _accepted_ledger()
+    forged_ledger = {
+        **ledger,
+        "records": [
+            {
+                **ledger["records"][0],
+                "review_id": "accepted-without-candidate-link",
+                "candidate_present": False,
+            },
+        ],
+        "summary": {
+            **ledger["summary"],
+            "invalid_record_ids": [],
+            "accepted_surface_ids": [spec["surface_id"]],
+            "unreviewed_candidate_surface_ids": [],
+        },
+    }
+
+    plan = build_read_surface_physical_readback_fixture_closure_plan(
+        acceptance_ledger=forged_ledger
+    )
+
+    assert plan["status"] == "fixture_closure_replacement_required"
+    assert plan["summary"]["invalid_record_ids"] == [
+        "accepted-without-candidate-link"
+    ]
+    assert plan["summary"]["closure_candidate_count"] == 0
+    assert plan["summary"]["closure_candidate_surface_ids"] == []
+    assert plan["closure_candidates"] == []
+    assert "operator_must_replace_invalid_acceptance_records_before_fixture_closure" in plan[
+        "summary"
+    ]["blocked_by"]
+    assert plan["summary"]["fixture_update_allowed_by_plan"] is False
+    assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
+    assert plan["summary"]["live_authority_granted"] is False
+
+
+def test_fixture_closure_plan_rejects_ambiguous_surface_review_records():
+    spec, ledger = _accepted_ledger()
+    accepted_record = ledger["records"][0]
+    forged_ledger = {
+        **ledger,
+        "records": [
+            accepted_record,
+            {
+                **accepted_record,
+                "review_id": "review-raw-reject",
+                "decision": "rejected",
+                "operator_accepted_review_candidate": False,
+                "operator_rejected_review_candidate": True,
+            },
+            {
+                **accepted_record,
+                "review_id": "review-raw-duplicate",
+            },
+        ],
+        "summary": {
+            **ledger["summary"],
+            "acceptance_record_count": 3,
+            "invalid_record_ids": [],
+            "accepted_record_count": 2,
+            "rejected_record_count": 1,
+            "accepted_surface_ids": [spec["surface_id"], spec["surface_id"]],
+            "rejected_surface_ids": [spec["surface_id"]],
+            "unreviewed_candidate_surface_ids": [],
+        },
+    }
+
+    plan = build_read_surface_physical_readback_fixture_closure_plan(
+        acceptance_ledger=forged_ledger
+    )
+
+    assert plan["status"] == "fixture_closure_replacement_required"
+    assert plan["summary"]["accepted_record_count"] == 2
+    assert plan["summary"]["invalid_record_ids"] == [
+        "review-raw-1",
+        "review-raw-reject",
+        "review-raw-duplicate",
+    ]
+    assert plan["summary"]["closure_candidate_count"] == 0
+    assert plan["closure_candidates"] == []
+    assert "operator_must_replace_invalid_acceptance_records_before_fixture_closure" in plan[
+        "summary"
+    ]["blocked_by"]
+    assert plan["summary"]["physical_fixture_gap_remains"] is True
+    assert plan["summary"]["fixture_update_allowed_by_plan"] is False
+    assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
+
+
+def test_fixture_closure_plan_rejects_malformed_ledger_summary_counts():
+    _, ledger = _accepted_ledger()
+    forged_ledger = {
+        **ledger,
+        "summary": {
+            **ledger["summary"],
+            "unreviewed_candidate_count": 1,
+            "unreviewed_candidate_surface_ids": [],
+        },
+    }
+
+    plan = build_read_surface_physical_readback_fixture_closure_plan(
+        acceptance_ledger=forged_ledger
+    )
+
+    assert plan["status"] == "fixture_closure_replacement_required"
+    assert plan["summary"]["invalid_record_ids"] == [
+        "ledger_summary_unreviewed_candidate_count_mismatch"
+    ]
+    assert plan["summary"]["closure_candidate_count"] == 0
+    assert plan["summary"]["closure_candidate_surface_ids"] == []
+    assert plan["closure_candidates"] == []
+    assert "operator_must_replace_invalid_acceptance_records_before_fixture_closure" in plan[
+        "summary"
+    ]["blocked_by"]
+    assert plan["summary"]["physical_fixture_gap_remains"] is True
+    assert plan["summary"]["fixture_update_allowed_by_plan"] is False
+    assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
+
+
+def test_fixture_closure_plan_rejects_accepted_surface_id_summary_drift():
+    _, ledger = _accepted_ledger()
+    forged_ledger = {
+        **ledger,
+        "summary": {
+            **ledger["summary"],
+            "accepted_surface_ids": ["wrong_surface"],
+        },
+    }
+
+    plan = build_read_surface_physical_readback_fixture_closure_plan(
+        acceptance_ledger=forged_ledger
+    )
+
+    assert plan["status"] == "fixture_closure_replacement_required"
+    assert plan["summary"]["invalid_record_ids"] == [
+        "ledger_summary_accepted_surface_ids_mismatch"
+    ]
+    assert plan["summary"]["closure_candidate_count"] == 0
+    assert plan["summary"]["closure_candidate_surface_ids"] == []
+    assert plan["closure_candidates"] == []
+    assert plan["summary"]["physical_fixture_gap_remains"] is True
+    assert plan["summary"]["fixture_update_allowed_by_plan"] is False
+    assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
+
+
+def test_fixture_closure_plan_rejects_unsafe_ledger_envelope():
+    _, ledger = _accepted_ledger()
+    forged_ledger = {
+        **ledger,
+        "method_id": "forged_acceptance_ledger",
+        "status": "fixture_closure_already_allowed",
+        "safety": {
+            **ledger["safety"],
+            "read_only": False,
+            "live_write": True,
+            "fixture_closure_allowed_by_acceptance": True,
+            "live_authority_granted": True,
+        },
+    }
+
+    plan = build_read_surface_physical_readback_fixture_closure_plan(
+        acceptance_ledger=forged_ledger
+    )
+
+    assert plan["status"] == "fixture_closure_replacement_required"
+    assert plan["summary"]["invalid_record_ids"] == [
+        "ledger_envelope_method_id_mismatch",
+        "ledger_envelope_status_unknown",
+        "ledger_envelope_read_only_not_true",
+        "ledger_envelope_live_write_not_false",
+        "ledger_envelope_fixture_closure_allowed_by_acceptance_not_false",
+        "ledger_envelope_live_authority_granted_not_false",
+    ]
+    assert plan["summary"]["closure_candidate_count"] == 0
+    assert plan["summary"]["closure_candidate_surface_ids"] == []
+    assert plan["closure_candidates"] == []
+    assert "operator_must_replace_invalid_acceptance_records_before_fixture_closure" in plan[
+        "summary"
+    ]["blocked_by"]
+    assert plan["summary"]["physical_fixture_gap_remains"] is True
+    assert plan["summary"]["fixture_update_allowed_by_plan"] is False
+    assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
+    assert plan["summary"]["live_authority_granted"] is False
+    assert plan["summary"]["full_autonomous_ready"] is False
+
+
+def test_fixture_closure_plan_rejects_malformed_ledger_identity_envelope():
+    _, ledger = _accepted_ledger()
+    forged_ledger = {
+        **ledger,
+        "type": "forged_acceptance_ledger",
+        "generated_at": "2026-06-05 21:10:00",
+    }
+
+    plan = build_read_surface_physical_readback_fixture_closure_plan(
+        acceptance_ledger=forged_ledger
+    )
+
+    assert plan["status"] == "fixture_closure_replacement_required"
+    assert plan["summary"]["invalid_record_ids"] == [
+        "ledger_envelope_type_mismatch",
+        "ledger_envelope_generated_at_invalid",
+    ]
+    assert plan["summary"]["closure_candidate_count"] == 0
+    assert plan["summary"]["closure_candidate_surface_ids"] == []
+    assert plan["closure_candidates"] == []
+    assert "operator_must_replace_invalid_acceptance_records_before_fixture_closure" in plan[
+        "summary"
+    ]["blocked_by"]
+    assert plan["summary"]["physical_fixture_gap_remains"] is True
+    assert plan["summary"]["fixture_update_allowed_by_plan"] is False
+    assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
+    assert plan["summary"]["live_authority_granted"] is False
+    assert plan["summary"]["full_autonomous_ready"] is False
+
+
+def test_fixture_closure_plan_rejects_rejected_surface_id_summary_drift():
+    spec, queue = _queue_with_valid_candidate()
+    ledger = build_read_surface_physical_readback_fixture_acceptance_ledger(
+        review_queue=queue,
+        acceptance_records=[
+            {
+                "review_id": "review-raw-reject",
+                "surface_id": spec["surface_id"],
+                "artifact_source_id": "raw-mixer-physical.json",
+                "required_contract_method_id": spec["required_contract_method_id"],
+                "decision": "rejected",
+                "reviewed_by": "operator",
+                "reviewed_at": "2026-06-05T21:10:00Z",
+            }
+        ],
+    )
+    forged_ledger = {
+        **ledger,
+        "summary": {
+            **ledger["summary"],
+            "rejected_surface_ids": ["wrong_surface"],
+        },
+    }
+
+    plan = build_read_surface_physical_readback_fixture_closure_plan(
+        acceptance_ledger=forged_ledger
+    )
+
+    assert plan["status"] == "fixture_closure_replacement_required"
+    assert plan["summary"]["invalid_record_ids"] == [
+        "ledger_summary_rejected_surface_ids_mismatch"
+    ]
+    assert plan["summary"]["closure_candidate_count"] == 0
+    assert plan["summary"]["closure_candidate_surface_ids"] == []
+    assert plan["closure_candidates"] == []
+    assert plan["summary"]["physical_fixture_gap_remains"] is True
+    assert plan["summary"]["fixture_update_allowed_by_plan"] is False
+    assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
+
+
 def test_fixture_closure_plan_does_not_create_candidate_for_rejected_records():
     spec, queue = _queue_with_valid_candidate()
     ledger = build_read_surface_physical_readback_fixture_acceptance_ledger(

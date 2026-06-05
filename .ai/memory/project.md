@@ -101,6 +101,7 @@
 - Read-surface physical readback fixture acceptance ledger may record operator accepted/rejected review candidates only as review records; it must keep `fixture_closure_allowed_by_acceptance=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false` until a separate manual fixture-closure decision exists.
 - Read-surface physical readback fixture closure plan may surface accepted ledger records as manual fixture-baseline update candidates only; it must keep `fixture_update_allowed_by_plan=false`, `fixture_closure_allowed_by_plan=false`, `physical_fixture_gap_remains=true`, `live_authority_granted=false`, and `full_autonomous_ready=false` until a separate baseline update is performed and reviewed.
 - Cockpit module status should expose the read-surface physical readback fixture closure plan as its own read-only operator row, preserving `canWriteLive=false`, empty `liveWriteKinds`, `fixture_update_allowed=false`, `fixture_closure_allowed=false`, `physical_gap_remains=true`, `live_authority=false`, and `full_autonomous_ready=false` even when manual closure candidates exist.
+- Fixture closure-plan hardening must distrust injected acceptance ledgers: malformed ledger envelopes, unsafe safety claims, summary count drift, accepted/rejected surface-id drift, ambiguous surface reviews, accepted-record decision mismatches, missing candidate links, or non-UTC review timestamps must produce `fixture_closure_replacement_required` with zero closure candidates.
 
 ## Memory Pipeline Lessons
 
