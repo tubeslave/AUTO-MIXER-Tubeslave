@@ -36,6 +36,9 @@ try:
     from fx_slots_inserts_physical_readback_contract import (
         build_fx_slots_inserts_physical_readback_contract,
     )
+    from fx_slots_inserts_physical_readback_artifact_intake import (
+        build_fx_slots_inserts_physical_readback_artifact_intake,
+    )
     from matrix_state_physical_readback_contract import (
         build_matrix_state_physical_readback_contract,
     )
@@ -92,6 +95,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.fx_slots_inserts_physical_readback_contract import (
         build_fx_slots_inserts_physical_readback_contract,
+    )
+    from backend.fx_slots_inserts_physical_readback_artifact_intake import (
+        build_fx_slots_inserts_physical_readback_artifact_intake,
     )
     from backend.matrix_state_physical_readback_contract import (
         build_matrix_state_physical_readback_contract,
@@ -746,6 +752,31 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "readback_contract_only",
             "no_live_writes",
             "does_not_query_console",
+        ),
+    ),
+    ProcessingMethod(
+        id="fx_slots_inserts_physical_readback_artifact_intake",
+        label="FX Slots / Inserts Physical Readback Artifact Intake",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Read-only intake snapshot for separately captured FX slot, "
+            "parameter, and insert assignment physical readback artifacts."
+        ),
+        module="backend/fx_slots_inserts_physical_readback_artifact_intake.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="artifact_intake_only_fx_slots_inserts_operator_review_required",
+        promotion_next=(
+            "operator reviews any valid FX slots/inserts candidate before "
+            "closing the physical fixture gap"
+        ),
+        notes=(
+            "transport_free",
+            "artifact_intake_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "fixture_closure_allowed_by_intake_false",
         ),
     ),
     ProcessingMethod(
@@ -1816,6 +1847,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, read-surface remediation artifact contract",
         "next_step": "Use only to validate separately captured FX slots/inserts readback; do not infer live authority.",
     },
+    "fx_slots_inserts_physical_readback_artifact_intake": {
+        "entrypoint": "build_fx_slots_inserts_physical_readback_artifact_intake",
+        "ui_surface": "Processing registry, FX slots/inserts physical artifact intake",
+        "next_step": "Use only to surface operator-captured FX slots/inserts candidates; manual review still gates fixture closure.",
+    },
     "routing_sends_physical_readback_contract": {
         "entrypoint": (
             "build_routing_sends_physical_readback_contract / "
@@ -2096,6 +2132,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "fx_slots_inserts_physical_readback_contract": (
             build_fx_slots_inserts_physical_readback_contract()
+        ),
+        "fx_slots_inserts_physical_readback_artifact_intake": (
+            build_fx_slots_inserts_physical_readback_artifact_intake()
         ),
         "routing_sends_physical_readback_contract": (
             build_routing_sends_physical_readback_contract()
