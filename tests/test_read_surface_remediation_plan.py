@@ -95,6 +95,17 @@ def test_plan_creates_actions_for_current_partial_and_missing_read_surfaces():
     )
     assert bus_group_main_dca["mutates_console_state"] is False
 
+    matrix_state = actions["matrix_state"]
+    assert matrix_state["action_type"] == "complete_read_dto"
+    assert matrix_state["physical_readback_gap"] is True
+    assert matrix_state["next_physical_readback_target"] is False
+    assert "physical_readback_fixture" in matrix_state["missing_contracts"]
+    assert any(
+        "matrix_state_physical_readback_contract" in artifact
+        for artifact in matrix_state["expected_artifacts"]
+    )
+    assert matrix_state["mutates_console_state"] is False
+
     presets = actions["user_presets"]
     assert presets["action_type"] == "complete_read_dto"
     assert "enumeration_contract" in presets["missing_contracts"]

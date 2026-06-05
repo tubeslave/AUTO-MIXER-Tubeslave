@@ -134,10 +134,16 @@ FIXTURE_EVIDENCE_BY_SURFACE: Dict[str, Dict[str, Tuple[str, ...]]] = {
         ),
     },
     "matrix_state": {
-        "fixture_paths": ("tests/test_operator_product_state.py",),
+        "fixture_paths": (
+            "tests/test_operator_product_state.py",
+            "tests/test_matrix_state_physical_readback_contract.py",
+        ),
         "test_names": (
             "test_matrix_snapshot_publishes_cached_console_state_without_queries",
             "test_matrix_snapshot_marks_missing_cache_without_queries",
+            "test_matrix_state_contract_describes_future_physical_artifact",
+            "test_matrix_state_contract_validates_minimal_physical_artifact",
+            "test_matrix_state_contract_rejects_live_or_cached_claims",
         ),
         "covered_contracts": (
             "cached_matrix_state",
@@ -145,6 +151,7 @@ FIXTURE_EVIDENCE_BY_SURFACE: Dict[str, Dict[str, Tuple[str, ...]]] = {
             "cached_matrix_sends",
             "matrix_cache_freshness",
             "stale_cache_detection",
+            "physical_readback_artifact_contract",
             "coverage_flags",
             "no_console_query",
         ),

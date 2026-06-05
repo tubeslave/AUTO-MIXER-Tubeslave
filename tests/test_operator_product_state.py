@@ -1933,8 +1933,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     "snapshot_status": "fixture_evidence_incomplete",
                     "surface_count": 10,
                     "surface_with_fixture_count": 10,
-                    "declared_fixture_path_count": 10,
-                    "declared_test_name_count": 25,
+                    "declared_fixture_path_count": 11,
+                    "declared_test_name_count": 28,
                     "physical_gap_surface_count": 10,
                     "summary_recomputed_from_rows": True,
                     "fixture_declaration_validation": True,
@@ -2131,6 +2131,57 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "matrix_state_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "matrix_state_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "matrix_state",
+                    "remediation_action_id": "remediate_matrix_state",
+                    "physical_readback_surface_id": "matrix_state",
+                    "physical_readback_action_id": "remediate_matrix_state",
+                    "fixture_physical_gap_declared": True,
+                    "remediation_physical_gap_declared": True,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "bus_group_matrix",
+                        "fx_send_insert",
+                        "routing",
+                    ],
+                    "required_control_fields": ["fader_db", "mute", "pan"],
+                    "required_eq_fields": ["enabled", "bands"],
+                    "required_eq_band_fields": ["band", "frequency_hz", "gain_db", "q"],
+                    "required_dynamics_fields": ["enabled", "model", "gain_reduction_db"],
+                    "required_insert_fields": ["pre_insert_on", "post_insert_weight"],
+                    "required_metering_fields": ["lufs", "true_peak_dbtp", "headroom_db"],
+                    "required_coverage_flags": [
+                        "controls",
+                        "eq",
+                        "dynamics",
+                        "inserts",
+                        "metering",
+                        "cache_matches_physical_readback",
+                    ],
+                    "minimum_matrix_count": 1,
+                    "minimum_eq_band_count": 8,
+                    "allowed_sources": ["physical_readback", "wing_physical_readback"],
+                    "accepted_matrix_statuses": ["verified_from_physical_readback"],
+                    "forbidden_mutation_evidence_fields": [
+                        "manual_write_events",
+                        "matrix_write_events",
+                    ],
+                    "violations": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -2160,8 +2211,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     proof_quality = payload["summary"]["read_surface_proof_quality"]
     assert proof_quality["available"] is True
     assert proof_quality["summary_path"] == str(latest_dir / "summary.json")
-    assert proof_quality["declared_fixture_path_count"] == 10
-    assert proof_quality["declared_test_name_count"] == 25
+    assert proof_quality["declared_fixture_path_count"] == 11
+    assert proof_quality["declared_test_name_count"] == 28
     assert proof_quality["physical_gap_surface_count"] == 10
     assert proof_quality["summary_recomputed_from_rows"] is True
     assert proof_quality["fixture_declaration_validation"] is True
@@ -2279,6 +2330,35 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert bus_contract["minimum_dca_count"] == 1
     assert "physical_readback" in bus_contract["allowed_sources"]
     assert "dca_write_events" in bus_contract["forbidden_mutation_evidence_fields"]
+    matrix_contract = proof_quality["matrix_state_physical_readback_contract"]
+    assert matrix_contract["available"] is True
+    assert matrix_contract["status"] == "passed"
+    assert matrix_contract["schema_id"] == "matrix_state_physical_readback.v1"
+    assert matrix_contract["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert matrix_contract["surface_id"] == "matrix_state"
+    assert matrix_contract["remediation_action_id"] == "remediate_matrix_state"
+    assert matrix_contract["artifact_required"] is True
+    assert matrix_contract["physical_fixture_gap_remains"] is True
+    assert matrix_contract["accepted_as_physical_fixture_candidate"] is False
+    assert matrix_contract["live_authority_granted"] is False
+    assert matrix_contract["full_autonomous_ready"] is False
+    assert matrix_contract["fixture_physical_gap_declared"] is True
+    assert matrix_contract["remediation_physical_gap_declared"] is True
+    assert matrix_contract["target_consistency"] is True
+    assert matrix_contract["promotion_families_requiring_surface"] == [
+        "bus_group_matrix",
+        "fx_send_insert",
+        "routing",
+    ]
+    assert matrix_contract["required_control_fields"] == ["fader_db", "mute", "pan"]
+    assert matrix_contract["required_eq_band_fields"] == ["band", "frequency_hz", "gain_db", "q"]
+    assert "gain_reduction_db" in matrix_contract["required_dynamics_fields"]
+    assert "post_insert_weight" in matrix_contract["required_insert_fields"]
+    assert "true_peak_dbtp" in matrix_contract["required_metering_fields"]
+    assert matrix_contract["minimum_matrix_count"] == 1
+    assert matrix_contract["minimum_eq_band_count"] == 8
+    assert "physical_readback" in matrix_contract["allowed_sources"]
+    assert "matrix_write_events" in matrix_contract["forbidden_mutation_evidence_fields"]
     overlay = payload["autonomy_evidence_overlay"]
     assert overlay["source_report_available"] is True
     assert overlay["source_report_path"] == str(latest_report)
@@ -2444,6 +2524,39 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["bus_contract_claimed_live_authority"],
                 },
+                "matrix_state_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "matrix_state_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "physical_readback_surface_id": "dlive_state",
+                    "physical_readback_action_id": "remediate_dlive_state",
+                    "fixture_physical_gap_declared": False,
+                    "remediation_physical_gap_declared": False,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "target_consistency": False,
+                    "promotion_families_requiring_surface": ["routing"],
+                    "required_control_fields": ["fader_db"],
+                    "required_eq_fields": ["enabled"],
+                    "required_eq_band_fields": ["band"],
+                    "required_dynamics_fields": ["enabled"],
+                    "required_insert_fields": ["pre_insert_on"],
+                    "required_metering_fields": ["lufs"],
+                    "required_coverage_flags": [],
+                    "minimum_matrix_count": 0,
+                    "minimum_eq_band_count": 2,
+                    "allowed_sources": ["physical_readback", "mixer_state_cache"],
+                    "accepted_matrix_statuses": ["verified_from_cache"],
+                    "forbidden_mutation_evidence_fields": [],
+                    "violations": ["matrix_contract_claimed_live_authority"],
+                },
             }
         ),
         encoding="utf-8",
@@ -2529,6 +2642,26 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert bus_contract["minimum_main_count"] == 0
     assert bus_contract["minimum_dca_count"] == 0
     assert "bus_contract_claimed_live_authority" in bus_contract["violations"]
+    matrix_contract = payload["summary"]["read_surface_proof_quality"][
+        "matrix_state_physical_readback_contract"
+    ]
+    assert matrix_contract["available"] is True
+    assert matrix_contract["surface_id"] == "dlive_state"
+    assert matrix_contract["physical_readback_surface_id"] == "dlive_state"
+    assert matrix_contract["target_consistency"] is False
+    assert matrix_contract["accepted_as_physical_fixture_candidate"] is False
+    assert matrix_contract["read_only"] is True
+    assert matrix_contract["live_write"] is False
+    assert matrix_contract["live_authority_granted"] is False
+    assert matrix_contract["full_autonomous_ready"] is False
+    assert matrix_contract["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert matrix_contract["source_live_write_claimed"] is True
+    assert matrix_contract["source_live_authority_granted_claimed"] is True
+    assert matrix_contract["source_full_autonomous_ready_claimed"] is True
+    assert matrix_contract["promotion_families_requiring_surface"] == ["routing"]
+    assert matrix_contract["minimum_matrix_count"] == 0
+    assert matrix_contract["minimum_eq_band_count"] == 2
+    assert "matrix_contract_claimed_live_authority" in matrix_contract["violations"]
     assert "set_gain" not in set(_walk_keys(payload))
 
 

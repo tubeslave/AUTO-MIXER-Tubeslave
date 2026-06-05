@@ -24,6 +24,10 @@ try:
         CHANNEL_PROCESSING_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         CHANNEL_PROCESSING_SURFACE_ID,
     )
+    from matrix_state_physical_readback_contract import (
+        MATRIX_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        MATRIX_STATE_SURFACE_ID,
+    )
     from read_surface_inventory import ReadSurface, iter_read_surfaces
     from read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
     from raw_mixer_state_physical_readback_contract import (
@@ -42,6 +46,10 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.channel_processing_physical_readback_contract import (
         CHANNEL_PROCESSING_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
         CHANNEL_PROCESSING_SURFACE_ID,
+    )
+    from backend.matrix_state_physical_readback_contract import (
+        MATRIX_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+        MATRIX_STATE_SURFACE_ID,
     )
     from backend.read_surface_inventory import ReadSurface, iter_read_surfaces
     from backend.read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
@@ -206,6 +214,11 @@ def _expected_artifacts(surface: ReadSurface, *, physical_readback_gap: bool) ->
             artifacts.append(
                 "Bus/group/main/DCA physical readback artifact validated by "
                 f"{BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
+            )
+        if surface.id == MATRIX_STATE_SURFACE_ID:
+            artifacts.append(
+                "Matrix-state physical readback artifact validated by "
+                f"{MATRIX_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID}."
             )
     return tuple(artifacts)
 

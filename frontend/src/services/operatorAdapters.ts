@@ -814,11 +814,28 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const busMainDcaContractBusAssignments = stringList(busMainDcaContract.required_bus_assignment_fields);
     const busMainDcaContractDcaAssignments = stringList(busMainDcaContract.required_dca_assignment_fields);
     const busMainDcaContractMetering = stringList(busMainDcaContract.required_metering_fields);
+    const matrixStateContract = asRecord(proofQuality.matrix_state_physical_readback_contract);
+    const matrixStateContractAvailable = Boolean(matrixStateContract.available);
+    const matrixStateContractStatus = str(matrixStateContract.contract_status, str(matrixStateContract.status, 'missing'));
+    const matrixStateContractSchemaId = str(matrixStateContract.schema_id, '');
+    const matrixStateContractSurfaceId = str(matrixStateContract.surface_id, '');
+    const matrixStateContractActionId = str(matrixStateContract.remediation_action_id, '');
+    const matrixStateContractPhysicalSurfaceId = str(matrixStateContract.physical_readback_surface_id, '');
+    const matrixStateContractPhysicalActionId = str(matrixStateContract.physical_readback_action_id, '');
+    const matrixStateContractGapRemains = matrixStateContract.physical_fixture_gap_remains === true;
+    const matrixStateContractLiveAuthority = matrixStateContract.live_authority_granted === true;
+    const matrixStateContractTargetConsistency = matrixStateContract.target_consistency === true;
+    const matrixStateContractPromotionFamilies = stringList(matrixStateContract.promotion_families_requiring_surface);
+    const matrixStateContractControls = stringList(matrixStateContract.required_control_fields);
+    const matrixStateContractEqBands = stringList(matrixStateContract.required_eq_band_fields);
+    const matrixStateContractDynamics = stringList(matrixStateContract.required_dynamics_fields);
+    const matrixStateContractInserts = stringList(matrixStateContract.required_insert_fields);
+    const matrixStateContractMetering = stringList(matrixStateContract.required_metering_fields);
     const freshnessText = available
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
@@ -871,6 +888,12 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `bus_contract_gap:${busMainDcaContractGapRemains}`,
         `bus_contract_live_authority:${busMainDcaContractLiveAuthority}`,
         `bus_contract_target_gate:${busMainDcaContractTargetConsistency}`,
+        `matrix_contract_available:${matrixStateContractAvailable}`,
+        `matrix_contract_status:${matrixStateContractStatus}`,
+        `matrix_contract_schema:${matrixStateContractSchemaId}`,
+        `matrix_contract_gap:${matrixStateContractGapRemains}`,
+        `matrix_contract_live_authority:${matrixStateContractLiveAuthority}`,
+        `matrix_contract_target_gate:${matrixStateContractTargetConsistency}`,
       ],
       blockedReason: available
         ? stale
@@ -1063,6 +1086,58 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       tone: !busMainDcaContractAvailable || busMainDcaContractLiveAuthority || !busMainDcaContractTargetConsistency
         ? 'yellow'
         : busMainDcaContractGapRemains
+          ? 'yellow'
+          : 'green'
+    });
+    rows.push({
+      moduleId: 'matrix_state_physical_readback_contract',
+      label: 'Matrix state readback contract',
+      domain: 'read_surface_contract',
+      status: matrixStateContractAvailable ? matrixStateContractStatus || 'contract_available' : 'contract_missing',
+      entrypoint: 'matrix_state_physical_readback_contract',
+      module: matrixStateContractActionId || 'no_contract_action',
+      uiSurface: 'Read-surface proof contract',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${matrixStateContractAvailable}`,
+        `schema:${matrixStateContractSchemaId}`,
+        `surface:${matrixStateContractSurfaceId}`,
+        `physical_readback:${matrixStateContractPhysicalSurfaceId}`,
+        `physical_action:${matrixStateContractPhysicalActionId}`,
+        `physical_gap_remains:${matrixStateContractGapRemains}`,
+        `live_authority:${matrixStateContractLiveAuthority}`,
+        `target_consistency:${matrixStateContractTargetConsistency}`,
+        `promotion_families:${matrixStateContractPromotionFamilies.join('|')}`,
+        `controls:${matrixStateContractControls.join('|')}`,
+        `eq_band_fields:${matrixStateContractEqBands.join('|')}`,
+        `dynamics:${matrixStateContractDynamics.join('|')}`,
+        `inserts:${matrixStateContractInserts.join('|')}`,
+        `metering:${matrixStateContractMetering.join('|')}`,
+      ],
+      blockedReason: matrixStateContractAvailable
+        ? matrixStateContractGapRemains
+          ? 'Matrix-state contract is present, but physical readback fixture evidence is still missing.'
+          : 'Matrix-state contract is present; physical gap state must still be reviewed before promotion.'
+        : 'Matrix-state physical readback contract is missing from proof summary.',
+      nextStep: matrixStateContractAvailable
+        ? [
+            matrixStateContractPhysicalSurfaceId ? `physical_readback:${matrixStateContractPhysicalSurfaceId}` : '',
+            matrixStateContractPhysicalActionId ? `physical_action:${matrixStateContractPhysicalActionId}` : '',
+            matrixStateContractPromotionFamilies.length ? `families:${matrixStateContractPromotionFamilies.join(',')}` : '',
+            matrixStateContractControls.length ? `controls:${matrixStateContractControls.join(',')}` : '',
+            matrixStateContractEqBands.length ? `eq_bands:${matrixStateContractEqBands.join(',')}` : '',
+            matrixStateContractDynamics.length ? `dynamics:${matrixStateContractDynamics.join(',')}` : '',
+            matrixStateContractInserts.length ? `inserts:${matrixStateContractInserts.join(',')}` : '',
+            matrixStateContractMetering.length ? `metering:${matrixStateContractMetering.join(',')}` : '',
+            `physical_gap_remains:${matrixStateContractGapRemains}`,
+            `live_authority:${matrixStateContractLiveAuthority}`,
+            `target_consistency:${matrixStateContractTargetConsistency}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with matrix-state readback contract schema validation.',
+      tone: !matrixStateContractAvailable || matrixStateContractLiveAuthority || !matrixStateContractTargetConsistency
+        ? 'yellow'
+        : matrixStateContractGapRemains
           ? 'yellow'
           : 'green'
     });

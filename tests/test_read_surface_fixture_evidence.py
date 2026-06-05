@@ -196,11 +196,13 @@ def test_console_read_goal_references_fixture_evidence_without_widening_live_sco
     assert "channel_basic_controls_physical_readback_contract" in row.method_ids
     assert "channel_processing_physical_readback_contract" in row.method_ids
     assert "bus_group_main_dca_physical_readback_contract" in row.method_ids
+    assert "matrix_state_physical_readback_contract" in row.method_ids
     assert "backend/read_surface_fixture_evidence.py" in row.support_paths
     assert "backend/raw_mixer_state_physical_readback_contract.py" in row.support_paths
     assert "backend/channel_basic_controls_physical_readback_contract.py" in row.support_paths
     assert "backend/channel_processing_physical_readback_contract.py" in row.support_paths
     assert "backend/bus_group_main_dca_physical_readback_contract.py" in row.support_paths
+    assert "backend/matrix_state_physical_readback_contract.py" in row.support_paths
     assert row.current_live_write_kinds == ()
     assert "physical fixtures" in row.next_step
 

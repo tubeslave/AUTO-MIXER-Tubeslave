@@ -530,8 +530,8 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
           snapshot_status: 'fixture_evidence_incomplete',
           surface_count: 10,
           surface_with_fixture_count: 10,
-          declared_fixture_path_count: 10,
-          declared_test_name_count: 25,
+          declared_fixture_path_count: 11,
+          declared_test_name_count: 28,
           physical_gap_surface_count: 10,
           summary_recomputed_from_rows: true,
           fixture_declaration_validation: true,
@@ -666,6 +666,38 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
             forbidden_mutation_evidence_fields: ['manual_write_events', 'dca_write_events'],
             violations: [],
           },
+          matrix_state_physical_readback_contract: {
+            available: true,
+            status: 'passed',
+            schema_id: 'matrix_state_physical_readback.v1',
+            contract_status: 'contract_ready_physical_fixture_missing',
+            surface_id: 'matrix_state',
+            remediation_action_id: 'remediate_matrix_state',
+            artifact_required: true,
+            physical_fixture_gap_remains: true,
+            accepted_as_physical_fixture_candidate: false,
+            read_only: true,
+            live_write: false,
+            live_authority_granted: false,
+            full_autonomous_ready: false,
+            target_consistency: true,
+            physical_readback_surface_id: 'matrix_state',
+            physical_readback_action_id: 'remediate_matrix_state',
+            fixture_physical_gap_declared: true,
+            remediation_physical_gap_declared: true,
+            promotion_families_requiring_surface: ['bus_group_matrix', 'fx_send_insert', 'routing'],
+            required_control_fields: ['fader_db', 'mute', 'pan'],
+            required_eq_band_fields: ['band', 'frequency_hz', 'gain_db', 'q'],
+            required_dynamics_fields: ['enabled', 'model', 'gain_reduction_db'],
+            required_insert_fields: ['pre_insert_on', 'post_insert_weight'],
+            required_metering_fields: ['lufs', 'true_peak_dbtp', 'headroom_db'],
+            allowed_sources: ['physical_readback', 'wing_physical_readback'],
+            accepted_matrix_statuses: ['verified_from_physical_readback'],
+            forbidden_mutation_evidence_fields: ['manual_write_events', 'matrix_write_events'],
+            minimum_matrix_count: 1,
+            minimum_eq_band_count: 8,
+            violations: [],
+          },
         },
       },
     },
@@ -751,6 +783,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'channel_basic_controls_physical_readback_contract',
       'channel_processing_physical_readback_contract',
       'bus_group_main_dca_physical_readback_contract',
+      'matrix_state_physical_readback_contract',
       'read_surface_remediation_plan',
       'autonomy_evidence:fader_supervised_promotion',
       'autonomy_evidence:gain_trim_supervised_promotion',
@@ -838,7 +871,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'next_readback_target:raw_mixer_state_cache',
     'source_next_readback_target:raw_mixer_state_cache',
     'next_readback_gate:true',
-    'fixture_tests:25',
+    'fixture_tests:28',
     'contract_gap:true',
     'raw_contract_available:true',
     'raw_contract_status:contract_ready_physical_fixture_missing',
@@ -864,13 +897,19 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'bus_contract_gap:true',
     'bus_contract_live_authority:false',
     'bus_contract_target_gate:true',
+    'matrix_contract_available:true',
+    'matrix_contract_status:contract_ready_physical_fixture_missing',
+    'matrix_contract_schema:matrix_state_physical_readback.v1',
+    'matrix_contract_gap:true',
+    'matrix_contract_live_authority:false',
+    'matrix_contract_target_gate:true',
   ]);
   assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
   assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
   assert.match(proofEvidence.nextStep, /age:120s stale_after:86400s stale:false/);
   assert.match(proofEvidence.nextStep, /read_surface_gaps:10/);
-  assert.match(proofEvidence.nextStep, /fixture_paths:10/);
-  assert.match(proofEvidence.nextStep, /test_names:25/);
+  assert.match(proofEvidence.nextStep, /fixture_paths:11/);
+  assert.match(proofEvidence.nextStep, /test_names:28/);
   assert.match(proofEvidence.nextStep, /contract_gap:true/);
   assert.match(proofEvidence.nextStep, /gap_surfaces:raw_mixer_state_cache/);
   assert.match(proofEvidence.nextStep, /next_readback:raw_mixer_state_cache/);
@@ -892,6 +931,10 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(proofEvidence.nextStep, /bus_contract_gap:true/);
   assert.match(proofEvidence.nextStep, /bus_contract_live_authority:false/);
   assert.match(proofEvidence.nextStep, /bus_contract_target_gate:true/);
+  assert.match(proofEvidence.nextStep, /matrix_contract:contract_ready_physical_fixture_missing/);
+  assert.match(proofEvidence.nextStep, /matrix_contract_gap:true/);
+  assert.match(proofEvidence.nextStep, /matrix_contract_live_authority:false/);
+  assert.match(proofEvidence.nextStep, /matrix_contract_target_gate:true/);
   assert.match(proofEvidence.nextStep, /dlive_state/);
 
   const rawMixerContract = rows.find(row => row.moduleId === 'raw_mixer_state_physical_readback_contract');
@@ -1013,6 +1056,42 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.match(busMainDcaContract.nextStep, /metering:lufs,true_peak_dbtp,headroom_db/);
   assert.match(busMainDcaContract.nextStep, /live_authority:false/);
   assert.match(busMainDcaContract.nextStep, /target_consistency:true/);
+
+  const matrixStateContract = rows.find(row => row.moduleId === 'matrix_state_physical_readback_contract');
+  assert.equal(matrixStateContract.domain, 'read_surface_contract');
+  assert.equal(matrixStateContract.canWriteLive, false);
+  assert.deepEqual(matrixStateContract.liveWriteKinds, []);
+  assert.equal(matrixStateContract.status, 'contract_ready_physical_fixture_missing');
+  assert.equal(matrixStateContract.entrypoint, 'matrix_state_physical_readback_contract');
+  assert.equal(matrixStateContract.module, 'remediate_matrix_state');
+  assert.equal(matrixStateContract.tone, 'yellow');
+  assert.deepEqual(matrixStateContract.pipelineProfiles, [
+    'available:true',
+    'schema:matrix_state_physical_readback.v1',
+    'surface:matrix_state',
+    'physical_readback:matrix_state',
+    'physical_action:remediate_matrix_state',
+    'physical_gap_remains:true',
+    'live_authority:false',
+    'target_consistency:true',
+    'promotion_families:bus_group_matrix|fx_send_insert|routing',
+    'controls:fader_db|mute|pan',
+    'eq_band_fields:band|frequency_hz|gain_db|q',
+    'dynamics:enabled|model|gain_reduction_db',
+    'inserts:pre_insert_on|post_insert_weight',
+    'metering:lufs|true_peak_dbtp|headroom_db',
+  ]);
+  assert.match(matrixStateContract.blockedReason, /physical readback fixture evidence is still missing/);
+  assert.match(matrixStateContract.nextStep, /physical_readback:matrix_state/);
+  assert.match(matrixStateContract.nextStep, /physical_action:remediate_matrix_state/);
+  assert.match(matrixStateContract.nextStep, /families:bus_group_matrix,fx_send_insert,routing/);
+  assert.match(matrixStateContract.nextStep, /controls:fader_db,mute,pan/);
+  assert.match(matrixStateContract.nextStep, /eq_bands:band,frequency_hz,gain_db,q/);
+  assert.match(matrixStateContract.nextStep, /dynamics:enabled,model,gain_reduction_db/);
+  assert.match(matrixStateContract.nextStep, /inserts:pre_insert_on,post_insert_weight/);
+  assert.match(matrixStateContract.nextStep, /metering:lufs,true_peak_dbtp,headroom_db/);
+  assert.match(matrixStateContract.nextStep, /live_authority:false/);
+  assert.match(matrixStateContract.nextStep, /target_consistency:true/);
 
   const readRemediation = rows.find(row => row.moduleId === 'read_surface_remediation_plan');
   assert.equal(readRemediation.domain, 'read_surface_remediation');
@@ -1177,7 +1256,7 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     },
   });
 
-  assert.equal(rows.length, 5);
+  assert.equal(rows.length, 6);
   assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
   assert.equal(rows[0].status, 'artifact_stale');
   assert.equal(rows[0].tone, 'yellow');
@@ -1223,6 +1302,12 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
     'bus_contract_gap:false',
     'bus_contract_live_authority:false',
     'bus_contract_target_gate:false',
+    'matrix_contract_available:false',
+    'matrix_contract_status:missing',
+    'matrix_contract_schema:',
+    'matrix_contract_gap:false',
+    'matrix_contract_live_authority:false',
+    'matrix_contract_target_gate:false',
   ]);
 
   assert.equal(rows[1].moduleId, 'raw_mixer_state_physical_readback_contract');
@@ -1252,6 +1337,13 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.equal(rows[4].canWriteLive, false);
   assert.deepEqual(rows[4].liveWriteKinds, []);
   assert.match(rows[4].blockedReason, /contract is missing/);
+
+  assert.equal(rows[5].moduleId, 'matrix_state_physical_readback_contract');
+  assert.equal(rows[5].domain, 'read_surface_contract');
+  assert.equal(rows[5].status, 'contract_missing');
+  assert.equal(rows[5].canWriteLive, false);
+  assert.deepEqual(rows[5].liveWriteKinds, []);
+  assert.match(rows[5].blockedReason, /contract is missing/);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

@@ -91,6 +91,28 @@ from backend.channel_processing_physical_readback_contract import (  # noqa: E40
     MINIMUM_EQ_BAND_COUNT,
     build_channel_processing_physical_readback_contract,
 )
+from backend.matrix_state_physical_readback_contract import (  # noqa: E402
+    MATRIX_STATE_FORBIDDEN_MUTATION_EVIDENCE_FIELDS,
+    MATRIX_STATE_PHYSICAL_READBACK_ARTIFACT_TYPE,
+    MATRIX_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+    MATRIX_STATE_PHYSICAL_READBACK_SCHEMA_ID,
+    MATRIX_STATE_PHYSICAL_READBACK_SOURCES,
+    MATRIX_STATE_REMEDIATION_ACTION_ID,
+    MATRIX_STATE_REQUIRED_CONTROL_FIELDS,
+    MATRIX_STATE_REQUIRED_COVERAGE_FLAGS,
+    MATRIX_STATE_REQUIRED_DYNAMICS_FIELDS,
+    MATRIX_STATE_REQUIRED_EQ_BAND_FIELDS,
+    MATRIX_STATE_REQUIRED_EQ_FIELDS,
+    MATRIX_STATE_REQUIRED_FALSE_SAFETY_FLAGS,
+    MATRIX_STATE_REQUIRED_INSERT_FIELDS,
+    MATRIX_STATE_REQUIRED_MATRIX_FIELDS,
+    MATRIX_STATE_REQUIRED_METERING_FIELDS,
+    MATRIX_STATE_REQUIRED_TOP_LEVEL_FIELDS,
+    MATRIX_STATE_SURFACE_ID,
+    MATRIX_STATE_VERIFIED_PHYSICAL_STATUSES,
+    MINIMUM_MATRIX_EQ_BAND_COUNT,
+    build_matrix_state_physical_readback_contract,
+)
 from backend.read_surface_fixture_evidence import (  # noqa: E402
     FIXTURE_EVIDENCE_STATUSES,
     build_read_surface_fixture_evidence_snapshot,
@@ -297,6 +319,7 @@ def build_checks(
                 "tests/test_channel_basic_controls_physical_readback_contract.py",
                 "tests/test_channel_processing_physical_readback_contract.py",
                 "tests/test_bus_group_main_dca_physical_readback_contract.py",
+                "tests/test_matrix_state_physical_readback_contract.py",
                 "-q",
                 "--tb=short",
             ),
@@ -2018,6 +2041,222 @@ def validate_bus_group_main_dca_physical_readback_contract_snapshot() -> CheckRe
     )
 
 
+def validate_matrix_state_physical_readback_contract_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "matrix_state_readback_contract_is_schema_only_no_live_authority",
+    }
+    violations: list[str] = []
+
+    try:
+        fixture_snapshot = build_read_surface_fixture_evidence_snapshot()
+        remediation_plan = build_read_surface_remediation_plan(
+            fixture_evidence_snapshot=fixture_snapshot
+        )
+        contract = build_matrix_state_physical_readback_contract()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        fixture_snapshot = {}
+        remediation_plan = {}
+        contract = {}
+        violations.append(f"matrix_state_readback_contract_build_error:{type(exc).__name__}")
+
+    fixture_summary = (
+        fixture_snapshot.get("summary")
+        if isinstance(fixture_snapshot.get("summary"), Mapping)
+        else {}
+    )
+    remediation_actions = (
+        remediation_plan.get("actions")
+        if isinstance(remediation_plan.get("actions"), list)
+        else []
+    )
+    safety = contract.get("safety") if isinstance(contract.get("safety"), Mapping) else {}
+    contract_summary = (
+        contract.get("summary") if isinstance(contract.get("summary"), Mapping) else {}
+    )
+    artifact_contract = (
+        contract.get("artifact_contract")
+        if isinstance(contract.get("artifact_contract"), Mapping)
+        else {}
+    )
+
+    if contract.get("type") != "matrix_state_physical_readback_contract":
+        violations.append("matrix_state_readback_contract_type_mismatch")
+    if contract.get("method_id") != MATRIX_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID:
+        violations.append("matrix_state_readback_contract_method_id_mismatch")
+    if contract.get("schema_id") != MATRIX_STATE_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("matrix_state_readback_contract_schema_id_mismatch")
+    if contract.get("status") != "contract_ready_physical_fixture_missing":
+        violations.append("matrix_state_readback_contract_status_mismatch")
+    if contract.get("surface_id") != MATRIX_STATE_SURFACE_ID:
+        violations.append("matrix_state_readback_contract_surface_id_mismatch")
+    if contract.get("remediation_action_id") != MATRIX_STATE_REMEDIATION_ACTION_ID:
+        violations.append("matrix_state_readback_contract_action_id_mismatch")
+
+    if safety.get("read_only") is not True:
+        violations.append("matrix_state_readback_contract_read_only_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"matrix_state_readback_contract_{key}_not_false")
+
+    if artifact_contract.get("type") != MATRIX_STATE_PHYSICAL_READBACK_ARTIFACT_TYPE:
+        violations.append("matrix_state_readback_artifact_type_mismatch")
+    if artifact_contract.get("schema_id") != MATRIX_STATE_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("matrix_state_readback_artifact_schema_id_mismatch")
+    if artifact_contract.get("minimum_matrix_count") != 1:
+        violations.append("matrix_state_readback_artifact_minimum_matrix_count_mismatch")
+    if artifact_contract.get("minimum_eq_band_count") != MINIMUM_MATRIX_EQ_BAND_COUNT:
+        violations.append("matrix_state_readback_artifact_minimum_eq_band_count_mismatch")
+
+    expected_lists = {
+        "required_top_level_fields": MATRIX_STATE_REQUIRED_TOP_LEVEL_FIELDS,
+        "required_matrix_fields": MATRIX_STATE_REQUIRED_MATRIX_FIELDS,
+        "required_control_fields": MATRIX_STATE_REQUIRED_CONTROL_FIELDS,
+        "required_eq_fields": MATRIX_STATE_REQUIRED_EQ_FIELDS,
+        "required_eq_band_fields": MATRIX_STATE_REQUIRED_EQ_BAND_FIELDS,
+        "required_dynamics_fields": MATRIX_STATE_REQUIRED_DYNAMICS_FIELDS,
+        "required_insert_fields": MATRIX_STATE_REQUIRED_INSERT_FIELDS,
+        "required_metering_fields": MATRIX_STATE_REQUIRED_METERING_FIELDS,
+        "required_coverage_flags": MATRIX_STATE_REQUIRED_COVERAGE_FLAGS,
+        "required_false_safety_flags": MATRIX_STATE_REQUIRED_FALSE_SAFETY_FLAGS,
+    }
+    list_details: dict[str, list[object]] = {}
+    for key, expected in expected_lists.items():
+        value = artifact_contract.get(key)
+        if not isinstance(value, list) or value != list(expected):
+            violations.append(f"matrix_state_readback_{key}_mismatch")
+            list_details[key] = []
+        else:
+            list_details[key] = list(value)
+
+    allowed_sources = artifact_contract.get("allowed_sources")
+    if not isinstance(allowed_sources, list):
+        allowed_sources = []
+        violations.append("matrix_state_readback_allowed_sources_missing")
+    elif list(allowed_sources) != list(MATRIX_STATE_PHYSICAL_READBACK_SOURCES):
+        violations.append("matrix_state_readback_allowed_sources_mismatch")
+    if "mixer_state_cache" in allowed_sources or "cache" in allowed_sources:
+        violations.append("matrix_state_readback_allows_cached_source")
+
+    accepted_statuses = artifact_contract.get("accepted_matrix_statuses")
+    if (
+        not isinstance(accepted_statuses, list)
+        or accepted_statuses != list(MATRIX_STATE_VERIFIED_PHYSICAL_STATUSES)
+    ):
+        violations.append("matrix_state_readback_accepted_statuses_mismatch")
+        accepted_statuses = []
+    forbidden_mutation_fields = artifact_contract.get("forbidden_mutation_evidence_fields")
+    if (
+        not isinstance(forbidden_mutation_fields, list)
+        or forbidden_mutation_fields != list(MATRIX_STATE_FORBIDDEN_MUTATION_EVIDENCE_FIELDS)
+    ):
+        violations.append("matrix_state_readback_forbidden_mutation_fields_mismatch")
+        forbidden_mutation_fields = []
+
+    physical_gap_ids = fixture_summary.get("physical_fixture_missing_surface_ids")
+    if not isinstance(physical_gap_ids, list):
+        physical_gap_ids = []
+        violations.append("matrix_state_fixture_physical_gap_ids_missing")
+    if MATRIX_STATE_SURFACE_ID not in physical_gap_ids:
+        violations.append("matrix_state_fixture_gap_not_declared")
+
+    remediation_action = {}
+    for action in remediation_actions:
+        if isinstance(action, Mapping) and action.get("surface_id") == MATRIX_STATE_SURFACE_ID:
+            remediation_action = dict(action)
+            break
+    if not remediation_action:
+        violations.append("matrix_state_remediation_action_missing")
+    elif remediation_action.get("id") != MATRIX_STATE_REMEDIATION_ACTION_ID:
+        violations.append("matrix_state_remediation_action_id_mismatch")
+    if remediation_action and remediation_action.get("physical_readback_gap") is not True:
+        violations.append("matrix_state_remediation_physical_gap_not_true")
+
+    if contract_summary.get("physical_readback_surface_id") != MATRIX_STATE_SURFACE_ID:
+        violations.append("matrix_state_contract_surface_summary_mismatch")
+    if contract_summary.get("physical_readback_action_id") != MATRIX_STATE_REMEDIATION_ACTION_ID:
+        violations.append("matrix_state_contract_action_summary_mismatch")
+    if contract_summary.get("artifact_required") is not True:
+        violations.append("matrix_state_contract_artifact_required_not_true")
+    if contract_summary.get("physical_fixture_gap_remains") is not True:
+        violations.append("matrix_state_contract_physical_gap_not_true")
+    if contract_summary.get("accepted_as_physical_fixture_candidate") is not False:
+        violations.append("matrix_state_contract_candidate_not_false")
+    if contract_summary.get("live_authority_granted") is not False:
+        violations.append("matrix_state_contract_live_authority_not_false")
+    promotion_families = contract_summary.get("promotion_families_requiring_surface")
+    if not isinstance(promotion_families, list):
+        promotion_families = []
+        violations.append("matrix_state_promotion_families_missing")
+    for family in ("bus_group_matrix", "fx_send_insert", "routing"):
+        if family not in promotion_families:
+            violations.append(f"matrix_state_promotion_family_missing:{family}")
+
+    detail["contract_status"] = contract.get("status")
+    detail["schema_id"] = contract.get("schema_id")
+    detail["surface_id"] = contract.get("surface_id")
+    detail["remediation_action_id"] = contract.get("remediation_action_id")
+    detail["physical_readback_surface_id"] = contract_summary.get("physical_readback_surface_id")
+    detail["physical_readback_action_id"] = contract_summary.get("physical_readback_action_id")
+    detail["fixture_physical_gap_declared"] = MATRIX_STATE_SURFACE_ID in physical_gap_ids
+    detail["remediation_physical_gap_declared"] = bool(
+        remediation_action and remediation_action.get("physical_readback_gap") is True
+    )
+    detail["artifact_required"] = contract_summary.get("artifact_required")
+    detail["physical_fixture_gap_remains"] = contract_summary.get("physical_fixture_gap_remains")
+    detail["accepted_as_physical_fixture_candidate"] = contract_summary.get(
+        "accepted_as_physical_fixture_candidate"
+    )
+    detail["live_authority_granted"] = contract_summary.get("live_authority_granted")
+    detail["promotion_families_requiring_surface"] = list(promotion_families)
+    detail["required_top_level_field_count"] = len(
+        list_details.get("required_top_level_fields", [])
+    )
+    detail["required_matrix_field_count"] = len(
+        list_details.get("required_matrix_fields", [])
+    )
+    detail["required_control_fields"] = list(list_details.get("required_control_fields", []))
+    detail["required_eq_fields"] = list(list_details.get("required_eq_fields", []))
+    detail["required_eq_band_fields"] = list(
+        list_details.get("required_eq_band_fields", [])
+    )
+    detail["required_dynamics_fields"] = list(
+        list_details.get("required_dynamics_fields", [])
+    )
+    detail["required_insert_fields"] = list(list_details.get("required_insert_fields", []))
+    detail["required_metering_fields"] = list(
+        list_details.get("required_metering_fields", [])
+    )
+    detail["required_coverage_flags"] = list(
+        list_details.get("required_coverage_flags", [])
+    )
+    detail["required_false_safety_flags"] = list(
+        list_details.get("required_false_safety_flags", [])
+    )
+    detail["minimum_matrix_count"] = int(artifact_contract.get("minimum_matrix_count") or 0)
+    detail["minimum_eq_band_count"] = int(artifact_contract.get("minimum_eq_band_count") or 0)
+    detail["allowed_sources"] = list(allowed_sources)
+    detail["accepted_matrix_statuses"] = list(accepted_statuses)
+    detail["forbidden_mutation_evidence_fields"] = list(forbidden_mutation_fields)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="matrix_state_physical_readback_contract_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_supervised_proof_report_gain_dry_run(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -2877,6 +3116,115 @@ def bus_group_main_dca_readback_contract_summary(
     return None
 
 
+def matrix_state_readback_contract_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "matrix_state_physical_readback_contract_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        allowed_sources = detail.get("allowed_sources")
+        accepted_statuses = detail.get("accepted_matrix_statuses")
+        forbidden_mutation_fields = detail.get("forbidden_mutation_evidence_fields")
+        required_false_flags = detail.get("required_false_safety_flags")
+        promotion_families = detail.get("promotion_families_requiring_surface")
+        required_control_fields = detail.get("required_control_fields")
+        required_eq_fields = detail.get("required_eq_fields")
+        required_eq_band_fields = detail.get("required_eq_band_fields")
+        required_dynamics_fields = detail.get("required_dynamics_fields")
+        required_insert_fields = detail.get("required_insert_fields")
+        required_metering_fields = detail.get("required_metering_fields")
+        required_coverage_flags = detail.get("required_coverage_flags")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "live_widening_allowed": False,
+            "full_autonomous_ready": False,
+            "schema_id": detail.get("schema_id"),
+            "contract_status": detail.get("contract_status"),
+            "surface_id": detail.get("surface_id"),
+            "remediation_action_id": detail.get("remediation_action_id"),
+            "physical_readback_surface_id": detail.get("physical_readback_surface_id"),
+            "physical_readback_action_id": detail.get("physical_readback_action_id"),
+            "fixture_physical_gap_declared": detail.get("fixture_physical_gap_declared") is True,
+            "remediation_physical_gap_declared": (
+                detail.get("remediation_physical_gap_declared") is True
+            ),
+            "artifact_required": detail.get("artifact_required") is True,
+            "physical_fixture_gap_remains": detail.get("physical_fixture_gap_remains") is True,
+            "accepted_as_physical_fixture_candidate": (
+                detail.get("accepted_as_physical_fixture_candidate") is True
+            ),
+            "live_authority_granted": detail.get("live_authority_granted") is True,
+            "promotion_families_requiring_surface": (
+                list(promotion_families) if isinstance(promotion_families, list) else []
+            ),
+            "required_top_level_field_count": int(detail.get("required_top_level_field_count") or 0),
+            "required_matrix_field_count": int(detail.get("required_matrix_field_count") or 0),
+            "required_control_fields": (
+                list(required_control_fields)
+                if isinstance(required_control_fields, list)
+                else []
+            ),
+            "required_eq_fields": (
+                list(required_eq_fields) if isinstance(required_eq_fields, list) else []
+            ),
+            "required_eq_band_fields": (
+                list(required_eq_band_fields)
+                if isinstance(required_eq_band_fields, list)
+                else []
+            ),
+            "required_dynamics_fields": (
+                list(required_dynamics_fields)
+                if isinstance(required_dynamics_fields, list)
+                else []
+            ),
+            "required_insert_fields": (
+                list(required_insert_fields)
+                if isinstance(required_insert_fields, list)
+                else []
+            ),
+            "required_metering_fields": (
+                list(required_metering_fields)
+                if isinstance(required_metering_fields, list)
+                else []
+            ),
+            "required_coverage_flags": (
+                list(required_coverage_flags)
+                if isinstance(required_coverage_flags, list)
+                else []
+            ),
+            "required_false_safety_flags": (
+                list(required_false_flags) if isinstance(required_false_flags, list) else []
+            ),
+            "minimum_matrix_count": int(detail.get("minimum_matrix_count") or 0),
+            "minimum_eq_band_count": int(detail.get("minimum_eq_band_count") or 0),
+            "allowed_sources": list(allowed_sources) if isinstance(allowed_sources, list) else [],
+            "accepted_matrix_statuses": (
+                list(accepted_statuses) if isinstance(accepted_statuses, list) else []
+            ),
+            "forbidden_mutation_evidence_fields": (
+                list(forbidden_mutation_fields)
+                if isinstance(forbidden_mutation_fields, list)
+                else []
+            ),
+            "target_consistency": (
+                detail.get("physical_readback_surface_id") == detail.get("surface_id")
+                and detail.get("physical_readback_action_id")
+                == detail.get("remediation_action_id")
+                and detail.get("fixture_physical_gap_declared") is True
+                and detail.get("remediation_physical_gap_declared") is True
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "next_wing_proof_plan_schema":
@@ -2914,6 +3262,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     channel_basic_contract = channel_basic_controls_readback_contract_summary(results)
     channel_processing_contract = channel_processing_readback_contract_summary(results)
     bus_group_main_dca_contract = bus_group_main_dca_readback_contract_summary(results)
+    matrix_state_contract = matrix_state_readback_contract_summary(results)
     next_plan = next_wing_proof_plan_summary(results)
     summary = {
         "type": "no_wing_release_check",
@@ -2942,6 +3291,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["channel_processing_physical_readback_contract"] = channel_processing_contract
     if bus_group_main_dca_contract is not None:
         summary["bus_group_main_dca_physical_readback_contract"] = bus_group_main_dca_contract
+    if matrix_state_contract is not None:
+        summary["matrix_state_physical_readback_contract"] = matrix_state_contract
     if next_plan is not None:
         summary["next_wing_proof_plan"] = next_plan
     summary_path = run_dir / "summary.json"
@@ -3313,6 +3664,71 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(bus_group_main_dca_contract['violations'])}`",
             ]
         )
+    if matrix_state_contract is not None:
+        lines.extend(
+            [
+                "",
+                "## Matrix State Physical Readback Contract",
+                "",
+                f"- schema_check: `{matrix_state_contract['status']}`",
+                f"- read_only: `{str(matrix_state_contract['read_only']).lower()}`",
+                f"- live_write: `{str(matrix_state_contract['live_write']).lower()}`",
+                f"- mutates_console_state: `{str(matrix_state_contract['mutates_console_state']).lower()}`",
+                f"- queries_console: `{str(matrix_state_contract['queries_console']).lower()}`",
+                f"- executes_tests: `{str(matrix_state_contract['executes_tests']).lower()}`",
+                f"- live_widening_allowed: `{str(matrix_state_contract['live_widening_allowed']).lower()}`",
+                f"- full_autonomous_ready: `{str(matrix_state_contract['full_autonomous_ready']).lower()}`",
+                f"- schema_id: `{matrix_state_contract['schema_id']}`",
+                f"- contract_status: `{matrix_state_contract['contract_status']}`",
+                f"- surface_id: `{matrix_state_contract['surface_id']}`",
+                f"- remediation_action_id: `{matrix_state_contract['remediation_action_id']}`",
+                "- physical_readback_surface_id: "
+                f"`{matrix_state_contract['physical_readback_surface_id']}`",
+                "- physical_readback_action_id: "
+                f"`{matrix_state_contract['physical_readback_action_id']}`",
+                "- fixture_physical_gap_declared: "
+                f"`{str(matrix_state_contract['fixture_physical_gap_declared']).lower()}`",
+                "- remediation_physical_gap_declared: "
+                f"`{str(matrix_state_contract['remediation_physical_gap_declared']).lower()}`",
+                f"- artifact_required: `{str(matrix_state_contract['artifact_required']).lower()}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(matrix_state_contract['physical_fixture_gap_remains']).lower()}`",
+                "- accepted_as_physical_fixture_candidate: "
+                f"`{str(matrix_state_contract['accepted_as_physical_fixture_candidate']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(matrix_state_contract['live_authority_granted']).lower()}`",
+                "- promotion_families_requiring_surface: "
+                f"`{json.dumps(matrix_state_contract['promotion_families_requiring_surface'])}`",
+                "- required_top_level_field_count: "
+                f"`{matrix_state_contract['required_top_level_field_count']}`",
+                "- required_matrix_field_count: "
+                f"`{matrix_state_contract['required_matrix_field_count']}`",
+                "- required_control_fields: "
+                f"`{json.dumps(matrix_state_contract['required_control_fields'])}`",
+                "- required_eq_fields: "
+                f"`{json.dumps(matrix_state_contract['required_eq_fields'])}`",
+                "- required_eq_band_fields: "
+                f"`{json.dumps(matrix_state_contract['required_eq_band_fields'])}`",
+                "- required_dynamics_fields: "
+                f"`{json.dumps(matrix_state_contract['required_dynamics_fields'])}`",
+                "- required_insert_fields: "
+                f"`{json.dumps(matrix_state_contract['required_insert_fields'])}`",
+                "- required_metering_fields: "
+                f"`{json.dumps(matrix_state_contract['required_metering_fields'])}`",
+                "- required_coverage_flags: "
+                f"`{json.dumps(matrix_state_contract['required_coverage_flags'])}`",
+                f"- minimum_matrix_count: `{matrix_state_contract['minimum_matrix_count']}`",
+                f"- minimum_eq_band_count: `{matrix_state_contract['minimum_eq_band_count']}`",
+                "- allowed_sources: "
+                f"`{json.dumps(matrix_state_contract['allowed_sources'])}`",
+                "- accepted_matrix_statuses: "
+                f"`{json.dumps(matrix_state_contract['accepted_matrix_statuses'])}`",
+                "- forbidden_mutation_evidence_fields: "
+                f"`{json.dumps(matrix_state_contract['forbidden_mutation_evidence_fields'])}`",
+                f"- target_consistency: `{str(matrix_state_contract['target_consistency']).lower()}`",
+                f"- violations: `{json.dumps(matrix_state_contract['violations'])}`",
+            ]
+        )
     if next_plan is not None:
         lines.extend(
             [
@@ -3408,6 +3824,15 @@ def run_release_checks(
             results.append(bus_group_main_dca_contract_result)
             if (
                 bus_group_main_dca_contract_result.status != "passed"
+                and not continue_on_failure
+            ):
+                break
+            matrix_state_contract_result = (
+                validate_matrix_state_physical_readback_contract_snapshot()
+            )
+            results.append(matrix_state_contract_result)
+            if (
+                matrix_state_contract_result.status != "passed"
                 and not continue_on_failure
             ):
                 break

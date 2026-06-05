@@ -21,6 +21,9 @@ try:
     from channel_processing_physical_readback_contract import (
         build_channel_processing_physical_readback_contract,
     )
+    from matrix_state_physical_readback_contract import (
+        build_matrix_state_physical_readback_contract,
+    )
     from autonomy_mode_transition_gate import build_autonomy_mode_transition_gate
     from autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
     from project_goal_capability_matrix import build_project_goal_capability_matrix_snapshot
@@ -41,6 +44,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.channel_processing_physical_readback_contract import (
         build_channel_processing_physical_readback_contract,
+    )
+    from backend.matrix_state_physical_readback_contract import (
+        build_matrix_state_physical_readback_contract,
     )
     from backend.autonomy_mode_transition_gate import build_autonomy_mode_transition_gate
     from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
@@ -470,6 +476,30 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         promotion_next=(
             "capture an operator-run bus/group/main/DCA physical readback "
             "artifact before closing the bus/group/main/DCA gap"
+        ),
+        notes=(
+            "transport_free",
+            "readback_contract_only",
+            "no_live_writes",
+            "does_not_query_console",
+        ),
+    ),
+    ProcessingMethod(
+        id="matrix_state_physical_readback_contract",
+        label="Matrix State Physical Readback Contract",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Transport-free schema contract for matrix controls, EQ, dynamics, "
+            "inserts, and metering physical readback artifacts."
+        ),
+        module="backend/matrix_state_physical_readback_contract.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="contract_only_matrix_state_physical_readback_artifact_missing",
+        promotion_next=(
+            "capture an operator-run matrix physical readback artifact before "
+            "closing the matrix-state physical fixture gap"
         ),
         notes=(
             "transport_free",
@@ -1401,6 +1431,14 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, read-surface remediation artifact contract",
         "next_step": "Use only to validate separately captured bus/group/main/DCA readback; do not infer live authority.",
     },
+    "matrix_state_physical_readback_contract": {
+        "entrypoint": (
+            "build_matrix_state_physical_readback_contract / "
+            "validate_matrix_state_physical_readback_artifact"
+        ),
+        "ui_surface": "Processing registry, read-surface remediation artifact contract",
+        "next_step": "Use only to validate separately captured matrix-state readback; do not infer live authority.",
+    },
     "auto_fader_v1": {
         "entrypoint": "main_pipeline_preview proposal adapter",
         "ui_surface": "Task Queue preview/proposal rows",
@@ -1625,6 +1663,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "bus_group_main_dca_physical_readback_contract": (
             build_bus_group_main_dca_physical_readback_contract()
+        ),
+        "matrix_state_physical_readback_contract": (
+            build_matrix_state_physical_readback_contract()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),
