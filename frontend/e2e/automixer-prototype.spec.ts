@@ -1026,7 +1026,66 @@ test.describe('Automixer backend Product Layer adapter', () => {
               blocked_reason: 'legacy entrypoint unavailable',
               next_step: 'Restore as offline entrypoint or retire.'
             }
-          ]
+          ],
+          supervised_proof_evidence: {
+            type: 'supervised_proof_evidence_snapshot',
+            available: true,
+            report_path: 'artifacts/no_wing_release_check_current_cycle/latest/supervised_proof_artifact_report.json',
+            safety: {
+              read_only: true,
+              live_write: false,
+              generates_artifacts: false,
+              live_widening_allowed: false,
+              automatic_safety_update_allowed: false,
+              full_autonomous_ready: false
+            },
+            summary: {
+              latest_report_status: 'ok',
+              latest_report_age_sec: 180,
+              latest_report_stale: false,
+              stale_after_sec: 86400,
+              artifact_count: 1,
+              invalid_summary_count: 0,
+              overlay_status: 'dry_run_only',
+              overlay_row_count: 2
+            }
+          },
+          autonomy_evidence_overlay: {
+            rows: [
+              {
+                id: 'fader_autonomy_evidence_overlay',
+                target_id: 'fader_supervised_promotion',
+                value_type: 'fader',
+                status: 'no_current_evidence',
+                physical_candidate_count: 0,
+                dry_run_ready_count: 0,
+                blocked_artifact_count: 0,
+                remediation_action_count: 0,
+                physical_candidate_proof_ids: [],
+                dry_run_ready_proof_ids: [],
+                blocked_proof_ids: [],
+                remediation_action_ids: [],
+                blockers: ['proof_artifact_missing'],
+                next_required_actions: ['Run one physical supervised fader proof.']
+              },
+              {
+                id: 'gain_autonomy_evidence_overlay',
+                target_id: 'gain_trim_supervised_promotion',
+                value_type: 'gain',
+                status: 'dry_run_only',
+                physical_candidate_count: 0,
+                dry_run_ready_count: 1,
+                blocked_artifact_count: 0,
+                remediation_action_count: 0,
+                physical_candidate_proof_ids: [],
+                dry_run_ready_proof_ids: ['gain-proof-dry-run'],
+                blocked_proof_ids: [],
+                remediation_action_ids: [],
+                blockers: ['physical_proof_required_for_promotion'],
+                next_required_actions: ['Run one small supervised gain proof on WING.']
+              }
+            ]
+          }
         },
         get_main_pipeline_preview: {
           type: 'main_pipeline_preview',
@@ -1192,8 +1251,8 @@ test.describe('Automixer backend Product Layer adapter', () => {
     });
 
     await page.goto('/#/dashboard');
-    await expect(page.locator('header').filter({ hasText: 'Status' }).getByText(/Live data/i)).toBeVisible();
-    await expect(page.getByText(/Product Layer live/i)).toBeVisible();
+    await expect(page.locator('header').filter({ hasText: 'Status' }).getByText(/Partial data/i)).toBeVisible();
+    await expect(page.getByRole('banner').getByText(/Product Layer partial/i)).toBeVisible();
     await expect(page.getByText('WING 10.10.10.20')).toBeVisible();
     await expect(page.getByText('-18.2').first()).toBeVisible();
     await expect(page.getByText('-2.4').first()).toBeVisible();
@@ -1259,6 +1318,16 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('Backend Product State').first()).toBeVisible();
     await expect(page.getByText('Control Center dashboard, Task Queue, Safety Monitor').first()).toBeVisible();
     await expect(page.getByText('Backend Production Mix v1').first()).toBeVisible();
+    await expect(page.getByText('Supervised proof evidence').first()).toBeVisible();
+    await expect(page.getByText('artifact_available').first()).toBeVisible();
+    await expect(page.getByText('age:180s stale_after:86400s stale:false').first()).toBeVisible();
+    await expect(page.getByText('Autonomy proof evidence: Fader').first()).toBeVisible();
+    await expect(page.getByText('Autonomy proof evidence: Gain').first()).toBeVisible();
+    await expect(page.getByText('dry_run_only').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Module Status' }).first().click();
+    await expect(page.getByText('Proof freshness').first()).toBeVisible();
+    await expect(page.getByText('Fresh', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Dry Run Only (2)').first()).toBeVisible();
 
     await page.goto('/#/groups');
     await expect(page.getByText('Backend DTO Drums').first()).toBeVisible();

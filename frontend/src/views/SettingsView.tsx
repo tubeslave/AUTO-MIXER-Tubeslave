@@ -130,6 +130,32 @@ function modePolicyRows(ui: UiState, modules: ModuleStatusRecord[], writeScope: 
   ];
 }
 
+function profileValue(row: ModuleStatusRecord | undefined, prefix: string) {
+  if (!row) return '';
+  return row.pipelineProfiles
+    .find(profile => profile.startsWith(prefix))
+    ?.slice(prefix.length) ?? '';
+}
+
+function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
+  const proof = modules.find(row => row.moduleId === 'supervised_proof_evidence');
+  const overlayRows = modules.filter(row => row.domain === 'autonomy_evidence_overlay');
+  if (!proof) {
+    return [
+      { label: 'Proof evidence', value: 'Missing', tone: 'yellow' as const },
+      { label: 'Proof freshness', value: 'No artifact', tone: 'yellow' as const },
+      { label: 'Autonomy overlay', value: overlayRows.length ? `${overlayRows.length} rows` : 'Missing', tone: overlayRows.length ? 'yellow' as const : 'muted' as const }
+    ];
+  }
+  const stale = profileValue(proof, 'stale:') === 'true';
+  const overlayStatus = profileValue(proof, 'overlay:') || 'unknown';
+  return [
+    { label: 'Proof evidence', value: readableStatus(proof.status), tone: proof.tone },
+    { label: 'Proof freshness', value: stale ? 'Stale' : 'Fresh', tone: stale ? 'yellow' as const : 'green' as const },
+    { label: 'Autonomy overlay', value: `${readableStatus(overlayStatus)} (${overlayRows.length})`, tone: overlayRows.length ? 'blue' as const : 'yellow' as const }
+  ];
+}
+
 function ModuleStatusTable({
   rows,
   onFocus
@@ -155,6 +181,7 @@ function ModuleStatusTable({
           { label: 'All', predicate: () => true },
           { label: 'Live', predicate: row => row.canWriteLive },
           { label: 'Write Surface', predicate: row => row.domain === 'write_surface' },
+          { label: 'Proof', predicate: row => row.domain === 'supervised_proof_evidence' || row.domain === 'autonomy_evidence_overlay' },
           { label: 'Review', predicate: row => row.status.includes('proposal') || !row.canWriteLive },
           { label: 'Blocked', predicate: row => row.status.includes('blocked') || row.status.includes('quarantined') || row.pipelineProfiles.includes('quarantine') }
         ]}
@@ -208,7 +235,8 @@ function SettingsInspector({
       { label: 'Live executors', value: String(liveModuleCount), tone: liveModuleCount === 1 ? 'green' : 'yellow' },
       { label: 'Review/status only', value: String(reviewOnlyCount), tone: reviewOnlyCount ? 'yellow' : 'green' },
       { label: 'Quarantine', value: String(quarantinedCount), tone: quarantinedCount ? 'red' : 'green' },
-      { label: 'Allowed writes', value: writeScope, tone: backend.writeScope.length ? 'yellow' : 'red' }
+      { label: 'Allowed writes', value: writeScope, tone: backend.writeScope.length ? 'yellow' : 'red' },
+      ...proofEvidenceInspectorRows(modules)
     ],
     'Mix Defaults': [
       { label: 'LUFS target', value: '-14 LUFS', tone: 'blue' },

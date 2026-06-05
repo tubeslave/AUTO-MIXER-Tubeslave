@@ -53,6 +53,7 @@
 - `artifacts/no_wing_release_check_current_cycle` is a Product Layer proof-evidence input root; treat its contents as read-only artifacts and normalize safety before cockpit display.
 - Cockpit proof-evidence status should separate source availability (`supervised_proof_evidence`) from target-level readiness (`autonomy_evidence_overlay`) so operators can see whether missing proof is a missing artifact or a target-specific blocker.
 - Proof-report artifacts need freshness metadata in Product Layer and cockpit rows; stale proof remains read-only evidence and should trigger rerun/review before any promotion discussion.
+- Settings proof-evidence visibility should show source freshness and autonomy overlay status as read-only operator evidence; browser/e2e coverage must keep no-live-write command assertions in the same path.
 
 ## Memory Pipeline Lessons
 
