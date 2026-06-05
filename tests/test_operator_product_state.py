@@ -2833,6 +2833,41 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "user_presets_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "user_presets_physical_readback.v1",
+                    "intake_status": "operator_artifact_missing",
+                    "surface_id": "user_presets",
+                    "remediation_action_id": "remediate_user_presets",
+                    "required_contract_method_id": (
+                        "user_presets_physical_readback_contract"
+                    ),
+                    "artifact_count": 0,
+                    "valid_candidate_count": 0,
+                    "invalid_candidate_count": 0,
+                    "valid_preset_count": 0,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "operator_review_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "fixture_closure_allowed_by_intake": False,
+                    "preset_recall_allowed": False,
+                    "preset_store_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "scene_preset",
+                        "routing",
+                        "mix_balance",
+                        "performance_adaptation",
+                    ],
+                    "blocked_by": [
+                        "operator_must_capture_user_presets_physical_readback_artifact",
+                    ],
+                    "artifact_source_ids": [],
+                    "intake_violations": [],
+                    "violations": [],
+                },
                 "dlive_state_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "dlive_state_physical_readback.v1",
@@ -2897,6 +2932,47 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                         "tcp_send_events",
                         "dlive_write_events",
                     ],
+                    "violations": [],
+                },
+                "dlive_state_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "dlive_state_physical_readback.v1",
+                    "intake_status": "operator_artifact_missing",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "required_contract_method_id": (
+                        "dlive_state_physical_readback_contract"
+                    ),
+                    "artifact_count": 0,
+                    "valid_candidate_count": 0,
+                    "invalid_candidate_count": 0,
+                    "valid_channel_count": 0,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "operator_review_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "fixture_closure_allowed_by_intake": False,
+                    "midi_send_allowed": False,
+                    "tcp_send_allowed": False,
+                    "dlive_write_allowed": False,
+                    "dlive_apply_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "fader",
+                        "gain",
+                        "mute",
+                        "bus_group_matrix",
+                        "routing",
+                        "scene_preset",
+                        "mix_balance",
+                        "performance_adaptation",
+                    ],
+                    "blocked_by": [
+                        "operator_must_capture_dlive_state_physical_readback_artifact",
+                    ],
+                    "artifact_source_ids": [],
+                    "intake_violations": [],
                     "violations": [],
                 },
             }
@@ -3482,6 +3558,33 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert "preset_store_events" in presets_contract[
         "forbidden_mutation_evidence_fields"
     ]
+    presets_intake = proof_quality["user_presets_physical_readback_artifact_intake"]
+    assert presets_intake["available"] is True
+    assert presets_intake["status"] == "passed"
+    assert presets_intake["schema_id"] == "user_presets_physical_readback.v1"
+    assert presets_intake["intake_status"] == "operator_artifact_missing"
+    assert presets_intake["surface_id"] == "user_presets"
+    assert presets_intake["remediation_action_id"] == "remediate_user_presets"
+    assert presets_intake["required_contract_method_id"] == (
+        "user_presets_physical_readback_contract"
+    )
+    assert presets_intake["artifact_count"] == 0
+    assert presets_intake["valid_candidate_count"] == 0
+    assert presets_intake["invalid_candidate_count"] == 0
+    assert presets_intake["valid_preset_count"] == 0
+    assert presets_intake["accepted_as_physical_fixture_candidate"] is False
+    assert presets_intake["operator_review_required"] is True
+    assert presets_intake["physical_fixture_gap_remains"] is True
+    assert presets_intake["fixture_closure_allowed_by_intake"] is False
+    assert presets_intake["preset_recall_allowed"] is False
+    assert presets_intake["preset_store_allowed"] is False
+    assert presets_intake["live_authority_granted"] is False
+    assert presets_intake["full_autonomous_ready"] is False
+    assert presets_intake["target_consistency"] is True
+    assert "scene_preset" in presets_intake["promotion_families_requiring_surface"]
+    assert "operator_must_capture_user_presets_physical_readback_artifact" in presets_intake[
+        "blocked_by"
+    ]
     dlive_contract = proof_quality["dlive_state_physical_readback_contract"]
     assert dlive_contract["available"] is True
     assert dlive_contract["status"] == "passed"
@@ -3514,6 +3617,37 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert "physical_readback" in dlive_contract["allowed_sources"]
     assert "midi_send_events" in dlive_contract[
         "forbidden_mutation_evidence_fields"
+    ]
+    dlive_intake = proof_quality["dlive_state_physical_readback_artifact_intake"]
+    assert dlive_intake["available"] is True
+    assert dlive_intake["status"] == "passed"
+    assert dlive_intake["schema_id"] == "dlive_state_physical_readback.v1"
+    assert dlive_intake["intake_status"] == "operator_artifact_missing"
+    assert dlive_intake["surface_id"] == "dlive_state"
+    assert dlive_intake["remediation_action_id"] == "remediate_dlive_state"
+    assert dlive_intake["required_contract_method_id"] == (
+        "dlive_state_physical_readback_contract"
+    )
+    assert dlive_intake["artifact_count"] == 0
+    assert dlive_intake["valid_candidate_count"] == 0
+    assert dlive_intake["invalid_candidate_count"] == 0
+    assert dlive_intake["valid_channel_count"] == 0
+    assert dlive_intake["accepted_as_physical_fixture_candidate"] is False
+    assert dlive_intake["operator_review_required"] is True
+    assert dlive_intake["physical_fixture_gap_remains"] is True
+    assert dlive_intake["fixture_closure_allowed_by_intake"] is False
+    assert dlive_intake["midi_send_allowed"] is False
+    assert dlive_intake["tcp_send_allowed"] is False
+    assert dlive_intake["dlive_write_allowed"] is False
+    assert dlive_intake["dlive_apply_allowed"] is False
+    assert dlive_intake["live_authority_granted"] is False
+    assert dlive_intake["full_autonomous_ready"] is False
+    assert dlive_intake["target_consistency"] is True
+    assert "performance_adaptation" in dlive_intake[
+        "promotion_families_requiring_surface"
+    ]
+    assert "operator_must_capture_dlive_state_physical_readback_artifact" in dlive_intake[
+        "blocked_by"
     ]
     overlay = payload["autonomy_evidence_overlay"]
     assert overlay["source_report_available"] is True
