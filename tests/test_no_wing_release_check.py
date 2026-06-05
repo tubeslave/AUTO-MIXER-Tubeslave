@@ -16,6 +16,7 @@ from tools.no_wing_release_check import (
     gain_proof_artifact_root_for_run,
     next_wing_proof_plan_summary,
     proof_report_path_for_run,
+    raw_mixer_readback_contract_summary,
     read_surface_fixture_evidence_summary,
     read_surface_remediation_plan_summary,
     run_command_check,
@@ -24,6 +25,7 @@ from tools.no_wing_release_check import (
     validate_repo_local_commands,
     validate_no_live_commands,
     validate_read_surface_fixture_evidence_snapshot,
+    validate_raw_mixer_state_physical_readback_contract_snapshot,
     validate_read_surface_remediation_plan_snapshot,
     validate_supervised_proof_report_autonomy_overlay,
     validate_supervised_proof_report_next_wing_plan,
@@ -371,6 +373,62 @@ def test_no_wing_release_check_rejects_multiple_remediation_next_target_flags(mo
         "read_surface_remediation_next_target_action_flags_mismatch"
         in result.detail["violations"]
     )
+
+
+def test_no_wing_release_check_validates_raw_mixer_readback_contract_snapshot():
+    result = validate_raw_mixer_state_physical_readback_contract_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert result.detail["schema_id"] == "raw_mixer_state_physical_readback.v1"
+    assert result.detail["surface_id"] == "raw_mixer_state_cache"
+    assert result.detail["remediation_action_id"] == "remediate_raw_mixer_state_cache"
+    assert result.detail["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert result.detail["fixture_next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert result.detail["remediation_next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert result.detail["artifact_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert "physical_readback" in result.detail["allowed_sources"]
+    assert "mixer_state_cache" not in result.detail["allowed_sources"]
+    assert "verified_from_physical_readback" in result.detail["accepted_row_statuses"]
+    assert "manual_write_events" in result.detail["forbidden_mutation_evidence_fields"]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_raw_mixer_contract_drift(monkeypatch):
+    contract = release_check.build_raw_mixer_state_physical_readback_contract()
+    corrupted = json.loads(json.dumps(contract))
+    corrupted["schema_id"] = "raw_mixer_state_physical_readback.v0"
+    corrupted["surface_id"] = "channel_identity_and_basic_controls"
+    corrupted["safety"]["live_write"] = True
+    corrupted["artifact_contract"]["required_top_level_fields"] = ["type"]
+    corrupted["artifact_contract"]["allowed_sources"].append("mixer_state_cache")
+    corrupted["artifact_contract"]["accepted_row_statuses"] = ["verified_from_cache"]
+    corrupted["artifact_contract"]["forbidden_mutation_evidence_fields"] = []
+    corrupted["summary"]["next_physical_readback_surface_id"] = "dlive_state"
+    corrupted["summary"]["live_authority_granted"] = True
+
+    monkeypatch.setattr(
+        release_check,
+        "build_raw_mixer_state_physical_readback_contract",
+        lambda: corrupted,
+    )
+
+    result = validate_raw_mixer_state_physical_readback_contract_snapshot()
+
+    assert result.status == "failed"
+    assert "raw_mixer_readback_contract_schema_id_mismatch" in result.detail["violations"]
+    assert "raw_mixer_readback_contract_surface_id_mismatch" in result.detail["violations"]
+    assert "raw_mixer_readback_contract_live_write_not_false" in result.detail["violations"]
+    assert "raw_mixer_readback_required_top_level_fields_mismatch" in result.detail["violations"]
+    assert "raw_mixer_readback_allowed_sources_mismatch" in result.detail["violations"]
+    assert "raw_mixer_readback_allows_cached_source" in result.detail["violations"]
+    assert "raw_mixer_readback_accepted_statuses_mismatch" in result.detail["violations"]
+    assert "raw_mixer_readback_forbidden_mutation_fields_mismatch" in result.detail["violations"]
+    assert "raw_mixer_readback_contract_next_target_mismatch" in result.detail["violations"]
+    assert "raw_mixer_readback_contract_live_authority_not_false" in result.detail["violations"]
 
 
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
@@ -822,6 +880,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert summary["status"] == "passed"
     assert "read_surface_fixture_evidence_schema" in result_names
     assert "read_surface_remediation_plan_schema" in result_names
+    assert "raw_mixer_state_physical_readback_contract_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
@@ -833,6 +892,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "read_surface_remediation_plan_schema"
     )
     assert result_names.index("read_surface_remediation_plan_schema") < result_names.index(
+        "raw_mixer_state_physical_readback_contract_schema"
+    )
+    assert result_names.index("raw_mixer_state_physical_readback_contract_schema") < result_names.index(
         "backend_pytest"
     )
     assert result_names.index("supervised_proof_artifact_report") < result_names.index(
@@ -1564,6 +1626,69 @@ def test_no_wing_release_check_summary_embeds_read_surface_remediation_plan(tmp_
     assert "next_physical_readback_action_id" in markdown_summary
     assert "next_physical_readback_target_action_ids" in markdown_summary
     assert "target_action_consistency: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_raw_mixer_readback_contract(tmp_path):
+    result = CheckResult(
+        name="raw_mixer_state_physical_readback_contract_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "contract_status": "contract_ready_physical_fixture_missing",
+            "schema_id": "raw_mixer_state_physical_readback.v1",
+            "surface_id": "raw_mixer_state_cache",
+            "remediation_action_id": "remediate_raw_mixer_state_cache",
+            "next_physical_readback_surface_id": "raw_mixer_state_cache",
+            "next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
+            "fixture_next_physical_readback_surface_id": "raw_mixer_state_cache",
+            "remediation_next_physical_readback_surface_id": "raw_mixer_state_cache",
+            "remediation_next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
+            "artifact_required": True,
+            "physical_fixture_gap_remains": True,
+            "accepted_as_physical_fixture_candidate": False,
+            "live_authority_granted": False,
+            "required_top_level_field_count": 10,
+            "required_row_field_count": 5,
+            "required_false_safety_flags": [
+                "live_write",
+                "mutates_console_state",
+                "live_widening_allowed",
+                "full_autonomous_ready",
+            ],
+            "allowed_sources": ["physical_readback", "wing_physical_readback"],
+            "accepted_row_statuses": ["verified_from_physical_readback"],
+            "forbidden_mutation_evidence_fields": ["manual_write_events"],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert raw_mixer_readback_contract_summary([result]) == summary[
+        "raw_mixer_state_physical_readback_contract"
+    ]
+    contract = json_summary["raw_mixer_state_physical_readback_contract"]
+    assert contract["read_only"] is True
+    assert contract["live_write"] is False
+    assert contract["mutates_console_state"] is False
+    assert contract["queries_console"] is False
+    assert contract["executes_tests"] is False
+    assert contract["full_autonomous_ready"] is False
+    assert contract["artifact_required"] is True
+    assert contract["physical_fixture_gap_remains"] is True
+    assert contract["accepted_as_physical_fixture_candidate"] is False
+    assert contract["live_authority_granted"] is False
+    assert contract["target_consistency"] is True
+    assert contract["surface_id"] == "raw_mixer_state_cache"
+    assert contract["remediation_action_id"] == "remediate_raw_mixer_state_cache"
+    assert "## Raw Mixer State Physical Readback Contract" in markdown_summary
+    assert "physical_fixture_gap_remains: `true`" in markdown_summary
+    assert "live_authority_granted: `false`" in markdown_summary
+    assert "target_consistency: `true`" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):

@@ -32,6 +32,20 @@ from backend.read_surface_fixture_evidence import (  # noqa: E402
     FIXTURE_EVIDENCE_STATUSES,
     build_read_surface_fixture_evidence_snapshot,
 )
+from backend.raw_mixer_state_physical_readback_contract import (  # noqa: E402
+    FORBIDDEN_MUTATION_EVIDENCE_FIELDS,
+    PHYSICAL_READBACK_SOURCES,
+    RAW_MIXER_STATE_PHYSICAL_READBACK_ARTIFACT_TYPE,
+    RAW_MIXER_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID,
+    RAW_MIXER_STATE_PHYSICAL_READBACK_SCHEMA_ID,
+    RAW_MIXER_STATE_REMEDIATION_ACTION_ID,
+    RAW_MIXER_STATE_SURFACE_ID,
+    REQUIRED_FALSE_SAFETY_FLAGS,
+    REQUIRED_ROW_FIELDS,
+    REQUIRED_TOP_LEVEL_FIELDS,
+    VERIFIED_PHYSICAL_ROW_STATUSES,
+    build_raw_mixer_state_physical_readback_contract,
+)
 from backend.read_surface_remediation_plan import build_read_surface_remediation_plan  # noqa: E402
 
 DEFAULT_ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "no_wing_release_check"
@@ -988,6 +1002,172 @@ def validate_read_surface_remediation_plan_snapshot() -> CheckResult:
     )
 
 
+def validate_raw_mixer_state_physical_readback_contract_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "raw_mixer_state_readback_contract_is_schema_only_no_live_authority",
+    }
+    violations: list[str] = []
+
+    try:
+        fixture_snapshot = build_read_surface_fixture_evidence_snapshot()
+        remediation_plan = build_read_surface_remediation_plan(
+            fixture_evidence_snapshot=fixture_snapshot
+        )
+        contract = build_raw_mixer_state_physical_readback_contract()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        fixture_snapshot = {}
+        remediation_plan = {}
+        contract = {}
+        violations.append(f"raw_mixer_readback_contract_build_error:{type(exc).__name__}")
+
+    fixture_summary = (
+        fixture_snapshot.get("summary")
+        if isinstance(fixture_snapshot.get("summary"), Mapping)
+        else {}
+    )
+    remediation_summary = (
+        remediation_plan.get("summary")
+        if isinstance(remediation_plan.get("summary"), Mapping)
+        else {}
+    )
+    safety = contract.get("safety") if isinstance(contract.get("safety"), Mapping) else {}
+    contract_summary = (
+        contract.get("summary") if isinstance(contract.get("summary"), Mapping) else {}
+    )
+    artifact_contract = (
+        contract.get("artifact_contract")
+        if isinstance(contract.get("artifact_contract"), Mapping)
+        else {}
+    )
+
+    if contract.get("type") != "raw_mixer_state_physical_readback_contract":
+        violations.append("raw_mixer_readback_contract_type_mismatch")
+    if contract.get("method_id") != RAW_MIXER_STATE_PHYSICAL_READBACK_CONTRACT_METHOD_ID:
+        violations.append("raw_mixer_readback_contract_method_id_mismatch")
+    if contract.get("schema_id") != RAW_MIXER_STATE_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("raw_mixer_readback_contract_schema_id_mismatch")
+    if contract.get("status") != "contract_ready_physical_fixture_missing":
+        violations.append("raw_mixer_readback_contract_status_mismatch")
+    if contract.get("surface_id") != RAW_MIXER_STATE_SURFACE_ID:
+        violations.append("raw_mixer_readback_contract_surface_id_mismatch")
+    if contract.get("remediation_action_id") != RAW_MIXER_STATE_REMEDIATION_ACTION_ID:
+        violations.append("raw_mixer_readback_contract_action_id_mismatch")
+
+    expected_true = ("read_only",)
+    for key in expected_true:
+        if safety.get(key) is not True:
+            violations.append(f"raw_mixer_readback_contract_{key}_not_true")
+    expected_false = (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+    )
+    for key in expected_false:
+        if safety.get(key) is not False:
+            violations.append(f"raw_mixer_readback_contract_{key}_not_false")
+
+    if artifact_contract.get("type") != RAW_MIXER_STATE_PHYSICAL_READBACK_ARTIFACT_TYPE:
+        violations.append("raw_mixer_readback_artifact_type_mismatch")
+    if artifact_contract.get("schema_id") != RAW_MIXER_STATE_PHYSICAL_READBACK_SCHEMA_ID:
+        violations.append("raw_mixer_readback_artifact_schema_id_mismatch")
+    if artifact_contract.get("minimum_row_count") != 1:
+        violations.append("raw_mixer_readback_artifact_minimum_row_count_mismatch")
+
+    required_top_level = artifact_contract.get("required_top_level_fields")
+    if not isinstance(required_top_level, list) or required_top_level != list(REQUIRED_TOP_LEVEL_FIELDS):
+        violations.append("raw_mixer_readback_required_top_level_fields_mismatch")
+        required_top_level = []
+    required_row_fields = artifact_contract.get("required_row_fields")
+    if not isinstance(required_row_fields, list) or required_row_fields != list(REQUIRED_ROW_FIELDS):
+        violations.append("raw_mixer_readback_required_row_fields_mismatch")
+        required_row_fields = []
+    required_false_flags = artifact_contract.get("required_false_safety_flags")
+    if not isinstance(required_false_flags, list) or required_false_flags != list(REQUIRED_FALSE_SAFETY_FLAGS):
+        violations.append("raw_mixer_readback_required_false_safety_flags_mismatch")
+        required_false_flags = []
+
+    allowed_sources = artifact_contract.get("allowed_sources")
+    if not isinstance(allowed_sources, list):
+        allowed_sources = []
+        violations.append("raw_mixer_readback_allowed_sources_missing")
+    elif list(allowed_sources) != list(PHYSICAL_READBACK_SOURCES):
+        violations.append("raw_mixer_readback_allowed_sources_mismatch")
+    if "mixer_state_cache" in allowed_sources or "cache" in allowed_sources:
+        violations.append("raw_mixer_readback_allows_cached_source")
+
+    accepted_statuses = artifact_contract.get("accepted_row_statuses")
+    if not isinstance(accepted_statuses, list) or accepted_statuses != list(VERIFIED_PHYSICAL_ROW_STATUSES):
+        violations.append("raw_mixer_readback_accepted_statuses_mismatch")
+        accepted_statuses = []
+    forbidden_mutation_fields = artifact_contract.get("forbidden_mutation_evidence_fields")
+    if (
+        not isinstance(forbidden_mutation_fields, list)
+        or forbidden_mutation_fields != list(FORBIDDEN_MUTATION_EVIDENCE_FIELDS)
+    ):
+        violations.append("raw_mixer_readback_forbidden_mutation_fields_mismatch")
+        forbidden_mutation_fields = []
+
+    fixture_next_target = fixture_summary.get("next_physical_readback_surface_id")
+    remediation_next_target = remediation_summary.get("next_physical_readback_surface_id")
+    remediation_next_action = remediation_summary.get("next_physical_readback_action_id")
+    contract_next_target = contract_summary.get("next_physical_readback_surface_id")
+    contract_next_action = contract_summary.get("next_physical_readback_action_id")
+    if fixture_next_target != RAW_MIXER_STATE_SURFACE_ID:
+        violations.append("raw_mixer_readback_fixture_next_target_mismatch")
+    if remediation_next_target != RAW_MIXER_STATE_SURFACE_ID:
+        violations.append("raw_mixer_readback_remediation_next_target_mismatch")
+    if remediation_next_action != RAW_MIXER_STATE_REMEDIATION_ACTION_ID:
+        violations.append("raw_mixer_readback_remediation_next_action_mismatch")
+    if contract_next_target != RAW_MIXER_STATE_SURFACE_ID:
+        violations.append("raw_mixer_readback_contract_next_target_mismatch")
+    if contract_next_action != RAW_MIXER_STATE_REMEDIATION_ACTION_ID:
+        violations.append("raw_mixer_readback_contract_next_action_mismatch")
+    if contract_summary.get("artifact_required") is not True:
+        violations.append("raw_mixer_readback_contract_artifact_required_not_true")
+    if contract_summary.get("physical_fixture_gap_remains") is not True:
+        violations.append("raw_mixer_readback_contract_physical_gap_not_true")
+    if contract_summary.get("accepted_as_physical_fixture_candidate") is not False:
+        violations.append("raw_mixer_readback_contract_candidate_not_false")
+    if contract_summary.get("live_authority_granted") is not False:
+        violations.append("raw_mixer_readback_contract_live_authority_not_false")
+
+    detail["contract_status"] = contract.get("status")
+    detail["schema_id"] = contract.get("schema_id")
+    detail["surface_id"] = contract.get("surface_id")
+    detail["remediation_action_id"] = contract.get("remediation_action_id")
+    detail["next_physical_readback_surface_id"] = contract_next_target
+    detail["next_physical_readback_action_id"] = contract_next_action
+    detail["fixture_next_physical_readback_surface_id"] = fixture_next_target
+    detail["remediation_next_physical_readback_surface_id"] = remediation_next_target
+    detail["remediation_next_physical_readback_action_id"] = remediation_next_action
+    detail["artifact_required"] = contract_summary.get("artifact_required")
+    detail["physical_fixture_gap_remains"] = contract_summary.get("physical_fixture_gap_remains")
+    detail["accepted_as_physical_fixture_candidate"] = contract_summary.get(
+        "accepted_as_physical_fixture_candidate"
+    )
+    detail["live_authority_granted"] = contract_summary.get("live_authority_granted")
+    detail["required_top_level_field_count"] = len(required_top_level)
+    detail["required_row_field_count"] = len(required_row_fields)
+    detail["required_false_safety_flags"] = list(required_false_flags)
+    detail["allowed_sources"] = list(allowed_sources)
+    detail["accepted_row_statuses"] = list(accepted_statuses)
+    detail["forbidden_mutation_evidence_fields"] = list(forbidden_mutation_fields)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="raw_mixer_state_physical_readback_contract_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_supervised_proof_report_gain_dry_run(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -1474,6 +1654,72 @@ def read_surface_remediation_plan_summary(results: Sequence[CheckResult]) -> dic
     return None
 
 
+def raw_mixer_readback_contract_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "raw_mixer_state_physical_readback_contract_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        allowed_sources = detail.get("allowed_sources")
+        accepted_statuses = detail.get("accepted_row_statuses")
+        forbidden_mutation_fields = detail.get("forbidden_mutation_evidence_fields")
+        required_false_flags = detail.get("required_false_safety_flags")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "live_widening_allowed": False,
+            "full_autonomous_ready": False,
+            "schema_id": detail.get("schema_id"),
+            "contract_status": detail.get("contract_status"),
+            "surface_id": detail.get("surface_id"),
+            "remediation_action_id": detail.get("remediation_action_id"),
+            "next_physical_readback_surface_id": detail.get("next_physical_readback_surface_id"),
+            "next_physical_readback_action_id": detail.get("next_physical_readback_action_id"),
+            "fixture_next_physical_readback_surface_id": detail.get(
+                "fixture_next_physical_readback_surface_id"
+            ),
+            "remediation_next_physical_readback_surface_id": detail.get(
+                "remediation_next_physical_readback_surface_id"
+            ),
+            "remediation_next_physical_readback_action_id": detail.get(
+                "remediation_next_physical_readback_action_id"
+            ),
+            "artifact_required": detail.get("artifact_required") is True,
+            "physical_fixture_gap_remains": detail.get("physical_fixture_gap_remains") is True,
+            "accepted_as_physical_fixture_candidate": (
+                detail.get("accepted_as_physical_fixture_candidate") is True
+            ),
+            "live_authority_granted": detail.get("live_authority_granted") is True,
+            "required_top_level_field_count": int(detail.get("required_top_level_field_count") or 0),
+            "required_row_field_count": int(detail.get("required_row_field_count") or 0),
+            "required_false_safety_flags": (
+                list(required_false_flags) if isinstance(required_false_flags, list) else []
+            ),
+            "allowed_sources": list(allowed_sources) if isinstance(allowed_sources, list) else [],
+            "accepted_row_statuses": (
+                list(accepted_statuses) if isinstance(accepted_statuses, list) else []
+            ),
+            "forbidden_mutation_evidence_fields": (
+                list(forbidden_mutation_fields)
+                if isinstance(forbidden_mutation_fields, list)
+                else []
+            ),
+            "target_consistency": (
+                detail.get("next_physical_readback_surface_id")
+                == detail.get("fixture_next_physical_readback_surface_id")
+                == detail.get("remediation_next_physical_readback_surface_id")
+                and detail.get("next_physical_readback_action_id")
+                == detail.get("remediation_next_physical_readback_action_id")
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "next_wing_proof_plan_schema":
@@ -1507,6 +1753,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     gain_dry_run = supervised_gain_dry_run_summary(results)
     read_fixture = read_surface_fixture_evidence_summary(results)
     read_remediation = read_surface_remediation_plan_summary(results)
+    raw_mixer_contract = raw_mixer_readback_contract_summary(results)
     next_plan = next_wing_proof_plan_summary(results)
     summary = {
         "type": "no_wing_release_check",
@@ -1527,6 +1774,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["read_surface_fixture_evidence"] = read_fixture
     if read_remediation is not None:
         summary["read_surface_remediation_plan"] = read_remediation
+    if raw_mixer_contract is not None:
+        summary["raw_mixer_state_physical_readback_contract"] = raw_mixer_contract
     if next_plan is not None:
         summary["next_wing_proof_plan"] = next_plan
     summary_path = run_dir / "summary.json"
@@ -1661,6 +1910,48 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(read_remediation['violations'])}`",
             ]
         )
+    if raw_mixer_contract is not None:
+        lines.extend(
+            [
+                "",
+                "## Raw Mixer State Physical Readback Contract",
+                "",
+                f"- schema_check: `{raw_mixer_contract['status']}`",
+                f"- read_only: `{str(raw_mixer_contract['read_only']).lower()}`",
+                f"- live_write: `{str(raw_mixer_contract['live_write']).lower()}`",
+                f"- mutates_console_state: `{str(raw_mixer_contract['mutates_console_state']).lower()}`",
+                f"- queries_console: `{str(raw_mixer_contract['queries_console']).lower()}`",
+                f"- executes_tests: `{str(raw_mixer_contract['executes_tests']).lower()}`",
+                f"- live_widening_allowed: `{str(raw_mixer_contract['live_widening_allowed']).lower()}`",
+                f"- full_autonomous_ready: `{str(raw_mixer_contract['full_autonomous_ready']).lower()}`",
+                f"- schema_id: `{raw_mixer_contract['schema_id']}`",
+                f"- contract_status: `{raw_mixer_contract['contract_status']}`",
+                f"- surface_id: `{raw_mixer_contract['surface_id']}`",
+                f"- remediation_action_id: `{raw_mixer_contract['remediation_action_id']}`",
+                "- next_physical_readback_surface_id: "
+                f"`{raw_mixer_contract['next_physical_readback_surface_id']}`",
+                "- next_physical_readback_action_id: "
+                f"`{raw_mixer_contract['next_physical_readback_action_id']}`",
+                f"- artifact_required: `{str(raw_mixer_contract['artifact_required']).lower()}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(raw_mixer_contract['physical_fixture_gap_remains']).lower()}`",
+                "- accepted_as_physical_fixture_candidate: "
+                f"`{str(raw_mixer_contract['accepted_as_physical_fixture_candidate']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(raw_mixer_contract['live_authority_granted']).lower()}`",
+                "- required_top_level_field_count: "
+                f"`{raw_mixer_contract['required_top_level_field_count']}`",
+                f"- required_row_field_count: `{raw_mixer_contract['required_row_field_count']}`",
+                "- allowed_sources: "
+                f"`{json.dumps(raw_mixer_contract['allowed_sources'])}`",
+                "- accepted_row_statuses: "
+                f"`{json.dumps(raw_mixer_contract['accepted_row_statuses'])}`",
+                "- forbidden_mutation_evidence_fields: "
+                f"`{json.dumps(raw_mixer_contract['forbidden_mutation_evidence_fields'])}`",
+                f"- target_consistency: `{str(raw_mixer_contract['target_consistency']).lower()}`",
+                f"- violations: `{json.dumps(raw_mixer_contract['violations'])}`",
+            ]
+        )
     if next_plan is not None:
         lines.extend(
             [
@@ -1733,6 +2024,10 @@ def run_release_checks(
             read_remediation_result = validate_read_surface_remediation_plan_snapshot()
             results.append(read_remediation_result)
             if read_remediation_result.status != "passed" and not continue_on_failure:
+                break
+            raw_mixer_contract_result = validate_raw_mixer_state_physical_readback_contract_snapshot()
+            results.append(raw_mixer_contract_result)
+            if raw_mixer_contract_result.status != "passed" and not continue_on_failure:
                 break
         if check.name == "supervised_proof_artifact_report" and result.status == "passed":
             gain_dry_run_result = validate_supervised_proof_report_gain_dry_run(proof_report_path)
