@@ -184,6 +184,57 @@ def test_no_wing_release_check_rejects_read_surface_fixture_stale_declarations(m
     assert "read_surface_fixture_row_dlive_state_missing_status_has_test_names" in result.detail["violations"]
 
 
+def test_no_wing_release_check_rejects_read_surface_contract_gap_inconsistency(monkeypatch):
+    snapshot = release_check.build_read_surface_fixture_evidence_snapshot()
+    corrupted = json.loads(json.dumps(snapshot))
+
+    channel_row = next(
+        row
+        for row in corrupted["surfaces"]
+        if row["surface_id"] == "channel_identity_and_basic_controls"
+    )
+    channel_row["status"] = "partial_fixture_evidence"
+    channel_row["covered_contracts"].append("physical_readback_fixture")
+    channel_row["remaining_gaps"] = [
+        gap
+        for gap in channel_row["remaining_gaps"]
+        if gap not in {"physical_readback_fixture_missing", "hardware_parity_unproven"}
+    ]
+
+    matrix_row = next(row for row in corrupted["surfaces"] if row["surface_id"] == "matrix_state")
+    matrix_row["status"] = "fixture_evidence_present"
+    matrix_row["covered_contracts"] = [
+        contract
+        for contract in matrix_row["covered_contracts"]
+        if contract != "physical_readback_fixture"
+    ]
+    matrix_row["remaining_gaps"].append("physical_readback_fixture_missing")
+    matrix_row["remaining_gaps"].append("hardware_parity_unproven")
+
+    dlive_row = next(row for row in corrupted["surfaces"] if row["surface_id"] == "dlive_state")
+    dlive_row["status"] = "missing_fixture_evidence"
+    dlive_row["covered_contracts"] = ["cached_dlive_midi_state"]
+    dlive_row["fixture_paths"] = []
+    dlive_row["test_names"] = []
+
+    monkeypatch.setattr(
+        release_check,
+        "build_read_surface_fixture_evidence_snapshot",
+        lambda: corrupted,
+    )
+
+    result = validate_read_surface_fixture_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert "read_surface_fixture_row_channel_identity_and_basic_controls_partial_status_has_physical_contract" in result.detail["violations"]
+    assert "read_surface_fixture_row_channel_identity_and_basic_controls_partial_status_missing_physical_gap" in result.detail["violations"]
+    assert "read_surface_fixture_row_channel_identity_and_basic_controls_partial_status_missing_hardware_gap" in result.detail["violations"]
+    assert "read_surface_fixture_row_matrix_state_present_status_missing_physical_contract" in result.detail["violations"]
+    assert "read_surface_fixture_row_matrix_state_present_status_has_physical_gap" in result.detail["violations"]
+    assert "read_surface_fixture_row_matrix_state_present_status_has_hardware_gap" in result.detail["violations"]
+    assert "read_surface_fixture_row_dlive_state_missing_status_has_covered_contracts" in result.detail["violations"]
+
+
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_frontend=False, quick=True)
 

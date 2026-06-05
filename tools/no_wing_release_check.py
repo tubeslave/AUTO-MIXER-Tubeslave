@@ -599,6 +599,10 @@ def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
             violations.append(f"read_surface_fixture_row_{index}_not_object")
             continue
         surface_id = str(row.get("surface_id") or f"index_{index}")
+        if not isinstance(row.get("surface_id"), str) or not row.get("surface_id"):
+            violations.append(f"read_surface_fixture_row_{surface_id}_surface_id_missing")
+        if not isinstance(row.get("target_console_surface"), str) or not row.get("target_console_surface"):
+            violations.append(f"read_surface_fixture_row_{surface_id}_target_console_surface_missing")
         status = str(row.get("status") or "")
         if not status:
             violations.append(f"read_surface_fixture_row_{surface_id}_status_missing")
@@ -616,6 +620,26 @@ def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
             violations.append(f"read_surface_fixture_row_{surface_id}_remaining_gaps_missing")
         if "physical_readback_fixture_missing" in remaining_gaps:
             expected_physical_missing.append(surface_id)
+        covered_contracts_value = row.get("covered_contracts")
+        if not isinstance(covered_contracts_value, list):
+            covered_contracts: list[object] = []
+            violations.append(f"read_surface_fixture_row_{surface_id}_covered_contracts_not_list")
+        else:
+            covered_contracts = list(covered_contracts_value)
+        invalid_contracts = [
+            value
+            for value in covered_contracts
+            if not isinstance(value, str) or not value.strip()
+        ]
+        if invalid_contracts:
+            violations.append(f"read_surface_fixture_row_{surface_id}_covered_contracts_invalid")
+        invalid_gaps = [
+            value
+            for value in remaining_gaps
+            if not isinstance(value, str) or not value.strip()
+        ]
+        if invalid_gaps:
+            violations.append(f"read_surface_fixture_row_{surface_id}_remaining_gaps_invalid")
         fixture_paths_value = row.get("fixture_paths")
         if not isinstance(fixture_paths_value, list):
             fixture_paths: list[object] = []
@@ -631,11 +655,32 @@ def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
         declared_fixture_path_count += len(fixture_paths)
         declared_test_name_count += len(test_names)
         if status == "missing_fixture_evidence":
+            if covered_contracts:
+                violations.append(f"read_surface_fixture_row_{surface_id}_missing_status_has_covered_contracts")
             if fixture_paths:
                 violations.append(f"read_surface_fixture_row_{surface_id}_missing_status_has_fixture_paths")
             if test_names:
                 violations.append(f"read_surface_fixture_row_{surface_id}_missing_status_has_test_names")
             continue
+        if not covered_contracts:
+            violations.append(f"read_surface_fixture_row_{surface_id}_covered_contracts_missing")
+        has_physical_contract = "physical_readback_fixture" in covered_contracts
+        has_physical_gap = "physical_readback_fixture_missing" in remaining_gaps
+        has_hardware_gap = "hardware_parity_unproven" in remaining_gaps
+        if status == "partial_fixture_evidence":
+            if has_physical_contract:
+                violations.append(f"read_surface_fixture_row_{surface_id}_partial_status_has_physical_contract")
+            if not has_physical_gap:
+                violations.append(f"read_surface_fixture_row_{surface_id}_partial_status_missing_physical_gap")
+            if not has_hardware_gap:
+                violations.append(f"read_surface_fixture_row_{surface_id}_partial_status_missing_hardware_gap")
+        if status == "fixture_evidence_present":
+            if not has_physical_contract:
+                violations.append(f"read_surface_fixture_row_{surface_id}_present_status_missing_physical_contract")
+            if has_physical_gap:
+                violations.append(f"read_surface_fixture_row_{surface_id}_present_status_has_physical_gap")
+            if has_hardware_gap:
+                violations.append(f"read_surface_fixture_row_{surface_id}_present_status_has_hardware_gap")
         if not fixture_paths:
             violations.append(f"read_surface_fixture_row_{surface_id}_fixture_paths_missing")
         if not test_names:
