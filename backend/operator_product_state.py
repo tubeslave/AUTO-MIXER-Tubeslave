@@ -62,6 +62,28 @@ DEFAULT_USER_PRESET_COUNT = 200
 DEFAULT_CACHE_STALE_AFTER_SEC = 30.0
 MIN_ACTIVE_DB = -90.0
 DEFAULT_TELEMETRY_STORAGE_DIR = "data/telemetry/sessions"
+DEFAULT_SUPERVISED_PROOF_REPORT_STALE_AFTER_SEC = 24 * 60 * 60
+DEFAULT_SUPERVISED_PROOF_REPORT_DIRS = (
+    "artifacts/no_wing_release_check",
+    "artifacts/no_wing_release_check_current_cycle",
+    "artifacts/supervised_proof_artifact_report",
+)
+SUPERVISED_PROOF_REPORT_FILENAMES = (
+    "supervised_proof_artifact_report.json",
+    "report.json",
+)
+AUTONOMY_OVERLAY_STATUSES = {
+    "manual_remediation_required",
+    "manual_review_ready",
+    "dry_run_only",
+    "no_current_evidence",
+}
+AUTONOMY_OVERLAY_ROW_STATUSES = {
+    "manual_safety_review_candidate",
+    "remediation_required",
+    "dry_run_only",
+    "no_current_evidence",
+}
 TELEMETRY_ALERT_CONTEXT_ALLOWLIST = {
     "actor",
     "action_type",
@@ -3347,8 +3369,11 @@ def build_processing_pipeline_snapshot(server: Any, include_methods: bool = True
         else {}
     )
     snapshot = build_processing_registry_snapshot(include_methods=include_methods)
+    proof_evidence = build_supervised_proof_evidence_snapshot(server)
     snapshot["runtime"] = build_pipeline_runtime_summary(operator_mode, manual_write_supervision)
     snapshot["operator_mode"] = operator_mode
+    snapshot["supervised_proof_evidence"] = proof_evidence
+    snapshot["autonomy_evidence_overlay"] = proof_evidence["autonomy_evidence_overlay"]
     return snapshot
 
 
@@ -3364,6 +3389,341 @@ def _read_json_file(path: Path) -> Dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def _configured_path_values(config: Dict[str, Any], section_names: Iterable[str], key_names: Iterable[str]) -> List[str]:
+    values: List[str] = []
+    for section_name in section_names:
+        section = config.get(section_name)
+        if not isinstance(section, dict):
+            continue
+        for key_name in key_names:
+            raw_value = section.get(key_name)
+            if isinstance(raw_value, str) and raw_value.strip():
+                values.append(raw_value.strip())
+            elif isinstance(raw_value, list):
+                values.extend(str(item).strip() for item in raw_value if str(item).strip())
+    return values
+
+
+def _supervised_proof_report_roots(server: Any) -> List[Path]:
+    config = getattr(server, "config", {})
+    if not isinstance(config, dict):
+        config = {}
+    configured = _configured_path_values(
+        config,
+        ("supervised_proof_evidence", "proof_evidence"),
+        ("report_path", "report_paths", "artifact_root", "artifact_roots", "storage_dir", "storage_dirs"),
+    )
+    paths = configured or list(DEFAULT_SUPERVISED_PROOF_REPORT_DIRS)
+    return [Path(path) for path in paths]
+
+
+def _supervised_proof_report_stale_after_sec(server: Any) -> int:
+    config = getattr(server, "config", {})
+    if not isinstance(config, dict):
+        config = {}
+    for section_name in ("supervised_proof_evidence", "proof_evidence"):
+        section = config.get(section_name)
+        if isinstance(section, dict) and "stale_after_sec" in section:
+            return max(1, _safe_int_value(section.get("stale_after_sec"), DEFAULT_SUPERVISED_PROOF_REPORT_STALE_AFTER_SEC))
+    return DEFAULT_SUPERVISED_PROOF_REPORT_STALE_AFTER_SEC
+
+
+def _supervised_proof_report_candidates(roots: Iterable[Path]) -> List[Path]:
+    candidates: List[Path] = []
+    for root in roots:
+        path = Path(root)
+        if path.is_file():
+            candidates.append(path)
+            continue
+        if not path.is_dir():
+            continue
+        for filename in SUPERVISED_PROOF_REPORT_FILENAMES:
+            candidates.extend(candidate for candidate in path.rglob(filename) if candidate.is_file())
+    candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+    return candidates
+
+
+def _string_list_value(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item]
+
+
+def _int_mapping(value: Any) -> Dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): _safe_int_value(raw_value) for key, raw_value in value.items()}
+
+
+def _proof_report_freshness(
+    report: Dict[str, Any],
+    *,
+    report_path: Path,
+    generated_at: str,
+    stale_after_sec: int,
+) -> Dict[str, Any]:
+    report_epoch = _coerce_epoch_seconds(report.get("generated_at"))
+    source = "report_generated_at"
+    if report_epoch is None:
+        try:
+            report_epoch = report_path.stat().st_mtime
+            source = "file_mtime"
+        except OSError:
+            report_epoch = None
+            source = "missing_timestamp"
+    now_epoch = _coerce_epoch_seconds(generated_at) or _utc_epoch()
+    age_sec = max(0.0, now_epoch - report_epoch) if report_epoch is not None else None
+    stale = True if age_sec is None else age_sec > stale_after_sec
+    return {
+        "latest_report_timestamp_source": source,
+        "latest_report_age_sec": round(age_sec, 3) if age_sec is not None else None,
+        "stale_after_sec": stale_after_sec,
+        "latest_report_stale": stale,
+    }
+
+
+def _empty_autonomy_evidence_overlay(*, generated_at: str, report_path: Optional[Path] = None) -> Dict[str, Any]:
+    rows = []
+    for value_type, target_id in (
+        ("fader", "fader_supervised_promotion"),
+        ("gain", "gain_trim_supervised_promotion"),
+    ):
+        rows.append(
+            {
+                "id": f"{value_type}_autonomy_evidence_overlay",
+                "target_id": target_id,
+                "value_type": value_type,
+                "status": "no_current_evidence",
+                "safety_review_candidate": False,
+                "supervised_live_allowed_static": value_type == "fader",
+                "autonomous_ready": False,
+                "proof_artifact_count": 0,
+                "physical_candidate_count": 0,
+                "dry_run_ready_count": 0,
+                "blocked_artifact_count": 0,
+                "remediation_action_count": 0,
+                "physical_candidate_proof_ids": [],
+                "dry_run_ready_proof_ids": [],
+                "blocked_proof_ids": [],
+                "remediation_action_ids": [],
+                "blockers": ["proof_artifact_missing"],
+                "next_required_actions": ["Collect supervised proof artifacts before promotion review."],
+            }
+        )
+    return {
+        "type": "autonomy_evidence_overlay",
+        "generated_at": generated_at,
+        "source": "supervised_proof_artifact_report",
+        "source_report_available": False,
+        "source_report_path": str(report_path) if report_path else None,
+        "status": "no_current_evidence",
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "live_widening_allowed": False,
+            "automatic_safety_update_allowed": False,
+            "full_autonomous_ready": False,
+            "operator_required": True,
+        },
+        "summary": {
+            "target_count": len(rows),
+            "status_counts": {
+                "dry_run_only": 0,
+                "manual_safety_review_candidate": 0,
+                "no_current_evidence": len(rows),
+                "remediation_required": 0,
+            },
+            "manual_safety_review_candidate_target_ids": [],
+            "remediation_required_target_ids": [],
+            "dry_run_only_target_ids": [],
+            "no_current_evidence_target_ids": [row["target_id"] for row in rows],
+            "autonomous_ready_target_ids": [],
+            "global_blockers": [
+                "proof_report_missing",
+                "manual_safety_review_required_before_promotion",
+                "full_autonomous_mode_remains_blocked",
+            ],
+        },
+        "rows": rows,
+    }
+
+
+def _normalized_autonomy_overlay_row(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    value_type = str(row.get("value_type") or "")
+    if value_type not in {"fader", "gain"}:
+        return None
+    target_id = str(
+        row.get("target_id")
+        or ("fader_supervised_promotion" if value_type == "fader" else "gain_trim_supervised_promotion")
+    )
+    status = str(row.get("status") or "no_current_evidence")
+    if status not in AUTONOMY_OVERLAY_ROW_STATUSES:
+        status = "no_current_evidence"
+    blockers = _string_list_value(row.get("blockers"))
+    if status == "manual_safety_review_candidate" and "automatic_promotion_forbidden" not in blockers:
+        blockers.append("automatic_promotion_forbidden")
+    if row.get("autonomous_ready") is not False:
+        blockers.append("source_autonomous_ready_normalized_false")
+    return {
+        "id": str(row.get("id") or f"{value_type}_autonomy_evidence_overlay"),
+        "target_id": target_id,
+        "value_type": value_type,
+        "status": status,
+        "safety_review_candidate": bool(row.get("safety_review_candidate")),
+        "supervised_live_allowed_static": bool(row.get("supervised_live_allowed_static")),
+        "autonomous_ready": False,
+        "proof_artifact_count": _safe_int_value(row.get("proof_artifact_count")),
+        "physical_candidate_count": _safe_int_value(row.get("physical_candidate_count")),
+        "dry_run_ready_count": _safe_int_value(row.get("dry_run_ready_count")),
+        "blocked_artifact_count": _safe_int_value(row.get("blocked_artifact_count")),
+        "remediation_action_count": _safe_int_value(row.get("remediation_action_count")),
+        "physical_candidate_proof_ids": _string_list_value(row.get("physical_candidate_proof_ids")),
+        "dry_run_ready_proof_ids": _string_list_value(row.get("dry_run_ready_proof_ids")),
+        "blocked_proof_ids": _string_list_value(row.get("blocked_proof_ids")),
+        "remediation_action_ids": _string_list_value(row.get("remediation_action_ids")),
+        "blockers": blockers,
+        "next_required_actions": _string_list_value(row.get("next_required_actions")),
+    }
+
+
+def _normalize_autonomy_evidence_overlay(
+    overlay: Dict[str, Any],
+    *,
+    generated_at: str,
+    report_path: Path,
+) -> Dict[str, Any]:
+    summary = overlay.get("summary") if isinstance(overlay.get("summary"), dict) else {}
+    source_rows = overlay.get("rows") if isinstance(overlay.get("rows"), list) else []
+    rows = [
+        normalized
+        for normalized in (
+            _normalized_autonomy_overlay_row(row)
+            for row in source_rows
+            if isinstance(row, dict)
+        )
+        if normalized is not None
+    ]
+    present_value_types = {row["value_type"] for row in rows}
+    if present_value_types != {"fader", "gain"}:
+        fallback = _empty_autonomy_evidence_overlay(generated_at=generated_at, report_path=report_path)
+        for row in fallback["rows"]:
+            if row["value_type"] not in present_value_types:
+                rows.append(row)
+    status = str(overlay.get("status") or "no_current_evidence")
+    if status not in AUTONOMY_OVERLAY_STATUSES:
+        status = "no_current_evidence"
+    global_blockers = _string_list_value(summary.get("global_blockers"))
+    for blocker in (
+        "overlay_does_not_modify_safety_rows",
+        "manual_safety_review_required_before_promotion",
+        "full_autonomous_mode_remains_blocked",
+    ):
+        if blocker not in global_blockers:
+            global_blockers.append(blocker)
+    return {
+        "type": "autonomy_evidence_overlay",
+        "generated_at": str(overlay.get("generated_at") or generated_at),
+        "source": "supervised_proof_artifact_report",
+        "source_report_available": True,
+        "source_report_path": str(report_path),
+        "status": status,
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "live_widening_allowed": False,
+            "automatic_safety_update_allowed": False,
+            "full_autonomous_ready": False,
+            "operator_required": True,
+        },
+        "summary": {
+            "target_count": len(rows),
+            "status_counts": _int_mapping(summary.get("status_counts")),
+            "manual_safety_review_candidate_target_ids": _string_list_value(
+                summary.get("manual_safety_review_candidate_target_ids")
+            ),
+            "remediation_required_target_ids": _string_list_value(summary.get("remediation_required_target_ids")),
+            "dry_run_only_target_ids": _string_list_value(summary.get("dry_run_only_target_ids")),
+            "no_current_evidence_target_ids": _string_list_value(summary.get("no_current_evidence_target_ids")),
+            "autonomous_ready_target_ids": [],
+            "global_blockers": global_blockers,
+        },
+        "rows": rows,
+    }
+
+
+def build_supervised_proof_evidence_snapshot(server: Any) -> Dict[str, Any]:
+    """Return latest supervised proof report evidence without generating artifacts."""
+
+    generated_at = _utc_now()
+    roots = _supervised_proof_report_roots(server)
+    stale_after_sec = _supervised_proof_report_stale_after_sec(server)
+    candidates = _supervised_proof_report_candidates(roots)
+    base = {
+        "type": "supervised_proof_evidence_snapshot",
+        "generated_at": generated_at,
+        "source": "supervised_proof_artifact_report",
+        "storage_roots": [str(path) for path in roots],
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "generates_artifacts": False,
+            "live_widening_allowed": False,
+            "automatic_safety_update_allowed": False,
+            "full_autonomous_ready": False,
+        },
+    }
+    if not candidates:
+        overlay = _empty_autonomy_evidence_overlay(generated_at=generated_at)
+        return {
+            **base,
+            "available": False,
+            "report_path": None,
+            "summary": {
+                "report_count": 0,
+                "latest_report_status": "missing",
+                "latest_report_age_sec": None,
+                "latest_report_stale": True,
+                "latest_report_timestamp_source": "missing_report",
+                "stale_after_sec": stale_after_sec,
+                "overlay_status": overlay["status"],
+                "overlay_row_count": len(overlay["rows"]),
+            },
+            "autonomy_evidence_overlay": overlay,
+        }
+
+    report_path = candidates[0]
+    report = _read_json_file(report_path)
+    overlay_payload = report.get("autonomy_evidence_overlay")
+    overlay = _normalize_autonomy_evidence_overlay(
+        overlay_payload if isinstance(overlay_payload, dict) else {},
+        generated_at=generated_at,
+        report_path=report_path,
+    )
+    report_summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    freshness = _proof_report_freshness(
+        report,
+        report_path=report_path,
+        generated_at=generated_at,
+        stale_after_sec=stale_after_sec,
+    )
+    return {
+        **base,
+        "available": bool(report),
+        "report_path": str(report_path),
+        "summary": {
+            "report_count": len(candidates),
+            "latest_report_status": str(report.get("status") or "unavailable"),
+            "latest_report_generated_at": report.get("generated_at"),
+            **freshness,
+            "artifact_count": _safe_int_value(report_summary.get("artifact_count")),
+            "invalid_summary_count": _safe_int_value(report_summary.get("invalid_summary_count")),
+            "overlay_status": overlay["status"],
+            "overlay_row_count": len(overlay["rows"]),
+        },
+        "autonomy_evidence_overlay": overlay,
+    }
 
 
 def _read_jsonl_file(path: Path) -> List[Dict[str, Any]]:

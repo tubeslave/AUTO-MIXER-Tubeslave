@@ -780,6 +780,154 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     )
 
 
+def validate_supervised_proof_report_autonomy_overlay(report_path: Path) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    payload, load_error = _json_object_from_path(report_path)
+    detail: dict[str, object] = {
+        "report_path": str(report_path),
+        "policy": "autonomy_evidence_overlay_must_remain_read_only_and_non_promoting",
+    }
+    violations: list[str] = []
+    overlay_status: object = None
+    row_count = 0
+    status_counts: Mapping[str, Any] = {}
+    global_blockers: list[str] = []
+    manual_review_ids: list[str] = []
+    remediation_ids: list[str] = []
+    dry_run_ids: list[str] = []
+    no_evidence_ids: list[str] = []
+
+    if load_error is not None:
+        violations.append(load_error)
+    else:
+        assert payload is not None
+        overlay = (
+            payload.get("autonomy_evidence_overlay")
+            if isinstance(payload.get("autonomy_evidence_overlay"), Mapping)
+            else {}
+        )
+        safety = overlay.get("safety") if isinstance(overlay.get("safety"), Mapping) else {}
+        summary = overlay.get("summary") if isinstance(overlay.get("summary"), Mapping) else {}
+        rows = overlay.get("rows") if isinstance(overlay.get("rows"), list) else []
+        overlay_status = overlay.get("status")
+
+        if overlay.get("type") != "autonomy_evidence_overlay":
+            violations.append("autonomy_overlay_type_mismatch")
+        if overlay_status not in {
+            "manual_remediation_required",
+            "manual_review_ready",
+            "dry_run_only",
+            "no_current_evidence",
+        }:
+            violations.append("autonomy_overlay_status_unknown")
+
+        expected_true = ("read_only", "operator_required")
+        for key in expected_true:
+            if safety.get(key) is not True:
+                violations.append(f"autonomy_overlay_{key}_not_true")
+        expected_false = (
+            "live_write",
+            "live_widening_allowed",
+            "automatic_safety_update_allowed",
+            "full_autonomous_ready",
+        )
+        for key in expected_false:
+            if safety.get(key) is not False:
+                violations.append(f"autonomy_overlay_{key}_not_false")
+
+        status_counts = summary.get("status_counts") if isinstance(summary.get("status_counts"), Mapping) else {}
+        global_blockers = [str(item) for item in summary.get("global_blockers", []) if item] if isinstance(summary.get("global_blockers"), list) else []
+        manual_review_ids = [str(item) for item in summary.get("manual_safety_review_candidate_target_ids", []) if item] if isinstance(summary.get("manual_safety_review_candidate_target_ids"), list) else []
+        remediation_ids = [str(item) for item in summary.get("remediation_required_target_ids", []) if item] if isinstance(summary.get("remediation_required_target_ids"), list) else []
+        dry_run_ids = [str(item) for item in summary.get("dry_run_only_target_ids", []) if item] if isinstance(summary.get("dry_run_only_target_ids"), list) else []
+        no_evidence_ids = [str(item) for item in summary.get("no_current_evidence_target_ids", []) if item] if isinstance(summary.get("no_current_evidence_target_ids"), list) else []
+
+        if summary.get("autonomous_ready_target_ids") != []:
+            violations.append("autonomy_overlay_autonomous_ready_targets_not_empty")
+        for blocker in (
+            "overlay_does_not_modify_safety_rows",
+            "manual_safety_review_required_before_promotion",
+            "full_autonomous_mode_remains_blocked",
+        ):
+            if blocker not in global_blockers:
+                violations.append(f"autonomy_overlay_global_blocker_missing:{blocker}")
+
+        row_count = len(rows)
+        row_value_types: set[str] = set()
+        expected_row_statuses = {
+            "manual_safety_review_candidate",
+            "remediation_required",
+            "dry_run_only",
+            "no_current_evidence",
+        }
+        actual_status_counts = {status: 0 for status in expected_row_statuses}
+        actual_target_ids_by_status = {status: [] for status in expected_row_statuses}
+        for index, row in enumerate(rows):
+            if not isinstance(row, Mapping):
+                violations.append(f"autonomy_overlay_row_{index}_not_object")
+                continue
+            value_type = str(row.get("value_type") or "")
+            row_status = str(row.get("status") or "")
+            target_id = str(row.get("target_id") or "")
+            row_value_types.add(value_type)
+            if value_type not in {"fader", "gain"}:
+                violations.append(f"autonomy_overlay_row_{index}_unexpected_value_type")
+            if row.get("autonomous_ready") is not False:
+                violations.append(f"autonomy_overlay_row_{index}_autonomous_ready_not_false")
+            if row_status not in expected_row_statuses:
+                violations.append(f"autonomy_overlay_row_{index}_status_unknown")
+            else:
+                actual_status_counts[row_status] += 1
+                if target_id:
+                    actual_target_ids_by_status[row_status].append(target_id)
+            if row_status == "manual_safety_review_candidate":
+                blockers = row.get("blockers") if isinstance(row.get("blockers"), list) else []
+                if "automatic_promotion_forbidden" not in blockers:
+                    violations.append(f"autonomy_overlay_row_{index}_automatic_promotion_blocker_missing")
+        if summary.get("target_count") != row_count:
+            violations.append("autonomy_overlay_target_count_mismatch")
+        normalized_status_counts: dict[str, int] = {}
+        for status in expected_row_statuses:
+            try:
+                normalized_status_counts[status] = int(status_counts.get(status, -1))
+            except (TypeError, ValueError):
+                normalized_status_counts[status] = -1
+        if normalized_status_counts != actual_status_counts:
+            violations.append("autonomy_overlay_status_counts_mismatch")
+        expected_summary_buckets = {
+            "manual_safety_review_candidate": manual_review_ids,
+            "remediation_required": remediation_ids,
+            "dry_run_only": dry_run_ids,
+            "no_current_evidence": no_evidence_ids,
+        }
+        for status, summary_ids in expected_summary_buckets.items():
+            if summary_ids != actual_target_ids_by_status[status]:
+                violations.append(f"autonomy_overlay_{status}_target_ids_mismatch")
+        if row_value_types != {"fader", "gain"}:
+            violations.append("autonomy_overlay_fader_gain_rows_missing")
+        if not dry_run_ids:
+            violations.append("autonomy_overlay_dry_run_target_ids_missing")
+
+    detail["overlay_status"] = overlay_status
+    detail["row_count"] = row_count
+    detail["status_counts"] = dict(status_counts)
+    detail["manual_safety_review_candidate_target_ids"] = manual_review_ids
+    detail["remediation_required_target_ids"] = remediation_ids
+    detail["dry_run_only_target_ids"] = dry_run_ids
+    detail["no_current_evidence_target_ids"] = no_evidence_ids
+    detail["global_blockers"] = global_blockers
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="autonomy_evidence_overlay_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def autonomy_gap_rollup_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "supervised_proof_report_gap_rollup_schema":
@@ -802,6 +950,45 @@ def autonomy_gap_rollup_summary(results: Sequence[CheckResult]) -> dict[str, obj
             "unexpected_supervised_live_write_kinds": list(unexpected_kinds)
             if isinstance(unexpected_kinds, list)
             else [],
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
+def autonomy_evidence_overlay_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "autonomy_evidence_overlay_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        status_counts = detail.get("status_counts")
+        manual_review_ids = detail.get("manual_safety_review_candidate_target_ids")
+        remediation_ids = detail.get("remediation_required_target_ids")
+        dry_run_ids = detail.get("dry_run_only_target_ids")
+        no_evidence_ids = detail.get("no_current_evidence_target_ids")
+        global_blockers = detail.get("global_blockers")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "live_widening_allowed": False,
+            "automatic_safety_update_allowed": False,
+            "full_autonomous_ready": False,
+            "operator_required": True,
+            "overlay_status": detail.get("overlay_status"),
+            "row_count": int(detail.get("row_count") or 0),
+            "status_counts": dict(status_counts) if isinstance(status_counts, Mapping) else {},
+            "manual_safety_review_candidate_target_ids": list(manual_review_ids)
+            if isinstance(manual_review_ids, list)
+            else [],
+            "remediation_required_target_ids": list(remediation_ids)
+            if isinstance(remediation_ids, list)
+            else [],
+            "dry_run_only_target_ids": list(dry_run_ids) if isinstance(dry_run_ids, list) else [],
+            "no_current_evidence_target_ids": list(no_evidence_ids)
+            if isinstance(no_evidence_ids, list)
+            else [],
+            "global_blockers": list(global_blockers) if isinstance(global_blockers, list) else [],
             "violations": list(violations) if isinstance(violations, list) else [],
         }
     return None
@@ -883,6 +1070,7 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
 def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at: str) -> dict[str, object]:
     failed = [result.name for result in results if result.status != "passed"]
     gap_rollup = autonomy_gap_rollup_summary(results)
+    autonomy_overlay = autonomy_evidence_overlay_summary(results)
     gain_dry_run = supervised_gain_dry_run_summary(results)
     read_fixture = read_surface_fixture_evidence_summary(results)
     next_plan = next_wing_proof_plan_summary(results)
@@ -897,6 +1085,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     }
     if gap_rollup is not None:
         summary["autonomy_gap_rollup"] = gap_rollup
+    if autonomy_overlay is not None:
+        summary["autonomy_evidence_overlay"] = autonomy_overlay
     if gain_dry_run is not None:
         summary["supervised_gain_dry_run"] = gain_dry_run
     if read_fixture is not None:
@@ -936,6 +1126,30 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 "- policy_supervised_live_write_kinds: "
                 f"`{json.dumps(gap_rollup['policy_supervised_live_write_kinds'])}`",
                 f"- violations: `{json.dumps(gap_rollup['violations'])}`",
+            ]
+        )
+    if autonomy_overlay is not None:
+        lines.extend(
+            [
+                "",
+                "## Autonomy Evidence Overlay",
+                "",
+                f"- schema_check: `{autonomy_overlay['status']}`",
+                f"- read_only: `{str(autonomy_overlay['read_only']).lower()}`",
+                f"- live_write: `{str(autonomy_overlay['live_write']).lower()}`",
+                f"- live_widening_allowed: `{str(autonomy_overlay['live_widening_allowed']).lower()}`",
+                f"- automatic_safety_update_allowed: `{str(autonomy_overlay['automatic_safety_update_allowed']).lower()}`",
+                f"- full_autonomous_ready: `{str(autonomy_overlay['full_autonomous_ready']).lower()}`",
+                f"- operator_required: `{str(autonomy_overlay['operator_required']).lower()}`",
+                f"- overlay_status: `{autonomy_overlay['overlay_status']}`",
+                f"- row_count: `{autonomy_overlay['row_count']}`",
+                "- status_counts: "
+                f"`{json.dumps(autonomy_overlay['status_counts'], sort_keys=True)}`",
+                "- dry_run_only_target_ids: "
+                f"`{json.dumps(autonomy_overlay['dry_run_only_target_ids'])}`",
+                "- manual_safety_review_candidate_target_ids: "
+                f"`{json.dumps(autonomy_overlay['manual_safety_review_candidate_target_ids'])}`",
+                f"- violations: `{json.dumps(autonomy_overlay['violations'])}`",
             ]
         )
     if gain_dry_run is not None:
@@ -1047,6 +1261,10 @@ def run_release_checks(
             gain_dry_run_result = validate_supervised_proof_report_gain_dry_run(proof_report_path)
             results.append(gain_dry_run_result)
             if gain_dry_run_result.status != "passed" and not continue_on_failure:
+                break
+            autonomy_overlay_result = validate_supervised_proof_report_autonomy_overlay(proof_report_path)
+            results.append(autonomy_overlay_result)
+            if autonomy_overlay_result.status != "passed" and not continue_on_failure:
                 break
             next_plan_result = validate_supervised_proof_report_next_wing_plan(proof_report_path)
             results.append(next_plan_result)

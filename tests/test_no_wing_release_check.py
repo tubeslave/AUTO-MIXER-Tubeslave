@@ -9,6 +9,7 @@ from tools import no_wing_release_check as release_check
 from tools.no_wing_release_check import (
     CheckResult,
     CommandCheck,
+    autonomy_evidence_overlay_summary,
     autonomy_gap_rollup_summary,
     build_checks,
     current_supervised_live_write_kinds,
@@ -21,6 +22,7 @@ from tools.no_wing_release_check import (
     supervised_gain_dry_run_summary,
     validate_no_live_commands,
     validate_read_surface_fixture_evidence_snapshot,
+    validate_supervised_proof_report_autonomy_overlay,
     validate_supervised_proof_report_next_wing_plan,
     validate_supervised_proof_report_gain_dry_run,
     validate_supervised_proof_report_gap_rollup,
@@ -221,6 +223,79 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "blocked_modes": ["auto"],
             }
         },
+        "autonomy_evidence_overlay": {
+            "type": "autonomy_evidence_overlay",
+            "status": "dry_run_only",
+            "safety": {
+                "read_only": True,
+                "live_write": False,
+                "live_widening_allowed": False,
+                "automatic_safety_update_allowed": False,
+                "full_autonomous_ready": False,
+                "operator_required": True,
+            },
+            "summary": {
+                "target_count": 2,
+                "status_counts": {
+                    "dry_run_only": 1,
+                    "manual_safety_review_candidate": 0,
+                    "no_current_evidence": 1,
+                    "remediation_required": 0,
+                },
+                "manual_safety_review_candidate_target_ids": [],
+                "remediation_required_target_ids": [],
+                "dry_run_only_target_ids": ["gain_trim_supervised_promotion"],
+                "no_current_evidence_target_ids": ["fader_supervised_promotion"],
+                "autonomous_ready_target_ids": [],
+                "global_blockers": [
+                    "overlay_does_not_modify_safety_rows",
+                    "manual_safety_review_required_before_promotion",
+                    "full_autonomous_mode_remains_blocked",
+                ],
+            },
+            "rows": [
+                {
+                    "id": "fader_autonomy_evidence_overlay",
+                    "target_id": "fader_supervised_promotion",
+                    "value_type": "fader",
+                    "status": "no_current_evidence",
+                    "safety_review_candidate": False,
+                    "supervised_live_allowed_static": True,
+                    "autonomous_ready": False,
+                    "proof_artifact_count": 0,
+                    "physical_candidate_count": 0,
+                    "dry_run_ready_count": 0,
+                    "blocked_artifact_count": 0,
+                    "remediation_action_count": 0,
+                    "physical_candidate_proof_ids": [],
+                    "dry_run_ready_proof_ids": [],
+                    "blocked_proof_ids": [],
+                    "remediation_action_ids": [],
+                    "blockers": ["proof_artifact_missing"],
+                    "next_required_actions": ["Run one physical supervised fader proof."],
+                },
+                {
+                    "id": "gain_autonomy_evidence_overlay",
+                    "target_id": "gain_trim_supervised_promotion",
+                    "value_type": "gain",
+                    "status": "dry_run_only",
+                    "safety_review_candidate": False,
+                    "supervised_live_allowed_static": False,
+                    "autonomous_ready": False,
+                    "proof_artifact_count": 1,
+                    "physical_candidate_count": 0,
+                    "dry_run_ready_count": 1,
+                    "blocked_artifact_count": 0,
+                    "remediation_action_count": 0,
+                    "physical_candidate_proof_ids": [],
+                    "dry_run_ready_proof_ids": ["gain-proof-dry-run"],
+                    "blocked_proof_ids": [],
+                    "remediation_action_ids": [],
+                    "blockers": ["physical_proof_required_for_promotion"],
+                    "next_required_actions": ["Run one small supervised gain proof on WING."],
+                },
+            ],
+        },
         "next_wing_proof_plan": {
             "type": "supervised_wing_proof_plan",
             "status": "operator_proof_required",
@@ -288,6 +363,20 @@ def test_no_wing_release_check_validates_gain_dry_run_report_schema(tmp_path):
     assert result.detail["value_type_counts"] == {"gain": 1}
 
 
+def test_no_wing_release_check_validates_autonomy_evidence_overlay_schema(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    report_path.write_text(json.dumps(valid_proof_report_with_gap_rollup()), encoding="utf-8")
+
+    result = validate_supervised_proof_report_autonomy_overlay(report_path)
+
+    assert result.status == "passed"
+    assert result.detail["overlay_status"] == "dry_run_only"
+    assert result.detail["row_count"] == 2
+    assert result.detail["dry_run_only_target_ids"] == ["gain_trim_supervised_promotion"]
+    assert result.detail["no_current_evidence_target_ids"] == ["fader_supervised_promotion"]
+    assert result.detail["violations"] == []
+
+
 def test_no_wing_release_check_validates_next_wing_proof_plan_schema(tmp_path):
     report_path = tmp_path / "supervised_proof_artifact_report.json"
     report_path.write_text(json.dumps(valid_proof_report_with_gap_rollup()), encoding="utf-8")
@@ -325,6 +414,54 @@ def test_no_wing_release_check_rejects_next_wing_proof_plan_that_grants_executio
     assert "next_wing_proof_plan_step_0_execution_allowed" in result.detail["violations"]
     assert "next_wing_proof_plan_step_0_operator_approval_not_required" in result.detail["violations"]
     assert "next_wing_proof_plan_step_0_delta_not_safe_negative_proof" in result.detail["violations"]
+
+
+def test_no_wing_release_check_rejects_autonomy_overlay_that_claims_authority(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    overlay = payload["autonomy_evidence_overlay"]
+    overlay["safety"]["live_write"] = True
+    overlay["safety"]["live_widening_allowed"] = True
+    overlay["safety"]["automatic_safety_update_allowed"] = True
+    overlay["safety"]["full_autonomous_ready"] = True
+    overlay["safety"]["operator_required"] = False
+    overlay["summary"]["autonomous_ready_target_ids"] = ["gain_trim_supervised_promotion"]
+    overlay["summary"]["global_blockers"] = []
+    overlay["rows"][1]["autonomous_ready"] = True
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_autonomy_overlay(report_path)
+
+    assert result.status == "failed"
+    assert "autonomy_overlay_live_write_not_false" in result.detail["violations"]
+    assert "autonomy_overlay_live_widening_allowed_not_false" in result.detail["violations"]
+    assert "autonomy_overlay_automatic_safety_update_allowed_not_false" in result.detail["violations"]
+    assert "autonomy_overlay_full_autonomous_ready_not_false" in result.detail["violations"]
+    assert "autonomy_overlay_operator_required_not_true" in result.detail["violations"]
+    assert "autonomy_overlay_autonomous_ready_targets_not_empty" in result.detail["violations"]
+    assert "autonomy_overlay_row_1_autonomous_ready_not_false" in result.detail["violations"]
+
+
+def test_no_wing_release_check_rejects_autonomy_overlay_summary_row_drift(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    overlay = payload["autonomy_evidence_overlay"]
+    overlay["summary"]["target_count"] = 3
+    overlay["summary"]["status_counts"]["dry_run_only"] = 2
+    overlay["summary"]["dry_run_only_target_ids"] = [
+        "gain_trim_supervised_promotion",
+        "fader_supervised_promotion",
+    ]
+    overlay["summary"]["no_current_evidence_target_ids"] = []
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_autonomy_overlay(report_path)
+
+    assert result.status == "failed"
+    assert "autonomy_overlay_target_count_mismatch" in result.detail["violations"]
+    assert "autonomy_overlay_status_counts_mismatch" in result.detail["violations"]
+    assert "autonomy_overlay_dry_run_only_target_ids_mismatch" in result.detail["violations"]
+    assert "autonomy_overlay_no_current_evidence_target_ids_mismatch" in result.detail["violations"]
 
 
 def test_no_wing_release_check_rejects_gain_dry_run_report_that_claims_promotion(tmp_path):
@@ -432,6 +569,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert summary["status"] == "passed"
     assert "read_surface_fixture_evidence_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
+    assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
     assert "supervised_proof_report_gap_rollup_schema" in result_names
     assert result_names.index("read_surface_fixture_evidence") < result_names.index(
@@ -444,6 +582,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "supervised_proof_report_gain_dry_run_schema"
     )
     assert result_names.index("supervised_proof_report_gain_dry_run_schema") < result_names.index(
+        "autonomy_evidence_overlay_schema"
+    )
+    assert result_names.index("autonomy_evidence_overlay_schema") < result_names.index(
         "next_wing_proof_plan_schema"
     )
     assert result_names.index("next_wing_proof_plan_schema") < result_names.index(
@@ -1025,6 +1166,52 @@ def test_no_wing_release_check_summary_embeds_gain_dry_run_proof(tmp_path):
     assert json_summary["supervised_gain_dry_run"]["gain_dry_run_row_count"] == 1
     assert "## Supervised Gain Dry-Run Proof" in markdown_summary
     assert 'dry_run_ready_proof_ids: `["gain-proof-dry-run"]`' in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_autonomy_evidence_overlay(tmp_path):
+    result = CheckResult(
+        name="autonomy_evidence_overlay_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "overlay_status": "dry_run_only",
+            "row_count": 2,
+            "status_counts": {
+                "dry_run_only": 1,
+                "manual_safety_review_candidate": 0,
+                "no_current_evidence": 1,
+                "remediation_required": 0,
+            },
+            "manual_safety_review_candidate_target_ids": [],
+            "remediation_required_target_ids": [],
+            "dry_run_only_target_ids": ["gain_trim_supervised_promotion"],
+            "no_current_evidence_target_ids": ["fader_supervised_promotion"],
+            "global_blockers": [
+                "overlay_does_not_modify_safety_rows",
+                "manual_safety_review_required_before_promotion",
+                "full_autonomous_mode_remains_blocked",
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert autonomy_evidence_overlay_summary([result]) == summary["autonomy_evidence_overlay"]
+    assert json_summary["autonomy_evidence_overlay"]["live_write"] is False
+    assert json_summary["autonomy_evidence_overlay"]["live_widening_allowed"] is False
+    assert json_summary["autonomy_evidence_overlay"]["automatic_safety_update_allowed"] is False
+    assert json_summary["autonomy_evidence_overlay"]["full_autonomous_ready"] is False
+    assert json_summary["autonomy_evidence_overlay"]["operator_required"] is True
+    assert json_summary["autonomy_evidence_overlay"]["dry_run_only_target_ids"] == [
+        "gain_trim_supervised_promotion"
+    ]
+    assert "## Autonomy Evidence Overlay" in markdown_summary
+    assert 'dry_run_only_target_ids: `["gain_trim_supervised_promotion"]`' in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_read_surface_fixture_evidence(tmp_path):

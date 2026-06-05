@@ -374,6 +374,15 @@ function toneForModeGateStatus(status: string): Tone {
   return 'blue';
 }
 
+function toneForAutonomyEvidenceOverlayStatus(status: string): Tone {
+  const normalized = status.toLowerCase();
+  if (normalized === 'manual_safety_review_candidate') return 'yellow';
+  if (normalized === 'remediation_required') return 'red';
+  if (normalized === 'dry_run_only') return 'blue';
+  if (normalized === 'no_current_evidence') return 'yellow';
+  return toneForModuleStatus(status, false);
+}
+
 function titleFromToken(value: string): string {
   return value
     .split(/[_-]+/)
@@ -721,6 +730,96 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     };
   });
 
+  const proofEvidence = asRecord(data.supervised_proof_evidence);
+  const proofSummary = asRecord(proofEvidence.summary);
+  const proofEvidenceRows: ModuleStatusRecord[] = Object.keys(proofEvidence).length ? (() => {
+    const available = Boolean(proofEvidence.available);
+    const reportPath = str(proofEvidence.report_path, 'no_report_artifact');
+    const overlayStatus = str(proofSummary.overlay_status, 'no_current_evidence');
+    const artifactCount = Math.trunc(num(proofSummary.artifact_count, 0));
+    const invalidCount = Math.trunc(num(proofSummary.invalid_summary_count, 0));
+    const stale = Boolean(proofSummary.latest_report_stale);
+    const ageSec = Math.max(0, num(proofSummary.latest_report_age_sec, 0));
+    const staleAfterSec = Math.max(0, num(proofSummary.stale_after_sec, 0));
+    const freshnessText = available
+      ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
+      : '';
+    const rowStatus = available
+      ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
+      : 'no_current_evidence';
+    return [{
+      moduleId: 'supervised_proof_evidence',
+      label: 'Supervised proof evidence',
+      domain: 'supervised_proof_evidence',
+      status: rowStatus,
+      entrypoint: 'supervised_proof_artifact_report',
+      module: reportPath,
+      uiSurface: 'Supervised proof evidence source',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${available}`,
+        `overlay:${overlayStatus}`,
+        `artifacts:${artifactCount}`,
+        `invalid:${invalidCount}`,
+        `stale:${stale}`,
+      ],
+      blockedReason: available
+        ? stale
+          ? 'Proof report artifact is stale; rerun proof checks before promotion review.'
+          : 'Read-only artifact source; safety is normalized before cockpit display.'
+        : 'No supervised proof report artifact found.',
+      nextStep: available
+        ? `Latest report status: ${str(proofSummary.latest_report_status, 'unknown')}; overlay: ${overlayStatus}; artifacts: ${artifactCount}; invalid: ${invalidCount}; ${freshnessText}.`
+        : 'Run no-WING supervised proof checks or point Product Layer at an existing report artifact.',
+      tone: invalidCount > 0 ? 'red' : stale || !available ? 'yellow' : 'blue'
+    }];
+  })() : [];
+
+  const overlay = asRecord(data.autonomy_evidence_overlay);
+  const overlayRows = asArray(overlay.rows).map(row => {
+    const valueType = str(row.value_type, 'unknown');
+    const targetId = str(row.target_id, 'unknown_target');
+    const status = str(row.status, 'unknown');
+    const blockers = stringList(row.blockers);
+    const nextActions = stringList(row.next_required_actions);
+    const physicalIds = stringList(row.physical_candidate_proof_ids);
+    const dryRunIds = stringList(row.dry_run_ready_proof_ids);
+    const blockedIds = stringList(row.blocked_proof_ids);
+    const remediationIds = stringList(row.remediation_action_ids);
+    const proofCounts = [
+      `physical:${Math.trunc(num(row.physical_candidate_count, physicalIds.length))}`,
+      `dry_run:${Math.trunc(num(row.dry_run_ready_count, dryRunIds.length))}`,
+      `blocked:${Math.trunc(num(row.blocked_artifact_count, blockedIds.length))}`,
+      `remediation:${Math.trunc(num(row.remediation_action_count, remediationIds.length))}`,
+    ];
+    const proofText = [
+      physicalIds.length ? `Physical: ${physicalIds.join(', ')}` : '',
+      dryRunIds.length ? `Dry-run: ${dryRunIds.join(', ')}` : '',
+      blockedIds.length ? `Blocked: ${blockedIds.join(', ')}` : '',
+      remediationIds.length ? `Remediate: ${remediationIds.join(', ')}` : '',
+    ].filter(Boolean).join(' / ');
+    return {
+      moduleId: `autonomy_evidence:${targetId}`,
+      label: `Autonomy proof evidence: ${titleFromToken(valueType)}`,
+      domain: 'autonomy_evidence_overlay',
+      status,
+      entrypoint: valueType,
+      module: targetId,
+      uiSurface: 'Autonomy proof evidence overlay',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [`target:${targetId}`, ...proofCounts],
+      blockedReason: blockers.length
+        ? blockers.join(', ')
+        : 'Overlay is read-only; manual safety review is still required before promotion.',
+      nextStep: [nextActions.join(' / '), proofText || 'Collect proof artifacts before promotion.']
+        .filter(Boolean)
+        .join(' / '),
+      tone: toneForAutonomyEvidenceOverlayStatus(status)
+    };
+  });
+
   const gapCounts = asRecord(gapSummary.gap_bucket_counts);
   const blockedByBucket = asRecord(gapSummary.blocked_target_ids_by_bucket);
   const evidenceByFamily = asRecord(gapSummary.evidence_requirement_ids_by_action_family);
@@ -767,7 +866,16 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     });
   });
 
-  return [...moduleRows, ...surfaceRows, ...coverageRows, ...modeGateRows, ...readinessRows, ...gapRows];
+  return [
+    ...moduleRows,
+    ...surfaceRows,
+    ...coverageRows,
+    ...modeGateRows,
+    ...readinessRows,
+    ...proofEvidenceRows,
+    ...overlayRows,
+    ...gapRows
+  ];
 }
 
 export function adaptTelemetryAlertsSnapshot(payload: unknown): TelemetryAlertsSnapshot {

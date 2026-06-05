@@ -483,6 +483,65 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
         },
       ],
     },
+    supervised_proof_evidence: {
+      type: 'supervised_proof_evidence_snapshot',
+      available: true,
+      report_path: 'artifacts/no_wing_release_check_current_cycle/latest/supervised_proof_artifact_report.json',
+      safety: {
+        read_only: true,
+        live_write: false,
+        generates_artifacts: false,
+        live_widening_allowed: false,
+        automatic_safety_update_allowed: false,
+        full_autonomous_ready: false,
+      },
+      summary: {
+        latest_report_status: 'ok',
+        latest_report_age_sec: 120,
+        latest_report_stale: false,
+        stale_after_sec: 86400,
+        artifact_count: 1,
+        invalid_summary_count: 0,
+        overlay_status: 'dry_run_only',
+        overlay_row_count: 2,
+      },
+    },
+    autonomy_evidence_overlay: {
+      rows: [
+        {
+          id: 'fader_autonomy_evidence_overlay',
+          target_id: 'fader_supervised_promotion',
+          value_type: 'fader',
+          status: 'no_current_evidence',
+          physical_candidate_count: 0,
+          dry_run_ready_count: 0,
+          blocked_artifact_count: 0,
+          remediation_action_count: 0,
+          physical_candidate_proof_ids: [],
+          dry_run_ready_proof_ids: [],
+          blocked_proof_ids: [],
+          remediation_action_ids: [],
+          blockers: ['proof_artifact_missing'],
+          next_required_actions: ['Run one physical supervised fader proof.'],
+        },
+        {
+          id: 'gain_autonomy_evidence_overlay',
+          target_id: 'gain_trim_supervised_promotion',
+          value_type: 'gain',
+          status: 'dry_run_only',
+          physical_candidate_count: 0,
+          dry_run_ready_count: 1,
+          blocked_artifact_count: 0,
+          remediation_action_count: 0,
+          physical_candidate_proof_ids: [],
+          dry_run_ready_proof_ids: ['gain-proof-dry-run'],
+          blocked_proof_ids: [],
+          remediation_action_ids: [],
+          blockers: ['physical_proof_required_for_promotion'],
+          next_required_actions: ['Run one small supervised gain proof on WING.'],
+        },
+      ],
+    },
   });
 
   assert.deepEqual(
@@ -496,6 +555,9 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'mode_gate:supervised',
       'mode_gate:auto',
       'promotion_readiness:scene_preset_supervised_promotion',
+      'supervised_proof_evidence',
+      'autonomy_evidence:fader_supervised_promotion',
+      'autonomy_evidence:gain_trim_supervised_promotion',
       'promotion_gap:autonomy_mode',
       'promotion_gap:read_surface',
       'promotion_gap:write_surface',
@@ -559,6 +621,46 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.equal(scenePresetReadiness.tone, 'red');
   assert.match(scenePresetReadiness.blockedReason, /safety_status_blocked/);
   assert.match(scenePresetReadiness.nextStep, /read_only_scoped_diff_evidence/);
+
+  const proofEvidence = rows.find(row => row.moduleId === 'supervised_proof_evidence');
+  assert.equal(proofEvidence.domain, 'supervised_proof_evidence');
+  assert.equal(proofEvidence.canWriteLive, false);
+  assert.deepEqual(proofEvidence.liveWriteKinds, []);
+  assert.equal(proofEvidence.status, 'artifact_available');
+  assert.equal(proofEvidence.entrypoint, 'supervised_proof_artifact_report');
+  assert.match(proofEvidence.module, /supervised_proof_artifact_report\.json/);
+  assert.equal(proofEvidence.tone, 'blue');
+  assert.deepEqual(proofEvidence.pipelineProfiles, [
+    'available:true',
+    'overlay:dry_run_only',
+    'artifacts:1',
+    'invalid:0',
+    'stale:false',
+  ]);
+  assert.match(proofEvidence.blockedReason, /Read-only artifact source/);
+  assert.match(proofEvidence.nextStep, /overlay: dry_run_only/);
+  assert.match(proofEvidence.nextStep, /age:120s stale_after:86400s stale:false/);
+
+  const faderOverlay = rows.find(row => row.moduleId === 'autonomy_evidence:fader_supervised_promotion');
+  assert.equal(faderOverlay.domain, 'autonomy_evidence_overlay');
+  assert.equal(faderOverlay.canWriteLive, false);
+  assert.deepEqual(faderOverlay.liveWriteKinds, []);
+  assert.equal(faderOverlay.status, 'no_current_evidence');
+  assert.equal(faderOverlay.entrypoint, 'fader');
+  assert.equal(faderOverlay.module, 'fader_supervised_promotion');
+  assert.equal(faderOverlay.tone, 'yellow');
+  assert.match(faderOverlay.blockedReason, /proof_artifact_missing/);
+  assert.match(faderOverlay.nextStep, /physical supervised fader proof/);
+
+  const gainOverlay = rows.find(row => row.moduleId === 'autonomy_evidence:gain_trim_supervised_promotion');
+  assert.equal(gainOverlay.domain, 'autonomy_evidence_overlay');
+  assert.equal(gainOverlay.canWriteLive, false);
+  assert.deepEqual(gainOverlay.liveWriteKinds, []);
+  assert.equal(gainOverlay.status, 'dry_run_only');
+  assert.equal(gainOverlay.entrypoint, 'gain');
+  assert.equal(gainOverlay.module, 'gain_trim_supervised_promotion');
+  assert.equal(gainOverlay.tone, 'blue');
+  assert.match(gainOverlay.nextStep, /gain-proof-dry-run/);
 
   const readSurfaceGap = rows.find(row => row.moduleId === 'promotion_gap:read_surface');
   assert.equal(readSurfaceGap.domain, 'promotion_gap');
@@ -656,6 +758,42 @@ test('adaptTelemetryAlertsSnapshot maps generated alert artifacts as read-only e
   assert.equal(snapshot.alerts[0].time, '2000 ms');
   assert.equal(snapshot.alerts[0].value, '-0.05');
   assert.equal(snapshot.alerts[0].threshold, '-0.10');
+});
+
+test('adaptModuleStatusRecords marks stale supervised proof evidence separately from available evidence', async () => {
+  const { adaptModuleStatusRecords } = await importTypeScript('services/operatorAdapters.ts');
+
+  const rows = adaptModuleStatusRecords({
+    supervised_proof_evidence: {
+      available: true,
+      report_path: 'artifacts/no_wing_release_check_current_cycle/stale/supervised_proof_artifact_report.json',
+      summary: {
+        latest_report_status: 'ok',
+        latest_report_age_sec: 90000,
+        latest_report_stale: true,
+        stale_after_sec: 86400,
+        artifact_count: 1,
+        invalid_summary_count: 0,
+        overlay_status: 'dry_run_only',
+      },
+    },
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].moduleId, 'supervised_proof_evidence');
+  assert.equal(rows[0].status, 'artifact_stale');
+  assert.equal(rows[0].tone, 'yellow');
+  assert.equal(rows[0].canWriteLive, false);
+  assert.deepEqual(rows[0].liveWriteKinds, []);
+  assert.match(rows[0].blockedReason, /stale/);
+  assert.match(rows[0].nextStep, /stale:true/);
+  assert.deepEqual(rows[0].pipelineProfiles, [
+    'available:true',
+    'overlay:dry_run_only',
+    'artifacts:1',
+    'invalid:0',
+    'stale:true',
+  ]);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {

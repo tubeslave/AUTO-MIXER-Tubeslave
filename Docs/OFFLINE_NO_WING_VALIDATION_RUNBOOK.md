@@ -88,11 +88,15 @@ The no-WING validation can be treated as passed only if:
 - `read_surface_fixture_evidence_schema` is `passed`;
 - `gain_dry_run_proof` is `passed`;
 - `supervised_proof_report_gain_dry_run_schema` is `passed`;
+- `autonomy_evidence_overlay_schema` is `passed`;
 - `next_wing_proof_plan_schema` is `passed`;
 - `supervised_proof_report_gap_rollup_schema` is `passed`;
 - `summary.json` and `summary.md` expose the Supervised Gain Dry-Run Proof as
   read-only, non-live, non-promoting evidence for fake-mixer gain pre-read,
   apply readback, rollback, cooldown block, and emergency-stop block behavior;
+- `summary.json` and `summary.md` expose the Autonomy Evidence Overlay as
+  read-only, non-live, non-promoting target-level proof evidence with no
+  automatic safety update and `full_autonomous_ready=false`;
 - `summary.json` and `summary.md` expose the Next WING Proof Plan as
   read-only and operator-required with `execution_allowed_by_plan=false`;
 - `summary.json` and `summary.md` expose Read Surface Fixture Evidence as

@@ -1,5 +1,6 @@
 import importlib
 import json
+import os
 import sys
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -11,6 +12,7 @@ from backend.decision_memory import DecisionMemoryStore, decision_memory_entry_f
 from backend.operator_analysis import build_operator_analysis_report
 from backend.shadow_gain_rides import build_shadow_gain_ride_candidates, shadow_gain_ride_trace
 from backend.operator_product_state import (
+    DEFAULT_SUPERVISED_PROOF_REPORT_DIRS,
     build_agent_communications_snapshot,
     build_bus_main_dca_snapshot,
     build_channel_intelligence,
@@ -30,6 +32,7 @@ from backend.operator_product_state import (
     build_rules_library_snapshot,
     build_safety_monitor,
     build_snapshots_scenes_snapshot,
+    build_supervised_proof_evidence_snapshot,
     build_telemetry_alerts_snapshot,
     build_training_sessions_snapshot,
     build_user_presets_snapshot,
@@ -1837,6 +1840,173 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
     assert module_map["auto_eq"]["next_step"].startswith("proposal_adapter") or "ADR" in module_map["auto_eq"]["next_step"]
     assert module_map["automixer_production_mix_v1"]["entrypoint"] == "none in this checkout"
     assert module_map["ai_mixing_pipeline_legacy"]["status"] == "deprecated"
+
+
+def proof_report_with_autonomy_overlay(report_status="ok"):
+    return {
+        "type": "supervised_proof_artifact_report",
+        "generated_at": "2026-06-05T08:20:00Z",
+        "status": report_status,
+        "safety": {
+            "read_only": False,
+            "live_write": True,
+            "live_widening_allowed": True,
+            "full_autonomous_ready": True,
+        },
+        "summary": {
+            "artifact_count": 1,
+            "invalid_summary_count": 0,
+        },
+        "autonomy_evidence_overlay": {
+            "type": "autonomy_evidence_overlay",
+            "generated_at": "2026-06-05T08:20:00Z",
+            "status": "dry_run_only",
+            "safety": {
+                "read_only": False,
+                "live_write": True,
+                "live_widening_allowed": True,
+                "automatic_safety_update_allowed": True,
+                "full_autonomous_ready": True,
+                "operator_required": False,
+            },
+            "summary": {
+                "status_counts": {
+                    "dry_run_only": 1,
+                    "manual_safety_review_candidate": 0,
+                    "no_current_evidence": 1,
+                    "remediation_required": 0,
+                },
+                "manual_safety_review_candidate_target_ids": [],
+                "remediation_required_target_ids": [],
+                "dry_run_only_target_ids": ["gain_trim_supervised_promotion"],
+                "no_current_evidence_target_ids": ["fader_supervised_promotion"],
+                "autonomous_ready_target_ids": ["gain_trim_supervised_promotion"],
+                "global_blockers": ["source_only_blocker"],
+            },
+            "rows": [
+                {
+                    "id": "gain_autonomy_evidence_overlay",
+                    "target_id": "gain_trim_supervised_promotion",
+                    "value_type": "gain",
+                    "status": "dry_run_only",
+                    "safety_review_candidate": False,
+                    "supervised_live_allowed_static": False,
+                    "autonomous_ready": True,
+                    "proof_artifact_count": 1,
+                    "physical_candidate_count": 0,
+                    "dry_run_ready_count": 1,
+                    "blocked_artifact_count": 0,
+                    "remediation_action_count": 0,
+                    "physical_candidate_proof_ids": [],
+                    "dry_run_ready_proof_ids": ["gain-proof-dry-run"],
+                    "blocked_proof_ids": [],
+                    "remediation_action_ids": [],
+                    "blockers": ["physical_proof_required_for_promotion"],
+                    "next_required_actions": ["Run one small supervised gain proof on WING."],
+                    "set_gain": {"channel": 1, "value": 3.0},
+                }
+            ],
+        },
+    }
+
+
+def test_supervised_proof_evidence_default_roots_include_current_cycle():
+    assert "artifacts/no_wing_release_check_current_cycle" in DEFAULT_SUPERVISED_PROOF_REPORT_DIRS
+
+
+def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(server, tmp_path):
+    old_dir = tmp_path / "old"
+    latest_dir = tmp_path / "latest"
+    old_dir.mkdir()
+    latest_dir.mkdir()
+    old_report = old_dir / "supervised_proof_artifact_report.json"
+    latest_report = latest_dir / "supervised_proof_artifact_report.json"
+    old_report.write_text(json.dumps(proof_report_with_autonomy_overlay("old")), encoding="utf-8")
+    latest_report.write_text(json.dumps(proof_report_with_autonomy_overlay("ok")), encoding="utf-8")
+    old_time = time.time() - 100
+    latest_time = time.time()
+    os.utime(old_report, (old_time, old_time))
+    os.utime(latest_report, (latest_time, latest_time))
+    server.config["supervised_proof_evidence"] = {"artifact_root": str(tmp_path)}
+
+    payload = build_supervised_proof_evidence_snapshot(server)
+
+    assert payload["type"] == "supervised_proof_evidence_snapshot"
+    assert payload["available"] is True
+    assert payload["report_path"] == str(latest_report)
+    assert payload["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "generates_artifacts": False,
+        "live_widening_allowed": False,
+        "automatic_safety_update_allowed": False,
+        "full_autonomous_ready": False,
+    }
+    assert payload["summary"]["latest_report_stale"] is False
+    assert payload["summary"]["latest_report_age_sec"] is not None
+    assert payload["summary"]["stale_after_sec"] == 24 * 60 * 60
+    overlay = payload["autonomy_evidence_overlay"]
+    assert overlay["source_report_available"] is True
+    assert overlay["source_report_path"] == str(latest_report)
+    assert overlay["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "live_widening_allowed": False,
+        "automatic_safety_update_allowed": False,
+        "full_autonomous_ready": False,
+        "operator_required": True,
+    }
+    assert overlay["summary"]["autonomous_ready_target_ids"] == []
+    assert "overlay_does_not_modify_safety_rows" in overlay["summary"]["global_blockers"]
+    rows = {row["value_type"]: row for row in overlay["rows"]}
+    assert set(rows) == {"fader", "gain"}
+    assert rows["gain"]["autonomous_ready"] is False
+    assert "source_autonomous_ready_normalized_false" in rows["gain"]["blockers"]
+    assert rows["gain"]["dry_run_ready_proof_ids"] == ["gain-proof-dry-run"]
+    assert rows["fader"]["status"] == "no_current_evidence"
+    assert "set_gain" not in set(_walk_keys(payload))
+
+
+def test_supervised_proof_evidence_snapshot_marks_stale_artifacts(server, tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    report_path.write_text(
+        json.dumps({**proof_report_with_autonomy_overlay(), "generated_at": "2020-01-01T00:00:00Z"}),
+        encoding="utf-8",
+    )
+    server.config["supervised_proof_evidence"] = {
+        "report_path": str(report_path),
+        "stale_after_sec": 1,
+    }
+
+    payload = build_supervised_proof_evidence_snapshot(server)
+
+    assert payload["available"] is True
+    assert payload["summary"]["latest_report_stale"] is True
+    assert payload["summary"]["latest_report_age_sec"] > 1
+    assert payload["summary"]["stale_after_sec"] == 1
+    assert payload["safety"]["live_write"] is False
+    assert payload["autonomy_evidence_overlay"]["safety"]["full_autonomous_ready"] is False
+
+
+def test_processing_pipeline_snapshot_includes_sanitized_autonomy_overlay(server, tmp_path):
+    report_path = tmp_path / "custom-proof-report.json"
+    report_path.write_text(json.dumps(proof_report_with_autonomy_overlay()), encoding="utf-8")
+    server.config["supervised_proof_evidence"] = {"report_path": str(report_path)}
+
+    payload = build_processing_pipeline_snapshot(server, include_methods=False)
+
+    assert payload["methods"] == []
+    assert payload["supervised_proof_evidence"]["available"] is True
+    assert payload["supervised_proof_evidence"]["safety"]["live_write"] is False
+    overlay = payload["autonomy_evidence_overlay"]
+    assert overlay == payload["supervised_proof_evidence"]["autonomy_evidence_overlay"]
+    assert overlay["source_report_path"] == str(report_path)
+    assert overlay["safety"]["live_write"] is False
+    assert overlay["safety"]["automatic_safety_update_allowed"] is False
+    assert overlay["safety"]["full_autonomous_ready"] is False
+    assert any(row["value_type"] == "gain" for row in overlay["rows"])
+    assert any(row["value_type"] == "fader" for row in overlay["rows"])
+    assert "set_gain" not in set(_walk_keys(payload))
 
 
 def test_telemetry_alerts_snapshot_reads_existing_artifacts_without_generating(server, tmp_path):

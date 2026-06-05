@@ -48,6 +48,11 @@
 - No-WING release checks must capture supervised gain dry-run proof through the Product Layer proposal path and classify it as read-only, non-live, non-promoting evidence until physical WING pre-read/apply/rollback proof exists.
 - No-WING release summaries may expose next physical WING proof plan metadata, but only with `operator_required=true`, `execution_allowed_by_plan=false`, and no implication that Codex or automation may run it.
 - Read-surface fixture evidence is part of no-WING readiness: declared fixture paths and pytest function names must be drift-checked before release proof reports are trusted, and no-WING summaries should keep remaining physical readback fixture gaps visible.
+- Autonomy evidence overlays may connect proof artifacts to fader/gain promotion targets in release summaries and cockpit status rows, but they remain read-only review evidence: `live_write=false`, no automatic safety-row update, no live widening, and `full_autonomous_ready=false`.
+- Product Layer supervised proof evidence snapshots may read existing proof-report artifacts to expose sanitized autonomy overlays, but snapshot reads must not generate artifacts, query mixers, or trust source safety flags that claim live authority.
+- `artifacts/no_wing_release_check_current_cycle` is a Product Layer proof-evidence input root; treat its contents as read-only artifacts and normalize safety before cockpit display.
+- Cockpit proof-evidence status should separate source availability (`supervised_proof_evidence`) from target-level readiness (`autonomy_evidence_overlay`) so operators can see whether missing proof is a missing artifact or a target-specific blocker.
+- Proof-report artifacts need freshness metadata in Product Layer and cockpit rows; stale proof remains read-only evidence and should trigger rerun/review before any promotion discussion.
 
 ## Memory Pipeline Lessons
 
