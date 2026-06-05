@@ -1,0 +1,433 @@
+{
+  "autonomy_evidence_overlay": {
+    "automatic_safety_update_allowed": false,
+    "dry_run_only_target_ids": [
+      "gain_trim_supervised_promotion"
+    ],
+    "full_autonomous_ready": false,
+    "global_blockers": [
+      "overlay_does_not_modify_safety_rows",
+      "manual_safety_review_required_before_promotion",
+      "full_autonomous_mode_remains_blocked"
+    ],
+    "live_widening_allowed": false,
+    "live_write": false,
+    "manual_safety_review_candidate_target_ids": [],
+    "no_current_evidence_target_ids": [
+      "fader_supervised_promotion"
+    ],
+    "operator_required": true,
+    "overlay_status": "dry_run_only",
+    "read_only": true,
+    "remediation_required_target_ids": [],
+    "row_count": 2,
+    "status": "passed",
+    "status_counts": {
+      "dry_run_only": 1,
+      "manual_safety_review_candidate": 0,
+      "no_current_evidence": 1,
+      "remediation_required": 0
+    },
+    "violations": []
+  },
+  "autonomy_gap_rollup": {
+    "autonomy_gap_rollup_present": true,
+    "full_auto_gap_bucket_counts": {
+      "autonomy_mode": 22,
+      "capability": 1,
+      "evidence_requirement": 12,
+      "proof": 62,
+      "read_surface": 14,
+      "safety": 14,
+      "write_surface": 19
+    },
+    "full_autonomous_ready": false,
+    "live_write": false,
+    "policy_supervised_live_write_kinds": [
+      "fader",
+      "gain"
+    ],
+    "read_only": true,
+    "status": "passed",
+    "supervised_current_live_write_kinds": [
+      "fader",
+      "gain"
+    ],
+    "unexpected_supervised_live_write_kinds": [],
+    "violations": []
+  },
+  "connection_policy": "no_hardware_no_network_no_live_writes",
+  "failed_checks": [],
+  "generated_at": "2026-06-05T09:10:01Z",
+  "live_write": false,
+  "next_wing_proof_plan": {
+    "execution_allowed_by_plan": false,
+    "full_autonomous_ready": false,
+    "global_blockers": [
+      "operator_must_approve_and_execute_manually",
+      "proof_plan_does_not_contact_mixer",
+      "safety_matrix_review_required_after_artifacts"
+    ],
+    "live_write": false,
+    "operator_required": true,
+    "plan_status": "operator_proof_required",
+    "planned_channels": [
+      3,
+      2,
+      8,
+      16
+    ],
+    "planned_value_types": [
+      "fader",
+      "gain"
+    ],
+    "read_only": true,
+    "status": "passed",
+    "step_count": 4,
+    "violations": []
+  },
+  "read_surface_fixture_evidence": {
+    "contract_gap_consistency_enforced": true,
+    "declared_fixture_path_count": 10,
+    "declared_test_name_count": 25,
+    "fixture_declaration_validation": true,
+    "full_autonomous_ready": false,
+    "live_write": false,
+    "physical_fixture_missing_surface_ids": [
+      "raw_mixer_state_cache",
+      "channel_identity_and_basic_controls",
+      "channel_eq_dynamics_gate",
+      "bus_group_main_dca_state",
+      "matrix_state",
+      "fx_slots_and_inserts",
+      "routing_and_sends",
+      "snapshots_scenes",
+      "user_presets",
+      "dlive_state"
+    ],
+    "physical_gap_surface_count": 10,
+    "read_only": true,
+    "snapshot_status": "fixture_evidence_incomplete",
+    "status": "passed",
+    "status_counts": {
+      "fixture_evidence_present": 0,
+      "missing_fixture_evidence": 0,
+      "partial_fixture_evidence": 10
+    },
+    "summary_recomputed_from_rows": true,
+    "surface_count": 10,
+    "surface_with_fixture_count": 10,
+    "violations": []
+  },
+  "results": [
+    {
+      "command": null,
+      "cwd": null,
+      "detail": {
+        "host": "127.0.0.1",
+        "listener_detected": false,
+        "policy": "port_must_not_have_unexpected_listener",
+        "port": 8765
+      },
+      "duration_sec": 0.0,
+      "finished_at": "2026-06-05T09:10:01Z",
+      "name": "backend_port_free",
+      "returncode": null,
+      "started_at": "2026-06-05T09:10:01Z",
+      "status": "passed",
+      "stderr_log": null,
+      "stdout_log": null
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 -m pytest tests/test_write_surface_inventory_static_scan.py -q --tb=short",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.422,
+      "finished_at": "2026-06-05T09:10:01Z",
+      "name": "write_surface_static_scan",
+      "returncode": 0,
+      "started_at": "2026-06-05T09:10:01Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/write_surface_static_scan.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/write_surface_static_scan.stdout.log"
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 -m pytest tests/test_read_surface_fixture_evidence.py -q --tb=short",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.41,
+      "finished_at": "2026-06-05T09:10:02Z",
+      "name": "read_surface_fixture_evidence",
+      "returncode": 0,
+      "started_at": "2026-06-05T09:10:01Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/read_surface_fixture_evidence.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/read_surface_fixture_evidence.stdout.log"
+    },
+    {
+      "command": null,
+      "cwd": null,
+      "detail": {
+        "declared_fixture_path_count": 10,
+        "declared_test_name_count": 25,
+        "physical_fixture_missing_surface_ids": [
+          "raw_mixer_state_cache",
+          "channel_identity_and_basic_controls",
+          "channel_eq_dynamics_gate",
+          "bus_group_main_dca_state",
+          "matrix_state",
+          "fx_slots_and_inserts",
+          "routing_and_sends",
+          "snapshots_scenes",
+          "user_presets",
+          "dlive_state"
+        ],
+        "policy": "read_surface_fixture_evidence_must_remain_read_only_and_non_autonomous",
+        "snapshot_status": "fixture_evidence_incomplete",
+        "status_counts": {
+          "fixture_evidence_present": 0,
+          "missing_fixture_evidence": 0,
+          "partial_fixture_evidence": 10
+        },
+        "surface_count": 10,
+        "surface_with_fixture_count": 10,
+        "violations": []
+      },
+      "duration_sec": 0.024,
+      "finished_at": "2026-06-05T09:10:02Z",
+      "name": "read_surface_fixture_evidence_schema",
+      "returncode": null,
+      "started_at": "2026-06-05T09:10:02Z",
+      "status": "passed",
+      "stderr_log": null,
+      "stdout_log": null
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 -m pytest tests/test_offline_validation_harness.py -q --tb=short -q",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.241,
+      "finished_at": "2026-06-05T09:10:02Z",
+      "name": "backend_pytest",
+      "returncode": 0,
+      "started_at": "2026-06-05T09:10:02Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/backend_pytest.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/backend_pytest.stdout.log"
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 tools/offline_operator_validation_harness.py --artifact-root artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/offline_validation",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.109,
+      "finished_at": "2026-06-05T09:10:02Z",
+      "name": "offline_operator_validation_harness",
+      "returncode": 0,
+      "started_at": "2026-06-05T09:10:02Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/offline_operator_validation_harness.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/offline_operator_validation_harness.stdout.log"
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 tools/gain_proof_dry_run_runner.py --artifact-root artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/gain_proof_dry_run --channel 1 --initial-gain-db 1.0 --delta-db -0.25 --cooldown-sec 2.0 --reason no_wing_release_gain_dry_run",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 2.217,
+      "finished_at": "2026-06-05T09:10:04Z",
+      "name": "gain_dry_run_proof",
+      "returncode": 0,
+      "started_at": "2026-06-05T09:10:02Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/gain_dry_run_proof.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/gain_dry_run_proof.stdout.log"
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 tools/evaluate_supervised_proof_artifacts.py --artifact-root artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/offline_validation --artifact-root artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/gain_proof_dry_run --require-physical --output artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/supervised_proof_artifact_report.json --quiet",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.051,
+      "finished_at": "2026-06-05T09:10:05Z",
+      "name": "supervised_proof_artifact_report",
+      "returncode": 0,
+      "started_at": "2026-06-05T09:10:04Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/supervised_proof_artifact_report.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/supervised_proof_artifact_report.stdout.log"
+    },
+    {
+      "command": null,
+      "cwd": null,
+      "detail": {
+        "dry_run_ready_proof_ids": [
+          "20260605T091002Z_gain_proof_dry_run_ch1"
+        ],
+        "gain_dry_run_row_count": 1,
+        "policy": "supervised_proof_report_must_include_read_only_gain_dry_run_evidence",
+        "report_path": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/supervised_proof_artifact_report.json",
+        "value_type_counts": {
+          "gain": 1
+        },
+        "violations": []
+      },
+      "duration_sec": 0.0,
+      "finished_at": "2026-06-05T09:10:05Z",
+      "name": "supervised_proof_report_gain_dry_run_schema",
+      "returncode": null,
+      "started_at": "2026-06-05T09:10:05Z",
+      "status": "passed",
+      "stderr_log": null,
+      "stdout_log": null
+    },
+    {
+      "command": null,
+      "cwd": null,
+      "detail": {
+        "dry_run_only_target_ids": [
+          "gain_trim_supervised_promotion"
+        ],
+        "global_blockers": [
+          "overlay_does_not_modify_safety_rows",
+          "manual_safety_review_required_before_promotion",
+          "full_autonomous_mode_remains_blocked"
+        ],
+        "manual_safety_review_candidate_target_ids": [],
+        "no_current_evidence_target_ids": [
+          "fader_supervised_promotion"
+        ],
+        "overlay_status": "dry_run_only",
+        "policy": "autonomy_evidence_overlay_must_remain_read_only_and_non_promoting",
+        "remediation_required_target_ids": [],
+        "report_path": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/supervised_proof_artifact_report.json",
+        "row_count": 2,
+        "status_counts": {
+          "dry_run_only": 1,
+          "manual_safety_review_candidate": 0,
+          "no_current_evidence": 1,
+          "remediation_required": 0
+        },
+        "violations": []
+      },
+      "duration_sec": 0.0,
+      "finished_at": "2026-06-05T09:10:05Z",
+      "name": "autonomy_evidence_overlay_schema",
+      "returncode": null,
+      "started_at": "2026-06-05T09:10:05Z",
+      "status": "passed",
+      "stderr_log": null,
+      "stdout_log": null
+    },
+    {
+      "command": null,
+      "cwd": null,
+      "detail": {
+        "global_blockers": [
+          "operator_must_approve_and_execute_manually",
+          "proof_plan_does_not_contact_mixer",
+          "safety_matrix_review_required_after_artifacts"
+        ],
+        "plan_status": "operator_proof_required",
+        "planned_channels": [
+          3,
+          2,
+          8,
+          16
+        ],
+        "planned_value_types": [
+          "fader",
+          "gain"
+        ],
+        "policy": "next_wing_proof_plan_must_be_operator_required_and_non_executing",
+        "report_path": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/supervised_proof_artifact_report.json",
+        "step_count": 4,
+        "violations": []
+      },
+      "duration_sec": 0.0,
+      "finished_at": "2026-06-05T09:10:05Z",
+      "name": "next_wing_proof_plan_schema",
+      "returncode": null,
+      "started_at": "2026-06-05T09:10:05Z",
+      "status": "passed",
+      "stderr_log": null,
+      "stdout_log": null
+    },
+    {
+      "command": null,
+      "cwd": null,
+      "detail": {
+        "autonomy_gap_rollup_present": true,
+        "full_auto_gap_bucket_counts": {
+          "autonomy_mode": 22,
+          "capability": 1,
+          "evidence_requirement": 12,
+          "proof": 62,
+          "read_surface": 14,
+          "safety": 14,
+          "write_surface": 19
+        },
+        "policy": "supervised_proof_report_must_expose_read_only_autonomy_gap_rollup",
+        "policy_supervised_live_write_kinds": [
+          "fader",
+          "gain"
+        ],
+        "report_path": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/supervised_proof_artifact_report.json",
+        "supervised_current_live_write_kinds": [
+          "fader",
+          "gain"
+        ],
+        "unexpected_supervised_live_write_kinds": [],
+        "violations": []
+      },
+      "duration_sec": 0.0,
+      "finished_at": "2026-06-05T09:10:05Z",
+      "name": "supervised_proof_report_gap_rollup_schema",
+      "returncode": null,
+      "started_at": "2026-06-05T09:10:05Z",
+      "status": "passed",
+      "stderr_log": null,
+      "stdout_log": null
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 tools/memory/memory_lint.py",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.034,
+      "finished_at": "2026-06-05T09:10:05Z",
+      "name": "memory_lint",
+      "returncode": 0,
+      "started_at": "2026-06-05T09:10:05Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/memory_lint.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/memory_lint.stdout.log"
+    },
+    {
+      "command": "/opt/homebrew/bin/git diff --check",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.046,
+      "finished_at": "2026-06-05T09:10:05Z",
+      "name": "diff_check",
+      "returncode": 0,
+      "started_at": "2026-06-05T09:10:05Z",
+      "status": "passed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/diff_check.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260605T091001Z_no_wing_release_check/logs/diff_check.stdout.log"
+    }
+  ],
+  "status": "passed",
+  "supervised_gain_dry_run": {
+    "autonomous_ready": false,
+    "dry_run_ready_proof_ids": [
+      "20260605T091002Z_gain_proof_dry_run_ch1"
+    ],
+    "gain_dry_run_row_count": 1,
+    "live_write": false,
+    "promotion_allowed": false,
+    "read_only": true,
+    "status": "passed",
+    "value_type_counts": {
+      "gain": 1
+    },
+    "violations": []
+  },
+  "type": "no_wing_release_check"
+}
