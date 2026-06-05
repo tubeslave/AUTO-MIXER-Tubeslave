@@ -2010,6 +2010,40 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     "forbidden_mutation_evidence_fields": ["manual_write_events"],
                     "violations": [],
                 },
+                "raw_mixer_state_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "raw_mixer_state_physical_readback.v1",
+                    "intake_status": "operator_artifact_missing",
+                    "surface_id": "raw_mixer_state_cache",
+                    "remediation_action_id": "remediate_raw_mixer_state_cache",
+                    "required_contract_method_id": "raw_mixer_state_physical_readback_contract",
+                    "artifact_search_roots": [
+                        "artifacts/read_surface_physical_readback/raw_mixer_state",
+                    ],
+                    "artifact_count": 0,
+                    "valid_candidate_count": 0,
+                    "invalid_candidate_count": 0,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "operator_review_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "fixture_closure_allowed_by_intake": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "operator_required": True,
+                    "execution_allowed_by_intake": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "blocked_by": [
+                        "operator_must_capture_raw_mixer_state_physical_readback_artifact",
+                    ],
+                    "artifact_source_ids": [],
+                    "intake_violations": [],
+                    "violations": [],
+                },
                 "channel_basic_controls_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "channel_basic_controls_physical_readback.v1",
@@ -2635,6 +2669,25 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert raw_contract["next_physical_readback_action_id"] == "remediate_raw_mixer_state_cache"
     assert "physical_readback" in raw_contract["allowed_sources"]
     assert "manual_write_events" in raw_contract["forbidden_mutation_evidence_fields"]
+    raw_intake = proof_quality["raw_mixer_state_physical_readback_artifact_intake"]
+    assert raw_intake["available"] is True
+    assert raw_intake["status"] == "passed"
+    assert raw_intake["schema_id"] == "raw_mixer_state_physical_readback.v1"
+    assert raw_intake["intake_status"] == "operator_artifact_missing"
+    assert raw_intake["surface_id"] == "raw_mixer_state_cache"
+    assert raw_intake["remediation_action_id"] == "remediate_raw_mixer_state_cache"
+    assert raw_intake["required_contract_method_id"] == "raw_mixer_state_physical_readback_contract"
+    assert raw_intake["artifact_count"] == 0
+    assert raw_intake["valid_candidate_count"] == 0
+    assert raw_intake["invalid_candidate_count"] == 0
+    assert raw_intake["accepted_as_physical_fixture_candidate"] is False
+    assert raw_intake["operator_review_required"] is True
+    assert raw_intake["physical_fixture_gap_remains"] is True
+    assert raw_intake["fixture_closure_allowed_by_intake"] is False
+    assert raw_intake["live_authority_granted"] is False
+    assert raw_intake["full_autonomous_ready"] is False
+    assert raw_intake["target_consistency"] is True
+    assert "operator_must_capture_raw_mixer_state_physical_readback_artifact" in raw_intake["blocked_by"]
     channel_contract = proof_quality["channel_basic_controls_physical_readback_contract"]
     assert channel_contract["available"] is True
     assert channel_contract["status"] == "passed"
@@ -3027,6 +3080,38 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "forbidden_mutation_evidence_fields": [],
                     "violations": ["source_claimed_live_authority"],
                 },
+                "raw_mixer_state_physical_readback_artifact_intake": {
+                    "status": "passed",
+                    "schema_id": "raw_mixer_state_physical_readback.v1",
+                    "intake_status": "valid_operator_artifact_available",
+                    "surface_id": "dlive_state",
+                    "remediation_action_id": "remediate_dlive_state",
+                    "required_contract_method_id": "raw_mixer_state_physical_readback_contract",
+                    "artifact_search_roots": [
+                        "artifacts/read_surface_physical_readback/raw_mixer_state",
+                    ],
+                    "artifact_count": 1,
+                    "valid_candidate_count": 1,
+                    "invalid_candidate_count": 0,
+                    "accepted_as_physical_fixture_candidate": True,
+                    "operator_review_required": False,
+                    "physical_fixture_gap_remains": False,
+                    "fixture_closure_allowed_by_intake": True,
+                    "read_only": False,
+                    "live_write": True,
+                    "mutates_console_state": True,
+                    "queries_console": True,
+                    "executes_tests": True,
+                    "operator_required": False,
+                    "execution_allowed_by_intake": True,
+                    "live_widening_allowed": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "blocked_by": [],
+                    "artifact_source_ids": ["unsafe.json"],
+                    "intake_violations": [],
+                    "violations": ["intake_claimed_live_authority"],
+                },
                 "channel_basic_controls_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "channel_basic_controls_physical_readback.v1",
@@ -3341,6 +3426,33 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
     assert raw_contract["source_live_authority_granted_claimed"] is True
     assert raw_contract["source_full_autonomous_ready_claimed"] is True
     assert "source_claimed_live_authority" in raw_contract["violations"]
+    raw_intake = payload["summary"]["read_surface_proof_quality"][
+        "raw_mixer_state_physical_readback_artifact_intake"
+    ]
+    assert raw_intake["available"] is True
+    assert raw_intake["surface_id"] == "raw_mixer_state_cache"
+    assert raw_intake["source_surface_id"] == "dlive_state"
+    assert raw_intake["remediation_action_id"] == "remediate_raw_mixer_state_cache"
+    assert raw_intake["source_remediation_action_id"] == "remediate_dlive_state"
+    assert raw_intake["target_consistency"] is False
+    assert raw_intake["artifact_count"] == 1
+    assert raw_intake["valid_candidate_count"] == 1
+    assert raw_intake["invalid_candidate_count"] == 0
+    assert raw_intake["accepted_as_physical_fixture_candidate"] is False
+    assert raw_intake["operator_review_required"] is True
+    assert raw_intake["physical_fixture_gap_remains"] is True
+    assert raw_intake["fixture_closure_allowed_by_intake"] is False
+    assert raw_intake["live_authority_granted"] is False
+    assert raw_intake["full_autonomous_ready"] is False
+    assert raw_intake["source_accepted_as_physical_fixture_candidate_claimed"] is True
+    assert raw_intake["source_operator_review_required_claimed"] is False
+    assert raw_intake["source_physical_fixture_gap_remains_claimed"] is False
+    assert raw_intake["source_fixture_closure_allowed_by_intake_claimed"] is True
+    assert raw_intake["source_execution_allowed_by_intake_claimed"] is True
+    assert raw_intake["source_live_write_claimed"] is True
+    assert raw_intake["source_live_authority_granted_claimed"] is True
+    assert raw_intake["source_full_autonomous_ready_claimed"] is True
+    assert "intake_claimed_live_authority" in raw_intake["violations"]
     channel_contract = payload["summary"]["read_surface_proof_quality"][
         "channel_basic_controls_physical_readback_contract"
     ]

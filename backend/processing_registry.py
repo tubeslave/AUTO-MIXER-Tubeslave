@@ -42,6 +42,9 @@ try:
     from raw_mixer_state_physical_readback_contract import (
         build_raw_mixer_state_physical_readback_contract,
     )
+    from raw_mixer_state_physical_readback_artifact_intake import (
+        build_raw_mixer_state_physical_readback_artifact_intake,
+    )
     from routing_sends_physical_readback_contract import (
         build_routing_sends_physical_readback_contract,
     )
@@ -83,6 +86,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.read_surface_remediation_plan import build_read_surface_remediation_plan
     from backend.raw_mixer_state_physical_readback_contract import (
         build_raw_mixer_state_physical_readback_contract,
+    )
+    from backend.raw_mixer_state_physical_readback_artifact_intake import (
+        build_raw_mixer_state_physical_readback_artifact_intake,
     )
     from backend.routing_sends_physical_readback_contract import (
         build_routing_sends_physical_readback_contract,
@@ -471,6 +477,31 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "readback_contract_only",
             "no_live_writes",
             "does_not_query_console",
+        ),
+    ),
+    ProcessingMethod(
+        id="raw_mixer_state_physical_readback_artifact_intake",
+        label="Raw Mixer State Physical Readback Artifact Intake",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Read-only intake snapshot for separately captured raw mixer-state "
+            "physical readback artifacts."
+        ),
+        module="backend/raw_mixer_state_physical_readback_artifact_intake.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="artifact_intake_only_operator_review_required",
+        promotion_next=(
+            "operator reviews any valid candidate before closing the raw "
+            "mixer-state physical fixture gap"
+        ),
+        notes=(
+            "transport_free",
+            "artifact_intake_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "fixture_closure_allowed_by_intake_false",
         ),
     ),
     ProcessingMethod(
@@ -1596,6 +1627,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, read-surface remediation artifact contract",
         "next_step": "Use only to validate a separately captured physical readback artifact; do not infer live authority.",
     },
+    "raw_mixer_state_physical_readback_artifact_intake": {
+        "entrypoint": "build_raw_mixer_state_physical_readback_artifact_intake",
+        "ui_surface": "Processing registry, raw mixer-state physical artifact intake",
+        "next_step": "Use only to surface operator-captured artifact candidates; manual review still gates fixture closure.",
+    },
     "channel_basic_controls_physical_readback_contract": {
         "entrypoint": (
             "build_channel_basic_controls_physical_readback_contract / "
@@ -1887,6 +1923,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "read_surface_fixture_evidence": build_read_surface_fixture_evidence_snapshot(),
         "raw_mixer_state_physical_readback_contract": build_raw_mixer_state_physical_readback_contract(),
+        "raw_mixer_state_physical_readback_artifact_intake": (
+            build_raw_mixer_state_physical_readback_artifact_intake()
+        ),
         "channel_basic_controls_physical_readback_contract": (
             build_channel_basic_controls_physical_readback_contract()
         ),

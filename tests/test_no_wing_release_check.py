@@ -22,6 +22,7 @@ from tools.no_wing_release_check import (
     matrix_state_readback_contract_summary,
     next_wing_proof_plan_summary,
     proof_report_path_for_run,
+    raw_mixer_readback_artifact_intake_summary,
     raw_mixer_readback_contract_summary,
     read_surface_physical_readback_capture_plan_summary,
     read_surface_fixture_evidence_summary,
@@ -41,6 +42,7 @@ from tools.no_wing_release_check import (
     validate_matrix_state_physical_readback_contract_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
     validate_read_surface_physical_readback_capture_plan_snapshot,
+    validate_raw_mixer_state_physical_readback_artifact_intake_snapshot,
     validate_raw_mixer_state_physical_readback_contract_snapshot,
     validate_read_surface_remediation_plan_snapshot,
     validate_routing_sends_physical_readback_contract_snapshot,
@@ -502,6 +504,55 @@ def test_no_wing_release_check_rejects_raw_mixer_contract_drift(monkeypatch):
     assert "raw_mixer_readback_forbidden_mutation_fields_mismatch" in result.detail["violations"]
     assert "raw_mixer_readback_contract_next_target_mismatch" in result.detail["violations"]
     assert "raw_mixer_readback_contract_live_authority_not_false" in result.detail["violations"]
+
+
+def test_no_wing_release_check_validates_raw_mixer_artifact_intake_snapshot():
+    result = validate_raw_mixer_state_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["intake_status"] == "operator_artifact_missing"
+    assert result.detail["schema_id"] == "raw_mixer_state_physical_readback.v1"
+    assert result.detail["surface_id"] == "raw_mixer_state_cache"
+    assert result.detail["remediation_action_id"] == "remediate_raw_mixer_state_cache"
+    assert result.detail["required_contract_method_id"] == "raw_mixer_state_physical_readback_contract"
+    assert result.detail["artifact_count"] == 0
+    assert result.detail["valid_candidate_count"] == 0
+    assert result.detail["invalid_candidate_count"] == 0
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["operator_review_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["fixture_closure_allowed_by_intake"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert "operator_must_capture_raw_mixer_state_physical_readback_artifact" in result.detail["blocked_by"]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_raw_mixer_artifact_intake_authority(monkeypatch):
+    intake = release_check.build_raw_mixer_state_physical_readback_artifact_intake()
+    corrupted = json.loads(json.dumps(intake))
+    corrupted["safety"]["live_write"] = True
+    corrupted["safety"]["fixture_closure_allowed_by_intake"] = True
+    corrupted["summary"]["physical_fixture_gap_remains"] = False
+    corrupted["summary"]["fixture_closure_allowed_by_intake"] = True
+    corrupted["summary"]["live_authority_granted"] = True
+    corrupted["summary"]["full_autonomous_ready"] = True
+
+    monkeypatch.setattr(
+        release_check,
+        "build_raw_mixer_state_physical_readback_artifact_intake",
+        lambda: corrupted,
+    )
+
+    result = validate_raw_mixer_state_physical_readback_artifact_intake_snapshot()
+
+    assert result.status == "failed"
+    assert "raw_mixer_artifact_intake_live_write_not_false" in result.detail["violations"]
+    assert "raw_mixer_artifact_intake_fixture_closure_allowed_by_intake_not_false" in result.detail["violations"]
+    assert "raw_mixer_artifact_intake_physical_gap_not_true" in result.detail["violations"]
+    assert "raw_mixer_artifact_intake_fixture_closure_not_false" in result.detail["violations"]
+    assert "raw_mixer_artifact_intake_live_authority_not_false" in result.detail["violations"]
+    assert "raw_mixer_artifact_intake_full_autonomous_not_false" in result.detail["violations"]
 
 
 def test_no_wing_release_check_validates_channel_basic_controls_readback_contract_snapshot():
@@ -1686,6 +1737,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "read_surface_remediation_plan_schema" in result_names
     assert "read_surface_physical_readback_capture_plan_schema" in result_names
     assert "raw_mixer_state_physical_readback_contract_schema" in result_names
+    assert "raw_mixer_state_physical_readback_artifact_intake_schema" in result_names
     assert "channel_basic_controls_physical_readback_contract_schema" in result_names
     assert "channel_processing_physical_readback_contract_schema" in result_names
     assert "bus_group_main_dca_physical_readback_contract_schema" in result_names
@@ -1712,6 +1764,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "raw_mixer_state_physical_readback_contract_schema"
     )
     assert result_names.index("raw_mixer_state_physical_readback_contract_schema") < result_names.index(
+        "raw_mixer_state_physical_readback_artifact_intake_schema"
+    )
+    assert result_names.index("raw_mixer_state_physical_readback_artifact_intake_schema") < result_names.index(
         "channel_basic_controls_physical_readback_contract_schema"
     )
     assert result_names.index("channel_basic_controls_physical_readback_contract_schema") < result_names.index(
@@ -2625,6 +2680,66 @@ def test_no_wing_release_check_summary_embeds_raw_mixer_readback_contract(tmp_pa
     assert "physical_fixture_gap_remains: `true`" in markdown_summary
     assert "live_authority_granted: `false`" in markdown_summary
     assert "target_consistency: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_raw_mixer_artifact_intake(tmp_path):
+    result = CheckResult(
+        name="raw_mixer_state_physical_readback_artifact_intake_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "intake_status": "operator_artifact_missing",
+            "schema_id": "raw_mixer_state_physical_readback.v1",
+            "surface_id": "raw_mixer_state_cache",
+            "remediation_action_id": "remediate_raw_mixer_state_cache",
+            "required_contract_method_id": "raw_mixer_state_physical_readback_contract",
+            "artifact_search_roots": ["artifacts/read_surface_physical_readback/raw_mixer_state"],
+            "artifact_count": 0,
+            "valid_candidate_count": 0,
+            "invalid_candidate_count": 0,
+            "accepted_as_physical_fixture_candidate": False,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_closure_allowed_by_intake": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "latest_valid_candidate_source_id": None,
+            "latest_valid_candidate_captured_at": None,
+            "blocked_by": ["operator_must_capture_raw_mixer_state_physical_readback_artifact"],
+            "artifact_source_ids": [],
+            "intake_violations": [],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert raw_mixer_readback_artifact_intake_summary([result]) == summary[
+        "raw_mixer_state_physical_readback_artifact_intake"
+    ]
+    intake = json_summary["raw_mixer_state_physical_readback_artifact_intake"]
+    assert intake["read_only"] is True
+    assert intake["live_write"] is False
+    assert intake["mutates_console_state"] is False
+    assert intake["queries_console"] is False
+    assert intake["executes_tests"] is False
+    assert intake["operator_required"] is True
+    assert intake["execution_allowed_by_intake"] is False
+    assert intake["fixture_closure_allowed_by_intake"] is False
+    assert intake["full_autonomous_ready"] is False
+    assert intake["intake_status"] == "operator_artifact_missing"
+    assert intake["artifact_count"] == 0
+    assert intake["accepted_as_physical_fixture_candidate"] is False
+    assert intake["operator_review_required"] is True
+    assert intake["physical_fixture_gap_remains"] is True
+    assert intake["live_authority_granted"] is False
+    assert "## Raw Mixer State Physical Readback Artifact Intake" in markdown_summary
+    assert "fixture_closure_allowed_by_intake: `false`" in markdown_summary
+    assert "operator_review_required: `true`" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_channel_basic_controls_readback_contract(tmp_path):

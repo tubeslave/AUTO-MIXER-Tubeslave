@@ -783,6 +783,23 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const rawMixerContractGapRemains = rawMixerContract.physical_fixture_gap_remains === true;
     const rawMixerContractLiveAuthority = rawMixerContract.live_authority_granted === true;
     const rawMixerContractTargetConsistency = rawMixerContract.target_consistency === true;
+    const rawMixerIntake = asRecord(proofQuality.raw_mixer_state_physical_readback_artifact_intake);
+    const rawMixerIntakeAvailable = Boolean(rawMixerIntake.available);
+    const rawMixerIntakeStatus = str(rawMixerIntake.intake_status, str(rawMixerIntake.status, 'missing'));
+    const rawMixerIntakeSchemaId = str(rawMixerIntake.schema_id, '');
+    const rawMixerIntakeSurfaceId = str(rawMixerIntake.surface_id, '');
+    const rawMixerIntakeActionId = str(rawMixerIntake.remediation_action_id, '');
+    const rawMixerIntakeArtifactCount = Math.trunc(num(rawMixerIntake.artifact_count, 0));
+    const rawMixerIntakeValidCount = Math.trunc(num(rawMixerIntake.valid_candidate_count, 0));
+    const rawMixerIntakeInvalidCount = Math.trunc(num(rawMixerIntake.invalid_candidate_count, 0));
+    const rawMixerIntakeCandidate = rawMixerIntake.accepted_as_physical_fixture_candidate === true;
+    const rawMixerIntakeOperatorReview = rawMixerIntake.operator_review_required === true;
+    const rawMixerIntakeGapRemains = rawMixerIntake.physical_fixture_gap_remains === true;
+    const rawMixerIntakeClosureAllowed = rawMixerIntake.fixture_closure_allowed_by_intake === true;
+    const rawMixerIntakeLiveAuthority = rawMixerIntake.live_authority_granted === true;
+    const rawMixerIntakeTargetConsistency = rawMixerIntake.target_consistency === true;
+    const rawMixerIntakeBlockedBy = stringList(rawMixerIntake.blocked_by);
+    const rawMixerIntakeSources = stringList(rawMixerIntake.artifact_source_ids);
     const channelBasicContract = asRecord(proofQuality.channel_basic_controls_physical_readback_contract);
     const channelBasicContractAvailable = Boolean(channelBasicContract.available);
     const channelBasicContractStatus = str(channelBasicContract.contract_status, str(channelBasicContract.status, 'missing'));
@@ -944,7 +961,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; capture_plan:${readSurfaceCapturePlanStatus || 'missing'}; capture_steps:${readSurfaceCapturePlanStepCount}; capture_execution:${readSurfaceCapturePlanExecutionAllowed}; capture_target_gate:${readSurfaceCapturePlanTargetConsistency}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}; scenes_contract:${snapshotsScenesContractStatus || 'missing'}; scenes_contract_gap:${snapshotsScenesContractGapRemains}; scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}; scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}; presets_contract:${userPresetsContractStatus || 'missing'}; presets_contract_gap:${userPresetsContractGapRemains}; presets_contract_live_authority:${userPresetsContractLiveAuthority}; presets_contract_target_gate:${userPresetsContractTargetConsistency}; dlive_contract:${dliveStateContractStatus || 'missing'}; dlive_contract_gap:${dliveStateContractGapRemains}; dlive_contract_live_authority:${dliveStateContractLiveAuthority}; dlive_contract_target_gate:${dliveStateContractTargetConsistency}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; capture_plan:${readSurfaceCapturePlanStatus || 'missing'}; capture_steps:${readSurfaceCapturePlanStepCount}; capture_execution:${readSurfaceCapturePlanExecutionAllowed}; capture_target_gate:${readSurfaceCapturePlanTargetConsistency}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; raw_intake:${rawMixerIntakeStatus || 'missing'}; raw_intake_artifacts:${rawMixerIntakeArtifactCount}; raw_intake_valid:${rawMixerIntakeValidCount}; raw_intake_invalid:${rawMixerIntakeInvalidCount}; raw_intake_candidate:${rawMixerIntakeCandidate}; raw_intake_closure:${rawMixerIntakeClosureAllowed}; raw_intake_target_gate:${rawMixerIntakeTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}; scenes_contract:${snapshotsScenesContractStatus || 'missing'}; scenes_contract_gap:${snapshotsScenesContractGapRemains}; scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}; scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}; presets_contract:${userPresetsContractStatus || 'missing'}; presets_contract_gap:${userPresetsContractGapRemains}; presets_contract_live_authority:${userPresetsContractLiveAuthority}; presets_contract_target_gate:${userPresetsContractTargetConsistency}; dlive_contract:${dliveStateContractStatus || 'missing'}; dlive_contract_gap:${dliveStateContractGapRemains}; dlive_contract_live_authority:${dliveStateContractLiveAuthority}; dlive_contract_target_gate:${dliveStateContractTargetConsistency}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
@@ -985,6 +1002,16 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `raw_contract_gap:${rawMixerContractGapRemains}`,
         `raw_contract_live_authority:${rawMixerContractLiveAuthority}`,
         `raw_contract_target_gate:${rawMixerContractTargetConsistency}`,
+        `raw_intake_available:${rawMixerIntakeAvailable}`,
+        `raw_intake_status:${rawMixerIntakeStatus}`,
+        `raw_intake_artifacts:${rawMixerIntakeArtifactCount}`,
+        `raw_intake_valid:${rawMixerIntakeValidCount}`,
+        `raw_intake_invalid:${rawMixerIntakeInvalidCount}`,
+        `raw_intake_candidate:${rawMixerIntakeCandidate}`,
+        `raw_intake_gap:${rawMixerIntakeGapRemains}`,
+        `raw_intake_closure_allowed:${rawMixerIntakeClosureAllowed}`,
+        `raw_intake_live_authority:${rawMixerIntakeLiveAuthority}`,
+        `raw_intake_target_gate:${rawMixerIntakeTargetConsistency}`,
         `channel_contract_available:${channelBasicContractAvailable}`,
         `channel_contract_status:${channelBasicContractStatus}`,
         `channel_contract_schema:${channelBasicContractSchemaId}`,
@@ -1131,6 +1158,56 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         : rawMixerContractGapRemains
           ? 'yellow'
           : 'green'
+    });
+    rows.push({
+      moduleId: 'raw_mixer_state_physical_readback_artifact_intake',
+      label: 'Raw mixer readback artifact intake',
+      domain: 'read_surface_artifact_intake',
+      status: rawMixerIntakeAvailable ? rawMixerIntakeStatus || 'intake_available' : 'intake_missing',
+      entrypoint: 'build_raw_mixer_state_physical_readback_artifact_intake',
+      module: rawMixerIntakeActionId || 'no_intake_action',
+      uiSurface: 'Read-surface proof artifact intake',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${rawMixerIntakeAvailable}`,
+        `schema:${rawMixerIntakeSchemaId}`,
+        `surface:${rawMixerIntakeSurfaceId}`,
+        `action:${rawMixerIntakeActionId}`,
+        `artifacts:${rawMixerIntakeArtifactCount}`,
+        `valid:${rawMixerIntakeValidCount}`,
+        `invalid:${rawMixerIntakeInvalidCount}`,
+        `candidate:${rawMixerIntakeCandidate}`,
+        `operator_review:${rawMixerIntakeOperatorReview}`,
+        `physical_gap_remains:${rawMixerIntakeGapRemains}`,
+        `fixture_closure_allowed:${rawMixerIntakeClosureAllowed}`,
+        `live_authority:${rawMixerIntakeLiveAuthority}`,
+        `target_consistency:${rawMixerIntakeTargetConsistency}`,
+        rawMixerIntakeSources.length ? `sources:${rawMixerIntakeSources.join(',')}` : '',
+      ].filter(Boolean),
+      blockedReason: rawMixerIntakeAvailable
+        ? rawMixerIntakeBlockedBy.length
+          ? rawMixerIntakeBlockedBy.join(', ')
+          : 'Artifact intake is read-only; operator review still gates fixture closure.'
+        : 'Raw mixer-state artifact intake is missing from proof summary.',
+      nextStep: rawMixerIntakeAvailable
+        ? [
+            rawMixerIntakeSurfaceId ? `surface:${rawMixerIntakeSurfaceId}` : '',
+            rawMixerIntakeActionId ? `action:${rawMixerIntakeActionId}` : '',
+            `artifacts:${rawMixerIntakeArtifactCount}`,
+            `valid:${rawMixerIntakeValidCount}`,
+            `invalid:${rawMixerIntakeInvalidCount}`,
+            `candidate:${rawMixerIntakeCandidate}`,
+            `operator_review:${rawMixerIntakeOperatorReview}`,
+            `fixture_closure_allowed:${rawMixerIntakeClosureAllowed}`,
+            `live_authority:${rawMixerIntakeLiveAuthority}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with raw mixer artifact-intake validation.',
+      tone: !rawMixerIntakeAvailable || rawMixerIntakeInvalidCount > 0 || rawMixerIntakeClosureAllowed || rawMixerIntakeLiveAuthority || !rawMixerIntakeTargetConsistency
+        ? 'yellow'
+        : rawMixerIntakeCandidate
+          ? 'yellow'
+          : 'yellow'
     });
     rows.push({
       moduleId: 'channel_basic_controls_physical_readback_contract',
