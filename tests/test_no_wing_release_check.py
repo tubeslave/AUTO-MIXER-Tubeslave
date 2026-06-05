@@ -121,6 +121,33 @@ def test_no_wing_release_check_validates_read_surface_fixture_evidence_snapshot(
     assert result.detail["violations"] == []
 
 
+def test_no_wing_release_check_rejects_read_surface_fixture_summary_row_drift(monkeypatch):
+    snapshot = release_check.build_read_surface_fixture_evidence_snapshot()
+    corrupted = json.loads(json.dumps(snapshot))
+    corrupted["summary"]["surface_count"] += 1
+    corrupted["summary"]["surface_with_fixture_count"] = 0
+    corrupted["summary"]["status_counts"]["partial_fixture_evidence"] = 0
+    corrupted["summary"]["status_counts"]["fixture_evidence_present"] = "not-an-int"
+    corrupted["summary"]["physical_fixture_missing_surface_ids"] = []
+    corrupted["surfaces"][0]["status"] = "unsupported_fixture_status"
+
+    monkeypatch.setattr(
+        release_check,
+        "build_read_surface_fixture_evidence_snapshot",
+        lambda: corrupted,
+    )
+
+    result = validate_read_surface_fixture_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert "read_surface_fixture_row_raw_mixer_state_cache_status_unknown" in result.detail["violations"]
+    assert "read_surface_fixture_status_count_fixture_evidence_present_not_integer" in result.detail["violations"]
+    assert "read_surface_fixture_surface_count_mismatch" in result.detail["violations"]
+    assert "read_surface_fixture_surface_with_fixture_count_mismatch" in result.detail["violations"]
+    assert "read_surface_fixture_status_counts_mismatch" in result.detail["violations"]
+    assert "read_surface_fixture_physical_missing_surface_ids_mismatch" in result.detail["violations"]
+
+
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_frontend=False, quick=True)
 

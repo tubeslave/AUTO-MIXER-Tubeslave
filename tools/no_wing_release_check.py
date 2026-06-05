@@ -27,7 +27,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_status  # noqa: E402
-from backend.read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot  # noqa: E402
+from backend.read_surface_fixture_evidence import (  # noqa: E402
+    FIXTURE_EVIDENCE_STATUSES,
+    build_read_surface_fixture_evidence_snapshot,
+)
 
 DEFAULT_ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "no_wing_release_check"
 DEFAULT_BACKEND_PORT = 8765
@@ -563,6 +566,51 @@ def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
     safety = snapshot.get("safety") if isinstance(snapshot.get("safety"), Mapping) else {}
     summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), Mapping) else {}
     status_counts = summary.get("status_counts") if isinstance(summary.get("status_counts"), Mapping) else {}
+    surfaces = snapshot.get("surfaces") if isinstance(snapshot.get("surfaces"), list) else []
+    if not isinstance(snapshot.get("surfaces"), list):
+        violations.append("read_surface_fixture_surfaces_missing")
+
+    def summary_int(key: str) -> int:
+        try:
+            return int(summary.get(key) or 0)
+        except (TypeError, ValueError):
+            violations.append(f"read_surface_fixture_{key}_not_integer")
+            return -1
+
+    expected_status_counts = {status: 0 for status in sorted(FIXTURE_EVIDENCE_STATUSES)}
+    expected_physical_missing: list[str] = []
+    expected_surface_with_fixture_count = 0
+    for index, row in enumerate(surfaces):
+        if not isinstance(row, Mapping):
+            violations.append(f"read_surface_fixture_row_{index}_not_object")
+            continue
+        surface_id = str(row.get("surface_id") or f"index_{index}")
+        status = str(row.get("status") or "")
+        if not status:
+            violations.append(f"read_surface_fixture_row_{surface_id}_status_missing")
+        else:
+            if status not in FIXTURE_EVIDENCE_STATUSES:
+                violations.append(f"read_surface_fixture_row_{surface_id}_status_unknown")
+            expected_status_counts[status] = expected_status_counts.get(status, 0) + 1
+            if status != "missing_fixture_evidence":
+                expected_surface_with_fixture_count += 1
+        if row.get("full_autonomous_ready") is not False:
+            violations.append(f"read_surface_fixture_row_{surface_id}_full_autonomous_ready_not_false")
+        remaining_gaps = row.get("remaining_gaps")
+        if not isinstance(remaining_gaps, list):
+            remaining_gaps = []
+            violations.append(f"read_surface_fixture_row_{surface_id}_remaining_gaps_missing")
+        if "physical_readback_fixture_missing" in remaining_gaps:
+            expected_physical_missing.append(surface_id)
+
+    normalized_status_counts = {status: 0 for status in sorted(FIXTURE_EVIDENCE_STATUSES)}
+    for key, value in status_counts.items():
+        status_key = str(key)
+        try:
+            normalized_status_counts[status_key] = int(value)
+        except (TypeError, ValueError):
+            normalized_status_counts[status_key] = -1
+            violations.append(f"read_surface_fixture_status_count_{status_key}_not_integer")
     physical_missing = summary.get("physical_fixture_missing_surface_ids")
     if not isinstance(physical_missing, list):
         physical_missing = []
@@ -588,10 +636,20 @@ def validate_read_surface_fixture_evidence_snapshot() -> CheckResult:
         violations.append("fixture_status_complete_but_physical_gaps_remain")
     if not physical_missing:
         violations.append("physical_readback_gaps_not_reported")
+    summary_surface_count = summary_int("surface_count")
+    summary_surface_with_fixture_count = summary_int("surface_with_fixture_count")
+    if summary_surface_count != len(surfaces):
+        violations.append("read_surface_fixture_surface_count_mismatch")
+    if summary_surface_with_fixture_count != expected_surface_with_fixture_count:
+        violations.append("read_surface_fixture_surface_with_fixture_count_mismatch")
+    if normalized_status_counts != expected_status_counts:
+        violations.append("read_surface_fixture_status_counts_mismatch")
+    if list(physical_missing) != expected_physical_missing:
+        violations.append("read_surface_fixture_physical_missing_surface_ids_mismatch")
 
     detail["snapshot_status"] = snapshot.get("status")
-    detail["surface_count"] = int(summary.get("surface_count") or 0)
-    detail["surface_with_fixture_count"] = int(summary.get("surface_with_fixture_count") or 0)
+    detail["surface_count"] = summary_surface_count
+    detail["surface_with_fixture_count"] = summary_surface_with_fixture_count
     detail["status_counts"] = dict(status_counts)
     detail["physical_fixture_missing_surface_ids"] = list(physical_missing)
     detail["violations"] = violations
