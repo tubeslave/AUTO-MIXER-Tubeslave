@@ -85,6 +85,20 @@ def test_full_autonomous_and_broad_console_writes_remain_blocked():
     assert scene.current_live_write_kinds == ()
 
 
+def test_console_read_parameters_tracks_physical_readback_capture_plan():
+    row = get_project_goal_capability("console_read_parameters")
+
+    assert row is not None
+    assert row.status == "proposal_only"
+    assert row.autonomy_mode_ceiling == "analysis"
+    assert "read_surface_remediation_plan" in row.method_ids
+    assert "read_surface_physical_readback_capture_plan" in row.method_ids
+    assert "read_surface_fixture_evidence" in row.method_ids
+    assert "backend/read_surface_physical_readback_capture_plan.py" in row.support_paths
+    assert "physical fixtures" in row.next_step
+    assert row.current_live_write_kinds == ()
+
+
 def test_deessing_is_tracked_as_proposal_only_method_not_ignored():
     row = get_project_goal_capability("deessing")
 

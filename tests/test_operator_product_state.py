@@ -1949,6 +1949,42 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     "next_physical_readback_surface_id": "raw_mixer_state_cache",
                     "violations": [],
                 },
+                "read_surface_physical_readback_capture_plan": {
+                    "status": "passed",
+                    "plan_status": "operator_capture_required",
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "operator_required": True,
+                    "execution_allowed_by_plan": False,
+                    "live_widening_allowed": False,
+                    "full_autonomous_ready": False,
+                    "capture_step_count": 1,
+                    "physical_gap_surface_count": 2,
+                    "physical_fixture_missing_surface_ids": [
+                        "raw_mixer_state_cache",
+                        "channel_identity_and_basic_controls",
+                    ],
+                    "next_physical_readback_surface_id": "raw_mixer_state_cache",
+                    "next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
+                    "target_action_consistency": True,
+                    "required_artifact_contracts": [
+                        "physical_readback_fixture",
+                        "raw_mixer_state_physical_readback_contract",
+                    ],
+                    "blocked_by": [
+                        "physical_readback_fixtures_incomplete",
+                        "operator_must_capture_and_review_physical_readback_artifact",
+                    ],
+                    "step_surface_id": "raw_mixer_state_cache",
+                    "step_remediation_action_id": "remediate_raw_mixer_state_cache",
+                    "step_forbidden_actions": [
+                        "do not mark cached state as physical proof",
+                    ],
+                    "violations": [],
+                },
                 "raw_mixer_state_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "raw_mixer_state_physical_readback.v1",
@@ -2563,6 +2599,25 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert proof_quality["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
     assert proof_quality["source_next_physical_readback_surface_id"] == "raw_mixer_state_cache"
     assert proof_quality["next_physical_readback_target_consistent"] is True
+    capture_plan = proof_quality["read_surface_physical_readback_capture_plan"]
+    assert capture_plan["available"] is True
+    assert capture_plan["status"] == "passed"
+    assert capture_plan["plan_status"] == "operator_capture_required"
+    assert capture_plan["read_only"] is True
+    assert capture_plan["live_write"] is False
+    assert capture_plan["mutates_console_state"] is False
+    assert capture_plan["queries_console"] is False
+    assert capture_plan["executes_tests"] is False
+    assert capture_plan["operator_required"] is True
+    assert capture_plan["execution_allowed_by_plan"] is False
+    assert capture_plan["live_authority_granted"] is False
+    assert capture_plan["full_autonomous_ready"] is False
+    assert capture_plan["capture_step_count"] == 1
+    assert capture_plan["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert capture_plan["next_physical_readback_action_id"] == "remediate_raw_mixer_state_cache"
+    assert capture_plan["target_consistency"] is True
+    assert "physical_readback_fixture" in capture_plan["required_artifact_contracts"]
+    assert "operator_must_capture_and_review_physical_readback_artifact" in capture_plan["blocked_by"]
     raw_contract = proof_quality["raw_mixer_state_physical_readback_contract"]
     assert raw_contract["available"] is True
     assert raw_contract["status"] == "passed"
@@ -2922,6 +2977,35 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
                     "next_physical_readback_surface_id": "raw_mixer_state_cache",
                     "violations": [],
                 },
+                "read_surface_physical_readback_capture_plan": {
+                    "status": "passed",
+                    "plan_status": "operator_capture_required",
+                    "read_only": False,
+                    "live_write": True,
+                    "mutates_console_state": True,
+                    "queries_console": True,
+                    "executes_tests": True,
+                    "operator_required": False,
+                    "execution_allowed_by_plan": True,
+                    "live_widening_allowed": True,
+                    "live_authority_granted": True,
+                    "full_autonomous_ready": True,
+                    "capture_step_count": 1,
+                    "physical_gap_surface_count": 2,
+                    "physical_fixture_missing_surface_ids": [
+                        "raw_mixer_state_cache",
+                        "channel_identity_and_basic_controls",
+                    ],
+                    "next_physical_readback_surface_id": "dlive_state",
+                    "next_physical_readback_action_id": "remediate_dlive_state",
+                    "target_action_consistency": False,
+                    "required_artifact_contracts": ["physical_readback_fixture"],
+                    "blocked_by": [],
+                    "step_surface_id": "dlive_state",
+                    "step_remediation_action_id": "remediate_dlive_state",
+                    "step_forbidden_actions": [],
+                    "violations": ["capture_plan_claimed_execution_authority"],
+                },
                 "raw_mixer_state_physical_readback_contract": {
                     "status": "passed",
                     "schema_id": "raw_mixer_state_physical_readback.v1",
@@ -3215,6 +3299,29 @@ def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(
 
     payload = build_supervised_proof_evidence_snapshot(server)
 
+    capture_plan = payload["summary"]["read_surface_proof_quality"][
+        "read_surface_physical_readback_capture_plan"
+    ]
+    assert capture_plan["available"] is True
+    assert capture_plan["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert capture_plan["source_next_physical_readback_surface_id"] == "dlive_state"
+    assert capture_plan["next_physical_readback_action_id"] == "remediate_raw_mixer_state_cache"
+    assert capture_plan["source_next_physical_readback_action_id"] == "remediate_dlive_state"
+    assert capture_plan["target_consistency"] is False
+    assert capture_plan["read_only"] is True
+    assert capture_plan["live_write"] is False
+    assert capture_plan["mutates_console_state"] is False
+    assert capture_plan["queries_console"] is False
+    assert capture_plan["executes_tests"] is False
+    assert capture_plan["operator_required"] is True
+    assert capture_plan["execution_allowed_by_plan"] is False
+    assert capture_plan["live_authority_granted"] is False
+    assert capture_plan["full_autonomous_ready"] is False
+    assert capture_plan["source_execution_allowed_by_plan_claimed"] is True
+    assert capture_plan["source_live_write_claimed"] is True
+    assert capture_plan["source_live_authority_granted_claimed"] is True
+    assert capture_plan["source_full_autonomous_ready_claimed"] is True
+    assert "capture_plan_claimed_execution_authority" in capture_plan["violations"]
     raw_contract = payload["summary"]["read_surface_proof_quality"][
         "raw_mixer_state_physical_readback_contract"
     ]

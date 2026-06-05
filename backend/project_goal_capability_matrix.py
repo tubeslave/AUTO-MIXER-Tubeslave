@@ -480,6 +480,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         method_ids=(
             "product_operator_state",
             "read_surface_remediation_plan",
+            "read_surface_physical_readback_capture_plan",
             "read_surface_fixture_evidence",
             "raw_mixer_state_physical_readback_contract",
             "channel_basic_controls_physical_readback_contract",
@@ -495,6 +496,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         support_paths=(
             "backend/read_surface_inventory.py",
             "backend/read_surface_remediation_plan.py",
+            "backend/read_surface_physical_readback_capture_plan.py",
             "backend/read_surface_fixture_evidence.py",
             "backend/raw_mixer_state_physical_readback_contract.py",
             "backend/channel_basic_controls_physical_readback_contract.py",

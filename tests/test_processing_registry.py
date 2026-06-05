@@ -288,6 +288,22 @@ def test_read_surface_remediation_plan_is_shadow_only_not_executor():
     assert "read_surface_remediation_plan" not in main.executor_method_ids
 
 
+def test_read_surface_physical_readback_capture_plan_is_shadow_only_not_executor():
+    method = get_processing_method("read_surface_physical_readback_capture_plan")
+    assert method is not None
+    assert method.status == "shadow_only"
+    assert method.domain == "evaluation"
+    assert method.can_analyze is True
+    assert method.can_write_live is False
+    assert method.live_write_kinds == ()
+    assert set(method.pipeline_profiles) == {"shadow_quality", "lab_dsp"}
+    assert "execution_allowed_by_plan_false" in method.notes
+
+    main = get_pipeline_profile("main_live_assist")
+    assert main is not None
+    assert "read_surface_physical_readback_capture_plan" not in main.executor_method_ids
+
+
 def test_secondary_pipelines_do_not_declare_live_write_executor():
     for pipeline_id in ("offline_mix", "shadow_quality", "lab_dsp", "quarantine"):
         profile = get_pipeline_profile(pipeline_id)
@@ -327,6 +343,22 @@ def test_registry_snapshot_can_hide_full_method_inventory():
     assert snapshot["read_surface_remediation_plan"]["type"] == "read_surface_remediation_plan"
     assert snapshot["read_surface_remediation_plan"]["safety"]["live_write"] is False
     assert snapshot["read_surface_remediation_plan"]["summary"]["incomplete_surface_count"] >= 1
+    assert (
+        snapshot["read_surface_physical_readback_capture_plan"]["type"]
+        == "read_surface_physical_readback_capture_plan"
+    )
+    assert snapshot["read_surface_physical_readback_capture_plan"]["safety"][
+        "live_write"
+    ] is False
+    assert snapshot["read_surface_physical_readback_capture_plan"]["safety"][
+        "execution_allowed_by_plan"
+    ] is False
+    assert snapshot["read_surface_physical_readback_capture_plan"]["summary"][
+        "next_physical_readback_surface_id"
+    ] == "raw_mixer_state_cache"
+    assert snapshot["read_surface_physical_readback_capture_plan"]["summary"][
+        "target_action_consistency"
+    ] is True
     assert (
         snapshot["raw_mixer_state_physical_readback_contract"]["type"]
         == "raw_mixer_state_physical_readback_contract"

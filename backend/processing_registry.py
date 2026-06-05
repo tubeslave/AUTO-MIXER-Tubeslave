@@ -35,6 +35,9 @@ try:
     from project_goal_capability_matrix import build_project_goal_capability_matrix_snapshot
     from read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
     from read_surface_inventory import build_read_surface_inventory_snapshot
+    from read_surface_physical_readback_capture_plan import (
+        build_read_surface_physical_readback_capture_plan,
+    )
     from read_surface_remediation_plan import build_read_surface_remediation_plan
     from raw_mixer_state_physical_readback_contract import (
         build_raw_mixer_state_physical_readback_contract,
@@ -74,6 +77,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.project_goal_capability_matrix import build_project_goal_capability_matrix_snapshot
     from backend.read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
     from backend.read_surface_inventory import build_read_surface_inventory_snapshot
+    from backend.read_surface_physical_readback_capture_plan import (
+        build_read_surface_physical_readback_capture_plan,
+    )
     from backend.read_surface_remediation_plan import build_read_surface_remediation_plan
     from backend.raw_mixer_state_physical_readback_contract import (
         build_raw_mixer_state_physical_readback_contract,
@@ -393,6 +399,31 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         blocked_reason="read_remediation_only_no_console_queries",
         promotion_next="complete read DTOs, coverage flags, and fixture tests before broad autonomous console control",
         notes=("transport_free", "read_remediation_only", "no_live_writes", "mutates_console_state_false"),
+    ),
+    ProcessingMethod(
+        id="read_surface_physical_readback_capture_plan",
+        label="Read Surface Physical Readback Capture Plan",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Read-only operator checklist for capturing the next physical readback "
+            "artifact required by console read-surface remediation."
+        ),
+        module="backend/read_surface_physical_readback_capture_plan.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="operator_capture_plan_only_no_console_queries_or_execution",
+        promotion_next=(
+            "operator captures the named physical readback artifact outside this "
+            "plan, then release checks validate the artifact before closing the gap"
+        ),
+        notes=(
+            "transport_free",
+            "readback_capture_plan_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "execution_allowed_by_plan_false",
+        ),
     ),
     ProcessingMethod(
         id="read_surface_fixture_evidence",
@@ -1552,6 +1583,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, console read coverage remediation",
         "next_step": "Use only to plan read DTO and fixture work; do not query or mutate a live console from this plan.",
     },
+    "read_surface_physical_readback_capture_plan": {
+        "entrypoint": "build_read_surface_physical_readback_capture_plan",
+        "ui_surface": "Processing registry, operator readback capture checklist",
+        "next_step": "Use only as a non-executing checklist; do not capture or query hardware without explicit operator action.",
+    },
     "raw_mixer_state_physical_readback_contract": {
         "entrypoint": (
             "build_raw_mixer_state_physical_readback_contract / "
@@ -1846,6 +1882,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         "autonomy_mode_transition_gate": autonomy_mode_transition_gate,
         "read_surface_inventory": build_read_surface_inventory_snapshot(),
         "read_surface_remediation_plan": build_read_surface_remediation_plan(),
+        "read_surface_physical_readback_capture_plan": (
+            build_read_surface_physical_readback_capture_plan()
+        ),
         "read_surface_fixture_evidence": build_read_surface_fixture_evidence_snapshot(),
         "raw_mixer_state_physical_readback_contract": build_raw_mixer_state_physical_readback_contract(),
         "channel_basic_controls_physical_readback_contract": (

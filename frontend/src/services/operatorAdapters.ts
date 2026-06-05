@@ -757,6 +757,21 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     );
     const sourceNextPhysicalReadbackSurfaceId = str(proofQuality.source_next_physical_readback_surface_id, '');
     const nextPhysicalReadbackTargetConsistent = proofQuality.next_physical_readback_target_consistent === true;
+    const readSurfaceCapturePlan = asRecord(proofQuality.read_surface_physical_readback_capture_plan);
+    const readSurfaceCapturePlanAvailable = Boolean(readSurfaceCapturePlan.available);
+    const readSurfaceCapturePlanStatus = str(readSurfaceCapturePlan.plan_status, str(readSurfaceCapturePlan.status, 'missing'));
+    const readSurfaceCapturePlanStepCount = Math.trunc(num(readSurfaceCapturePlan.capture_step_count, 0));
+    const readSurfaceCapturePlanSurfaceId = str(readSurfaceCapturePlan.next_physical_readback_surface_id, '');
+    const readSurfaceCapturePlanActionId = str(readSurfaceCapturePlan.next_physical_readback_action_id, '');
+    const readSurfaceCapturePlanSourceSurfaceId = str(readSurfaceCapturePlan.source_next_physical_readback_surface_id, '');
+    const readSurfaceCapturePlanSourceActionId = str(readSurfaceCapturePlan.source_next_physical_readback_action_id, '');
+    const readSurfaceCapturePlanExecutionAllowed = readSurfaceCapturePlan.execution_allowed_by_plan === true;
+    const readSurfaceCapturePlanOperatorRequired = readSurfaceCapturePlan.operator_required === true;
+    const readSurfaceCapturePlanLiveAuthority = readSurfaceCapturePlan.live_authority_granted === true;
+    const readSurfaceCapturePlanTargetConsistency = readSurfaceCapturePlan.target_consistency === true;
+    const readSurfaceCapturePlanRequiredContracts = stringList(readSurfaceCapturePlan.required_artifact_contracts);
+    const readSurfaceCapturePlanBlockedBy = stringList(readSurfaceCapturePlan.blocked_by);
+    const readSurfaceCapturePlanForbidden = stringList(readSurfaceCapturePlan.step_forbidden_actions);
     const rawMixerContract = asRecord(proofQuality.raw_mixer_state_physical_readback_contract);
     const rawMixerContractAvailable = Boolean(rawMixerContract.available);
     const rawMixerContractStatus = str(rawMixerContract.contract_status, str(rawMixerContract.status, 'missing'));
@@ -929,7 +944,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}; scenes_contract:${snapshotsScenesContractStatus || 'missing'}; scenes_contract_gap:${snapshotsScenesContractGapRemains}; scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}; scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}; presets_contract:${userPresetsContractStatus || 'missing'}; presets_contract_gap:${userPresetsContractGapRemains}; presets_contract_live_authority:${userPresetsContractLiveAuthority}; presets_contract_target_gate:${userPresetsContractTargetConsistency}; dlive_contract:${dliveStateContractStatus || 'missing'}; dlive_contract_gap:${dliveStateContractGapRemains}; dlive_contract_live_authority:${dliveStateContractLiveAuthority}; dlive_contract_target_gate:${dliveStateContractTargetConsistency}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; capture_plan:${readSurfaceCapturePlanStatus || 'missing'}; capture_steps:${readSurfaceCapturePlanStepCount}; capture_execution:${readSurfaceCapturePlanExecutionAllowed}; capture_target_gate:${readSurfaceCapturePlanTargetConsistency}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}; scenes_contract:${snapshotsScenesContractStatus || 'missing'}; scenes_contract_gap:${snapshotsScenesContractGapRemains}; scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}; scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}; presets_contract:${userPresetsContractStatus || 'missing'}; presets_contract_gap:${userPresetsContractGapRemains}; presets_contract_live_authority:${userPresetsContractLiveAuthority}; presets_contract_target_gate:${userPresetsContractTargetConsistency}; dlive_contract:${dliveStateContractStatus || 'missing'}; dlive_contract_gap:${dliveStateContractGapRemains}; dlive_contract_live_authority:${dliveStateContractLiveAuthority}; dlive_contract_target_gate:${dliveStateContractTargetConsistency}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
@@ -956,6 +971,12 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `next_readback_target:${nextPhysicalReadbackSurfaceId}`,
         `source_next_readback_target:${sourceNextPhysicalReadbackSurfaceId}`,
         `next_readback_gate:${nextPhysicalReadbackTargetConsistent}`,
+        `capture_plan_available:${readSurfaceCapturePlanAvailable}`,
+        `capture_plan_status:${readSurfaceCapturePlanStatus}`,
+        `capture_plan_steps:${readSurfaceCapturePlanStepCount}`,
+        `capture_plan_next_surface:${readSurfaceCapturePlanSurfaceId}`,
+        `capture_plan_execution_allowed:${readSurfaceCapturePlanExecutionAllowed}`,
+        `capture_plan_target_gate:${readSurfaceCapturePlanTargetConsistency}`,
         `fixture_tests:${declaredTestNameCount}`,
         `contract_gap:${contractGapConsistency}`,
         `raw_contract_available:${rawMixerContractAvailable}`,
@@ -1029,6 +1050,48 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         : 'Run no-WING supervised proof checks or point Product Layer at an existing report artifact.',
       tone: invalidCount > 0 ? 'red' : stale || !available ? 'yellow' : 'blue'
     }];
+    rows.push({
+      moduleId: 'read_surface_physical_readback_capture_plan',
+      label: 'Readback capture plan',
+      domain: 'read_surface_capture_plan',
+      status: readSurfaceCapturePlanAvailable ? readSurfaceCapturePlanStatus || 'plan_available' : 'plan_missing',
+      entrypoint: 'build_read_surface_physical_readback_capture_plan',
+      module: readSurfaceCapturePlanActionId || 'no_next_capture_action',
+      uiSurface: 'Read-surface physical readback capture plan',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${readSurfaceCapturePlanAvailable}`,
+        `steps:${readSurfaceCapturePlanStepCount}`,
+        `next_surface:${readSurfaceCapturePlanSurfaceId}`,
+        `source_next_surface:${readSurfaceCapturePlanSourceSurfaceId}`,
+        `next_action:${readSurfaceCapturePlanActionId}`,
+        `source_next_action:${readSurfaceCapturePlanSourceActionId}`,
+        `operator_required:${readSurfaceCapturePlanOperatorRequired}`,
+        `execution_allowed_by_plan:${readSurfaceCapturePlanExecutionAllowed}`,
+        `live_authority:${readSurfaceCapturePlanLiveAuthority}`,
+        `target_consistency:${readSurfaceCapturePlanTargetConsistency}`,
+        readSurfaceCapturePlanRequiredContracts.length ? `contracts:${readSurfaceCapturePlanRequiredContracts.join(',')}` : '',
+        readSurfaceCapturePlanForbidden.length ? `forbidden:${readSurfaceCapturePlanForbidden.join(',')}` : '',
+      ].filter(Boolean),
+      blockedReason: readSurfaceCapturePlanBlockedBy.length
+        ? readSurfaceCapturePlanBlockedBy.join(', ')
+        : 'Capture plan is complete or missing no current blockers.',
+      nextStep: readSurfaceCapturePlanAvailable
+        ? [
+            readSurfaceCapturePlanSurfaceId ? `next_physical_readback:${readSurfaceCapturePlanSurfaceId}` : '',
+            readSurfaceCapturePlanActionId ? `next_action:${readSurfaceCapturePlanActionId}` : '',
+            `operator_required:${readSurfaceCapturePlanOperatorRequired}`,
+            `execution_allowed_by_plan:${readSurfaceCapturePlanExecutionAllowed}`,
+            `target_consistency:${readSurfaceCapturePlanTargetConsistency}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with read-surface physical readback capture-plan validation.',
+      tone: !readSurfaceCapturePlanAvailable || readSurfaceCapturePlanExecutionAllowed || readSurfaceCapturePlanLiveAuthority || !readSurfaceCapturePlanTargetConsistency
+        ? 'yellow'
+        : readSurfaceCapturePlanStepCount > 0
+          ? 'yellow'
+          : 'green'
+    });
     rows.push({
       moduleId: 'raw_mixer_state_physical_readback_contract',
       label: 'Raw mixer readback contract',

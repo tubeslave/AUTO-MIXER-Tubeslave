@@ -3558,6 +3558,83 @@ def _raw_mixer_readback_contract_quality_from_summary(
     }
 
 
+def _read_surface_capture_plan_quality_from_summary(
+    summary: Dict[str, Any],
+    *,
+    expected_next_physical_readback_surface_id: Optional[str],
+    expected_next_physical_readback_action_id: Optional[str],
+) -> Dict[str, Any]:
+    plan = (
+        summary.get("read_surface_physical_readback_capture_plan")
+        if isinstance(summary.get("read_surface_physical_readback_capture_plan"), dict)
+        else {}
+    )
+    available = bool(plan)
+    source_next_surface = plan.get("next_physical_readback_surface_id")
+    source_next_physical_readback_surface_id = (
+        source_next_surface if isinstance(source_next_surface, str) and source_next_surface else None
+    )
+    source_next_action = plan.get("next_physical_readback_action_id")
+    source_next_physical_readback_action_id = (
+        source_next_action if isinstance(source_next_action, str) and source_next_action else None
+    )
+    target_consistent = (
+        available
+        and source_next_physical_readback_surface_id == expected_next_physical_readback_surface_id
+        and source_next_physical_readback_action_id == expected_next_physical_readback_action_id
+        and plan.get("target_action_consistency") is True
+    )
+    source_execution_claimed = plan.get("execution_allowed_by_plan") is True
+    source_live_write_claimed = plan.get("live_write") is True
+    source_live_authority_claimed = plan.get("live_authority_granted") is True
+    source_full_autonomous_ready_claimed = plan.get("full_autonomous_ready") is True
+    return {
+        "available": available,
+        "status": str(plan.get("status") or "missing"),
+        "plan_status": plan.get("plan_status"),
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "operator_required": True,
+        "execution_allowed_by_plan": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "source_execution_allowed_by_plan_claimed": source_execution_claimed,
+        "source_live_write_claimed": source_live_write_claimed,
+        "source_live_authority_granted_claimed": source_live_authority_claimed,
+        "source_full_autonomous_ready_claimed": source_full_autonomous_ready_claimed,
+        "capture_step_count": _safe_int_value(plan.get("capture_step_count")),
+        "physical_gap_surface_count": _safe_int_value(plan.get("physical_gap_surface_count")),
+        "physical_fixture_missing_surface_ids": _string_list_value(
+            plan.get("physical_fixture_missing_surface_ids")
+        ),
+        "next_physical_readback_surface_id": (
+            source_next_physical_readback_surface_id
+            if target_consistent
+            else expected_next_physical_readback_surface_id
+        ),
+        "source_next_physical_readback_surface_id": source_next_physical_readback_surface_id,
+        "next_physical_readback_action_id": (
+            source_next_physical_readback_action_id
+            if target_consistent
+            else expected_next_physical_readback_action_id
+        ),
+        "source_next_physical_readback_action_id": source_next_physical_readback_action_id,
+        "target_consistency": target_consistent,
+        "required_artifact_contracts": _string_list_value(
+            plan.get("required_artifact_contracts")
+        ),
+        "blocked_by": _string_list_value(plan.get("blocked_by")),
+        "step_surface_id": plan.get("step_surface_id"),
+        "step_remediation_action_id": plan.get("step_remediation_action_id"),
+        "step_forbidden_actions": _string_list_value(plan.get("step_forbidden_actions")),
+        "violations": _string_list_value(plan.get("violations")),
+    }
+
+
 def _channel_basic_controls_readback_contract_quality_from_summary(
     summary: Dict[str, Any],
 ) -> Dict[str, Any]:
@@ -4493,6 +4570,11 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
         expected_next_physical_readback_surface_id=next_physical_readback_surface_id,
         expected_next_physical_readback_action_id=expected_next_physical_readback_action_id,
     )
+    read_surface_capture_plan = _read_surface_capture_plan_quality_from_summary(
+        summary,
+        expected_next_physical_readback_surface_id=next_physical_readback_surface_id,
+        expected_next_physical_readback_action_id=expected_next_physical_readback_action_id,
+    )
     channel_basic_contract = _channel_basic_controls_readback_contract_quality_from_summary(
         summary
     )
@@ -4540,6 +4622,7 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
         "next_physical_readback_surface_id": next_physical_readback_surface_id,
         "source_next_physical_readback_surface_id": source_next_physical_readback_surface_id,
         "next_physical_readback_target_consistent": next_physical_readback_target_consistent,
+        "read_surface_physical_readback_capture_plan": read_surface_capture_plan,
         "raw_mixer_state_physical_readback_contract": raw_mixer_contract,
         "channel_basic_controls_physical_readback_contract": channel_basic_contract,
         "channel_processing_physical_readback_contract": channel_processing_contract,

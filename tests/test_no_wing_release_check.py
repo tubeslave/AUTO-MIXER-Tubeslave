@@ -23,6 +23,7 @@ from tools.no_wing_release_check import (
     next_wing_proof_plan_summary,
     proof_report_path_for_run,
     raw_mixer_readback_contract_summary,
+    read_surface_physical_readback_capture_plan_summary,
     read_surface_fixture_evidence_summary,
     read_surface_remediation_plan_summary,
     routing_sends_readback_contract_summary,
@@ -39,6 +40,7 @@ from tools.no_wing_release_check import (
     validate_fx_slots_inserts_physical_readback_contract_snapshot,
     validate_matrix_state_physical_readback_contract_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
+    validate_read_surface_physical_readback_capture_plan_snapshot,
     validate_raw_mixer_state_physical_readback_contract_snapshot,
     validate_read_surface_remediation_plan_snapshot,
     validate_routing_sends_physical_readback_contract_snapshot,
@@ -391,6 +393,59 @@ def test_no_wing_release_check_rejects_multiple_remediation_next_target_flags(mo
         "read_surface_remediation_next_target_action_flags_mismatch"
         in result.detail["violations"]
     )
+
+
+def test_no_wing_release_check_validates_read_surface_capture_plan_alignment():
+    result = validate_read_surface_physical_readback_capture_plan_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["plan_status"] == "operator_capture_required"
+    assert result.detail["capture_step_count"] == 1
+    assert result.detail["physical_fixture_missing_surface_ids"]
+    assert (
+        result.detail["next_physical_readback_surface_id"]
+        == result.detail["expected_next_physical_readback_surface_id"]
+    )
+    assert (
+        result.detail["next_physical_readback_action_id"]
+        == result.detail["expected_next_physical_readback_action_id"]
+    )
+    assert result.detail["target_action_consistency"] is True
+    assert result.detail["step_surface_id"] == result.detail["next_physical_readback_surface_id"]
+    assert result.detail["step_remediation_action_id"] == result.detail["next_physical_readback_action_id"]
+    assert "physical_readback_fixture" in result.detail["required_artifact_contracts"]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_capture_plan_execution_authority(monkeypatch):
+    capture_plan = release_check.build_read_surface_physical_readback_capture_plan()
+    corrupted = json.loads(json.dumps(capture_plan))
+    corrupted["safety"]["execution_allowed_by_plan"] = True
+    corrupted["safety"]["live_write"] = True
+    corrupted["safety"]["live_authority_granted"] = True
+    corrupted["safety"]["operator_required"] = False
+    corrupted["summary"]["target_action_consistency"] = False
+    corrupted["steps"][0]["execution_allowed_by_plan"] = True
+    corrupted["steps"][0]["live_write"] = True
+    corrupted["steps"][0]["operator_required"] = False
+
+    monkeypatch.setattr(
+        release_check,
+        "build_read_surface_physical_readback_capture_plan",
+        lambda **_: corrupted,
+    )
+
+    result = validate_read_surface_physical_readback_capture_plan_snapshot()
+
+    assert result.status == "failed"
+    assert "read_surface_capture_plan_execution_allowed_by_plan_not_false" in result.detail["violations"]
+    assert "read_surface_capture_plan_live_write_not_false" in result.detail["violations"]
+    assert "read_surface_capture_plan_live_authority_granted_not_false" in result.detail["violations"]
+    assert "read_surface_capture_plan_operator_required_not_true" in result.detail["violations"]
+    assert "read_surface_capture_plan_target_action_consistency_mismatch" in result.detail["violations"]
+    assert "read_surface_capture_plan_step_operator_required_not_true" in result.detail["violations"]
+    assert "read_surface_capture_plan_step_execution_allowed_by_plan_not_false" in result.detail["violations"]
+    assert "read_surface_capture_plan_step_live_write_not_false" in result.detail["violations"]
 
 
 def test_no_wing_release_check_validates_raw_mixer_readback_contract_snapshot():
@@ -1629,6 +1684,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert summary["status"] == "passed"
     assert "read_surface_fixture_evidence_schema" in result_names
     assert "read_surface_remediation_plan_schema" in result_names
+    assert "read_surface_physical_readback_capture_plan_schema" in result_names
     assert "raw_mixer_state_physical_readback_contract_schema" in result_names
     assert "channel_basic_controls_physical_readback_contract_schema" in result_names
     assert "channel_processing_physical_readback_contract_schema" in result_names
@@ -1650,6 +1706,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "read_surface_remediation_plan_schema"
     )
     assert result_names.index("read_surface_remediation_plan_schema") < result_names.index(
+        "read_surface_physical_readback_capture_plan_schema"
+    )
+    assert result_names.index("read_surface_physical_readback_capture_plan_schema") < result_names.index(
         "raw_mixer_state_physical_readback_contract_schema"
     )
     assert result_names.index("raw_mixer_state_physical_readback_contract_schema") < result_names.index(
@@ -2442,6 +2501,67 @@ def test_no_wing_release_check_summary_embeds_read_surface_remediation_plan(tmp_
     assert "next_physical_readback_action_id" in markdown_summary
     assert "next_physical_readback_target_action_ids" in markdown_summary
     assert "target_action_consistency: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_read_surface_capture_plan(tmp_path):
+    result = CheckResult(
+        name="read_surface_physical_readback_capture_plan_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "plan_status": "operator_capture_required",
+            "capture_step_count": 1,
+            "physical_fixture_missing_surface_ids": ["raw_mixer_state_cache"],
+            "next_physical_readback_surface_id": "raw_mixer_state_cache",
+            "next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
+            "expected_next_physical_readback_surface_id": "raw_mixer_state_cache",
+            "expected_next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
+            "target_action_consistency": True,
+            "required_artifact_contracts": [
+                "physical_readback_fixture",
+                "raw_mixer_state_physical_readback_contract",
+            ],
+            "blocked_by": [
+                "physical_readback_fixtures_incomplete",
+                "operator_must_capture_and_review_physical_readback_artifact",
+            ],
+            "step_surface_id": "raw_mixer_state_cache",
+            "step_remediation_action_id": "remediate_raw_mixer_state_cache",
+            "step_forbidden_actions": [
+                "do not apply fader, gain, trim, pan, mute, EQ, dynamics, gate, routing, DCA, matrix, FX, scene, or preset changes",
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert (
+        read_surface_physical_readback_capture_plan_summary([result])
+        == summary["read_surface_physical_readback_capture_plan"]
+    )
+    capture_plan = json_summary["read_surface_physical_readback_capture_plan"]
+    assert capture_plan["read_only"] is True
+    assert capture_plan["live_write"] is False
+    assert capture_plan["queries_console"] is False
+    assert capture_plan["executes_tests"] is False
+    assert capture_plan["operator_required"] is True
+    assert capture_plan["execution_allowed_by_plan"] is False
+    assert capture_plan["live_authority_granted"] is False
+    assert capture_plan["full_autonomous_ready"] is False
+    assert capture_plan["capture_step_count"] == 1
+    assert capture_plan["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert capture_plan["target_action_consistency"] is True
+    assert "physical_readback_fixture" in capture_plan["required_artifact_contracts"]
+    assert "operator_must_capture_and_review_physical_readback_artifact" in capture_plan["blocked_by"]
+    assert "## Read Surface Physical Readback Capture Plan" in markdown_summary
+    assert "execution_allowed_by_plan: `false`" in markdown_summary
+    assert "live_authority_granted: `false`" in markdown_summary
+    assert "step_remediation_action_id" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_raw_mixer_readback_contract(tmp_path):
