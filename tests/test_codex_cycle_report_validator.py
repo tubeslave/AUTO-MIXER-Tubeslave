@@ -2189,6 +2189,32 @@ def test_cycle_report_validator_rejects_out_of_order_end_sections(tmp_path):
     assert any("required end sections are out of order" in error for error in errors)
 
 
+def test_cycle_report_validator_rejects_top_level_section_between_questions_and_plain_explanation(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "## Объяснение простым языком",
+            "## Extra Evidence\n\nExtra notes should not sit between the "
+            "mandatory questions and the plain-language explanation.\n\n"
+            "## Объяснение простым языком",
+            1,
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "## Три обязательных вопроса must directly precede "
+        "## Объяснение простым языком without another top-level section "
+        "between them"
+        in errors
+    )
+
+
 def test_cycle_report_validator_rejects_top_level_section_after_plain_explanation(tmp_path):
     validator = load_validator_module()
     report_path = write_report(

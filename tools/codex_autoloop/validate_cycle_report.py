@@ -873,6 +873,40 @@ def _validate_ordered_end_sections(text: str) -> list[str]:
     return errors
 
 
+def _validate_mandatory_questions_directly_precede_plain_explanation(
+    text: str,
+) -> list[str]:
+    questions_match = re.search(
+        rf"^{re.escape(MANDATORY_QUESTIONS_HEADING)}\s*$",
+        text,
+        re.MULTILINE,
+    )
+    plain_match = re.search(
+        rf"^{re.escape(PLAIN_EXPLANATION_HEADING)}\s*$",
+        text,
+        re.MULTILINE,
+    )
+    if not questions_match or not plain_match:
+        return []
+
+    if plain_match.start() < questions_match.end():
+        return []
+
+    intervening_top_level_heading = re.search(
+        r"^##\s+",
+        text[questions_match.end():plain_match.start()],
+        re.MULTILINE,
+    )
+    if intervening_top_level_heading:
+        return [
+            f"{MANDATORY_QUESTIONS_HEADING} must directly precede "
+            f"{PLAIN_EXPLANATION_HEADING} without another top-level section "
+            "between them"
+        ]
+
+    return []
+
+
 def _validate_ordered_mid_sections(text: str) -> list[str]:
     errors: list[str] = []
     previous_heading = ""
@@ -1585,6 +1619,7 @@ def validate_report(
     errors.extend(_validate_ordered_core_sections(text))
     errors.extend(_validate_ordered_mid_sections(text))
     errors.extend(_validate_ordered_end_sections(text))
+    errors.extend(_validate_mandatory_questions_directly_precede_plain_explanation(text))
     errors.extend(_validate_changed_file_links(text, resolved_report, root))
     errors.extend(_validate_next_steps_limit(text))
     errors.extend(_validate_plain_explanation_is_final_major_section(text))

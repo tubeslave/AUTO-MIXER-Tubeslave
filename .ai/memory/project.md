@@ -62,6 +62,7 @@
 - Settings should show read-surface proof quality as read-only operator evidence: metadata availability, physical gap count, fixture test count, and contract/gap enforcement are visibility facts, not live authority.
 - Settings read-surface proof visibility should include compact physical gap surface IDs so the next hardware readback proof target is operator-visible without granting live read/write authority.
 - Product Layer read-surface proof quality should expose `next_physical_readback_surface_id` as read-only planning evidence; frontend surfaces must not infer this as hardware permission or readiness.
+- Codex autoloop reports should keep `## Три обязательных вопроса` directly adjacent to `## Объяснение простым языком`; extra top-level evidence belongs earlier so the operator-facing ending stays predictable.
 
 ## Memory Pipeline Lessons
 
