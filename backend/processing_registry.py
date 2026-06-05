@@ -15,6 +15,9 @@ try:
     from channel_basic_controls_physical_readback_contract import (
         build_channel_basic_controls_physical_readback_contract,
     )
+    from channel_processing_physical_readback_contract import (
+        build_channel_processing_physical_readback_contract,
+    )
     from autonomy_mode_transition_gate import build_autonomy_mode_transition_gate
     from autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
     from project_goal_capability_matrix import build_project_goal_capability_matrix_snapshot
@@ -29,6 +32,9 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.channel_basic_controls_physical_readback_contract import (
         build_channel_basic_controls_physical_readback_contract,
+    )
+    from backend.channel_processing_physical_readback_contract import (
+        build_channel_processing_physical_readback_contract,
     )
     from backend.autonomy_mode_transition_gate import build_autonomy_mode_transition_gate
     from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
@@ -410,6 +416,30 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         promotion_next=(
             "capture an operator-run channel physical readback artifact matching "
             "this contract before closing the channel identity/basic controls gap"
+        ),
+        notes=(
+            "transport_free",
+            "readback_contract_only",
+            "no_live_writes",
+            "does_not_query_console",
+        ),
+    ),
+    ProcessingMethod(
+        id="channel_processing_physical_readback_contract",
+        label="Channel Processing Physical Readback Contract",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Transport-free schema contract for channel HPF, EQ, compressor, "
+            "and gate physical readback artifacts needed by processing proof."
+        ),
+        module="backend/channel_processing_physical_readback_contract.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="contract_only_channel_processing_physical_readback_artifact_missing",
+        promotion_next=(
+            "capture an operator-run channel processing physical readback "
+            "artifact before closing the channel EQ/dynamics/gate gap"
         ),
         notes=(
             "transport_free",
@@ -1325,6 +1355,14 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, read-surface remediation artifact contract",
         "next_step": "Use only to validate separately captured channel identity/control readback; do not infer live authority.",
     },
+    "channel_processing_physical_readback_contract": {
+        "entrypoint": (
+            "build_channel_processing_physical_readback_contract / "
+            "validate_channel_processing_physical_readback_artifact"
+        ),
+        "ui_surface": "Processing registry, read-surface remediation artifact contract",
+        "next_step": "Use only to validate separately captured HPF/EQ/dynamics/gate readback; do not infer live authority.",
+    },
     "auto_fader_v1": {
         "entrypoint": "main_pipeline_preview proposal adapter",
         "ui_surface": "Task Queue preview/proposal rows",
@@ -1543,6 +1581,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         "raw_mixer_state_physical_readback_contract": build_raw_mixer_state_physical_readback_contract(),
         "channel_basic_controls_physical_readback_contract": (
             build_channel_basic_controls_physical_readback_contract()
+        ),
+        "channel_processing_physical_readback_contract": (
+            build_channel_processing_physical_readback_contract()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),

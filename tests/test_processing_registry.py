@@ -349,6 +349,17 @@ def test_registry_snapshot_can_hide_full_method_inventory():
         ]
         is True
     )
+    assert (
+        snapshot["channel_processing_physical_readback_contract"]["type"]
+        == "channel_processing_physical_readback_contract"
+    )
+    assert snapshot["channel_processing_physical_readback_contract"]["safety"]["live_write"] is False
+    assert (
+        snapshot["channel_processing_physical_readback_contract"]["summary"][
+            "physical_fixture_gap_remains"
+        ]
+        is True
+    )
     assert snapshot["project_goal_capability_matrix"]["type"] == "project_goal_capability_matrix"
     assert snapshot["project_goal_capability_matrix"]["safety"][
         "live_widening_allowed"

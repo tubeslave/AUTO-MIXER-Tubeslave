@@ -92,16 +92,23 @@ FIXTURE_EVIDENCE_BY_SURFACE: Dict[str, Dict[str, Tuple[str, ...]]] = {
         ),
     },
     "channel_eq_dynamics_gate": {
-        "fixture_paths": ("tests/test_operator_product_state.py",),
+        "fixture_paths": (
+            "tests/test_operator_product_state.py",
+            "tests/test_channel_processing_physical_readback_contract.py",
+        ),
         "test_names": (
             "test_channel_processing_snapshot_publishes_cached_processing_readback_only",
             "test_channel_processing_snapshot_marks_stale_cache_timestamps_without_queries",
             "test_channel_processing_snapshot_marks_missing_cache_without_queries",
+            "test_channel_processing_contract_describes_future_physical_artifact",
+            "test_channel_processing_contract_validates_minimal_physical_artifact",
+            "test_channel_processing_contract_rejects_live_or_cached_claims",
         ),
         "covered_contracts": (
             "cached_hpf_eq_dynamics_gate",
             "field_cache_freshness",
             "stale_cache_detection",
+            "physical_readback_artifact_contract",
             "no_console_query",
         ),
     },

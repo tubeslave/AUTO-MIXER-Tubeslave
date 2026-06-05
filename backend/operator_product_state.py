@@ -3640,6 +3640,95 @@ def _channel_basic_controls_readback_contract_quality_from_summary(
     }
 
 
+def _channel_processing_readback_contract_quality_from_summary(
+    summary: Dict[str, Any],
+) -> Dict[str, Any]:
+    contract = (
+        summary.get("channel_processing_physical_readback_contract")
+        if isinstance(summary.get("channel_processing_physical_readback_contract"), dict)
+        else {}
+    )
+    available = bool(contract)
+    surface_id = contract.get("surface_id") if isinstance(contract.get("surface_id"), str) else None
+    action_id = (
+        contract.get("remediation_action_id")
+        if isinstance(contract.get("remediation_action_id"), str)
+        else None
+    )
+    physical_surface_id = (
+        contract.get("physical_readback_surface_id")
+        if isinstance(contract.get("physical_readback_surface_id"), str)
+        else None
+    )
+    physical_action_id = (
+        contract.get("physical_readback_action_id")
+        if isinstance(contract.get("physical_readback_action_id"), str)
+        else None
+    )
+    target_consistent = (
+        available
+        and surface_id == "channel_eq_dynamics_gate"
+        and action_id == "remediate_channel_eq_dynamics_gate"
+        and physical_surface_id == surface_id
+        and physical_action_id == action_id
+        and contract.get("fixture_physical_gap_declared") is True
+        and contract.get("remediation_physical_gap_declared") is True
+        and contract.get("target_consistency") is True
+    )
+    source_live_write_claimed = contract.get("live_write") is True
+    source_candidate_claimed = contract.get("accepted_as_physical_fixture_candidate") is True
+    source_live_authority_claimed = contract.get("live_authority_granted") is True
+    source_full_autonomous_ready_claimed = contract.get("full_autonomous_ready") is True
+    return {
+        "available": available,
+        "status": str(contract.get("status") or "missing"),
+        "schema_id": contract.get("schema_id"),
+        "contract_status": contract.get("contract_status"),
+        "surface_id": surface_id,
+        "remediation_action_id": action_id,
+        "physical_readback_surface_id": physical_surface_id,
+        "physical_readback_action_id": physical_action_id,
+        "artifact_required": contract.get("artifact_required") is True,
+        "physical_fixture_gap_remains": contract.get("physical_fixture_gap_remains") is True,
+        "accepted_as_physical_fixture_candidate": False,
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "source_accepted_as_physical_fixture_candidate_claimed": source_candidate_claimed,
+        "source_live_write_claimed": source_live_write_claimed,
+        "source_live_authority_granted_claimed": source_live_authority_claimed,
+        "source_full_autonomous_ready_claimed": source_full_autonomous_ready_claimed,
+        "fixture_physical_gap_declared": contract.get("fixture_physical_gap_declared") is True,
+        "remediation_physical_gap_declared": (
+            contract.get("remediation_physical_gap_declared") is True
+        ),
+        "target_consistency": target_consistent,
+        "promotion_families_requiring_surface": _string_list_value(
+            contract.get("promotion_families_requiring_surface")
+        ),
+        "required_hpf_fields": _string_list_value(contract.get("required_hpf_fields")),
+        "required_eq_fields": _string_list_value(contract.get("required_eq_fields")),
+        "required_eq_band_fields": _string_list_value(contract.get("required_eq_band_fields")),
+        "required_compressor_fields": _string_list_value(
+            contract.get("required_compressor_fields")
+        ),
+        "required_gate_fields": _string_list_value(contract.get("required_gate_fields")),
+        "required_coverage_flags": _string_list_value(contract.get("required_coverage_flags")),
+        "allowed_sources": _string_list_value(contract.get("allowed_sources")),
+        "accepted_channel_statuses": _string_list_value(contract.get("accepted_channel_statuses")),
+        "forbidden_mutation_evidence_fields": _string_list_value(
+            contract.get("forbidden_mutation_evidence_fields")
+        ),
+        "minimum_eq_band_count": _safe_int_value(contract.get("minimum_eq_band_count")),
+        "violations": _string_list_value(contract.get("violations")),
+    }
+
+
 def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any]:
     summary_path = report_path.parent / "summary.json"
     summary = _read_json_file(summary_path)
@@ -3677,6 +3766,9 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
     channel_basic_contract = _channel_basic_controls_readback_contract_quality_from_summary(
         summary
     )
+    channel_processing_contract = _channel_processing_readback_contract_quality_from_summary(
+        summary
+    )
     source_full_autonomous_ready = read_surface.get("full_autonomous_ready") is True
     return {
         "available": available,
@@ -3701,6 +3793,7 @@ def _read_surface_proof_quality_from_summary(report_path: Path) -> Dict[str, Any
         "next_physical_readback_target_consistent": next_physical_readback_target_consistent,
         "raw_mixer_state_physical_readback_contract": raw_mixer_contract,
         "channel_basic_controls_physical_readback_contract": channel_basic_contract,
+        "channel_processing_physical_readback_contract": channel_processing_contract,
         "violations": _string_list_value(read_surface.get("violations")),
     }
 

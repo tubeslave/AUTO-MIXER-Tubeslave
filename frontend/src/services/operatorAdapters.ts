@@ -781,11 +781,26 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const channelBasicContractTargetConsistency = channelBasicContract.target_consistency === true;
     const channelBasicContractPromotionFamilies = stringList(channelBasicContract.promotion_families_requiring_surface);
     const channelBasicContractControls = stringList(channelBasicContract.required_control_fields);
+    const channelProcessingContract = asRecord(proofQuality.channel_processing_physical_readback_contract);
+    const channelProcessingContractAvailable = Boolean(channelProcessingContract.available);
+    const channelProcessingContractStatus = str(channelProcessingContract.contract_status, str(channelProcessingContract.status, 'missing'));
+    const channelProcessingContractSchemaId = str(channelProcessingContract.schema_id, '');
+    const channelProcessingContractSurfaceId = str(channelProcessingContract.surface_id, '');
+    const channelProcessingContractActionId = str(channelProcessingContract.remediation_action_id, '');
+    const channelProcessingContractPhysicalSurfaceId = str(channelProcessingContract.physical_readback_surface_id, '');
+    const channelProcessingContractPhysicalActionId = str(channelProcessingContract.physical_readback_action_id, '');
+    const channelProcessingContractGapRemains = channelProcessingContract.physical_fixture_gap_remains === true;
+    const channelProcessingContractLiveAuthority = channelProcessingContract.live_authority_granted === true;
+    const channelProcessingContractTargetConsistency = channelProcessingContract.target_consistency === true;
+    const channelProcessingContractPromotionFamilies = stringList(channelProcessingContract.promotion_families_requiring_surface);
+    const channelProcessingContractEqBands = stringList(channelProcessingContract.required_eq_band_fields);
+    const channelProcessingContractCompressor = stringList(channelProcessingContract.required_compressor_fields);
+    const channelProcessingContractGate = stringList(channelProcessingContract.required_gate_fields);
     const freshnessText = available
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
@@ -826,6 +841,12 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `channel_contract_gap:${channelBasicContractGapRemains}`,
         `channel_contract_live_authority:${channelBasicContractLiveAuthority}`,
         `channel_contract_target_gate:${channelBasicContractTargetConsistency}`,
+        `processing_contract_available:${channelProcessingContractAvailable}`,
+        `processing_contract_status:${channelProcessingContractStatus}`,
+        `processing_contract_schema:${channelProcessingContractSchemaId}`,
+        `processing_contract_gap:${channelProcessingContractGapRemains}`,
+        `processing_contract_live_authority:${channelProcessingContractLiveAuthority}`,
+        `processing_contract_target_gate:${channelProcessingContractTargetConsistency}`,
       ],
       blockedReason: available
         ? stale
@@ -918,6 +939,54 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       tone: !channelBasicContractAvailable || channelBasicContractLiveAuthority || !channelBasicContractTargetConsistency
         ? 'yellow'
         : channelBasicContractGapRemains
+          ? 'yellow'
+          : 'green'
+    });
+    rows.push({
+      moduleId: 'channel_processing_physical_readback_contract',
+      label: 'Channel processing readback contract',
+      domain: 'read_surface_contract',
+      status: channelProcessingContractAvailable ? channelProcessingContractStatus || 'contract_available' : 'contract_missing',
+      entrypoint: 'channel_processing_physical_readback_contract',
+      module: channelProcessingContractActionId || 'no_contract_action',
+      uiSurface: 'Read-surface proof contract',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${channelProcessingContractAvailable}`,
+        `schema:${channelProcessingContractSchemaId}`,
+        `surface:${channelProcessingContractSurfaceId}`,
+        `physical_readback:${channelProcessingContractPhysicalSurfaceId}`,
+        `physical_action:${channelProcessingContractPhysicalActionId}`,
+        `physical_gap_remains:${channelProcessingContractGapRemains}`,
+        `live_authority:${channelProcessingContractLiveAuthority}`,
+        `target_consistency:${channelProcessingContractTargetConsistency}`,
+        `promotion_families:${channelProcessingContractPromotionFamilies.join('|')}`,
+        `eq_band_fields:${channelProcessingContractEqBands.join('|')}`,
+        `compressor_fields:${channelProcessingContractCompressor.join('|')}`,
+        `gate_fields:${channelProcessingContractGate.join('|')}`,
+      ],
+      blockedReason: channelProcessingContractAvailable
+        ? channelProcessingContractGapRemains
+          ? 'Channel EQ/dynamics/gate contract is present, but physical readback fixture evidence is still missing.'
+          : 'Channel EQ/dynamics/gate contract is present; physical gap state must still be reviewed before promotion.'
+        : 'Channel EQ/dynamics/gate physical readback contract is missing from proof summary.',
+      nextStep: channelProcessingContractAvailable
+        ? [
+            channelProcessingContractPhysicalSurfaceId ? `physical_readback:${channelProcessingContractPhysicalSurfaceId}` : '',
+            channelProcessingContractPhysicalActionId ? `physical_action:${channelProcessingContractPhysicalActionId}` : '',
+            channelProcessingContractPromotionFamilies.length ? `families:${channelProcessingContractPromotionFamilies.join(',')}` : '',
+            channelProcessingContractEqBands.length ? `eq_bands:${channelProcessingContractEqBands.join(',')}` : '',
+            channelProcessingContractCompressor.length ? `compressor:${channelProcessingContractCompressor.join(',')}` : '',
+            channelProcessingContractGate.length ? `gate:${channelProcessingContractGate.join(',')}` : '',
+            `physical_gap_remains:${channelProcessingContractGapRemains}`,
+            `live_authority:${channelProcessingContractLiveAuthority}`,
+            `target_consistency:${channelProcessingContractTargetConsistency}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with channel processing readback contract schema validation.',
+      tone: !channelProcessingContractAvailable || channelProcessingContractLiveAuthority || !channelProcessingContractTargetConsistency
+        ? 'yellow'
+        : channelProcessingContractGapRemains
           ? 'yellow'
           : 'green'
     });
