@@ -129,6 +129,20 @@ def test_plan_creates_actions_for_current_partial_and_missing_read_surfaces():
     )
     assert routing_sends["mutates_console_state"] is False
 
+    snapshots_scenes = actions["snapshots_scenes"]
+    assert snapshots_scenes["action_type"] == "complete_read_dto"
+    assert snapshots_scenes["physical_readback_gap"] is True
+    assert snapshots_scenes["next_physical_readback_target"] is False
+    assert "destructive_change_diff_marker" in snapshots_scenes["missing_contracts"]
+    assert "physical_readback_fixture" in snapshots_scenes["missing_contracts"]
+    assert "scoped_diff_fixture_missing" in snapshots_scenes["missing_contracts"]
+    assert "rollback_diff_fixture_missing" in snapshots_scenes["missing_contracts"]
+    assert any(
+        "snapshots_scenes_physical_readback_contract" in artifact
+        for artifact in snapshots_scenes["expected_artifacts"]
+    )
+    assert snapshots_scenes["mutates_console_state"] is False
+
     presets = actions["user_presets"]
     assert presets["action_type"] == "complete_read_dto"
     assert "enumeration_contract" in presets["missing_contracts"]

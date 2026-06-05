@@ -869,11 +869,29 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const routingSendsContractSendCoverage = stringList(routingSendsContract.required_send_coverage_flags);
     const routingSendsContractOutputCoverage = stringList(routingSendsContract.required_output_route_coverage_flags);
     const routingSendsContractFalseSafetyFlags = stringList(routingSendsContract.required_false_safety_flags);
+    const snapshotsScenesContract = asRecord(proofQuality.snapshots_scenes_physical_readback_contract);
+    const snapshotsScenesContractAvailable = Boolean(snapshotsScenesContract.available);
+    const snapshotsScenesContractStatus = str(snapshotsScenesContract.contract_status, str(snapshotsScenesContract.status, 'missing'));
+    const snapshotsScenesContractSchemaId = str(snapshotsScenesContract.schema_id, '');
+    const snapshotsScenesContractSurfaceId = str(snapshotsScenesContract.surface_id, '');
+    const snapshotsScenesContractActionId = str(snapshotsScenesContract.remediation_action_id, '');
+    const snapshotsScenesContractPhysicalSurfaceId = str(snapshotsScenesContract.physical_readback_surface_id, '');
+    const snapshotsScenesContractPhysicalActionId = str(snapshotsScenesContract.physical_readback_action_id, '');
+    const snapshotsScenesContractGapRemains = snapshotsScenesContract.physical_fixture_gap_remains === true;
+    const snapshotsScenesContractLiveAuthority = snapshotsScenesContract.live_authority_granted === true;
+    const snapshotsScenesContractTargetConsistency = snapshotsScenesContract.target_consistency === true;
+    const snapshotsScenesContractSceneLoadAllowed = snapshotsScenesContract.scene_load_allowed === true;
+    const snapshotsScenesContractSceneSaveAllowed = snapshotsScenesContract.scene_save_allowed === true;
+    const snapshotsScenesContractPromotionFamilies = stringList(snapshotsScenesContract.promotion_families_requiring_surface);
+    const snapshotsScenesContractActiveFields = stringList(snapshotsScenesContract.required_active_scene_fields);
+    const snapshotsScenesContractSnapshotFields = stringList(snapshotsScenesContract.required_snapshot_fields);
+    const snapshotsScenesContractCoverage = stringList(snapshotsScenesContract.required_coverage_flags);
+    const snapshotsScenesContractFalseSafetyFlags = stringList(snapshotsScenesContract.required_false_safety_flags);
     const freshnessText = available
       ? `age:${Math.round(ageSec)}s stale_after:${Math.round(staleAfterSec)}s stale:${stale}`
       : '';
     const proofQualityText = proofQualityAvailable
-      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}`
+      ? `read_surface_gaps:${physicalGapSurfaceCount}; fixture_paths:${declaredFixturePathCount}; test_names:${declaredTestNameCount}; summary_recomputed:${summaryRecomputed}; declarations:${fixtureDeclarationValidation}; contract_gap:${contractGapConsistency}; gap_surfaces:${physicalGapSurfaceIds.join(',') || 'none'}; next_readback:${nextPhysicalReadbackSurfaceId || 'none'}; source_next_readback:${sourceNextPhysicalReadbackSurfaceId || 'none'}; next_readback_gate:${nextPhysicalReadbackTargetConsistent}; raw_contract:${rawMixerContractStatus || 'missing'}; raw_contract_gap:${rawMixerContractGapRemains}; raw_contract_live_authority:${rawMixerContractLiveAuthority}; raw_contract_target_gate:${rawMixerContractTargetConsistency}; channel_contract:${channelBasicContractStatus || 'missing'}; channel_contract_gap:${channelBasicContractGapRemains}; channel_contract_live_authority:${channelBasicContractLiveAuthority}; channel_contract_target_gate:${channelBasicContractTargetConsistency}; processing_contract:${channelProcessingContractStatus || 'missing'}; processing_contract_gap:${channelProcessingContractGapRemains}; processing_contract_live_authority:${channelProcessingContractLiveAuthority}; processing_contract_target_gate:${channelProcessingContractTargetConsistency}; bus_contract:${busMainDcaContractStatus || 'missing'}; bus_contract_gap:${busMainDcaContractGapRemains}; bus_contract_live_authority:${busMainDcaContractLiveAuthority}; bus_contract_target_gate:${busMainDcaContractTargetConsistency}; matrix_contract:${matrixStateContractStatus || 'missing'}; matrix_contract_gap:${matrixStateContractGapRemains}; matrix_contract_live_authority:${matrixStateContractLiveAuthority}; matrix_contract_target_gate:${matrixStateContractTargetConsistency}; fx_contract:${fxSlotsInsertsContractStatus || 'missing'}; fx_contract_gap:${fxSlotsInsertsContractGapRemains}; fx_contract_live_authority:${fxSlotsInsertsContractLiveAuthority}; fx_contract_target_gate:${fxSlotsInsertsContractTargetConsistency}; routing_contract:${routingSendsContractStatus || 'missing'}; routing_contract_gap:${routingSendsContractGapRemains}; routing_contract_live_authority:${routingSendsContractLiveAuthority}; routing_contract_target_gate:${routingSendsContractTargetConsistency}; scenes_contract:${snapshotsScenesContractStatus || 'missing'}; scenes_contract_gap:${snapshotsScenesContractGapRemains}; scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}; scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}`
       : 'read_surface_quality:missing';
     const rowStatus = available
       ? invalidCount > 0 ? 'artifact_review_required' : stale ? 'artifact_stale' : 'artifact_available'
@@ -944,6 +962,12 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `routing_contract_gap:${routingSendsContractGapRemains}`,
         `routing_contract_live_authority:${routingSendsContractLiveAuthority}`,
         `routing_contract_target_gate:${routingSendsContractTargetConsistency}`,
+        `scenes_contract_available:${snapshotsScenesContractAvailable}`,
+        `scenes_contract_status:${snapshotsScenesContractStatus}`,
+        `scenes_contract_schema:${snapshotsScenesContractSchemaId}`,
+        `scenes_contract_gap:${snapshotsScenesContractGapRemains}`,
+        `scenes_contract_live_authority:${snapshotsScenesContractLiveAuthority}`,
+        `scenes_contract_target_gate:${snapshotsScenesContractTargetConsistency}`,
       ],
       blockedReason: available
         ? stale
@@ -1296,6 +1320,60 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       tone: !routingSendsContractAvailable || routingSendsContractLiveAuthority || !routingSendsContractTargetConsistency
         ? 'yellow'
         : routingSendsContractGapRemains
+          ? 'yellow'
+          : 'green'
+    });
+    rows.push({
+      moduleId: 'snapshots_scenes_physical_readback_contract',
+      label: 'Snapshots/scenes readback contract',
+      domain: 'read_surface_contract',
+      status: snapshotsScenesContractAvailable ? snapshotsScenesContractStatus || 'contract_available' : 'contract_missing',
+      entrypoint: 'snapshots_scenes_physical_readback_contract',
+      module: snapshotsScenesContractActionId || 'no_contract_action',
+      uiSurface: 'Read-surface proof contract',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `available:${snapshotsScenesContractAvailable}`,
+        `schema:${snapshotsScenesContractSchemaId}`,
+        `surface:${snapshotsScenesContractSurfaceId}`,
+        `physical_readback:${snapshotsScenesContractPhysicalSurfaceId}`,
+        `physical_action:${snapshotsScenesContractPhysicalActionId}`,
+        `physical_gap_remains:${snapshotsScenesContractGapRemains}`,
+        `live_authority:${snapshotsScenesContractLiveAuthority}`,
+        `target_consistency:${snapshotsScenesContractTargetConsistency}`,
+        `scene_load_allowed:${snapshotsScenesContractSceneLoadAllowed}`,
+        `scene_save_allowed:${snapshotsScenesContractSceneSaveAllowed}`,
+        `promotion_families:${snapshotsScenesContractPromotionFamilies.join('|')}`,
+        `active_scene:${snapshotsScenesContractActiveFields.join('|')}`,
+        `snapshots:${snapshotsScenesContractSnapshotFields.join('|')}`,
+        `coverage:${snapshotsScenesContractCoverage.join('|')}`,
+        `false_safety:${snapshotsScenesContractFalseSafetyFlags.join('|')}`,
+      ],
+      blockedReason: snapshotsScenesContractAvailable
+        ? snapshotsScenesContractGapRemains
+          ? 'Snapshots/scenes contract is present, but physical readback fixture evidence is still missing.'
+          : 'Snapshots/scenes contract is present; physical gap state must still be reviewed before promotion.'
+        : 'Snapshots/scenes physical readback contract is missing from proof summary.',
+      nextStep: snapshotsScenesContractAvailable
+        ? [
+            snapshotsScenesContractPhysicalSurfaceId ? `physical_readback:${snapshotsScenesContractPhysicalSurfaceId}` : '',
+            snapshotsScenesContractPhysicalActionId ? `physical_action:${snapshotsScenesContractPhysicalActionId}` : '',
+            snapshotsScenesContractPromotionFamilies.length ? `families:${snapshotsScenesContractPromotionFamilies.join(',')}` : '',
+            snapshotsScenesContractActiveFields.length ? `active_scene:${snapshotsScenesContractActiveFields.join(',')}` : '',
+            snapshotsScenesContractSnapshotFields.length ? `snapshots:${snapshotsScenesContractSnapshotFields.join(',')}` : '',
+            snapshotsScenesContractCoverage.length ? `coverage:${snapshotsScenesContractCoverage.join(',')}` : '',
+            snapshotsScenesContractFalseSafetyFlags.length ? `false_safety:${snapshotsScenesContractFalseSafetyFlags.join(',')}` : '',
+            `scene_load_allowed:${snapshotsScenesContractSceneLoadAllowed}`,
+            `scene_save_allowed:${snapshotsScenesContractSceneSaveAllowed}`,
+            `physical_gap_remains:${snapshotsScenesContractGapRemains}`,
+            `live_authority:${snapshotsScenesContractLiveAuthority}`,
+            `target_consistency:${snapshotsScenesContractTargetConsistency}`,
+          ].filter(Boolean).join(' / ')
+        : 'Run no-WING release checks with snapshots/scenes readback contract schema validation.',
+      tone: !snapshotsScenesContractAvailable || snapshotsScenesContractLiveAuthority || !snapshotsScenesContractTargetConsistency || snapshotsScenesContractSceneLoadAllowed || snapshotsScenesContractSceneSaveAllowed
+        ? 'yellow'
+        : snapshotsScenesContractGapRemains
           ? 'yellow'
           : 'green'
     });

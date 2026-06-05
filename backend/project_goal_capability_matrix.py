@@ -488,6 +488,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "matrix_state_physical_readback_contract",
             "fx_slots_inserts_physical_readback_contract",
             "routing_sends_physical_readback_contract",
+            "snapshots_scenes_physical_readback_contract",
         ),
         support_paths=(
             "backend/read_surface_inventory.py",
@@ -500,6 +501,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/matrix_state_physical_readback_contract.py",
             "backend/fx_slots_inserts_physical_readback_contract.py",
             "backend/routing_sends_physical_readback_contract.py",
+            "backend/snapshots_scenes_physical_readback_contract.py",
             "backend/wing_client.py",
             "backend/dlive_client.py",
         ),

@@ -1933,8 +1933,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     "snapshot_status": "fixture_evidence_incomplete",
                     "surface_count": 10,
                     "surface_with_fixture_count": 10,
-                    "declared_fixture_path_count": 13,
-                    "declared_test_name_count": 34,
+                    "declared_fixture_path_count": 14,
+                    "declared_test_name_count": 37,
                     "physical_gap_surface_count": 10,
                     "summary_recomputed_from_rows": True,
                     "fixture_declaration_validation": True,
@@ -2331,6 +2331,67 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
                     ],
                     "violations": [],
                 },
+                "snapshots_scenes_physical_readback_contract": {
+                    "status": "passed",
+                    "schema_id": "snapshots_scenes_physical_readback.v1",
+                    "contract_status": "contract_ready_physical_fixture_missing",
+                    "surface_id": "snapshots_scenes",
+                    "remediation_action_id": "remediate_snapshots_scenes",
+                    "physical_readback_surface_id": "snapshots_scenes",
+                    "physical_readback_action_id": "remediate_snapshots_scenes",
+                    "fixture_physical_gap_declared": True,
+                    "remediation_physical_gap_declared": True,
+                    "artifact_required": True,
+                    "physical_fixture_gap_remains": True,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                    "scene_load_allowed": False,
+                    "scene_save_allowed": False,
+                    "target_consistency": True,
+                    "promotion_families_requiring_surface": [
+                        "scene_preset",
+                        "routing",
+                        "mix_balance",
+                        "performance_adaptation",
+                    ],
+                    "required_active_scene_fields": [
+                        "active_snapshot_index",
+                        "active_snapshot_name",
+                        "current_show",
+                    ],
+                    "required_snapshot_fields": [
+                        "snapshot_index",
+                        "snapshot_name",
+                        "scene_content_fingerprint",
+                        "rollback_reference",
+                    ],
+                    "required_coverage_flags": [
+                        "catalog_identity",
+                        "active_scene",
+                        "rollback_reference",
+                    ],
+                    "required_false_safety_flags": [
+                        "live_write",
+                        "mutates_console_state",
+                        "scene_load_allowed",
+                        "scene_save_allowed",
+                    ],
+                    "minimum_snapshot_count": 1,
+                    "allowed_sources": ["physical_readback", "wing_physical_readback"],
+                    "accepted_row_statuses": ["verified_from_physical_readback"],
+                    "forbidden_mutation_evidence_fields": [
+                        "manual_write_events",
+                        "scene_recall_events",
+                    ],
+                    "violations": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -2360,8 +2421,8 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     proof_quality = payload["summary"]["read_surface_proof_quality"]
     assert proof_quality["available"] is True
     assert proof_quality["summary_path"] == str(latest_dir / "summary.json")
-    assert proof_quality["declared_fixture_path_count"] == 13
-    assert proof_quality["declared_test_name_count"] == 34
+    assert proof_quality["declared_fixture_path_count"] == 14
+    assert proof_quality["declared_test_name_count"] == 37
     assert proof_quality["physical_gap_surface_count"] == 10
     assert proof_quality["summary_recomputed_from_rows"] is True
     assert proof_quality["fixture_declaration_validation"] is True
@@ -2594,6 +2655,33 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert routing_contract["minimum_output_route_count"] == 1
     assert "physical_readback" in routing_contract["allowed_sources"]
     assert "routing_write_events" in routing_contract[
+        "forbidden_mutation_evidence_fields"
+    ]
+    scenes_contract = proof_quality["snapshots_scenes_physical_readback_contract"]
+    assert scenes_contract["available"] is True
+    assert scenes_contract["status"] == "passed"
+    assert scenes_contract["schema_id"] == "snapshots_scenes_physical_readback.v1"
+    assert scenes_contract["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert scenes_contract["surface_id"] == "snapshots_scenes"
+    assert scenes_contract["remediation_action_id"] == "remediate_snapshots_scenes"
+    assert scenes_contract["artifact_required"] is True
+    assert scenes_contract["physical_fixture_gap_remains"] is True
+    assert scenes_contract["accepted_as_physical_fixture_candidate"] is False
+    assert scenes_contract["live_authority_granted"] is False
+    assert scenes_contract["full_autonomous_ready"] is False
+    assert scenes_contract["scene_load_allowed"] is False
+    assert scenes_contract["scene_save_allowed"] is False
+    assert scenes_contract["fixture_physical_gap_declared"] is True
+    assert scenes_contract["remediation_physical_gap_declared"] is True
+    assert scenes_contract["target_consistency"] is True
+    assert "scene_preset" in scenes_contract["promotion_families_requiring_surface"]
+    assert "active_snapshot_index" in scenes_contract["required_active_scene_fields"]
+    assert "scene_content_fingerprint" in scenes_contract["required_snapshot_fields"]
+    assert "rollback_reference" in scenes_contract["required_coverage_flags"]
+    assert "scene_load_allowed" in scenes_contract["required_false_safety_flags"]
+    assert scenes_contract["minimum_snapshot_count"] == 1
+    assert "physical_readback" in scenes_contract["allowed_sources"]
+    assert "scene_recall_events" in scenes_contract[
         "forbidden_mutation_evidence_fields"
     ]
     overlay = payload["autonomy_evidence_overlay"]

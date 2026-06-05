@@ -39,6 +39,9 @@ try:
     from routing_sends_physical_readback_contract import (
         build_routing_sends_physical_readback_contract,
     )
+    from snapshots_scenes_physical_readback_contract import (
+        build_snapshots_scenes_physical_readback_contract,
+    )
     from safety_coverage_matrix import build_safety_coverage_matrix_snapshot
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
@@ -68,6 +71,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.routing_sends_physical_readback_contract import (
         build_routing_sends_physical_readback_contract,
+    )
+    from backend.snapshots_scenes_physical_readback_contract import (
+        build_snapshots_scenes_physical_readback_contract,
     )
     from backend.safety_coverage_matrix import build_safety_coverage_matrix_snapshot
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
@@ -566,6 +572,31 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "readback_contract_only",
             "no_live_writes",
             "does_not_query_console",
+        ),
+    ),
+    ProcessingMethod(
+        id="snapshots_scenes_physical_readback_contract",
+        label="Snapshots / Scenes Physical Readback Contract",
+        domain="evaluation",
+        status="shadow_only",
+        summary=(
+            "Transport-free schema contract for snapshot catalog, active scene, "
+            "scene diff, and rollback physical readback artifacts."
+        ),
+        module="backend/snapshots_scenes_physical_readback_contract.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="contract_only_snapshots_scenes_physical_readback_artifact_missing",
+        promotion_next=(
+            "capture an operator-run snapshots/scenes physical readback artifact "
+            "before closing scene content, diff, and rollback fixture gaps"
+        ),
+        notes=(
+            "transport_free",
+            "readback_contract_only",
+            "no_live_writes",
+            "does_not_query_console",
+            "does_not_load_or_save_scenes",
         ),
     ),
     ProcessingMethod(
@@ -1515,6 +1546,14 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, read-surface remediation artifact contract",
         "next_step": "Use only to validate separately captured routing/sends readback; do not infer live authority.",
     },
+    "snapshots_scenes_physical_readback_contract": {
+        "entrypoint": (
+            "build_snapshots_scenes_physical_readback_contract / "
+            "validate_snapshots_scenes_physical_readback_artifact"
+        ),
+        "ui_surface": "Processing registry, read-surface remediation artifact contract",
+        "next_step": "Use only to validate separately captured scene/snapshot readback; do not infer live authority.",
+    },
     "auto_fader_v1": {
         "entrypoint": "main_pipeline_preview proposal adapter",
         "ui_surface": "Task Queue preview/proposal rows",
@@ -1748,6 +1787,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "routing_sends_physical_readback_contract": (
             build_routing_sends_physical_readback_contract()
+        ),
+        "snapshots_scenes_physical_readback_contract": (
+            build_snapshots_scenes_physical_readback_contract()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),

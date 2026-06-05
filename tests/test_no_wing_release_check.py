@@ -39,6 +39,7 @@ from tools.no_wing_release_check import (
     validate_raw_mixer_state_physical_readback_contract_snapshot,
     validate_read_surface_remediation_plan_snapshot,
     validate_routing_sends_physical_readback_contract_snapshot,
+    validate_snapshots_scenes_physical_readback_contract_snapshot,
     validate_supervised_proof_report_autonomy_overlay,
     validate_supervised_proof_report_next_wing_plan,
     validate_supervised_proof_report_gain_dry_run,
@@ -1028,6 +1029,35 @@ def test_no_wing_release_check_rejects_routing_sends_contract_drift(monkeypatch)
     ]
 
 
+def test_no_wing_release_check_validates_snapshots_scenes_readback_contract_snapshot():
+    result = validate_snapshots_scenes_physical_readback_contract_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["contract_status"] == "contract_ready_physical_fixture_missing"
+    assert result.detail["schema_id"] == "snapshots_scenes_physical_readback.v1"
+    assert result.detail["surface_id"] == "snapshots_scenes"
+    assert result.detail["remediation_action_id"] == "remediate_snapshots_scenes"
+    assert result.detail["physical_readback_surface_id"] == "snapshots_scenes"
+    assert result.detail["physical_readback_action_id"] == "remediate_snapshots_scenes"
+    assert result.detail["fixture_physical_gap_declared"] is True
+    assert result.detail["remediation_physical_gap_declared"] is True
+    assert result.detail["artifact_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert "physical_readback" in result.detail["allowed_sources"]
+    assert "mixer_state_cache" not in result.detail["allowed_sources"]
+    assert "verified_from_physical_readback" in result.detail["accepted_row_statuses"]
+    assert "scene_recall_events" in result.detail["forbidden_mutation_evidence_fields"]
+    assert "active_snapshot_index" in result.detail["required_active_scene_fields"]
+    assert "scene_content_fingerprint" in result.detail["required_snapshot_fields"]
+    assert "rollback_reference" in result.detail["required_coverage_flags"]
+    assert "scene_load_allowed" in result.detail["required_false_safety_flags"]
+    assert result.detail["minimum_snapshot_count"] == 1
+    assert "scene_preset" in result.detail["promotion_families_requiring_surface"]
+    assert result.detail["violations"] == []
+
+
 def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_frontend=False, quick=True)
 
@@ -1066,6 +1096,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "tests/test_matrix_state_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_fx_slots_inserts_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_routing_sends_physical_readback_contract.py" in fixture_check.command
+    assert "tests/test_snapshots_scenes_physical_readback_contract.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command
@@ -1538,6 +1569,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "matrix_state_physical_readback_contract_schema" in result_names
     assert "fx_slots_inserts_physical_readback_contract_schema" in result_names
     assert "routing_sends_physical_readback_contract_schema" in result_names
+    assert "snapshots_scenes_physical_readback_contract_schema" in result_names
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
@@ -1570,6 +1602,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "routing_sends_physical_readback_contract_schema"
     )
     assert result_names.index("routing_sends_physical_readback_contract_schema") < result_names.index(
+        "snapshots_scenes_physical_readback_contract_schema"
+    )
+    assert result_names.index("snapshots_scenes_physical_readback_contract_schema") < result_names.index(
         "backend_pytest"
     )
     assert result_names.index("supervised_proof_artifact_report") < result_names.index(

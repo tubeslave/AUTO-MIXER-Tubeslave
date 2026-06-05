@@ -203,17 +203,24 @@ FIXTURE_EVIDENCE_BY_SURFACE: Dict[str, Dict[str, Tuple[str, ...]]] = {
         ),
     },
     "snapshots_scenes": {
-        "fixture_paths": ("tests/test_operator_product_state.py",),
+        "fixture_paths": (
+            "tests/test_operator_product_state.py",
+            "tests/test_snapshots_scenes_physical_readback_contract.py",
+        ),
         "test_names": (
             "test_snapshots_scenes_snapshot_publishes_cached_catalog_without_queries",
             "test_snapshots_scenes_snapshot_marks_stale_cache_timestamps_without_queries",
             "test_snapshots_scenes_snapshot_marks_missing_cache_without_queries",
+            "test_snapshots_scenes_contract_describes_future_physical_artifact",
+            "test_snapshots_scenes_contract_validates_minimal_physical_artifact",
+            "test_snapshots_scenes_contract_rejects_live_or_cached_claims",
         ),
         "covered_contracts": (
             "cached_scene_catalog",
             "snapshot_scene_cache_freshness",
             "stale_cache_detection",
             "destructive_scene_marker",
+            "physical_readback_artifact_contract",
             "no_scene_load",
             "no_console_query",
         ),

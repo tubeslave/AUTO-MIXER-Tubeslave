@@ -153,6 +153,14 @@ def test_read_surface_fixture_evidence_snapshot_tracks_cached_dto_fixtures_only(
         in surfaces["snapshots_scenes"]["test_names"]
     )
     assert (
+        "test_snapshots_scenes_contract_validates_minimal_physical_artifact"
+        in surfaces["snapshots_scenes"]["test_names"]
+    )
+    assert (
+        "physical_readback_artifact_contract"
+        in surfaces["snapshots_scenes"]["covered_contracts"]
+    )
+    assert (
         "per_field_stale_cache_fixture_incomplete"
         not in surfaces["snapshots_scenes"]["remaining_gaps"]
     )
@@ -215,6 +223,7 @@ def test_console_read_goal_references_fixture_evidence_without_widening_live_sco
     assert "matrix_state_physical_readback_contract" in row.method_ids
     assert "fx_slots_inserts_physical_readback_contract" in row.method_ids
     assert "routing_sends_physical_readback_contract" in row.method_ids
+    assert "snapshots_scenes_physical_readback_contract" in row.method_ids
     assert "backend/read_surface_fixture_evidence.py" in row.support_paths
     assert "backend/raw_mixer_state_physical_readback_contract.py" in row.support_paths
     assert "backend/channel_basic_controls_physical_readback_contract.py" in row.support_paths
@@ -223,6 +232,7 @@ def test_console_read_goal_references_fixture_evidence_without_widening_live_sco
     assert "backend/matrix_state_physical_readback_contract.py" in row.support_paths
     assert "backend/fx_slots_inserts_physical_readback_contract.py" in row.support_paths
     assert "backend/routing_sends_physical_readback_contract.py" in row.support_paths
+    assert "backend/snapshots_scenes_physical_readback_contract.py" in row.support_paths
     assert row.current_live_write_kinds == ()
     assert "physical fixtures" in row.next_step
 
