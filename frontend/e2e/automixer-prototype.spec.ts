@@ -1047,7 +1047,20 @@ test.describe('Automixer backend Product Layer adapter', () => {
               artifact_count: 1,
               invalid_summary_count: 0,
               overlay_status: 'dry_run_only',
-              overlay_row_count: 2
+              overlay_row_count: 2,
+              read_surface_proof_quality: {
+                available: true,
+                status: 'fixture_evidence_incomplete',
+                surface_count: 10,
+                surface_with_fixture_count: 10,
+                declared_fixture_path_count: 10,
+                declared_test_name_count: 25,
+                physical_gap_surface_count: 10,
+                summary_recomputed_from_rows: true,
+                fixture_declaration_validation: true,
+                contract_gap_consistency_enforced: true,
+                full_autonomous_ready: false
+              }
             }
           },
           autonomy_evidence_overlay: {
@@ -1321,6 +1334,7 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('Supervised proof evidence').first()).toBeVisible();
     await expect(page.getByText('artifact_available').first()).toBeVisible();
     await expect(page.getByText('age:180s stale_after:86400s stale:false').first()).toBeVisible();
+    await expect(page.getByText('read_surface_gaps:10; fixture_paths:10; test_names:25').first()).toBeVisible();
     await expect(page.getByText('Autonomy proof evidence: Fader').first()).toBeVisible();
     await expect(page.getByText('Autonomy proof evidence: Gain').first()).toBeVisible();
     await expect(page.getByText('dry_run_only').first()).toBeVisible();
@@ -1328,6 +1342,14 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await expect(page.getByText('Proof freshness').first()).toBeVisible();
     await expect(page.getByText('Fresh', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Dry Run Only (2)').first()).toBeVisible();
+    await expect(page.getByText('Read-surface proof').first()).toBeVisible();
+    await expect(page.getByText('Metadata available').first()).toBeVisible();
+    await expect(page.getByText('Read-surface gaps').first()).toBeVisible();
+    await expect(page.getByText('10 physical gaps').first()).toBeVisible();
+    await expect(page.getByText('Fixture tests').first()).toBeVisible();
+    await expect(page.getByText('25 declared tests').first()).toBeVisible();
+    await expect(page.getByText('Contract/gap gate').first()).toBeVisible();
+    await expect(page.getByText('Enforced').first()).toBeVisible();
 
     await page.goto('/#/groups');
     await expect(page.getByText('Backend DTO Drums').first()).toBeVisible();

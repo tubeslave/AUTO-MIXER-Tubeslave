@@ -144,15 +144,41 @@ function proofEvidenceInspectorRows(modules: ModuleStatusRecord[]) {
     return [
       { label: 'Proof evidence', value: 'Missing', tone: 'yellow' as const },
       { label: 'Proof freshness', value: 'No artifact', tone: 'yellow' as const },
-      { label: 'Autonomy overlay', value: overlayRows.length ? `${overlayRows.length} rows` : 'Missing', tone: overlayRows.length ? 'yellow' as const : 'muted' as const }
+      { label: 'Autonomy overlay', value: overlayRows.length ? `${overlayRows.length} rows` : 'Missing', tone: overlayRows.length ? 'yellow' as const : 'muted' as const },
+      { label: 'Read-surface proof', value: 'Missing', tone: 'muted' as const }
     ];
   }
   const stale = profileValue(proof, 'stale:') === 'true';
   const overlayStatus = profileValue(proof, 'overlay:') || 'unknown';
+  const readSurfaceQualityAvailable = profileValue(proof, 'read_surface_quality:') === 'true';
+  const readSurfaceGapText = profileValue(proof, 'read_surface_gaps:');
+  const readSurfaceGapCount = Number.parseInt(readSurfaceGapText, 10);
+  const hasReadSurfaceGapCount = Number.isFinite(readSurfaceGapCount);
+  const fixtureTestText = profileValue(proof, 'fixture_tests:');
+  const fixtureTestCount = Number.parseInt(fixtureTestText, 10);
+  const hasFixtureTestCount = Number.isFinite(fixtureTestCount);
+  const contractGapEnforced = profileValue(proof, 'contract_gap:') === 'true';
+  const readSurfaceGapValue = hasReadSurfaceGapCount
+    ? `${readSurfaceGapCount} physical gaps`
+    : 'Unknown';
+  const readSurfaceGapTone = !readSurfaceQualityAvailable
+    ? 'muted' as const
+    : hasReadSurfaceGapCount && readSurfaceGapCount === 0
+      ? 'green' as const
+      : 'yellow' as const;
+  const readSurfaceProofTone = !readSurfaceQualityAvailable
+    ? 'muted' as const
+    : hasReadSurfaceGapCount && readSurfaceGapCount === 0 && contractGapEnforced
+      ? 'green' as const
+      : 'yellow' as const;
   return [
     { label: 'Proof evidence', value: readableStatus(proof.status), tone: proof.tone },
     { label: 'Proof freshness', value: stale ? 'Stale' : 'Fresh', tone: stale ? 'yellow' as const : 'green' as const },
-    { label: 'Autonomy overlay', value: `${readableStatus(overlayStatus)} (${overlayRows.length})`, tone: overlayRows.length ? 'blue' as const : 'yellow' as const }
+    { label: 'Autonomy overlay', value: `${readableStatus(overlayStatus)} (${overlayRows.length})`, tone: overlayRows.length ? 'blue' as const : 'yellow' as const },
+    { label: 'Read-surface proof', value: readSurfaceQualityAvailable ? 'Metadata available' : 'Missing', tone: readSurfaceProofTone },
+    { label: 'Read-surface gaps', value: readSurfaceGapValue, tone: readSurfaceGapTone },
+    { label: 'Fixture tests', value: hasFixtureTestCount ? `${fixtureTestCount} declared tests` : 'Unknown', tone: readSurfaceQualityAvailable ? 'blue' as const : 'muted' as const },
+    { label: 'Contract/gap gate', value: contractGapEnforced ? 'Enforced' : 'Missing', tone: contractGapEnforced ? 'green' as const : 'yellow' as const }
   ];
 }
 
