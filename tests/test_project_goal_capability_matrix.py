@@ -359,6 +359,14 @@ def test_long_term_memory_learning_is_tracked_as_proposal_layer_without_live_wid
         in row.method_ids
     )
     assert (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification"
+        in row.method_ids
+    )
+    assert (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate"
+        in row.method_ids
+    )
+    assert (
         "backend/operator_proposal_apply_sequence_policy_memory_index.py"
         in row.support_paths
     )
@@ -396,6 +404,14 @@ def test_long_term_memory_learning_is_tracked_as_proposal_layer_without_live_wid
     )
     assert (
         "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit.py"
+        in row.support_paths
+    )
+    assert (
+        "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification.py"
+        in row.support_paths
+    )
+    assert (
+        "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate.py"
         in row.support_paths
     )
     assert row.current_live_write_kinds == ()

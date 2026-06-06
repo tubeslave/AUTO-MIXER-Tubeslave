@@ -75,6 +75,15 @@ try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit,
     )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -193,6 +202,15 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -615,6 +633,39 @@ def _operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_r
     return [dict(record) for record in raw_records if isinstance(record, dict)]
 
 
+def _operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification_records(
+    server: Any,
+) -> List[Dict[str, Any]]:
+    raw_records = getattr(
+        server,
+        (
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_"
+            "rollback_verification_records"
+        ),
+        None,
+    )
+    if raw_records is None:
+        raw_records = getattr(
+            server,
+            "sequence_policy_memory_trust_promotion_rollback_verification_records",
+            None,
+        )
+    if raw_records is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_records = config.get(
+                "operator_proposal_apply_sequence_policy_memory_trust_promotion_"
+                "rollback_verification_records"
+            )
+            if raw_records is None:
+                raw_records = config.get(
+                    "sequence_policy_memory_trust_promotion_rollback_verification_records"
+                )
+    if not isinstance(raw_records, (list, tuple)):
+        return []
+    return [dict(record) for record in raw_records if isinstance(record, dict)]
+
+
 def _source_identity_memory_trust_acceptance_records(server: Any) -> List[Dict[str, Any]]:
     raw_records = getattr(server, "source_identity_memory_trust_acceptance_records", None)
     if raw_records is None:
@@ -898,6 +949,29 @@ def build_main_pipeline_preview(
     sequence_policy_memory_trust_promotion_apply_audit_summary = (
         sequence_policy_memory_trust_promotion_apply_audit.get("summary", {})
     )
+    sequence_policy_memory_trust_promotion_rollback_verification = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification(
+            apply_audit=sequence_policy_memory_trust_promotion_apply_audit,
+            verification_records=(
+                _operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification_records(
+                    server
+                )
+            ),
+        )
+    )
+    sequence_policy_memory_trust_promotion_rollback_verification_summary = (
+        sequence_policy_memory_trust_promotion_rollback_verification.get("summary", {})
+    )
+    sequence_policy_memory_trust_promotion_sequence_policy_gate = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate(
+            rollback_verification=(
+                sequence_policy_memory_trust_promotion_rollback_verification
+            ),
+        )
+    )
+    sequence_policy_memory_trust_promotion_sequence_policy_gate_summary = (
+        sequence_policy_memory_trust_promotion_sequence_policy_gate.get("summary", {})
+    )
     source_identity_memory_trust_review = (
         build_source_identity_calibration_memory_trust_review(
             memory_index=source_identity_memory_index,
@@ -1015,6 +1089,17 @@ def build_main_pipeline_preview(
         + safe_gain_proposals
         + agentic_foundation_proposals
         + source_identity_replay_proposals
+    )
+    sequence_policy_memory_trust_promotion_policy_consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer(
+            proposals=proposals,
+            sequence_policy_gate=(
+                sequence_policy_memory_trust_promotion_sequence_policy_gate
+            ),
+        )
+    )
+    sequence_policy_memory_trust_promotion_policy_consumer_summary = (
+        sequence_policy_memory_trust_promotion_policy_consumer.get("summary", {})
     )
     source_identity_proposal_priority_policy = (
         build_source_identity_proposal_priority_policy(
@@ -1204,6 +1289,34 @@ def build_main_pipeline_preview(
                     0,
                 )
                 or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verified_record_count": int(
+                sequence_policy_memory_trust_promotion_rollback_verification_summary.get(
+                    "rollback_verified_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate_record_count": int(
+                sequence_policy_memory_trust_promotion_sequence_policy_gate_summary.get(
+                    "sequence_policy_gate_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer_record_count": int(
+                sequence_policy_memory_trust_promotion_policy_consumer_summary.get(
+                    "consumer_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer_matched_proposal_count": len(
+                sequence_policy_memory_trust_promotion_policy_consumer_summary.get(
+                    "policy_consumer_proposal_ids",
+                    [],
+                )
+                or []
             ),
             "source_identity_calibration_memory_trust_review_candidate_count": int(
                 source_identity_memory_trust_review_summary.get(
@@ -1667,6 +1780,90 @@ def build_main_pipeline_preview(
                 ),
             },
             {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification"
+                ),
+                "status": (
+                    sequence_policy_memory_trust_promotion_rollback_verification.get(
+                        "status"
+                    )
+                ),
+                "output": (
+                    "operator_proposal_apply_sequence_memory_trust_promotion_rollback_verification"
+                ),
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_promotion_rollback_verification_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_promotion_rollback_verification_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate"
+                ),
+                "status": (
+                    sequence_policy_memory_trust_promotion_sequence_policy_gate.get(
+                        "status"
+                    )
+                ),
+                "output": (
+                    "operator_proposal_apply_sequence_memory_trust_promotion_sequence_policy_gate"
+                ),
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_promotion_sequence_policy_gate_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_promotion_sequence_policy_gate_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer"
+                ),
+                "status": (
+                    sequence_policy_memory_trust_promotion_policy_consumer.get(
+                        "status"
+                    )
+                ),
+                "output": (
+                    "operator_proposal_apply_sequence_memory_trust_promotion_policy_consumer"
+                ),
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_promotion_policy_consumer_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_promotion_policy_consumer_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
                 "adapter_id": "source_identity_calibration_memory_trust_review",
                 "method_id": "source_identity_calibration_memory_trust_review",
                 "status": source_identity_memory_trust_review.get("status"),
@@ -2045,6 +2242,15 @@ def build_main_pipeline_preview(
         ),
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit": (
             sequence_policy_memory_trust_promotion_apply_audit
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification": (
+            sequence_policy_memory_trust_promotion_rollback_verification
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate": (
+            sequence_policy_memory_trust_promotion_sequence_policy_gate
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer": (
+            sequence_policy_memory_trust_promotion_policy_consumer
         ),
         "source_identity_calibration_memory_trust_review": (
             source_identity_memory_trust_review

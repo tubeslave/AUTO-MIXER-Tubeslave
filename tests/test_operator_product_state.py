@@ -5692,6 +5692,15 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     apply_audit = payload[
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit"
     ]
+    rollback_verification = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification"
+    ]
+    sequence_policy_gate = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate"
+    ]
+    policy_consumer = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
@@ -5750,6 +5759,24 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
         for item in payload["adapters"]
         if item["adapter_id"]
         == "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit"
+    ][0]
+    rollback_verification_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification"
+    ][0]
+    sequence_policy_gate_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate"
+    ][0]
+    policy_consumer_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer"
     ][0]
 
     assert (
@@ -5830,6 +5857,30 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
         ]
         == 0
     )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verified_record_count"
+        ]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate_record_count"
+        ]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer_record_count"
+        ]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer_matched_proposal_count"
+        ]
+        == 0
+    )
     assert adapter["method_id"] == "operator_proposal_apply_sequence_policy_memory_index"
     assert (
         adapter["output"]
@@ -5906,6 +5957,30 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     assert (
         apply_audit_adapter["output"]
         == "operator_proposal_apply_sequence_memory_trust_promotion_apply_audit"
+    )
+    assert (
+        rollback_verification_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification"
+    )
+    assert (
+        rollback_verification_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_rollback_verification"
+    )
+    assert (
+        sequence_policy_gate_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate"
+    )
+    assert (
+        sequence_policy_gate_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_sequence_policy_gate"
+    )
+    assert (
+        policy_consumer_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer"
+    )
+    assert (
+        policy_consumer_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_policy_consumer"
     )
     assert index["status"] == "append_only_sequence_memory_index_available"
     assert index["summary"]["memory_record_count"] == 1
@@ -6112,6 +6187,67 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     assert apply_audit["summary"]["live_write"] is False
     assert apply_audit["summary"]["rollback_verified"] is False
     assert apply_audit["audit_records"] == []
+    assert (
+        rollback_verification["status"]
+        == "sequence_memory_trust_promotion_rollback_verification_not_ready"
+    )
+    assert rollback_verification["summary"]["apply_audit_record_count"] == 0
+    assert rollback_verification["summary"]["verification_record_count"] == 0
+    assert rollback_verification["summary"]["rollback_verified_record_count"] == 0
+    assert rollback_verification["summary"]["runtime_memory_mutation"] is False
+    assert rollback_verification["summary"]["sequence_policy_trust_store_mutation"] is False
+    assert rollback_verification["summary"]["queue_mutation"] is False
+    assert rollback_verification["summary"]["proposal_state_mutation"] is False
+    assert (
+        rollback_verification["summary"][
+            "sequence_execution_allowed_by_verification"
+        ]
+        is False
+    )
+    assert rollback_verification["summary"]["live_write"] is False
+    assert rollback_verification["summary"]["rollback_verified"] is False
+    assert rollback_verification["verified_records"] == []
+    assert (
+        sequence_policy_gate["status"]
+        == "sequence_memory_trust_promotion_sequence_policy_gate_not_ready"
+    )
+    assert sequence_policy_gate["summary"]["rollback_verified_record_count"] == 0
+    assert sequence_policy_gate["summary"]["sequence_policy_gate_record_count"] == 0
+    assert sequence_policy_gate["summary"]["eligible_record_count"] == 0
+    assert sequence_policy_gate["summary"]["runtime_memory_mutation"] is False
+    assert sequence_policy_gate["summary"]["sequence_policy_trust_store_mutation"] is False
+    assert sequence_policy_gate["summary"]["queue_mutation"] is False
+    assert sequence_policy_gate["summary"]["proposal_state_mutation"] is False
+    assert sequence_policy_gate["summary"]["sequence_execution_allowed_by_gate"] is False
+    assert sequence_policy_gate["summary"]["sequence_policy_change_allowed_by_gate"] is False
+    assert sequence_policy_gate["summary"]["live_write"] is False
+    assert sequence_policy_gate["summary"]["sequence_policy_eligible"] is False
+    assert sequence_policy_gate["policy_records"] == []
+    assert (
+        policy_consumer["status"]
+        == "sequence_memory_trust_promotion_policy_consumer_not_ready"
+    )
+    assert policy_consumer["summary"]["sequence_policy_gate_record_count"] == 0
+    assert policy_consumer["summary"]["consumer_record_count"] == 0
+    assert policy_consumer["summary"]["unmatched_eligible_policy_count"] == 0
+    assert policy_consumer["summary"]["proposal_order_mutation"] is False
+    assert policy_consumer["summary"]["queue_mutation"] is False
+    assert policy_consumer["summary"]["runtime_memory_mutation"] is False
+    assert policy_consumer["summary"]["sequence_policy_trust_store_mutation"] is False
+    assert policy_consumer["summary"]["proposal_state_mutation"] is False
+    assert (
+        policy_consumer["summary"]["sequence_execution_allowed_by_consumer"]
+        is False
+    )
+    assert (
+        policy_consumer["summary"]["sequence_policy_change_allowed_by_consumer"]
+        is False
+    )
+    assert policy_consumer["summary"]["live_widening_allowed"] is False
+    assert policy_consumer["summary"]["live_write"] is False
+    assert policy_consumer["summary"]["can_import_to_queue"] is False
+    assert policy_consumer["summary"]["can_apply_live"] is False
+    assert policy_consumer["consumer_records"] == []
     assert queue["summary"]["pending_count"] == 0
 
 

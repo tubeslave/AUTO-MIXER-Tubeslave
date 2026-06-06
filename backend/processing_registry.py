@@ -136,6 +136,15 @@ try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit,
     )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -306,6 +315,15 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -1001,6 +1019,121 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "no_live_writes",
             "no_queue_mutation",
             "no_model_mutation",
+            "no_proposal_state_mutation",
+            "no_direct_sequence_execution",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification",
+        label=(
+            "Operator Proposal Apply Sequence Policy Memory Trust Promotion "
+            "Rollback Verification"
+        ),
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only operator rollback verification gate for sequence-policy "
+            "memory trust promotion apply-audit records."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_rollback_verification_is_not_sequence_or_live_authority"
+        ),
+        promotion_next=(
+            "use verified rollback records only as evidence for a separate "
+            "sequence-policy gate"
+        ),
+        notes=(
+            "transport_free",
+            "rollback_verification_only",
+            "sequence_memory_trust_promotion_apply_audit_consumer",
+            "operator_review_required",
+            "no_live_writes",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_policy_mutation",
+            "no_proposal_state_mutation",
+            "no_direct_sequence_execution",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate",
+        label=(
+            "Operator Proposal Apply Sequence Policy Memory Trust Promotion "
+            "Sequence Policy Gate"
+        ),
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only sequence-policy eligibility gate for operator-verified "
+            "sequence memory trust promotion rollback records."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_sequence_policy_gate_is_not_policy_or_live_mutation_authority"
+        ),
+        promotion_next=(
+            "route eligible records through a separate sequence-policy consumer "
+            "before any proposal ordering, queue import, or execution behavior changes"
+        ),
+        notes=(
+            "transport_free",
+            "sequence_policy_gate_only",
+            "sequence_memory_trust_promotion_rollback_verification_consumer",
+            "operator_review_required",
+            "no_live_writes",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_policy_mutation",
+            "no_proposal_state_mutation",
+            "no_direct_sequence_execution",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer",
+        label=(
+            "Operator Proposal Apply Sequence Policy Memory Trust Promotion "
+            "Policy Consumer"
+        ),
+        domain="decision_evidence",
+        status="shadow_only",
+        summary=(
+            "Read-only consumer that projects trusted sequence-memory evidence "
+            "onto proposal previews without mutating order, queues, policy "
+            "stores, models, proposal state, or live transport."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_policy_consumer_is_not_ordering_queue_or_live_authority"
+        ),
+        promotion_next=(
+            "route consumer records through a separate ordering or sequence-policy "
+            "consumer before any proposal order, queue import, or execution changes"
+        ),
+        notes=(
+            "transport_free",
+            "policy_evidence_only",
+            "sequence_policy_gate_consumer",
+            "no_proposal_order_mutation",
+            "no_live_writes",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_policy_mutation",
             "no_proposal_state_mutation",
             "no_direct_sequence_execution",
         ),
@@ -2815,6 +2948,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -2927,6 +3063,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -2998,6 +3137,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -3196,6 +3338,21 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit",
         "ui_surface": "Decision Queue, sequence policy memory trust promotion apply audit",
         "next_step": "Use audit records as rollback evidence only; rollback verification is still required before sequence policy consumption.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion rollback verification",
+        "next_step": "Use verified rollback records only as evidence for a separate sequence-policy gate before policy consumption.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion policy gate",
+        "next_step": "Use eligible records only as evidence for a separate sequence-policy consumer before ordering, queue, or execution changes.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion policy consumer",
+        "next_step": "Use consumer records only as read-only decision evidence before any separate ordering, queue, or execution consumer is reviewed.",
     },
     "source_identity_calibration_memory_trust_review": {
         "entrypoint": "build_source_identity_calibration_memory_trust_review",
@@ -3807,6 +3964,15 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit": (
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer()
         ),
         "source_identity_calibration_memory_trust_review": (
             build_source_identity_calibration_memory_trust_review()
