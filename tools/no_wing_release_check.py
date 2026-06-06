@@ -348,6 +348,9 @@ WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL = (
 WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT = (
     "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
 )
+READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PACKET_TOOL = (
+    "tools/build_read_surface_physical_readback_capture_packet.py"
+)
 WING_READONLY_PREFLIGHT_REVIEW_EXIT_CODES = {
     "candidate_ready": 0,
     "artifact_missing": 2,
@@ -650,6 +653,9 @@ def build_checks(
     command_timeout_sec: float | None = DEFAULT_COMMAND_TIMEOUT_SEC,
 ) -> list[CommandCheck]:
     offline_artifact_root = (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "offline_validation"
+    read_surface_capture_packet_output = (
+        read_surface_physical_readback_capture_packet_path_for_run(run_dir)
+    )
     handoff_packet_output = wing_readonly_preflight_handoff_packet_path_for_run(run_dir)
     gain_proof_root = gain_proof_artifact_root_for_run(run_dir)
     proof_report_path = proof_report_path_for_run(run_dir)
@@ -674,6 +680,7 @@ def build_checks(
                 "-m",
                 "pytest",
                 "tests/test_read_surface_fixture_evidence.py",
+                "tests/test_read_surface_physical_readback_capture_packet.py",
                 "tests/test_raw_mixer_state_physical_readback_contract.py",
                 "tests/test_raw_mixer_state_physical_readback_artifact_intake.py",
                 "tests/test_channel_basic_controls_physical_readback_contract.py",
@@ -726,6 +733,17 @@ def build_checks(
                 "tools/offline_operator_validation_harness.py",
                 "--artifact-root",
                 str(offline_artifact_root),
+            ),
+            cwd=str(repo_root),
+        ),
+        CommandCheck(
+            name="read_surface_physical_readback_capture_packet",
+            command=(
+                sys.executable,
+                READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PACKET_TOOL,
+                "--output",
+                str(read_surface_capture_packet_output),
+                "--quiet",
             ),
             cwd=str(repo_root),
         ),
@@ -835,6 +853,10 @@ def build_checks(
 
 def proof_report_path_for_run(run_dir: Path | None) -> Path:
     return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "supervised_proof_artifact_report.json"
+
+
+def read_surface_physical_readback_capture_packet_path_for_run(run_dir: Path | None) -> Path:
+    return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "read_surface_physical_readback_capture_packet.md"
 
 
 def gain_proof_artifact_root_for_run(run_dir: Path | None) -> Path:
