@@ -15673,6 +15673,474 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
         ]
         == "promotion-import:proposal-first"
     )
+
+    promotion_audit_policy_gate_payload = {
+        "type": "operator_proposal_apply_sequence_audit_policy_gate",
+        "status": "ready",
+        "success": True,
+        "reason": None,
+        "generated_at": 123.0,
+        "source_audit_status": "passed",
+        "summary": {
+            "input_audit_row_count": 1,
+            "policy_evidence_ready_count": 1,
+            "blocked_count": 0,
+            "policy_evidence_ready_proposal_ids": ["proposal-first"],
+            "blocked_proposal_ids": [],
+            "policy_gate_only": True,
+            "audit_payload_required": True,
+            "execution_allowed_by_policy_gate": False,
+            "execution_allowed_by_audit": False,
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "policy_mutation": False,
+            "runtime_memory_mutation": False,
+            "model_mutation": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "safety": {
+            "policy_gate_only": True,
+            "audit_payload_required": True,
+            "does_not_call_apply_operator_proposal": True,
+            "does_not_call_manual_console_write": True,
+            "allowed_live_write_kinds": ["fader", "gain"],
+            "execution_allowed_by_policy_gate": False,
+            "execution_allowed_by_audit": False,
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "policy_mutation": False,
+            "runtime_memory_mutation": False,
+            "model_mutation": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "policy_evidence": [
+            {
+                "proposal_id": "proposal-first",
+                "audit_row_index": 0,
+                "status": "policy_evidence_ready",
+                "eligible_for_supervised_sequence_policy": True,
+                "execution_allowed_by_policy_gate": False,
+                "policy_mutation_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+                "value_type": "fader",
+                "channel": 2,
+                "effective_value": -8.5,
+                "idempotency_key": "promotion-import:proposal-first",
+                "readback_status": "verified_from_cache",
+                "proof_status": "verified",
+                "rollback_available": True,
+                "live_apply_entrypoint": "apply_operator_proposal",
+            }
+        ],
+        "blocked_results": [],
+    }
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_audit_policy_gate_result"
+    ](
+        object(),
+        {
+            "promotion_execution_audit_result_consumer": (
+                execution_audit_result_consumer_payload
+            ),
+            "promotion_audit_policy_gate_result": (
+                promotion_audit_policy_gate_payload
+            ),
+        },
+    )
+
+    audit_policy_gate_result_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert audit_policy_gate_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_audit_policy_gate_result_consumer"
+    )
+    assert audit_policy_gate_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_audit_policy_gate_result"
+    )
+    assert audit_policy_gate_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_draft_request_available"
+    )
+    assert (
+        audit_policy_gate_result_consumer_payload["summary"][
+            "promotion_memory_draft_request_available"
+        ]
+        is True
+    )
+    assert (
+        audit_policy_gate_result_consumer_payload["summary"][
+            "memory_draft_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        audit_policy_gate_result_consumer_payload["summary"]["memory_draft_created"]
+        is False
+    )
+    assert (
+        audit_policy_gate_result_consumer_payload["summary"]["memory_file_mutation"]
+        is False
+    )
+    assert audit_policy_gate_result_consumer_payload["summary"]["live_write"] is False
+
+    memory_draft_request = audit_policy_gate_result_consumer_payload[
+        "promotion_memory_draft_request"
+    ]
+    assert memory_draft_request["handler"] == (
+        "draft_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert memory_draft_request["read_only_template"] is True
+    assert memory_draft_request["promotion_memory_draft_request_template_only"] is True
+    assert memory_draft_request["memory_draft_created"] is False
+    assert memory_draft_request["memory_file_mutation"] is False
+    assert memory_draft_request["live_authority_granted"] is False
+    assert (
+        memory_draft_request["policy_gate_payload"]["policy_evidence"][0][
+            "idempotency_key"
+        ]
+        == "promotion-import:proposal-first"
+    )
+
+    promotion_memory_draft_payload = {
+        "type": "operator_proposal_apply_sequence_policy_memory_draft",
+        "status": "ready",
+        "success": True,
+        "reason": None,
+        "generated_at": 123.0,
+        "source_policy_gate_status": "ready",
+        "summary": {
+            "input_policy_evidence_count": 1,
+            "memory_draft_count": 1,
+            "blocked_count": 0,
+            "memory_draft_proposal_ids": ["proposal-first"],
+            "blocked_proposal_ids": [],
+            "memory_draft_only": True,
+            "policy_gate_payload_required": True,
+            "append_only_memory_write_allowed_by_draft": False,
+            "requires_separate_memory_writer": True,
+            "execution_allowed_by_draft": False,
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "policy_mutation": False,
+            "memory_mutation": False,
+            "runtime_memory_mutation": False,
+            "model_mutation": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "safety": {
+            "memory_draft_only": True,
+            "policy_gate_payload_required": True,
+            "does_not_call_apply_operator_proposal": True,
+            "does_not_call_manual_console_write": True,
+            "allowed_live_write_kinds": ["fader", "gain"],
+            "append_only_memory_write_allowed_by_draft": False,
+            "requires_separate_memory_writer": True,
+            "execution_allowed_by_draft": False,
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "policy_mutation": False,
+            "memory_mutation": False,
+            "runtime_memory_mutation": False,
+            "model_mutation": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "memory_draft_records": [
+            {
+                "draft_id": (
+                    "operator-sequence-policy-memory:"
+                    "proposal-first:promotion-import:proposal-first"
+                ),
+                "proposal_id": "proposal-first",
+                "policy_evidence_index": 0,
+                "status": "memory_draft_ready",
+                "learning_scope": "supervised_fader_gain_sequence_execution",
+                "target_memory_path": ".ai/memory/project.md",
+                "target_section": "Project Memory Lessons",
+                "append_only": True,
+                "memory_write_allowed_by_draft": False,
+                "append_only_memory_write_allowed_by_draft": False,
+                "requires_separate_memory_writer": True,
+                "operator_ack_required_for_write": True,
+                "memory_mutation": False,
+                "runtime_memory_mutation": False,
+                "policy_mutation": False,
+                "model_mutation": False,
+                "queue_mutation": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+                "evidence": {
+                    "value_type": "fader",
+                    "channel": 2,
+                    "effective_value": -8.5,
+                    "idempotency_key": "promotion-import:proposal-first",
+                    "readback_status": "verified_from_cache",
+                    "proof_status": "verified",
+                    "rollback_available": True,
+                    "live_apply_entrypoint": "apply_operator_proposal",
+                },
+                "draft_text": (
+                    "Supervised fader/gain sequence execution was verified "
+                    "from `proposal-first` with `fader` evidence, idempotency "
+                    "`promotion-import:proposal-first`, readback "
+                    "`verified_from_cache`, and rollback available. Future "
+                    "policy or autonomous use still requires separate audited "
+                    "gates and safety limits."
+                ),
+            }
+        ],
+        "blocked_results": [],
+    }
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_draft_result"
+    ](
+        object(),
+        {
+            "promotion_audit_policy_gate_result_consumer": (
+                audit_policy_gate_result_consumer_payload
+            ),
+            "promotion_memory_draft_result": promotion_memory_draft_payload,
+        },
+    )
+
+    memory_draft_result_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert memory_draft_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_draft_result_consumer"
+    )
+    assert memory_draft_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_draft_result"
+    )
+    assert memory_draft_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_writer_request_available"
+    )
+    assert (
+        memory_draft_result_consumer_payload["summary"][
+            "promotion_memory_writer_request_available"
+        ]
+        is True
+    )
+    assert (
+        memory_draft_result_consumer_payload["summary"][
+            "memory_writer_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        memory_draft_result_consumer_payload["summary"][
+            "memory_file_write_applied"
+        ]
+        is False
+    )
+    assert (
+        memory_draft_result_consumer_payload["summary"]["memory_file_mutation"]
+        is False
+    )
+    assert memory_draft_result_consumer_payload["summary"]["live_write"] is False
+
+    memory_writer_request = memory_draft_result_consumer_payload[
+        "promotion_memory_writer_request"
+    ]
+    assert memory_writer_request["handler"] == (
+        "write_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert memory_writer_request["apply"] is False
+    assert memory_writer_request["operator_ack"] is False
+    assert memory_writer_request["promotion_memory_writer_request_template_only"] is True
+    assert memory_writer_request["memory_file_write_applied"] is False
+    assert memory_writer_request["memory_file_mutation"] is False
+    assert memory_writer_request["live_authority_granted"] is False
+    assert (
+        memory_writer_request["memory_draft_payload"]["memory_draft_records"][0][
+            "evidence"
+        ]["idempotency_key"]
+        == "promotion-import:proposal-first"
+    )
+
+    promotion_memory_writer_dry_run_payload = {
+        "type": "operator_proposal_apply_sequence_policy_memory_writer",
+        "status": "append_only_memory_write_dry_run_ready",
+        "success": False,
+        "reason": "sequence_policy_memory_write_not_applied",
+        "generated_at": 123.0,
+        "source_memory_draft_status": "ready",
+        "summary": {
+            "memory_draft_record_count": 1,
+            "invalid_record_count": 1,
+            "write_result_count": 0,
+            "append_only_memory_write_applied": False,
+            "operator_ack_required": True,
+            "operator_ack": False,
+            "apply_requested": False,
+            "target_memory_path": ".ai/memory/project.md",
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "policy_mutation": False,
+            "memory_file_mutation": False,
+            "runtime_memory_mutation": False,
+            "model_mutation": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "blocked_by": [
+                "operator_ack_and_apply_required_before_append_only_memory_write"
+            ],
+        },
+        "safety": {
+            "operator_required": True,
+            "operator_ack_required": True,
+            "apply_requested": False,
+            "operator_ack": False,
+            "append_only_memory_file_write_applied": False,
+            "target_memory_path": ".ai/memory/project.md",
+            "does_not_call_apply_operator_proposal": True,
+            "does_not_call_manual_console_write": True,
+            "allowed_live_write_kinds": ["fader", "gain"],
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "policy_mutation": False,
+            "memory_file_mutation": False,
+            "runtime_memory_mutation": False,
+            "model_mutation": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "write_results": [],
+        "blocked_results": [
+            {
+                "draft_id": None,
+                "memory_draft_index": None,
+                "status": "blocked",
+                "reason": (
+                    "operator_ack_and_apply_required_before_append_only_memory_write"
+                ),
+            }
+        ],
+    }
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_writer_dry_run_result"
+    ](
+        object(),
+        {
+            "promotion_memory_draft_result_consumer": (
+                memory_draft_result_consumer_payload
+            ),
+            "promotion_memory_writer_dry_run_result": (
+                promotion_memory_writer_dry_run_payload
+            ),
+        },
+    )
+
+    memory_writer_dry_run_result_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert memory_writer_dry_run_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_writer_dry_run_result_consumer"
+    )
+    assert memory_writer_dry_run_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_writer_dry_run_result"
+    )
+    assert memory_writer_dry_run_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_writer_apply_request_available"
+    )
+    assert (
+        memory_writer_dry_run_result_consumer_payload["summary"][
+            "promotion_memory_writer_apply_request_available"
+        ]
+        is True
+    )
+    assert (
+        memory_writer_dry_run_result_consumer_payload["summary"][
+            "memory_writer_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        memory_writer_dry_run_result_consumer_payload["summary"][
+            "memory_file_write_applied"
+        ]
+        is False
+    )
+    assert (
+        memory_writer_dry_run_result_consumer_payload["summary"][
+            "memory_file_mutation"
+        ]
+        is False
+    )
+    assert (
+        memory_writer_dry_run_result_consumer_payload["summary"]["live_write"]
+        is False
+    )
+
+    writer_apply_request = memory_writer_dry_run_result_consumer_payload[
+        "promotion_memory_writer_apply_request"
+    ]
+    assert writer_apply_request["handler"] == (
+        "write_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert writer_apply_request["apply"] is False
+    assert writer_apply_request["operator_ack"] is False
+    assert (
+        writer_apply_request["promotion_memory_writer_apply_request_template_only"]
+        is True
+    )
+    assert writer_apply_request["memory_file_write_applied"] is False
+    assert writer_apply_request["memory_file_mutation"] is False
+    assert writer_apply_request["live_authority_granted"] is False
+    assert (
+        writer_apply_request["memory_draft_payload"]["memory_draft_records"][0][
+            "evidence"
+        ]["idempotency_key"]
+        == "promotion-import:proposal-first"
+    )
     assert "promotion-import:proposal-first" not in (
         server._operator_apply_idempotency_keys
     )

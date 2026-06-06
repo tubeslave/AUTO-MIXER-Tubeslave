@@ -261,6 +261,9 @@ TODO_SCAN_EXCLUSION_PHRASES = (
     "scan noise",
     "исключ",
 )
+TODO_SCAN_COMMAND_PHRASES = (
+    "rg --hidden --glob",
+)
 
 PLAN_SECTION_HEADINGS = (
     "## Short Plan",
@@ -803,6 +806,12 @@ def _validate_todo_scan_boundary_evidence(text: str) -> list[str]:
         errors.append(
             "What Was Found TODO/FIXME scan must mention excluded "
             "vendored/generated/reference noise"
+        )
+
+    if not any(phrase in normalized_section for phrase in TODO_SCAN_COMMAND_PHRASES):
+        errors.append(
+            "What Was Found TODO/FIXME scan must mention rg --hidden --glob "
+            "command pattern"
         )
 
     return errors

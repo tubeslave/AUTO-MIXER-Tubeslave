@@ -62,8 +62,8 @@ files preserved.
 Latest repo-local `.paperclip/reports/` and `Docs/reports/` entries were
 inspected.
 Latest test artifacts under `artifacts/` and `sessions/` were inspected.
-TODO/FIXME scan, excluding vendored/generated/reference noise, found only
-bounded owned-code items.
+TODO/FIXME scan used `rg --hidden --glob ...`, excluding
+vendored/generated/reference noise, and found only bounded owned-code items.
 Local project tasks in `.ai/project-layer/current_tasks.md` were inspected.
 Project canon from `README.md`, `AGENTS.md`, `CLAUDE.md`,
 `.ai/memory/project.md`, and `Docs/PROJECT_IMPLEMENTATION_PLAN.md` confirms
@@ -1596,8 +1596,8 @@ def test_cycle_report_validator_rejects_missing_discovery_evidence(tmp_path):
         tmp_path,
         "automixer_codex_cycle_20260530T000000Z.md",
         VALID_REPORT.replace(
-            "TODO/FIXME scan, excluding vendored/generated/reference noise, found only\n"
-            "bounded owned-code items.\n",
+            "TODO/FIXME scan used `rg --hidden --glob ...`, excluding\n"
+            "vendored/generated/reference noise, and found only bounded owned-code items.\n",
             "",
         ),
     )
@@ -1691,8 +1691,8 @@ def test_cycle_report_validator_rejects_todo_scan_without_boundary_evidence(tmp_
         tmp_path,
         "automixer_codex_cycle_20260530T000000Z.md",
         VALID_REPORT.replace(
-            "TODO/FIXME scan, excluding vendored/generated/reference noise, found only\n"
-            "bounded owned-code items.\n",
+            "TODO/FIXME scan used `rg --hidden --glob ...`, excluding\n"
+            "vendored/generated/reference noise, and found only bounded owned-code items.\n",
             "TODO/FIXME scan found local items.\n",
         ),
     )
@@ -1703,6 +1703,35 @@ def test_cycle_report_validator_rejects_todo_scan_without_boundary_evidence(tmp_
     assert (
         "What Was Found TODO/FIXME scan must mention excluded "
         "vendored/generated/reference noise"
+        in errors
+    )
+    assert (
+        "What Was Found TODO/FIXME scan must mention rg --hidden --glob "
+        "command pattern"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_todo_scan_without_rg_hidden_glob_pattern(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "TODO/FIXME scan used `rg --hidden --glob ...`, excluding\n"
+            "vendored/generated/reference noise, and found only bounded owned-code items.\n",
+            "TODO/FIXME scan, excluding vendored/generated/reference noise, "
+            "found only bounded owned-code items.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "What Was Found TODO/FIXME scan must mention rg --hidden --glob "
+        "command pattern"
         in errors
     )
 
@@ -2198,8 +2227,8 @@ files preserved.
 Latest repo-local `.paperclip/reports/` and `Docs/reports/` entries were
 inspected.
 Latest test artifacts under `artifacts/` and `sessions/` were inspected.
-TODO/FIXME scan, excluding vendored/generated/reference noise, found only
-bounded owned-code items.
+TODO/FIXME scan used `rg --hidden --glob ...`, excluding
+vendored/generated/reference noise, and found only bounded owned-code items.
 Local project tasks in `.ai/project-layer/current_tasks.md` were inspected.
 Project canon from `README.md`, `AGENTS.md`, `CLAUDE.md`,
 `.ai/memory/project.md`, and `Docs/PROJECT_IMPLEMENTATION_PLAN.md` confirms
@@ -2222,8 +2251,8 @@ files preserved.
 Latest repo-local `.paperclip/reports/` and `Docs/reports/` entries were
 inspected.
 Latest test artifacts under `artifacts/` and `sessions/` were inspected.
-TODO/FIXME scan, excluding vendored/generated/reference noise, found only
-bounded owned-code items.
+TODO/FIXME scan used `rg --hidden --glob ...`, excluding
+vendored/generated/reference noise, and found only bounded owned-code items.
 Local project tasks in `.ai/project-layer/current_tasks.md` were inspected.
 Project canon from `README.md`, `AGENTS.md`, `CLAUDE.md`,
 `.ai/memory/project.md`, and `Docs/PROJECT_IMPLEMENTATION_PLAN.md` confirms
