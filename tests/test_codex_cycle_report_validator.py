@@ -23,7 +23,10 @@ def write_report(project_root: Path, name: str, body: str) -> Path:
     reports_dir = project_root / ".paperclip" / "reports"
     reports_dir.mkdir(parents=True)
     report_path = reports_dir / name
-    report_path.write_text(body, encoding="utf-8")
+    report_path.write_text(
+        body.replace("{PROJECT_ROOT}", str(project_root)),
+        encoding="utf-8",
+    )
     return report_path
 
 
@@ -36,6 +39,8 @@ External Paperclip/PiperClip was not used as an agent runner.
 No neighboring repositories or external local projects were analyzed, modified,
 or used.
 Repo-local `.paperclip/reports/` was used only as an Automixer report directory.
+Repo-local report path:
+`{PROJECT_ROOT}/.paperclip/reports`.
 
 Live safety status: no live OSC/WING writes were executed.
 No real console was contacted.
@@ -234,12 +239,16 @@ def test_cycle_report_validator_rejects_missing_scope_section(tmp_path):
             "External Paperclip/PiperClip was not used as an agent runner.\n"
             "No neighboring repositories or external local projects were analyzed, modified,\n"
             "or used.\n"
-            "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.\n\n",
+            "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.\n"
+            "Repo-local report path:\n"
+            "`{PROJECT_ROOT}/.paperclip/reports`.\n\n",
             "Codex CLI was the only agent workflow used.\n"
             "External Paperclip/PiperClip was not used as an agent runner.\n"
             "No neighboring repositories or external local projects were analyzed, modified,\n"
             "or used.\n"
-            "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.\n\n",
+            "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.\n"
+            "Repo-local report path:\n"
+            "`{PROJECT_ROOT}/.paperclip/reports`.\n\n",
         ),
     )
 
@@ -266,6 +275,30 @@ def test_cycle_report_validator_rejects_missing_project_boundary_evidence(tmp_pa
         "missing required report phrase: No neighboring repositories or external "
         "local projects were analyzed, modified, or used."
         in errors
+    )
+
+
+def test_cycle_report_validator_rejects_missing_repo_local_report_path_evidence(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "Repo-local report path:\n"
+            "`{PROJECT_ROOT}/.paperclip/reports`.\n",
+            "",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert "missing required report phrase: Repo-local report path:" in errors
+    assert "missing required Scope evidence: Repo-local report path:" in errors
+    assert any(
+        "Scope must include repo-local report path under Automixer project:" in error
+        for error in errors
     )
 
 
@@ -317,6 +350,38 @@ def test_cycle_report_validator_rejects_non_exact_codex_cli_agent_workflow_line(
     )
 
 
+def test_cycle_report_validator_rejects_codex_cli_agent_workflow_outside_scope(
+    tmp_path,
+):
+    validator = load_validator_module()
+    moved_workflow_report = VALID_REPORT.replace(
+        "Codex CLI was the only agent workflow used.\n",
+        "",
+    ).replace(
+        "A safe local report validator was checked.",
+        "Codex CLI was the only agent workflow used.\n"
+        "A safe local report validator was checked.",
+    )
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        moved_workflow_report,
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "missing required Scope evidence: Codex CLI was the only agent "
+        "workflow used."
+        in errors
+    )
+    assert (
+        "Scope must contain exact agent workflow line: "
+        "Codex CLI was the only agent workflow used."
+        in errors
+    )
+
+
 def test_cycle_report_validator_rejects_non_exact_external_agent_runner_line(
     tmp_path,
 ):
@@ -341,6 +406,38 @@ def test_cycle_report_validator_rejects_non_exact_external_agent_runner_line(
         "missing required Scope evidence: External Paperclip/PiperClip was not "
         "used as an agent runner."
         not in errors
+    )
+
+
+def test_cycle_report_validator_rejects_external_agent_boundary_outside_scope(
+    tmp_path,
+):
+    validator = load_validator_module()
+    moved_boundary_report = VALID_REPORT.replace(
+        "External Paperclip/PiperClip was not used as an agent runner.\n",
+        "",
+    ).replace(
+        "A safe local report validator was checked.",
+        "External Paperclip/PiperClip was not used as an agent runner.\n"
+        "A safe local report validator was checked.",
+    )
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        moved_boundary_report,
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "missing required Scope evidence: External Paperclip/PiperClip was not "
+        "used as an agent runner."
+        in errors
+    )
+    assert (
+        "Scope must contain exact external agent boundary line: "
+        "External Paperclip/PiperClip was not used as an agent runner."
+        in errors
     )
 
 
@@ -2246,7 +2343,33 @@ def test_cycle_report_validator_rejects_top_level_section_between_questions_and_
 
     assert (
         "## Три обязательных вопроса must directly precede "
-        "## Объяснение простым языком without another top-level section "
+        "## Объяснение простым языком without another markdown heading "
+        "between them"
+        in errors
+    )
+
+
+def test_cycle_report_validator_rejects_subsection_between_questions_and_plain_explanation(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "## Объяснение простым языком",
+            "### Extra Evidence\n\nNested notes should not sit between the "
+            "mandatory questions and the plain-language explanation.\n\n"
+            "## Объяснение простым языком",
+            1,
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "## Три обязательных вопроса must directly precede "
+        "## Объяснение простым языком without another markdown heading "
         "between them"
         in errors
     )

@@ -1,0 +1,1343 @@
+{
+  "autonomy_evidence_overlay": {
+    "generated_at": "2026-06-05T23:03:26Z",
+    "rows": [
+      {
+        "autonomous_ready": false,
+        "blocked_artifact_count": 0,
+        "blocked_proof_ids": [],
+        "blockers": [
+          "physical_candidate_missing",
+          "emergency_stop_proof_partial",
+          "mode_full_autonomous_blocked",
+          "not_autonomous_ready",
+          "read_surface_channel_identity_and_basic_controls_partial",
+          "real_wing_proof_partial",
+          "proof_artifact_missing"
+        ],
+        "dry_run_ready_count": 0,
+        "dry_run_ready_proof_ids": [],
+        "id": "fader_autonomy_evidence_overlay",
+        "next_required_actions": [
+          "Run repeated controlled fader proofs across representative channels with connection-loss and emergency-stop reset evidence.",
+          "Keep fader automation supervised-only until repeated proof closes partial hardware evidence.",
+          "Repeat controlled WING proof across representative channels with connection-loss and emergency-stop reset evidence.",
+          "Keep as the only live executor; do not add EQ/dynamics/routing/FX here without separate proof.",
+          "Continue feeding proposal evidence and rollback values into the queue.",
+          "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."
+        ],
+        "physical_candidate_count": 0,
+        "physical_candidate_proof_ids": [],
+        "proof_artifact_count": 0,
+        "remediation_action_count": 0,
+        "remediation_action_ids": [],
+        "safety_review_candidate": false,
+        "status": "no_current_evidence",
+        "supervised_live_allowed_static": true,
+        "target_id": "fader_supervised_promotion",
+        "value_type": "fader"
+      },
+      {
+        "autonomous_ready": false,
+        "blocked_artifact_count": 0,
+        "blocked_proof_ids": [],
+        "blockers": [
+          "physical_candidate_missing",
+          "apply_readback_missing",
+          "capability_declares_live_kind_without_safety_proof",
+          "emergency_stop_proof_missing",
+          "fake_mixer_proof_partial",
+          "mode_full_autonomous_blocked",
+          "not_autonomous_ready",
+          "pre_read_partial",
+          "read_surface_channel_identity_and_basic_controls_partial",
+          "real_wing_proof_missing",
+          "rollback_readback_missing",
+          "safety_live_not_allowed"
+        ],
+        "dry_run_ready_count": 1,
+        "dry_run_ready_proof_ids": [
+          "20260605T230323Z_gain_proof_dry_run_ch1"
+        ],
+        "id": "gain_autonomy_evidence_overlay",
+        "next_required_actions": [
+          "Run one small supervised gain-down proof with physical pre-read, apply readback, rollback readback, and emergency-stop block evidence.",
+          "Keep gain-up blocked unless the operator authored the reason and headroom/bleed safety is proven.",
+          "One small supervised gain-down proof with physical pre-read, apply readback, rollback readback, and blocked unsafe follow-up.",
+          "Keep as the only live executor; do not add EQ/dynamics/routing/FX here without separate proof.",
+          "Continue feeding proposal evidence and rollback values into the queue.",
+          "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."
+        ],
+        "physical_candidate_count": 0,
+        "physical_candidate_proof_ids": [],
+        "proof_artifact_count": 1,
+        "remediation_action_count": 0,
+        "remediation_action_ids": [],
+        "safety_review_candidate": false,
+        "status": "dry_run_only",
+        "supervised_live_allowed_static": false,
+        "target_id": "gain_trim_supervised_promotion",
+        "value_type": "gain"
+      }
+    ],
+    "safety": {
+      "automatic_safety_update_allowed": false,
+      "full_autonomous_ready": false,
+      "live_widening_allowed": false,
+      "live_write": false,
+      "operator_required": true,
+      "read_only": true
+    },
+    "status": "dry_run_only",
+    "summary": {
+      "autonomous_ready_target_ids": [],
+      "dry_run_only_target_ids": [
+        "gain_trim_supervised_promotion"
+      ],
+      "global_blockers": [
+        "overlay_does_not_modify_safety_rows",
+        "manual_safety_review_required_before_promotion",
+        "full_autonomous_mode_remains_blocked"
+      ],
+      "manual_safety_review_candidate_target_ids": [],
+      "no_current_evidence_target_ids": [
+        "fader_supervised_promotion"
+      ],
+      "remediation_required_target_ids": [],
+      "status_counts": {
+        "dry_run_only": 1,
+        "manual_safety_review_candidate": 0,
+        "no_current_evidence": 1,
+        "remediation_required": 0
+      },
+      "target_count": 2
+    },
+    "type": "autonomy_evidence_overlay"
+  },
+  "autonomy_mode_transition_gate": {
+    "generated_at": "2026-06-05T23:03:26Z",
+    "rows": [
+      {
+        "autonomous_apply_allowed": false,
+        "blockers": [
+          "mode_has_no_live_apply_authority",
+          "full_autonomous_mode_remains_blocked"
+        ],
+        "current_live_write_kinds": [],
+        "evidence_statuses": [],
+        "live_apply_allowed": false,
+        "mode": "analyze",
+        "mode_expansion_allowed": false,
+        "next_required_actions": [],
+        "project_mode_name": "Analysis Mode",
+        "promotion_target_ids": [],
+        "proposal_creation_allowed": false,
+        "readiness_gap_bucket_counts": {
+          "autonomy_mode": 22,
+          "capability": 2,
+          "evidence_requirement": 24,
+          "proof": 78,
+          "read_surface": 14,
+          "safety": 16,
+          "write_surface": 19
+        },
+        "readiness_gap_target_ids_by_bucket": {
+          "autonomy_mode": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "capability": [
+            "gain_trim_supervised_promotion",
+            "bus_group_matrix_supervised_promotion"
+          ],
+          "evidence_requirement": [
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "proof": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "read_surface": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "safety": [
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "write_surface": [
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ]
+        },
+        "runtime_entry_allowed": true,
+        "status": "available"
+      },
+      {
+        "autonomous_apply_allowed": false,
+        "blockers": [
+          "mode_has_no_live_apply_authority",
+          "full_autonomous_mode_remains_blocked"
+        ],
+        "current_live_write_kinds": [],
+        "evidence_statuses": [],
+        "live_apply_allowed": false,
+        "mode": "assist",
+        "mode_expansion_allowed": false,
+        "next_required_actions": [],
+        "project_mode_name": "Assisted Mixing Mode",
+        "promotion_target_ids": [],
+        "proposal_creation_allowed": true,
+        "readiness_gap_bucket_counts": {
+          "autonomy_mode": 22,
+          "capability": 2,
+          "evidence_requirement": 24,
+          "proof": 78,
+          "read_surface": 14,
+          "safety": 16,
+          "write_surface": 19
+        },
+        "readiness_gap_target_ids_by_bucket": {
+          "autonomy_mode": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "capability": [
+            "gain_trim_supervised_promotion",
+            "bus_group_matrix_supervised_promotion"
+          ],
+          "evidence_requirement": [
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "proof": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "read_surface": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "safety": [
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "write_surface": [
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ]
+        },
+        "runtime_entry_allowed": true,
+        "status": "available"
+      },
+      {
+        "autonomous_apply_allowed": false,
+        "blockers": [
+          "physical_proof_required_before_promotion",
+          "current_proof_evidence_missing",
+          "supervised_mode_is_narrow_fader_gain_only",
+          "full_autonomous_mode_remains_blocked",
+          "wing_deployment_requires_manual_safety_review"
+        ],
+        "current_live_write_kinds": [
+          "fader",
+          "gain"
+        ],
+        "evidence_statuses": [
+          "no_current_evidence"
+        ],
+        "live_apply_allowed": true,
+        "mode": "supervised",
+        "mode_expansion_allowed": false,
+        "next_required_actions": [
+          "Repeat controlled WING proof across representative channels with connection-loss and emergency-stop reset evidence.",
+          "Keep as the only live executor; do not add EQ/dynamics/routing/FX here without separate proof.",
+          "Continue feeding proposal evidence and rollback values into the queue.",
+          "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals.",
+          "Run repeated controlled fader proofs across representative channels with connection-loss and emergency-stop reset evidence.",
+          "Keep fader automation supervised-only until repeated proof closes partial hardware evidence."
+        ],
+        "project_mode_name": "Supervised AutoMix Mode",
+        "promotion_target_ids": [
+          "fader_supervised_promotion"
+        ],
+        "proposal_creation_allowed": true,
+        "readiness_gap_bucket_counts": {
+          "autonomy_mode": 22,
+          "capability": 2,
+          "evidence_requirement": 24,
+          "proof": 78,
+          "read_surface": 14,
+          "safety": 16,
+          "write_surface": 19
+        },
+        "readiness_gap_target_ids_by_bucket": {
+          "autonomy_mode": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "capability": [
+            "gain_trim_supervised_promotion",
+            "bus_group_matrix_supervised_promotion"
+          ],
+          "evidence_requirement": [
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "proof": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "read_surface": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "safety": [
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "write_surface": [
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ]
+        },
+        "runtime_entry_allowed": true,
+        "status": "limited_available"
+      },
+      {
+        "autonomous_apply_allowed": false,
+        "blockers": [
+          "auto_mode_not_approved_for_wing_deployment",
+          "mode_full_autonomous_blocked",
+          "only_supervised_fader_gain_executor_is_registered",
+          "read_coverage_is_partial_or_missing",
+          "real_wing_and_emergency_stop_proof_incomplete",
+          "physical_proof_required_before_promotion",
+          "current_proof_evidence_missing",
+          "readiness_gap_capability",
+          "readiness_gap_safety",
+          "readiness_gap_proof",
+          "readiness_gap_read_surface",
+          "readiness_gap_write_surface",
+          "readiness_gap_autonomy_mode",
+          "readiness_gap_evidence_requirement",
+          "wing_deployment_requires_manual_safety_review"
+        ],
+        "current_live_write_kinds": [],
+        "evidence_statuses": [],
+        "live_apply_allowed": false,
+        "mode": "auto",
+        "mode_expansion_allowed": false,
+        "next_required_actions": [
+          "Complete all supervised proof gates before Full Autonomous mode can be reviewed."
+        ],
+        "project_mode_name": "Full Autonomous Mixing Mode",
+        "promotion_target_ids": [],
+        "proposal_creation_allowed": true,
+        "readiness_gap_bucket_counts": {
+          "autonomy_mode": 22,
+          "capability": 2,
+          "evidence_requirement": 24,
+          "proof": 78,
+          "read_surface": 14,
+          "safety": 16,
+          "write_surface": 19
+        },
+        "readiness_gap_target_ids_by_bucket": {
+          "autonomy_mode": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "capability": [
+            "gain_trim_supervised_promotion",
+            "bus_group_matrix_supervised_promotion"
+          ],
+          "evidence_requirement": [
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "proof": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "read_surface": [
+            "fader_supervised_promotion",
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "safety": [
+            "gain_trim_supervised_promotion",
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ],
+          "write_surface": [
+            "eq_supervised_promotion",
+            "dynamics_supervised_promotion",
+            "gate_supervised_promotion",
+            "pan_phase_supervised_promotion",
+            "fx_supervised_promotion",
+            "bus_group_matrix_supervised_promotion",
+            "mute_supervised_promotion",
+            "routing_supervised_promotion",
+            "scene_preset_supervised_promotion"
+          ]
+        },
+        "runtime_entry_allowed": false,
+        "status": "blocked"
+      }
+    ],
+    "safety": {
+      "automatic_mode_change_allowed": false,
+      "automatic_safety_update_allowed": false,
+      "full_autonomous_ready": false,
+      "live_widening_allowed": false,
+      "live_write": false,
+      "read_only": true
+    },
+    "status": "ok",
+    "summary": {
+      "autonomous_apply_allowed_modes": [],
+      "blocked_modes": [
+        "auto"
+      ],
+      "full_auto_readiness_gap_bucket_counts": {
+        "autonomy_mode": 22,
+        "capability": 2,
+        "evidence_requirement": 24,
+        "proof": 78,
+        "read_surface": 14,
+        "safety": 16,
+        "write_surface": 19
+      },
+      "full_auto_readiness_gap_target_ids_by_bucket": {
+        "autonomy_mode": [
+          "fader_supervised_promotion",
+          "gain_trim_supervised_promotion",
+          "eq_supervised_promotion",
+          "dynamics_supervised_promotion",
+          "gate_supervised_promotion",
+          "pan_phase_supervised_promotion",
+          "fx_supervised_promotion",
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ],
+        "capability": [
+          "gain_trim_supervised_promotion",
+          "bus_group_matrix_supervised_promotion"
+        ],
+        "evidence_requirement": [
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ],
+        "proof": [
+          "fader_supervised_promotion",
+          "gain_trim_supervised_promotion",
+          "eq_supervised_promotion",
+          "dynamics_supervised_promotion",
+          "gate_supervised_promotion",
+          "pan_phase_supervised_promotion",
+          "fx_supervised_promotion",
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ],
+        "read_surface": [
+          "fader_supervised_promotion",
+          "gain_trim_supervised_promotion",
+          "eq_supervised_promotion",
+          "dynamics_supervised_promotion",
+          "gate_supervised_promotion",
+          "pan_phase_supervised_promotion",
+          "fx_supervised_promotion",
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ],
+        "safety": [
+          "gain_trim_supervised_promotion",
+          "eq_supervised_promotion",
+          "dynamics_supervised_promotion",
+          "gate_supervised_promotion",
+          "pan_phase_supervised_promotion",
+          "fx_supervised_promotion",
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ],
+        "write_surface": [
+          "eq_supervised_promotion",
+          "dynamics_supervised_promotion",
+          "gate_supervised_promotion",
+          "pan_phase_supervised_promotion",
+          "fx_supervised_promotion",
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ]
+      },
+      "global_blockers": [
+        "mode_gate_does_not_change_runtime_mode",
+        "supervised_mode_limited_to_existing_policy",
+        "full_autonomous_mode_remains_blocked"
+      ],
+      "live_apply_allowed_modes": [
+        "supervised"
+      ],
+      "mode_count": 4,
+      "runtime_entry_allowed_modes": [
+        "analyze",
+        "assist",
+        "supervised"
+      ],
+      "status_counts": {
+        "available": 2,
+        "blocked": 1,
+        "limited_available": 1
+      },
+      "supervised_current_live_write_kinds": [
+        "fader",
+        "gain"
+      ],
+      "supervised_promotion_target_ids": [
+        "fader_supervised_promotion"
+      ]
+    },
+    "type": "autonomy_mode_transition_gate"
+  },
+  "generated_at": "2026-06-05T23:03:26Z",
+  "ignored_summaries": [
+    "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260605T230321Z_no_wing_release_check/offline_validation/20260605T230323Z_offline_operator_validation/summary.json"
+  ],
+  "invalid_summaries": [],
+  "next_wing_proof_plan": {
+    "generated_at": "2026-06-05T23:03:26Z",
+    "safety": {
+      "automatic_safety_update_allowed": false,
+      "execution_allowed_by_plan": false,
+      "full_autonomous_ready": false,
+      "live_widening_allowed": false,
+      "live_write": false,
+      "operator_required": true,
+      "read_only": true
+    },
+    "status": "operator_proof_required",
+    "steps": [
+      {
+        "abort_conditions": [
+          "Pre-read is unavailable or not from physical readback.",
+          "Requested delta is positive or exceeds 0.5 dB.",
+          "Apply readback is missing, mismatched, or not physically verified.",
+          "Rollback readback or rollback proof is missing.",
+          "Emergency stop does not block a follow-up proposal.",
+          "Any fader move would exceed 0 dBFS.",
+          "Feedback, clipping, or operator concern appears at any point."
+        ],
+        "channel": 3,
+        "command": [
+          "python",
+          "tools/wing_operator_proposal_validation_runner.py",
+          "--url",
+          "ws://localhost:8765",
+          "--channel",
+          "3",
+          "--value-type",
+          "gain",
+          "--delta-db",
+          "-0.25",
+          "--execute",
+          "--prove-blocked-apply",
+          "--prove-emergency-stop",
+          "--rollback-delay-sec",
+          "0",
+          "--artifact-root",
+          "artifacts/wing_telemetry",
+          "--reason",
+          "supervised_physical_gain_proof"
+        ],
+        "delta_db": -0.25,
+        "evidence_blockers_to_review": [
+          "physical_candidate_missing"
+        ],
+        "execution_allowed_by_plan": false,
+        "expected_artifacts": [
+          "summary.json with value_type=gain and channel=3",
+          "events.jsonl with proposal/apply/rollback/emergency-stop sequence",
+          "proof report row with proof_mode=physical and status=supervised_candidate",
+          "promotion evidence row marked safety_review_candidate only after manual artifact review"
+        ],
+        "id": "gain_physical_proof_ch3",
+        "live_execution_required": true,
+        "operator_approval_required": true,
+        "prerequisites": [
+          "Operator is physically present and explicitly approves a bounded proof run.",
+          "Backend is connected to the intended WING Rack only.",
+          "A current scene/console backup exists and the operator can restore manually.",
+          "Monitor/PA risk is controlled before any supervised write.",
+          "Proof uses the Product Layer proposal path and rollback gate only.",
+          "Use gain-down proof only; gain-up remains out of scope for this plan."
+        ],
+        "rationale": "Physical proof candidate is missing or blocked; run a small supervised negative move through the existing Product Layer proof runner.",
+        "value_type": "gain"
+      },
+      {
+        "abort_conditions": [
+          "Pre-read is unavailable or not from physical readback.",
+          "Requested delta is positive or exceeds 0.5 dB.",
+          "Apply readback is missing, mismatched, or not physically verified.",
+          "Rollback readback or rollback proof is missing.",
+          "Emergency stop does not block a follow-up proposal.",
+          "Any fader move would exceed 0 dBFS.",
+          "Feedback, clipping, or operator concern appears at any point."
+        ],
+        "channel": 2,
+        "command": [
+          "python",
+          "tools/wing_operator_proposal_validation_runner.py",
+          "--url",
+          "ws://localhost:8765",
+          "--channel",
+          "2",
+          "--value-type",
+          "fader",
+          "--delta-db",
+          "-0.25",
+          "--execute",
+          "--prove-blocked-apply",
+          "--prove-emergency-stop",
+          "--rollback-delay-sec",
+          "0",
+          "--artifact-root",
+          "artifacts/wing_telemetry",
+          "--reason",
+          "supervised_physical_fader_proof"
+        ],
+        "delta_db": -0.25,
+        "evidence_blockers_to_review": [
+          "physical_candidate_missing"
+        ],
+        "execution_allowed_by_plan": false,
+        "expected_artifacts": [
+          "summary.json with value_type=fader and channel=2",
+          "events.jsonl with proposal/apply/rollback/emergency-stop sequence",
+          "proof report row with proof_mode=physical and status=supervised_candidate",
+          "promotion evidence row marked safety_review_candidate only after manual artifact review"
+        ],
+        "id": "fader_physical_proof_ch2",
+        "live_execution_required": true,
+        "operator_approval_required": true,
+        "prerequisites": [
+          "Operator is physically present and explicitly approves a bounded proof run.",
+          "Backend is connected to the intended WING Rack only.",
+          "A current scene/console backup exists and the operator can restore manually.",
+          "Monitor/PA risk is controlled before any supervised write.",
+          "Proof uses the Product Layer proposal path and rollback gate only."
+        ],
+        "rationale": "Physical proof candidate is missing or blocked; run a small supervised negative move through the existing Product Layer proof runner.",
+        "value_type": "fader"
+      },
+      {
+        "abort_conditions": [
+          "Pre-read is unavailable or not from physical readback.",
+          "Requested delta is positive or exceeds 0.5 dB.",
+          "Apply readback is missing, mismatched, or not physically verified.",
+          "Rollback readback or rollback proof is missing.",
+          "Emergency stop does not block a follow-up proposal.",
+          "Any fader move would exceed 0 dBFS.",
+          "Feedback, clipping, or operator concern appears at any point."
+        ],
+        "channel": 8,
+        "command": [
+          "python",
+          "tools/wing_operator_proposal_validation_runner.py",
+          "--url",
+          "ws://localhost:8765",
+          "--channel",
+          "8",
+          "--value-type",
+          "fader",
+          "--delta-db",
+          "-0.25",
+          "--execute",
+          "--prove-blocked-apply",
+          "--prove-emergency-stop",
+          "--rollback-delay-sec",
+          "0",
+          "--artifact-root",
+          "artifacts/wing_telemetry",
+          "--reason",
+          "supervised_physical_fader_proof"
+        ],
+        "delta_db": -0.25,
+        "evidence_blockers_to_review": [
+          "physical_candidate_missing"
+        ],
+        "execution_allowed_by_plan": false,
+        "expected_artifacts": [
+          "summary.json with value_type=fader and channel=8",
+          "events.jsonl with proposal/apply/rollback/emergency-stop sequence",
+          "proof report row with proof_mode=physical and status=supervised_candidate",
+          "promotion evidence row marked safety_review_candidate only after manual artifact review"
+        ],
+        "id": "fader_physical_proof_ch8",
+        "live_execution_required": true,
+        "operator_approval_required": true,
+        "prerequisites": [
+          "Operator is physically present and explicitly approves a bounded proof run.",
+          "Backend is connected to the intended WING Rack only.",
+          "A current scene/console backup exists and the operator can restore manually.",
+          "Monitor/PA risk is controlled before any supervised write.",
+          "Proof uses the Product Layer proposal path and rollback gate only."
+        ],
+        "rationale": "Physical proof candidate is missing or blocked; run a small supervised negative move through the existing Product Layer proof runner.",
+        "value_type": "fader"
+      },
+      {
+        "abort_conditions": [
+          "Pre-read is unavailable or not from physical readback.",
+          "Requested delta is positive or exceeds 0.5 dB.",
+          "Apply readback is missing, mismatched, or not physically verified.",
+          "Rollback readback or rollback proof is missing.",
+          "Emergency stop does not block a follow-up proposal.",
+          "Any fader move would exceed 0 dBFS.",
+          "Feedback, clipping, or operator concern appears at any point."
+        ],
+        "channel": 16,
+        "command": [
+          "python",
+          "tools/wing_operator_proposal_validation_runner.py",
+          "--url",
+          "ws://localhost:8765",
+          "--channel",
+          "16",
+          "--value-type",
+          "fader",
+          "--delta-db",
+          "-0.25",
+          "--execute",
+          "--prove-blocked-apply",
+          "--prove-emergency-stop",
+          "--rollback-delay-sec",
+          "0",
+          "--artifact-root",
+          "artifacts/wing_telemetry",
+          "--reason",
+          "supervised_physical_fader_proof"
+        ],
+        "delta_db": -0.25,
+        "evidence_blockers_to_review": [
+          "physical_candidate_missing"
+        ],
+        "execution_allowed_by_plan": false,
+        "expected_artifacts": [
+          "summary.json with value_type=fader and channel=16",
+          "events.jsonl with proposal/apply/rollback/emergency-stop sequence",
+          "proof report row with proof_mode=physical and status=supervised_candidate",
+          "promotion evidence row marked safety_review_candidate only after manual artifact review"
+        ],
+        "id": "fader_physical_proof_ch16",
+        "live_execution_required": true,
+        "operator_approval_required": true,
+        "prerequisites": [
+          "Operator is physically present and explicitly approves a bounded proof run.",
+          "Backend is connected to the intended WING Rack only.",
+          "A current scene/console backup exists and the operator can restore manually.",
+          "Monitor/PA risk is controlled before any supervised write.",
+          "Proof uses the Product Layer proposal path and rollback gate only."
+        ],
+        "rationale": "Physical proof candidate is missing or blocked; run a small supervised negative move through the existing Product Layer proof runner.",
+        "value_type": "fader"
+      }
+    ],
+    "summary": {
+      "global_blockers": [
+        "operator_must_approve_and_execute_manually",
+        "proof_plan_does_not_contact_mixer",
+        "safety_matrix_review_required_after_artifacts"
+      ],
+      "planned_channels": [
+        3,
+        2,
+        8,
+        16
+      ],
+      "planned_value_types": [
+        "fader",
+        "gain"
+      ],
+      "step_count": 4
+    },
+    "type": "supervised_wing_proof_plan"
+  },
+  "promotion_evidence": {
+    "generated_at": "2026-06-05T23:03:26Z",
+    "rows": [
+      {
+        "artifact_count": 0,
+        "automatic_safety_update_allowed": false,
+        "autonomous_ready": false,
+        "blocked_artifact_count": 0,
+        "blocked_proof_ids": [],
+        "blockers": [
+          "physical_candidate_missing"
+        ],
+        "current_live_allowed": true,
+        "current_safety_status": "hardware_proven_narrow",
+        "dry_run_ready_count": 0,
+        "dry_run_ready_proof_ids": [],
+        "id": "fader_supervised_evidence",
+        "next_required_evidence": [
+          "Run repeated controlled fader proofs across representative channels with connection-loss and emergency-stop reset evidence.",
+          "Keep fader automation supervised-only until repeated proof closes partial hardware evidence."
+        ],
+        "physical_candidate_count": 0,
+        "physical_candidate_proof_ids": [],
+        "required_physical_candidate_count": 1,
+        "safety_row_id": "fader_supervised",
+        "safety_row_review_candidate": false,
+        "status": "evidence_blocked",
+        "value_type": "fader"
+      },
+      {
+        "artifact_count": 1,
+        "automatic_safety_update_allowed": false,
+        "autonomous_ready": false,
+        "blocked_artifact_count": 0,
+        "blocked_proof_ids": [],
+        "blockers": [
+          "physical_candidate_missing"
+        ],
+        "current_live_allowed": false,
+        "current_safety_status": "dry_run_ready",
+        "dry_run_ready_count": 1,
+        "dry_run_ready_proof_ids": [
+          "20260605T230323Z_gain_proof_dry_run_ch1"
+        ],
+        "id": "gain_supervised_evidence",
+        "next_required_evidence": [
+          "Run one small supervised gain-down proof with physical pre-read, apply readback, rollback readback, and emergency-stop block evidence.",
+          "Keep gain-up blocked unless the operator authored the reason and headroom/bleed safety is proven."
+        ],
+        "physical_candidate_count": 0,
+        "physical_candidate_proof_ids": [],
+        "required_physical_candidate_count": 1,
+        "safety_row_id": "gain_supervised",
+        "safety_row_review_candidate": false,
+        "status": "dry_run_only",
+        "value_type": "gain"
+      }
+    ],
+    "safety": {
+      "automatic_safety_update_allowed": false,
+      "full_autonomous_ready": false,
+      "live_widening_allowed": false,
+      "live_write": false,
+      "read_only": true,
+      "supervised_only": true
+    },
+    "status": "ok",
+    "summary": {
+      "autonomous_ready_row_ids": [],
+      "blocked_evidence_row_ids": [
+        "fader_supervised_evidence",
+        "gain_supervised_evidence"
+      ],
+      "global_blockers": [
+        "manual_safety_review_required",
+        "full_autonomous_mode_remains_blocked",
+        "proof_report_does_not_modify_safety_matrix"
+      ],
+      "row_count": 2,
+      "safety_row_review_candidate_ids": [],
+      "status_counts": {
+        "dry_run_only": 1,
+        "evidence_blocked": 1,
+        "safety_review_candidate": 0
+      }
+    },
+    "type": "supervised_promotion_evidence"
+  },
+  "proof_remediation_plan": {
+    "actions": [],
+    "generated_at": "2026-06-05T23:03:26Z",
+    "safety": {
+      "automatic_safety_update_allowed": false,
+      "execution_allowed_by_plan": false,
+      "full_autonomous_ready": false,
+      "live_widening_allowed": false,
+      "live_write": false,
+      "operator_required": true,
+      "read_only": true
+    },
+    "status": "manual_review_ready",
+    "summary": {
+      "action_count": 0,
+      "action_count_truncated": false,
+      "blocked_artifact_count": 0,
+      "blocker_counts": {},
+      "global_blockers": [
+        "proof_remediation_plan_does_not_contact_mixer",
+        "operator_must_execute_reruns_manually",
+        "safety_matrix_review_required_after_new_artifacts"
+      ],
+      "invalid_summary_count": 0,
+      "legacy_ambiguous_count": 0,
+      "value_type_counts": {}
+    },
+    "type": "supervised_proof_remediation_plan"
+  },
+  "report_path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260605T230321Z_no_wing_release_check/supervised_proof_artifact_report.json",
+  "rows": [
+    {
+      "artifact_path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260605T230321Z_no_wing_release_check/gain_proof_dry_run/20260605T230323Z_gain_proof_dry_run_ch1/summary.json",
+      "autonomous_ready": false,
+      "blockers": [
+        "physical_proof_required_for_promotion"
+      ],
+      "channel": 1,
+      "evidence": {
+        "blocked_followup_status": "verified",
+        "delta_db": -0.25,
+        "emergency_stop_proof_status": "verified",
+        "idempotency_key_present": true,
+        "metadata": {
+          "execute": null,
+          "physical_wing": false,
+          "proof_artifact_schema": "gain_proof_dry_run.v1",
+          "proof_runner": "gain_proof_dry_run_runner",
+          "summary_status": "passed",
+          "write_policy": "fake_mixer_apply_operator_proposal_only"
+        },
+        "operator_approval_recorded": true,
+        "pre_read_source": "fake_mixer",
+        "pre_read_status": "verified_from_physical_readback",
+        "proof_status": "verified",
+        "readback_source": "fake_mixer",
+        "readback_status": "verified_from_physical_readback",
+        "require_physical": true,
+        "rollback_available": true,
+        "rollback_proof_status": "verified",
+        "rollback_readback_source": "fake_mixer",
+        "rollback_readback_status": "verified_from_physical_readback"
+      },
+      "method_id": "supervised_proof_artifact_evaluator",
+      "promotion_allowed": false,
+      "proof_id": "20260605T230323Z_gain_proof_dry_run_ch1",
+      "proof_mode": "dry_run",
+      "status": "dry_run_ready",
+      "value_type": "gain"
+    }
+  ],
+  "safety": {
+    "full_autonomous_ready": false,
+    "live_widening_allowed": false,
+    "live_write": false,
+    "read_only": true,
+    "supervised_only": true
+  },
+  "status": "ok",
+  "summary": {
+    "artifact_count": 1,
+    "autonomous_ready_proof_ids": [],
+    "autonomy_gap_rollup": {
+      "claim": "Full Autonomous remains blocked; this rollup is report-only and does not widen the current supervised fader/gain live-write boundary.",
+      "evidence_requirement_ids_by_action_family": {
+        "bus_group_matrix": [
+          "bus_group_assignment_cache_freshness",
+          "bus_group_fader_readback",
+          "matrix_send_readback",
+          "main_bus_true_peak_headroom",
+          "bus_group_physical_fixture",
+          "hardware_readback_and_rollback_proof"
+        ],
+        "mute": [
+          "current_mute_cache_freshness",
+          "mute_owner_intent_evidence",
+          "signal_return_or_idle_window_evidence",
+          "manual_mute_authority_review",
+          "mute_physical_fixture",
+          "hardware_readback_rollback_and_emergency_proof"
+        ],
+        "routing": [
+          "current_route_cache_freshness",
+          "route_diff_evidence",
+          "source_identity_downstream_trust",
+          "routing_physical_fixture",
+          "hardware_readback_and_rollback_proof"
+        ],
+        "scene_preset": [
+          "current_scene_preset_cache_freshness",
+          "snapshots_scenes_snapshot_cache_freshness",
+          "user_presets_snapshot_cache_freshness",
+          "read_only_scoped_diff_evidence",
+          "read_only_rollback_evidence",
+          "scene_preset_physical_fixture",
+          "hardware_readback_and_rollback_proof"
+        ]
+      },
+      "full_auto_gap_bucket_counts": {
+        "autonomy_mode": 22,
+        "capability": 2,
+        "evidence_requirement": 24,
+        "proof": 78,
+        "read_surface": 14,
+        "safety": 16,
+        "write_surface": 19
+      },
+      "full_auto_gap_target_ids_by_bucket": {
+        "autonomy_mode": [
+          "fader_supervised_promotion",
+          "gain_trim_supervised_promotion",
+          "eq_supervised_promotion",
+          "dynamics_supervised_promotion",
+          "gate_supervised_promotion",
+          "pan_phase_supervised_promotion",
+          "fx_supervised_promotion",
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ],
+        "capability": [
+          "gain_trim_supervised_promotion",
+          "bus_group_matrix_supervised_promotion"
+        ],
+        "evidence_requirement": [
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ],
+        "proof": [
+          "fader_supervised_promotion",
+          "gain_trim_supervised_promotion",
+          "eq_supervised_promotion",
+          "dynamics_supervised_promotion",
+          "gate_supervised_promotion",
+          "pan_phase_supervised_promotion",
+          "fx_supervised_promotion",
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ],
+        "read_surface": [
+          "fader_supervised_promotion",
+          "gain_trim_supervised_promotion",
+          "eq_supervised_promotion",
+          "dynamics_supervised_promotion",
+          "gate_supervised_promotion",
+          "pan_phase_supervised_promotion",
+          "fx_supervised_promotion",
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ],
+        "safety": [
+          "gain_trim_supervised_promotion",
+          "eq_supervised_promotion",
+          "dynamics_supervised_promotion",
+          "gate_supervised_promotion",
+          "pan_phase_supervised_promotion",
+          "fx_supervised_promotion",
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ],
+        "write_surface": [
+          "eq_supervised_promotion",
+          "dynamics_supervised_promotion",
+          "gate_supervised_promotion",
+          "pan_phase_supervised_promotion",
+          "fx_supervised_promotion",
+          "bus_group_matrix_supervised_promotion",
+          "mute_supervised_promotion",
+          "routing_supervised_promotion",
+          "scene_preset_supervised_promotion"
+        ]
+      },
+      "full_autonomous_blocked": true,
+      "full_autonomous_ready": false,
+      "live_widening_allowed": false,
+      "live_write": false,
+      "next_required_evidence": [
+        "Reduce every Full Autonomous readiness gap bucket to zero before reviewing auto mode.",
+        "Keep live apply limited to current supervised write kinds until physical readback and rollback evidence exists."
+      ],
+      "next_required_evidence_by_action_family": {
+        "bus_group_matrix": [
+          "Add bus/group/matrix safety review with true-peak headroom, assignment/fader readback, rollback, fake-mixer, real-WING, and emergency-stop proof before any supervised candidate.",
+          "Keep direct imports behind supervised gates and include any new transport client in this inventory.",
+          "Add physical-query fixture snapshots, full group membership proof, matrix-send evidence, WING/dLive parity mapping, and safety review before bus/DCA/group balance proposals become live candidates.",
+          "Add physical-query matrix fixtures, route diff proof, WING/dLive parity mapping, and matrix safety review before master/matrix optimization claims."
+        ],
+        "compressor": [
+          "Split recommendation code from executor code and add fail-closed tests before any promotion.",
+          "Route blocked compressor evidence to operator review before any supervised dynamics promotion.",
+          "Use compressor proposal adapter and require dynamics readback, makeup/headroom and rollback proof before any live apply.",
+          "Add physical-query fixture snapshots and parity evidence before promoting EQ/dynamics/gate proposals."
+        ],
+        "eq": [
+          "Keep EQ in offline/proposal mode until filter package audit and fake-mixer proof are complete.",
+          "Route blocked EQ evidence to operator review before any supervised EQ promotion.",
+          "Use EQ proposal DTOs and require filter audit, feedback safety, readback and rollback proof before any live apply.",
+          "Add physical-query fixture snapshots and parity evidence before promoting EQ/dynamics/gate proposals."
+        ],
+        "fader": [
+          "Repeat controlled WING proof across representative channels with connection-loss and emergency-stop reset evidence.",
+          "Keep as the only live executor; do not add EQ/dynamics/routing/FX here without separate proof.",
+          "Continue feeding proposal evidence and rollback values into the queue.",
+          "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."
+        ],
+        "fx_send_insert": [
+          "Add offline FX plan evaluation before any operator-facing proposal.",
+          "Keep direct FX sends quarantined; route useful FX behavior into explainable FX plans with physical proof requirements.",
+          "Expand FX-model parameter schemas, add physical fixture snapshots, scoped insert diff artifacts, and FX safety review before FX proposals become live candidates.",
+          "Add physical-query fixtures and route/send diff schema before any routing or send proposal can become queueable."
+        ],
+        "gain": [
+          "One small supervised gain-down proof with physical pre-read, apply readback, rollback readback, and blocked unsafe follow-up.",
+          "Keep as the only live executor; do not add EQ/dynamics/routing/FX here without separate proof.",
+          "Continue feeding proposal evidence and rollback values into the queue.",
+          "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."
+        ],
+        "gate": [
+          "Feed real telemetry/replay sessions into bleed metrics; keep live gate writes blocked.",
+          "Connect real telemetry and offline bleed fixtures, but keep gate apply blocked.",
+          "Keep direct gate sends quarantined; route all gate/HPF/send outputs to proposal-only contracts with physical proof requirements.",
+          "Add physical-query fixture snapshots and parity evidence before promoting EQ/dynamics/gate proposals."
+        ],
+        "mute": [
+          "Add fresh mute-state intent, owner, signal-return, physical readback, rollback, fake-mixer, real-WING, and emergency-stop proof before any supervised mute candidate.",
+          "Keep direct imports behind supervised gates and include any new transport client in this inventory.",
+          "Convert commands into operator proposal intents and blocked reasons.",
+          "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."
+        ],
+        "pan_phase_delay": [
+          "Define read-only stage-position DTO and proposal schema before fake-mixer proof.",
+          "Keep stage-position and pan/phase outputs as evidence until separate hardware readback and rollback proof.",
+          "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."
+        ],
+        "routing": [
+          "Keep manual-only runbooks; no automated promotion without separate ADR.",
+          "Keep manual scripts lab-only or migrate to explicit operator runbooks with preview diffs.",
+          "Add physical-query fixtures and route/send diff schema before any routing or send proposal can become queueable."
+        ],
+        "scene_preset": [
+          "Keep manual-only runbooks; no automated promotion without separate ADR.",
+          "Keep manual scripts lab-only or migrate to explicit operator runbooks with preview diffs.",
+          "Keep scene apply blocked; add read-only scene diff artifacts, rollback evidence, and physical fixtures before any automation.",
+          "Add physical-query fixtures and preset diff artifacts before any preset recall/store proposal can become queueable."
+        ]
+      },
+      "read_only": true,
+      "source": "autonomy_mode_transition_gate.rows[mode=auto]",
+      "supervised_current_live_write_kinds": [
+        "fader",
+        "gain"
+      ],
+      "supervised_live_apply_allowed": true
+    },
+    "blocked_proof_ids": [],
+    "dry_run_ready_proof_ids": [
+      "20260605T230323Z_gain_proof_dry_run_ch1"
+    ],
+    "ignored_summary_count": 1,
+    "invalid_summary_count": 0,
+    "next_required_evidence": [
+      "Run physical supervised fader/gain proof before changing safety coverage rows."
+    ],
+    "promotion_allowed_proof_ids": [],
+    "proof_mode_counts": {
+      "dry_run": 1
+    },
+    "require_physical": true,
+    "source_summary_count": 2,
+    "status_counts": {
+      "blocked": 0,
+      "dry_run_ready": 1,
+      "supervised_candidate": 0
+    },
+    "value_type_counts": {
+      "gain": 1
+    }
+  },
+  "type": "supervised_proof_artifact_report"
+}

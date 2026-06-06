@@ -23,6 +23,7 @@ CODEX_CLI_AGENT_WORKFLOW_PHRASE = "Codex CLI was the only agent workflow used."
 EXTERNAL_AGENT_RUNNER_PHRASE = (
     "External Paperclip/PiperClip was not used as an agent runner."
 )
+REPO_LOCAL_REPORT_PATH_LABEL = "Repo-local report path:"
 EXACT_SCOPE_LINE_REQUIREMENTS = (
     (
         CODEX_CLI_AGENT_WORKFLOW_PHRASE,
@@ -50,6 +51,7 @@ REQUIRED_PHRASES = (
     EXTERNAL_AGENT_RUNNER_PHRASE,
     "No neighboring repositories or external local projects were analyzed, modified, or used.",
     "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.",
+    REPO_LOCAL_REPORT_PATH_LABEL,
     "No `.env`, tokens, credentials, API keys, or local secrets were accessed or modified.",
     "## Три обязательных вопроса",
     "1. Что нового проект научился делать?",
@@ -140,6 +142,7 @@ REQUIRED_SCOPE_PHRASES = (
     EXTERNAL_AGENT_RUNNER_PHRASE,
     "No neighboring repositories or external local projects were analyzed, modified, or used.",
     "Repo-local `.paperclip/reports/` was used only as an Automixer report directory.",
+    REPO_LOCAL_REPORT_PATH_LABEL,
     "Live safety status:",
     "no live OSC/WING writes were executed",
     "No `.env`, tokens, credentials, API keys, or local secrets were accessed or modified.",
@@ -596,6 +599,24 @@ def _validate_scope_evidence(text: str) -> list[str]:
     return errors
 
 
+def _validate_scope_repo_local_report_path(
+    text: str,
+    project_root: Path,
+) -> list[str]:
+    scope_body = _extract_heading_section(text, "## Scope")
+    if not scope_body:
+        return []
+
+    expected_path = str((project_root / ".paperclip" / "reports").resolve())
+    if expected_path in scope_body:
+        return []
+
+    return [
+        "Scope must include repo-local report path under Automixer project: "
+        f"{expected_path}"
+    ]
+
+
 def _validate_project_boundary_contradictions(text: str) -> list[str]:
     report_body_without_scope = _remove_heading_section(text, "## Scope")
     normalized_report_body = _collapse_whitespace(report_body_without_scope).lower()
@@ -921,15 +942,15 @@ def _validate_mandatory_questions_directly_precede_plain_explanation(
     if plain_match.start() < questions_match.end():
         return []
 
-    intervening_top_level_heading = re.search(
-        r"^##\s+",
+    intervening_heading = re.search(
+        r"^#{1,6}\s+",
         text[questions_match.end():plain_match.start()],
         re.MULTILINE,
     )
-    if intervening_top_level_heading:
+    if intervening_heading:
         return [
             f"{MANDATORY_QUESTIONS_HEADING} must directly precede "
-            f"{PLAIN_EXPLANATION_HEADING} without another top-level section "
+            f"{PLAIN_EXPLANATION_HEADING} without another markdown heading "
             "between them"
         ]
 
@@ -1633,6 +1654,7 @@ def validate_report(
     errors.extend(_validate_plan_item_limit(text))
     errors.extend(_validate_required_sections_have_content(text))
     errors.extend(_validate_scope_evidence(text))
+    errors.extend(_validate_scope_repo_local_report_path(text, root))
     errors.extend(_validate_scope_project_boundary_contradictions(text))
     errors.extend(_validate_project_boundary_contradictions(text))
     errors.extend(_validate_secret_boundary_contradictions(text))

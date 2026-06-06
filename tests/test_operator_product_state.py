@@ -14346,6 +14346,307 @@ async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audi
         ]
         is False
     )
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_policy_gate_result"
+    ](
+        object(),
+        {
+            "promotion_rollback_verification_result_consumer": (
+                promotion_rollback_verification_result_consumer_payload
+            ),
+            "promotion_sequence_policy_gate_result": (
+                promotion_sequence_policy_gate_payload
+            ),
+        },
+    )
+
+    promotion_sequence_policy_gate_result_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert promotion_sequence_policy_gate_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer"
+    )
+    assert promotion_sequence_policy_gate_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_policy_gate_result"
+    )
+    assert promotion_sequence_policy_gate_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_policy_consumer_request_available"
+    )
+    assert (
+        promotion_sequence_policy_gate_result_consumer_payload["summary"][
+            "promotion_policy_consumer_request_available"
+        ]
+        is True
+    )
+    assert (
+        promotion_sequence_policy_gate_result_consumer_payload["summary"][
+            "promotion_policy_consumer_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        promotion_sequence_policy_gate_result_consumer_payload["summary"][
+            "promotion_policy_consumer_created"
+        ]
+        is False
+    )
+    assert (
+        promotion_sequence_policy_gate_result_consumer_payload["summary"][
+            "proposal_order_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_sequence_policy_gate_result_consumer_payload["summary"][
+            "queue_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_sequence_policy_gate_result_consumer_payload["summary"][
+            "policy_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_sequence_policy_gate_result_consumer_payload["summary"][
+            "runtime_memory_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_sequence_policy_gate_result_consumer_payload["summary"][
+            "live_authority_granted"
+        ]
+        is False
+    )
+    assert (
+        promotion_sequence_policy_gate_result_consumer_payload[
+            "promotion_policy_consumer_request"
+        ]["handler"]
+        == "consume_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy"
+    )
+    assert (
+        promotion_sequence_policy_gate_result_consumer_payload[
+            "promotion_policy_consumer_request"
+        ]["proposals_required_from_operator"]
+        is True
+    )
+    policy_record = promotion_sequence_policy_gate_payload["policy_records"][0]
+    policy_consumer_request = dict(
+        promotion_sequence_policy_gate_result_consumer_payload[
+            "promotion_policy_consumer_request"
+        ]
+    )
+    policy_consumer_request["proposals"] = [
+        {
+            "proposal_id": policy_record["proposal_id"],
+            "method_id": "safe_gain",
+            "kind": "fader",
+            "target": "ch/02",
+            "severity": "high",
+            "confidence": 0.82,
+            "evidence": {
+                "idempotency_key": policy_record["source_idempotency_key"],
+            },
+        }
+    ]
+    await server._dispatch[
+        "consume_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy"
+    ](
+        object(),
+        policy_consumer_request,
+    )
+
+    promotion_policy_consumer_payload = server.send_to_client.await_args.args[1]
+    assert promotion_policy_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer"
+    )
+    assert promotion_policy_consumer_payload["handler"] == (
+        "consume_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy"
+    )
+    assert promotion_policy_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_policy_consumer_records_available"
+    )
+    assert (
+        promotion_policy_consumer_payload["summary"]["consumer_record_count"]
+        == 1
+    )
+    assert (
+        promotion_policy_consumer_payload["summary"]["proposal_order_mutation"]
+        is False
+    )
+    assert promotion_policy_consumer_payload["summary"]["queue_mutation"] is False
+    assert (
+        promotion_policy_consumer_payload["summary"][
+            "sequence_policy_trust_store_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_policy_consumer_payload["summary"][
+            "sequence_policy_change_allowed_by_consumer"
+        ]
+        is False
+    )
+    assert (
+        promotion_policy_consumer_payload["summary"][
+            "sequence_execution_allowed_by_consumer"
+        ]
+        is False
+    )
+    assert (
+        promotion_policy_consumer_payload["summary"]["live_authority_granted"]
+        is False
+    )
+    assert (
+        promotion_policy_consumer_payload["consumer_records"][0][
+            "can_import_to_queue"
+        ]
+        is False
+    )
+    assert (
+        promotion_policy_consumer_payload["consumer_records"][0]["can_apply_live"]
+        is False
+    )
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_policy_consumer_result"
+    ](
+        object(),
+        {
+            "promotion_sequence_policy_gate_result_consumer": (
+                promotion_sequence_policy_gate_result_consumer_payload
+            ),
+            "promotion_policy_consumer_result": promotion_policy_consumer_payload,
+        },
+    )
+
+    promotion_policy_consumer_result_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert promotion_policy_consumer_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer"
+    )
+    assert promotion_policy_consumer_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_policy_consumer_result"
+    )
+    assert promotion_policy_consumer_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_ordering_preview_request_available"
+    )
+    assert (
+        promotion_policy_consumer_result_consumer_payload["summary"][
+            "promotion_ordering_preview_request_available"
+        ]
+        is True
+    )
+    assert (
+        promotion_policy_consumer_result_consumer_payload["summary"][
+            "promotion_ordering_preview_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        promotion_policy_consumer_result_consumer_payload["summary"][
+            "promotion_ordering_preview_created"
+        ]
+        is False
+    )
+    assert (
+        promotion_policy_consumer_result_consumer_payload["summary"][
+            "proposal_order_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_policy_consumer_result_consumer_payload["summary"][
+            "queue_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_policy_consumer_result_consumer_payload["summary"][
+            "live_authority_granted"
+        ]
+        is False
+    )
+    assert (
+        promotion_policy_consumer_result_consumer_payload[
+            "promotion_ordering_preview_request"
+        ]["handler"]
+        == "preview_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering"
+    )
+    assert (
+        promotion_policy_consumer_result_consumer_payload[
+            "promotion_ordering_preview_request"
+        ]["proposals_required_from_operator"]
+        is True
+    )
+
+    ordering_preview_request = dict(
+        promotion_policy_consumer_result_consumer_payload[
+            "promotion_ordering_preview_request"
+        ]
+    )
+    ordering_preview_request["proposals"] = policy_consumer_request["proposals"]
+    await server._dispatch[
+        "preview_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering"
+    ](
+        object(),
+        ordering_preview_request,
+    )
+
+    promotion_ordering_preview_payload = server.send_to_client.await_args.args[1]
+    assert promotion_ordering_preview_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview"
+    )
+    assert promotion_ordering_preview_payload["handler"] == (
+        "preview_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering"
+    )
+    assert promotion_ordering_preview_payload["status"] == (
+        "sequence_memory_trust_promotion_ordering_preview_available"
+    )
+    assert (
+        promotion_ordering_preview_payload["summary"]["ordered_preview_count"]
+        == 1
+    )
+    assert (
+        promotion_ordering_preview_payload["summary"]["proposal_order_mutation"]
+        is False
+    )
+    assert promotion_ordering_preview_payload["summary"]["queue_mutation"] is False
+    assert (
+        promotion_ordering_preview_payload["summary"][
+            "sequence_policy_trust_store_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_ordering_preview_payload["summary"][
+            "sequence_policy_change_allowed_by_ordering_preview"
+        ]
+        is False
+    )
+    assert (
+        promotion_ordering_preview_payload["summary"][
+            "sequence_execution_allowed_by_ordering_preview"
+        ]
+        is False
+    )
+    assert (
+        promotion_ordering_preview_payload["summary"]["live_authority_granted"]
+        is False
+    )
+    assert (
+        promotion_ordering_preview_payload["ordered_proposals"][0][
+            "can_import_to_queue"
+        ]
+        is False
+    )
+    assert (
+        promotion_ordering_preview_payload["ordered_proposals"][0]["can_apply_live"]
+        is False
+    )
     assert server._apply_manual_console_write.await_count == 1
     assert "seq-import-audit:proposal-sequence-fader" in (
         server._operator_apply_idempotency_keys

@@ -122,6 +122,9 @@ Automixer.
   `Codex CLI was the only agent workflow used.`;
 - статус external agent boundary: в `## Scope` укажи ровно
   `External Paperclip/PiperClip was not used as an agent runner.`;
+- статус repo-local report path: в `## Scope` укажи метку
+  `Repo-local report path:` и абсолютный путь
+  `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/.paperclip/reports`;
 - что было найдено;
 - краткий план выбранных безопасных задач;
 - что было сделано;

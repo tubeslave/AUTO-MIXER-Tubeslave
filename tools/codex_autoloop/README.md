@@ -72,8 +72,11 @@ you want the background automation active.
   `Codex CLI was the only agent workflow used.` and
   `External Paperclip/PiperClip was not used as an agent runner.`, and must
   explicitly state that no neighboring repositories or external local projects
-  were analyzed, modified, or used. The worktree evidence must mention both
-  modified/changed files and new/untracked files, even when one side is empty.
+  were analyzed, modified, or used. Scope must include `Repo-local report path:`
+  with `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/.paperclip/reports` so
+  repo-local reports cannot be confused with external Paperclip/PiperClip
+  output. The worktree evidence must mention both modified/changed files and
+  new/untracked files, even when one side is empty.
   The plain-language project-state subsection must explicitly cover what
   already works, what works partially, what is not implemented, and the current
   risks. The end-of-report order is fixed: `## Три обязательных вопроса`

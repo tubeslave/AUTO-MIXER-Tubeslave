@@ -131,6 +131,8 @@ def test_codex_cycle_prompt_requires_repo_local_safety_report_shape():
         "`/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/.paperclip/reports/`",
         "Не используй внешний Paperclip/PiperClip как систему запуска агентов.",
         "`Codex CLI was the only agent workflow used.`",
+        "`External Paperclip/PiperClip was not used as an agent runner.`",
+        "`Repo-local report path:`",
         "статус live safety: обязательно укажи, что live OSC/WING writes не выполнялись.",
         "`## Три обязательных вопроса`",
         "`## Объяснение простым языком`",
@@ -152,6 +154,11 @@ def test_codex_autoloop_readme_documents_exact_agent_scope_lines():
     assert "exact Scope lines" in readme_text
     assert "`Codex CLI was the only agent workflow used.`" in readme_text
     assert "`External Paperclip/PiperClip was not used as an agent runner.`" in readme_text
+    assert "`Repo-local report path:`" in readme_text
+    assert (
+        "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/.paperclip/reports"
+        in readme_text
+    )
 
 
 def test_codex_autoloop_readme_documents_nested_dependency_todo_scan_noise():
