@@ -5558,6 +5558,178 @@ def test_main_pipeline_preview_exposes_source_identity_memory_index_records(serv
     assert queue["summary"]["pending_count"] == 0
 
 
+def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(server):
+    server.operator_proposal_apply_sequence_policy_review_freshness = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "stale_field_count": 0,
+        "read_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "queries_console": False,
+        "queue_mutation": False,
+        "policy_mutation": False,
+    }
+    server.operator_proposal_apply_sequence_policy_memory_trust_acceptance_records = [
+        {
+            "acceptance_id": "sequence-memory-trust-acceptance-1",
+            "review_candidate_id": (
+                "operator_sequence_memory_trust_review:"
+                "operator_sequence_policy_memory_index:"
+                "operator-sequence-policy-memory:memory-write-applied:"
+                "memory-write:memory-write-applied"
+            ),
+            "memory_record_id": (
+                "operator_sequence_policy_memory_index:"
+                "operator-sequence-policy-memory:memory-write-applied:"
+                "memory-write:memory-write-applied"
+            ),
+            "proposal_id": "memory-write-applied",
+            "learning_scope": "supervised_fader_gain_sequence_execution",
+            "value_type": "fader",
+            "idempotency_key": "memory-write:memory-write-applied",
+            "decision": "accepted",
+            "reviewed_by": "operator",
+            "reviewed_at": "2026-06-06T12:30:00Z",
+        }
+    ]
+    server.operator_proposal_apply_sequence_policy_memory_text = "\n".join(
+        [
+            "# Project Memory",
+            "",
+            "---",
+            "",
+            "### Supervised sequence policy memory",
+            "",
+            (
+                "- Draft ID: "
+                "`operator-sequence-policy-memory:memory-write-applied:"
+                "memory-write:memory-write-applied`"
+            ),
+            "- Proposal ID: `memory-write-applied`",
+            "- Learning scope: `supervised_fader_gain_sequence_execution`",
+            "- Value type: `fader`",
+            "- Channel: `2`",
+            "- Effective value: `-8.5`",
+            "- Idempotency key: `memory-write:memory-write-applied`",
+            "- Readback status: `verified_from_cache`",
+            "- Proof status: `verified`",
+            "- Runtime authority: no live, queue, model, or policy mutation",
+            "",
+            "Supervised fader/gain sequence execution was verified.",
+            "",
+        ]
+    )
+
+    payload = build_main_pipeline_preview(server, total_channels=4)
+    queue = build_decision_queue(server)
+    index = payload["operator_proposal_apply_sequence_policy_memory_index"]
+    review = payload["operator_proposal_apply_sequence_policy_memory_trust_review"]
+    ledger = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger"
+    ]
+    adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"] == "operator_proposal_apply_sequence_policy_memory_index"
+    ][0]
+    review_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_review"
+    ][0]
+    ledger_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger"
+    ][0]
+
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_index_record_count"
+        ]
+        == 1
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_index_invalid_record_count"
+        ]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_review_candidate_count"
+        ]
+        == 1
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_acceptance_record_count"
+        ]
+        == 1
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_accepted_record_count"
+        ]
+        == 1
+    )
+    assert adapter["method_id"] == "operator_proposal_apply_sequence_policy_memory_index"
+    assert (
+        adapter["output"]
+        == "operator_proposal_apply_sequence_append_only_memory_index_review"
+    )
+    assert (
+        review_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_review"
+    )
+    assert (
+        review_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_operator_review"
+    )
+    assert (
+        ledger_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger"
+    )
+    assert (
+        ledger_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_acceptance_ledger"
+    )
+    assert index["status"] == "append_only_sequence_memory_index_available"
+    assert index["summary"]["memory_record_count"] == 1
+    assert index["summary"]["execution_allowed_by_index"] is False
+    assert index["summary"]["policy_mutation"] is False
+    assert index["summary"]["runtime_memory_mutation"] is False
+    assert index["memory_records"][0]["proposal_id"] == "memory-write-applied"
+    assert index["memory_records"][0]["value_type"] == "fader"
+    assert index["memory_records"][0]["usable_for_sequence_policy_review"] is True
+    assert index["memory_records"][0]["execution_allowed_by_index"] is False
+    assert review["status"] == "sequence_memory_trust_review_candidate_available"
+    assert review["summary"]["trust_review_candidate_count"] == 1
+    assert review["summary"]["execution_allowed_by_review"] is False
+    assert review["summary"]["policy_mutation"] is False
+    assert review["summary"]["runtime_memory_mutation"] is False
+    assert review["trust_review_candidates"][0]["proposal_id"] == "memory-write-applied"
+    assert review["trust_review_candidates"][0]["operator_review_required"] is True
+    assert (
+        review["trust_review_candidates"][0]["execution_allowed_by_review"]
+        is False
+    )
+    assert ledger["status"] == "operator_sequence_memory_trust_acceptance_records_available"
+    assert ledger["summary"]["accepted_record_count"] == 1
+    assert ledger["summary"]["accepted_proposal_ids"] == ["memory-write-applied"]
+    assert ledger["summary"]["sequence_policy_promotion_allowed_by_acceptance"] is False
+    assert ledger["summary"]["execution_allowed_by_acceptance"] is False
+    assert ledger["summary"]["runtime_memory_mutation_allowed_by_acceptance"] is False
+    assert ledger["records"][0]["operator_accepted_sequence_memory_trust_candidate"] is True
+    assert ledger["records"][0]["sequence_policy_promotion_allowed_by_acceptance"] is False
+    assert ledger["records"][0]["execution_allowed_by_acceptance"] is False
+    assert queue["summary"]["pending_count"] == 0
+
+
 def test_main_pipeline_preview_exposes_source_identity_memory_trust_acceptance(server):
     server.source_identity_replay_context_cache_freshness = {
         "status": "fresh",

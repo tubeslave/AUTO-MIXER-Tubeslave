@@ -106,6 +106,15 @@ try:
     from source_identity_calibration_memory_index import (
         build_source_identity_calibration_memory_index,
     )
+    from operator_proposal_apply_sequence_policy_memory_index import (
+        build_operator_proposal_apply_sequence_policy_memory_index,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_review import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_review,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -246,6 +255,15 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_index import (
         build_source_identity_calibration_memory_index,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_index import (
+        build_operator_proposal_apply_sequence_policy_memory_index,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_review import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_review,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -628,6 +646,94 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "no_model_mutation",
             "no_runtime_memory_mutation",
             "no_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_index",
+        label="Operator Proposal Apply Sequence Policy Memory Index",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only index of append-only supervised operator proposal apply "
+            "sequence memory blocks; exposes durable sequence evidence without "
+            "execution or policy authority."
+        ),
+        module="backend/operator_proposal_apply_sequence_policy_memory_index.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="sequence_memory_index_is_review_evidence_not_execution_authority",
+        promotion_next=(
+            "use indexed sequence memory only as review evidence; separate "
+            "policy/trust promotion must approve any future execution influence"
+        ),
+        notes=(
+            "transport_free",
+            "append_only_sequence_memory_index",
+            "read_only_memory_evidence",
+            "no_queue_mutation",
+            "no_policy_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_review",
+        label="Operator Proposal Apply Sequence Policy Memory Trust Review",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only operator-review candidates derived from indexed supervised "
+            "operator proposal apply-sequence memory and fresh review context."
+        ),
+        module="backend/operator_proposal_apply_sequence_policy_memory_trust_review.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="sequence_memory_trust_review_requires_operator_policy_review",
+        promotion_next=(
+            "operator reviews indexed sequence memory with fresh context before "
+            "any separate policy/trust promotion can influence execution"
+        ),
+        notes=(
+            "transport_free",
+            "operator_review_only",
+            "sequence_memory_index_consumer",
+            "fresh_sequence_review_context_required",
+            "no_execution_authority",
+            "no_queue_mutation",
+            "no_policy_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger",
+        label="Operator Proposal Apply Sequence Policy Memory Trust Acceptance Ledger",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only ledger for operator accepted/rejected decisions on "
+            "supervised sequence memory trust-review candidates."
+        ),
+        module="backend/operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="sequence_memory_trust_acceptance_is_not_promotion_authority",
+        promotion_next=(
+            "use accepted sequence-memory trust records only as evidence for a "
+            "separate promotion contract before policy or execution influence"
+        ),
+        notes=(
+            "transport_free",
+            "operator_acceptance_ledger_only",
+            "sequence_memory_trust_review_consumer",
+            "no_execution_authority",
+            "no_queue_mutation",
+            "no_policy_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
             "no_live_writes",
         ),
     ),
@@ -2431,6 +2537,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_draft",
             "source_identity_calibration_memory_writer",
             "source_identity_calibration_memory_index",
+            "operator_proposal_apply_sequence_policy_memory_index",
+            "operator_proposal_apply_sequence_policy_memory_trust_review",
+            "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -2533,6 +2642,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_draft",
             "source_identity_calibration_memory_writer",
             "source_identity_calibration_memory_index",
+            "operator_proposal_apply_sequence_policy_memory_index",
+            "operator_proposal_apply_sequence_policy_memory_trust_review",
+            "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -2594,6 +2706,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_draft",
             "source_identity_calibration_memory_writer",
             "source_identity_calibration_memory_index",
+            "operator_proposal_apply_sequence_policy_memory_index",
+            "operator_proposal_apply_sequence_policy_memory_trust_review",
+            "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -2742,6 +2857,21 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "build_source_identity_calibration_memory_index",
         "ui_surface": "Channel Intelligence, append-only source identity memory index",
         "next_step": "Use indexed memory as review evidence only; separate replay/trust promotion is required before downstream priority changes.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_index": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_index",
+        "ui_surface": "Decision Queue, append-only sequence policy memory index",
+        "next_step": "Use indexed sequence memory as review evidence only; separate policy/trust promotion is required before any execution influence.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_review": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_review",
+        "ui_surface": "Decision Queue, sequence policy memory trust review",
+        "next_step": "Use only as operator-review evidence with fresh sequence context; execution influence still requires a separate promotion contract.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger",
+        "ui_surface": "Decision Queue, sequence policy memory trust acceptance ledger",
+        "next_step": "Record accepted/rejected sequence-memory trust decisions as evidence only; execution influence still requires a separate promotion contract.",
     },
     "source_identity_calibration_memory_trust_review": {
         "entrypoint": "build_source_identity_calibration_memory_trust_review",
@@ -3323,6 +3453,15 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "source_identity_calibration_memory_index": (
             build_source_identity_calibration_memory_index()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_index": (
+            build_operator_proposal_apply_sequence_policy_memory_index()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_review": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_review()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger()
         ),
         "source_identity_calibration_memory_trust_review": (
             build_source_identity_calibration_memory_trust_review()

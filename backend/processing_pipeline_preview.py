@@ -45,6 +45,15 @@ try:
     from source_identity_calibration_memory_index import (
         build_source_identity_calibration_memory_index,
     )
+    from operator_proposal_apply_sequence_policy_memory_index import (
+        build_operator_proposal_apply_sequence_policy_memory_index,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_review import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_review,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -133,6 +142,15 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_index import (
         build_source_identity_calibration_memory_index,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_index import (
+        build_operator_proposal_apply_sequence_policy_memory_index,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_review import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_review,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -447,6 +465,58 @@ def _source_identity_calibration_memory_root(server: Any) -> Optional[str]:
     return str(raw_root) if raw_root else None
 
 
+def _operator_proposal_apply_sequence_policy_memory_text(server: Any) -> Optional[str]:
+    raw_text = getattr(server, "operator_proposal_apply_sequence_policy_memory_text", None)
+    if raw_text is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_text = config.get("operator_proposal_apply_sequence_policy_memory_text")
+    return raw_text if isinstance(raw_text, str) else None
+
+
+def _operator_proposal_apply_sequence_policy_memory_root(server: Any) -> Optional[str]:
+    raw_root = getattr(server, "operator_proposal_apply_sequence_policy_memory_root", None)
+    if raw_root is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_root = config.get("operator_proposal_apply_sequence_policy_memory_root")
+    return str(raw_root) if raw_root else None
+
+
+def _operator_proposal_apply_sequence_policy_review_freshness(
+    server: Any,
+) -> Dict[str, Any]:
+    raw = getattr(server, "operator_proposal_apply_sequence_policy_review_freshness", None)
+    if raw is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw = config.get("operator_proposal_apply_sequence_policy_review_freshness")
+    return dict(raw) if isinstance(raw, dict) else {"status": "not_provided", "provided": False}
+
+
+def _operator_proposal_apply_sequence_policy_memory_trust_acceptance_records(
+    server: Any,
+) -> List[Dict[str, Any]]:
+    raw_records = getattr(
+        server,
+        "operator_proposal_apply_sequence_policy_memory_trust_acceptance_records",
+        None,
+    )
+    if raw_records is None:
+        raw_records = getattr(server, "sequence_policy_memory_trust_acceptance_records", None)
+    if raw_records is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_records = config.get(
+                "operator_proposal_apply_sequence_policy_memory_trust_acceptance_records"
+            )
+            if raw_records is None:
+                raw_records = config.get("sequence_policy_memory_trust_acceptance_records")
+    if not isinstance(raw_records, (list, tuple)):
+        return []
+    return [dict(record) for record in raw_records if isinstance(record, dict)]
+
+
 def _source_identity_memory_trust_acceptance_records(server: Any) -> List[Dict[str, Any]]:
     raw_records = getattr(server, "source_identity_memory_trust_acceptance_records", None)
     if raw_records is None:
@@ -624,6 +694,37 @@ def build_main_pipeline_preview(
         root=_source_identity_calibration_memory_root(server),
     )
     source_identity_memory_index_summary = source_identity_memory_index.get("summary", {})
+    sequence_policy_memory_index = (
+        build_operator_proposal_apply_sequence_policy_memory_index(
+            memory_text=_operator_proposal_apply_sequence_policy_memory_text(server),
+            root=_operator_proposal_apply_sequence_policy_memory_root(server),
+        )
+    )
+    sequence_policy_memory_index_summary = sequence_policy_memory_index.get("summary", {})
+    sequence_policy_memory_trust_review = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_review(
+            memory_index=sequence_policy_memory_index,
+            current_sequence_review_freshness=(
+                _operator_proposal_apply_sequence_policy_review_freshness(server)
+            ),
+        )
+    )
+    sequence_policy_memory_trust_review_summary = (
+        sequence_policy_memory_trust_review.get("summary", {})
+    )
+    sequence_policy_memory_trust_acceptance_ledger = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger(
+            memory_trust_review=sequence_policy_memory_trust_review,
+            acceptance_records=(
+                _operator_proposal_apply_sequence_policy_memory_trust_acceptance_records(
+                    server
+                )
+            ),
+        )
+    )
+    sequence_policy_memory_trust_acceptance_summary = (
+        sequence_policy_memory_trust_acceptance_ledger.get("summary", {})
+    )
     source_identity_memory_trust_review = (
         build_source_identity_calibration_memory_trust_review(
             memory_index=source_identity_memory_index,
@@ -847,6 +948,33 @@ def build_main_pipeline_preview(
             ),
             "source_identity_calibration_memory_index_invalid_record_count": int(
                 source_identity_memory_index_summary.get("invalid_record_count", 0) or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_index_record_count": int(
+                sequence_policy_memory_index_summary.get("memory_record_count", 0) or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_index_invalid_record_count": int(
+                sequence_policy_memory_index_summary.get("invalid_record_count", 0) or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_review_candidate_count": int(
+                sequence_policy_memory_trust_review_summary.get(
+                    "trust_review_candidate_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_acceptance_record_count": int(
+                sequence_policy_memory_trust_acceptance_summary.get(
+                    "acceptance_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_accepted_record_count": int(
+                sequence_policy_memory_trust_acceptance_summary.get(
+                    "accepted_record_count",
+                    0,
+                )
+                or 0
             ),
             "source_identity_calibration_memory_trust_review_candidate_count": int(
                 source_identity_memory_trust_review_summary.get(
@@ -1088,6 +1216,50 @@ def build_main_pipeline_preview(
                 "reason": (
                     ", ".join(source_identity_memory_index_summary.get("blocked_by", []))
                     if source_identity_memory_index_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
+                "adapter_id": "operator_proposal_apply_sequence_policy_memory_index",
+                "method_id": "operator_proposal_apply_sequence_policy_memory_index",
+                "status": sequence_policy_memory_index.get("status"),
+                "output": "operator_proposal_apply_sequence_append_only_memory_index_review",
+                "reason": (
+                    ", ".join(sequence_policy_memory_index_summary.get("blocked_by", []))
+                    if sequence_policy_memory_index_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
+                "adapter_id": "operator_proposal_apply_sequence_policy_memory_trust_review",
+                "method_id": "operator_proposal_apply_sequence_policy_memory_trust_review",
+                "status": sequence_policy_memory_trust_review.get("status"),
+                "output": "operator_proposal_apply_sequence_memory_trust_operator_review",
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_review_summary.get("blocked_by", [])
+                    )
+                    if sequence_policy_memory_trust_review_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger"
+                ),
+                "status": sequence_policy_memory_trust_acceptance_ledger.get("status"),
+                "output": "operator_proposal_apply_sequence_memory_trust_acceptance_ledger",
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_acceptance_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_acceptance_summary.get("blocked_by")
                     else None
                 ),
             },
@@ -1441,6 +1613,15 @@ def build_main_pipeline_preview(
         "source_identity_calibration_memory_draft": source_identity_memory_draft,
         "source_identity_calibration_memory_writer": source_identity_memory_writer,
         "source_identity_calibration_memory_index": source_identity_memory_index,
+        "operator_proposal_apply_sequence_policy_memory_index": (
+            sequence_policy_memory_index
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_review": (
+            sequence_policy_memory_trust_review
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger": (
+            sequence_policy_memory_trust_acceptance_ledger
+        ),
         "source_identity_calibration_memory_trust_review": (
             source_identity_memory_trust_review
         ),
