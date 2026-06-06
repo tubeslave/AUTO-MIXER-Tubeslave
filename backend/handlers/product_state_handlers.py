@@ -40,6 +40,15 @@ from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import
 from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan import (
     build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan,
 )
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_sequence_plan_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_sequence_plan_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer,
+)
 
 
 VERIFIED_MANUAL_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
@@ -674,6 +683,75 @@ def register_handlers(server):
         )
         result["handler"] = (
             "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_preflight_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_result_consumer(
+                queue_import_preflight_plan=(
+                    data.get("queue_import_preflight_plan")
+                    or data.get("preflight_plan")
+                    or data.get("plan")
+                ),
+                batch_preflight_result=(
+                    data.get("batch_preflight_result")
+                    or data.get("preflight_batch")
+                    or data.get("batch")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_preflight_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_sequence_plan_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_sequence_plan_result_consumer(
+                preflight_result_consumer=(
+                    data.get("preflight_result_consumer")
+                    or data.get("queue_import_preflight_result_consumer")
+                    or data.get("consumer")
+                ),
+                sequence_plan_result=(
+                    data.get("sequence_plan_result")
+                    or data.get("sequence_plan")
+                    or data.get("plan")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_sequence_plan_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_dry_run_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer(
+                sequence_plan_result_consumer=(
+                    data.get("sequence_plan_result_consumer")
+                    or data.get("queue_import_sequence_plan_result_consumer")
+                    or data.get("consumer")
+                ),
+                dry_run_result=(
+                    data.get("dry_run_result")
+                    or data.get("dry_run_payload")
+                    or data.get("dry_run")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_dry_run_result"
         )
         await server.send_to_client(websocket, result)
 
@@ -4449,6 +4527,15 @@ def register_handlers(server):
         ),
         "plan_operator_proposal_apply_sequence_policy_queue_import_preflight": (
             handle_plan_operator_proposal_apply_sequence_policy_queue_import_preflight
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_preflight_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_preflight_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_sequence_plan_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_sequence_plan_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_dry_run_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_dry_run_result
         ),
         "create_operator_proposal": handle_create_operator_proposal,
         "accept_operator_proposal": handle_accept_operator_proposal,

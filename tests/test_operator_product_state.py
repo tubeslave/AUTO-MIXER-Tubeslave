@@ -11802,6 +11802,382 @@ async def test_sequence_policy_queue_import_preflight_plan_handler_feeds_batch_p
     server._apply_manual_console_write.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_sequence_policy_queue_import_preflight_result_consumer_feeds_sequence_plan_without_write(server):
+    proposals, plan = _sequence_policy_queue_import_fixture()
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch[
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+    ](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+            "apply": True,
+            "operator_ack": True,
+        },
+    )
+    await server._dispatch[
+        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
+    ](
+        object(),
+        {
+            "idempotency_key_prefix": "seq-import-consumer",
+        },
+    )
+    plan_payload = server.send_to_client.await_args.args[1]
+    request = dict(plan_payload["batch_preflight_request"])
+    request["approved"] = True
+
+    await server._dispatch["preflight_operator_proposal_apply_batch"](
+        object(),
+        request,
+    )
+    preflight_payload = server.send_to_client.await_args.args[1]
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_preflight_result"
+    ](
+        object(),
+        {
+            "queue_import_preflight_plan": plan_payload,
+            "batch_preflight_result": preflight_payload,
+        },
+    )
+
+    consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_result_consumer"
+    )
+    assert (
+        consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_preflight_result"
+    )
+    assert (
+        consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_sequence_plan_request_available"
+    )
+    assert consumer_payload["summary"]["planned_preflight_candidate_count"] == 1
+    assert consumer_payload["summary"]["ready_preflight_result_count"] == 1
+    assert consumer_payload["summary"]["blocked_preflight_result_count"] == 0
+    assert consumer_payload["summary"]["sequence_plan_request_available"] is True
+    assert consumer_payload["summary"]["sequence_plan_handler_invoked"] is False
+    assert consumer_payload["summary"]["sequence_plan_created"] is False
+    assert (
+        consumer_payload["summary"]["sequence_execution_allowed_by_consumer"]
+        is False
+    )
+    assert consumer_payload["summary"]["idempotency_reserved"] is False
+    assert consumer_payload["sequence_plan_request"]["handler"] == (
+        "plan_operator_proposal_apply_sequence"
+    )
+    assert len(consumer_payload["sequence_plan_request"]["preflight_results"]) == 1
+
+    await server._dispatch["plan_operator_proposal_apply_sequence"](
+        object(),
+        consumer_payload["sequence_plan_request"],
+    )
+
+    sequence_plan_payload = server.send_to_client.await_args.args[1]
+    assert sequence_plan_payload["type"] == "operator_proposal_apply_sequence_plan"
+    assert sequence_plan_payload["status"] == "ok"
+    assert sequence_plan_payload["summary"]["planned_apply_count"] == 1
+    assert sequence_plan_payload["summary"]["planned_apply_proposal_ids"] == [
+        "proposal-sequence-fader"
+    ]
+    assert sequence_plan_payload["summary"]["execution_allowed_by_plan"] is False
+    assert sequence_plan_payload["summary"]["live_write"] is False
+    assert sequence_plan_payload["summary"]["queue_mutation"] is False
+    assert sequence_plan_payload["summary"]["idempotency_reserved"] is False
+    assert sequence_plan_payload["summary"]["manual_console_write_called"] is False
+    assert (
+        sequence_plan_payload["planned_apply_sequence"][0]["idempotency_key"]
+        == "seq-import-consumer:proposal-sequence-fader"
+    )
+    assert "seq-import-consumer:proposal-sequence-fader" not in (
+        server._operator_apply_idempotency_keys
+    )
+    assert build_decision_queue(server)["summary"]["pending_count"] == 2
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_sequence_policy_queue_import_sequence_plan_result_consumer_feeds_dry_run_without_write(server):
+    proposals, plan = _sequence_policy_queue_import_fixture()
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch[
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+    ](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+            "apply": True,
+            "operator_ack": True,
+        },
+    )
+    await server._dispatch[
+        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
+    ](
+        object(),
+        {
+            "idempotency_key_prefix": "seq-import-dry-run",
+        },
+    )
+    plan_payload = server.send_to_client.await_args.args[1]
+    request = dict(plan_payload["batch_preflight_request"])
+    request["approved"] = True
+
+    await server._dispatch["preflight_operator_proposal_apply_batch"](
+        object(),
+        request,
+    )
+    preflight_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_preflight_result"
+    ](
+        object(),
+        {
+            "queue_import_preflight_plan": plan_payload,
+            "batch_preflight_result": preflight_payload,
+        },
+    )
+    preflight_consumer_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["plan_operator_proposal_apply_sequence"](
+        object(),
+        preflight_consumer_payload["sequence_plan_request"],
+    )
+    sequence_plan_payload = server.send_to_client.await_args.args[1]
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_sequence_plan_result"
+    ](
+        object(),
+        {
+            "preflight_result_consumer": preflight_consumer_payload,
+            "sequence_plan_result": sequence_plan_payload,
+        },
+    )
+
+    sequence_plan_consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        sequence_plan_consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_sequence_plan_result_consumer"
+    )
+    assert (
+        sequence_plan_consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_sequence_plan_result"
+    )
+    assert (
+        sequence_plan_consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_dry_run_request_available"
+    )
+    assert (
+        sequence_plan_consumer_payload["summary"]["expected_sequence_plan_step_count"]
+        == 1
+    )
+    assert sequence_plan_consumer_payload["summary"]["sequence_plan_step_count"] == 1
+    assert (
+        sequence_plan_consumer_payload["summary"]["blocked_sequence_plan_step_count"]
+        == 0
+    )
+    assert sequence_plan_consumer_payload["summary"]["dry_run_request_available"] is True
+    assert sequence_plan_consumer_payload["summary"]["dry_run_handler_invoked"] is False
+    assert sequence_plan_consumer_payload["summary"]["dry_run_created"] is False
+    assert (
+        sequence_plan_consumer_payload["summary"]["execution_allowed_by_consumer"]
+        is False
+    )
+    assert sequence_plan_consumer_payload["summary"]["idempotency_reserved"] is False
+    assert sequence_plan_consumer_payload["dry_run_request"]["handler"] == (
+        "dry_run_operator_proposal_apply_sequence"
+    )
+    assert (
+        sequence_plan_consumer_payload["dry_run_request"]["sequence_plan"]["type"]
+        == "operator_proposal_apply_sequence_plan"
+    )
+
+    await server._dispatch["dry_run_operator_proposal_apply_sequence"](
+        object(),
+        sequence_plan_consumer_payload["dry_run_request"],
+    )
+
+    dry_run_payload = server.send_to_client.await_args.args[1]
+    assert dry_run_payload["type"] == "operator_proposal_apply_sequence_dry_run"
+    assert dry_run_payload["status"] == "ok"
+    assert dry_run_payload["summary"]["would_apply_count"] == 1
+    assert dry_run_payload["summary"]["would_apply_proposal_ids"] == [
+        "proposal-sequence-fader"
+    ]
+    assert dry_run_payload["summary"]["execution_allowed_by_dry_run"] is False
+    assert dry_run_payload["summary"]["live_write"] is False
+    assert dry_run_payload["summary"]["queue_mutation"] is False
+    assert dry_run_payload["summary"]["idempotency_reserved"] is False
+    assert dry_run_payload["summary"]["manual_console_write_called"] is False
+    assert (
+        dry_run_payload["dry_run_results"][0]["apply_request"]["idempotency_key"]
+        == "seq-import-dry-run:proposal-sequence-fader"
+    )
+    assert "seq-import-dry-run:proposal-sequence-fader" not in (
+        server._operator_apply_idempotency_keys
+    )
+    assert build_decision_queue(server)["summary"]["pending_count"] == 2
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_sequence_policy_queue_import_dry_run_result_consumer_feeds_execution_gate_without_write(server):
+    proposals, plan = _sequence_policy_queue_import_fixture()
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch[
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+    ](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+            "apply": True,
+            "operator_ack": True,
+        },
+    )
+    await server._dispatch[
+        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
+    ](
+        object(),
+        {
+            "idempotency_key_prefix": "seq-import-gate",
+        },
+    )
+    plan_payload = server.send_to_client.await_args.args[1]
+    request = dict(plan_payload["batch_preflight_request"])
+    request["approved"] = True
+    await server._dispatch["preflight_operator_proposal_apply_batch"](
+        object(),
+        request,
+    )
+    preflight_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_preflight_result"
+    ](
+        object(),
+        {
+            "queue_import_preflight_plan": plan_payload,
+            "batch_preflight_result": preflight_payload,
+        },
+    )
+    preflight_consumer_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["plan_operator_proposal_apply_sequence"](
+        object(),
+        preflight_consumer_payload["sequence_plan_request"],
+    )
+    sequence_plan_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_sequence_plan_result"
+    ](
+        object(),
+        {
+            "preflight_result_consumer": preflight_consumer_payload,
+            "sequence_plan_result": sequence_plan_payload,
+        },
+    )
+    sequence_plan_consumer_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["dry_run_operator_proposal_apply_sequence"](
+        object(),
+        sequence_plan_consumer_payload["dry_run_request"],
+    )
+    dry_run_payload = server.send_to_client.await_args.args[1]
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_dry_run_result"
+    ](
+        object(),
+        {
+            "sequence_plan_result_consumer": sequence_plan_consumer_payload,
+            "dry_run_result": dry_run_payload,
+        },
+    )
+
+    dry_run_consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        dry_run_consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer"
+    )
+    assert (
+        dry_run_consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_dry_run_result"
+    )
+    assert (
+        dry_run_consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_execution_gate_request_available"
+    )
+    assert dry_run_consumer_payload["summary"]["expected_dry_run_result_count"] == 1
+    assert dry_run_consumer_payload["summary"]["dry_run_result_count"] == 1
+    assert dry_run_consumer_payload["summary"]["would_apply_result_count"] == 1
+    assert dry_run_consumer_payload["summary"]["blocked_dry_run_result_count"] == 0
+    assert dry_run_consumer_payload["summary"]["execution_gate_request_available"] is True
+    assert dry_run_consumer_payload["summary"]["execution_gate_handler_invoked"] is False
+    assert dry_run_consumer_payload["summary"]["execution_gate_created"] is False
+    assert (
+        dry_run_consumer_payload["summary"]["execution_allowed_by_consumer"]
+        is False
+    )
+    assert dry_run_consumer_payload["summary"]["idempotency_reserved"] is False
+    assert dry_run_consumer_payload["execution_gate_request"]["handler"] == (
+        "gate_operator_proposal_apply_sequence_execution"
+    )
+    assert dry_run_consumer_payload["execution_gate_request"]["operator_ack"] is False
+    assert (
+        dry_run_consumer_payload["execution_gate_request"][
+            "operator_must_set_operator_ack_true"
+        ]
+        is True
+    )
+
+    gate_request = dict(dry_run_consumer_payload["execution_gate_request"])
+    gate_request["operator_ack"] = True
+    await server._dispatch["gate_operator_proposal_apply_sequence_execution"](
+        object(),
+        gate_request,
+    )
+
+    gate_payload = server.send_to_client.await_args.args[1]
+    assert gate_payload["type"] == "operator_proposal_apply_sequence_execution_gate"
+    assert gate_payload["status"] == "ready"
+    assert gate_payload["summary"]["ready_for_executor_count"] == 1
+    assert gate_payload["summary"]["ready_for_executor_proposal_ids"] == [
+        "proposal-sequence-fader"
+    ]
+    assert gate_payload["summary"]["operator_ack_received"] is True
+    assert gate_payload["summary"]["execution_allowed_by_gate"] is False
+    assert gate_payload["summary"]["requires_separate_executor"] is True
+    assert gate_payload["summary"]["live_write"] is False
+    assert gate_payload["summary"]["queue_mutation"] is False
+    assert gate_payload["summary"]["idempotency_reserved"] is False
+    assert gate_payload["summary"]["manual_console_write_called"] is False
+    assert (
+        gate_payload["ready_for_executor"][0]["apply_request"]["idempotency_key"]
+        == "seq-import-gate:proposal-sequence-fader"
+    )
+    assert "seq-import-gate:proposal-sequence-fader" not in (
+        server._operator_apply_idempotency_keys
+    )
+    assert build_decision_queue(server)["summary"]["pending_count"] == 2
+    server._apply_manual_console_write.assert_not_called()
+
+
 def test_import_soundcheck_recommendations_respects_analyze_mode(server):
     server.operator_mode = "analyze"
     workflow = NoWriteSoundcheckRecommendationWorkflow()

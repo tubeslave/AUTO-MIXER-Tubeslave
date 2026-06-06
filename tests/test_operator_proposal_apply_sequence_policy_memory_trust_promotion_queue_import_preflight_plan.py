@@ -216,6 +216,32 @@ def test_sequence_policy_queue_import_preflight_plan_rejects_forged_metadata():
     assert plan["batch_preflight_request"]["proposal_ids"] == []
 
 
+def test_sequence_policy_queue_import_preflight_plan_rejects_ambiguous_import_order():
+    plan = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan(
+            pending_actions=[
+                _imported_action("duplicate-proposal", index=0),
+                _imported_action("duplicate-proposal", index=0),
+            ],
+        )
+    )
+
+    assert (
+        plan["status"]
+        == "sequence_memory_trust_promotion_queue_import_preflight_plan_replacement_required"
+    )
+    assert plan["summary"]["preflight_candidate_count"] == 0
+    assert plan["summary"]["batch_preflight_request_available"] is False
+    assert (
+        "duplicate_proposal_id:duplicate-proposal"
+        in plan["summary"]["invalid_record_ids"]
+    )
+    assert "duplicate_planned_queue_index:0" in plan["summary"]["invalid_record_ids"]
+    assert plan["batch_preflight_request"]["proposal_ids"] == []
+    assert plan["batch_preflight_request"]["approved"] is False
+    assert plan["summary"]["live_authority_granted"] is False
+
+
 def test_sequence_policy_queue_import_preflight_plan_is_registered_non_live():
     method = get_processing_method(
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_PREFLIGHT_PLAN_METHOD_ID

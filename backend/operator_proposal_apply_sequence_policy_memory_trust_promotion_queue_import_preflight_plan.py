@@ -67,6 +67,10 @@ def _duplicate_values(values: Tuple[str, ...]) -> Tuple[str, ...]:
     return tuple(value for value, count in counts.items() if count > 1)
 
 
+def _duplicate_markers(values: Tuple[str, ...], label: str) -> Tuple[str, ...]:
+    return tuple(f"{label}:{value}" for value in _duplicate_values(values))
+
+
 def _action_id(action: Mapping[str, Any], index: int) -> str:
     value = action.get("id") or action.get("proposal_id") or action.get("action_id")
     return str(value) if value is not None and str(value).strip() else f"proposal:{index}"
@@ -169,14 +173,19 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
                     for index, action in enumerate(imported_actions)
                     for violation in _metadata_violations(action, index=index)
                 ),
-                *_duplicate_values(
-                    tuple(_action_id(action, index) for index, action in enumerate(imported_actions))
+                *_duplicate_markers(
+                    tuple(
+                        _action_id(action, index)
+                        for index, action in enumerate(imported_actions)
+                    ),
+                    "duplicate_proposal_id",
                 ),
-                *_duplicate_values(
+                *_duplicate_markers(
                     tuple(
                         str(_metadata(action).get("planned_queue_index"))
                         for action in imported_actions
-                    )
+                    ),
+                    "duplicate_planned_queue_index",
                 ),
             )
         )
