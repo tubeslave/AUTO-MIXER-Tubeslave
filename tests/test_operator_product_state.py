@@ -5571,6 +5571,48 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
         "queue_mutation": False,
         "policy_mutation": False,
     }
+    server.operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_evidence = {
+        "status": "ready",
+        "read_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "queue_mutation": False,
+        "policy_mutation": False,
+        "model_mutation": False,
+        "runtime_memory_mutation": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "rollback_strategy": "manual_revert_to_previous_sequence_policy_state",
+        "previous_policy_state": "not_trusted_for_sequence_policy",
+        "target_policy_store": "operator_sequence_policy_trust_gate",
+        "reviewed_by": "operator",
+        "reviewed_at": "2026-06-06T13:00:00Z",
+    }
+    server.operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_records = [
+        {
+            "promotion_acceptance_id": "sequence-memory-promotion-acceptance-1",
+            "promotion_contract_record_id": (
+                "operator_sequence_memory_trust_promotion_contract:"
+                "operator_sequence_memory_trust_promotion:"
+                "sequence-memory-trust-acceptance-1"
+            ),
+            "promotion_candidate_id": (
+                "operator_sequence_memory_trust_promotion:"
+                "sequence-memory-trust-acceptance-1"
+            ),
+            "proposal_id": "memory-write-applied",
+            "learning_scope": "supervised_fader_gain_sequence_execution",
+            "value_type": "fader",
+            "idempotency_key": "memory-write:memory-write-applied",
+            "previous_policy_state": "not_trusted_for_sequence_policy",
+            "rollback_strategy": "manual_revert_to_previous_sequence_policy_state",
+            "decision": "accepted",
+            "reviewed_by": "operator",
+            "reviewed_at": "2026-06-06T13:30:00Z",
+        }
+    ]
     server.operator_proposal_apply_sequence_policy_memory_trust_acceptance_records = [
         {
             "acceptance_id": "sequence-memory-trust-acceptance-1",
@@ -5629,6 +5671,18 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     ledger = payload[
         "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger"
     ]
+    plan = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan"
+    ]
+    contract = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract"
+    ]
+    promotion_ledger = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger"
+    ]
+    execution_plan = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
@@ -5645,6 +5699,30 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
         for item in payload["adapters"]
         if item["adapter_id"]
         == "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger"
+    ][0]
+    plan_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan"
+    ][0]
+    contract_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract"
+    ][0]
+    promotion_ledger_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger"
+    ][0]
+    execution_plan_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan"
     ][0]
 
     assert (
@@ -5677,6 +5755,36 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
         ]
         == 1
     )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_candidate_count"
+        ]
+        == 1
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract_record_count"
+        ]
+        == 1
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_record_count"
+        ]
+        == 1
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_accepted_record_count"
+        ]
+        == 1
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_candidate_count"
+        ]
+        == 1
+    )
     assert adapter["method_id"] == "operator_proposal_apply_sequence_policy_memory_index"
     assert (
         adapter["output"]
@@ -5697,6 +5805,38 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     assert (
         ledger_adapter["output"]
         == "operator_proposal_apply_sequence_memory_trust_acceptance_ledger"
+    )
+    assert (
+        plan_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan"
+    )
+    assert (
+        plan_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_plan"
+    )
+    assert (
+        contract_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract"
+    )
+    assert (
+        contract_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_contract_review"
+    )
+    assert (
+        promotion_ledger_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger"
+    )
+    assert (
+        promotion_ledger_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_acceptance_ledger"
+    )
+    assert (
+        execution_plan_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan"
+    )
+    assert (
+        execution_plan_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_execution_plan"
     )
     assert index["status"] == "append_only_sequence_memory_index_available"
     assert index["summary"]["memory_record_count"] == 1
@@ -5727,6 +5867,122 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     assert ledger["records"][0]["operator_accepted_sequence_memory_trust_candidate"] is True
     assert ledger["records"][0]["sequence_policy_promotion_allowed_by_acceptance"] is False
     assert ledger["records"][0]["execution_allowed_by_acceptance"] is False
+    assert plan["status"] == "sequence_memory_trust_promotion_plan_candidate_available"
+    assert plan["summary"]["promotion_candidate_count"] == 1
+    assert plan["summary"]["accepted_proposal_ids"] == ["memory-write-applied"]
+    assert plan["summary"]["sequence_policy_promotion_allowed_by_plan"] is False
+    assert plan["summary"]["execution_allowed_by_plan"] is False
+    assert plan["summary"]["runtime_memory_mutation_allowed_by_plan"] is False
+    assert (
+        plan["promotion_candidates"][0]["manual_sequence_policy_promotion_required"]
+        is True
+    )
+    assert plan["promotion_candidates"][0]["proposal_id"] == "memory-write-applied"
+    assert (
+        plan["promotion_candidates"][0]["sequence_policy_promotion_allowed_by_plan"]
+        is False
+    )
+    assert plan["promotion_candidates"][0]["execution_allowed_by_plan"] is False
+    assert (
+        contract["status"]
+        == "manual_sequence_memory_trust_promotion_contract_ready"
+    )
+    assert contract["summary"]["contract_record_count"] == 1
+    assert contract["summary"]["proposal_ids"] == ["memory-write-applied"]
+    assert contract["summary"]["sequence_policy_promotion_allowed_by_contract"] is False
+    assert contract["summary"]["execution_allowed_by_contract"] is False
+    assert contract["summary"]["runtime_memory_mutation_allowed_by_contract"] is False
+    assert (
+        contract["contract_records"][0][
+            "sequence_policy_promotion_ready_for_operator_review"
+        ]
+        is True
+    )
+    assert contract["contract_records"][0]["proposal_id"] == "memory-write-applied"
+    assert (
+        contract["contract_records"][0]["sequence_policy_promotion_allowed_by_contract"]
+        is False
+    )
+    assert contract["contract_records"][0]["execution_allowed_by_contract"] is False
+    assert contract["contract_records"][0]["policy_mutation_allowed_by_contract"] is False
+    assert (
+        contract["contract_records"][0]["runtime_memory_mutation_allowed_by_contract"]
+        is False
+    )
+    assert contract["contract_records"][0]["read_only"] is True
+    assert contract["contract_records"][0]["live_write"] is False
+    assert contract["contract_records"][0]["mutates_console_state"] is False
+    assert contract["contract_records"][0]["rollback_evidence_required"] is True
+    assert contract["contract_records"][0]["live_authority_granted"] is False
+    assert promotion_ledger["status"] == (
+        "operator_sequence_memory_trust_promotion_acceptance_records_available"
+    )
+    assert promotion_ledger["summary"]["accepted_record_count"] == 1
+    assert promotion_ledger["summary"]["accepted_proposal_ids"] == [
+        "memory-write-applied"
+    ]
+    assert (
+        promotion_ledger["summary"]["sequence_policy_promotion_allowed_by_acceptance"]
+        is False
+    )
+    assert promotion_ledger["summary"]["execution_allowed_by_acceptance"] is False
+    assert (
+        promotion_ledger["summary"]["runtime_memory_mutation_allowed_by_acceptance"]
+        is False
+    )
+    assert (
+        promotion_ledger["records"][0][
+            "operator_accepted_sequence_memory_trust_promotion_contract"
+        ]
+        is True
+    )
+    assert (
+        promotion_ledger["records"][0][
+            "sequence_policy_promotion_allowed_by_acceptance"
+        ]
+        is False
+    )
+    assert promotion_ledger["records"][0]["execution_allowed_by_acceptance"] is False
+    assert promotion_ledger["records"][0]["policy_mutation_allowed_by_acceptance"] is False
+    assert (
+        execution_plan["status"]
+        == "manual_sequence_memory_trust_promotion_execution_candidate_available"
+    )
+    assert execution_plan["summary"]["execution_candidate_count"] == 1
+    assert execution_plan["summary"]["accepted_proposal_ids"] == [
+        "memory-write-applied"
+    ]
+    assert execution_plan["summary"]["execution_allowed_by_plan"] is False
+    assert (
+        execution_plan["summary"]["sequence_policy_promotion_allowed_by_plan"]
+        is False
+    )
+    assert execution_plan["summary"]["policy_mutation_allowed_by_plan"] is False
+    assert (
+        execution_plan["summary"]["runtime_memory_mutation_allowed_by_plan"]
+        is False
+    )
+    assert execution_plan["execution_candidates"][0]["proposal_id"] == (
+        "memory-write-applied"
+    )
+    assert execution_plan["execution_candidates"][0]["read_only"] is True
+    assert execution_plan["execution_candidates"][0]["live_write"] is False
+    assert execution_plan["execution_candidates"][0]["apply_attempted"] is False
+    assert (
+        execution_plan["execution_candidates"][0][
+            "sequence_policy_promotion_allowed_by_plan"
+        ]
+        is False
+    )
+    assert (
+        execution_plan["execution_candidates"][0][
+            "runtime_memory_mutation_allowed_by_plan"
+        ]
+        is False
+    )
+    assert (
+        execution_plan["execution_candidates"][0]["live_authority_granted"] is False
+    )
     assert queue["summary"]["pending_count"] == 0
 
 

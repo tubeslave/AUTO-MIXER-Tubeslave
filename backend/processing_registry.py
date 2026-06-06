@@ -115,6 +115,18 @@ try:
     from operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
         build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
     )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_plan,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_contract import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_contract,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -264,6 +276,18 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
         build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_plan,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_contract import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_contract,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -729,6 +753,132 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "transport_free",
             "operator_acceptance_ledger_only",
             "sequence_memory_trust_review_consumer",
+            "no_execution_authority",
+            "no_queue_mutation",
+            "no_policy_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_plan",
+        label="Operator Proposal Apply Sequence Policy Memory Trust Promotion Plan",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only manual promotion plan derived from accepted supervised "
+            "sequence-memory trust ledger records; does not change policy or execution."
+        ),
+        module="backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_plan.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="sequence_memory_trust_promotion_plan_is_manual_not_authority",
+        promotion_next=(
+            "define a separate promotion contract with fresh policy context and "
+            "rollback before accepted sequence memory can influence execution"
+        ),
+        notes=(
+            "transport_free",
+            "manual_promotion_plan_only",
+            "sequence_memory_trust_acceptance_consumer",
+            "no_execution_authority",
+            "no_queue_mutation",
+            "no_policy_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_contract",
+        label="Operator Proposal Apply Sequence Policy Memory Trust Promotion Contract",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only contract for accepted sequence-memory trust promotion "
+            "candidates; requires fresh policy context and rollback evidence."
+        ),
+        module="backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_contract.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="sequence_memory_trust_promotion_contract_is_review_not_authority",
+        promotion_next=(
+            "operator reviews contract records before any separate executor can "
+            "mutate sequence policy or influence supervised execution"
+        ),
+        notes=(
+            "transport_free",
+            "manual_promotion_contract_only",
+            "fresh_sequence_context_required",
+            "rollback_evidence_required",
+            "sequence_memory_trust_promotion_plan_consumer",
+            "no_execution_authority",
+            "no_queue_mutation",
+            "no_policy_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger",
+        label="Operator Proposal Apply Sequence Policy Memory Trust Promotion Acceptance Ledger",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only ledger for operator accepted/rejected decisions on "
+            "sequence-memory trust promotion contract records."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_acceptance_is_not_policy_or_execution_authority"
+        ),
+        promotion_next=(
+            "use accepted promotion contract records only as evidence for a "
+            "separate executor plan before policy or execution influence"
+        ),
+        notes=(
+            "transport_free",
+            "operator_acceptance_ledger_only",
+            "sequence_memory_trust_promotion_contract_consumer",
+            "no_execution_authority",
+            "no_queue_mutation",
+            "no_policy_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan",
+        label="Operator Proposal Apply Sequence Policy Memory Trust Promotion Execution Plan",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only execution plan that surfaces accepted sequence-memory "
+            "promotion records as non-executing candidates."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_execution_plan_is_not_executor_authority"
+        ),
+        promotion_next=(
+            "build a separate acknowledged executor before sequence policy, "
+            "queue, runtime memory, or live execution can be influenced"
+        ),
+        notes=(
+            "transport_free",
+            "execution_plan_only",
+            "sequence_memory_trust_promotion_acceptance_consumer",
             "no_execution_authority",
             "no_queue_mutation",
             "no_policy_mutation",
@@ -2540,6 +2690,10 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_index",
             "operator_proposal_apply_sequence_policy_memory_trust_review",
             "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -2645,6 +2799,10 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_index",
             "operator_proposal_apply_sequence_policy_memory_trust_review",
             "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -2709,6 +2867,10 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_index",
             "operator_proposal_apply_sequence_policy_memory_trust_review",
             "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -2872,6 +3034,26 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger",
         "ui_surface": "Decision Queue, sequence policy memory trust acceptance ledger",
         "next_step": "Record accepted/rejected sequence-memory trust decisions as evidence only; execution influence still requires a separate promotion contract.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_plan",
+        "ui_surface": "Decision Queue, manual sequence policy memory trust promotion plan",
+        "next_step": "Use accepted sequence-memory trust records only as manual promotion candidates; policy and execution influence still require a separate promotion contract.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_contract",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion contract",
+        "next_step": "Use contract records only for operator review; policy and execution influence still require a separate executor and rollback path.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion acceptance ledger",
+        "next_step": "Record accepted/rejected promotion contract records as evidence only; policy and execution influence still require a separate executor plan.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion execution plan",
+        "next_step": "Surface accepted promotion records only as non-executing candidates; policy and execution influence still require a separate acknowledged executor.",
     },
     "source_identity_calibration_memory_trust_review": {
         "entrypoint": "build_source_identity_calibration_memory_trust_review",
@@ -3462,6 +3644,18 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger": (
             build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_plan()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_contract()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan()
         ),
         "source_identity_calibration_memory_trust_review": (
             build_source_identity_calibration_memory_trust_review()

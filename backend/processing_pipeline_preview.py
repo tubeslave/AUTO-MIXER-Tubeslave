@@ -54,6 +54,18 @@ try:
     from operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
         build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
     )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_plan,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_contract import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_contract,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -151,6 +163,18 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
         build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_plan,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_contract import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_contract,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -517,6 +541,62 @@ def _operator_proposal_apply_sequence_policy_memory_trust_acceptance_records(
     return [dict(record) for record in raw_records if isinstance(record, dict)]
 
 
+def _operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_evidence(
+    server: Any,
+) -> Dict[str, Any]:
+    raw_evidence = getattr(
+        server,
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_evidence",
+        None,
+    )
+    if raw_evidence is None:
+        raw_evidence = getattr(
+            server,
+            "sequence_policy_memory_trust_promotion_rollback_evidence",
+            None,
+        )
+    if raw_evidence is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_evidence = config.get(
+                "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_evidence"
+            )
+            if raw_evidence is None:
+                raw_evidence = config.get(
+                    "sequence_policy_memory_trust_promotion_rollback_evidence"
+                )
+    return dict(raw_evidence) if isinstance(raw_evidence, dict) else {}
+
+
+def _operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_records(
+    server: Any,
+) -> List[Dict[str, Any]]:
+    raw_records = getattr(
+        server,
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_records",
+        None,
+    )
+    if raw_records is None:
+        raw_records = getattr(
+            server,
+            "sequence_policy_memory_trust_promotion_acceptance_records",
+            None,
+        )
+    if raw_records is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_records = config.get(
+                "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_records"
+            )
+            if raw_records is None:
+                raw_records = config.get(
+                    "sequence_policy_memory_trust_promotion_acceptance_records"
+                )
+    if not isinstance(raw_records, (list, tuple)):
+        return []
+    return [dict(record) for record in raw_records if isinstance(record, dict)]
+
+
 def _source_identity_memory_trust_acceptance_records(server: Any) -> List[Dict[str, Any]]:
     raw_records = getattr(server, "source_identity_memory_trust_acceptance_records", None)
     if raw_records is None:
@@ -724,6 +804,53 @@ def build_main_pipeline_preview(
     )
     sequence_policy_memory_trust_acceptance_summary = (
         sequence_policy_memory_trust_acceptance_ledger.get("summary", {})
+    )
+    sequence_policy_memory_trust_promotion_plan = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_plan(
+            acceptance_ledger=sequence_policy_memory_trust_acceptance_ledger,
+        )
+    )
+    sequence_policy_memory_trust_promotion_summary = (
+        sequence_policy_memory_trust_promotion_plan.get("summary", {})
+    )
+    sequence_policy_memory_trust_promotion_contract = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_contract(
+            promotion_plan=sequence_policy_memory_trust_promotion_plan,
+            current_sequence_policy_context=(
+                _operator_proposal_apply_sequence_policy_review_freshness(server)
+            ),
+            rollback_evidence=(
+                _operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_evidence(
+                    server
+                )
+            ),
+        )
+    )
+    sequence_policy_memory_trust_promotion_contract_summary = (
+        sequence_policy_memory_trust_promotion_contract.get("summary", {})
+    )
+    sequence_policy_memory_trust_promotion_acceptance_ledger = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger(
+            promotion_contract=sequence_policy_memory_trust_promotion_contract,
+            acceptance_records=(
+                _operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_records(
+                    server
+                )
+            ),
+        )
+    )
+    sequence_policy_memory_trust_promotion_acceptance_summary = (
+        sequence_policy_memory_trust_promotion_acceptance_ledger.get("summary", {})
+    )
+    sequence_policy_memory_trust_promotion_execution_plan = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan(
+            promotion_acceptance_ledger=(
+                sequence_policy_memory_trust_promotion_acceptance_ledger
+            ),
+        )
+    )
+    sequence_policy_memory_trust_promotion_execution_summary = (
+        sequence_policy_memory_trust_promotion_execution_plan.get("summary", {})
     )
     source_identity_memory_trust_review = (
         build_source_identity_calibration_memory_trust_review(
@@ -972,6 +1099,41 @@ def build_main_pipeline_preview(
             "operator_proposal_apply_sequence_policy_memory_trust_accepted_record_count": int(
                 sequence_policy_memory_trust_acceptance_summary.get(
                     "accepted_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_candidate_count": int(
+                sequence_policy_memory_trust_promotion_summary.get(
+                    "promotion_candidate_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract_record_count": int(
+                sequence_policy_memory_trust_promotion_contract_summary.get(
+                    "contract_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_record_count": int(
+                sequence_policy_memory_trust_promotion_acceptance_summary.get(
+                    "acceptance_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_accepted_record_count": int(
+                sequence_policy_memory_trust_promotion_acceptance_summary.get(
+                    "accepted_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_candidate_count": int(
+                sequence_policy_memory_trust_promotion_execution_summary.get(
+                    "execution_candidate_count",
                     0,
                 )
                 or 0
@@ -1260,6 +1422,100 @@ def build_main_pipeline_preview(
                         )
                     )
                     if sequence_policy_memory_trust_acceptance_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan"
+                ),
+                "status": sequence_policy_memory_trust_promotion_plan.get("status"),
+                "output": "operator_proposal_apply_sequence_memory_trust_promotion_plan",
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_promotion_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_promotion_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract"
+                ),
+                "status": sequence_policy_memory_trust_promotion_contract.get("status"),
+                "output": "operator_proposal_apply_sequence_memory_trust_promotion_contract_review",
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_promotion_contract_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_promotion_contract_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger"
+                ),
+                "status": sequence_policy_memory_trust_promotion_acceptance_ledger.get(
+                    "status"
+                ),
+                "output": (
+                    "operator_proposal_apply_sequence_memory_trust_promotion_acceptance_ledger"
+                ),
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_promotion_acceptance_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_promotion_acceptance_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan"
+                ),
+                "status": sequence_policy_memory_trust_promotion_execution_plan.get(
+                    "status"
+                ),
+                "output": (
+                    "operator_proposal_apply_sequence_memory_trust_promotion_execution_plan"
+                ),
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_promotion_execution_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_promotion_execution_summary.get(
+                        "blocked_by"
+                    )
                     else None
                 ),
             },
@@ -1621,6 +1877,18 @@ def build_main_pipeline_preview(
         ),
         "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger": (
             sequence_policy_memory_trust_acceptance_ledger
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan": (
+            sequence_policy_memory_trust_promotion_plan
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract": (
+            sequence_policy_memory_trust_promotion_contract
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger": (
+            sequence_policy_memory_trust_promotion_acceptance_ledger
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan": (
+            sequence_policy_memory_trust_promotion_execution_plan
         ),
         "source_identity_calibration_memory_trust_review": (
             source_identity_memory_trust_review
