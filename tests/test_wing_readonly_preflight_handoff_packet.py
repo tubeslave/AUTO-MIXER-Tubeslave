@@ -21,6 +21,24 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["full_autonomous_ready"] is False
     assert packet["channels"] == [3]
     assert packet["value_types"] == ["fader", "gain"]
+    assert packet["commands"]["preview_readonly_request_plan"] == [
+        "python3",
+        "tools/wing_readonly_preflight_runner.py",
+        "--url",
+        "ws://localhost:8765",
+        "--channels",
+        "3",
+        "--operator-confirm-channels",
+        "3",
+        "--value-types",
+        "fader,gain",
+        "--require-physical-readback",
+        "--artifact-root",
+        "artifacts/wing_readonly_preflight",
+        "--plan-only",
+        "--plan-output",
+        "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+    ]
     assert packet["commands"]["capture_readonly_preflight"] == [
         "python3",
         "tools/wing_readonly_preflight_runner.py",
@@ -58,6 +76,9 @@ def test_handoff_packet_supports_custom_channel_confirmation():
     packet = handoff.build_handoff_packet(channels="2,4", generated_at="2026-06-07T00:00:00Z")
 
     assert packet["channels"] == [2, 4]
+    preview = packet["commands"]["preview_readonly_request_plan"]
+    assert preview[preview.index("--channels") + 1] == "2,4"
+    assert preview[preview.index("--operator-confirm-channels") + 1] == "2,4"
     command = packet["commands"]["capture_readonly_preflight"]
     assert command[command.index("--channels") + 1] == "2,4"
     assert command[command.index("--operator-confirm-channels") + 1] == "2,4"
@@ -72,12 +93,27 @@ def test_handoff_packet_rejects_invalid_channels():
         raise AssertionError("expected invalid channel to fail")
 
 
+def test_handoff_packet_rejects_channels_outside_wing_input_range(tmp_path: Path):
+    try:
+        handoff.build_handoff_packet(channels="49")
+    except ValueError as exc:
+        assert str(exc) == "channels_must_be_in_1_48"
+    else:
+        raise AssertionError("expected out-of-range channel to fail")
+
+    output = tmp_path / "handoff.md"
+    assert handoff.main(["--channels", "49", "--output", str(output), "--quiet"]) == 2
+    assert not output.exists()
+
+
 def test_handoff_markdown_renders_commands_and_boundaries():
     packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
     markdown = handoff.render_markdown(packet)
 
     assert "WING Read-Only Preflight Handoff Packet" in markdown
     assert "live_write: `false`" in markdown
+    assert "preview_readonly_request_plan" in markdown
+    assert "--plan-only" in markdown
     assert "capture_readonly_preflight" in markdown
     assert "review_edited_decision_json" in markdown
     assert "pending_review_decision_template.json" in markdown

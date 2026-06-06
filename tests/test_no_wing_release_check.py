@@ -30,12 +30,14 @@ from tools.no_wing_release_check import (
     proof_report_path_for_run,
     raw_mixer_readback_artifact_intake_summary,
     raw_mixer_readback_contract_summary,
+    read_surface_physical_readback_acceptance_template_path_for_run,
     read_surface_physical_readback_capture_packet_path_for_run,
     read_surface_physical_readback_artifact_review_queue_summary,
     read_surface_physical_readback_fixture_acceptance_ledger_summary,
     read_surface_physical_readback_fixture_closure_plan_summary,
     read_surface_physical_readback_capture_plan_summary,
     wing_readonly_preflight_evidence_summary,
+    wing_readonly_preflight_plan_artifact_summary,
     wing_readonly_preflight_review_decision_summary,
     read_surface_fixture_evidence_summary,
     read_surface_remediation_plan_summary,
@@ -65,6 +67,7 @@ from tools.no_wing_release_check import (
     validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot,
     validate_read_surface_physical_readback_fixture_closure_plan_snapshot,
     validate_wing_readonly_preflight_evidence_snapshot,
+    validate_wing_readonly_preflight_plan_artifact_snapshot,
     validate_wing_readonly_preflight_review_decision_ledger_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
     validate_read_surface_physical_readback_capture_plan_snapshot,
@@ -82,6 +85,7 @@ from tools.no_wing_release_check import (
     validate_supervised_proof_report_gain_dry_run,
     validate_supervised_proof_report_gap_rollup,
     wing_readonly_preflight_handoff_packet_path_for_run,
+    wing_readonly_preflight_plan_path_for_run,
     write_summary,
 )
 
@@ -503,6 +507,35 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     ]
     assert result.detail["capture_tool_path"] == "tools/wing_readonly_preflight_runner.py"
     assert result.detail["capture_tool_available"] is True
+    assert result.detail["plan_command"] == [
+        "python3",
+        "tools/wing_readonly_preflight_runner.py",
+        "--url",
+        "ws://localhost:8765",
+        "--channels",
+        "3",
+        "--operator-confirm-channels",
+        "3",
+        "--value-types",
+        "fader,gain",
+        "--require-physical-readback",
+        "--artifact-root",
+        "artifacts/wing_readonly_preflight",
+        "--plan-only",
+        "--plan-output",
+        "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+    ]
+    assert result.detail["plan_command_uses_plan_only"] is True
+    assert result.detail["plan_command_output"] == (
+        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+    )
+    assert result.detail["plan_command_channels"] == "3"
+    assert result.detail["plan_command_operator_confirmed_channels"] == "3"
+    assert result.detail["plan_command_value_types"] == "fader,gain"
+    assert result.detail["plan_command_artifact_root"] == (
+        "artifacts/wing_readonly_preflight"
+    )
+    assert result.detail["plan_command_matches_capture"] is True
     assert result.detail["capture_command_template"] == [
         "python3",
         "tools/wing_readonly_preflight_runner.py",
@@ -572,11 +605,16 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "tools/build_wing_readonly_preflight_handoff_packet.py",
         "--channels",
         "3",
+        "--plan-output",
+        "artifacts/wing_readonly_preflight_plan/latest_plan.json",
         "--output",
         "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
     ]
     assert result.detail["handoff_packet_output"] == (
         "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
+    )
+    assert result.detail["handoff_packet_plan_output"] == (
+        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
     )
     assert result.detail["handoff_packet_channels"] == "3"
     assert result.detail["handoff_packet_channel_matches_capture"] is True
@@ -584,6 +622,140 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "operator_must_run_wing_readonly_preflight_runner"
     ]
     assert result.detail["violations"] == []
+
+
+def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
+    return {
+        "type": "wing_readonly_preflight_offline_plan",
+        "status": "ready_for_operator_review",
+        "proof_artifact_schema": "wing_readonly_preflight.v1",
+        "proof_runner": "wing_readonly_preflight_runner",
+        "url": "ws://localhost:8765",
+        "artifact_root": "artifacts/wing_readonly_preflight",
+        "channels": [3],
+        "operator_channel_confirmation_required": True,
+        "operator_confirmed_channels": [3],
+        "value_types": ["fader", "gain"],
+        "require_physical_readback": True,
+        "read_only": True,
+        "live_write": False,
+        "contacts_backend": False,
+        "queries_console": False,
+        "execution_allowed_by_plan": False,
+        "live_authority_granted": False,
+        "allowed_request_types": [
+            "get_operator_mode",
+            "get_state",
+            "query_mixer_parameter",
+        ],
+        "forbidden_request_types": [
+            "apply_operator_proposal",
+            "connect_mixer",
+            "disconnect_mixer",
+            "emergency_stop",
+            "rollback_last_manual_write",
+            "set_compressor",
+            "set_eq",
+            "set_fader",
+            "set_gain",
+            "set_gate",
+            "set_operator_mode",
+        ],
+        "request_sequence": [
+            {"type": "get_operator_mode"},
+            {"type": "get_state"},
+            {
+                "type": "query_mixer_parameter",
+                "channel": 3,
+                "value_type": "fader",
+                "address": "/ch/3/fdr",
+            },
+            {
+                "type": "query_mixer_parameter",
+                "channel": 3,
+                "value_type": "gain",
+                "address": "/ch/3/in/set/trim",
+            },
+        ],
+        "expected_artifacts": [
+            "artifacts/wing_readonly_preflight/<run_id>/summary.json",
+            "artifacts/wing_readonly_preflight/<run_id>/events.jsonl",
+        ],
+        "next_step": (
+            "Run without --plan-only only when the intended backend/WING "
+            "session is ready."
+        ),
+        "plan_output": str(plan_path),
+    }
+
+
+def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+
+    result = validate_wing_readonly_preflight_plan_artifact_snapshot(plan_path)
+
+    assert result.status == "passed"
+    assert (
+        result.detail["policy"]
+        == "wing_readonly_preflight_plan_artifact_is_offline_readonly_preview"
+    )
+    assert result.detail["plan_path"] == str(plan_path)
+    assert result.detail["plan_status"] == "ready_for_operator_review"
+    assert result.detail["plan_output"] == str(plan_path)
+    assert result.detail["channels"] == [3]
+    assert result.detail["operator_confirmed_channels"] == [3]
+    assert result.detail["value_types"] == ["fader", "gain"]
+    assert result.detail["request_count"] == 4
+    assert result.detail["expected_request_count"] == 4
+    assert result.detail["request_sequence_matches_expected"] is True
+    assert result.detail["read_only"] is True
+    assert result.detail["live_write"] is False
+    assert result.detail["contacts_backend"] is False
+    assert result.detail["queries_console"] is False
+    assert result.detail["execution_allowed_by_plan"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert "set_gain" in result.detail["forbidden_request_types"]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_missing_wing_preflight_plan_artifact(tmp_path):
+    result = validate_wing_readonly_preflight_plan_artifact_snapshot(
+        tmp_path / "missing-plan.json"
+    )
+
+    assert result.status == "failed"
+    assert "wing_readonly_preflight_plan_artifact_missing_report" in result.detail[
+        "violations"
+    ]
+
+
+def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_path):
+    plan_path = tmp_path / "unsafe-plan.json"
+    payload = valid_wing_readonly_preflight_plan_payload(plan_path)
+    payload["contacts_backend"] = True
+    payload["live_authority_granted"] = True
+    payload["request_sequence"].append({"type": "set_gain", "channel": 3})
+    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_plan_artifact_snapshot(plan_path)
+
+    assert result.status == "failed"
+    assert "wing_readonly_preflight_plan_contacts_backend_not_false" in result.detail[
+        "violations"
+    ]
+    assert "wing_readonly_preflight_plan_live_authority_granted_not_false" in result.detail[
+        "violations"
+    ]
+    assert "wing_readonly_preflight_plan_request_sequence_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "wing_readonly_preflight_plan_unsafe_request_type_present" in result.detail[
+        "violations"
+    ]
 
 
 def test_no_wing_release_check_rejects_missing_wing_preflight_runner(
@@ -739,6 +911,42 @@ def test_no_wing_release_check_rejects_wing_preflight_handoff_channel_mismatch(
         "wing_readonly_preflight_handoff_packet_channel_mismatch"
         in result.detail["violations"]
     )
+
+
+def test_no_wing_release_check_rejects_wing_preflight_plan_command_mismatch(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_plan_command",
+        lambda: [
+            "python3",
+            "tools/wing_readonly_preflight_runner.py",
+            "--url",
+            "ws://localhost:8765",
+            "--channels",
+            "4",
+            "--operator-confirm-channels",
+            "4",
+            "--value-types",
+            "fader,gain",
+            "--require-physical-readback",
+            "--artifact-root",
+            "artifacts/wing_readonly_preflight",
+        ],
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["plan_command_uses_plan_only"] is False
+    assert result.detail["plan_command_channels"] == "4"
+    assert result.detail["plan_command_matches_capture"] is False
+    assert "wing_readonly_preflight_plan_only_missing" in result.detail["violations"]
+    assert "wing_readonly_preflight_plan_output_missing" in result.detail["violations"]
+    assert "wing_readonly_preflight_plan_command_mismatch" in result.detail[
+        "violations"
+    ]
 
 
 def test_no_wing_release_check_rejects_review_command_without_decision_template_output(
@@ -2460,6 +2668,11 @@ def test_no_wing_release_check_validates_fixture_acceptance_ledger_snapshot():
     assert result.detail["accepted_record_count"] == 0
     assert result.detail["rejected_record_count"] == 0
     assert result.detail["invalid_record_count"] == 0
+    assert (
+        result.detail["acceptance_template_tool_path"]
+        == "tools/build_read_surface_physical_readback_acceptance_template.py"
+    )
+    assert result.detail["acceptance_template_tool_available"] is True
     assert result.detail["operator_acceptance_required"] is True
     assert result.detail["operator_review_required"] is True
     assert result.detail["physical_fixture_gap_remains"] is True
@@ -2684,7 +2897,9 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "read_surface_fixture_evidence" in check_names
     assert "memory_lint" in check_names
     assert "gain_dry_run_proof" in check_names
+    assert "wing_readonly_preflight_plan" in check_names
     assert "read_surface_physical_readback_capture_packet" in check_names
+    assert "read_surface_physical_readback_acceptance_template" in check_names
     assert "wing_readonly_preflight_handoff_packet" in check_names
     assert "supervised_proof_artifact_report" in check_names
     assert check_names.index("write_surface_static_scan") < check_names.index("backend_pytest")
@@ -2693,9 +2908,17 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         "read_surface_fixture_evidence"
     )
     assert check_names.index("offline_operator_validation_harness") < check_names.index(
+        "wing_readonly_preflight_plan"
+    )
+    assert check_names.index("wing_readonly_preflight_plan") < check_names.index(
         "read_surface_physical_readback_capture_packet"
     )
     assert check_names.index("read_surface_physical_readback_capture_packet") < check_names.index(
+        "read_surface_physical_readback_acceptance_template"
+    )
+    assert check_names.index(
+        "read_surface_physical_readback_acceptance_template"
+    ) < check_names.index(
         "wing_readonly_preflight_handoff_packet"
     )
     assert check_names.index("wing_readonly_preflight_handoff_packet") < check_names.index(
@@ -2716,6 +2939,10 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     fixture_check = next(check for check in checks if check.name == "read_surface_fixture_evidence")
     assert "tests/test_read_surface_fixture_evidence.py" in fixture_check.command
     assert "tests/test_read_surface_physical_readback_capture_packet.py" in fixture_check.command
+    assert (
+        "tests/test_read_surface_physical_readback_fixture_acceptance_template.py"
+        in fixture_check.command
+    )
     assert "tests/test_raw_mixer_state_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_raw_mixer_state_physical_readback_artifact_intake.py" in fixture_check.command
     assert "tests/test_channel_basic_controls_physical_readback_contract.py" in fixture_check.command
@@ -2760,6 +2987,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     )
     assert "tests/test_dlive_state_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_wing_readonly_preflight_evidence.py" in fixture_check.command
+    assert "tests/test_wing_readonly_preflight_runner.py" in fixture_check.command
     assert "tests/test_wing_readonly_preflight_review_tool.py" in fixture_check.command
     assert "tests/test_wing_readonly_preflight_review_decision.py" in fixture_check.command
     assert "tests/test_wing_readonly_preflight_review_decision_tool.py" in fixture_check.command
@@ -2777,6 +3005,8 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "tools/build_wing_readonly_preflight_handoff_packet.py" in handoff_check.command
     assert "--channels" in handoff_check.command
     assert "3" in handoff_check.command
+    assert "--plan-output" in handoff_check.command
+    assert str(wing_readonly_preflight_plan_path_for_run(tmp_path)) in handoff_check.command
     assert "--quiet" in handoff_check.command
     assert str(wing_readonly_preflight_handoff_packet_path_for_run(tmp_path)) in (
         handoff_check.command
@@ -2790,6 +3020,29 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "--quiet" in read_capture_packet_check.command
     assert str(read_surface_physical_readback_capture_packet_path_for_run(tmp_path)) in (
         read_capture_packet_check.command
+    )
+    wing_plan_check = next(
+        check for check in checks if check.name == "wing_readonly_preflight_plan"
+    )
+    assert "tools/wing_readonly_preflight_runner.py" in wing_plan_check.command
+    assert "--plan-only" in wing_plan_check.command
+    assert "--plan-output" in wing_plan_check.command
+    assert str(wing_readonly_preflight_plan_path_for_run(tmp_path)) in (
+        wing_plan_check.command
+    )
+    assert "--operator-confirm-channels" in wing_plan_check.command
+    assert "--require-physical-readback" in wing_plan_check.command
+    read_acceptance_template_check = next(
+        check
+        for check in checks
+        if check.name == "read_surface_physical_readback_acceptance_template"
+    )
+    assert "tools/build_read_surface_physical_readback_acceptance_template.py" in (
+        read_acceptance_template_check.command
+    )
+    assert "--quiet" in read_acceptance_template_check.command
+    assert str(read_surface_physical_readback_acceptance_template_path_for_run(tmp_path)) in (
+        read_acceptance_template_check.command
     )
     gain_check = next(check for check in checks if check.name == "gain_dry_run_proof")
     assert "tools/gain_proof_dry_run_runner.py" in gain_check.command
@@ -3454,6 +3707,13 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         )
 
     def fake_command_check(check: CommandCheck, log_dir: Path) -> CheckResult:
+        if check.name == "wing_readonly_preflight_plan":
+            plan_path = wing_readonly_preflight_plan_path_for_run(log_dir.parent)
+            plan_path.parent.mkdir(parents=True, exist_ok=True)
+            plan_path.write_text(
+                json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+                encoding="utf-8",
+            )
         if check.name == "supervised_proof_artifact_report":
             report_path = proof_report_path_for_run(log_dir.parent)
             report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3485,6 +3745,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "read_surface_remediation_plan_schema" in result_names
     assert "read_surface_physical_readback_capture_plan_schema" in result_names
     assert "wing_readonly_preflight_evidence_schema" in result_names
+    assert "wing_readonly_preflight_plan_artifact_schema" in result_names
     assert "wing_readonly_preflight_review_decision_ledger_schema" in result_names
     assert "raw_mixer_state_physical_readback_contract_schema" in result_names
     assert "raw_mixer_state_physical_readback_artifact_intake_schema" in result_names
@@ -3528,6 +3789,12 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert result_names.index("wing_readonly_preflight_evidence_schema") < result_names.index(
         "wing_readonly_preflight_review_decision_ledger_schema"
     )
+    assert result_names.index("wing_readonly_preflight_plan") < result_names.index(
+        "wing_readonly_preflight_plan_artifact_schema"
+    )
+    assert result_names.index(
+        "wing_readonly_preflight_plan_artifact_schema"
+    ) < result_names.index("read_surface_physical_readback_capture_packet")
     assert result_names.index("wing_readonly_preflight_review_decision_ledger_schema") < result_names.index(
         "raw_mixer_state_physical_readback_contract_schema"
     )
@@ -4461,6 +4728,31 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "latest_valid_candidate_run_id": None,
             "capture_tool_path": "tools/wing_readonly_preflight_runner.py",
             "capture_tool_available": True,
+            "plan_command": [
+                "python3",
+                "tools/wing_readonly_preflight_runner.py",
+                "--url",
+                "ws://localhost:8765",
+                "--channels",
+                "3",
+                "--operator-confirm-channels",
+                "3",
+                "--value-types",
+                "fader,gain",
+                "--require-physical-readback",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
+                "--plan-only",
+                "--plan-output",
+                "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+            ],
+            "plan_command_uses_plan_only": True,
+            "plan_command_output": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+            "plan_command_channels": "3",
+            "plan_command_operator_confirmed_channels": "3",
+            "plan_command_value_types": "fader,gain",
+            "plan_command_artifact_root": "artifacts/wing_readonly_preflight",
+            "plan_command_matches_capture": True,
             "capture_command_template": [
                 "python3",
                 "tools/wing_readonly_preflight_runner.py",
@@ -4528,11 +4820,16 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "tools/build_wing_readonly_preflight_handoff_packet.py",
                 "--channels",
                 "3",
+                "--plan-output",
+                "artifacts/wing_readonly_preflight_plan/latest_plan.json",
                 "--output",
                 "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
             ],
             "handoff_packet_output": (
                 "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
+            ),
+            "handoff_packet_plan_output": (
+                "artifacts/wing_readonly_preflight_plan/latest_plan.json"
             ),
             "handoff_packet_channels": "3",
             "handoff_packet_channel_matches_capture": True,
@@ -4570,6 +4867,17 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     ]
     assert preflight["capture_tool_path"] == "tools/wing_readonly_preflight_runner.py"
     assert preflight["capture_tool_available"] is True
+    assert preflight["plan_command"][1] == "tools/wing_readonly_preflight_runner.py"
+    assert "--plan-only" in preflight["plan_command"]
+    assert preflight["plan_command_uses_plan_only"] is True
+    assert preflight["plan_command_output"] == (
+        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+    )
+    assert preflight["plan_command_channels"] == "3"
+    assert preflight["plan_command_operator_confirmed_channels"] == "3"
+    assert preflight["plan_command_value_types"] == "fader,gain"
+    assert preflight["plan_command_artifact_root"] == "artifacts/wing_readonly_preflight"
+    assert preflight["plan_command_matches_capture"] is True
     assert preflight["capture_command_template"][1] == "tools/wing_readonly_preflight_runner.py"
     assert preflight["capture_command_channels"] == "3"
     assert preflight["capture_command_operator_confirmed_channels"] == "3"
@@ -4622,6 +4930,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["handoff_packet_output"] == (
         "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
     )
+    assert preflight["handoff_packet_plan_output"] == (
+        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+    )
     assert preflight["handoff_packet_channels"] == "3"
     assert preflight["handoff_packet_channel_matches_capture"] is True
     assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
@@ -4630,6 +4941,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "live_authority_granted: `false`" in markdown_summary
     assert "readiness_update_candidate_available: `false`" in markdown_summary
     assert "capture_tool_path: `tools/wing_readonly_preflight_runner.py`" in markdown_summary
+    assert "plan_command_uses_plan_only: `true`" in markdown_summary
+    assert "wing_readonly_preflight_plan/latest_plan.json" in markdown_summary
+    assert "plan_command_matches_capture: `true`" in markdown_summary
     assert "capture_command_channels: `3`" in markdown_summary
     assert "capture_command_operator_confirmed_channels: `3`" in markdown_summary
     assert "capture_command_operator_confirmation_matches_channels: `true`" in markdown_summary
@@ -4652,7 +4966,67 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         in markdown_summary
     )
     assert "WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md" in markdown_summary
+    assert "handoff_packet_plan_output" in markdown_summary
     assert "handoff_packet_channel_matches_capture: `true`" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_path):
+    result = CheckResult(
+        name="wing_readonly_preflight_plan_artifact_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "plan_path": "/tmp/wing_readonly_preflight_plan.json",
+            "plan_type": "wing_readonly_preflight_offline_plan",
+            "plan_status": "ready_for_operator_review",
+            "plan_output": "/tmp/wing_readonly_preflight_plan.json",
+            "expected_plan_output": "/tmp/wing_readonly_preflight_plan.json",
+            "channels": [3],
+            "operator_confirmed_channels": [3],
+            "value_types": ["fader", "gain"],
+            "request_count": 4,
+            "expected_request_count": 4,
+            "request_sequence_matches_expected": True,
+            "read_only": True,
+            "live_write": False,
+            "contacts_backend": False,
+            "queries_console": False,
+            "execution_allowed_by_plan": False,
+            "live_authority_granted": False,
+            "forbidden_request_types": ["apply_operator_proposal", "set_gain"],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert wing_readonly_preflight_plan_artifact_summary([result]) == summary[
+        "wing_readonly_preflight_plan_artifact"
+    ]
+    artifact = json_summary["wing_readonly_preflight_plan_artifact"]
+    assert artifact["read_only"] is True
+    assert artifact["live_write"] is False
+    assert artifact["contacts_backend"] is False
+    assert artifact["queries_console"] is False
+    assert artifact["execution_allowed_by_plan"] is False
+    assert artifact["live_authority_granted"] is False
+    assert artifact["plan_status"] == "ready_for_operator_review"
+    assert artifact["channels"] == [3]
+    assert artifact["operator_confirmed_channels"] == [3]
+    assert artifact["value_types"] == ["fader", "gain"]
+    assert artifact["request_count"] == 4
+    assert artifact["expected_request_count"] == 4
+    assert artifact["request_sequence_matches_expected"] is True
+    assert artifact["forbidden_request_types"] == ["apply_operator_proposal", "set_gain"]
+    assert artifact["violations"] == []
+    assert "## WING Read-Only Preflight Plan Artifact" in markdown_summary
+    assert "contacts_backend: `false`" in markdown_summary
+    assert "request_sequence_matches_expected: `true`" in markdown_summary
+    assert "set_gain" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(

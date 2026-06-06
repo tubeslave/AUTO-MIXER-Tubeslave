@@ -306,3 +306,95 @@ async def test_readonly_preflight_blocks_missing_physical_readback(
     assert summary["blockers"] == ["physical_readback_missing:ch3:fader"]
     assert summary["write_request_sent"] is False
     assert summary["proposal_request_sent"] is False
+
+
+@pytest.mark.asyncio
+async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_artifacts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"plan-only must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    plan_output = tmp_path / "readonly-preflight-plan.json"
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader,gain",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--plan-only",
+        "--plan-output",
+        str(plan_output),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 0
+    printed = json.loads(capsys.readouterr().out)
+    written = json.loads(plan_output.read_text(encoding="utf-8"))
+    assert printed["type"] == "wing_readonly_preflight_offline_plan"
+    assert printed["status"] == "ready_for_operator_review"
+    assert printed["plan_output"] == str(plan_output)
+    assert written["plan_output"] == str(plan_output)
+    assert written["contacts_backend"] is False
+    assert written["queries_console"] is False
+    assert written["execution_allowed_by_plan"] is False
+    assert written["live_authority_granted"] is False
+    assert written["read_only"] is True
+    assert written["live_write"] is False
+    assert written["channels"] == [3]
+    assert written["operator_confirmed_channels"] == [3]
+    assert [request["type"] for request in written["request_sequence"]] == [
+        "get_operator_mode",
+        "get_state",
+        "query_mixer_parameter",
+        "query_mixer_parameter",
+    ]
+    assert written["request_sequence"][2]["address"] == "/ch/3/fdr"
+    assert written["request_sequence"][3]["address"] == "/ch/3/in/set/trim"
+    assert "set_gain" in written["forbidden_request_types"]
+    assert not list(tmp_path.glob("*/summary.json"))
+
+
+@pytest.mark.asyncio
+async def test_plan_only_blocks_invalid_channel_confirmation_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"plan-only must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    plan_output = tmp_path / "blocked-plan.json"
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader,gain",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "4",
+        "--plan-only",
+        "--plan-output",
+        str(plan_output),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    printed = json.loads(capsys.readouterr().out)
+    assert printed["type"] == "wing_readonly_preflight_offline_plan"
+    assert printed["status"] == "blocked"
+    assert printed["reason"] == "--operator-confirm-channels must exactly match --channels"
+    assert printed["contacts_backend"] is False
+    assert printed["queries_console"] is False
+    assert printed["live_authority_granted"] is False
+    assert not plan_output.exists()

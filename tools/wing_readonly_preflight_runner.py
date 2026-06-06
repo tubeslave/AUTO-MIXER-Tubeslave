@@ -188,6 +188,16 @@ def build_parser() -> argparse.ArgumentParser:
             "readback is required."
         ),
     )
+    parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="Validate inputs and print the offline read-only request plan without opening WebSocket.",
+    )
+    parser.add_argument(
+        "--plan-output",
+        default=None,
+        help="Optional JSON output path for --plan-only.",
+    )
     parser.add_argument("--timeout", type=float, default=5.0, help="Timeout per WebSocket step")
     parser.add_argument("--artifact-root", default="artifacts/wing_readonly_preflight", help="Artifact root directory")
     return parser
@@ -237,8 +247,75 @@ def build_read_requests(channels: tuple[int, ...], value_types: tuple[str, ...])
     return requests
 
 
+def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
+    channels = parse_csv_ints(args.channels)
+    value_types = parse_csv_strings(args.value_types)
+    read_requests = build_read_requests(channels, value_types)
+    return {
+        "type": "wing_readonly_preflight_offline_plan",
+        "status": "ready_for_operator_review",
+        "proof_artifact_schema": "wing_readonly_preflight.v1",
+        "proof_runner": "wing_readonly_preflight_runner",
+        "url": args.url,
+        "artifact_root": args.artifact_root,
+        "channels": list(channels),
+        "operator_channel_confirmation_required": bool(args.require_physical_readback),
+        "operator_confirmed_channels": parse_csv_ints_for_summary(args.operator_confirm_channels),
+        "value_types": list(value_types),
+        "require_physical_readback": bool(args.require_physical_readback),
+        "read_only": True,
+        "live_write": False,
+        "contacts_backend": False,
+        "queries_console": False,
+        "execution_allowed_by_plan": False,
+        "live_authority_granted": False,
+        "allowed_request_types": [
+            "get_operator_mode",
+            "get_state",
+            "query_mixer_parameter",
+        ],
+        "forbidden_request_types": sorted(FORBIDDEN_REQUEST_TYPES),
+        "request_sequence": [
+            {"type": "get_operator_mode"},
+            {"type": "get_state"},
+            *read_requests,
+        ],
+        "expected_artifacts": [
+            f"{args.artifact_root}/<run_id>/summary.json",
+            f"{args.artifact_root}/<run_id>/events.jsonl",
+        ],
+        "next_step": "Run without --plan-only only when the intended backend/WING session is ready.",
+    }
+
+
 async def run(args: argparse.Namespace) -> int:
     validation_error = validate_args(args)
+    if args.plan_only:
+        if validation_error:
+            plan = {
+                "type": "wing_readonly_preflight_offline_plan",
+                "status": "blocked",
+                "reason": validation_error,
+                "read_only": True,
+                "live_write": False,
+                "contacts_backend": False,
+                "queries_console": False,
+                "execution_allowed_by_plan": False,
+                "live_authority_granted": False,
+            }
+            print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
+            return 2
+        plan = build_offline_preflight_plan(args)
+        if args.plan_output:
+            output_path = Path(args.plan_output)
+            plan["plan_output"] = str(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(
+                json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
     channels = parse_csv_ints(args.channels) if validation_error is None else ()
     value_types = parse_csv_strings(args.value_types) if validation_error is None else ()
     run_id = f"{utc_stamp()}_wing_readonly_preflight"

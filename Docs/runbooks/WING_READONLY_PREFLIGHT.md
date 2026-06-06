@@ -39,6 +39,26 @@ python3 tools/build_wing_readonly_preflight_handoff_packet.py \
 
 Replace channel `3` with the operator-approved channel:
 
+Before opening the backend/WING session, preview the exact read-only request
+plan. This validates the channel confirmation and writes only a local JSON plan;
+it does not open WebSocket, contact WING, query the console, or grant live
+authority:
+
+```bash
+python3 tools/wing_readonly_preflight_runner.py \
+  --url ws://localhost:8765 \
+  --channels 3 \
+  --operator-confirm-channels 3 \
+  --value-types fader,gain \
+  --require-physical-readback \
+  --artifact-root artifacts/wing_readonly_preflight \
+  --plan-only \
+  --plan-output artifacts/wing_readonly_preflight_plan/latest_plan.json
+```
+
+Then run the real read-only preflight only when the intended backend/WING
+session is ready:
+
 ```bash
 python3 tools/wing_readonly_preflight_runner.py \
   --url ws://localhost:8765 \

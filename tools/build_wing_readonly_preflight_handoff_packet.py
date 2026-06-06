@@ -22,6 +22,8 @@ DEFAULT_DECISION_TEMPLATE_OUTPUT = (
 DEFAULT_DECISION_ROOT = "artifacts/wing_readonly_preflight_review_decisions"
 DEFAULT_DECISION_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
 DEFAULT_PACKET_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
+DEFAULT_PLAN_OUTPUT = "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+MAX_WING_INPUT_CHANNEL = 48
 FOCUSED_VALIDATION_COMMAND = [
     "PYTHONPATH=backend",
     "python3",
@@ -72,6 +74,8 @@ def _validate_channels(channels: str) -> list[int]:
             raise ValueError("channels_must_be_comma_separated_integers") from exc
         if channel <= 0:
             raise ValueError("channels_must_be_positive")
+        if channel > MAX_WING_INPUT_CHANNEL:
+            raise ValueError("channels_must_be_in_1_48")
         parsed.append(channel)
     if not parsed:
         raise ValueError("at_least_one_channel_required")
@@ -99,6 +103,34 @@ def capture_command(
         "--require-physical-readback",
         "--artifact-root",
         artifact_root,
+    ]
+
+
+def plan_command(
+    *,
+    url: str,
+    channels: str,
+    value_types: str,
+    artifact_root: str,
+    plan_output: str,
+) -> list[str]:
+    return [
+        "python3",
+        "tools/wing_readonly_preflight_runner.py",
+        "--url",
+        url,
+        "--channels",
+        channels,
+        "--operator-confirm-channels",
+        channels,
+        "--value-types",
+        value_types,
+        "--require-physical-readback",
+        "--artifact-root",
+        artifact_root,
+        "--plan-only",
+        "--plan-output",
+        plan_output,
     ]
 
 
@@ -148,9 +180,17 @@ def build_handoff_packet(
     decision_template_output: str = DEFAULT_DECISION_TEMPLATE_OUTPUT,
     decision_root: str = DEFAULT_DECISION_ROOT,
     decision_review_output: str = DEFAULT_DECISION_REVIEW_OUTPUT,
+    plan_output: str = DEFAULT_PLAN_OUTPUT,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
     channel_numbers = _validate_channels(channels)
+    preview = plan_command(
+        url=url,
+        channels=channels,
+        value_types=value_types,
+        artifact_root=artifact_root,
+        plan_output=plan_output,
+    )
     capture = capture_command(
         url=url,
         channels=channels,
@@ -189,16 +229,19 @@ def build_handoff_packet(
         "decision_root": decision_root,
         "expected_run_artifact_glob": f"{artifact_root}/<run_id>/summary.json",
         "expected_event_log_glob": f"{artifact_root}/<run_id>/events.jsonl",
+        "plan_output": plan_output,
         "decision_template_output": decision_template_output,
         "review_output": review_output,
         "decision_review_output": decision_review_output,
         "commands": {
+            "preview_readonly_request_plan": preview,
             "capture_readonly_preflight": capture,
             "review_artifact_and_write_pending_decision_template": review,
             "review_edited_decision_json": decision,
             "focused_validation": list(FOCUSED_VALIDATION_COMMAND),
         },
         "operator_sequence": [
+            "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
             "Confirm backend is connected to the intended WING Rack.",
             "Confirm the selected channel numbers are safe to inspect.",
             "Run capture_readonly_preflight.",
@@ -252,6 +295,7 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         lines.append(f"{index}. {item}")
     lines.extend(["", "## Commands", ""])
     for name in (
+        "preview_readonly_request_plan",
         "capture_readonly_preflight",
         "review_artifact_and_write_pending_decision_template",
         "review_edited_decision_json",
@@ -303,6 +347,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--decision-template-output", default=DEFAULT_DECISION_TEMPLATE_OUTPUT)
     parser.add_argument("--decision-root", default=DEFAULT_DECISION_ROOT)
     parser.add_argument("--decision-review-output", default=DEFAULT_DECISION_REVIEW_OUTPUT)
+    parser.add_argument("--plan-output", default=DEFAULT_PLAN_OUTPUT)
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
     parser.add_argument("--output", default=DEFAULT_PACKET_OUTPUT)
     parser.add_argument("--quiet", action="store_true")
@@ -321,6 +366,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             decision_template_output=args.decision_template_output,
             decision_root=args.decision_root,
             decision_review_output=args.decision_review_output,
+            plan_output=args.plan_output,
         )
     except ValueError as exc:
         if not args.quiet:

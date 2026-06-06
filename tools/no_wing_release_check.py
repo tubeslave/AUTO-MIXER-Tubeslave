@@ -321,12 +321,15 @@ DEFAULT_COMMAND_TIMEOUT_SEC = 900
 AUTONOMY_GAP_ROLLUP_SOURCE = "autonomy_mode_transition_gate.rows[mode=auto]"
 DEFAULT_HOMEBREW_GIT = Path("/opt/homebrew/bin/git")
 GAIN_DRY_RUN_REASON = "no_wing_release_gain_dry_run"
-REPO_LOCAL_COMMAND_OUTPUT_FLAGS = {"--artifact-root", "--output"}
+REPO_LOCAL_COMMAND_OUTPUT_FLAGS = {"--artifact-root", "--output", "--plan-output"}
 WING_READONLY_PREFLIGHT_RUNNER_TOOL = "tools/wing_readonly_preflight_runner.py"
 WING_READONLY_PREFLIGHT_RUNNER_URL = "ws://localhost:8765"
 WING_READONLY_PREFLIGHT_RUNNER_CHANNELS = "3"
 WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = "fader,gain"
 WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
+WING_READONLY_PREFLIGHT_PLAN_OUTPUT = (
+    "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+)
 WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
 WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
 WING_READONLY_PREFLIGHT_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md"
@@ -350,6 +353,9 @@ WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT = (
 )
 READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PACKET_TOOL = (
     "tools/build_read_surface_physical_readback_capture_packet.py"
+)
+READ_SURFACE_PHYSICAL_READBACK_ACCEPTANCE_TEMPLATE_TOOL = (
+    "tools/build_read_surface_physical_readback_acceptance_template.py"
 )
 WING_READONLY_PREFLIGHT_REVIEW_EXIT_CODES = {
     "candidate_ready": 0,
@@ -400,6 +406,27 @@ def wing_readonly_preflight_capture_command_template() -> list[str]:
     ]
 
 
+def wing_readonly_preflight_plan_command() -> list[str]:
+    return [
+        "python3",
+        WING_READONLY_PREFLIGHT_RUNNER_TOOL,
+        "--url",
+        WING_READONLY_PREFLIGHT_RUNNER_URL,
+        "--channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--value-types",
+        WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        "--require-physical-readback",
+        "--artifact-root",
+        WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+        "--plan-only",
+        "--plan-output",
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+    ]
+
+
 def command_value_after_flag(command: Sequence[str], flag: str) -> str | None:
     try:
         index = list(command).index(flag)
@@ -442,6 +469,8 @@ def wing_readonly_preflight_handoff_packet_command() -> list[str]:
         WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL,
         "--channels",
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--plan-output",
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
         "--output",
         WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
     ]
@@ -653,8 +682,12 @@ def build_checks(
     command_timeout_sec: float | None = DEFAULT_COMMAND_TIMEOUT_SEC,
 ) -> list[CommandCheck]:
     offline_artifact_root = (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "offline_validation"
+    wing_readonly_plan_output = wing_readonly_preflight_plan_path_for_run(run_dir)
     read_surface_capture_packet_output = (
         read_surface_physical_readback_capture_packet_path_for_run(run_dir)
+    )
+    read_surface_acceptance_template_output = (
+        read_surface_physical_readback_acceptance_template_path_for_run(run_dir)
     )
     handoff_packet_output = wing_readonly_preflight_handoff_packet_path_for_run(run_dir)
     gain_proof_root = gain_proof_artifact_root_for_run(run_dir)
@@ -681,6 +714,7 @@ def build_checks(
                 "pytest",
                 "tests/test_read_surface_fixture_evidence.py",
                 "tests/test_read_surface_physical_readback_capture_packet.py",
+                "tests/test_read_surface_physical_readback_fixture_acceptance_template.py",
                 "tests/test_raw_mixer_state_physical_readback_contract.py",
                 "tests/test_raw_mixer_state_physical_readback_artifact_intake.py",
                 "tests/test_channel_basic_controls_physical_readback_contract.py",
@@ -702,6 +736,7 @@ def build_checks(
                 "tests/test_dlive_state_physical_readback_contract.py",
                 "tests/test_dlive_state_physical_readback_artifact_intake.py",
                 "tests/test_wing_readonly_preflight_evidence.py",
+                "tests/test_wing_readonly_preflight_runner.py",
                 "tests/test_wing_readonly_preflight_review_tool.py",
                 "tests/test_wing_readonly_preflight_review_decision.py",
                 "tests/test_wing_readonly_preflight_review_decision_tool.py",
@@ -737,6 +772,28 @@ def build_checks(
             cwd=str(repo_root),
         ),
         CommandCheck(
+            name="wing_readonly_preflight_plan",
+            command=(
+                sys.executable,
+                WING_READONLY_PREFLIGHT_RUNNER_TOOL,
+                "--url",
+                WING_READONLY_PREFLIGHT_RUNNER_URL,
+                "--channels",
+                WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+                "--operator-confirm-channels",
+                WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+                "--value-types",
+                WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+                "--require-physical-readback",
+                "--artifact-root",
+                WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+                "--plan-only",
+                "--plan-output",
+                str(wing_readonly_plan_output),
+            ),
+            cwd=str(repo_root),
+        ),
+        CommandCheck(
             name="read_surface_physical_readback_capture_packet",
             command=(
                 sys.executable,
@@ -748,12 +805,25 @@ def build_checks(
             cwd=str(repo_root),
         ),
         CommandCheck(
+            name="read_surface_physical_readback_acceptance_template",
+            command=(
+                sys.executable,
+                READ_SURFACE_PHYSICAL_READBACK_ACCEPTANCE_TEMPLATE_TOOL,
+                "--output",
+                str(read_surface_acceptance_template_output),
+                "--quiet",
+            ),
+            cwd=str(repo_root),
+        ),
+        CommandCheck(
             name="wing_readonly_preflight_handoff_packet",
             command=(
                 sys.executable,
                 WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL,
                 "--channels",
                 WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+                "--plan-output",
+                str(wing_readonly_plan_output),
                 "--output",
                 str(handoff_packet_output),
                 "--quiet",
@@ -855,8 +925,21 @@ def proof_report_path_for_run(run_dir: Path | None) -> Path:
     return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "supervised_proof_artifact_report.json"
 
 
+def wing_readonly_preflight_plan_path_for_run(run_dir: Path | None) -> Path:
+    return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "wing_readonly_preflight_plan.json"
+
+
 def read_surface_physical_readback_capture_packet_path_for_run(run_dir: Path | None) -> Path:
     return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "read_surface_physical_readback_capture_packet.md"
+
+
+def read_surface_physical_readback_acceptance_template_path_for_run(
+    run_dir: Path | None,
+) -> Path:
+    return (
+        (run_dir or DEFAULT_ARTIFACT_ROOT / "pending")
+        / "read_surface_physical_readback_acceptance_template.json"
+    )
 
 
 def gain_proof_artifact_root_for_run(run_dir: Path | None) -> Path:
@@ -1745,6 +1828,7 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     capture_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_RUNNER_TOOL).is_file()
     review_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_TOOL).is_file()
     handoff_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL).is_file()
+    plan_command = wing_readonly_preflight_plan_command()
     capture_command = wing_readonly_preflight_capture_command_template()
     review_command = wing_readonly_preflight_review_command()
     handoff_command = wing_readonly_preflight_handoff_packet_command()
@@ -1768,7 +1852,26 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         and bool(capture_confirmed_channels)
         and capture_channels == capture_confirmed_channels
     )
+    plan_channels = command_value_after_flag(plan_command, "--channels")
+    plan_confirmed_channels = command_value_after_flag(
+        plan_command,
+        "--operator-confirm-channels",
+    )
+    plan_value_types = command_value_after_flag(plan_command, "--value-types")
+    plan_artifact_root = command_value_after_flag(plan_command, "--artifact-root")
+    plan_output = command_value_after_flag(plan_command, "--plan-output")
+    capture_value_types = command_value_after_flag(capture_command, "--value-types")
+    capture_artifact_root = command_value_after_flag(capture_command, "--artifact-root")
+    plan_matches_capture = (
+        bool(plan_channels)
+        and bool(plan_confirmed_channels)
+        and plan_channels == capture_channels
+        and plan_confirmed_channels == capture_confirmed_channels
+        and plan_value_types == capture_value_types
+        and plan_artifact_root == capture_artifact_root
+    )
     handoff_channels = command_value_after_flag(handoff_command, "--channels")
+    handoff_plan_output = command_value_after_flag(handoff_command, "--plan-output")
     handoff_channel_matches_capture = bool(handoff_channels) and handoff_channels == capture_channels
 
     if not capture_tool_available:
@@ -1777,10 +1880,18 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_review_tool_missing")
     if not handoff_tool_available:
         violations.append("wing_readonly_preflight_handoff_packet_tool_missing")
+    if "--plan-only" not in plan_command:
+        violations.append("wing_readonly_preflight_plan_only_missing")
+    if "--plan-output" not in plan_command or not plan_output:
+        violations.append("wing_readonly_preflight_plan_output_missing")
+    if not plan_matches_capture:
+        violations.append("wing_readonly_preflight_plan_command_mismatch")
     if "--channels" not in handoff_command:
         violations.append("wing_readonly_preflight_handoff_packet_channels_missing")
     if "--output" not in handoff_command:
         violations.append("wing_readonly_preflight_handoff_packet_output_missing")
+    if "--plan-output" not in handoff_command or not handoff_plan_output:
+        violations.append("wing_readonly_preflight_handoff_packet_plan_output_missing")
     if not handoff_channel_matches_capture:
         violations.append("wing_readonly_preflight_handoff_packet_channel_mismatch")
     if not review_manual_checklist_complete:
@@ -1889,6 +2000,14 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["latest_valid_candidate_run_id"] = summary.get("latest_valid_candidate_run_id")
     detail["capture_tool_path"] = WING_READONLY_PREFLIGHT_RUNNER_TOOL
     detail["capture_tool_available"] = capture_tool_available
+    detail["plan_command"] = plan_command
+    detail["plan_command_uses_plan_only"] = "--plan-only" in plan_command
+    detail["plan_command_output"] = plan_output
+    detail["plan_command_channels"] = plan_channels
+    detail["plan_command_operator_confirmed_channels"] = plan_confirmed_channels
+    detail["plan_command_value_types"] = plan_value_types
+    detail["plan_command_artifact_root"] = plan_artifact_root
+    detail["plan_command_matches_capture"] = plan_matches_capture
     detail["capture_command_template"] = capture_command
     detail["capture_command_channels"] = capture_channels
     detail["capture_command_operator_confirmed_channels"] = capture_confirmed_channels
@@ -1920,6 +2039,7 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["handoff_packet_tool_available"] = handoff_tool_available
     detail["handoff_packet_command"] = handoff_command
     detail["handoff_packet_output"] = WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
+    detail["handoff_packet_plan_output"] = handoff_plan_output
     detail["handoff_packet_channels"] = handoff_channels
     detail["handoff_packet_channel_matches_capture"] = handoff_channel_matches_capture
     detail["blocked_by"] = (
@@ -1931,6 +2051,187 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     finished = datetime.now(timezone.utc)
     return CheckResult(
         name="wing_readonly_preflight_evidence_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def _csv_strings(value: str | None) -> list[str]:
+    if not isinstance(value, str):
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _csv_ints(value: str | None) -> list[int]:
+    parsed: list[int] = []
+    for item in _csv_strings(value):
+        try:
+            parsed.append(int(item))
+        except ValueError:
+            return []
+    return parsed
+
+
+def _expected_wing_read_request(channel: int, value_type: str) -> dict[str, object]:
+    address = f"/ch/{channel}/fdr" if value_type == "fader" else f"/ch/{channel}/in/set/trim"
+    return {
+        "type": "query_mixer_parameter",
+        "channel": channel,
+        "value_type": value_type,
+        "address": address,
+    }
+
+
+def validate_wing_readonly_preflight_plan_artifact_snapshot(
+    plan_path: Path,
+) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "wing_readonly_preflight_plan_artifact_is_offline_readonly_preview",
+        "plan_path": str(plan_path),
+    }
+    violations: list[str] = []
+
+    payload, load_error = _json_object_from_path(plan_path)
+    plan = payload or {}
+    plan_command = wing_readonly_preflight_plan_command()
+    expected_channels = _csv_ints(command_value_after_flag(plan_command, "--channels"))
+    expected_confirmed_channels = _csv_ints(
+        command_value_after_flag(plan_command, "--operator-confirm-channels")
+    )
+    expected_value_types = _csv_strings(command_value_after_flag(plan_command, "--value-types"))
+    expected_artifact_root = command_value_after_flag(plan_command, "--artifact-root")
+    expected_plan_output = command_value_after_flag(plan_command, "--plan-output")
+    expected_requests = [
+        {"type": "get_operator_mode"},
+        {"type": "get_state"},
+        *[
+            _expected_wing_read_request(channel, value_type)
+            for channel in expected_channels
+            for value_type in expected_value_types
+        ],
+    ]
+
+    if load_error:
+        violations.append(f"wing_readonly_preflight_plan_artifact_{load_error}")
+
+    if plan.get("type") != "wing_readonly_preflight_offline_plan":
+        violations.append("wing_readonly_preflight_plan_type_mismatch")
+    if plan.get("status") != "ready_for_operator_review":
+        violations.append("wing_readonly_preflight_plan_status_mismatch")
+    if plan.get("proof_artifact_schema") != "wing_readonly_preflight.v1":
+        violations.append("wing_readonly_preflight_plan_schema_mismatch")
+    if plan.get("proof_runner") != "wing_readonly_preflight_runner":
+        violations.append("wing_readonly_preflight_plan_runner_mismatch")
+    if plan.get("artifact_root") != expected_artifact_root:
+        violations.append("wing_readonly_preflight_plan_artifact_root_mismatch")
+    if plan.get("plan_output") != str(plan_path):
+        violations.append("wing_readonly_preflight_plan_output_path_mismatch")
+    if expected_plan_output != WING_READONLY_PREFLIGHT_PLAN_OUTPUT:
+        violations.append("wing_readonly_preflight_plan_default_output_mismatch")
+    if plan.get("channels") != expected_channels:
+        violations.append("wing_readonly_preflight_plan_channels_mismatch")
+    if plan.get("operator_confirmed_channels") != expected_confirmed_channels:
+        violations.append("wing_readonly_preflight_plan_operator_confirmation_mismatch")
+    if plan.get("value_types") != expected_value_types:
+        violations.append("wing_readonly_preflight_plan_value_types_mismatch")
+    if plan.get("operator_channel_confirmation_required") is not True:
+        violations.append("wing_readonly_preflight_plan_operator_confirmation_not_required")
+    if plan.get("require_physical_readback") is not True:
+        violations.append("wing_readonly_preflight_plan_physical_readback_not_required")
+
+    for key in (
+        "read_only",
+    ):
+        if plan.get(key) is not True:
+            violations.append(f"wing_readonly_preflight_plan_{key}_not_true")
+    for key in (
+        "live_write",
+        "contacts_backend",
+        "queries_console",
+        "execution_allowed_by_plan",
+        "live_authority_granted",
+    ):
+        if plan.get(key) is not False:
+            violations.append(f"wing_readonly_preflight_plan_{key}_not_false")
+
+    allowed_request_types = plan.get("allowed_request_types")
+    if allowed_request_types != [
+        "get_operator_mode",
+        "get_state",
+        "query_mixer_parameter",
+    ]:
+        violations.append("wing_readonly_preflight_plan_allowed_request_types_mismatch")
+        if not isinstance(allowed_request_types, list):
+            allowed_request_types = []
+    forbidden_request_types = plan.get("forbidden_request_types")
+    if not isinstance(forbidden_request_types, list):
+        forbidden_request_types = []
+        violations.append("wing_readonly_preflight_plan_forbidden_request_types_missing")
+    for required_forbidden in (
+        "apply_operator_proposal",
+        "set_gain",
+        "set_fader",
+        "set_eq",
+        "set_compressor",
+    ):
+        if required_forbidden not in forbidden_request_types:
+            violations.append(
+                f"wing_readonly_preflight_plan_forbidden_{required_forbidden}_missing"
+            )
+
+    request_sequence = plan.get("request_sequence")
+    if not isinstance(request_sequence, list):
+        request_sequence = []
+        violations.append("wing_readonly_preflight_plan_request_sequence_missing")
+    if request_sequence != expected_requests:
+        violations.append("wing_readonly_preflight_plan_request_sequence_mismatch")
+    unsafe_requests = [
+        item.get("type")
+        for item in request_sequence
+        if isinstance(item, Mapping) and item.get("type") not in allowed_request_types
+    ]
+    if unsafe_requests:
+        violations.append("wing_readonly_preflight_plan_unsafe_request_type_present")
+
+    expected_artifacts = plan.get("expected_artifacts")
+    expected_artifact_paths = [
+        f"{expected_artifact_root}/<run_id>/summary.json",
+        f"{expected_artifact_root}/<run_id>/events.jsonl",
+    ]
+    if expected_artifacts != expected_artifact_paths:
+        violations.append("wing_readonly_preflight_plan_expected_artifacts_mismatch")
+
+    detail["plan_type"] = plan.get("type")
+    detail["plan_status"] = plan.get("status")
+    detail["plan_output"] = plan.get("plan_output")
+    detail["expected_plan_output"] = str(plan_path)
+    detail["channels"] = plan.get("channels") if isinstance(plan.get("channels"), list) else []
+    detail["operator_confirmed_channels"] = (
+        plan.get("operator_confirmed_channels")
+        if isinstance(plan.get("operator_confirmed_channels"), list)
+        else []
+    )
+    detail["value_types"] = (
+        plan.get("value_types") if isinstance(plan.get("value_types"), list) else []
+    )
+    detail["request_count"] = len(request_sequence)
+    detail["expected_request_count"] = len(expected_requests)
+    detail["request_sequence_matches_expected"] = request_sequence == expected_requests
+    detail["read_only"] = plan.get("read_only")
+    detail["live_write"] = plan.get("live_write")
+    detail["contacts_backend"] = plan.get("contacts_backend")
+    detail["queries_console"] = plan.get("queries_console")
+    detail["execution_allowed_by_plan"] = plan.get("execution_allowed_by_plan")
+    detail["live_authority_granted"] = plan.get("live_authority_granted")
+    detail["forbidden_request_types"] = list(forbidden_request_types)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="wing_readonly_preflight_plan_artifact_schema",
         status="passed" if not violations else "failed",
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -6025,6 +6326,9 @@ def validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot()
     safety = ledger.get("safety") if isinstance(ledger.get("safety"), Mapping) else {}
     summary = ledger.get("summary") if isinstance(ledger.get("summary"), Mapping) else {}
     records = ledger.get("records") if isinstance(ledger.get("records"), list) else []
+    acceptance_template_tool_available = (
+        REPO_ROOT / READ_SURFACE_PHYSICAL_READBACK_ACCEPTANCE_TEMPLATE_TOOL
+    ).is_file()
 
     if ledger.get("type") != "read_surface_physical_readback_fixture_acceptance_ledger":
         violations.append("fixture_acceptance_ledger_type_mismatch")
@@ -6035,6 +6339,8 @@ def validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot()
         violations.append("fixture_acceptance_ledger_method_id_mismatch")
     if ledger.get("status") not in READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_STATUSES:
         violations.append("fixture_acceptance_ledger_status_unknown")
+    if not acceptance_template_tool_available:
+        violations.append("fixture_acceptance_template_tool_missing")
 
     for key in ("read_only", "operator_required"):
         if safety.get(key) is not True:
@@ -6108,6 +6414,10 @@ def validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot()
     unreviewed_surface_ids = summary.get("unreviewed_candidate_surface_ids")
     blocked_by = summary.get("blocked_by")
     detail["ledger_status"] = ledger.get("status")
+    detail["acceptance_template_tool_path"] = (
+        READ_SURFACE_PHYSICAL_READBACK_ACCEPTANCE_TEMPLATE_TOOL
+    )
+    detail["acceptance_template_tool_available"] = acceptance_template_tool_available
     detail["queue_status"] = summary.get("queue_status")
     detail["review_candidate_count"] = review_candidate_count
     detail["acceptance_record_count"] = acceptance_record_count
@@ -7075,6 +7385,7 @@ def wing_readonly_preflight_evidence_summary(
         matrix_ids = detail.get("mvp_blocker_matrix_ids")
         closed_ids = detail.get("mvp_blockers_closed_by_evidence")
         violations = detail.get("violations")
+        plan_command = detail.get("plan_command")
         capture_command = detail.get("capture_command_template")
         review_command = detail.get("review_command")
         review_exit_codes = detail.get("review_exit_codes")
@@ -7130,6 +7441,22 @@ def wing_readonly_preflight_evidence_summary(
             "latest_valid_candidate_run_id": detail.get("latest_valid_candidate_run_id"),
             "capture_tool_path": detail.get("capture_tool_path"),
             "capture_tool_available": detail.get("capture_tool_available") is True,
+            "plan_command": (
+                list(plan_command) if isinstance(plan_command, list) else []
+            ),
+            "plan_command_uses_plan_only": (
+                detail.get("plan_command_uses_plan_only") is True
+            ),
+            "plan_command_output": detail.get("plan_command_output"),
+            "plan_command_channels": detail.get("plan_command_channels"),
+            "plan_command_operator_confirmed_channels": detail.get(
+                "plan_command_operator_confirmed_channels"
+            ),
+            "plan_command_value_types": detail.get("plan_command_value_types"),
+            "plan_command_artifact_root": detail.get("plan_command_artifact_root"),
+            "plan_command_matches_capture": (
+                detail.get("plan_command_matches_capture") is True
+            ),
             "capture_command_template": (
                 list(capture_command) if isinstance(capture_command, list) else []
             ),
@@ -7183,11 +7510,64 @@ def wing_readonly_preflight_evidence_summary(
                 else []
             ),
             "handoff_packet_output": detail.get("handoff_packet_output"),
+            "handoff_packet_plan_output": detail.get("handoff_packet_plan_output"),
             "handoff_packet_channels": detail.get("handoff_packet_channels"),
             "handoff_packet_channel_matches_capture": (
                 detail.get("handoff_packet_channel_matches_capture") is True
             ),
             "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
+def wing_readonly_preflight_plan_artifact_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "wing_readonly_preflight_plan_artifact_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        violations = detail.get("violations")
+        forbidden_request_types = detail.get("forbidden_request_types")
+        return {
+            "status": result.status,
+            "read_only": detail.get("read_only") is True,
+            "live_write": False,
+            "contacts_backend": False,
+            "queries_console": False,
+            "execution_allowed_by_plan": False,
+            "live_authority_granted": False,
+            "plan_path": detail.get("plan_path"),
+            "plan_type": detail.get("plan_type"),
+            "plan_status": detail.get("plan_status"),
+            "plan_output": detail.get("plan_output"),
+            "expected_plan_output": detail.get("expected_plan_output"),
+            "channels": (
+                list(detail.get("channels"))
+                if isinstance(detail.get("channels"), list)
+                else []
+            ),
+            "operator_confirmed_channels": (
+                list(detail.get("operator_confirmed_channels"))
+                if isinstance(detail.get("operator_confirmed_channels"), list)
+                else []
+            ),
+            "value_types": (
+                list(detail.get("value_types"))
+                if isinstance(detail.get("value_types"), list)
+                else []
+            ),
+            "request_count": int(detail.get("request_count") or 0),
+            "expected_request_count": int(detail.get("expected_request_count") or 0),
+            "request_sequence_matches_expected": (
+                detail.get("request_sequence_matches_expected") is True
+            ),
+            "forbidden_request_types": (
+                list(forbidden_request_types)
+                if isinstance(forbidden_request_types, list)
+                else []
+            ),
             "violations": list(violations) if isinstance(violations, list) else [],
         }
     return None
@@ -9351,6 +9731,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     read_remediation = read_surface_remediation_plan_summary(results)
     read_capture_plan = read_surface_physical_readback_capture_plan_summary(results)
     wing_readonly_preflight = wing_readonly_preflight_evidence_summary(results)
+    wing_readonly_preflight_plan_artifact = (
+        wing_readonly_preflight_plan_artifact_summary(results)
+    )
     wing_readonly_preflight_review_decision = (
         wing_readonly_preflight_review_decision_summary(results)
     )
@@ -9407,6 +9790,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["read_surface_physical_readback_capture_plan"] = read_capture_plan
     if wing_readonly_preflight is not None:
         summary["wing_readonly_preflight_evidence"] = wing_readonly_preflight
+    if wing_readonly_preflight_plan_artifact is not None:
+        summary["wing_readonly_preflight_plan_artifact"] = (
+            wing_readonly_preflight_plan_artifact
+        )
     if wing_readonly_preflight_review_decision is not None:
         summary["wing_readonly_preflight_review_decision_ledger"] = (
             wing_readonly_preflight_review_decision
@@ -9674,6 +10061,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- capture_tool_path: `{wing_readonly_preflight['capture_tool_path']}`",
                 "- capture_tool_available: "
                 f"`{str(wing_readonly_preflight['capture_tool_available']).lower()}`",
+                "- plan_command: "
+                f"`{json.dumps(wing_readonly_preflight['plan_command'])}`",
+                "- plan_command_uses_plan_only: "
+                f"`{str(wing_readonly_preflight['plan_command_uses_plan_only']).lower()}`",
+                f"- plan_command_output: `{wing_readonly_preflight['plan_command_output']}`",
+                f"- plan_command_channels: `{wing_readonly_preflight['plan_command_channels']}`",
+                "- plan_command_operator_confirmed_channels: "
+                f"`{wing_readonly_preflight['plan_command_operator_confirmed_channels']}`",
+                f"- plan_command_value_types: `{wing_readonly_preflight['plan_command_value_types']}`",
+                f"- plan_command_artifact_root: `{wing_readonly_preflight['plan_command_artifact_root']}`",
+                "- plan_command_matches_capture: "
+                f"`{str(wing_readonly_preflight['plan_command_matches_capture']).lower()}`",
                 "- capture_command_template: "
                 f"`{json.dumps(wing_readonly_preflight['capture_command_template'])}`",
                 f"- capture_command_channels: `{wing_readonly_preflight['capture_command_channels']}`",
@@ -9708,11 +10107,46 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 "- handoff_packet_command: "
                 f"`{json.dumps(wing_readonly_preflight['handoff_packet_command'])}`",
                 f"- handoff_packet_output: `{wing_readonly_preflight['handoff_packet_output']}`",
+                f"- handoff_packet_plan_output: `{wing_readonly_preflight['handoff_packet_plan_output']}`",
                 f"- handoff_packet_channels: `{wing_readonly_preflight['handoff_packet_channels']}`",
                 "- handoff_packet_channel_matches_capture: "
                 f"`{str(wing_readonly_preflight['handoff_packet_channel_matches_capture']).lower()}`",
                 f"- blocked_by: `{json.dumps(wing_readonly_preflight['blocked_by'])}`",
                 f"- violations: `{json.dumps(wing_readonly_preflight['violations'])}`",
+            ]
+        )
+    if wing_readonly_preflight_plan_artifact is not None:
+        lines.extend(
+            [
+                "",
+                "## WING Read-Only Preflight Plan Artifact",
+                "",
+                f"- schema_check: `{wing_readonly_preflight_plan_artifact['status']}`",
+                f"- read_only: `{str(wing_readonly_preflight_plan_artifact['read_only']).lower()}`",
+                f"- live_write: `{str(wing_readonly_preflight_plan_artifact['live_write']).lower()}`",
+                f"- contacts_backend: `{str(wing_readonly_preflight_plan_artifact['contacts_backend']).lower()}`",
+                f"- queries_console: `{str(wing_readonly_preflight_plan_artifact['queries_console']).lower()}`",
+                "- execution_allowed_by_plan: "
+                f"`{str(wing_readonly_preflight_plan_artifact['execution_allowed_by_plan']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(wing_readonly_preflight_plan_artifact['live_authority_granted']).lower()}`",
+                f"- plan_path: `{wing_readonly_preflight_plan_artifact['plan_path']}`",
+                f"- plan_status: `{wing_readonly_preflight_plan_artifact['plan_status']}`",
+                f"- plan_output: `{wing_readonly_preflight_plan_artifact['plan_output']}`",
+                "- channels: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['channels'])}`",
+                "- operator_confirmed_channels: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['operator_confirmed_channels'])}`",
+                "- value_types: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['value_types'])}`",
+                f"- request_count: `{wing_readonly_preflight_plan_artifact['request_count']}`",
+                "- expected_request_count: "
+                f"`{wing_readonly_preflight_plan_artifact['expected_request_count']}`",
+                "- request_sequence_matches_expected: "
+                f"`{str(wing_readonly_preflight_plan_artifact['request_sequence_matches_expected']).lower()}`",
+                "- forbidden_request_types: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['forbidden_request_types'])}`",
+                f"- violations: `{json.dumps(wing_readonly_preflight_plan_artifact['violations'])}`",
             ]
         )
     if wing_readonly_preflight_review_decision is not None:
@@ -11182,6 +11616,13 @@ def run_release_checks(
         results.append(result)
         if result.status != "passed" and not continue_on_failure:
             break
+        if check.name == "wing_readonly_preflight_plan" and result.status == "passed":
+            plan_artifact_result = validate_wing_readonly_preflight_plan_artifact_snapshot(
+                wing_readonly_preflight_plan_path_for_run(run_dir)
+            )
+            results.append(plan_artifact_result)
+            if plan_artifact_result.status != "passed" and not continue_on_failure:
+                break
         if check.name == "read_surface_fixture_evidence" and result.status == "passed":
             read_fixture_result = validate_read_surface_fixture_evidence_snapshot()
             results.append(read_fixture_result)
