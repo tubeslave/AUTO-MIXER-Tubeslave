@@ -94,6 +94,15 @@ from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import
 from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_acceptance_ledger_result_consumer import (
     build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_acceptance_ledger_result_consumer,
 )
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_plan_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_plan_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_dry_run_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_dry_run_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer,
+)
 from operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
     build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
 )
@@ -108,6 +117,15 @@ from operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_l
 )
 from operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan import (
     build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_executor import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit,
 )
 
 
@@ -1119,6 +1137,77 @@ def register_handlers(server):
         )
         result["handler"] = (
             "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_acceptance_ledger_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_plan_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_plan_result_consumer(
+                promotion_acceptance_ledger_result_consumer=(
+                    data.get("promotion_acceptance_ledger_result_consumer")
+                    or data.get("queue_import_promotion_acceptance_ledger_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_execution_plan_result=(
+                    data.get("promotion_execution_plan_result")
+                    or data.get("promotion_execution_plan")
+                    or data.get("execution_plan")
+                    or data.get("plan")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_plan_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_dry_run_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_dry_run_result_consumer(
+                promotion_execution_plan_result_consumer=(
+                    data.get("promotion_execution_plan_result_consumer")
+                    or data.get("queue_import_promotion_execution_plan_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_executor_dry_run_result=(
+                    data.get("promotion_executor_dry_run_result")
+                    or data.get("promotion_executor_dry_run")
+                    or data.get("executor_dry_run")
+                    or data.get("dry_run")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_dry_run_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer(
+                promotion_executor_dry_run_result_consumer=(
+                    data.get("promotion_executor_dry_run_result_consumer")
+                    or data.get("queue_import_promotion_executor_dry_run_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_executor_result=(
+                    data.get("promotion_executor_result")
+                    or data.get("promotion_executor")
+                    or data.get("executor")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
         )
         await server.send_to_client(websocket, result)
 
@@ -4972,6 +5061,67 @@ def register_handlers(server):
         )
         await server.send_to_client(websocket, result)
 
+    async def handle_dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor(
+        websocket,
+        data,
+    ):
+        result = build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run(
+            promotion_execution_plan=(
+                data.get("promotion_execution_plan")
+                or data.get("promotion_execution_plan_result")
+                or data.get("execution_plan")
+                or data.get("plan")
+            ),
+            apply=bool(data.get("apply", False)),
+            operator_ack=bool(data.get("operator_ack", False)),
+        )
+        result["handler"] = (
+            "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_execute_operator_proposal_apply_sequence_policy_memory_trust_promotion(
+        websocket,
+        data,
+    ):
+        if "target_store" in data:
+            target_store = data.get("target_store")
+        elif "sequence_policy_trust_store" in data:
+            target_store = data.get("sequence_policy_trust_store")
+        else:
+            target_store = None
+        result = build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor(
+            executor_dry_run=(
+                data.get("executor_dry_run")
+                or data.get("promotion_executor_dry_run_result")
+                or data.get("promotion_executor_dry_run")
+                or data.get("dry_run")
+            ),
+            target_store=target_store,
+            apply=bool(data.get("apply", False)),
+            operator_ack=bool(data.get("operator_ack", False)),
+        )
+        result["handler"] = (
+            "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_audit_operator_proposal_apply_sequence_policy_memory_trust_promotion(
+        websocket,
+        data,
+    ):
+        result = build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit(
+            promotion_executor=(
+                data.get("promotion_executor")
+                or data.get("promotion_executor_result")
+                or data.get("executor")
+            ),
+        )
+        result["handler"] = (
+            "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion"
+        )
+        await server.send_to_client(websocket, result)
+
     return {
         "get_dashboard_snapshot": handle_get_dashboard_snapshot,
         "get_channel_inventory": handle_get_channel_inventory,
@@ -5061,6 +5211,15 @@ def register_handlers(server):
         "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_acceptance_ledger_result": (
             handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_acceptance_ledger_result
         ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_plan_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_plan_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_dry_run_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_dry_run_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result
+        ),
         "create_operator_proposal": handle_create_operator_proposal,
         "accept_operator_proposal": handle_accept_operator_proposal,
         "dismiss_operator_proposal": handle_dismiss_operator_proposal,
@@ -5112,6 +5271,15 @@ def register_handlers(server):
         ),
         "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution": (
             handle_plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution
+        ),
+        "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor": (
+            handle_dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor
+        ),
+        "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion": (
+            handle_execute_operator_proposal_apply_sequence_policy_memory_trust_promotion
+        ),
+        "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion": (
+            handle_audit_operator_proposal_apply_sequence_policy_memory_trust_promotion
         ),
         "apply_operator_proposal": handle_apply_operator_proposal,
     }

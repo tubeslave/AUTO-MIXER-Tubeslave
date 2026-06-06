@@ -13600,6 +13600,414 @@ async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audi
         promotion_execution_plan_payload["summary"]["live_authority_granted"]
         is False
     )
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_plan_result"
+    ](
+        object(),
+        {
+            "promotion_acceptance_ledger_result_consumer": (
+                promotion_acceptance_consumer_payload
+            ),
+            "promotion_execution_plan_result": promotion_execution_plan_payload,
+        },
+    )
+
+    promotion_execution_plan_consumer_payload = server.send_to_client.await_args.args[1]
+    assert promotion_execution_plan_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_plan_result_consumer"
+    )
+    assert promotion_execution_plan_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_plan_result"
+    )
+    assert promotion_execution_plan_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_executor_dry_run_request_available"
+    )
+    assert (
+        promotion_execution_plan_consumer_payload["summary"][
+            "promotion_executor_dry_run_request_available"
+        ]
+        is True
+    )
+    assert (
+        promotion_execution_plan_consumer_payload["summary"][
+            "promotion_executor_dry_run_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        promotion_execution_plan_consumer_payload["summary"][
+            "promotion_executor_dry_run_created"
+        ]
+        is False
+    )
+    assert (
+        promotion_execution_plan_consumer_payload["summary"]["policy_mutation"]
+        is False
+    )
+    assert (
+        promotion_execution_plan_consumer_payload["summary"][
+            "runtime_memory_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_execution_plan_consumer_payload["summary"][
+            "live_authority_granted"
+        ]
+        is False
+    )
+    assert (
+        promotion_execution_plan_consumer_payload[
+            "promotion_executor_dry_run_request"
+        ]["handler"]
+        == "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
+    )
+    assert (
+        promotion_execution_plan_consumer_payload[
+            "promotion_executor_dry_run_request"
+        ]["apply"]
+        is False
+    )
+    assert (
+        promotion_execution_plan_consumer_payload[
+            "promotion_executor_dry_run_request"
+        ]["operator_ack"]
+        is False
+    )
+
+    await server._dispatch[
+        "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
+    ](
+        object(),
+        promotion_execution_plan_consumer_payload[
+            "promotion_executor_dry_run_request"
+        ],
+    )
+
+    promotion_executor_dry_run_payload = server.send_to_client.await_args.args[1]
+    assert promotion_executor_dry_run_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run"
+    )
+    assert promotion_executor_dry_run_payload["handler"] == (
+        "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
+    )
+    assert promotion_executor_dry_run_payload["status"] == (
+        "sequence_memory_trust_promotion_executor_dry_run_ready"
+    )
+    assert promotion_executor_dry_run_payload["summary"]["dry_run_record_count"] == 1
+    assert (
+        promotion_executor_dry_run_payload["summary"][
+            "execution_allowed_by_dry_run"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_dry_run_payload["summary"][
+            "sequence_policy_promotion_applied"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_dry_run_payload["summary"][
+            "policy_mutation_allowed_by_dry_run"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_dry_run_payload["summary"][
+            "runtime_memory_mutation_allowed_by_dry_run"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_dry_run_payload["summary"]["live_authority_granted"]
+        is False
+    )
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_dry_run_result"
+    ](
+        object(),
+        {
+            "promotion_execution_plan_result_consumer": (
+                promotion_execution_plan_consumer_payload
+            ),
+            "promotion_executor_dry_run_result": promotion_executor_dry_run_payload,
+        },
+    )
+
+    promotion_executor_dry_run_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert promotion_executor_dry_run_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_dry_run_result_consumer"
+    )
+    assert promotion_executor_dry_run_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_dry_run_result"
+    )
+    assert promotion_executor_dry_run_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_executor_request_available"
+    )
+    assert (
+        promotion_executor_dry_run_consumer_payload["summary"][
+            "promotion_executor_request_available"
+        ]
+        is True
+    )
+    assert (
+        promotion_executor_dry_run_consumer_payload["summary"][
+            "promotion_executor_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_dry_run_consumer_payload["summary"][
+            "promotion_executor_created"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_dry_run_consumer_payload["summary"]["policy_mutation"]
+        is False
+    )
+    assert (
+        promotion_executor_dry_run_consumer_payload["summary"][
+            "runtime_memory_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_dry_run_consumer_payload["summary"][
+            "live_authority_granted"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_dry_run_consumer_payload["promotion_executor_request"][
+            "handler"
+        ]
+        == "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
+    )
+    assert (
+        promotion_executor_dry_run_consumer_payload["promotion_executor_request"][
+            "apply"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_dry_run_consumer_payload["promotion_executor_request"][
+            "operator_ack"
+        ]
+        is False
+    )
+
+    await server._dispatch[
+        "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
+    ](
+        object(),
+        promotion_executor_dry_run_consumer_payload["promotion_executor_request"],
+    )
+
+    promotion_executor_payload = server.send_to_client.await_args.args[1]
+    assert promotion_executor_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
+    )
+    assert promotion_executor_payload["handler"] == (
+        "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
+    )
+    assert promotion_executor_payload["status"] == (
+        "sequence_memory_trust_promotion_executor_ready"
+    )
+    assert promotion_executor_payload["summary"]["apply_result_count"] == 0
+    assert promotion_executor_payload["summary"]["apply_requested"] is False
+    assert promotion_executor_payload["summary"]["operator_ack"] is False
+    assert (
+        promotion_executor_payload["summary"]["sequence_policy_promotion_applied"]
+        is False
+    )
+    assert (
+        promotion_executor_payload["summary"]["runtime_memory_mutation"]
+        is False
+    )
+    assert (
+        promotion_executor_payload["summary"][
+            "sequence_policy_trust_store_mutation"
+        ]
+        is False
+    )
+    assert promotion_executor_payload["summary"]["live_authority_granted"] is False
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
+    ](
+        object(),
+        {
+            "promotion_executor_dry_run_result_consumer": (
+                promotion_executor_dry_run_consumer_payload
+            ),
+            "promotion_executor_result": promotion_executor_payload,
+        },
+    )
+
+    promotion_executor_preview_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert promotion_executor_preview_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer"
+    )
+    assert promotion_executor_preview_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
+    )
+    assert promotion_executor_preview_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_executor_result_consumer_blocked"
+    )
+    assert (
+        promotion_executor_preview_consumer_payload["summary"][
+            "promotion_apply_audit_request_available"
+        ]
+        is False
+    )
+    assert (
+        "applied_sequence_memory_trust_promotion_executor_result_required_before_apply_audit"
+        in promotion_executor_preview_consumer_payload["summary"]["blocked_by"]
+    )
+
+    promotion_executor_apply_request = dict(
+        promotion_executor_dry_run_consumer_payload["promotion_executor_request"]
+    )
+    promotion_executor_apply_request.update(
+        {
+            "apply": True,
+            "operator_ack": True,
+            "target_store": {},
+        }
+    )
+    await server._dispatch[
+        "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
+    ](
+        object(),
+        promotion_executor_apply_request,
+    )
+
+    promotion_executor_applied_payload = server.send_to_client.await_args.args[1]
+    assert promotion_executor_applied_payload["status"] == (
+        "sequence_memory_trust_promotion_executor_applied"
+    )
+    assert promotion_executor_applied_payload["summary"]["apply_result_count"] == 1
+    assert promotion_executor_applied_payload["summary"]["apply_requested"] is True
+    assert promotion_executor_applied_payload["summary"]["operator_ack"] is True
+    assert (
+        promotion_executor_applied_payload["summary"][
+            "sequence_policy_promotion_applied"
+        ]
+        is True
+    )
+    assert (
+        promotion_executor_applied_payload["summary"][
+            "sequence_policy_trust_store_mutation"
+        ]
+        is True
+    )
+    assert (
+        promotion_executor_applied_payload["summary"]["live_authority_granted"]
+        is False
+    )
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
+    ](
+        object(),
+        {
+            "promotion_executor_dry_run_result_consumer": (
+                promotion_executor_dry_run_consumer_payload
+            ),
+            "promotion_executor_result": promotion_executor_applied_payload,
+        },
+    )
+
+    promotion_executor_result_consumer_payload = server.send_to_client.await_args.args[1]
+    assert promotion_executor_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer"
+    )
+    assert promotion_executor_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
+    )
+    assert promotion_executor_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_apply_audit_request_available"
+    )
+    assert (
+        promotion_executor_result_consumer_payload["summary"][
+            "promotion_apply_audit_request_available"
+        ]
+        is True
+    )
+    assert (
+        promotion_executor_result_consumer_payload["summary"][
+            "promotion_apply_audit_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_result_consumer_payload["summary"][
+            "promotion_apply_audit_created"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_result_consumer_payload["summary"]["policy_mutation"]
+        is False
+    )
+    assert (
+        promotion_executor_result_consumer_payload["summary"][
+            "runtime_memory_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_result_consumer_payload["summary"][
+            "live_authority_granted"
+        ]
+        is False
+    )
+    assert (
+        promotion_executor_result_consumer_payload["promotion_apply_audit_request"][
+            "handler"
+        ]
+        == "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion"
+    )
+
+    await server._dispatch[
+        "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion"
+    ](
+        object(),
+        promotion_executor_result_consumer_payload["promotion_apply_audit_request"],
+    )
+
+    promotion_apply_audit_payload = server.send_to_client.await_args.args[1]
+    assert promotion_apply_audit_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit"
+    )
+    assert promotion_apply_audit_payload["handler"] == (
+        "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion"
+    )
+    assert promotion_apply_audit_payload["status"] == (
+        "sequence_memory_trust_promotion_apply_audit_records_available"
+    )
+    assert promotion_apply_audit_payload["summary"]["executor_apply_result_count"] == 1
+    assert promotion_apply_audit_payload["summary"]["apply_audit_record_count"] == 1
+    assert promotion_apply_audit_payload["summary"]["runtime_memory_mutation"] is False
+    assert (
+        promotion_apply_audit_payload["summary"][
+            "sequence_policy_trust_store_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_apply_audit_payload["summary"]["live_authority_granted"]
+        is False
+    )
+    assert promotion_apply_audit_payload["summary"]["rollback_verified"] is False
     assert server._apply_manual_console_write.await_count == 1
     assert "seq-import-audit:proposal-sequence-fader" in (
         server._operator_apply_idempotency_keys
