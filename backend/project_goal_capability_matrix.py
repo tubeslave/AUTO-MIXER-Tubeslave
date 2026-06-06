@@ -789,16 +789,18 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "muq_perceptual_shadow",
             "ml_processing_graph",
             "source_identity_proposal_priority_policy",
+            "source_identity_proposal_ordering_preview",
         ),
         support_paths=(
             "backend/decision_evidence_packet_proposal.py",
             "backend/source_identity_downstream_gate.py",
             "backend/source_identity_proposal_priority_policy.py",
+            "backend/source_identity_proposal_ordering_preview.py",
             "backend/source_knowledge.py",
             "backend/decision_memory.py",
         ),
         blocker="Evidence packets are operator-review contracts, not live apply authority.",
-        next_step="Attach fresh-context and trusted-source-identity evidence packets to every proposal and rejected shadow decision, project read-only source-identity-aware ranking records, then replay accepted/rejected outcomes before promotion.",
+        next_step="Attach fresh-context and trusted-source-identity evidence packets to every proposal and rejected shadow decision, project read-only source-identity-aware ranking records and ordering previews, then replay accepted/rejected outcomes before promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="long_term_memory_learning",
@@ -824,6 +826,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "source_identity_calibration_memory_trust_promotion_rollback_verification",
             "source_identity_calibration_memory_trust_promotion_priority_gate",
             "source_identity_proposal_priority_policy",
+            "source_identity_proposal_ordering_preview",
             "product_operator_state",
         ),
         support_paths=(
@@ -843,13 +846,14 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_calibration_memory_trust_promotion_rollback_verification.py",
             "backend/source_identity_calibration_memory_trust_promotion_priority_gate.py",
             "backend/source_identity_proposal_priority_policy.py",
+            "backend/source_identity_proposal_ordering_preview.py",
             "backend/source_identity_downstream_gate.py",
             "backend/decision_memory.py",
             "backend/telemetry/",
             ".ai/memory/project.md",
         ),
         blocker="Memory-learning proposals are review contracts, not autonomous console authority.",
-        next_step="Route trusted-source, fresh-context learning records through replay correlation and operator review, then append-only memory drafts, acknowledged writes, read-only indexing, memory-trust review, operator acceptance, manual promotion planning, promotion contract review, promotion acceptance, non-executing execution planning, executor dry-run specs, operator-gated trust-store apply, rollback audit, rollback verification, read-only priority-gate eligibility, and read-only proposal-priority policy projection before any ordering mutation or live console authority.",
+        next_step="Route trusted-source, fresh-context learning records through replay correlation and operator review, then append-only memory drafts, acknowledged writes, read-only indexing, memory-trust review, operator acceptance, manual promotion planning, promotion contract review, promotion acceptance, non-executing execution planning, executor dry-run specs, operator-gated trust-store apply, rollback audit, rollback verification, read-only priority-gate eligibility, read-only proposal-priority policy projection, and read-only ordering preview before any ordering mutation or live console authority.",
     ),
 )
 

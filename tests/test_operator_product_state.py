@@ -5975,6 +5975,7 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         "source_identity_calibration_memory_trust_promotion_priority_gate"
     ]
     priority_policy = payload["source_identity_proposal_priority_policy"]
+    ordering_preview = payload["source_identity_proposal_ordering_preview"]
     adapter = [
         item
         for item in payload["adapters"]
@@ -6021,6 +6022,11 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         item
         for item in payload["adapters"]
         if item["adapter_id"] == "source_identity_proposal_priority_policy"
+    ][0]
+    ordering_preview_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"] == "source_identity_proposal_ordering_preview"
     ][0]
 
     assert (
@@ -6087,6 +6093,13 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         ]
         == 0
     )
+    assert payload["summary"]["source_identity_proposal_ordering_preview_count"] == 0
+    assert (
+        payload["summary"][
+            "source_identity_proposal_ordering_preview_ranked_proposal_count"
+        ]
+        == 0
+    )
     assert (
         adapter["method_id"]
         == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
@@ -6144,6 +6157,14 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert (
         priority_policy_adapter["output"]
         == "source_identity_proposal_priority_policy_projection"
+    )
+    assert (
+        ordering_preview_adapter["method_id"]
+        == "source_identity_proposal_ordering_preview"
+    )
+    assert (
+        ordering_preview_adapter["output"]
+        == "source_identity_proposal_ordering_preview"
     )
     assert (
         ledger["status"]
@@ -6295,6 +6316,30 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert priority_policy["safety"]["live_widening_allowed"] is False
     assert priority_policy["safety"]["live_write"] is False
     assert priority_policy["policy_records"] == []
+    assert (
+        ordering_preview["status"]
+        == "source_identity_proposal_ordering_preview_not_ready"
+    )
+    assert ordering_preview["summary"]["ordered_preview_count"] == 0
+    assert ordering_preview["summary"]["recommended_ordered_proposal_ids"] == []
+    assert ordering_preview["summary"]["proposal_order_mutation"] is False
+    assert ordering_preview["summary"]["queue_mutation"] is False
+    assert (
+        ordering_preview["summary"]["downstream_priority_change_allowed_by_policy"]
+        is False
+    )
+    assert ordering_preview["summary"]["live_widening_allowed"] is False
+    assert ordering_preview["summary"]["can_import_to_queue"] is False
+    assert ordering_preview["summary"]["can_apply_live"] is False
+    assert ordering_preview["safety"]["read_only"] is True
+    assert ordering_preview["safety"]["proposal_order_mutation"] is False
+    assert (
+        ordering_preview["safety"]["downstream_priority_change_allowed_by_policy"]
+        is False
+    )
+    assert ordering_preview["safety"]["live_widening_allowed"] is False
+    assert ordering_preview["safety"]["live_write"] is False
+    assert ordering_preview["ordered_proposals"] == []
     assert queue["summary"]["pending_count"] == 0
 
 

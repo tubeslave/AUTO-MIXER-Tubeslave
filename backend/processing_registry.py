@@ -142,6 +142,9 @@ try:
     from source_identity_proposal_priority_policy import (
         build_source_identity_proposal_priority_policy,
     )
+    from source_identity_proposal_ordering_preview import (
+        build_source_identity_proposal_ordering_preview,
+    )
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.bus_group_main_dca_physical_readback_contract import (
@@ -273,6 +276,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_proposal_priority_policy import (
         build_source_identity_proposal_priority_policy,
+    )
+    from backend.source_identity_proposal_ordering_preview import (
+        build_source_identity_proposal_ordering_preview,
     )
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
 
@@ -968,6 +974,36 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "no_queue_mutation",
             "no_model_mutation",
             "no_runtime_memory_mutation",
+            "no_direct_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_proposal_ordering_preview",
+        label="Source Identity Proposal Ordering Preview",
+        domain="decision_evidence",
+        status="shadow_only",
+        summary=(
+            "Read-only recommended proposal-order view from source identity "
+            "proposal-priority policy records."
+        ),
+        module="backend/source_identity_proposal_ordering_preview.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="source_identity_proposal_ordering_preview_is_not_queue_ordering_or_live_authority",
+        promotion_next=(
+            "route reviewed ordering-preview records through a separate queue "
+            "ordering/import consumer before mutating queues or live behavior"
+        ),
+        notes=(
+            "transport_free",
+            "ordering_preview_only",
+            "source_identity_proposal_priority_policy_consumer",
+            "proposal_order_mutation_false",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_source_identity_trust_store_mutation",
             "no_direct_downstream_priority_mutation",
             "no_live_writes",
         ),
@@ -2334,6 +2370,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_rollback_verification",
             "source_identity_calibration_memory_trust_promotion_priority_gate",
             "source_identity_proposal_priority_policy",
+            "source_identity_proposal_ordering_preview",
             "auto_fader_v1",
             "lufs_gain_staging",
             "live_shared_mix",
@@ -2433,6 +2470,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_rollback_verification",
             "source_identity_calibration_memory_trust_promotion_priority_gate",
             "source_identity_proposal_priority_policy",
+            "source_identity_proposal_ordering_preview",
             "bus_group_balance_proposal",
             "mute_management_proposal",
             "routing_management_proposal",
@@ -2491,6 +2529,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_rollback_verification",
             "source_identity_calibration_memory_trust_promotion_priority_gate",
             "source_identity_proposal_priority_policy",
+            "source_identity_proposal_ordering_preview",
             "cross_adaptive_eq",
             "autoeq_audit_validation",
             "diff_deq_playbook_bridge",
@@ -2700,6 +2739,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "build_source_identity_proposal_priority_policy",
         "ui_surface": "Channel Intelligence, source identity proposal priority policy projection",
         "next_step": "Use ranked records as read-only policy evidence only; proposal order, queue import, and live authority still require a separate consumer.",
+    },
+    "source_identity_proposal_ordering_preview": {
+        "entrypoint": "build_source_identity_proposal_ordering_preview",
+        "ui_surface": "Channel Intelligence, source identity proposal ordering preview",
+        "next_step": "Use the recommended order view as read-only operator evidence only; queue import and live authority still require a separate consumer.",
     },
     "supervised_manual_fader_gain": {
         "entrypoint": "apply_operator_proposal -> supervised manual gate",
@@ -3226,6 +3270,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "source_identity_proposal_priority_policy": (
             build_source_identity_proposal_priority_policy()
+        ),
+        "source_identity_proposal_ordering_preview": (
+            build_source_identity_proposal_ordering_preview()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),

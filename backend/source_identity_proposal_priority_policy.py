@@ -576,6 +576,8 @@ def build_source_identity_proposal_priority_policy(
             "unmatched_eligible_source_count": len(unmatched_source_ids),
             "invalid_record_count": len(invalid_record_ids),
             "policy_evidence_only": True,
+            "mutates_console_state": False,
+            "queries_console": False,
             "proposal_order_mutation": False,
             "queue_mutation": False,
             "model_mutation": False,
