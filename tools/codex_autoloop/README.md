@@ -54,7 +54,9 @@ you want the background automation active.
   directories, latest/recent test artifacts, TODO/FIXME scan, local `.ai`
   tasks, and non-empty evidence sections for
   findings, changes, tests, remaining work, risks, and each plain-language
-  explanation subsection. Core report sections must remain in the expected
+  explanation subsection. Worktree discovery must name the exact
+  `git status --short` command and the current branch. Core report sections
+  must remain in the expected
   order: scope, findings, short plan, changes, changed files, tests, memory
   lint result, remaining work, and risks. The TODO/FIXME evidence must state
   the owned-code focus and the excluded vendored/generated/reference scan-noise

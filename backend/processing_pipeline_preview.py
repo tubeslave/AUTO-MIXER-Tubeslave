@@ -30,6 +30,18 @@ try:
         get_pipeline_profile,
         get_processing_method,
     )
+    from source_identity_calibration_acceptance_ledger import (
+        build_source_identity_calibration_acceptance_ledger,
+    )
+    from source_identity_calibration_persistence_plan import (
+        build_source_identity_calibration_persistence_plan,
+    )
+    from source_identity_calibration_memory_draft import (
+        build_source_identity_calibration_memory_draft,
+    )
+    from source_identity_calibration_memory_writer import (
+        build_source_identity_calibration_memory_writer,
+    )
     from source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
         analyze_source_identity_replay_calibration,
@@ -58,6 +70,18 @@ except ImportError:  # pragma: no cover - package import compatibility
         build_processing_registry_snapshot,
         get_pipeline_profile,
         get_processing_method,
+    )
+    from backend.source_identity_calibration_acceptance_ledger import (
+        build_source_identity_calibration_acceptance_ledger,
+    )
+    from backend.source_identity_calibration_persistence_plan import (
+        build_source_identity_calibration_persistence_plan,
+    )
+    from backend.source_identity_calibration_memory_draft import (
+        build_source_identity_calibration_memory_draft,
+    )
+    from backend.source_identity_calibration_memory_writer import (
+        build_source_identity_calibration_memory_writer,
     )
     from backend.source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
@@ -298,6 +322,17 @@ def _source_identity_replay_preview(server: Any) -> Dict[str, Any]:
     }
 
 
+def _source_identity_calibration_acceptance_records(server: Any) -> List[Dict[str, Any]]:
+    raw_records = getattr(server, "source_identity_calibration_acceptance_records", None)
+    if raw_records is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_records = config.get("source_identity_calibration_acceptance_records")
+    if not isinstance(raw_records, (list, tuple)):
+        return []
+    return [dict(record) for record in raw_records if isinstance(record, dict)]
+
+
 def build_main_pipeline_preview(
     server: Any,
     *,
@@ -341,6 +376,25 @@ def build_main_pipeline_preview(
 
     source_identity_replay = _source_identity_replay_preview(server)
     source_identity_replay_proposals = source_identity_replay.get("proposals", [])
+    source_identity_acceptance_ledger = build_source_identity_calibration_acceptance_ledger(
+        calibration_candidates=source_identity_replay_proposals,
+        acceptance_records=_source_identity_calibration_acceptance_records(server),
+    )
+    source_identity_acceptance_summary = source_identity_acceptance_ledger.get("summary", {})
+    source_identity_persistence_plan = build_source_identity_calibration_persistence_plan(
+        acceptance_ledger=source_identity_acceptance_ledger,
+    )
+    source_identity_persistence_summary = source_identity_persistence_plan.get("summary", {})
+    source_identity_memory_draft = build_source_identity_calibration_memory_draft(
+        persistence_plan=source_identity_persistence_plan,
+    )
+    source_identity_memory_draft_summary = source_identity_memory_draft.get("summary", {})
+    source_identity_memory_writer = build_source_identity_calibration_memory_writer(
+        memory_draft=source_identity_memory_draft,
+        apply=False,
+        operator_ack=False,
+    )
+    source_identity_memory_writer_summary = source_identity_memory_writer.get("summary", {})
 
     proposals = (
         operator_proposals
@@ -392,6 +446,24 @@ def build_main_pipeline_preview(
             "agentic_foundation_recommendation_count": int(agentic_foundation.get("recommendation_count", 0) or 0),
             "source_identity_replay_event_count": int(source_identity_replay.get("event_count", 0) or 0),
             "source_identity_replay_calibration_proposal_count": len(source_identity_replay_proposals),
+            "source_identity_calibration_acceptance_record_count": int(
+                source_identity_acceptance_summary.get("acceptance_record_count", 0) or 0
+            ),
+            "source_identity_calibration_accepted_record_count": int(
+                source_identity_acceptance_summary.get("accepted_record_count", 0) or 0
+            ),
+            "source_identity_calibration_invalid_record_count": int(
+                source_identity_acceptance_summary.get("invalid_record_count", 0) or 0
+            ),
+            "source_identity_calibration_persistence_candidate_count": int(
+                source_identity_persistence_summary.get("persistence_candidate_count", 0) or 0
+            ),
+            "source_identity_calibration_memory_draft_record_count": int(
+                source_identity_memory_draft_summary.get("draft_record_count", 0) or 0
+            ),
+            "source_identity_calibration_memory_writer_write_result_count": int(
+                source_identity_memory_writer_summary.get("write_result_count", 0) or 0
+            ),
             "proposal_only_contract_count": len(proposal_only_contracts),
             "blocker_count": len(blockers),
             "queue_mutation": False,
@@ -425,6 +497,50 @@ def build_main_pipeline_preview(
                 "status": "active" if source_identity_replay_proposals else "standby",
                 "output": "source_identity_downstream_trust_review_preview",
                 "reason": source_identity_replay.get("reason"),
+            },
+            {
+                "adapter_id": "source_identity_calibration_acceptance_ledger",
+                "method_id": "source_identity_calibration_acceptance_ledger",
+                "status": source_identity_acceptance_ledger.get("status"),
+                "output": "source_identity_operator_acceptance_ledger",
+                "reason": (
+                    ", ".join(source_identity_acceptance_summary.get("blocked_by", []))
+                    if source_identity_acceptance_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
+                "adapter_id": "source_identity_calibration_persistence_plan",
+                "method_id": "source_identity_calibration_persistence_plan",
+                "status": source_identity_persistence_plan.get("status"),
+                "output": "source_identity_manual_persistence_plan",
+                "reason": (
+                    ", ".join(source_identity_persistence_summary.get("blocked_by", []))
+                    if source_identity_persistence_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
+                "adapter_id": "source_identity_calibration_memory_draft",
+                "method_id": "source_identity_calibration_memory_draft",
+                "status": source_identity_memory_draft.get("status"),
+                "output": "source_identity_append_only_memory_draft",
+                "reason": (
+                    ", ".join(source_identity_memory_draft_summary.get("blocked_by", []))
+                    if source_identity_memory_draft_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
+                "adapter_id": "source_identity_calibration_memory_writer",
+                "method_id": "source_identity_calibration_memory_writer",
+                "status": source_identity_memory_writer.get("status"),
+                "output": "source_identity_append_only_memory_writer_dry_run",
+                "reason": (
+                    ", ".join(source_identity_memory_writer_summary.get("blocked_by", []))
+                    if source_identity_memory_writer_summary.get("blocked_by")
+                    else None
+                ),
             },
             {
                 "adapter_id": "registry_blockers",
@@ -464,6 +580,10 @@ def build_main_pipeline_preview(
             for key, value in source_identity_replay.items()
             if key != "proposals"
         },
+        "source_identity_calibration_acceptance_ledger": source_identity_acceptance_ledger,
+        "source_identity_calibration_persistence_plan": source_identity_persistence_plan,
+        "source_identity_calibration_memory_draft": source_identity_memory_draft,
+        "source_identity_calibration_memory_writer": source_identity_memory_writer,
         "registry": {
             "summary": registry_snapshot.get("summary", {}),
             "pipeline_profiles": registry_snapshot.get("pipeline_profiles", []),

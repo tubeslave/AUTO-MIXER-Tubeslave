@@ -91,6 +91,18 @@ try:
         build_user_presets_physical_readback_artifact_intake,
     )
     from safety_coverage_matrix import build_safety_coverage_matrix_snapshot
+    from source_identity_calibration_acceptance_ledger import (
+        build_source_identity_calibration_acceptance_ledger,
+    )
+    from source_identity_calibration_persistence_plan import (
+        build_source_identity_calibration_persistence_plan,
+    )
+    from source_identity_calibration_memory_draft import (
+        build_source_identity_calibration_memory_draft,
+    )
+    from source_identity_calibration_memory_writer import (
+        build_source_identity_calibration_memory_writer,
+    )
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.bus_group_main_dca_physical_readback_contract import (
@@ -172,6 +184,18 @@ except ImportError:  # pragma: no cover - package import compatibility
         build_user_presets_physical_readback_artifact_intake,
     )
     from backend.safety_coverage_matrix import build_safety_coverage_matrix_snapshot
+    from backend.source_identity_calibration_acceptance_ledger import (
+        build_source_identity_calibration_acceptance_ledger,
+    )
+    from backend.source_identity_calibration_persistence_plan import (
+        build_source_identity_calibration_persistence_plan,
+    )
+    from backend.source_identity_calibration_memory_draft import (
+        build_source_identity_calibration_memory_draft,
+    )
+    from backend.source_identity_calibration_memory_writer import (
+        build_source_identity_calibration_memory_writer,
+    )
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
 
 
@@ -371,6 +395,115 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "accepted_rejected_replay_outcomes",
             "no_model_mutation",
             "no_memory_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_calibration_acceptance_ledger",
+        label="Source Identity Calibration Acceptance Ledger",
+        domain="source_identity",
+        status="shadow_only",
+        summary=(
+            "Read-only ledger for operator accept/reject records tied to "
+            "source identity replay-calibration candidates."
+        ),
+        module="backend/source_identity_calibration_acceptance_ledger.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="acceptance_ledger_only_calibration_persistence_still_separate",
+        promotion_next=(
+            "operator records acceptance or rejection of replay-calibrated trust "
+            "states; model, memory, and downstream-priority writes remain separate"
+        ),
+        notes=(
+            "transport_free",
+            "operator_acceptance_ledger_only",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_memory_mutation",
+            "no_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_calibration_persistence_plan",
+        label="Source Identity Calibration Persistence Plan",
+        domain="source_identity",
+        status="shadow_only",
+        summary=(
+            "Read-only plan that turns accepted source identity calibration "
+            "ledger records into manual persistence candidates."
+        ),
+        module="backend/source_identity_calibration_persistence_plan.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="persistence_plan_only_memory_write_still_separate",
+        promotion_next=(
+            "review accepted calibration records and define a separate, audited "
+            "persistence/write contract before memory or downstream priority changes"
+        ),
+        notes=(
+            "transport_free",
+            "manual_persistence_plan_only",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_memory_mutation",
+            "no_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_calibration_memory_draft",
+        label="Source Identity Calibration Memory Draft",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only append-only memory draft records derived from manual "
+            "source identity calibration persistence candidates."
+        ),
+        module="backend/source_identity_calibration_memory_draft.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="memory_draft_only_append_write_contract_still_separate",
+        promotion_next=(
+            "review memory draft records and route them through a separate "
+            "append-only memory write contract before updating project memory"
+        ),
+        notes=(
+            "transport_free",
+            "append_only_memory_draft_only",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_memory_mutation",
+            "no_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_calibration_memory_writer",
+        label="Source Identity Calibration Memory Writer",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Append-only memory writer contract for source identity calibration "
+            "drafts; preview runs dry-run and apply requires operator ack."
+        ),
+        module="backend/source_identity_calibration_memory_writer.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="memory_writer_requires_explicit_operator_ack_and_apply",
+        promotion_next=(
+            "use only with audited draft records and explicit operator ack; never "
+            "change models, downstream priority, queues, or live console state"
+        ),
+        notes=(
+            "transport_free",
+            "append_only_memory_writer_contract",
+            "dry_run_in_preview",
+            "operator_ack_required",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_downstream_priority_mutation",
             "no_live_writes",
         ),
     ),
@@ -1719,6 +1852,10 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "auto_soundcheck_engine",
             "source_identity_confidence_proposal",
             "source_identity_replay_calibration",
+            "source_identity_calibration_acceptance_ledger",
+            "source_identity_calibration_persistence_plan",
+            "source_identity_calibration_memory_draft",
+            "source_identity_calibration_memory_writer",
             "auto_fader_v1",
             "lufs_gain_staging",
             "live_shared_mix",
@@ -1801,6 +1938,10 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "agentic_method_foundation",
             "source_identity_confidence_proposal",
             "source_identity_replay_calibration",
+            "source_identity_calibration_acceptance_ledger",
+            "source_identity_calibration_persistence_plan",
+            "source_identity_calibration_memory_draft",
+            "source_identity_calibration_memory_writer",
             "bus_group_balance_proposal",
             "mute_management_proposal",
             "routing_management_proposal",
@@ -1842,6 +1983,10 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "auto_eq",
             "source_identity_confidence_proposal",
             "source_identity_replay_calibration",
+            "source_identity_calibration_acceptance_ledger",
+            "source_identity_calibration_persistence_plan",
+            "source_identity_calibration_memory_draft",
+            "source_identity_calibration_memory_writer",
             "cross_adaptive_eq",
             "autoeq_audit_validation",
             "diff_deq_playbook_bridge",
@@ -1950,6 +2095,26 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "source_identity_replay_calibration.analyze_source_identity_replay_calibration / build_source_identity_replay_calibration_proposals",
         "ui_surface": "Channel Intelligence, replay calibration evidence, downstream proposal priority review",
         "next_step": "Use accepted/rejected replay outcomes only as operator-reviewed calibration evidence before changing source-specific proposal priority.",
+    },
+    "source_identity_calibration_acceptance_ledger": {
+        "entrypoint": "build_source_identity_calibration_acceptance_ledger",
+        "ui_surface": "Channel Intelligence, source identity calibration acceptance ledger",
+        "next_step": "Use only to record operator review decisions; do not write models, memory, downstream priority, queues, or live console state.",
+    },
+    "source_identity_calibration_persistence_plan": {
+        "entrypoint": "build_source_identity_calibration_persistence_plan",
+        "ui_surface": "Channel Intelligence, manual source identity calibration persistence plan",
+        "next_step": "Use only to plan separate persistence work; do not write memory, models, downstream priority, queues, or live console state.",
+    },
+    "source_identity_calibration_memory_draft": {
+        "entrypoint": "build_source_identity_calibration_memory_draft",
+        "ui_surface": "Channel Intelligence, append-only source identity memory draft",
+        "next_step": "Use only to draft append-only memory updates; do not write memory, models, downstream priority, queues, or live console state.",
+    },
+    "source_identity_calibration_memory_writer": {
+        "entrypoint": "build_source_identity_calibration_memory_writer",
+        "ui_surface": "Channel Intelligence, append-only source identity memory writer dry-run",
+        "next_step": "Use preview as dry-run only; apply requires explicit operator acknowledgement and must not change runtime trust or live console state.",
     },
     "supervised_manual_fader_gain": {
         "entrypoint": "apply_operator_proposal -> supervised manual gate",
@@ -2425,6 +2590,18 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "read_surface_physical_readback_fixture_closure_plan": (
             build_read_surface_physical_readback_fixture_closure_plan()
+        ),
+        "source_identity_calibration_acceptance_ledger": (
+            build_source_identity_calibration_acceptance_ledger()
+        ),
+        "source_identity_calibration_persistence_plan": (
+            build_source_identity_calibration_persistence_plan()
+        ),
+        "source_identity_calibration_memory_draft": (
+            build_source_identity_calibration_memory_draft()
+        ),
+        "source_identity_calibration_memory_writer": (
+            build_source_identity_calibration_memory_writer()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),

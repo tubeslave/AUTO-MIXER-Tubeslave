@@ -159,6 +159,43 @@ def test_cycle_report_validator_accepts_required_repo_local_report(tmp_path):
     assert validator.main([str(report_path)], project_root=tmp_path) == 0
 
 
+def test_cycle_report_validator_requires_exact_git_status_short_evidence(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace("`git status --short` showed", "`git status` showed"),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "What Was Found must include exact worktree command evidence: "
+        "git status --short"
+        in errors
+    )
+
+
+def test_cycle_report_validator_requires_current_branch_value(tmp_path):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "Branch: `codex/project-structure-integration-20260518`.",
+            "Branch:",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "What Was Found must include current branch evidence, "
+        "e.g. Branch: `branch-name`"
+        in errors
+    )
+
+
 def test_cycle_report_validator_rejects_external_report_path(tmp_path):
     validator = load_validator_module()
     external_dir = tmp_path / "paperclip" / "reports"

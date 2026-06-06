@@ -5349,6 +5349,121 @@ def test_main_pipeline_preview_exposes_source_identity_replay_calibration_review
         "trusted_for_downstream_priority"
     )
     assert proposal["evidence"]["downstream_priority_mutation"] is False
+    ledger = payload["source_identity_calibration_acceptance_ledger"]
+    plan = payload["source_identity_calibration_persistence_plan"]
+    draft = payload["source_identity_calibration_memory_draft"]
+    writer = payload["source_identity_calibration_memory_writer"]
+    assert ledger["status"] == "operator_acceptance_required"
+    assert ledger["summary"]["calibration_candidate_count"] == 1
+    assert ledger["summary"]["unreviewed_candidate_ids"] == [proposal["id"]]
+    assert ledger["summary"]["downstream_priority_change_allowed_by_acceptance"] is False
+    assert ledger["summary"]["memory_mutation_allowed_by_acceptance"] is False
+    assert plan["status"] == "calibration_persistence_not_ready"
+    assert plan["summary"]["persistence_candidate_count"] == 0
+    assert plan["summary"]["memory_mutation_allowed_by_plan"] is False
+    assert plan["summary"]["downstream_priority_change_allowed_by_plan"] is False
+    assert draft["status"] == "memory_draft_not_ready"
+    assert draft["summary"]["draft_record_count"] == 0
+    assert draft["summary"]["memory_mutation_allowed_by_draft"] is False
+    assert draft["summary"]["downstream_priority_change_allowed_by_draft"] is False
+    assert writer["status"] == "memory_write_not_ready"
+    assert writer["summary"]["write_result_count"] == 0
+    assert writer["summary"]["runtime_memory_mutation"] is False
+    assert writer["summary"]["downstream_priority_mutation"] is False
+    assert queue["summary"]["pending_count"] == 0
+
+
+def test_main_pipeline_preview_exposes_source_identity_acceptance_ledger_records(
+    server,
+):
+    server.source_identity_replay_context_cache_freshness = {
+        "status": "fresh",
+        "field_count": 3,
+        "fresh_field_count": 3,
+        "stale_field_count": 0,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    server.source_identity_replay_events = [
+        {
+            "event_id": f"lead:{index}",
+            "source_id": f"ch{index}",
+            "predicted_source_type": "lead_vocal",
+            "predicted_confidence": 0.86 + index * 0.01,
+            "operator_decision": "accepted",
+            "accepted_source_type": "lead_vocal",
+            "replay_matched": True,
+            "downstream_family": "arrangement_role",
+            "evidence_packet_id": f"packet:{index}",
+            "session_id": "show:source-id",
+        }
+        for index in range(1, 4)
+    ]
+    server.source_identity_calibration_acceptance_records = [
+        {
+            "review_id": "source-id-acceptance-1",
+            "candidate_id": (
+                "main_live_assist:source_identity_replay_calibration:"
+                "source_identity_replay_calibration:lead_vocal"
+            ),
+            "calibration_method_id": "source_identity_replay_calibration",
+            "source_type": "lead_vocal",
+            "recommended_trust_state": "trusted_for_downstream_priority",
+            "decision": "accepted",
+            "reviewed_by": "operator",
+            "reviewed_at": "2026-06-06T07:30:00Z",
+        }
+    ]
+
+    payload = build_main_pipeline_preview(server, total_channels=4)
+    queue = build_decision_queue(server)
+    ledger = payload["source_identity_calibration_acceptance_ledger"]
+    plan = payload["source_identity_calibration_persistence_plan"]
+    draft = payload["source_identity_calibration_memory_draft"]
+    writer = payload["source_identity_calibration_memory_writer"]
+
+    assert payload["summary"]["source_identity_calibration_acceptance_record_count"] == 1
+    assert payload["summary"]["source_identity_calibration_accepted_record_count"] == 1
+    assert payload["summary"]["source_identity_calibration_invalid_record_count"] == 0
+    assert payload["summary"]["source_identity_calibration_persistence_candidate_count"] == 1
+    assert payload["summary"]["source_identity_calibration_memory_draft_record_count"] == 1
+    assert payload["summary"]["source_identity_calibration_memory_writer_write_result_count"] == 0
+    assert ledger["status"] == "operator_acceptance_records_available"
+    assert ledger["summary"]["accepted_source_types"] == ["lead_vocal"]
+    assert ledger["summary"]["calibration_persistence_allowed_by_acceptance"] is False
+    assert ledger["summary"]["downstream_priority_change_allowed_by_acceptance"] is False
+    assert ledger["summary"]["model_mutation_allowed_by_acceptance"] is False
+    assert ledger["summary"]["memory_mutation_allowed_by_acceptance"] is False
+    assert ledger["records"][0]["operator_accepted_calibration_candidate"] is True
+    assert ledger["records"][0]["live_authority_granted"] is False
+    assert plan["status"] == "manual_calibration_persistence_candidate_available"
+    assert plan["summary"]["persistence_candidate_count"] == 1
+    assert plan["summary"]["accepted_source_types"] == ["lead_vocal"]
+    assert plan["summary"]["calibration_persistence_write_allowed_by_plan"] is False
+    assert plan["summary"]["memory_mutation_allowed_by_plan"] is False
+    assert plan["summary"]["downstream_priority_change_allowed_by_plan"] is False
+    assert plan["persistence_candidates"][0]["manual_calibration_persistence_required"] is True
+    assert (
+        plan["persistence_candidates"][0]["calibration_persistence_write_allowed_by_plan"]
+        is False
+    )
+    assert draft["status"] == "append_only_memory_draft_available"
+    assert draft["summary"]["draft_record_count"] == 1
+    assert draft["summary"]["draft_source_types"] == ["lead_vocal"]
+    assert draft["summary"]["append_only_memory_write_allowed_by_draft"] is False
+    assert draft["summary"]["memory_mutation_allowed_by_draft"] is False
+    assert draft["summary"]["downstream_priority_change_allowed_by_draft"] is False
+    assert draft["draft_records"][0]["append_only"] is True
+    assert draft["draft_records"][0]["memory_write_allowed_by_draft"] is False
+    assert draft["draft_records"][0]["source_type"] == "lead_vocal"
+    assert writer["status"] == "append_only_memory_write_dry_run_ready"
+    assert writer["summary"]["draft_record_count"] == 1
+    assert writer["summary"]["write_result_count"] == 0
+    assert writer["summary"]["append_only_memory_write_applied"] is False
+    assert writer["summary"]["runtime_memory_mutation"] is False
+    assert writer["summary"]["downstream_priority_mutation"] is False
+    assert writer["write_results"] == []
     assert queue["summary"]["pending_count"] == 0
 
 

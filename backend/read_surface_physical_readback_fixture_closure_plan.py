@@ -52,6 +52,15 @@ REQUIRED_LEDGER_FALSE_SAFETY_FLAGS = (
     "live_authority_granted",
     "full_autonomous_ready",
 )
+REQUIRED_LEDGER_TRUE_SUMMARY_FLAGS = (
+    "operator_review_required",
+    "physical_fixture_gap_remains",
+)
+REQUIRED_LEDGER_FALSE_SUMMARY_FLAGS = (
+    "fixture_closure_allowed_by_acceptance",
+    "live_authority_granted",
+    "full_autonomous_ready",
+)
 
 
 def _utc_now() -> str:
@@ -174,7 +183,22 @@ def _ledger_summary_count_violations(
     invalid_record_ids: Tuple[str, ...],
     unreviewed_surface_ids: Tuple[str, ...],
 ) -> Tuple[str, ...]:
+    reviewed_surface_ids = tuple(
+        record["surface_id"]
+        for record in records
+        if record.get("valid") is True
+        and (
+            record.get("operator_accepted_review_candidate") is True
+            or record.get("operator_rejected_review_candidate") is True
+        )
+        and isinstance(record.get("surface_id"), str)
+        and record.get("surface_id")
+    )
+    review_candidate_surface_ids = tuple(
+        dict.fromkeys((*reviewed_surface_ids, *unreviewed_surface_ids))
+    )
     expected_counts = {
+        "review_candidate_count": len(review_candidate_surface_ids),
         "acceptance_record_count": len(records),
         "accepted_record_count": sum(
             1
@@ -232,6 +256,17 @@ def _ledger_summary_surface_id_violations(
         for key, surface_ids in expected.items()
         if _string_list(summary.get(key)) != surface_ids
     )
+
+
+def _ledger_summary_safety_violations(summary: Mapping[str, Any]) -> Tuple[str, ...]:
+    violations = []
+    for flag in REQUIRED_LEDGER_TRUE_SUMMARY_FLAGS:
+        if summary.get(flag) is not True:
+            violations.append(f"ledger_summary_{flag}_not_true")
+    for flag in REQUIRED_LEDGER_FALSE_SUMMARY_FLAGS:
+        if summary.get(flag) is not False:
+            violations.append(f"ledger_summary_{flag}_not_false")
+    return tuple(violations)
 
 
 def _ambiguous_surface_review_record_ids(
@@ -310,6 +345,7 @@ def build_read_surface_physical_readback_fixture_closure_plan(
         summary,
         records=records,
     )
+    ledger_summary_safety_violations = _ledger_summary_safety_violations(summary)
     invalid_record_ids = tuple(
         dict.fromkeys(
             (
@@ -319,6 +355,7 @@ def build_read_surface_physical_readback_fixture_closure_plan(
                 *ambiguous_surface_review_record_ids,
                 *ledger_summary_count_violations,
                 *ledger_summary_surface_id_violations,
+                *ledger_summary_safety_violations,
             )
         )
     )

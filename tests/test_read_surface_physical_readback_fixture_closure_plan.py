@@ -325,6 +325,71 @@ def test_fixture_closure_plan_rejects_accepted_surface_id_summary_drift():
     assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
 
 
+def test_fixture_closure_plan_rejects_review_candidate_count_drift():
+    _, ledger = _accepted_ledger()
+    forged_ledger = {
+        **ledger,
+        "summary": {
+            **ledger["summary"],
+            "review_candidate_count": 7,
+        },
+    }
+
+    plan = build_read_surface_physical_readback_fixture_closure_plan(
+        acceptance_ledger=forged_ledger
+    )
+
+    assert plan["status"] == "fixture_closure_replacement_required"
+    assert plan["summary"]["invalid_record_ids"] == [
+        "ledger_summary_review_candidate_count_mismatch"
+    ]
+    assert plan["summary"]["closure_candidate_count"] == 0
+    assert plan["summary"]["closure_candidate_surface_ids"] == []
+    assert plan["closure_candidates"] == []
+    assert plan["summary"]["physical_fixture_gap_remains"] is True
+    assert plan["summary"]["fixture_update_allowed_by_plan"] is False
+    assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
+
+
+def test_fixture_closure_plan_rejects_unsafe_ledger_summary_authority_claims():
+    _, ledger = _accepted_ledger()
+    forged_ledger = {
+        **ledger,
+        "summary": {
+            **ledger["summary"],
+            "operator_review_required": False,
+            "physical_fixture_gap_remains": False,
+            "fixture_closure_allowed_by_acceptance": True,
+            "live_authority_granted": True,
+            "full_autonomous_ready": True,
+        },
+    }
+
+    plan = build_read_surface_physical_readback_fixture_closure_plan(
+        acceptance_ledger=forged_ledger
+    )
+
+    assert plan["status"] == "fixture_closure_replacement_required"
+    assert plan["summary"]["invalid_record_ids"] == [
+        "ledger_summary_operator_review_required_not_true",
+        "ledger_summary_physical_fixture_gap_remains_not_true",
+        "ledger_summary_fixture_closure_allowed_by_acceptance_not_false",
+        "ledger_summary_live_authority_granted_not_false",
+        "ledger_summary_full_autonomous_ready_not_false",
+    ]
+    assert plan["summary"]["closure_candidate_count"] == 0
+    assert plan["summary"]["closure_candidate_surface_ids"] == []
+    assert plan["closure_candidates"] == []
+    assert "operator_must_replace_invalid_acceptance_records_before_fixture_closure" in plan[
+        "summary"
+    ]["blocked_by"]
+    assert plan["summary"]["physical_fixture_gap_remains"] is True
+    assert plan["summary"]["fixture_update_allowed_by_plan"] is False
+    assert plan["summary"]["fixture_closure_allowed_by_plan"] is False
+    assert plan["summary"]["live_authority_granted"] is False
+    assert plan["summary"]["full_autonomous_ready"] is False
+
+
 def test_fixture_closure_plan_rejects_unsafe_ledger_envelope():
     _, ledger = _accepted_ledger()
     forged_ledger = {

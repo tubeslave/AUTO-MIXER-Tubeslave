@@ -147,17 +147,26 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "auto_soundcheck_engine",
             "source_identity_confidence_proposal",
             "source_identity_replay_calibration",
+            "source_identity_calibration_acceptance_ledger",
+            "source_identity_calibration_persistence_plan",
+            "source_identity_calibration_memory_draft",
+            "source_identity_calibration_memory_writer",
         ),
         support_paths=(
             "backend/ml/channel_classifier.py",
             "backend/channel_recognizer.py",
             "backend/source_identity_confidence_proposal.py",
             "backend/source_identity_replay_calibration.py",
+            "backend/source_identity_calibration_acceptance_ledger.py",
+            "backend/source_identity_calibration_persistence_plan.py",
+            "backend/source_identity_calibration_memory_draft.py",
+            "backend/source_identity_calibration_memory_writer.py",
             "backend/source_identity_downstream_gate.py",
         ),
         next_step=(
-            "Route replay-calibrated source identity trust states to operator review "
-            "before downstream source-specific proposal priority changes."
+            "Keep replay-calibrated source identity trust states in operator review, "
+            "record acceptance, plan manual persistence, and draft append-only "
+            "memory before an acknowledged append-only memory write contract."
         ),
     ),
     ProjectGoalCapabilityRow(
@@ -768,16 +777,23 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Improve decisions from accumulated data, logs, tests, and previous concerts.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("long_term_memory_learning_proposal", "product_operator_state"),
+        method_ids=(
+            "long_term_memory_learning_proposal",
+            "source_identity_calibration_memory_draft",
+            "source_identity_calibration_memory_writer",
+            "product_operator_state",
+        ),
         support_paths=(
             "backend/long_term_memory_learning_proposal.py",
+            "backend/source_identity_calibration_memory_draft.py",
+            "backend/source_identity_calibration_memory_writer.py",
             "backend/source_identity_downstream_gate.py",
             "backend/decision_memory.py",
             "backend/telemetry/",
             ".ai/memory/project.md",
         ),
         blocker="Memory-learning proposals are review contracts, not autonomous console authority.",
-        next_step="Route trusted-source, fresh-context learning records to operator review and replay correlation before they influence future proposal priority.",
+        next_step="Route trusted-source, fresh-context learning records through replay correlation and operator review, then append-only memory drafts before any audited memory write or future proposal-priority influence.",
     ),
 )
 

@@ -423,6 +423,11 @@ REQUIRED_PROJECT_STATE_EVIDENCE = (
     ),
     ("risks", ("риск", "risk")),
 )
+REQUIRED_GIT_STATUS_COMMAND = "git status --short"
+BRANCH_EVIDENCE_PATTERN = re.compile(
+    r"^[ \t]*(?:Branch|Current branch|Текущая ветка)[ \t]*:[ \t]*(.*?)[ \t]*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 
 def _is_relative_to(path: Path, parent: Path) -> bool:
@@ -694,6 +699,30 @@ def _validate_discovery_evidence(text: str) -> list[str]:
     for label, phrases in REQUIRED_DISCOVERY_EVIDENCE:
         if not any(phrase.lower() in normalized_section for phrase in phrases):
             errors.append(f"What Was Found is missing discovery evidence: {label}")
+
+    return errors
+
+
+def _validate_git_status_and_branch_evidence(text: str) -> list[str]:
+    section_body = _extract_heading_section(text, "## What Was Found")
+    if not section_body:
+        return []
+
+    errors: list[str] = []
+    normalized_section = _collapse_whitespace(section_body).lower()
+    if REQUIRED_GIT_STATUS_COMMAND not in normalized_section:
+        errors.append(
+            "What Was Found must include exact worktree command evidence: "
+            f"{REQUIRED_GIT_STATUS_COMMAND}"
+        )
+
+    branch_match = BRANCH_EVIDENCE_PATTERN.search(section_body)
+    branch_value = branch_match.group(1).strip("` .") if branch_match else ""
+    if not branch_value or not re.search(r"[0-9A-Za-zА-Яа-яЁё/_\-.]", branch_value):
+        errors.append(
+            "What Was Found must include current branch evidence, "
+            "e.g. Branch: `branch-name`"
+        )
 
     return errors
 
@@ -1608,6 +1637,7 @@ def validate_report(
     errors.extend(_validate_project_boundary_contradictions(text))
     errors.extend(_validate_secret_boundary_contradictions(text))
     errors.extend(_validate_discovery_evidence(text))
+    errors.extend(_validate_git_status_and_branch_evidence(text))
     errors.extend(_validate_recent_discovery_evidence(text))
     errors.extend(_validate_todo_scan_boundary_evidence(text))
     errors.extend(_validate_project_goal_evidence(text))

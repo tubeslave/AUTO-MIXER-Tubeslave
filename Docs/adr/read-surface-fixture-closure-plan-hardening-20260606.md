@@ -18,9 +18,9 @@ evidence could be mistaken for closed physical-readback gaps.
 
 Use option 3. The closure plan now independently validates ledger identity,
 timestamps, status, safety flags, summary counts, surface-id summaries,
-accepted-record structure, accepted decision flags, candidate linkage, and
-duplicate/conflicting surface reviews before surfacing manual closure
-candidates.
+summary safety/authority claims, accepted-record structure, accepted decision
+flags, candidate linkage, and duplicate/conflicting surface reviews before
+surfacing manual closure candidates.
 
 ## Why This Won
 
@@ -45,9 +45,12 @@ the normal source of truth.
    `decision=accepted`, no conflicting rejected flag, candidate linkage, and
    false authority fields.
 3. Add ledger summary count and surface-id consistency checks.
-4. Suppress all closure candidates when any ledger or accepted-record violation
+4. Add ledger summary safety checks so summary-level fixture closure, live
+   authority, full autonomous, missing review, or missing physical-gap claims
+   fail closed.
+5. Suppress all closure candidates when any ledger or accepted-record violation
    is present.
-5. Add regression tests for malformed records, ambiguous surfaces, summary
+6. Add regression tests for malformed records, ambiguous surfaces, summary
    drift, unsafe envelopes, and decision/candidate-link mismatch.
 
 ## Test Plan
