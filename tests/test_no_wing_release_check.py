@@ -561,6 +561,23 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "checklist_ids",
     ]
     assert result.detail["review_decision_template_contract_complete"] is True
+    assert result.detail["handoff_packet_tool_path"] == (
+        "tools/build_wing_readonly_preflight_handoff_packet.py"
+    )
+    assert result.detail["handoff_packet_tool_available"] is True
+    assert result.detail["handoff_packet_command"] == [
+        "python3",
+        "tools/build_wing_readonly_preflight_handoff_packet.py",
+        "--channels",
+        "3",
+        "--output",
+        "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
+    ]
+    assert result.detail["handoff_packet_output"] == (
+        "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
+    )
+    assert result.detail["handoff_packet_channels"] == "3"
+    assert result.detail["handoff_packet_channel_matches_capture"] is True
     assert result.detail["blocked_by"] == [
         "operator_must_run_wing_readonly_preflight_runner"
     ]
@@ -668,6 +685,58 @@ def test_no_wing_release_check_rejects_missing_wing_preflight_review_tool(
         "tools/missing_wing_readonly_preflight_review_tool.py"
     )
     assert "wing_readonly_preflight_review_tool_missing" in result.detail["violations"]
+
+
+def test_no_wing_release_check_rejects_missing_wing_preflight_handoff_tool(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL",
+        "tools/missing_wing_readonly_preflight_handoff_packet.py",
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["handoff_packet_tool_available"] is False
+    assert result.detail["handoff_packet_tool_path"] == (
+        "tools/missing_wing_readonly_preflight_handoff_packet.py"
+    )
+    assert result.detail["handoff_packet_command"][1] == (
+        "tools/missing_wing_readonly_preflight_handoff_packet.py"
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_tool_missing"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_wing_preflight_handoff_channel_mismatch(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_handoff_packet_command",
+        lambda: [
+            "python3",
+            "tools/build_wing_readonly_preflight_handoff_packet.py",
+            "--channels",
+            "4",
+            "--output",
+            "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
+        ],
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["handoff_packet_channels"] == "4"
+    assert result.detail["handoff_packet_channel_matches_capture"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_channel_mismatch"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_rejects_review_command_without_decision_template_output(
@@ -2683,6 +2752,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "tests/test_wing_readonly_preflight_review_tool.py" in fixture_check.command
     assert "tests/test_wing_readonly_preflight_review_decision.py" in fixture_check.command
     assert "tests/test_wing_readonly_preflight_review_decision_tool.py" in fixture_check.command
+    assert "tests/test_wing_readonly_preflight_handoff_packet.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command
@@ -4418,6 +4488,23 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "checklist_ids",
             ],
             "review_decision_template_contract_complete": True,
+            "handoff_packet_tool_path": (
+                "tools/build_wing_readonly_preflight_handoff_packet.py"
+            ),
+            "handoff_packet_tool_available": True,
+            "handoff_packet_command": [
+                "python3",
+                "tools/build_wing_readonly_preflight_handoff_packet.py",
+                "--channels",
+                "3",
+                "--output",
+                "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
+            ],
+            "handoff_packet_output": (
+                "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
+            ),
+            "handoff_packet_channels": "3",
+            "handoff_packet_channel_matches_capture": True,
             "blocked_by": [
                 "operator_must_run_wing_readonly_preflight_runner"
             ],
@@ -4494,6 +4581,18 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         "checklist_ids",
     ]
     assert preflight["review_decision_template_contract_complete"] is True
+    assert preflight["handoff_packet_tool_path"] == (
+        "tools/build_wing_readonly_preflight_handoff_packet.py"
+    )
+    assert preflight["handoff_packet_tool_available"] is True
+    assert preflight["handoff_packet_command"][1] == (
+        "tools/build_wing_readonly_preflight_handoff_packet.py"
+    )
+    assert preflight["handoff_packet_output"] == (
+        "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
+    )
+    assert preflight["handoff_packet_channels"] == "3"
+    assert preflight["handoff_packet_channel_matches_capture"] is True
     assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
     assert "## WING Read-Only Preflight Evidence" in markdown_summary
     assert "readiness_closure_allowed_by_evidence: `false`" in markdown_summary
@@ -4517,6 +4616,12 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "confirm_event_log_readonly_sequence" in markdown_summary
     assert "review_decision_template_contract_complete: `true`" in markdown_summary
     assert "artifact_source_id" in markdown_summary
+    assert (
+        "handoff_packet_tool_path: `tools/build_wing_readonly_preflight_handoff_packet.py`"
+        in markdown_summary
+    )
+    assert "WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md" in markdown_summary
+    assert "handoff_packet_channel_matches_capture: `true`" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(

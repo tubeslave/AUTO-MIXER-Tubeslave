@@ -28,6 +28,15 @@ It does not approve live writes.
 
 ## Command
 
+Optional: before the hardware session, generate the offline operator handoff
+packet. This does not contact WING and does not approve live writes:
+
+```bash
+python3 tools/build_wing_readonly_preflight_handoff_packet.py \
+  --channels 3 \
+  --output Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md
+```
+
 Replace channel `3` with the operator-approved channel:
 
 ```bash

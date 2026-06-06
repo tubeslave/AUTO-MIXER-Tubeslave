@@ -342,6 +342,12 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT = (
 WING_READONLY_PREFLIGHT_REVIEW_DECISION_OUTPUT = (
     "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
 )
+WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL = (
+    "tools/build_wing_readonly_preflight_handoff_packet.py"
+)
+WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT = (
+    "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
+)
 WING_READONLY_PREFLIGHT_REVIEW_EXIT_CODES = {
     "candidate_ready": 0,
     "artifact_missing": 2,
@@ -424,6 +430,17 @@ def wing_readonly_preflight_review_decision_command() -> list[str]:
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
         "--output",
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_OUTPUT,
+    ]
+
+
+def wing_readonly_preflight_handoff_packet_command() -> list[str]:
+    return [
+        "python3",
+        WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL,
+        "--channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--output",
+        WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
     ]
 
 
@@ -680,6 +697,7 @@ def build_checks(
                 "tests/test_wing_readonly_preflight_review_tool.py",
                 "tests/test_wing_readonly_preflight_review_decision.py",
                 "tests/test_wing_readonly_preflight_review_decision_tool.py",
+                "tests/test_wing_readonly_preflight_handoff_packet.py",
                 "-q",
                 "--tb=short",
             ),
@@ -1686,8 +1704,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     artifacts = evidence.get("artifacts") if isinstance(evidence.get("artifacts"), list) else []
     capture_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_RUNNER_TOOL).is_file()
     review_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_TOOL).is_file()
+    handoff_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL).is_file()
     capture_command = wing_readonly_preflight_capture_command_template()
     review_command = wing_readonly_preflight_review_command()
+    handoff_command = wing_readonly_preflight_handoff_packet_command()
     review_manual_checklist_ids = wing_readonly_preflight_review_manual_checklist_ids()
     review_decision_template_required_fields = (
         wing_readonly_preflight_review_decision_template_required_fields()
@@ -1708,11 +1728,21 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         and bool(capture_confirmed_channels)
         and capture_channels == capture_confirmed_channels
     )
+    handoff_channels = command_value_after_flag(handoff_command, "--channels")
+    handoff_channel_matches_capture = bool(handoff_channels) and handoff_channels == capture_channels
 
     if not capture_tool_available:
         violations.append("wing_readonly_preflight_runner_tool_missing")
     if not review_tool_available:
         violations.append("wing_readonly_preflight_review_tool_missing")
+    if not handoff_tool_available:
+        violations.append("wing_readonly_preflight_handoff_packet_tool_missing")
+    if "--channels" not in handoff_command:
+        violations.append("wing_readonly_preflight_handoff_packet_channels_missing")
+    if "--output" not in handoff_command:
+        violations.append("wing_readonly_preflight_handoff_packet_output_missing")
+    if not handoff_channel_matches_capture:
+        violations.append("wing_readonly_preflight_handoff_packet_channel_mismatch")
     if not review_manual_checklist_complete:
         violations.append("wing_readonly_preflight_review_manual_checklist_incomplete")
     if not review_decision_template_contract_complete:
@@ -1846,6 +1876,12 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["review_decision_template_contract_complete"] = (
         review_decision_template_contract_complete
     )
+    detail["handoff_packet_tool_path"] = WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL
+    detail["handoff_packet_tool_available"] = handoff_tool_available
+    detail["handoff_packet_command"] = handoff_command
+    detail["handoff_packet_output"] = WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
+    detail["handoff_packet_channels"] = handoff_channels
+    detail["handoff_packet_channel_matches_capture"] = handoff_channel_matches_capture
     detail["blocked_by"] = (
         list(summary.get("blocked_by"))
         if isinstance(summary.get("blocked_by"), list)
@@ -7009,6 +7045,7 @@ def wing_readonly_preflight_evidence_summary(
         review_decision_template_required_fields = detail.get(
             "review_decision_template_required_fields"
         )
+        handoff_packet_command = detail.get("handoff_packet_command")
         valid_candidate_count = int(detail.get("valid_candidate_count") or 0)
         invalid_candidate_count = int(detail.get("invalid_candidate_count") or 0)
         readiness_update_candidate_available = (
@@ -7095,6 +7132,20 @@ def wing_readonly_preflight_evidence_summary(
             ),
             "review_decision_template_contract_complete": (
                 detail.get("review_decision_template_contract_complete") is True
+            ),
+            "handoff_packet_tool_path": detail.get("handoff_packet_tool_path"),
+            "handoff_packet_tool_available": (
+                detail.get("handoff_packet_tool_available") is True
+            ),
+            "handoff_packet_command": (
+                list(handoff_packet_command)
+                if isinstance(handoff_packet_command, list)
+                else []
+            ),
+            "handoff_packet_output": detail.get("handoff_packet_output"),
+            "handoff_packet_channels": detail.get("handoff_packet_channels"),
+            "handoff_packet_channel_matches_capture": (
+                detail.get("handoff_packet_channel_matches_capture") is True
             ),
             "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
             "violations": list(violations) if isinstance(violations, list) else [],
@@ -9611,6 +9662,15 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['review_decision_template_required_fields'])}`",
                 "- review_decision_template_contract_complete: "
                 f"`{str(wing_readonly_preflight['review_decision_template_contract_complete']).lower()}`",
+                f"- handoff_packet_tool_path: `{wing_readonly_preflight['handoff_packet_tool_path']}`",
+                "- handoff_packet_tool_available: "
+                f"`{str(wing_readonly_preflight['handoff_packet_tool_available']).lower()}`",
+                "- handoff_packet_command: "
+                f"`{json.dumps(wing_readonly_preflight['handoff_packet_command'])}`",
+                f"- handoff_packet_output: `{wing_readonly_preflight['handoff_packet_output']}`",
+                f"- handoff_packet_channels: `{wing_readonly_preflight['handoff_packet_channels']}`",
+                "- handoff_packet_channel_matches_capture: "
+                f"`{str(wing_readonly_preflight['handoff_packet_channel_matches_capture']).lower()}`",
                 f"- blocked_by: `{json.dumps(wing_readonly_preflight['blocked_by'])}`",
                 f"- violations: `{json.dumps(wing_readonly_preflight['violations'])}`",
             ]

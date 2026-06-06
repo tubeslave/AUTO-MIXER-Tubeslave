@@ -1,0 +1,126 @@
+import json
+from pathlib import Path
+
+from tools import build_wing_readonly_preflight_handoff_packet as handoff
+
+
+def test_handoff_packet_builds_readonly_operator_sequence():
+    packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
+
+    assert packet["type"] == "wing_readonly_preflight_handoff_packet"
+    assert packet["status"] == "operator_hardware_step_required"
+    assert packet["read_only"] is True
+    assert packet["live_write"] is False
+    assert packet["mutates_console_state"] is False
+    assert packet["queries_console"] is False
+    assert packet["executes_tests"] is False
+    assert packet["operator_required"] is True
+    assert packet["execution_allowed_by_packet"] is False
+    assert packet["readiness_matrix_update_allowed_by_packet"] is False
+    assert packet["live_authority_granted"] is False
+    assert packet["full_autonomous_ready"] is False
+    assert packet["channels"] == [3]
+    assert packet["value_types"] == ["fader", "gain"]
+    assert packet["commands"]["capture_readonly_preflight"] == [
+        "python3",
+        "tools/wing_readonly_preflight_runner.py",
+        "--url",
+        "ws://localhost:8765",
+        "--channels",
+        "3",
+        "--operator-confirm-channels",
+        "3",
+        "--value-types",
+        "fader,gain",
+        "--require-physical-readback",
+        "--artifact-root",
+        "artifacts/wing_readonly_preflight",
+    ]
+    assert "--decision-template-output" in packet["commands"][
+        "review_artifact_and_write_pending_decision_template"
+    ]
+    assert packet["commands"]["review_edited_decision_json"] == [
+        "python3",
+        "tools/review_wing_readonly_preflight_decisions.py",
+        "--artifact-root",
+        "artifacts/wing_readonly_preflight",
+        "--decision-root",
+        "artifacts/wing_readonly_preflight_review_decisions",
+        "--output",
+        "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
+    ]
+    assert "confirm_no_live_authority" in packet["required_review_checklist_ids"]
+    assert "apply_operator_proposal" in packet["forbidden_live_request_types"]
+    assert "wing_readonly_connection_proof" in packet["blockers_not_closed_by_packet"]
+
+
+def test_handoff_packet_supports_custom_channel_confirmation():
+    packet = handoff.build_handoff_packet(channels="2,4", generated_at="2026-06-07T00:00:00Z")
+
+    assert packet["channels"] == [2, 4]
+    command = packet["commands"]["capture_readonly_preflight"]
+    assert command[command.index("--channels") + 1] == "2,4"
+    assert command[command.index("--operator-confirm-channels") + 1] == "2,4"
+
+
+def test_handoff_packet_rejects_invalid_channels():
+    try:
+        handoff.build_handoff_packet(channels="0")
+    except ValueError as exc:
+        assert str(exc) == "channels_must_be_positive"
+    else:
+        raise AssertionError("expected invalid channel to fail")
+
+
+def test_handoff_markdown_renders_commands_and_boundaries():
+    packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
+    markdown = handoff.render_markdown(packet)
+
+    assert "WING Read-Only Preflight Handoff Packet" in markdown
+    assert "live_write: `false`" in markdown
+    assert "capture_readonly_preflight" in markdown
+    assert "review_edited_decision_json" in markdown
+    assert "pending_review_decision_template.json" in markdown
+    assert "full_autonomous_ready: `false`" in markdown
+
+
+def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
+    markdown_output = tmp_path / "handoff.md"
+    json_output = tmp_path / "handoff.json"
+
+    assert handoff.main(["--output", str(markdown_output), "--quiet"]) == 0
+    assert "WING Read-Only Preflight Handoff Packet" in markdown_output.read_text(
+        encoding="utf-8"
+    )
+
+    assert handoff.main(["--format", "json", "--output", str(json_output), "--quiet"]) == 0
+    payload = json.loads(json_output.read_text(encoding="utf-8"))
+    assert payload["type"] == "wing_readonly_preflight_handoff_packet"
+    assert payload["live_authority_granted"] is False
+
+
+def test_handoff_tool_main_fails_closed_for_invalid_channel(tmp_path: Path):
+    output = tmp_path / "handoff.md"
+
+    assert handoff.main(["--channels", "bad", "--output", str(output), "--quiet"]) == 2
+    assert not output.exists()
+
+
+def test_handoff_tool_is_transport_free():
+    source = Path("tools/build_wing_readonly_preflight_handoff_packet.py").read_text(
+        encoding="utf-8"
+    )
+
+    forbidden = [
+        "WingClient",
+        "EnhancedOSCClient",
+        "websockets",
+        "socket",
+        ".send(",
+        "mixer_client",
+        "set_fader(",
+        "set_gain(",
+        "apply_operator_proposal(",
+    ]
+    for token in forbidden:
+        assert token not in source
