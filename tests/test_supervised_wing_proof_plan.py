@@ -75,6 +75,7 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert gain_step["execution_allowed_by_plan"] is False
     assert gain_step["operator_approval_required"] is True
     assert gain_step["delta_db"] == -0.25
+    assert gain_step["command"][0] == "python3"
     assert "--execute" in gain_step["command"]
     assert "--prove-blocked-apply" in gain_step["command"]
     assert "--prove-emergency-stop" in gain_step["command"]

@@ -97,6 +97,42 @@ def legacy_execute_wing_summary(proof_id: str = "legacy-physical-gain-proof") ->
     return payload
 
 
+def timeout_after_apply_summary(proof_id: str = "timeout-after-apply-proof") -> dict:
+    payload = physical_summary(proof_id)
+    payload.update(
+        {
+            "status": "manual_review_required",
+            "reason": "connection_or_timeout_after_apply_request",
+            "proof_artifact_schema": "wing_operator_proposal_validation.v2",
+            "proof_runner": "wing_operator_proposal_validation_runner",
+            "proof_mode": "physical",
+            "execute": True,
+            "fail_closed": False,
+            "live_apply_request_sent": True,
+            "rollback_request_sent": False,
+        }
+    )
+    return payload
+
+
+def timeout_before_apply_summary(proof_id: str = "timeout-before-apply-proof") -> dict:
+    payload = physical_summary(proof_id)
+    payload.update(
+        {
+            "status": "blocked",
+            "reason": "connection_or_timeout_fail_closed",
+            "proof_artifact_schema": "wing_operator_proposal_validation.v2",
+            "proof_runner": "wing_operator_proposal_validation_runner",
+            "proof_mode": "physical",
+            "execute": True,
+            "fail_closed": True,
+            "live_apply_request_sent": False,
+            "rollback_request_sent": False,
+        }
+    )
+    return payload
+
+
 def test_proof_artifact_report_tool_is_read_only_and_transport_free():
     source = Path("tools/evaluate_supervised_proof_artifacts.py").read_text(encoding="utf-8")
 
@@ -255,3 +291,51 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     assert report["next_wing_proof_plan"]["safety"]["execution_allowed_by_plan"] is False
     assert report["next_wing_proof_plan"]["status"] == "operator_proof_required"
     assert report["next_wing_proof_plan"]["summary"]["planned_value_types"] == ["gain"]
+
+
+def test_timeout_artifacts_remain_blocked_through_report_and_promotion_evidence(tmp_path: Path):
+    write_summary(tmp_path / "timeout_after_apply", timeout_after_apply_summary())
+    write_summary(tmp_path / "timeout_before_apply", timeout_before_apply_summary())
+    output_path = tmp_path / "report.json"
+
+    exit_code = report_tool.main(
+        [
+            "--artifact-root",
+            str(tmp_path),
+            "--require-physical",
+            "--min-promotion-candidates",
+            "1",
+            "--output",
+            str(output_path),
+            "--quiet",
+        ]
+    )
+
+    report = json.loads(output_path.read_text(encoding="utf-8"))
+    assert exit_code == 2
+    assert report["summary"]["status_counts"]["blocked"] == 2
+    assert report["summary"]["promotion_allowed_proof_ids"] == []
+    assert report["summary"]["blocked_proof_ids"] == [
+        "timeout-after-apply-proof",
+        "timeout-before-apply-proof",
+    ]
+    rows_by_id = {row["proof_id"]: row for row in report["rows"]}
+    assert "transport_failure_after_apply_requires_manual_review" in rows_by_id[
+        "timeout-after-apply-proof"
+    ]["blockers"]
+    assert "transport_failure_before_apply_fail_closed" in rows_by_id[
+        "timeout-before-apply-proof"
+    ]["blockers"]
+
+    promotion = report["promotion_evidence"]
+    assert promotion["summary"]["safety_row_review_candidate_ids"] == []
+    fader_row = next(row for row in promotion["rows"] if row["value_type"] == "fader")
+    assert fader_row["status"] == "evidence_blocked"
+    assert fader_row["physical_candidate_count"] == 0
+    assert fader_row["blocked_proof_ids"] == [
+        "timeout-after-apply-proof",
+        "timeout-before-apply-proof",
+    ]
+    assert "blocked_artifacts_for_value_type" in fader_row["blockers"]
+    assert "physical_candidate_missing" in fader_row["blockers"]
+    assert report["next_wing_proof_plan"]["status"] == "operator_proof_required"

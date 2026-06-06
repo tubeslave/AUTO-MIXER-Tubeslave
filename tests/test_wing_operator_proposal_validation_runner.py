@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import json
 from pathlib import Path
@@ -32,6 +33,14 @@ class FakeWebSocket:
         return json.dumps(self.responses.pop(0))
 
 
+class HangingWebSocket(FakeWebSocket):
+    async def recv(self) -> str:
+        if self.responses:
+            return await super().recv()
+        await asyncio.sleep(1.0)
+        return json.dumps({"type": "late_response"})
+
+
 class FakeWebSocketConnect:
     def __init__(self, websocket: FakeWebSocket):
         self.websocket = websocket
@@ -47,6 +56,13 @@ def patch_websocket_connect(monkeypatch: pytest.MonkeyPatch, websocket: FakeWebS
     def fake_connect(url: str) -> FakeWebSocketConnect:
         websocket.url = url
         return FakeWebSocketConnect(websocket)
+
+    monkeypatch.setattr(runner.websockets, "connect", fake_connect)
+
+
+def patch_websocket_connect_failure(monkeypatch: pytest.MonkeyPatch, error: BaseException) -> None:
+    def fake_connect(url: str):
+        raise error
 
     monkeypatch.setattr(runner.websockets, "connect", fake_connect)
 
@@ -74,6 +90,62 @@ def read_summary(artifact_root: Path) -> dict:
 def read_events(summary: dict) -> list[dict]:
     events_path = Path(summary["events_path"])
     return [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines()]
+
+
+@pytest.mark.asyncio
+async def test_connection_failure_before_apply_records_fail_closed_without_live_request(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_websocket_connect_failure(monkeypatch, OSError("backend unavailable"))
+    args = parse_args(tmp_path, "--channel", "7", "--value-type", "fader", "--delta-db", "-0.25", "--execute")
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 1
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "connection_or_timeout_fail_closed"
+    assert summary["fail_closed"] is True
+    assert summary["live_apply_request_sent"] is False
+    assert summary["rollback_request_sent"] is False
+    assert summary["sent_request_types"] == []
+    assert summary["transport_failure"]["type"] == "OSError"
+
+
+@pytest.mark.asyncio
+async def test_timeout_after_apply_request_requires_manual_review_not_promotion_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = HangingWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist"},
+            {"type": "state_update", "state": {"/ch/4/fdr": -12.0}},
+            {"type": "operator_mode_status", "mode": "supervised"},
+            {"type": "operator_proposal_created", "status": "created", "proposal": {"id": "apply"}},
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    args = parse_args(tmp_path, "--channel", "4", "--value-type", "fader", "--delta-db", "-0.25", "--execute")
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 1
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "manual_review_required"
+    assert summary["reason"] == "connection_or_timeout_after_apply_request"
+    assert summary["fail_closed"] is False
+    assert summary["live_apply_request_sent"] is True
+    assert summary["rollback_request_sent"] is False
+    assert summary["sent_request_types"] == [
+        "get_operator_mode",
+        "get_state",
+        "set_operator_mode",
+        "create_operator_proposal",
+        "apply_operator_proposal",
+    ]
+    assert "do not use this artifact as promotion evidence" in summary["operator_action_required"]
 
 
 @pytest.mark.parametrize(

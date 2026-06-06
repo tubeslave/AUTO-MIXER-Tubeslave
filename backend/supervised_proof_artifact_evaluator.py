@@ -37,6 +37,7 @@ DRY_RUN_SOURCES = {
     "cache",
     "offline_simulation",
 }
+NON_PROMOTABLE_SUMMARY_STATUSES = {"manual_review_required", "blocked", "failed", "error"}
 
 
 @dataclass(frozen=True)
@@ -175,6 +176,23 @@ def _infer_source(source: str, status: str, *, physical_mode: bool, fallback: st
 
 
 def _append_common_blockers(artifact: SupervisedProofArtifactInput, blockers: list[str]) -> None:
+    metadata = artifact.metadata or {}
+    summary_status = _text(metadata.get("summary_status"))
+    summary_reason = _text(metadata.get("summary_reason"))
+    fail_closed = _flag_true(metadata.get("fail_closed"))
+    live_apply_request_sent = _flag_true(metadata.get("live_apply_request_sent"))
+
+    if summary_status in NON_PROMOTABLE_SUMMARY_STATUSES:
+        blockers.append("summary_status_not_promotable")
+    if summary_reason == "connection_or_timeout_after_apply_request" or (
+        summary_status == "manual_review_required" and live_apply_request_sent
+    ):
+        blockers.append("transport_failure_after_apply_requires_manual_review")
+    if summary_reason == "connection_or_timeout_fail_closed" or (fail_closed and not live_apply_request_sent):
+        blockers.append("transport_failure_before_apply_fail_closed")
+    if fail_closed and live_apply_request_sent:
+        blockers.append("invalid_fail_closed_after_live_apply")
+
     if artifact.proof_mode == LEGACY_AMBIGUOUS_PROOF_MODE:
         blockers.append("legacy_physical_schema_missing")
     if artifact.value_type not in SUPPORTED_VALUE_TYPES:
@@ -426,6 +444,10 @@ def supervised_proof_artifact_from_dict(payload: Mapping[str, Any]) -> Supervise
         reason=_text(payload.get("operator_reason") or payload.get("approval_reason")),
         metadata={
             "summary_status": payload.get("status"),
+            "summary_reason": payload.get("reason"),
+            "fail_closed": payload.get("fail_closed"),
+            "live_apply_request_sent": payload.get("live_apply_request_sent"),
+            "rollback_request_sent": payload.get("rollback_request_sent"),
             "write_policy": payload.get("write_policy"),
             "execute": payload.get("execute"),
             "proof_artifact_schema": payload.get("proof_artifact_schema"),

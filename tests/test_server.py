@@ -1894,6 +1894,41 @@ class TestWingDeploymentWriteBoundary:
         assert server.mixer_client.set_channel_fader.call_count == 1
 
     @pytest.mark.asyncio
+    async def test_rollback_last_manual_write_blocks_when_pre_read_times_out(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server._manual_write_cooldown_sec = 0.0
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_fader"](
+            websocket,
+            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-apply"},
+        )
+
+        server.mixer_client.state = {}
+        server.mixer_client.query_parameter = MagicMock(
+            return_value={"status": "timeout", "address": "/ch/1/fdr", "value": None}
+        )
+
+        await handlers["rollback_last_manual_write"](
+            websocket,
+            {"approved": True, "approval_id": "rollback-timeout"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_rollback_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "pre_read_unavailable"
+        assert payload["rollback"] is True
+        assert payload["rollback_of"] == "unit-apply"
+        assert payload["pre_read_status"] == "readback_unavailable"
+        assert payload["pre_read_source"] == "physical_readback"
+        assert payload["proof_status"] == "blocked"
+        assert server.mixer_client.set_channel_fader.call_count == 1
+
+    @pytest.mark.asyncio
     async def test_rollback_last_manual_write_applies_previous_value_through_gate(self, dummy_wing_server, tmp_path):
         server = dummy_wing_server
         server.operator_mode = "supervised"

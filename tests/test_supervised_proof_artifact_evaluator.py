@@ -230,6 +230,80 @@ def test_dict_parser_honors_explicit_physical_runner_schema():
     assert result.autonomous_ready is False
 
 
+def test_manual_review_timeout_summary_cannot_become_promotion_evidence_even_with_readback_fields():
+    payload = gain_dry_run_summary()
+    payload.update(
+        {
+            "run_id": "20260606T000000Z_wing_operator_proposal_ch3_gain",
+            "status": "manual_review_required",
+            "reason": "connection_or_timeout_after_apply_request",
+            "proof_artifact_schema": "wing_operator_proposal_validation.v2",
+            "proof_runner": "wing_operator_proposal_validation_runner",
+            "proof_mode": "physical",
+            "physical_wing": True,
+            "execute": True,
+            "fail_closed": False,
+            "live_apply_request_sent": True,
+            "rollback_request_sent": False,
+            "pre_read_source": "physical_readback",
+            "readback_source": "physical_readback",
+            "rollback_readback_source": "physical_readback",
+            "operator_reason": "operator approved small gain-down physical proof",
+        }
+    )
+    payload["apply_result"]["apply_result"].update(
+        {
+            "pre_read_source": "physical_readback",
+            "readback_source": "physical_readback",
+        }
+    )
+
+    result = evaluate_supervised_proof_artifact_dict(payload, require_physical=True)
+
+    assert result.status == "blocked"
+    assert result.promotion_allowed is False
+    assert "summary_status_not_promotable" in result.blockers
+    assert "transport_failure_after_apply_requires_manual_review" in result.blockers
+    assert result.evidence["metadata"]["live_apply_request_sent"] is True
+
+
+def test_fail_closed_timeout_summary_before_apply_is_blocked_as_evidence():
+    payload = gain_dry_run_summary()
+    payload.update(
+        {
+            "run_id": "20260606T000000Z_wing_operator_proposal_ch3_gain",
+            "status": "blocked",
+            "reason": "connection_or_timeout_fail_closed",
+            "proof_artifact_schema": "wing_operator_proposal_validation.v2",
+            "proof_runner": "wing_operator_proposal_validation_runner",
+            "proof_mode": "physical",
+            "physical_wing": True,
+            "execute": True,
+            "fail_closed": True,
+            "live_apply_request_sent": False,
+            "rollback_request_sent": False,
+            "pre_read_source": "physical_readback",
+            "readback_source": "physical_readback",
+            "rollback_readback_source": "physical_readback",
+            "operator_reason": "operator approved small gain-down physical proof",
+        }
+    )
+    payload["apply_result"]["apply_result"].update(
+        {
+            "pre_read_source": "physical_readback",
+            "readback_source": "physical_readback",
+        }
+    )
+
+    result = evaluate_supervised_proof_artifact_dict(payload, require_physical=True)
+
+    assert result.status == "blocked"
+    assert result.promotion_allowed is False
+    assert "summary_status_not_promotable" in result.blockers
+    assert "transport_failure_before_apply_fail_closed" in result.blockers
+    assert result.evidence["metadata"]["fail_closed"] is True
+
+
 def test_legacy_execute_wing_summary_without_schema_blocks_instead_of_dry_run_ready():
     payload = gain_dry_run_summary()
     payload.pop("physical_wing")

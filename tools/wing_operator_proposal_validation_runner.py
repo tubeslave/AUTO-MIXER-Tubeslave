@@ -124,9 +124,12 @@ class EventRecorder:
         self.events_path = run_dir / "events.jsonl"
         self.summary_path = run_dir / "summary.json"
         self.seq = 0
+        self.sent_request_types: list[str] = []
 
     def record(self, event_type: str, payload: Dict[str, Any]) -> None:
         self.seq += 1
+        if event_type == "send":
+            self.sent_request_types.append(str(payload.get("type") or "unknown"))
         event = {
             "seq": self.seq,
             "timestamp": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
@@ -260,6 +263,52 @@ def apply_succeeded(payload: Dict[str, Any]) -> bool:
         and result.get("proof_status", "verified") == "verified"
         and bool(result.get("rollback_available"))
     )
+
+
+def summarize_transport_failure(
+    summary: Dict[str, Any],
+    recorder: EventRecorder,
+    exc: BaseException,
+) -> Dict[str, Any]:
+    sent_request_types = list(recorder.sent_request_types)
+    apply_sent = "apply_operator_proposal" in sent_request_types
+    rollback_sent = "rollback_last_manual_write" in sent_request_types
+    summary.update(
+        {
+            "transport_failure": {
+                "type": type(exc).__name__,
+                "message": str(exc),
+            },
+            "sent_request_types": sent_request_types,
+            "proposal_create_request_sent": "create_operator_proposal" in sent_request_types,
+            "live_apply_request_sent": apply_sent,
+            "rollback_request_sent": rollback_sent,
+        }
+    )
+    if apply_sent:
+        summary.update(
+            {
+                "status": "manual_review_required",
+                "reason": "connection_or_timeout_after_apply_request",
+                "fail_closed": False,
+                "operator_action_required": (
+                    "Physically verify the WING value, perform or confirm rollback, "
+                    "and do not use this artifact as promotion evidence."
+                ),
+            }
+        )
+    else:
+        summary.update(
+            {
+                "status": "blocked",
+                "reason": "connection_or_timeout_fail_closed",
+                "fail_closed": True,
+                "operator_action_required": (
+                    "Fix backend/WING connectivity and rerun; no live apply request was sent."
+                ),
+            }
+        )
+    return summary
 
 
 async def create_proposal(
@@ -610,6 +659,11 @@ async def run(args: argparse.Namespace) -> int:
             recorder.write_summary(summary)
             print(json.dumps(summary, indent=2, sort_keys=True))
             return 0
+    except (TimeoutError, OSError, ConnectionError) as exc:
+        summarize_transport_failure(summary, recorder, exc)
+        recorder.write_summary(summary)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 1
     except Exception as exc:
         summary.update({"status": "error", "reason": type(exc).__name__, "error": str(exc)})
         recorder.write_summary(summary)

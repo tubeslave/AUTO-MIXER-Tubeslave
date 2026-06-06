@@ -30,6 +30,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/adr/automation-foundation-layer-20260527.md` | ADR for the safe agentic-mixing foundation layer and its live-write boundary. |
 | `Docs/reports/AUTOMIXER_WRITE_SURFACE_HARDENING_20260601.md` | Current write-surface inventory: canonical supervised fader/gain path, proposal-only surfaces, quarantined paths, and blocked mutation scripts. |
 | `Docs/reports/AUTOMIXER_SAFETY_COVERAGE_MATRIX_20260601.md` | Safety proof matrix for live-capable action families and explicit hardware-proof gaps before any live scope expansion. |
+| `Docs/reports/AUTOMIXER_WING_TIMEOUT_FAIL_CLOSED_PROOF_20260606.md` | Current timeout/connection-loss proof semantics for the supervised WING proposal runner. |
 | `Docs/reports/AUTOMIXER_STREAMING_ALERTS_20260601.md` | Read-only streaming telemetry alert artifacts for dashboards, QA, and future learning labels. |
 | `Docs/STRUCTURING_COMPLETION_20260518.md` | What was moved, what remains, and the next work boundary. |
 | `Docs/PROJECT_CLEANUP_BACKLOG.md` | Remaining cleanup backlog and rules. |
