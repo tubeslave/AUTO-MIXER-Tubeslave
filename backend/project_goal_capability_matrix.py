@@ -156,6 +156,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
             "source_identity_calibration_memory_trust_promotion_contract",
+            "source_identity_calibration_memory_trust_promotion_acceptance_ledger",
         ),
         support_paths=(
             "backend/ml/channel_classifier.py",
@@ -171,13 +172,14 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_calibration_memory_trust_acceptance_ledger.py",
             "backend/source_identity_calibration_memory_trust_promotion_plan.py",
             "backend/source_identity_calibration_memory_trust_promotion_contract.py",
+            "backend/source_identity_calibration_memory_trust_promotion_acceptance_ledger.py",
             "backend/source_identity_downstream_gate.py",
         ),
         next_step=(
             "Keep replay-calibrated source identity trust states in operator review, "
             "record acceptance, plan manual persistence, and draft append-only "
             "memory before acknowledged writes, read-only indexing, and operator "
-            "memory-trust promotion contract review."
+            "memory-trust promotion acceptance review."
         ),
     ),
     ProjectGoalCapabilityRow(
@@ -797,6 +799,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
             "source_identity_calibration_memory_trust_promotion_contract",
+            "source_identity_calibration_memory_trust_promotion_acceptance_ledger",
             "product_operator_state",
         ),
         support_paths=(
@@ -808,13 +811,14 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_calibration_memory_trust_acceptance_ledger.py",
             "backend/source_identity_calibration_memory_trust_promotion_plan.py",
             "backend/source_identity_calibration_memory_trust_promotion_contract.py",
+            "backend/source_identity_calibration_memory_trust_promotion_acceptance_ledger.py",
             "backend/source_identity_downstream_gate.py",
             "backend/decision_memory.py",
             "backend/telemetry/",
             ".ai/memory/project.md",
         ),
         blocker="Memory-learning proposals are review contracts, not autonomous console authority.",
-        next_step="Route trusted-source, fresh-context learning records through replay correlation and operator review, then append-only memory drafts, acknowledged writes, read-only indexing, memory-trust review, operator acceptance, manual promotion planning, and promotion contract review before any future proposal-priority influence.",
+        next_step="Route trusted-source, fresh-context learning records through replay correlation and operator review, then append-only memory drafts, acknowledged writes, read-only indexing, memory-trust review, operator acceptance, manual promotion planning, promotion contract review, and promotion acceptance before any future proposal-priority influence.",
     ),
 )
 

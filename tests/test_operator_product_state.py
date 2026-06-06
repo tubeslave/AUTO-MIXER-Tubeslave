@@ -5615,6 +5615,9 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_acceptance(s
     ledger = payload["source_identity_calibration_memory_trust_acceptance_ledger"]
     plan = payload["source_identity_calibration_memory_trust_promotion_plan"]
     contract = payload["source_identity_calibration_memory_trust_promotion_contract"]
+    promotion_acceptance = payload[
+        "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
@@ -5773,11 +5776,20 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_co
     payload = build_main_pipeline_preview(server, total_channels=4)
     queue = build_decision_queue(server)
     contract = payload["source_identity_calibration_memory_trust_promotion_contract"]
+    promotion_acceptance = payload[
+        "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
         if item["adapter_id"]
         == "source_identity_calibration_memory_trust_promotion_contract"
+    ][0]
+    acceptance_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
     ][0]
 
     assert (
@@ -5787,10 +5799,24 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_co
         == 1
     )
     assert (
+        payload["summary"][
+            "source_identity_calibration_memory_trust_promotion_acceptance_record_count"
+        ]
+        == 0
+    )
+    assert (
         adapter["method_id"]
         == "source_identity_calibration_memory_trust_promotion_contract"
     )
     assert adapter["output"] == "source_identity_memory_trust_promotion_contract_review"
+    assert (
+        acceptance_adapter["method_id"]
+        == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
+    )
+    assert (
+        acceptance_adapter["output"]
+        == "source_identity_memory_trust_promotion_acceptance_ledger"
+    )
     assert contract["status"] == "manual_memory_trust_promotion_contract_ready"
     assert contract["summary"]["contract_record_count"] == 1
     assert contract["summary"]["memory_trust_promotion_allowed_by_contract"] is False
@@ -5816,6 +5842,163 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_co
         is False
     )
     assert contract["contract_records"][0]["live_widening_allowed"] is False
+    assert (
+        promotion_acceptance["status"]
+        == "operator_memory_trust_promotion_acceptance_required"
+    )
+    assert promotion_acceptance["summary"]["acceptance_record_count"] == 0
+    assert promotion_acceptance["summary"]["accepted_record_count"] == 0
+    assert (
+        "operator_must_review_memory_trust_promotion_contract_records"
+        in promotion_acceptance["summary"]["blocked_by"]
+    )
+    assert (
+        promotion_acceptance["summary"][
+            "downstream_priority_change_allowed_by_acceptance"
+        ]
+        is False
+    )
+    assert queue["summary"]["pending_count"] == 0
+
+
+def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_acceptance(server):
+    server.source_identity_replay_context_cache_freshness = {
+        "status": "fresh",
+        "field_count": 3,
+        "fresh_field_count": 3,
+        "stale_field_count": 0,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    server.source_identity_calibration_memory_text = "\n".join(
+        [
+            "# Project Memory",
+            "",
+            "---",
+            "",
+            "### Source identity calibration memory: lead_vocal",
+            "",
+            "- Draft ID: `source_identity_memory:candidate-1`",
+            "- Source candidate: `candidate-1`",
+            "- Source review: `review-1`",
+            "- Recommended trust state: `trusted_for_downstream_priority`",
+            "- Reviewed by: `operator`",
+            "- Reviewed at: `2026-06-06T11:00:00Z`",
+            (
+                "- Runtime authority: no model, memory-priority, queue, "
+                "or live-console mutation"
+            ),
+            "",
+            "Source identity calibration for `lead_vocal` was operator-reviewed.",
+            "",
+        ]
+    )
+    server.source_identity_memory_trust_acceptance_records = [
+        {
+            "acceptance_id": "memory-trust-acceptance-1",
+            "review_candidate_id": (
+                "source_identity_memory_trust_review:"
+                "source_identity_memory_index:source_identity_memory:candidate-1"
+            ),
+            "memory_record_id": (
+                "source_identity_memory_index:source_identity_memory:candidate-1"
+            ),
+            "source_candidate_id": "candidate-1",
+            "source_type": "lead_vocal",
+            "recommended_trust_state": "trusted_for_downstream_priority",
+            "decision": "accepted",
+            "reviewed_by": "operator",
+            "reviewed_at": "2026-06-06T12:00:00Z",
+        }
+    ]
+    server.source_identity_memory_trust_promotion_rollback_evidence = {
+        "status": "ready",
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "queue_mutation": False,
+        "model_mutation": False,
+        "runtime_memory_mutation": False,
+        "downstream_priority_mutation": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "rollback_strategy": "manual_revert_to_previous_trust_state",
+        "previous_trust_state": "legacy_unverified",
+        "target_store": "source_identity_downstream_gate",
+        "reviewed_by": "operator",
+        "reviewed_at": "2026-06-06T12:30:00Z",
+    }
+    server.source_identity_memory_trust_promotion_acceptance_records = [
+        {
+            "promotion_acceptance_id": "memory-trust-promotion-acceptance-1",
+            "promotion_contract_record_id": (
+                "source_identity_memory_trust_promotion_contract:"
+                "source_identity_memory_trust_promotion:memory-trust-acceptance-1"
+            ),
+            "promotion_candidate_id": (
+                "source_identity_memory_trust_promotion:memory-trust-acceptance-1"
+            ),
+            "source_candidate_id": "candidate-1",
+            "source_type": "lead_vocal",
+            "recommended_trust_state": "trusted_for_downstream_priority",
+            "previous_trust_state": "legacy_unverified",
+            "rollback_strategy": "manual_revert_to_previous_trust_state",
+            "decision": "accepted",
+            "reviewed_by": "operator",
+            "reviewed_at": "2026-06-06T13:00:00Z",
+        }
+    ]
+
+    payload = build_main_pipeline_preview(server, total_channels=4)
+    queue = build_decision_queue(server)
+    ledger = payload[
+        "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
+    ]
+    adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
+    ][0]
+
+    assert (
+        payload["summary"][
+            "source_identity_calibration_memory_trust_promotion_acceptance_record_count"
+        ]
+        == 1
+    )
+    assert (
+        payload["summary"][
+            "source_identity_calibration_memory_trust_promotion_accepted_record_count"
+        ]
+        == 1
+    )
+    assert (
+        adapter["method_id"]
+        == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
+    )
+    assert adapter["output"] == "source_identity_memory_trust_promotion_acceptance_ledger"
+    assert (
+        ledger["status"]
+        == "operator_memory_trust_promotion_acceptance_records_available"
+    )
+    assert ledger["summary"]["accepted_record_count"] == 1
+    assert ledger["summary"]["memory_trust_promotion_allowed_by_acceptance"] is False
+    assert (
+        ledger["summary"]["downstream_priority_change_allowed_by_acceptance"]
+        is False
+    )
+    assert (
+        ledger["records"][0]["operator_accepted_memory_trust_promotion_contract"]
+        is True
+    )
+    assert (
+        ledger["records"][0]["downstream_priority_change_allowed_by_acceptance"]
+        is False
+    )
+    assert ledger["records"][0]["runtime_memory_mutation_allowed_by_acceptance"] is False
     assert queue["summary"]["pending_count"] == 0
 
 
