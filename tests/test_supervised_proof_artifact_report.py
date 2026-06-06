@@ -234,6 +234,12 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     assert report["proof_remediation_plan"]["status"] == "manual_remediation_required"
     assert report["proof_remediation_plan"]["summary"]["legacy_ambiguous_count"] == 1
     assert report["proof_remediation_plan"]["actions"][0]["action_type"] == "rerun_current_physical_schema"
+    readiness = report["autonomy_promotion_readiness"]
+    assert readiness["safety"]["live_write"] is False
+    preflight = readiness["summary"]["wing_readonly_preflight_evidence"]
+    assert preflight["evidence_status"] == "operator_preflight_required"
+    assert preflight["readiness_update_candidate_available"] is False
+    assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
     assert report["autonomy_evidence_overlay"]["safety"]["live_widening_allowed"] is False
     assert report["autonomy_evidence_overlay"]["summary"]["autonomous_ready_target_ids"] == []
     assert report["autonomy_evidence_overlay"]["summary"]["manual_safety_review_candidate_target_ids"] == [
@@ -289,8 +295,37 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     assert gap_rollup["supervised_current_live_write_kinds"] == ["fader", "gain"]
     assert "Full Autonomous remains blocked" in gap_rollup["claim"]
     assert report["next_wing_proof_plan"]["safety"]["execution_allowed_by_plan"] is False
-    assert report["next_wing_proof_plan"]["status"] == "operator_proof_required"
-    assert report["next_wing_proof_plan"]["summary"]["planned_value_types"] == ["gain"]
+    assert report["next_wing_proof_plan"]["status"] == "blocked_by_readonly_preflight"
+    assert report["next_wing_proof_plan"]["summary"]["planned_value_types"] == []
+    assert report["next_wing_proof_plan"]["summary"]["step_count"] == 0
+    assert report["next_wing_proof_plan"]["summary"]["readonly_preflight_required"] is True
+    assert (
+        report["next_wing_proof_plan"]["summary"]["readonly_preflight_candidate_available"]
+        is False
+    )
+    assert report["next_wing_proof_plan"]["summary"]["readonly_preflight_step_count"] == 1
+    preflight_step = report["next_wing_proof_plan"]["readonly_preflight_steps"][0]
+    assert preflight_step["read_only"] is True
+    assert preflight_step["live_execution_required"] is False
+    assert preflight_step["execution_allowed_by_plan"] is False
+    assert preflight_step["command"][:2] == [
+        "python3",
+        "tools/wing_readonly_preflight_runner.py",
+    ]
+    assert "--require-physical-readback" in preflight_step["command"]
+    assert "--execute" not in preflight_step["command"]
+    assert (
+        report["next_wing_proof_plan"]["summary"]["readonly_preflight_evidence_status"]
+        == preflight["evidence_status"]
+    )
+    assert (
+        report["next_wing_proof_plan"]["summary"]["readonly_preflight_blocked_by"]
+        == preflight["blocked_by"]
+    )
+    assert (
+        "readonly_preflight_candidate_required_before_supervised_proof"
+        in report["next_wing_proof_plan"]["summary"]["global_blockers"]
+    )
 
 
 def test_timeout_artifacts_remain_blocked_through_report_and_promotion_evidence(tmp_path: Path):
@@ -338,4 +373,9 @@ def test_timeout_artifacts_remain_blocked_through_report_and_promotion_evidence(
     ]
     assert "blocked_artifacts_for_value_type" in fader_row["blockers"]
     assert "physical_candidate_missing" in fader_row["blockers"]
-    assert report["next_wing_proof_plan"]["status"] == "operator_proof_required"
+    assert report["next_wing_proof_plan"]["status"] == "blocked_by_readonly_preflight"
+    assert report["next_wing_proof_plan"]["summary"]["step_count"] == 0
+    assert (
+        "readonly_preflight_candidate_required_before_supervised_proof"
+        in report["next_wing_proof_plan"]["summary"]["global_blockers"]
+    )

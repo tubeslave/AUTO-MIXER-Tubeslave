@@ -293,7 +293,7 @@ def _artifact_records(
     return tuple(records)
 
 
-def _matrix_rows(candidate_available: bool) -> Tuple[Dict[str, Any], ...]:
+def _matrix_rows(candidate_available: bool, blocked_status: str) -> Tuple[Dict[str, Any], ...]:
     blocker_ids = (
         "wing_readonly_connection_proof",
         "physical_console_readback_proof",
@@ -306,7 +306,7 @@ def _matrix_rows(candidate_available: bool) -> Tuple[Dict[str, Any], ...]:
             "status": (
                 "candidate_available"
                 if candidate_available
-                else "operator_preflight_required"
+                else blocked_status
             ),
             "closed": False,
             "manual_review_required": True,
@@ -331,15 +331,28 @@ def build_wing_readonly_preflight_evidence(
     )
     valid_records = tuple(row for row in records if row.accepted_as_readonly_preflight_candidate)
     invalid_records = tuple(row for row in records if not row.accepted_as_readonly_preflight_candidate)
-    if valid_records:
-        status = "readonly_preflight_candidate_available"
-        blocked_by = ("operator_must_review_readonly_preflight_candidate_before_readiness_update",)
-    elif records:
+    candidate_available = bool(valid_records) and not invalid_records
+    if invalid_records:
         status = "readonly_preflight_artifact_replacement_required"
         blocked_by = ("operator_must_replace_invalid_readonly_preflight_artifact",)
+        matrix_blocked_status = "artifact_replacement_required"
+        next_global_step = (
+            "Operator replaces invalid read-only preflight artifacts before any "
+            "readiness matrix review."
+        )
+    elif valid_records:
+        status = "readonly_preflight_candidate_available"
+        blocked_by = ("operator_must_review_readonly_preflight_candidate_before_readiness_update",)
+        matrix_blocked_status = "operator_preflight_required"
+        next_global_step = (
+            "Operator reviews the valid read-only preflight candidate before "
+            "readiness matrix rows may be updated."
+        )
     else:
         status = "operator_preflight_required"
         blocked_by = ("operator_must_run_wing_readonly_preflight_runner",)
+        matrix_blocked_status = "operator_preflight_required"
+        next_global_step = "Operator runs the read-only preflight runner against the intended WING backend."
 
     all_violations = tuple(
         dict.fromkeys(violation for row in records for violation in row.violations)
@@ -369,25 +382,20 @@ def build_wing_readonly_preflight_evidence(
             "artifact_count": len(records),
             "valid_candidate_count": len(valid_records),
             "invalid_candidate_count": len(invalid_records),
-            "accepted_as_readonly_preflight_candidate": bool(valid_records),
+            "accepted_as_readonly_preflight_candidate": candidate_available,
             "operator_review_required": True,
-            "mvp_blocker_candidate_count": 4 if valid_records else 0,
+            "mvp_blocker_candidate_count": 4 if candidate_available else 0,
             "mvp_blockers_closed_by_evidence": [],
-            "readiness_matrix_update_allowed": bool(valid_records),
+            "readiness_matrix_update_allowed": candidate_available,
             "readiness_closure_allowed_by_evidence": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
             "latest_valid_candidate_source_id": latest_valid.source_id if latest_valid else None,
             "latest_valid_candidate_run_id": latest_valid.run_id if latest_valid else None,
-            "next_global_step": (
-                "Operator reviews the valid read-only preflight candidate before "
-                "readiness matrix rows may be updated."
-                if valid_records
-                else "Operator runs the read-only preflight runner against the intended WING backend."
-            ),
+            "next_global_step": next_global_step,
             "blocked_by": list(blocked_by),
             "violations": list(all_violations),
         },
-        "mvp_blocker_matrix": list(_matrix_rows(bool(valid_records))),
+        "mvp_blocker_matrix": list(_matrix_rows(candidate_available, matrix_blocked_status)),
         "artifacts": [record.to_dict() for record in records],
     }

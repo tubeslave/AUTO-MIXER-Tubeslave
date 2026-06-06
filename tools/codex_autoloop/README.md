@@ -97,6 +97,14 @@ you want the background automation active.
   sentence. The validator also rejects reports that include a valid no-action
   audit in `## Scope` and then contradict it in later report sections with an
   explicit executed/run/sent/applied/performed action sentence.
+- Direction guard activation is inside each Codex cycle: the prompt requires
+  `tools/codex_autoloop/codex_direction_guard.py` before task selection and
+  again before the final cycle report. The guard reads git status, recent
+  commit subjects, and repo-local reports, then scores whether the cycle is
+  moving toward supervised WING Rack MVP blockers or drifting into
+  memory/queue/result-consumer/report-only work. The wall-clock cadence remains
+  the existing LaunchAgent interval of `1200` seconds when installed; no new
+  background service is installed by the guard.
 - Focused offline release gates can use `tools/no_wing_release_check.py`; each
   subprocess check has a default timeout and records a `timeout` result instead
   of leaving an autonomous run silent indefinitely.

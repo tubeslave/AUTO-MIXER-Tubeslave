@@ -129,6 +129,27 @@ blockers выше.
 Daily success измеряется закрытыми WING proof blockers, а не количеством
 коммитов, методов, отчетов или новых abstractions.
 
+## 2.2. Direction guard automation
+
+Перед выбором задачи запусти repo-local direction guard:
+
+```bash
+python3 tools/codex_autoloop/codex_direction_guard.py \
+  --format markdown \
+  --output .paperclip/reports/codex_direction_guard_latest.md
+```
+
+Прочитай результат guard-а до раздела `## 4. Написать краткий план`.
+
+- Если status `drifting` или `mixed_needs_review`, не продолжай broad
+  memory/queue/result-consumer/report-only/proposal-only работу. Выбери задачу
+  только из WING proof blockers раздела 2.1.
+- Если WING Rack подключен, следующий шаг должен быть read-only preflight или
+  ручной review реального preflight artifact.
+- Если WING Rack не подключен, разрешена только работа, которая прямо готовит
+  физический read-only/supervised proof и имеет тест.
+- Не считай guard доказательством live readiness: это только audit направления.
+
 ## 3. Найти нерешенные задачи
 
 Ищи задачи из:
@@ -163,6 +184,8 @@ Daily success измеряется закрытыми WING proof blockers, а н
 - добавь или обнови тесты, если меняешь поведение;
 - запусти релевантные проверки;
 - запусти `python3 tools/memory/memory_lint.py` и зафиксируй результат;
+- перед финальным отчетом снова запусти direction guard:
+  `python3 tools/codex_autoloop/codex_direction_guard.py --format markdown --output .paperclip/reports/codex_direction_guard_final.md`;
 - не останавливайся на середине;
 - если безопасной кодовой задачи нет, улучши report/docs/tests только вокруг
   named WING proof blockers из раздела 2.1.
@@ -189,6 +212,8 @@ Daily success измеряется закрытыми WING proof blockers, а н
 - что было сделано;
 - какие тесты запущены;
 - результат memory lint в отдельном разделе `## Memory Lint Result` с результатом `python3 tools/memory/memory_lint.py`;
+- результат direction guard: статус, score и краткое объяснение, почему задача
+  двигала supervised WING Rack MVP;
 - что осталось;
 - какие риски есть;
 - ссылки на измененные файлы;

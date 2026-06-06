@@ -848,6 +848,10 @@ def _declared_pytest_functions(path: Path) -> set[str]:
     }
 
 
+def _string_list(value: Any) -> list[str]:
+    return [str(item) for item in value if item] if isinstance(value, list) else []
+
+
 def _string_list_map(value: Any) -> tuple[dict[str, list[str]], bool]:
     if not isinstance(value, Mapping):
         return {}, False
@@ -1545,15 +1549,16 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     invalid_candidate_count = int(summary.get("invalid_candidate_count") or 0)
     accepted = summary.get("accepted_as_readonly_preflight_candidate") is True
     update_allowed = summary.get("readiness_matrix_update_allowed") is True
+    candidate_expected = bool(valid_candidate_count) and invalid_candidate_count == 0
     closure_allowed = summary.get("readiness_closure_allowed_by_evidence") is True
     live_authority = summary.get("live_authority_granted") is True
     full_auto = summary.get("full_autonomous_ready") is True
 
     if invalid_candidate_count:
         violations.append("wing_readonly_preflight_invalid_artifacts_present")
-    if accepted != bool(valid_candidate_count):
+    if accepted != candidate_expected:
         violations.append("wing_readonly_preflight_candidate_summary_mismatch")
-    if update_allowed != bool(valid_candidate_count):
+    if update_allowed != candidate_expected:
         violations.append("wing_readonly_preflight_readiness_update_allowed_mismatch")
     if closure_allowed:
         violations.append("wing_readonly_preflight_readiness_closure_allowed")
@@ -5923,6 +5928,11 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     planned_value_types: list[str] = []
     planned_channels: list[int] = []
     global_blockers: list[str] = []
+    readonly_preflight_required = False
+    readonly_preflight_candidate_available = False
+    readonly_preflight_evidence_status: object = None
+    readonly_preflight_blocked_by: list[str] = []
+    readonly_preflight_step_count = 0
     step_count = 0
     plan_status: object = None
 
@@ -5931,14 +5941,41 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     else:
         assert payload is not None
         plan = payload.get("next_wing_proof_plan") if isinstance(payload.get("next_wing_proof_plan"), Mapping) else {}
+        readiness = (
+            payload.get("autonomy_promotion_readiness")
+            if isinstance(payload.get("autonomy_promotion_readiness"), Mapping)
+            else {}
+        )
+        readiness_summary = (
+            readiness.get("summary") if isinstance(readiness.get("summary"), Mapping) else {}
+        )
+        preflight = (
+            readiness_summary.get("wing_readonly_preflight_evidence")
+            if isinstance(readiness_summary.get("wing_readonly_preflight_evidence"), Mapping)
+            else {}
+        )
         safety = plan.get("safety") if isinstance(plan.get("safety"), Mapping) else {}
         summary = plan.get("summary") if isinstance(plan.get("summary"), Mapping) else {}
+        preflight_steps = (
+            plan.get("readonly_preflight_steps")
+            if isinstance(plan.get("readonly_preflight_steps"), list)
+            else []
+        )
         steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
         plan_status = plan.get("status")
 
         if plan.get("type") != "supervised_wing_proof_plan":
             violations.append("next_wing_proof_plan_type_mismatch")
-        if plan_status not in {"operator_proof_required", "manual_review_ready", "blocked_by_invalid_artifacts"}:
+        if readiness.get("type") != "autonomy_promotion_readiness":
+            violations.append("next_wing_proof_plan_readiness_snapshot_missing")
+        if not preflight:
+            violations.append("next_wing_proof_plan_preflight_overlay_missing")
+        if plan_status not in {
+            "operator_proof_required",
+            "manual_review_ready",
+            "blocked_by_invalid_artifacts",
+            "blocked_by_readonly_preflight",
+        }:
             violations.append("next_wing_proof_plan_status_unknown")
 
         expected_true = ("read_only", "operator_required")
@@ -5966,10 +6003,83 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             if isinstance(item, (int, float, str)) and str(item).strip().lstrip("-").isdigit()
         ] if isinstance(summary.get("planned_channels"), list) else []
         global_blockers = [str(item) for item in summary.get("global_blockers", []) if item] if isinstance(summary.get("global_blockers"), list) else []
+        readonly_preflight_required = summary.get("readonly_preflight_required") is True
+        readonly_preflight_candidate_available = (
+            summary.get("readonly_preflight_candidate_available") is True
+        )
+        readonly_preflight_evidence_status = summary.get("readonly_preflight_evidence_status")
+        readonly_preflight_blocked_by = (
+            [str(item) for item in summary.get("readonly_preflight_blocked_by", []) if item]
+            if isinstance(summary.get("readonly_preflight_blocked_by"), list)
+            else []
+        )
+        readonly_preflight_step_count = int(summary.get("readonly_preflight_step_count") or 0)
+        if readonly_preflight_step_count != len(preflight_steps):
+            violations.append("next_wing_proof_plan_preflight_step_count_mismatch")
+        if not readonly_preflight_required:
+            violations.append("next_wing_proof_plan_readonly_preflight_required_not_true")
+        if preflight:
+            if readonly_preflight_evidence_status != preflight.get("evidence_status"):
+                violations.append("next_wing_proof_plan_preflight_status_mismatch")
+            if readonly_preflight_blocked_by != _string_list(preflight.get("blocked_by")):
+                violations.append("next_wing_proof_plan_preflight_blockers_mismatch")
+            expected_candidate = (
+                preflight.get("readiness_update_candidate_available") is True
+            )
+            if readonly_preflight_candidate_available != expected_candidate:
+                violations.append("next_wing_proof_plan_preflight_candidate_mismatch")
         if plan_status == "operator_proof_required" and step_count < 1:
             violations.append("next_wing_proof_plan_required_without_steps")
         if plan_status == "operator_proof_required" and "operator_must_approve_and_execute_manually" not in global_blockers:
             violations.append("next_wing_proof_plan_operator_blocker_missing")
+        if plan_status == "operator_proof_required" and not readonly_preflight_candidate_available:
+            violations.append("next_wing_proof_plan_preflight_candidate_missing_for_steps")
+        if step_count and not readonly_preflight_candidate_available:
+            violations.append("next_wing_proof_plan_steps_without_readonly_preflight_candidate")
+        if plan_status == "blocked_by_readonly_preflight":
+            if step_count:
+                violations.append("next_wing_proof_plan_preflight_blocked_with_steps")
+            if readonly_preflight_candidate_available:
+                violations.append("next_wing_proof_plan_preflight_blocked_candidate_true")
+            if readonly_preflight_step_count < 1:
+                violations.append("next_wing_proof_plan_preflight_blocked_without_preflight_step")
+            if "readonly_preflight_candidate_required_before_supervised_proof" not in global_blockers:
+                violations.append("next_wing_proof_plan_preflight_blocker_missing")
+        if readonly_preflight_candidate_available and readonly_preflight_step_count:
+            violations.append("next_wing_proof_plan_preflight_step_present_after_candidate")
+
+        for index, step in enumerate(preflight_steps):
+            if not isinstance(step, Mapping):
+                violations.append(f"next_wing_proof_plan_preflight_step_{index}_not_object")
+                continue
+            if step.get("read_only") is not True:
+                violations.append(f"next_wing_proof_plan_preflight_step_{index}_read_only_not_true")
+            if step.get("live_execution_required") is not False:
+                violations.append(f"next_wing_proof_plan_preflight_step_{index}_live_execution_not_false")
+            if step.get("execution_allowed_by_plan") is not False:
+                violations.append(f"next_wing_proof_plan_preflight_step_{index}_execution_allowed")
+            if step.get("operator_approval_required") is not True:
+                violations.append(f"next_wing_proof_plan_preflight_step_{index}_operator_approval_not_required")
+            command = [str(item) for item in step.get("command", []) if item] if isinstance(step.get("command"), list) else []
+            command_text = " ".join(command)
+            if "tools/wing_readonly_preflight_runner.py" not in command:
+                violations.append(f"next_wing_proof_plan_preflight_step_{index}_runner_missing")
+            if "--require-physical-readback" not in command:
+                violations.append(f"next_wing_proof_plan_preflight_step_{index}_physical_flag_missing")
+            forbidden_tokens = (
+                "--execute",
+                "tools/wing_operator_proposal_validation_runner.py",
+                "apply_operator_proposal",
+                "create_operator_proposal",
+                "set_operator_mode",
+                "rollback_last_manual_write",
+                "emergency_stop",
+            )
+            for token in forbidden_tokens:
+                if token in command_text:
+                    violations.append(
+                        f"next_wing_proof_plan_preflight_step_{index}_forbidden_command:{token}"
+                    )
 
         for index, step in enumerate(steps):
             if not isinstance(step, Mapping):
@@ -5993,6 +6103,11 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     detail["step_count"] = step_count
     detail["planned_value_types"] = planned_value_types
     detail["planned_channels"] = planned_channels
+    detail["readonly_preflight_required"] = readonly_preflight_required
+    detail["readonly_preflight_candidate_available"] = readonly_preflight_candidate_available
+    detail["readonly_preflight_evidence_status"] = readonly_preflight_evidence_status
+    detail["readonly_preflight_blocked_by"] = readonly_preflight_blocked_by
+    detail["readonly_preflight_step_count"] = readonly_preflight_step_count
     detail["global_blockers"] = global_blockers
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)
@@ -8442,6 +8557,7 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         detail = result.detail if isinstance(result.detail, Mapping) else {}
         planned_value_types = detail.get("planned_value_types")
         planned_channels = detail.get("planned_channels")
+        readonly_preflight_blocked_by = detail.get("readonly_preflight_blocked_by")
         global_blockers = detail.get("global_blockers")
         violations = detail.get("violations")
         return {
@@ -8455,6 +8571,23 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
             "step_count": int(detail.get("step_count") or 0),
             "planned_value_types": list(planned_value_types) if isinstance(planned_value_types, list) else [],
             "planned_channels": list(planned_channels) if isinstance(planned_channels, list) else [],
+            "readonly_preflight_required": (
+                detail.get("readonly_preflight_required") is True
+            ),
+            "readonly_preflight_candidate_available": (
+                detail.get("readonly_preflight_candidate_available") is True
+            ),
+            "readonly_preflight_evidence_status": detail.get(
+                "readonly_preflight_evidence_status"
+            ),
+            "readonly_preflight_blocked_by": (
+                list(readonly_preflight_blocked_by)
+                if isinstance(readonly_preflight_blocked_by, list)
+                else []
+            ),
+            "readonly_preflight_step_count": int(
+                detail.get("readonly_preflight_step_count") or 0
+            ),
             "global_blockers": list(global_blockers) if isinstance(global_blockers, list) else [],
             "violations": list(violations) if isinstance(violations, list) else [],
         }
@@ -10127,6 +10260,16 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- step_count: `{next_plan['step_count']}`",
                 f"- planned_value_types: `{json.dumps(next_plan['planned_value_types'])}`",
                 f"- planned_channels: `{json.dumps(next_plan['planned_channels'])}`",
+                "- readonly_preflight_required: "
+                f"`{str(next_plan['readonly_preflight_required']).lower()}`",
+                "- readonly_preflight_candidate_available: "
+                f"`{str(next_plan['readonly_preflight_candidate_available']).lower()}`",
+                "- readonly_preflight_evidence_status: "
+                f"`{next_plan['readonly_preflight_evidence_status']}`",
+                "- readonly_preflight_blocked_by: "
+                f"`{json.dumps(next_plan['readonly_preflight_blocked_by'])}`",
+                "- readonly_preflight_step_count: "
+                f"`{next_plan['readonly_preflight_step_count']}`",
                 f"- global_blockers: `{json.dumps(next_plan['global_blockers'])}`",
                 f"- violations: `{json.dumps(next_plan['violations'])}`",
             ]

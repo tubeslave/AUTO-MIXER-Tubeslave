@@ -23,6 +23,29 @@ def evidence_row(value_type: str, *, review_candidate: bool = False, blockers=No
     }
 
 
+def preflight_ready_snapshot() -> dict:
+    return {
+        "type": "autonomy_promotion_readiness",
+        "summary": {
+            "wing_readonly_preflight_evidence": {
+                "readiness_update_candidate_available": True,
+                "valid_candidate_count": 1,
+                "invalid_candidate_count": 0,
+                "readiness_closure_allowed_by_evidence": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+                "evidence_status": "readonly_preflight_candidate_available",
+                "blocked_by": [
+                    "operator_must_review_readonly_preflight_candidate_before_readiness_update"
+                ],
+                "next_required_actions": [
+                    "Manually review the read-only preflight candidate before updating readiness rows."
+                ],
+            },
+        },
+    }
+
+
 def test_supervised_wing_proof_plan_module_is_transport_free():
     source = Path("backend/supervised_wing_proof_plan.py").read_text(encoding="utf-8")
 
@@ -49,6 +72,7 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
             evidence_row("gain", blockers=["physical_candidate_missing"]),
             evidence_row("fader", blockers=["physical_candidate_missing", "blocked_artifacts_for_value_type"]),
         ),
+        autonomy_readiness_snapshot=preflight_ready_snapshot(),
         backend_url="ws://proof-backend",
         artifact_root="artifacts/proof",
         channels_by_value_type={"gain": (3,), "fader": (2, 16)},
@@ -68,6 +92,11 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert plan["summary"]["step_count"] == 3
     assert plan["summary"]["planned_value_types"] == ["fader", "gain"]
     assert plan["summary"]["planned_channels"] == [3, 2, 16]
+    assert plan["summary"]["readonly_preflight_required"] is True
+    assert plan["summary"]["readonly_preflight_candidate_available"] is True
+    assert plan["summary"]["readonly_preflight_evidence_status"] == "readonly_preflight_candidate_available"
+    assert plan["summary"]["readonly_preflight_step_count"] == 0
+    assert plan["readonly_preflight_steps"] == []
 
     gain_step = plan["steps"][0]
     assert gain_step["id"] == "gain_physical_proof_ch3"
@@ -80,6 +109,10 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert "--prove-blocked-apply" in gain_step["command"]
     assert "--prove-emergency-stop" in gain_step["command"]
     assert "ws://proof-backend" in gain_step["command"]
+    assert (
+        "A clean read-only WING preflight candidate exists and has been manually reviewed."
+        in gain_step["prerequisites"]
+    )
     assert "Use gain-down proof only; gain-up remains out of scope for this plan." in gain_step["prerequisites"]
 
     fader_step = plan["steps"][1]
@@ -93,6 +126,7 @@ def test_plan_skips_value_type_that_already_has_manual_review_candidate():
             evidence_row("gain", review_candidate=True),
             evidence_row("fader", blockers=["physical_candidate_missing"]),
         ),
+        autonomy_readiness_snapshot=preflight_ready_snapshot(),
         channels_by_value_type={"fader": (4,)},
     )
 
@@ -106,13 +140,111 @@ def test_plan_is_manual_review_ready_when_all_value_types_have_candidates():
         evidence_snapshot(
             evidence_row("gain", review_candidate=True),
             evidence_row("fader", review_candidate=True),
-        )
+        ),
+        autonomy_readiness_snapshot=preflight_ready_snapshot(),
     )
 
     assert plan["status"] == "manual_review_ready"
     assert plan["summary"]["step_count"] == 0
     assert plan["steps"] == []
     assert plan["safety"]["execution_allowed_by_plan"] is False
+
+
+def test_plan_blocks_physical_proof_steps_until_readonly_preflight_candidate_exists():
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(
+            evidence_row("gain", blockers=["physical_candidate_missing"]),
+            evidence_row("fader", blockers=["physical_candidate_missing"]),
+        ),
+        autonomy_readiness_snapshot={
+            "type": "autonomy_promotion_readiness",
+            "summary": {
+                "wing_readonly_preflight_evidence": {
+                    "readiness_update_candidate_available": False,
+                    "valid_candidate_count": 0,
+                    "invalid_candidate_count": 0,
+                    "evidence_status": "operator_preflight_required",
+                    "blocked_by": ["operator_must_run_wing_readonly_preflight_runner"],
+                    "next_required_actions": [
+                        "Run the read-only WING preflight runner and capture physical readback artifacts."
+                    ],
+                },
+            },
+        },
+    )
+
+    assert plan["status"] == "blocked_by_readonly_preflight"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["planned_value_types"] == []
+    assert plan["summary"]["readonly_preflight_required"] is True
+    assert plan["summary"]["readonly_preflight_candidate_available"] is False
+    assert plan["summary"]["readonly_preflight_evidence_status"] == "operator_preflight_required"
+    assert plan["summary"]["readonly_preflight_step_count"] == 1
+    assert "readonly_preflight_candidate_required_before_supervised_proof" in plan["summary"]["global_blockers"]
+    assert "operator_must_run_wing_readonly_preflight_runner" in plan["summary"]["global_blockers"]
+    preflight_step = plan["readonly_preflight_steps"][0]
+    assert preflight_step["id"] == "wing_readonly_preflight_required"
+    assert preflight_step["read_only"] is True
+    assert preflight_step["live_execution_required"] is False
+    assert preflight_step["execution_allowed_by_plan"] is False
+    assert preflight_step["operator_approval_required"] is True
+    assert preflight_step["command"][:2] == [
+        "python3",
+        "tools/wing_readonly_preflight_runner.py",
+    ]
+    assert "--require-physical-readback" in preflight_step["command"]
+    assert "--execute" not in preflight_step["command"]
+    assert "tools/wing_operator_proposal_validation_runner.py" not in preflight_step["command"]
+    assert "wing_readonly_preflight.v1 summary.json" in preflight_step["expected_artifacts"]
+    assert plan["steps"] == []
+
+
+def test_plan_blocks_physical_proof_steps_for_mixed_preflight_artifacts():
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(
+            evidence_row("gain", blockers=["physical_candidate_missing"]),
+            evidence_row("fader", blockers=["physical_candidate_missing"]),
+        ),
+        autonomy_readiness_snapshot={
+            "type": "autonomy_promotion_readiness",
+            "summary": {
+                "wing_readonly_preflight_evidence": {
+                    "readiness_update_candidate_available": False,
+                    "valid_candidate_count": 1,
+                    "invalid_candidate_count": 1,
+                    "evidence_status": "readonly_preflight_artifact_replacement_required",
+                    "blocked_by": [
+                        "operator_must_replace_invalid_readonly_preflight_artifact"
+                    ],
+                    "next_required_actions": [
+                        "Do not update readiness rows from missing or invalid preflight evidence."
+                    ],
+                },
+            },
+        },
+    )
+
+    assert plan["status"] == "blocked_by_readonly_preflight"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_candidate_available"] is False
+    assert (
+        plan["summary"]["readonly_preflight_evidence_status"]
+        == "readonly_preflight_artifact_replacement_required"
+    )
+    assert plan["summary"]["readonly_preflight_blocked_by"] == [
+        "operator_must_replace_invalid_readonly_preflight_artifact"
+    ]
+    assert plan["summary"]["readonly_preflight_step_count"] == 1
+    assert "readonly_preflight_candidate_required_before_supervised_proof" in plan["summary"]["global_blockers"]
+    assert "operator_must_replace_invalid_readonly_preflight_artifact" in plan["summary"]["global_blockers"]
+    assert plan["steps"] == []
+
+    preflight_step = plan["readonly_preflight_steps"][0]
+    assert preflight_step["read_only"] is True
+    assert preflight_step["execution_allowed_by_plan"] is False
+    assert "operator_must_replace_invalid_readonly_preflight_artifact" in preflight_step["abort_conditions"]
+    assert "--require-physical-readback" in preflight_step["command"]
+    assert "--execute" not in preflight_step["command"]
 
 
 def test_invalid_artifacts_block_plan_generation():

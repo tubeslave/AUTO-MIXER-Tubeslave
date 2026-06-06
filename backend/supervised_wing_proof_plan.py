@@ -11,12 +11,18 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Mapping, Tuple
 
+try:
+    from autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
+
 
 SUPERVISED_WING_PROOF_PLAN_METHOD_ID = "supervised_wing_proof_plan"
 PLAN_STATUSES = {
     "operator_proof_required",
     "manual_review_ready",
     "blocked_by_invalid_artifacts",
+    "blocked_by_readonly_preflight",
 }
 DEFAULT_CHANNELS_BY_VALUE_TYPE = {
     "gain": (3,),
@@ -27,6 +33,7 @@ DEFAULT_DELTA_DB_BY_VALUE_TYPE = {
     "fader": -0.25,
 }
 DEFAULT_ARTIFACT_ROOT = "artifacts/wing_telemetry"
+DEFAULT_READONLY_PREFLIGHT_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
 DEFAULT_BACKEND_URL = "ws://localhost:8765"
 
 
@@ -67,6 +74,47 @@ class WingProofPlanStep:
         return payload
 
 
+@dataclass(frozen=True)
+class WingReadonlyPreflightPlanStep:
+    id: str
+    live_execution_required: bool
+    execution_allowed_by_plan: bool
+    operator_approval_required: bool
+    read_only: bool
+    command: Tuple[str, ...]
+    rationale: str
+    prerequisites: Tuple[str, ...]
+    abort_conditions: Tuple[str, ...]
+    expected_artifacts: Tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if self.live_execution_required:
+            raise ValueError("Read-only preflight step must not be a live write step")
+        if self.execution_allowed_by_plan:
+            raise ValueError("The proof plan must not authorize read-only preflight execution")
+        if not self.operator_approval_required:
+            raise ValueError("Read-only WING preflight still requires operator presence")
+        forbidden = {
+            "--execute",
+            "tools/wing_operator_proposal_validation_runner.py",
+            "apply_" + "operator_proposal",
+            "create_" + "operator_proposal",
+        }
+        if any(token in self.command for token in forbidden):
+            raise ValueError("Read-only preflight step must not include supervised apply commands")
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload = asdict(self)
+        for key in (
+            "command",
+            "prerequisites",
+            "abort_conditions",
+            "expected_artifacts",
+        ):
+            payload[key] = list(payload[key])
+        return payload
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -81,6 +129,30 @@ def _evidence_rows(evidence_snapshot: Mapping[str, Any]) -> Tuple[Mapping[str, A
 def _invalid_artifacts_present(evidence_snapshot: Mapping[str, Any]) -> bool:
     rows = _evidence_rows(evidence_snapshot)
     return any("invalid_proof_summaries_present" in set(row.get("blockers") or []) for row in rows)
+
+
+def _readonly_preflight_overlay(
+    autonomy_readiness_snapshot: Mapping[str, Any] | None,
+) -> Mapping[str, Any]:
+    readiness = autonomy_readiness_snapshot or build_autonomy_promotion_readiness_snapshot()
+    summary = readiness.get("summary") if isinstance(readiness.get("summary"), Mapping) else {}
+    overlay = summary.get("wing_readonly_preflight_evidence")
+    return overlay if isinstance(overlay, Mapping) else {}
+
+
+def _readonly_preflight_candidate_available(overlay: Mapping[str, Any]) -> bool:
+    return (
+        overlay.get("readiness_update_candidate_available") is True
+        and int(overlay.get("valid_candidate_count") or 0) > 0
+        and int(overlay.get("invalid_candidate_count") or 0) == 0
+        and overlay.get("readiness_closure_allowed_by_evidence") is not True
+        and overlay.get("live_authority_granted") is not True
+        and overlay.get("full_autonomous_ready") is not True
+    )
+
+
+def _string_list(value: Any) -> list[str]:
+    return [str(item) for item in value if item] if isinstance(value, list) else []
 
 
 def _row_by_value_type(evidence_snapshot: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
@@ -122,8 +194,71 @@ def _proof_command(
     )
 
 
+def _readonly_preflight_command(
+    *,
+    backend_url: str,
+    artifact_root: str,
+) -> Tuple[str, ...]:
+    return (
+        "python3",
+        "tools/wing_readonly_preflight_runner.py",
+        "--url",
+        backend_url,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader,gain",
+        "--require-physical-readback",
+        "--artifact-root",
+        artifact_root,
+    )
+
+
+def _readonly_preflight_step(
+    *,
+    backend_url: str,
+    artifact_root: str,
+    blockers: Tuple[str, ...],
+    next_actions: Tuple[str, ...],
+) -> WingReadonlyPreflightPlanStep:
+    prerequisites = (
+        "Operator is physically present at the intended WING Rack.",
+        "Backend is already connected in WING mode.",
+        "No supervised apply, proposal, rollback, emergency-stop, connect, or disconnect request is sent by this step.",
+        "Move or replace invalid preflight artifacts before trusting a readiness candidate.",
+    )
+    return WingReadonlyPreflightPlanStep(
+        id="wing_readonly_preflight_required",
+        live_execution_required=False,
+        execution_allowed_by_plan=False,
+        operator_approval_required=True,
+        read_only=True,
+        command=_readonly_preflight_command(
+            backend_url=backend_url,
+            artifact_root=artifact_root,
+        ),
+        rationale=(
+            "Read-only WING connection and physical readback evidence is required before "
+            "any supervised fader/gain proof step can be planned."
+        ),
+        prerequisites=prerequisites,
+        abort_conditions=(
+            "Backend is not connected to the intended WING Rack.",
+            "Any response is not verified from physical readback.",
+            "Any forbidden write, proposal, rollback, emergency, connect, or disconnect request is observed.",
+            *blockers,
+        ),
+        expected_artifacts=(
+            "wing_readonly_preflight.v1 summary.json",
+            "events.jsonl with get_operator_mode/get_state/query_mixer_parameter only",
+            *next_actions,
+        ),
+    )
+
+
 def _common_prerequisites(value_type: str, blockers: Tuple[str, ...]) -> Tuple[str, ...]:
     prerequisites = [
+        "A clean read-only WING preflight candidate exists and has been manually reviewed.",
         "Operator is physically present and explicitly approves a bounded proof run.",
         "Backend is connected to the intended WING Rack only.",
         "A current scene/console backup exists and the operator can restore manually.",
@@ -208,10 +343,12 @@ def _build_steps(
 def build_supervised_wing_proof_plan(
     promotion_evidence_snapshot: Mapping[str, Any],
     *,
+    autonomy_readiness_snapshot: Mapping[str, Any] | None = None,
     backend_url: str = DEFAULT_BACKEND_URL,
     artifact_root: str = DEFAULT_ARTIFACT_ROOT,
     channels_by_value_type: Mapping[str, Tuple[int, ...]] | None = None,
     delta_db_by_value_type: Mapping[str, float] | None = None,
+    readonly_preflight_artifact_root: str = DEFAULT_READONLY_PREFLIGHT_ARTIFACT_ROOT,
 ) -> Dict[str, Any]:
     """Build a non-executing proof checklist from promotion evidence rows."""
 
@@ -223,9 +360,28 @@ def build_supervised_wing_proof_plan(
         deltas.update({key: float(value) for key, value in delta_db_by_value_type.items()})
 
     invalid = _invalid_artifacts_present(promotion_evidence_snapshot)
+    preflight = _readonly_preflight_overlay(autonomy_readiness_snapshot)
+    preflight_candidate = _readonly_preflight_candidate_available(preflight)
+    preflight_steps: Tuple[WingReadonlyPreflightPlanStep, ...] = ()
     if invalid:
         steps: Tuple[WingProofPlanStep, ...] = ()
         status = "blocked_by_invalid_artifacts"
+        global_blockers = ["invalid_proof_summaries_present"]
+    elif not preflight_candidate:
+        steps = ()
+        status = "blocked_by_readonly_preflight"
+        preflight_steps = (
+            _readonly_preflight_step(
+                backend_url=backend_url,
+                artifact_root=readonly_preflight_artifact_root,
+                blockers=tuple(_string_list(preflight.get("blocked_by"))),
+                next_actions=tuple(_string_list(preflight.get("next_required_actions"))),
+            ),
+        )
+        global_blockers = [
+            "readonly_preflight_candidate_required_before_supervised_proof",
+            *_string_list(preflight.get("blocked_by")),
+        ]
     else:
         steps = _build_steps(
             promotion_evidence_snapshot,
@@ -235,6 +391,11 @@ def build_supervised_wing_proof_plan(
             delta_db_by_value_type=deltas,
         )
         status = "manual_review_ready" if not steps else "operator_proof_required"
+        global_blockers = [
+            "operator_must_approve_and_execute_manually",
+            "proof_plan_does_not_contact_mixer",
+            "safety_matrix_review_required_after_artifacts",
+        ]
 
     return {
         "type": "supervised_wing_proof_plan",
@@ -253,15 +414,16 @@ def build_supervised_wing_proof_plan(
             "step_count": len(steps),
             "planned_value_types": sorted({step.value_type for step in steps}),
             "planned_channels": [step.channel for step in steps],
-            "global_blockers": (
-                ["invalid_proof_summaries_present"]
-                if invalid
-                else [
-                    "operator_must_approve_and_execute_manually",
-                    "proof_plan_does_not_contact_mixer",
-                    "safety_matrix_review_required_after_artifacts",
-                ]
+            "readonly_preflight_required": True,
+            "readonly_preflight_candidate_available": preflight_candidate,
+            "readonly_preflight_evidence_status": preflight.get("evidence_status"),
+            "readonly_preflight_blocked_by": _string_list(preflight.get("blocked_by")),
+            "readonly_preflight_next_required_actions": _string_list(
+                preflight.get("next_required_actions")
             ),
+            "readonly_preflight_step_count": len(preflight_steps),
+            "global_blockers": global_blockers,
         },
+        "readonly_preflight_steps": [step.to_dict() for step in preflight_steps],
         "steps": [step.to_dict() for step in steps],
     }

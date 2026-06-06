@@ -176,11 +176,21 @@ def test_wing_readonly_preflight_evidence_discovers_summary_json_files(tmp_path)
 
     evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
 
-    assert evidence["status"] == "readonly_preflight_candidate_available"
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
     assert evidence["summary"]["artifact_search_roots"] == [str(tmp_path / "preflight")]
     assert evidence["summary"]["artifact_count"] == 2
     assert evidence["summary"]["valid_candidate_count"] == 1
     assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert evidence["summary"]["accepted_as_readonly_preflight_candidate"] is False
+    assert evidence["summary"]["mvp_blocker_candidate_count"] == 0
+    assert evidence["summary"]["readiness_matrix_update_allowed"] is False
+    assert evidence["summary"]["latest_valid_candidate_run_id"] == "20260606T120000Z_wing_readonly_preflight"
+    assert evidence["summary"]["blocked_by"] == [
+        "operator_must_replace_invalid_readonly_preflight_artifact"
+    ]
+    assert {row["status"] for row in evidence["mvp_blocker_matrix"]} == {
+        "artifact_replacement_required"
+    }
     assert any(row["source_id"] == str(artifact_path) for row in evidence["artifacts"])
     assert any(
         "artifact_load_error:JSONDecodeError" in row["violations"]

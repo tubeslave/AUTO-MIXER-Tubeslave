@@ -16,11 +16,13 @@ try:
     from project_goal_capability_matrix import get_project_goal_capability
     from read_surface_inventory import get_read_surface
     from safety_coverage_matrix import get_safety_coverage_row
+    from wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from write_surface_inventory import get_write_surface
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.project_goal_capability_matrix import get_project_goal_capability
     from backend.read_surface_inventory import get_read_surface
     from backend.safety_coverage_matrix import get_safety_coverage_row
+    from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from backend.write_surface_inventory import get_write_surface
 
 
@@ -315,6 +317,77 @@ def _promotion_gap_summary(rows: Tuple["PromotionReadinessRow", ...]) -> Dict[st
     }
 
 
+def _wing_readonly_preflight_readiness_overlay(
+    evidence_snapshot: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    evidence = evidence_snapshot or build_wing_readonly_preflight_evidence()
+    summary = evidence.get("summary") if isinstance(evidence.get("summary"), dict) else {}
+    matrix = (
+        evidence.get("mvp_blocker_matrix")
+        if isinstance(evidence.get("mvp_blocker_matrix"), list)
+        else []
+    )
+    blocked_by = summary.get("blocked_by") if isinstance(summary.get("blocked_by"), list) else []
+    violations = summary.get("violations") if isinstance(summary.get("violations"), list) else []
+    valid_candidate_count = int(summary.get("valid_candidate_count") or 0)
+    invalid_candidate_count = int(summary.get("invalid_candidate_count") or 0)
+    update_allowed = summary.get("readiness_matrix_update_allowed") is True
+    closure_allowed = summary.get("readiness_closure_allowed_by_evidence") is True
+    live_authority = summary.get("live_authority_granted") is True
+    full_auto = summary.get("full_autonomous_ready") is True
+    candidate_available = (
+        valid_candidate_count > 0
+        and invalid_candidate_count == 0
+        and update_allowed
+        and not closure_allowed
+        and not live_authority
+        and not full_auto
+    )
+    matrix_rows = [row for row in matrix if isinstance(row, dict)]
+    candidate_ids = [
+        str(row.get("id"))
+        for row in matrix_rows
+        if row.get("status") == "candidate_available" and row.get("id")
+    ]
+    closed_ids = [
+        str(row.get("id"))
+        for row in matrix_rows
+        if row.get("closed") is True and row.get("id")
+    ]
+    next_actions = (
+        [
+            "Manually review the read-only preflight candidate before updating readiness rows.",
+            "Keep supervised apply, rollback, emergency-stop, and timeout proof as separate WING steps.",
+        ]
+        if candidate_available
+        else [
+            "Run the read-only WING preflight runner and capture physical readback artifacts.",
+            "Do not update readiness rows from missing or invalid preflight evidence.",
+        ]
+    )
+    return {
+        "read_only": True,
+        "live_write": False,
+        "live_widening_allowed": False,
+        "automatic_safety_update_allowed": False,
+        "readiness_closure_allowed_by_evidence": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "evidence_status": evidence.get("status"),
+        "artifact_count": int(summary.get("artifact_count") or 0),
+        "valid_candidate_count": valid_candidate_count,
+        "invalid_candidate_count": invalid_candidate_count,
+        "readiness_update_candidate_available": candidate_available,
+        "candidate_blocker_ids": candidate_ids,
+        "closed_blocker_ids": closed_ids,
+        "latest_valid_candidate_run_id": summary.get("latest_valid_candidate_run_id"),
+        "blocked_by": list(blocked_by),
+        "violations": list(violations),
+        "next_required_actions": next_actions,
+        "claim": "read-only preflight evidence can inform manual readiness review only; it closes no blocker automatically",
+    }
+
+
 def _target_readiness(target: PromotionTarget, *, full_autonomous_blocked: bool) -> PromotionReadinessRow:
     capabilities = _capabilities(target.capability_ids)
     safety = get_safety_coverage_row(target.safety_row_id) if target.safety_row_id else None
@@ -420,8 +493,14 @@ def iter_promotion_readiness_rows() -> Iterable[PromotionReadinessRow]:
     )
 
 
-def build_autonomy_promotion_readiness_snapshot() -> Dict[str, Any]:
+def build_autonomy_promotion_readiness_snapshot(
+    *,
+    wing_readonly_preflight_evidence_snapshot: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
     rows = tuple(iter_promotion_readiness_rows())
+    wing_preflight_overlay = _wing_readonly_preflight_readiness_overlay(
+        wing_readonly_preflight_evidence_snapshot
+    )
     status_counts: Dict[str, int] = {status: 0 for status in sorted(READINESS_STATUSES)}
     for row in rows:
         status_counts[row.status] += 1
@@ -454,6 +533,7 @@ def build_autonomy_promotion_readiness_snapshot() -> Dict[str, Any]:
             ],
             "next_global_step": "Run proof gates per action family before widening supervised or autonomous live writes.",
             "promotion_gap_summary": _promotion_gap_summary(rows),
+            "wing_readonly_preflight_evidence": wing_preflight_overlay,
         },
         "rows": [row.to_dict() for row in rows],
     }

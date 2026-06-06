@@ -332,10 +332,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     report = build_supervised_proof_artifact_report(summary_paths, require_physical=args.require_physical)
     report["proof_remediation_plan"] = build_supervised_proof_remediation_plan(report)
     report["promotion_evidence"] = build_supervised_promotion_evidence_snapshot(report)
+    report["autonomy_promotion_readiness"] = build_autonomy_promotion_readiness_snapshot()
     report["autonomy_evidence_overlay"] = build_autonomy_evidence_overlay(report)
     report["autonomy_mode_transition_gate"] = build_autonomy_mode_transition_gate(report)
     report["summary"]["autonomy_gap_rollup"] = build_autonomy_gap_rollup(report)
-    report["next_wing_proof_plan"] = build_supervised_wing_proof_plan(report["promotion_evidence"])
+    report["next_wing_proof_plan"] = build_supervised_wing_proof_plan(
+        report["promotion_evidence"],
+        autonomy_readiness_snapshot=report["autonomy_promotion_readiness"],
+    )
     output_path = args.output or DEFAULT_OUTPUT_ROOT / f"{compact_stamp()}_supervised_proof_artifact_report" / "report.json"
     report["report_path"] = str(output_path)
     write_report(report, output_path)

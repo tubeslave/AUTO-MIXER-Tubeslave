@@ -572,6 +572,8 @@ def test_no_wing_release_check_rejects_wing_preflight_evidence_authority_claim(
     assert "wing_readonly_preflight_evidence_live_authority_granted_not_false" in violations
     assert "wing_readonly_preflight_evidence_full_autonomous_ready_not_false" in violations
     assert "wing_readonly_preflight_invalid_artifacts_present" in violations
+    assert "wing_readonly_preflight_candidate_summary_mismatch" in violations
+    assert "wing_readonly_preflight_readiness_update_allowed_mismatch" in violations
     assert "wing_readonly_preflight_readiness_closure_allowed" in violations
     assert "wing_readonly_preflight_live_authority_granted" in violations
     assert "wing_readonly_preflight_full_autonomous_ready" in violations
@@ -2497,6 +2499,20 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 },
             ],
         },
+        "autonomy_promotion_readiness": {
+            "type": "autonomy_promotion_readiness",
+            "summary": {
+                "wing_readonly_preflight_evidence": {
+                    "evidence_status": "readonly_preflight_candidate_available",
+                    "readiness_update_candidate_available": True,
+                    "valid_candidate_count": 1,
+                    "invalid_candidate_count": 0,
+                    "blocked_by": [
+                        "operator_must_review_readonly_preflight_candidate_before_readiness_update"
+                    ],
+                },
+            },
+        },
         "next_wing_proof_plan": {
             "type": "supervised_wing_proof_plan",
             "status": "operator_proof_required",
@@ -2513,11 +2529,23 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "step_count": 1,
                 "planned_value_types": ["gain"],
                 "planned_channels": [3],
+                "readonly_preflight_required": True,
+                "readonly_preflight_candidate_available": True,
+                "readonly_preflight_evidence_status": "readonly_preflight_candidate_available",
+                "readonly_preflight_blocked_by": [
+                    "operator_must_review_readonly_preflight_candidate_before_readiness_update"
+                ],
+                "readonly_preflight_next_required_actions": [
+                    "Manually review the read-only preflight candidate before updating readiness rows."
+                ],
+                "readonly_preflight_step_count": 0,
                 "global_blockers": [
                     "operator_must_approve_and_execute_manually",
                     "proof_plan_does_not_contact_mixer",
+                    "safety_matrix_review_required_after_artifacts",
                 ],
             },
+            "readonly_preflight_steps": [],
             "steps": [
                 {
                     "id": "gain_physical_proof_ch3",
@@ -2609,6 +2637,76 @@ def test_no_wing_release_check_validates_next_wing_proof_plan_schema(tmp_path):
     assert result.detail["step_count"] == 1
     assert result.detail["planned_value_types"] == ["gain"]
     assert result.detail["planned_channels"] == [3]
+    assert result.detail["readonly_preflight_required"] is True
+    assert result.detail["readonly_preflight_candidate_available"] is True
+    assert result.detail["readonly_preflight_evidence_status"] == "readonly_preflight_candidate_available"
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    preflight = payload["autonomy_promotion_readiness"]["summary"][
+        "wing_readonly_preflight_evidence"
+    ]
+    preflight["evidence_status"] = "operator_preflight_required"
+    preflight["readiness_update_candidate_available"] = False
+    preflight["valid_candidate_count"] = 0
+    preflight["invalid_candidate_count"] = 0
+    preflight["blocked_by"] = ["operator_must_run_wing_readonly_preflight_runner"]
+    plan = payload["next_wing_proof_plan"]
+    plan["status"] = "blocked_by_readonly_preflight"
+    plan["summary"]["step_count"] = 0
+    plan["summary"]["planned_value_types"] = []
+    plan["summary"]["planned_channels"] = []
+    plan["summary"]["readonly_preflight_candidate_available"] = False
+    plan["summary"]["readonly_preflight_evidence_status"] = "operator_preflight_required"
+    plan["summary"]["readonly_preflight_blocked_by"] = [
+        "operator_must_run_wing_readonly_preflight_runner"
+    ]
+    plan["summary"]["readonly_preflight_step_count"] = 1
+    plan["summary"]["global_blockers"] = [
+        "readonly_preflight_candidate_required_before_supervised_proof",
+        "operator_must_run_wing_readonly_preflight_runner",
+    ]
+    plan["readonly_preflight_steps"] = [
+        {
+            "id": "wing_readonly_preflight_required",
+            "read_only": True,
+            "live_execution_required": False,
+            "execution_allowed_by_plan": False,
+            "operator_approval_required": True,
+            "command": [
+                "python3",
+                "tools/wing_readonly_preflight_runner.py",
+                "--url",
+                "ws://localhost:8765",
+                "--channels",
+                "3",
+                "--value-types",
+                "fader,gain",
+                "--require-physical-readback",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
+            ],
+            "rationale": "read-only preflight required",
+            "prerequisites": ["operator present"],
+            "abort_conditions": ["backend not wing"],
+            "expected_artifacts": ["wing_readonly_preflight.v1 summary.json"],
+        }
+    ]
+    plan["steps"] = []
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "passed"
+    assert result.detail["plan_status"] == "blocked_by_readonly_preflight"
+    assert result.detail["step_count"] == 0
+    assert result.detail["readonly_preflight_candidate_available"] is False
+    assert result.detail["readonly_preflight_evidence_status"] == "operator_preflight_required"
+    assert result.detail["readonly_preflight_step_count"] == 1
+    assert "readonly_preflight_candidate_required_before_supervised_proof" in result.detail["global_blockers"]
     assert result.detail["violations"] == []
 
 
@@ -6133,6 +6231,13 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
             "step_count": 1,
             "planned_value_types": ["gain"],
             "planned_channels": [3],
+            "readonly_preflight_required": True,
+            "readonly_preflight_candidate_available": True,
+            "readonly_preflight_evidence_status": "readonly_preflight_candidate_available",
+            "readonly_preflight_blocked_by": [
+                "operator_must_review_readonly_preflight_candidate_before_readiness_update"
+            ],
+            "readonly_preflight_step_count": 0,
             "global_blockers": ["operator_must_approve_and_execute_manually"],
             "violations": [],
         },
@@ -6147,8 +6252,17 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     assert json_summary["next_wing_proof_plan"]["execution_allowed_by_plan"] is False
     assert json_summary["next_wing_proof_plan"]["operator_required"] is True
     assert json_summary["next_wing_proof_plan"]["planned_value_types"] == ["gain"]
+    assert json_summary["next_wing_proof_plan"]["readonly_preflight_required"] is True
+    assert json_summary["next_wing_proof_plan"]["readonly_preflight_candidate_available"] is True
+    assert (
+        json_summary["next_wing_proof_plan"]["readonly_preflight_evidence_status"]
+        == "readonly_preflight_candidate_available"
+    )
+    assert json_summary["next_wing_proof_plan"]["readonly_preflight_step_count"] == 0
     assert "## Next WING Proof Plan" in markdown_summary
     assert 'planned_value_types: `["gain"]`' in markdown_summary
+    assert "readonly_preflight_candidate_available: `true`" in markdown_summary
+    assert "readonly_preflight_step_count: `0`" in markdown_summary
 
 
 def test_no_wing_release_check_records_command_timeout(tmp_path):

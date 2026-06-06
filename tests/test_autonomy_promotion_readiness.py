@@ -4,6 +4,48 @@ from backend.autonomy_promotion_readiness import (
     build_autonomy_promotion_readiness_snapshot,
     iter_promotion_readiness_rows,
 )
+from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
+
+
+def _valid_wing_preflight_summary() -> dict:
+    return {
+        "run_id": "20260606T150000Z_wing_readonly_preflight",
+        "status": "passed",
+        "reason": "wing_readonly_preflight_passed",
+        "proof_artifact_schema": "wing_readonly_preflight.v1",
+        "proof_runner": "wing_readonly_preflight_runner",
+        "connection_mode": "wing",
+        "channels": [3],
+        "value_types": ["fader", "gain"],
+        "require_physical_readback": True,
+        "read_only": True,
+        "live_write": False,
+        "write_request_sent": False,
+        "proposal_request_sent": False,
+        "sent_request_types": [
+            "get_operator_mode",
+            "get_state",
+            "query_mixer_parameter",
+            "query_mixer_parameter",
+        ],
+        "forbidden_request_types_sent": [],
+        "readback_count": 2,
+        "physical_readback_count": 2,
+        "readbacks": [
+            {
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "fader",
+            },
+            {
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "gain",
+            },
+        ],
+    }
 
 
 def test_autonomy_promotion_readiness_module_is_read_only_and_transport_free():
@@ -38,6 +80,19 @@ def test_promotion_readiness_snapshot_is_fail_closed_for_full_autonomous_mode():
     assert snapshot["summary"]["autonomous_ready_target_ids"] == []
     assert "mode_full_autonomous_blocked" in snapshot["summary"]["global_blockers"]
     assert snapshot["summary"]["target_count"] == len(snapshot["rows"])
+    preflight = snapshot["summary"]["wing_readonly_preflight_evidence"]
+    assert preflight["read_only"] is True
+    assert preflight["live_write"] is False
+    assert preflight["live_widening_allowed"] is False
+    assert preflight["automatic_safety_update_allowed"] is False
+    assert preflight["readiness_closure_allowed_by_evidence"] is False
+    assert preflight["live_authority_granted"] is False
+    assert preflight["full_autonomous_ready"] is False
+    assert preflight["evidence_status"] == "operator_preflight_required"
+    assert preflight["readiness_update_candidate_available"] is False
+    assert preflight["candidate_blocker_ids"] == []
+    assert preflight["closed_blocker_ids"] == []
+    assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
 
 
 def test_fader_is_supervised_only_but_not_autonomous_ready():
@@ -252,3 +307,38 @@ def test_readiness_snapshot_groups_autonomy_gaps_without_granting_authority():
 
     next_by_family = gap_summary["next_required_evidence_by_action_family"]
     assert any("Keep scene apply blocked" in item for item in next_by_family["scene_preset"])
+
+
+def test_readiness_snapshot_surfaces_wing_preflight_candidate_without_closing_rows():
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_payloads=(_valid_wing_preflight_summary(),),
+        artifact_roots=(),
+    )
+
+    snapshot = build_autonomy_promotion_readiness_snapshot(
+        wing_readonly_preflight_evidence_snapshot=evidence,
+    )
+    preflight = snapshot["summary"]["wing_readonly_preflight_evidence"]
+
+    assert preflight["evidence_status"] == "readonly_preflight_candidate_available"
+    assert preflight["artifact_count"] == 1
+    assert preflight["valid_candidate_count"] == 1
+    assert preflight["invalid_candidate_count"] == 0
+    assert preflight["readiness_update_candidate_available"] is True
+    assert preflight["candidate_blocker_ids"] == [
+        "wing_readonly_connection_proof",
+        "physical_console_readback_proof",
+        "operator_visible_evidence_report",
+        "readiness_matrix_update_based_on_real_proof",
+    ]
+    assert preflight["closed_blocker_ids"] == []
+    assert preflight["latest_valid_candidate_run_id"] == "20260606T150000Z_wing_readonly_preflight"
+    assert preflight["readiness_closure_allowed_by_evidence"] is False
+    assert preflight["live_authority_granted"] is False
+    assert preflight["full_autonomous_ready"] is False
+    assert "manual readiness review only" in preflight["claim"]
+    assert snapshot["summary"]["autonomous_ready_target_ids"] == []
+    assert "fader_supervised_promotion" in snapshot["summary"]["blocked_target_ids"]
+    rows = {row["id"]: row for row in snapshot["rows"]}
+    assert rows["fader_supervised_promotion"]["autonomous_ready"] is False
+    assert rows["gain_trim_supervised_promotion"]["supervised_live_allowed"] is False
