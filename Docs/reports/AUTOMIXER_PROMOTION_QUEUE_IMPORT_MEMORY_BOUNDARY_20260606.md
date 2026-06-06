@@ -6,7 +6,8 @@ This note maps the current promotion queue-import memory boundary so operators
 and future agents do not confuse request templates with executed evidence or
 memory writes.
 
-The seven newest promotion consumers are read-only verifiers. They may expose
+The current promotion queue-import memory consumers are read-only verifiers.
+They may expose
 the next request payload shape only after matching generic evidence back to
 promotion provenance. They do not invoke downstream handlers, write memory
 files, mutate Product Layer state, reserve idempotency keys, or grant live
@@ -23,6 +24,12 @@ authority.
 | Promotion memory-index result consumer | Read-only memory index result plus promotion writer-apply provenance and fresh sequence-review context | Memory-trust-review request template | Does not run trust review, mutate memory/policy/runtime/model state, mutate queues or proposals, reserve idempotency, or touch mixer transport |
 | Promotion memory-trust-review result consumer | Memory trust-review result plus promotion memory-index provenance | Acceptance-ledger request template with empty `acceptance_records` | Does not run acceptance ledger, accept or reject candidates, mutate memory/policy/runtime/model state, mutate queues or proposals, mutate sequence-policy trust stores, reserve idempotency, or touch mixer transport |
 | Promotion memory-trust acceptance-ledger result consumer | Explicit operator accept/reject ledger result plus promotion memory-trust-review provenance | Promotion-plan request template | Does not run promotion planning, promote policy, mutate memory/policy/runtime/model state, mutate queues or proposals, mutate sequence-policy trust stores, reserve idempotency, or touch mixer transport |
+| Promotion policy-consumer result consumer | Promotion policy-consumer result plus promotion sequence-policy-gate provenance | Ordering-preview request template | Does not run ordering preview, reorder proposals, mutate queues, mutate memory/policy/runtime/model state, reserve idempotency, or touch mixer transport |
+| Promotion ordering-preview result consumer | Promotion ordering-preview result plus promotion policy-consumer provenance | Queue-ordering-plan request template | Does not run queue-ordering plan, reorder Product Layer payloads, import queues, mutate memory/policy/runtime/model state, reserve idempotency, or touch mixer transport |
+| Promotion queue-ordering-plan result consumer | Promotion queue-ordering plan plus promotion ordering-preview provenance | Queue-importer request template with `apply=false` and `operator_ack=false` | Does not run the queue importer, import proposals, reorder Product Layer payloads, mutate queues, mutate proposal state, reserve idempotency, or touch mixer transport |
+| Promotion queue-importer result consumer | Dry-run or applied queue importer evidence plus promotion queue-ordering-plan provenance | Blocked result for dry-run specs; preflight-plan request template after applied queue import | Does not run the preflight plan, reserve idempotency, mutate proposal status/order, execute sequences, grant live authority, or touch mixer transport |
+| Promotion preflight-plan result consumer | Read-only queue-import preflight plan plus applied queue-importer provenance | Batch-preflight request template with `approved=false` | Does not run batch preflight, reserve idempotency, mutate queue/proposal state, create sequence plans, grant live authority, or touch mixer transport |
+| Promotion batch-preflight result consumer | Approved batch-preflight evidence plus promotion preflight-plan provenance | Sequence-plan request template | Does not run the sequence planner, reserve idempotency, mutate queue/proposal state, execute sequences, grant live authority, or touch mixer transport |
 
 ## Template Versus Execution
 
@@ -53,6 +60,18 @@ The current safety contract keeps these flags false at the consumer boundary:
 - `promotion_sequence_policy_gate_created`
 - `promotion_policy_consumer_handler_invoked`
 - `promotion_policy_consumer_created`
+- `promotion_ordering_preview_handler_invoked`
+- `promotion_ordering_preview_created`
+- `promotion_queue_ordering_plan_handler_invoked`
+- `promotion_queue_ordering_plan_created`
+- `promotion_queue_importer_handler_invoked`
+- `promotion_queue_importer_created`
+- `promotion_queue_import_preflight_plan_handler_invoked`
+- `promotion_queue_import_preflight_plan_created`
+- `promotion_batch_preflight_handler_invoked`
+- `promotion_batch_preflight_created`
+- `sequence_plan_handler_invoked`
+- `sequence_plan_created`
 - `memory_file_write_applied`
 - `memory_file_write_applied_by_consumer`
 - `memory_file_mutation`
@@ -90,6 +109,14 @@ queue-import result consumers still keep their own mutation, idempotency,
 direct sequence execution, live mixer authority, and full autonomous flags
 false.
 
+A third intentional source-evidence exception is the promotion queue importer:
+with `apply=true` and `operator_ack=true`, the importer may report
+`queue_mutation=true` only for the server operator proposal queue. The
+queue-importer result consumer still keeps its own queue/proposal/order
+mutation, idempotency reservation, direct sequence execution, live mixer
+authority, and full autonomous flags false, and emits only a preflight-plan
+request template.
+
 ## Current Validation Evidence
 
 Focused validation for this boundary:
@@ -108,7 +135,7 @@ PYTHONPATH=backend python3 -m pytest -q tests/test_operator_product_state.py
 ```
 
 Observed result in the 2026-06-06 validation cycle after the ProductState
-promotion-memory apply-audit handoff: `142 passed`.
+promotion-memory ordering-preview handoff: `142 passed`.
 
 Additional focused validation for the current writer-apply and memory-index
 handoffs plus the current memory-trust-review acceptance request handoff:
@@ -142,11 +169,20 @@ PYTHONPATH=backend python3 -m pytest -q \
   tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer.py \
   tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer.py \
   tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_importer_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_preflight_plan_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_batch_preflight_result_consumer.py \
   tests/test_operator_product_state.py::test_sequence_policy_queue_import_promotion_queue_importer_result_consumer_feeds_preflight_plan_without_live_write
 ```
 
 Observed result in the 2026-06-06 validation cycle after the ProductState
-promotion-memory policy-consumer request handoff: `79 passed`.
+promotion-memory batch-preflight sequence-plan request handoff: `125 passed`.
+
+The narrower alias/result handoff check for the policy-consumer and
+ordering-preview consumers plus the ProductState route passed with `17 passed`.
 
 ## Live Safety
 

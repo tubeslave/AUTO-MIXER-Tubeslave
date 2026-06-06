@@ -1402,6 +1402,8 @@ def register_handlers(server):
                 promotion_sequence_policy_gate_result_consumer=(
                     data.get("promotion_sequence_policy_gate_result_consumer")
                     or data.get("queue_import_promotion_sequence_policy_gate_result_consumer")
+                    or data.get("promotion_memory_sequence_policy_gate_result_consumer")
+                    or data.get("queue_import_promotion_memory_sequence_policy_gate_result_consumer")
                     or data.get("consumer")
                 ),
                 promotion_policy_consumer_result=(
@@ -1426,6 +1428,8 @@ def register_handlers(server):
                 promotion_policy_consumer_result_consumer=(
                     data.get("promotion_policy_consumer_result_consumer")
                     or data.get("queue_import_promotion_policy_consumer_result_consumer")
+                    or data.get("promotion_memory_policy_consumer_result_consumer")
+                    or data.get("queue_import_promotion_memory_policy_consumer_result_consumer")
                     or data.get("consumer")
                 ),
                 promotion_ordering_preview_result=(
@@ -1451,6 +1455,8 @@ def register_handlers(server):
                 promotion_ordering_preview_result_consumer=(
                     data.get("promotion_ordering_preview_result_consumer")
                     or data.get("queue_import_promotion_ordering_preview_result_consumer")
+                    or data.get("promotion_memory_ordering_preview_result_consumer")
+                    or data.get("queue_import_promotion_memory_ordering_preview_result_consumer")
                     or data.get("consumer")
                 ),
                 promotion_queue_ordering_plan_result=(
@@ -1476,6 +1482,8 @@ def register_handlers(server):
                 promotion_queue_ordering_plan_result_consumer=(
                     data.get("promotion_queue_ordering_plan_result_consumer")
                     or data.get("queue_import_promotion_queue_ordering_plan_result_consumer")
+                    or data.get("promotion_memory_queue_ordering_plan_result_consumer")
+                    or data.get("queue_import_promotion_memory_queue_ordering_plan_result_consumer")
                     or data.get("consumer")
                 ),
                 promotion_queue_importer_result=(
@@ -1506,6 +1514,8 @@ def register_handlers(server):
                 promotion_queue_importer_result_consumer=(
                     data.get("promotion_queue_importer_result_consumer")
                     or data.get("queue_import_promotion_queue_importer_result_consumer")
+                    or data.get("promotion_memory_queue_importer_result_consumer")
+                    or data.get("queue_import_promotion_memory_queue_importer_result_consumer")
                     or data.get("consumer")
                 ),
                 promotion_queue_import_preflight_plan_result=(
@@ -1531,6 +1541,8 @@ def register_handlers(server):
                 promotion_preflight_plan_result_consumer=(
                     data.get("promotion_preflight_plan_result_consumer")
                     or data.get("queue_import_promotion_preflight_plan_result_consumer")
+                    or data.get("promotion_memory_preflight_plan_result_consumer")
+                    or data.get("queue_import_promotion_memory_preflight_plan_result_consumer")
                     or data.get("consumer")
                 ),
                 promotion_batch_preflight_result=(
