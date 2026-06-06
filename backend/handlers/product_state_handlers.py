@@ -127,6 +127,18 @@ from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import
 from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_preflight_plan_result_consumer import (
     build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_preflight_plan_result_consumer,
 )
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_batch_preflight_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_batch_preflight_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_plan_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_plan_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_dry_run_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_dry_run_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_gate_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_gate_result_consumer,
+)
 from operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
     build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
 )
@@ -1450,6 +1462,104 @@ def register_handlers(server):
         )
         result["handler"] = (
             "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_batch_preflight_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_batch_preflight_result_consumer(
+                promotion_preflight_plan_result_consumer=(
+                    data.get("promotion_preflight_plan_result_consumer")
+                    or data.get("queue_import_promotion_preflight_plan_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_batch_preflight_result=(
+                    data.get("promotion_batch_preflight_result")
+                    or data.get("batch_preflight_result")
+                    or data.get("preflight_result")
+                    or data.get("result")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_batch_preflight_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_plan_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_plan_result_consumer(
+                promotion_batch_preflight_result_consumer=(
+                    data.get("promotion_batch_preflight_result_consumer")
+                    or data.get("queue_import_promotion_batch_preflight_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_sequence_plan_result=(
+                    data.get("promotion_sequence_plan_result")
+                    or data.get("sequence_plan_result")
+                    or data.get("sequence_plan")
+                    or data.get("plan")
+                    or data.get("result")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_plan_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_dry_run_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_dry_run_result_consumer(
+                promotion_sequence_plan_result_consumer=(
+                    data.get("promotion_sequence_plan_result_consumer")
+                    or data.get("queue_import_promotion_sequence_plan_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_dry_run_result=(
+                    data.get("promotion_dry_run_result")
+                    or data.get("dry_run_result")
+                    or data.get("dry_run")
+                    or data.get("result")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_dry_run_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_gate_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_gate_result_consumer(
+                promotion_dry_run_result_consumer=(
+                    data.get("promotion_dry_run_result_consumer")
+                    or data.get("queue_import_promotion_dry_run_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_execution_gate_result=(
+                    data.get("promotion_execution_gate_result")
+                    or data.get("execution_gate_result")
+                    or data.get("execution_gate")
+                    or data.get("gate")
+                    or data.get("result")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_gate_result"
         )
         await server.send_to_client(websocket, result)
 
@@ -5589,6 +5699,18 @@ def register_handlers(server):
         ),
         "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result": (
             handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_batch_preflight_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_batch_preflight_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_plan_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_plan_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_dry_run_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_dry_run_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_gate_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_gate_result
         ),
         "create_operator_proposal": handle_create_operator_proposal,
         "accept_operator_proposal": handle_accept_operator_proposal,

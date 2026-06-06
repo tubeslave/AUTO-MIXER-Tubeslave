@@ -15090,6 +15090,301 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
     assert batch_preflight_payload["summary"]["live_write"] is False
     assert server._apply_manual_console_write.await_count == 0
 
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_batch_preflight_result"
+    ](
+        object(),
+        {
+            "promotion_preflight_plan_result_consumer": (
+                preflight_plan_consumer_payload
+            ),
+            "promotion_batch_preflight_result": batch_preflight_payload,
+        },
+    )
+
+    batch_result_consumer_payload = server.send_to_client.await_args.args[1]
+    assert batch_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_batch_preflight_result_consumer"
+    )
+    assert batch_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_batch_preflight_result"
+    )
+    assert batch_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_sequence_plan_request_available"
+    )
+    assert (
+        batch_result_consumer_payload["summary"][
+            "promotion_sequence_plan_request_available"
+        ]
+        is True
+    )
+    assert (
+        batch_result_consumer_payload["summary"]["sequence_plan_handler_invoked"]
+        is False
+    )
+    assert batch_result_consumer_payload["summary"]["sequence_plan_created"] is False
+    assert batch_result_consumer_payload["summary"]["queue_mutation"] is False
+    assert batch_result_consumer_payload["summary"]["idempotency_reserved"] is False
+    assert batch_result_consumer_payload["summary"]["live_write"] is False
+
+    sequence_plan_request = batch_result_consumer_payload[
+        "promotion_sequence_plan_request"
+    ]
+    assert sequence_plan_request["handler"] == "plan_operator_proposal_apply_sequence"
+    assert sequence_plan_request["read_only_template"] is True
+    assert (
+        sequence_plan_request["promotion_sequence_plan_request_template_only"]
+        is True
+    )
+    assert len(sequence_plan_request["preflight_results"]) == 1
+    assert sequence_plan_request["queue_mutation"] is False
+    assert sequence_plan_request["idempotency_reserved"] is False
+
+    await server._dispatch["plan_operator_proposal_apply_sequence"](
+        object(),
+        sequence_plan_request,
+    )
+
+    sequence_plan_payload = server.send_to_client.await_args.args[1]
+    assert sequence_plan_payload["type"] == "operator_proposal_apply_sequence_plan"
+    assert sequence_plan_payload["status"] == "ok"
+    assert sequence_plan_payload["summary"]["planned_apply_count"] == 1
+    assert sequence_plan_payload["summary"]["planned_apply_proposal_ids"] == [
+        "proposal-first"
+    ]
+    assert sequence_plan_payload["summary"]["execution_allowed_by_plan"] is False
+    assert sequence_plan_payload["summary"]["queue_mutation"] is False
+    assert sequence_plan_payload["summary"]["idempotency_reserved"] is False
+    assert sequence_plan_payload["summary"]["live_write"] is False
+    assert sequence_plan_payload["summary"]["manual_console_write_called"] is False
+    assert (
+        sequence_plan_payload["planned_apply_sequence"][0]["idempotency_key"]
+        == "promotion-import:proposal-first"
+    )
+    assert "promotion-import:proposal-first" not in (
+        server._operator_apply_idempotency_keys
+    )
+    assert server._apply_manual_console_write.await_count == 0
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_plan_result"
+    ](
+        object(),
+        {
+            "promotion_batch_preflight_result_consumer": (
+                batch_result_consumer_payload
+            ),
+            "promotion_sequence_plan_result": sequence_plan_payload,
+        },
+    )
+
+    sequence_plan_result_consumer_payload = server.send_to_client.await_args.args[1]
+    assert sequence_plan_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_plan_result_consumer"
+    )
+    assert sequence_plan_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_plan_result"
+    )
+    assert sequence_plan_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_dry_run_request_available"
+    )
+    assert (
+        sequence_plan_result_consumer_payload["summary"][
+            "promotion_dry_run_request_available"
+        ]
+        is True
+    )
+    assert (
+        sequence_plan_result_consumer_payload["summary"]["dry_run_handler_invoked"]
+        is False
+    )
+    assert sequence_plan_result_consumer_payload["summary"]["dry_run_created"] is False
+    assert (
+        sequence_plan_result_consumer_payload["summary"]["idempotency_reserved"]
+        is False
+    )
+    assert sequence_plan_result_consumer_payload["summary"]["live_write"] is False
+
+    dry_run_request = sequence_plan_result_consumer_payload[
+        "promotion_dry_run_request"
+    ]
+    assert dry_run_request["handler"] == "dry_run_operator_proposal_apply_sequence"
+    assert dry_run_request["read_only_template"] is True
+    assert dry_run_request["promotion_dry_run_request_template_only"] is True
+    assert dry_run_request["dry_run_created"] is False
+    assert dry_run_request["idempotency_reserved"] is False
+
+    await server._dispatch["dry_run_operator_proposal_apply_sequence"](
+        object(),
+        dry_run_request,
+    )
+
+    dry_run_payload = server.send_to_client.await_args.args[1]
+    assert dry_run_payload["type"] == "operator_proposal_apply_sequence_dry_run"
+    assert dry_run_payload["status"] == "ok"
+    assert dry_run_payload["summary"]["would_apply_count"] == 1
+    assert dry_run_payload["summary"]["would_apply_proposal_ids"] == [
+        "proposal-first"
+    ]
+    assert dry_run_payload["summary"]["execution_allowed_by_dry_run"] is False
+    assert dry_run_payload["summary"]["queue_mutation"] is False
+    assert dry_run_payload["summary"]["idempotency_reserved"] is False
+    assert dry_run_payload["summary"]["live_write"] is False
+    assert dry_run_payload["summary"]["manual_console_write_called"] is False
+    assert (
+        dry_run_payload["dry_run_results"][0]["apply_request"]["idempotency_key"]
+        == "promotion-import:proposal-first"
+    )
+    assert "promotion-import:proposal-first" not in (
+        server._operator_apply_idempotency_keys
+    )
+    assert server._apply_manual_console_write.await_count == 0
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_dry_run_result"
+    ](
+        object(),
+        {
+            "promotion_sequence_plan_result_consumer": (
+                sequence_plan_result_consumer_payload
+            ),
+            "promotion_dry_run_result": dry_run_payload,
+        },
+    )
+
+    dry_run_result_consumer_payload = server.send_to_client.await_args.args[1]
+    assert dry_run_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_dry_run_result_consumer"
+    )
+    assert dry_run_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_dry_run_result"
+    )
+    assert dry_run_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_execution_gate_request_available"
+    )
+    assert (
+        dry_run_result_consumer_payload["summary"][
+            "promotion_execution_gate_request_available"
+        ]
+        is True
+    )
+    assert (
+        dry_run_result_consumer_payload["summary"]["execution_gate_handler_invoked"]
+        is False
+    )
+    assert (
+        dry_run_result_consumer_payload["summary"]["execution_gate_created"]
+        is False
+    )
+    assert (
+        dry_run_result_consumer_payload["summary"]["idempotency_reserved"]
+        is False
+    )
+    assert dry_run_result_consumer_payload["summary"]["live_write"] is False
+
+    gate_request = dict(
+        dry_run_result_consumer_payload["promotion_execution_gate_request"]
+    )
+    assert gate_request["handler"] == (
+        "gate_operator_proposal_apply_sequence_execution"
+    )
+    assert gate_request["operator_ack"] is False
+    assert gate_request["operator_must_set_operator_ack_true"] is True
+    assert gate_request["read_only_template"] is True
+    assert gate_request["promotion_execution_gate_request_template_only"] is True
+    assert gate_request["execution_gate_created"] is False
+    assert gate_request["idempotency_reserved"] is False
+    gate_request["operator_ack"] = True
+
+    await server._dispatch["gate_operator_proposal_apply_sequence_execution"](
+        object(),
+        gate_request,
+    )
+
+    gate_payload = server.send_to_client.await_args.args[1]
+    assert gate_payload["type"] == "operator_proposal_apply_sequence_execution_gate"
+    assert gate_payload["status"] == "ready"
+    assert gate_payload["summary"]["ready_for_executor_count"] == 1
+    assert gate_payload["summary"]["ready_for_executor_proposal_ids"] == [
+        "proposal-first"
+    ]
+    assert gate_payload["summary"]["operator_ack_received"] is True
+    assert gate_payload["summary"]["execution_allowed_by_gate"] is False
+    assert gate_payload["summary"]["requires_separate_executor"] is True
+    assert gate_payload["summary"]["queue_mutation"] is False
+    assert gate_payload["summary"]["idempotency_reserved"] is False
+    assert gate_payload["summary"]["live_write"] is False
+    assert gate_payload["summary"]["manual_console_write_called"] is False
+    assert (
+        gate_payload["ready_for_executor"][0]["apply_request"]["idempotency_key"]
+        == "promotion-import:proposal-first"
+    )
+    assert "promotion-import:proposal-first" not in (
+        server._operator_apply_idempotency_keys
+    )
+    assert server._apply_manual_console_write.await_count == 0
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_gate_result"
+    ](
+        object(),
+        {
+            "promotion_dry_run_result_consumer": dry_run_result_consumer_payload,
+            "promotion_execution_gate_result": gate_payload,
+        },
+    )
+
+    gate_result_consumer_payload = server.send_to_client.await_args.args[1]
+    assert gate_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_gate_result_consumer"
+    )
+    assert gate_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_gate_result"
+    )
+    assert gate_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_executor_request_available"
+    )
+    assert (
+        gate_result_consumer_payload["summary"][
+            "promotion_executor_request_available"
+        ]
+        is True
+    )
+    assert (
+        gate_result_consumer_payload["summary"][
+            "sequence_executor_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        gate_result_consumer_payload["summary"]["sequence_executor_created"]
+        is False
+    )
+    assert (
+        gate_result_consumer_payload["summary"]["idempotency_reserved"]
+        is False
+    )
+    assert gate_result_consumer_payload["summary"]["live_write"] is False
+
+    executor_request = gate_result_consumer_payload["promotion_executor_request"]
+    assert executor_request["handler"] == "execute_operator_proposal_apply_sequence"
+    assert executor_request["execute"] is False
+    assert executor_request["operator_ack"] is False
+    assert executor_request["approved"] is False
+    assert executor_request["operator_must_set_execute_true"] is True
+    assert executor_request["operator_must_set_operator_ack_true"] is True
+    assert executor_request["operator_must_set_approved_true"] is True
+    assert executor_request["read_only_template"] is True
+    assert executor_request["promotion_executor_request_template_only"] is True
+    assert executor_request["sequence_executor_created"] is False
+    assert executor_request["idempotency_reserved"] is False
+    assert executor_request["live_authority_granted"] is False
+    assert len(executor_request["execution_gate_payload"]["ready_for_executor"]) == 1
+    assert "promotion-import:proposal-first" not in (
+        server._operator_apply_idempotency_keys
+    )
+    assert server._apply_manual_console_write.await_count == 0
+
 
 def test_import_soundcheck_recommendations_respects_analyze_mode(server):
     server.operator_mode = "analyze"
