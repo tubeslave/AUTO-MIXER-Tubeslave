@@ -34,6 +34,37 @@ def _string_list(value: Any) -> list[str]:
     return [str(item) for item in value if item] if isinstance(value, list) else []
 
 
+def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in artifacts:
+        if not isinstance(item, Mapping):
+            continue
+        rows.append(
+            {
+                "source_id": item.get("source_id"),
+                "status": item.get("status"),
+                "run_id": item.get("run_id"),
+                "summary_path": item.get("summary_path"),
+                "events_path": item.get("events_path"),
+                "channels": item.get("channels") if isinstance(item.get("channels"), list) else [],
+                "operator_confirmed_channels": (
+                    item.get("operator_confirmed_channels")
+                    if isinstance(item.get("operator_confirmed_channels"), list)
+                    else []
+                ),
+                "value_types": (
+                    item.get("value_types") if isinstance(item.get("value_types"), list) else []
+                ),
+                "readback_count": int(item.get("readback_count") or 0),
+                "physical_readback_count": int(item.get("physical_readback_count") or 0),
+                "violations": (
+                    item.get("violations") if isinstance(item.get("violations"), list) else []
+                ),
+            }
+        )
+    return rows
+
+
 def build_review_report(
     *,
     artifact_roots: Iterable[str | Path] | None = None,
@@ -86,6 +117,7 @@ def build_review_report(
             for item in artifacts
             if isinstance(item, Mapping) and item.get("source_id")
         ],
+        "artifact_reviews": _artifact_review_rows(artifacts),
     }
 
 
@@ -138,6 +170,34 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     sources = report.get("artifact_sources") if isinstance(report.get("artifact_sources"), list) else []
     lines.extend(f"- `{item}`" for item in sources)
     if not sources:
+        lines.append("- none")
+    lines.extend(["", "## Artifact Details", ""])
+    artifact_reviews = (
+        report.get("artifact_reviews")
+        if isinstance(report.get("artifact_reviews"), list)
+        else []
+    )
+    if artifact_reviews:
+        for item in artifact_reviews:
+            row = item if isinstance(item, Mapping) else {}
+            lines.extend(
+                [
+                    f"- source: `{row.get('source_id')}`",
+                    f"  - status: `{row.get('status')}`",
+                    f"  - run_id: `{row.get('run_id')}`",
+                    f"  - summary_path: `{row.get('summary_path')}`",
+                    f"  - events_path: `{row.get('events_path')}`",
+                    f"  - channels: `{json.dumps(row.get('channels') or [])}`",
+                    "  - operator_confirmed_channels: "
+                    f"`{json.dumps(row.get('operator_confirmed_channels') or [])}`",
+                    f"  - value_types: `{json.dumps(row.get('value_types') or [])}`",
+                    f"  - readback_count: `{int(row.get('readback_count') or 0)}`",
+                    "  - physical_readback_count: "
+                    f"`{int(row.get('physical_readback_count') or 0)}`",
+                    f"  - violations: `{json.dumps(row.get('violations') or [])}`",
+                ]
+            )
+    else:
         lines.append("- none")
     lines.extend(
         [

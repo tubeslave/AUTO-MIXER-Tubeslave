@@ -34,6 +34,7 @@ Replace channel `3` with the operator-approved channel:
 python3 tools/wing_readonly_preflight_runner.py \
   --url ws://localhost:8765 \
   --channels 3 \
+  --operator-confirm-channels 3 \
   --value-types fader,gain \
   --require-physical-readback \
   --artifact-root artifacts/wing_readonly_preflight
@@ -51,6 +52,8 @@ The summary must show:
 - `proof_artifact_schema: wing_readonly_preflight.v1`
 - `proof_runner: wing_readonly_preflight_runner`
 - `connection_mode: wing`
+- `operator_channel_confirmation_required: true`
+- `operator_confirmed_channels == channels`
 - `read_only: true`
 - `live_write: false`
 - `write_request_sent: false`
@@ -108,7 +111,9 @@ Then update:
 - `events.jsonl` is not strict `send`/`recv` pairs;
 - a `query_mixer_parameter` response does not match its request identity;
 - the run contacts the wrong mixer;
-- the operator cannot confirm the selected channel.
+- the operator cannot confirm the selected channel;
+- `operator_confirmed_channels` is missing or does not exactly match
+  `channels`.
 
 ## Next Step
 

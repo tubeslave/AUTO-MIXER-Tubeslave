@@ -316,6 +316,58 @@ AUTONOMY_GAP_ROLLUP_SOURCE = "autonomy_mode_transition_gate.rows[mode=auto]"
 DEFAULT_HOMEBREW_GIT = Path("/opt/homebrew/bin/git")
 GAIN_DRY_RUN_REASON = "no_wing_release_gain_dry_run"
 REPO_LOCAL_COMMAND_OUTPUT_FLAGS = {"--artifact-root", "--output"}
+WING_READONLY_PREFLIGHT_RUNNER_TOOL = "tools/wing_readonly_preflight_runner.py"
+WING_READONLY_PREFLIGHT_RUNNER_URL = "ws://localhost:8765"
+WING_READONLY_PREFLIGHT_RUNNER_CHANNELS = "3"
+WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = "fader,gain"
+WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
+WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
+WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
+WING_READONLY_PREFLIGHT_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md"
+WING_READONLY_PREFLIGHT_REVIEW_EXIT_CODES = {
+    "candidate_ready": 0,
+    "artifact_missing": 2,
+    "invalid_artifact": 3,
+}
+
+
+def wing_readonly_preflight_capture_command_template() -> list[str]:
+    return [
+        "python3",
+        WING_READONLY_PREFLIGHT_RUNNER_TOOL,
+        "--url",
+        WING_READONLY_PREFLIGHT_RUNNER_URL,
+        "--channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--value-types",
+        WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        "--require-physical-readback",
+        "--artifact-root",
+        WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+    ]
+
+
+def command_value_after_flag(command: Sequence[str], flag: str) -> str | None:
+    try:
+        index = list(command).index(flag)
+    except ValueError:
+        return None
+    if index + 1 >= len(command):
+        return None
+    return str(command[index + 1])
+
+
+def wing_readonly_preflight_review_command() -> list[str]:
+    return [
+        "python3",
+        WING_READONLY_PREFLIGHT_REVIEW_TOOL,
+        "--artifact-root",
+        WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT,
+        "--output",
+        WING_READONLY_PREFLIGHT_REVIEW_OUTPUT,
+    ]
 
 FORBIDDEN_COMMAND_TOKENS = (
     "wing_operator_proposal_validation_runner.py",
@@ -1516,6 +1568,36 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         else []
     )
     artifacts = evidence.get("artifacts") if isinstance(evidence.get("artifacts"), list) else []
+    capture_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_RUNNER_TOOL).is_file()
+    review_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_TOOL).is_file()
+    capture_command = wing_readonly_preflight_capture_command_template()
+    capture_channels = command_value_after_flag(capture_command, "--channels")
+    capture_confirmed_channels = command_value_after_flag(
+        capture_command,
+        "--operator-confirm-channels",
+    )
+    capture_confirmation_matches_channels = (
+        bool(capture_channels)
+        and bool(capture_confirmed_channels)
+        and capture_channels == capture_confirmed_channels
+    )
+
+    if not capture_tool_available:
+        violations.append("wing_readonly_preflight_runner_tool_missing")
+    if not review_tool_available:
+        violations.append("wing_readonly_preflight_review_tool_missing")
+    if "--operator-confirm-channels" not in capture_command:
+        violations.append("wing_readonly_preflight_capture_operator_confirmation_missing")
+    if "--channels" not in capture_command:
+        violations.append("wing_readonly_preflight_capture_channels_missing")
+    if (
+        "--operator-confirm-channels" in capture_command
+        and "--channels" in capture_command
+        and not capture_confirmation_matches_channels
+    ):
+        violations.append("wing_readonly_preflight_capture_operator_confirmation_mismatch")
+    if "--require-physical-readback" not in capture_command:
+        violations.append("wing_readonly_preflight_capture_physical_readback_missing")
 
     if evidence.get("type") != "wing_readonly_preflight_evidence":
         violations.append("wing_readonly_preflight_evidence_type_mismatch")
@@ -1602,6 +1684,24 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     detail["mvp_blocker_matrix_ids"] = matrix_ids
     detail["latest_valid_candidate_run_id"] = summary.get("latest_valid_candidate_run_id")
+    detail["capture_tool_path"] = WING_READONLY_PREFLIGHT_RUNNER_TOOL
+    detail["capture_tool_available"] = capture_tool_available
+    detail["capture_command_template"] = capture_command
+    detail["capture_command_channels"] = capture_channels
+    detail["capture_command_operator_confirmed_channels"] = capture_confirmed_channels
+    detail["capture_command_requires_operator_channel_confirmation"] = (
+        "--operator-confirm-channels" in capture_command
+    )
+    detail["capture_command_operator_confirmation_matches_channels"] = (
+        capture_confirmation_matches_channels
+    )
+    detail["capture_command_requires_physical_readback"] = (
+        "--require-physical-readback" in capture_command
+    )
+    detail["review_tool_path"] = WING_READONLY_PREFLIGHT_REVIEW_TOOL
+    detail["review_tool_available"] = review_tool_available
+    detail["review_command"] = wing_readonly_preflight_review_command()
+    detail["review_exit_codes"] = dict(WING_READONLY_PREFLIGHT_REVIEW_EXIT_CODES)
     detail["blocked_by"] = (
         list(summary.get("blocked_by"))
         if isinstance(summary.get("blocked_by"), list)
@@ -6504,6 +6604,9 @@ def wing_readonly_preflight_evidence_summary(
         matrix_ids = detail.get("mvp_blocker_matrix_ids")
         closed_ids = detail.get("mvp_blockers_closed_by_evidence")
         violations = detail.get("violations")
+        capture_command = detail.get("capture_command_template")
+        review_command = detail.get("review_command")
+        review_exit_codes = detail.get("review_exit_codes")
         valid_candidate_count = int(detail.get("valid_candidate_count") or 0)
         invalid_candidate_count = int(detail.get("invalid_candidate_count") or 0)
         readiness_update_candidate_available = (
@@ -6546,6 +6649,32 @@ def wing_readonly_preflight_evidence_summary(
                 list(matrix_ids) if isinstance(matrix_ids, list) else []
             ),
             "latest_valid_candidate_run_id": detail.get("latest_valid_candidate_run_id"),
+            "capture_tool_path": detail.get("capture_tool_path"),
+            "capture_tool_available": detail.get("capture_tool_available") is True,
+            "capture_command_template": (
+                list(capture_command) if isinstance(capture_command, list) else []
+            ),
+            "capture_command_channels": detail.get("capture_command_channels"),
+            "capture_command_operator_confirmed_channels": detail.get(
+                "capture_command_operator_confirmed_channels"
+            ),
+            "capture_command_requires_operator_channel_confirmation": (
+                detail.get("capture_command_requires_operator_channel_confirmation") is True
+            ),
+            "capture_command_operator_confirmation_matches_channels": (
+                detail.get("capture_command_operator_confirmation_matches_channels") is True
+            ),
+            "capture_command_requires_physical_readback": (
+                detail.get("capture_command_requires_physical_readback") is True
+            ),
+            "review_tool_path": detail.get("review_tool_path"),
+            "review_tool_available": detail.get("review_tool_available") is True,
+            "review_command": (
+                list(review_command) if isinstance(review_command, list) else []
+            ),
+            "review_exit_codes": (
+                dict(review_exit_codes) if isinstance(review_exit_codes, Mapping) else {}
+            ),
             "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
             "violations": list(violations) if isinstance(violations, list) else [],
         }
@@ -8916,6 +9045,27 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['mvp_blockers_closed_by_evidence'])}`",
                 "- latest_valid_candidate_run_id: "
                 f"`{wing_readonly_preflight['latest_valid_candidate_run_id']}`",
+                f"- capture_tool_path: `{wing_readonly_preflight['capture_tool_path']}`",
+                "- capture_tool_available: "
+                f"`{str(wing_readonly_preflight['capture_tool_available']).lower()}`",
+                "- capture_command_template: "
+                f"`{json.dumps(wing_readonly_preflight['capture_command_template'])}`",
+                f"- capture_command_channels: `{wing_readonly_preflight['capture_command_channels']}`",
+                "- capture_command_operator_confirmed_channels: "
+                f"`{wing_readonly_preflight['capture_command_operator_confirmed_channels']}`",
+                "- capture_command_requires_operator_channel_confirmation: "
+                f"`{str(wing_readonly_preflight['capture_command_requires_operator_channel_confirmation']).lower()}`",
+                "- capture_command_operator_confirmation_matches_channels: "
+                f"`{str(wing_readonly_preflight['capture_command_operator_confirmation_matches_channels']).lower()}`",
+                "- capture_command_requires_physical_readback: "
+                f"`{str(wing_readonly_preflight['capture_command_requires_physical_readback']).lower()}`",
+                f"- review_tool_path: `{wing_readonly_preflight['review_tool_path']}`",
+                "- review_tool_available: "
+                f"`{str(wing_readonly_preflight['review_tool_available']).lower()}`",
+                "- review_command: "
+                f"`{json.dumps(wing_readonly_preflight['review_command'])}`",
+                "- review_exit_codes: "
+                f"`{json.dumps(wing_readonly_preflight['review_exit_codes'], sort_keys=True)}`",
                 f"- blocked_by: `{json.dumps(wing_readonly_preflight['blocked_by'])}`",
                 f"- violations: `{json.dumps(wing_readonly_preflight['violations'])}`",
             ]

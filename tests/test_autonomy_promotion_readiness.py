@@ -16,6 +16,8 @@ def _valid_wing_preflight_summary() -> dict:
         "proof_runner": "wing_readonly_preflight_runner",
         "connection_mode": "wing",
         "channels": [3],
+        "operator_channel_confirmation_required": True,
+        "operator_confirmed_channels": [3],
         "value_types": ["fader", "gain"],
         "require_physical_readback": True,
         "read_only": True,

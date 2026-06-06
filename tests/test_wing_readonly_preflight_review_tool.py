@@ -13,6 +13,8 @@ def _valid_summary() -> dict:
         "proof_runner": "wing_readonly_preflight_runner",
         "connection_mode": "wing",
         "channels": [3],
+        "operator_channel_confirmation_required": True,
+        "operator_confirmed_channels": [3],
         "value_types": ["fader", "gain"],
         "require_physical_readback": True,
         "read_only": True,
@@ -112,9 +114,27 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert report["live_authority_granted"] is False
     assert report["full_autonomous_ready"] is False
     assert report["artifact_sources"] == [str(summary_path)]
+    assert report["artifact_reviews"] == [
+        {
+            "source_id": str(summary_path),
+            "status": "valid_readonly_preflight_artifact",
+            "run_id": "20260606T120000Z_wing_readonly_preflight",
+            "summary_path": str(summary_path),
+            "events_path": str(summary_path.parent / "events.jsonl"),
+            "channels": [3],
+            "operator_confirmed_channels": [3],
+            "value_types": ["fader", "gain"],
+            "readback_count": 2,
+            "physical_readback_count": 2,
+            "violations": [],
+        }
+    ]
     assert review_tool.exit_code_for_report(report) == 0
     markdown = review_tool.render_markdown(report)
     assert "candidate_ready_for_manual_review" in markdown
+    assert f"summary_path: `{summary_path}`" in markdown
+    assert f"events_path: `{summary_path.parent / 'events.jsonl'}`" in markdown
+    assert "operator_confirmed_channels: `[3]`" in markdown
     assert "does not contact WING" in markdown
 
 
@@ -135,6 +155,7 @@ def test_review_report_blocks_tampered_event_log(tmp_path: Path):
     assert report["status"] == "blocked"
     assert report["artifact_count"] == 1
     assert report["invalid_candidate_count"] == 1
+    assert report["artifact_reviews"][0]["operator_confirmed_channels"] == [3]
     assert "event_log_forbidden_request_type_sent" in report["violations"]
     assert review_tool.exit_code_for_report(report) == 3
 

@@ -497,10 +497,152 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "operator_visible_evidence_report",
         "readiness_matrix_update_based_on_real_proof",
     ]
+    assert result.detail["capture_tool_path"] == "tools/wing_readonly_preflight_runner.py"
+    assert result.detail["capture_tool_available"] is True
+    assert result.detail["capture_command_template"] == [
+        "python3",
+        "tools/wing_readonly_preflight_runner.py",
+        "--url",
+        "ws://localhost:8765",
+        "--channels",
+        "3",
+        "--operator-confirm-channels",
+        "3",
+        "--value-types",
+        "fader,gain",
+        "--require-physical-readback",
+        "--artifact-root",
+        "artifacts/wing_readonly_preflight",
+    ]
+    assert result.detail["capture_command_channels"] == "3"
+    assert result.detail["capture_command_operator_confirmed_channels"] == "3"
+    assert result.detail["capture_command_requires_operator_channel_confirmation"] is True
+    assert result.detail["capture_command_operator_confirmation_matches_channels"] is True
+    assert result.detail["capture_command_requires_physical_readback"] is True
+    assert result.detail["review_tool_path"] == (
+        "tools/review_wing_readonly_preflight_artifacts.py"
+    )
+    assert result.detail["review_tool_available"] is True
+    assert result.detail["review_command"] == [
+        "python3",
+        "tools/review_wing_readonly_preflight_artifacts.py",
+        "--artifact-root",
+        "artifacts/wing_readonly_preflight",
+        "--output",
+        "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+    ]
+    assert result.detail["review_exit_codes"] == {
+        "candidate_ready": 0,
+        "artifact_missing": 2,
+        "invalid_artifact": 3,
+    }
     assert result.detail["blocked_by"] == [
         "operator_must_run_wing_readonly_preflight_runner"
     ]
     assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_missing_wing_preflight_runner(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_RUNNER_TOOL",
+        "tools/missing_wing_readonly_preflight_runner.py",
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["capture_tool_available"] is False
+    assert result.detail["capture_tool_path"] == (
+        "tools/missing_wing_readonly_preflight_runner.py"
+    )
+    assert result.detail["capture_command_template"][1] == (
+        "tools/missing_wing_readonly_preflight_runner.py"
+    )
+    assert "wing_readonly_preflight_runner_tool_missing" in result.detail["violations"]
+
+
+def test_no_wing_release_check_rejects_incomplete_wing_preflight_capture_template(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_capture_command_template",
+        lambda: [
+            "python3",
+            "tools/wing_readonly_preflight_runner.py",
+            "--channels",
+            "3",
+        ],
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert (
+        "wing_readonly_preflight_capture_operator_confirmation_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_capture_physical_readback_missing"
+        in result.detail["violations"]
+    )
+    assert result.detail["capture_command_requires_operator_channel_confirmation"] is False
+    assert result.detail["capture_command_operator_confirmation_matches_channels"] is False
+    assert result.detail["capture_command_requires_physical_readback"] is False
+
+
+def test_no_wing_release_check_rejects_mismatched_wing_preflight_confirmation(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_capture_command_template",
+        lambda: [
+            "python3",
+            "tools/wing_readonly_preflight_runner.py",
+            "--channels",
+            "3",
+            "--operator-confirm-channels",
+            "4",
+            "--require-physical-readback",
+        ],
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["capture_command_channels"] == "3"
+    assert result.detail["capture_command_operator_confirmed_channels"] == "4"
+    assert result.detail["capture_command_operator_confirmation_matches_channels"] is False
+    assert (
+        "wing_readonly_preflight_capture_operator_confirmation_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_missing_wing_preflight_review_tool(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_REVIEW_TOOL",
+        "tools/missing_wing_readonly_preflight_review_tool.py",
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["review_tool_available"] is False
+    assert result.detail["review_tool_path"] == (
+        "tools/missing_wing_readonly_preflight_review_tool.py"
+    )
+    assert result.detail["review_command"][1] == (
+        "tools/missing_wing_readonly_preflight_review_tool.py"
+    )
+    assert "wing_readonly_preflight_review_tool_missing" in result.detail["violations"]
 
 
 def test_no_wing_release_check_rejects_wing_preflight_evidence_authority_claim(
@@ -2683,6 +2825,8 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
                 "ws://localhost:8765",
                 "--channels",
                 "3",
+                "--operator-confirm-channels",
+                "3",
                 "--value-types",
                 "fader,gain",
                 "--require-physical-readback",
@@ -3862,6 +4006,43 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "readiness_matrix_update_based_on_real_proof",
             ],
             "latest_valid_candidate_run_id": None,
+            "capture_tool_path": "tools/wing_readonly_preflight_runner.py",
+            "capture_tool_available": True,
+            "capture_command_template": [
+                "python3",
+                "tools/wing_readonly_preflight_runner.py",
+                "--url",
+                "ws://localhost:8765",
+                "--channels",
+                "3",
+                "--operator-confirm-channels",
+                "3",
+                "--value-types",
+                "fader,gain",
+                "--require-physical-readback",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
+            ],
+            "capture_command_channels": "3",
+            "capture_command_operator_confirmed_channels": "3",
+            "capture_command_requires_operator_channel_confirmation": True,
+            "capture_command_operator_confirmation_matches_channels": True,
+            "capture_command_requires_physical_readback": True,
+            "review_tool_path": "tools/review_wing_readonly_preflight_artifacts.py",
+            "review_tool_available": True,
+            "review_command": [
+                "python3",
+                "tools/review_wing_readonly_preflight_artifacts.py",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
+                "--output",
+                "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+            ],
+            "review_exit_codes": {
+                "candidate_ready": 0,
+                "artifact_missing": 2,
+                "invalid_artifact": 3,
+            },
             "blocked_by": [
                 "operator_must_run_wing_readonly_preflight_runner"
             ],
@@ -3894,11 +4075,45 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         "operator_visible_evidence_report",
         "readiness_matrix_update_based_on_real_proof",
     ]
+    assert preflight["capture_tool_path"] == "tools/wing_readonly_preflight_runner.py"
+    assert preflight["capture_tool_available"] is True
+    assert preflight["capture_command_template"][1] == "tools/wing_readonly_preflight_runner.py"
+    assert preflight["capture_command_channels"] == "3"
+    assert preflight["capture_command_operator_confirmed_channels"] == "3"
+    assert "--operator-confirm-channels" in preflight["capture_command_template"]
+    assert "--require-physical-readback" in preflight["capture_command_template"]
+    assert preflight["capture_command_requires_operator_channel_confirmation"] is True
+    assert preflight["capture_command_operator_confirmation_matches_channels"] is True
+    assert preflight["capture_command_requires_physical_readback"] is True
+    assert preflight["review_tool_path"] == (
+        "tools/review_wing_readonly_preflight_artifacts.py"
+    )
+    assert preflight["review_tool_available"] is True
+    assert preflight["review_command"][1] == (
+        "tools/review_wing_readonly_preflight_artifacts.py"
+    )
+    assert preflight["review_exit_codes"] == {
+        "candidate_ready": 0,
+        "artifact_missing": 2,
+        "invalid_artifact": 3,
+    }
     assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
     assert "## WING Read-Only Preflight Evidence" in markdown_summary
     assert "readiness_closure_allowed_by_evidence: `false`" in markdown_summary
     assert "live_authority_granted: `false`" in markdown_summary
     assert "readiness_update_candidate_available: `false`" in markdown_summary
+    assert "capture_tool_path: `tools/wing_readonly_preflight_runner.py`" in markdown_summary
+    assert "capture_command_channels: `3`" in markdown_summary
+    assert "capture_command_operator_confirmed_channels: `3`" in markdown_summary
+    assert "capture_command_operator_confirmation_matches_channels: `true`" in markdown_summary
+    assert "--operator-confirm-channels" in markdown_summary
+    assert "--require-physical-readback" in markdown_summary
+    assert (
+        "review_tool_path: `tools/review_wing_readonly_preflight_artifacts.py`"
+        in markdown_summary
+    )
+    assert "WING_READONLY_PREFLIGHT_REVIEW_LATEST.md" in markdown_summary
+    assert '"invalid_artifact": 3' in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_raw_mixer_readback_contract(tmp_path):

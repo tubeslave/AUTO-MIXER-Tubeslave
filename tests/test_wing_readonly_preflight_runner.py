@@ -119,6 +119,28 @@ def test_forbidden_request_types_cover_hard_safety_boundary() -> None:
         (["--channels", "49"], "--channels values must be in 1..48"),
         (["--channels", ""], "--channels must include at least one channel"),
         (["--value-types", "fader,eq"], "--value-types unsupported: eq"),
+        (
+            ["--channels", "3", "--require-physical-readback"],
+            "--operator-confirm-channels must match --channels when --require-physical-readback is set",
+        ),
+        (
+            [
+                "--channels",
+                "3",
+                "--operator-confirm-channels",
+                "4",
+                "--require-physical-readback",
+            ],
+            "--operator-confirm-channels must exactly match --channels",
+        ),
+        (
+            [
+                "--operator-confirm-channels",
+                "bad",
+                "--require-physical-readback",
+            ],
+            "--operator-confirm-channels must be comma-separated integers",
+        ),
         (["--timeout", "0"], "--timeout must be positive"),
     ],
 )
@@ -169,6 +191,8 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
         "--value-types",
         "fader,gain",
         "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
     )
 
     exit_code = await runner.run(args)
@@ -185,6 +209,8 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
     assert summary["status"] == "passed"
     assert summary["reason"] == "wing_readonly_preflight_passed"
     assert summary["connection_mode"] == "wing"
+    assert summary["operator_channel_confirmation_required"] is True
+    assert summary["operator_confirmed_channels"] == [3]
     assert summary["read_only"] is True
     assert summary["live_write"] is False
     assert summary["write_request_sent"] is False
@@ -215,7 +241,16 @@ async def test_readonly_preflight_blocks_when_backend_is_not_wing(
         ]
     )
     patch_websocket_connect(monkeypatch, websocket)
-    args = parse_args(tmp_path, "--channels", "3", "--value-types", "gain", "--require-physical-readback")
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "gain",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+    )
 
     exit_code = await runner.run(args)
 
@@ -250,7 +285,16 @@ async def test_readonly_preflight_blocks_missing_physical_readback(
         ]
     )
     patch_websocket_connect(monkeypatch, websocket)
-    args = parse_args(tmp_path, "--channels", "3", "--value-types", "fader", "--require-physical-readback")
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+    )
 
     exit_code = await runner.run(args)
 

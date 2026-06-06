@@ -49,10 +49,13 @@ Use these files in this order:
 3. `Docs/MVP_WING_SUPERVISED.md`
 4. `.ai/project-layer/wing_mvp_blockers.md`
 5. `Docs/runbooks/WING_READONLY_PREFLIGHT.md`
-6. `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`
-7. `Docs/reports/MVP_PROGRESS_LATEST.md`
-8. `Docs/CORRECTION_METHODS_ROADMAP.md`
-9. `.ai/project-layer/correction_methods_backlog.md`
+6. `tools/wing_readonly_preflight_runner.py`
+7. `tools/review_wing_readonly_preflight_artifacts.py`
+8. `tools/no_wing_release_check.py`
+9. `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`
+10. `Docs/reports/MVP_PROGRESS_LATEST.md`
+11. `Docs/CORRECTION_METHODS_ROADMAP.md`
+12. `.ai/project-layer/correction_methods_backlog.md`
 
 ## Definition Of Done
 

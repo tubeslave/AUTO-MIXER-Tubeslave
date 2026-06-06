@@ -31,6 +31,9 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "Stop-The-Line Rules" in text
     assert ".ai/project-layer/wing_mvp_blockers.md" in text
     assert "Docs/runbooks/WING_READONLY_PREFLIGHT.md" in text
+    assert "tools/wing_readonly_preflight_runner.py" in text
+    assert "tools/review_wing_readonly_preflight_artifacts.py" in text
+    assert "tools/no_wing_release_check.py" in text
     assert "readiness candidates are not enough" in text
     assert "Docs/CORRECTION_METHODS_ROADMAP.md" in text
 
@@ -42,6 +45,15 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert len(rows) == 9
     assert rows[0]["blocker"] == "WING read-only connection proof"
     assert rows[0]["status"] == "tooling_ready_waits_real_wing"
+    assert "tools/no_wing_release_check.py" in rows[0]["evidence"]
+    assert (
+        "AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_RELEASE_GATE_20260607.md"
+        in rows[0]["evidence"]
+    )
+    assert (
+        "AUTOMIXER_WING_READONLY_PREFLIGHT_OPERATOR_CONFIRMATION_20260607.md"
+        in rows[0]["evidence"]
+    )
     assert all(row["status"] != "closed" for row in rows)
     assert progress.first_open_blocker(rows)["blocker"] == "WING read-only connection proof"
 
@@ -53,8 +65,10 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "wing_readonly_preflight_runner.py" in readonly
     assert "review_wing_readonly_preflight_artifacts.py" in readonly
     assert "--require-physical-readback" in readonly
+    assert "--operator-confirm-channels" in readonly
     assert "--execute" not in readonly
     assert "write_request_sent: false" in readonly
+    assert "operator_confirmed_channels == channels" in readonly
     assert "strict `send`/`recv` pairs" in readonly
     assert "channel, value type, and address" in readonly
     assert "wing_operator_proposal_validation_runner.py" in supervised

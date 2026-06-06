@@ -37,7 +37,9 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert directive["continue_goal_mode"] is True
     assert "Docs/MVP_WING_SUPERVISED.md" in directive["required_files"]
     assert "Docs/CORRECTION_METHODS_ROADMAP.md" in directive["required_files"]
+    assert "tools/wing_readonly_preflight_runner.py" in directive["required_files"]
     assert "tools/review_wing_readonly_preflight_artifacts.py" in directive["required_files"]
+    assert "tools/no_wing_release_check.py" in directive["required_files"]
     assert any("Develop correction methods" in item for item in directive["allowed_scope"])
 
 

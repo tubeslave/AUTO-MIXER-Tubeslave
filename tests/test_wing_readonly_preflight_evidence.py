@@ -25,6 +25,8 @@ def _valid_summary() -> dict:
         "proof_runner": "wing_readonly_preflight_runner",
         "connection_mode": "wing",
         "channels": [3],
+        "operator_channel_confirmation_required": True,
+        "operator_confirmed_channels": [3],
         "value_types": ["fader", "gain"],
         "require_physical_readback": True,
         "read_only": True,
@@ -182,7 +184,11 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
     }
     assert all(row["closed"] is False for row in evidence["mvp_blocker_matrix"])
     assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is True
+    assert evidence["artifacts"][0]["summary_path"] == "artifacts/wing_readonly_preflight/run/summary.json"
+    assert evidence["artifacts"][0]["events_path"] == "artifacts/wing_readonly_preflight/run/events.jsonl"
     assert evidence["artifacts"][0]["physical_readback_count"] == 2
+    assert evidence["artifacts"][0]["channels"] == [3]
+    assert evidence["artifacts"][0]["operator_confirmed_channels"] == [3]
     assert evidence["artifacts"][0]["violations"] == []
 
 
@@ -214,6 +220,47 @@ def test_preflight_evidence_rejects_non_physical_or_forbidden_request_artifact()
     assert "not_all_readbacks_physical" in evidence["summary"]["violations"]
     assert "readback_1_not_physical" in evidence["summary"]["violations"]
     assert "mutation_evidence_field_present:apply_result" in evidence["summary"]["violations"]
+
+
+def test_preflight_evidence_rejects_missing_operator_channel_confirmation():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact.pop("operator_channel_confirmation_required")
+    artifact.pop("operator_confirmed_channels")
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "operator_channel_confirmation_required_not_true" in validation["violations"]
+    assert "operator_confirmed_channels_missing" in validation["violations"]
+    assert "operator_confirmed_channels_mismatch" in validation["violations"]
+
+
+def test_preflight_evidence_rejects_operator_channel_confirmation_mismatch():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["operator_confirmed_channels"] = [4]
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "operator_confirmed_channels_mismatch" in validation["violations"]
+
+
+def test_preflight_evidence_rejects_readbacks_for_unconfirmed_channel():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["readbacks"][0]["channel"] = 4
+    artifact["readbacks"][0]["address"] = "/ch/4/fdr"
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_payloads=(artifact,),
+        artifact_roots=(),
+    )
+
+    expected_violation = "readback_targets_do_not_match_declared_channels_and_value_types"
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert expected_violation in validation["violations"]
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert expected_violation in evidence["summary"]["violations"]
 
 
 def test_wing_readonly_preflight_evidence_discovers_summary_json_files(tmp_path):
@@ -357,6 +404,27 @@ def test_file_preflight_artifact_rejects_query_readback_identity_mismatch(tmp_pa
     assert evidence["summary"]["invalid_candidate_count"] == 1
     assert "event_log_readbacks_mismatch" in evidence["summary"]["violations"]
     assert "event_log_query_readback_identity_mismatch:0" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_rejects_query_outside_confirmed_channels(tmp_path):
+    summary = _valid_summary()
+    summary["readbacks"][0] = {
+        **summary["readbacks"][0],
+        "channel": 4,
+        "address": "/ch/4/fdr",
+    }
+    events = _valid_events(summary)
+    _write_file_artifact(tmp_path / "preflight" / "unconfirmed-channel", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert (
+        "readback_targets_do_not_match_declared_channels_and_value_types"
+        in evidence["summary"]["violations"]
+    )
 
 
 def test_wing_readonly_preflight_evidence_uses_repo_default_roots():

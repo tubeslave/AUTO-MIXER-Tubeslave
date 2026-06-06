@@ -82,11 +82,14 @@ class WingReadonlyPreflightArtifactRecord:
     status: str
     accepted_as_readonly_preflight_candidate: bool
     run_id: str | None
+    summary_path: str | None
+    events_path: str | None
     connection_mode: str | None
     readback_count: int
     physical_readback_count: int
     sent_request_types: Tuple[str, ...]
     channels: Tuple[int, ...]
+    operator_confirmed_channels: Tuple[int, ...]
     value_types: Tuple[str, ...]
     violations: Tuple[str, ...]
 
@@ -102,6 +105,7 @@ class WingReadonlyPreflightArtifactRecord:
         payload = asdict(self)
         payload["sent_request_types"] = list(self.sent_request_types)
         payload["channels"] = list(self.channels)
+        payload["operator_confirmed_channels"] = list(self.operator_confirmed_channels)
         payload["value_types"] = list(self.value_types)
         payload["violations"] = list(self.violations)
         return payload
@@ -334,6 +338,17 @@ def _validate_readback_row(index: int, row: Mapping[str, Any], violations: list[
         violations.append(f"readback_{index}_invalid_channel")
 
 
+def _target_pairs(channels: Tuple[int, ...], value_types: Tuple[str, ...]) -> Tuple[Tuple[int, str], ...]:
+    return tuple((channel, value_type) for channel in channels for value_type in value_types)
+
+
+def _readback_pairs(readbacks: Tuple[Mapping[str, Any], ...]) -> Tuple[Tuple[int, str], ...]:
+    return tuple(
+        (_safe_int(row.get("channel")), str(row.get("value_type") or ""))
+        for row in readbacks
+    )
+
+
 def validate_wing_readonly_preflight_artifact(
     payload: Mapping[str, Any],
     *,
@@ -354,6 +369,15 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("connection_mode_not_wing")
     if payload.get("require_physical_readback") is not True:
         violations.append("require_physical_readback_not_true")
+    channels = _int_tuple(payload.get("channels"))
+    confirmed_channels = _int_tuple(payload.get("operator_confirmed_channels"))
+    value_types = _string_tuple(payload.get("value_types"))
+    if payload.get("operator_channel_confirmation_required") is not True:
+        violations.append("operator_channel_confirmation_required_not_true")
+    if not confirmed_channels:
+        violations.append("operator_confirmed_channels_missing")
+    if confirmed_channels != channels:
+        violations.append("operator_confirmed_channels_mismatch")
     if payload.get("read_only") is not True:
         violations.append("read_only_not_true")
     if payload.get("live_write") is not False:
@@ -390,6 +414,11 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("not_all_readbacks_physical")
     for index, row in enumerate(readbacks):
         _validate_readback_row(index, row, violations)
+    if channels and value_types and readbacks:
+        expected_pairs = _target_pairs(channels, value_types)
+        actual_pairs = _readback_pairs(readbacks)
+        if actual_pairs != expected_pairs:
+            violations.append("readback_targets_do_not_match_declared_channels_and_value_types")
 
     for field in sorted(MUTATION_EVIDENCE_FIELDS):
         if field in payload:
@@ -409,12 +438,15 @@ def validate_wing_readonly_preflight_artifact(
         "violations": sorted(dict.fromkeys(violations)),
         "evidence": {
             "run_id": payload.get("run_id"),
+            "summary_path": payload.get("summary_path"),
+            "events_path": payload.get("events_path"),
             "connection_mode": payload.get("connection_mode"),
             "readback_count": readback_count,
             "physical_readback_count": physical_readback_count,
             "sent_request_types": list(sent_request_types),
-            "channels": list(_int_tuple(payload.get("channels"))),
-            "value_types": list(_string_tuple(payload.get("value_types"))),
+            "channels": list(channels),
+            "operator_confirmed_channels": list(confirmed_channels),
+            "value_types": list(value_types),
         },
     }
 
@@ -431,11 +463,14 @@ def _record_from_validation(
             validation.get("accepted_as_readonly_preflight_candidate") is True
         ),
         run_id=str(evidence.get("run_id")) if evidence.get("run_id") else None,
+        summary_path=str(evidence.get("summary_path")) if evidence.get("summary_path") else None,
+        events_path=str(evidence.get("events_path")) if evidence.get("events_path") else None,
         connection_mode=str(evidence.get("connection_mode")) if evidence.get("connection_mode") else None,
         readback_count=_safe_int(evidence.get("readback_count")),
         physical_readback_count=_safe_int(evidence.get("physical_readback_count")),
         sent_request_types=_string_tuple(evidence.get("sent_request_types")),
         channels=_int_tuple(evidence.get("channels")),
+        operator_confirmed_channels=_int_tuple(evidence.get("operator_confirmed_channels")),
         value_types=_string_tuple(evidence.get("value_types")),
         violations=_string_tuple(validation.get("violations")),
     )
@@ -447,11 +482,14 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         status="artifact_load_error",
         accepted_as_readonly_preflight_candidate=False,
         run_id=None,
+        summary_path=None,
+        events_path=None,
         connection_mode=None,
         readback_count=0,
         physical_readback_count=0,
         sent_request_types=(),
         channels=(),
+        operator_confirmed_channels=(),
         value_types=(),
         violations=(f"artifact_load_error:{type(exc).__name__}",),
     )

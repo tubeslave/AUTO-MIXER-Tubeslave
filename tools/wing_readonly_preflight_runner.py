@@ -90,6 +90,13 @@ def parse_csv_ints(value: str) -> tuple[int, ...]:
     return tuple(items)
 
 
+def parse_csv_ints_for_summary(value: str) -> list[int]:
+    try:
+        return list(parse_csv_ints(value))
+    except ValueError:
+        return []
+
+
 def parse_csv_strings(value: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in str(value).split(",") if item.strip())
 
@@ -172,6 +179,15 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Require every queried parameter to return verified physical readback.",
     )
+    parser.add_argument(
+        "--operator-confirm-channels",
+        default="",
+        help=(
+            "Comma-separated channels explicitly confirmed by the operator as "
+            "safe to inspect; required to match --channels when physical "
+            "readback is required."
+        ),
+    )
     parser.add_argument("--timeout", type=float, default=5.0, help="Timeout per WebSocket step")
     parser.add_argument("--artifact-root", default="artifacts/wing_readonly_preflight", help="Artifact root directory")
     return parser
@@ -192,6 +208,15 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
     unsupported = sorted(set(value_types) - {"fader", "gain"})
     if unsupported:
         return f"--value-types unsupported: {','.join(unsupported)}"
+    if args.require_physical_readback:
+        try:
+            confirmed_channels = parse_csv_ints(args.operator_confirm_channels)
+        except ValueError:
+            return "--operator-confirm-channels must be comma-separated integers"
+        if not confirmed_channels:
+            return "--operator-confirm-channels must match --channels when --require-physical-readback is set"
+        if confirmed_channels != channels:
+            return "--operator-confirm-channels must exactly match --channels"
     if args.timeout <= 0:
         return "--timeout must be positive"
     return None
@@ -228,6 +253,10 @@ async def run(args: argparse.Namespace) -> int:
         "proof_runner": "wing_readonly_preflight_runner",
         "url": args.url,
         "channels": list(channels),
+        "operator_channel_confirmation_required": bool(args.require_physical_readback),
+        "operator_confirmed_channels": parse_csv_ints_for_summary(
+            args.operator_confirm_channels
+        ),
         "value_types": list(value_types),
         "require_physical_readback": bool(args.require_physical_readback),
         "read_only": True,
