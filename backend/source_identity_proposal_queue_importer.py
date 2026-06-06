@@ -38,6 +38,7 @@ SOURCE_IDENTITY_PROPOSAL_QUEUE_IMPORTER_STATUSES = {
     "source_identity_proposal_queue_importer_operator_ack_required",
     "source_identity_proposal_queue_importer_target_queue_required",
     "source_identity_proposal_queue_importer_dry_run_ready",
+    "source_identity_proposal_queue_importer_apply_blocked",
     "source_identity_proposal_queue_importer_applied",
 }
 REQUIRED_QUEUE_ORDERING_PLAN_TYPE = "source_identity_proposal_queue_ordering_plan"
@@ -545,13 +546,17 @@ def build_source_identity_proposal_queue_importer(
         status = "source_identity_proposal_queue_importer_target_queue_required"
         blocked_by = ("target_operator_proposal_queue_required_before_queue_import",)
     elif apply and operator_ack:
-        status = "source_identity_proposal_queue_importer_applied"
-        blocked_by = ()
         queue_import_results = _apply_import_specs(
             queue_import_specs,
             target_queue,
             effective_operator_mode,
         )
+        if any(result.get("success") is True for result in queue_import_results):
+            status = "source_identity_proposal_queue_importer_applied"
+            blocked_by = ()
+        else:
+            status = "source_identity_proposal_queue_importer_apply_blocked"
+            blocked_by = ("operator_mode_or_queue_policy_blocked_source_identity_queue_import",)
     else:
         status = "source_identity_proposal_queue_importer_dry_run_ready"
         blocked_by = ("operator_ack_and_apply_required_before_source_identity_queue_import",)
@@ -645,7 +650,12 @@ def build_source_identity_proposal_queue_importer(
                                 else (
                                     "Queue import applied to explicit target queue."
                                     if applied
-                                    else "Operator may inspect this dry run; apply plus acknowledgement is required before queue mutation."
+                                    else (
+                                        "Queue import was blocked by operator mode or queue policy."
+                                        if status
+                                        == "source_identity_proposal_queue_importer_apply_blocked"
+                                        else "Operator may inspect this dry run; apply plus acknowledgement is required before queue mutation."
+                                    )
                                 )
                             )
                         )

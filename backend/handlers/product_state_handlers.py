@@ -30,6 +30,9 @@ from operator_product_state import (
 )
 from operator_analysis import build_operator_analysis_report
 from processing_pipeline_preview import build_main_pipeline_preview
+from source_identity_proposal_queue_importer import (
+    build_source_identity_proposal_queue_importer,
+)
 
 
 VERIFIED_MANUAL_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
@@ -563,6 +566,39 @@ def register_handlers(server):
             websocket,
             server.import_soundcheck_recommendations_to_operator_queue(data.get("bundle")),
         )
+
+    async def handle_import_source_identity_queue_ordering_plan(websocket, data):
+        pipeline_preview = None
+        queue_ordering_plan = data.get("queue_ordering_plan")
+        proposal_payloads = data.get("proposal_payloads")
+        if not isinstance(queue_ordering_plan, dict) or proposal_payloads is None:
+            pipeline_preview = build_main_pipeline_preview(
+                server,
+                total_channels=data.get("total_channels", 24),
+                include_methods=False,
+            )
+            queue_ordering_plan = pipeline_preview.get(
+                "source_identity_proposal_queue_ordering_plan"
+            )
+            proposal_payloads = pipeline_preview.get("proposals", [])
+
+        apply_requested = bool(data.get("apply", False))
+        operator_ack = bool(data.get("operator_ack", False))
+        result = build_source_identity_proposal_queue_importer(
+            queue_ordering_plan=queue_ordering_plan,
+            proposal_payloads=proposal_payloads,
+            target_queue=(
+                server.operator_proposal_queue
+                if apply_requested and operator_ack
+                else None
+            ),
+            operator_mode=server.get_operator_mode_status(),
+            apply=apply_requested,
+            operator_ack=operator_ack,
+        )
+        result["handler"] = "import_source_identity_queue_ordering_plan"
+        result["pipeline_preview_generated"] = pipeline_preview is not None
+        await server.send_to_client(websocket, result)
 
     async def handle_create_operator_proposal(websocket, data):
         payload = dict(data.get("proposal") or data)
@@ -1170,6 +1206,9 @@ def register_handlers(server):
         "run_operator_analysis": handle_run_operator_analysis,
         "import_safe_gain_suggestions": handle_import_safe_gain_suggestions,
         "import_soundcheck_recommendations": handle_import_soundcheck_recommendations,
+        "import_source_identity_queue_ordering_plan": (
+            handle_import_source_identity_queue_ordering_plan
+        ),
         "create_operator_proposal": handle_create_operator_proposal,
         "accept_operator_proposal": handle_accept_operator_proposal,
         "dismiss_operator_proposal": handle_dismiss_operator_proposal,

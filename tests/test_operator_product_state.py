@@ -7679,6 +7679,222 @@ async def test_import_safe_gain_suggestions_handler_feeds_operator_queue(server)
     assert queue["pending_actions"][0]["requested_change"]["value"] == 3.5
 
 
+def _source_identity_queue_import_fixture():
+    from backend.source_identity_calibration_memory_trust_promotion_priority_gate import (
+        SOURCE_IDENTITY_CALIBRATION_MEMORY_TRUST_PROMOTION_PRIORITY_GATE_METHOD_ID,
+    )
+    from backend.source_identity_proposal_ordering_preview import (
+        build_source_identity_proposal_ordering_preview,
+    )
+    from backend.source_identity_proposal_priority_policy import (
+        build_source_identity_proposal_priority_policy,
+    )
+    from backend.source_identity_proposal_queue_ordering_plan import (
+        build_source_identity_proposal_queue_ordering_plan,
+    )
+
+    proposals = [
+        {
+            "proposal_id": "proposal-other",
+            "title": "Other channel review",
+            "method_id": "safe_gain",
+            "kind": "analysis",
+            "target": "ch/02",
+            "severity": "medium",
+            "confidence": 0.7,
+            "evidence": {"source_candidate_id": "candidate-2"},
+        },
+        {
+            "proposal_id": "proposal-vocal-gain",
+            "title": "Lead Vocal: lower gain",
+            "method_id": "safe_gain",
+            "kind": "gain",
+            "target": "ch/01",
+            "severity": "high",
+            "confidence": 0.8,
+            "requested_change": {
+                "value_type": "gain",
+                "channel": 1,
+                "value": -1.0,
+                "current_value": 0.0,
+                "rollback_value": 0.0,
+            },
+            "evidence": {"source_candidate_id": "candidate-1"},
+        },
+    ]
+    priority_gate = {
+        "type": "source_identity_calibration_memory_trust_promotion_priority_gate",
+        "generated_at": "2026-06-06T15:00:00Z",
+        "method_id": (
+            SOURCE_IDENTITY_CALIBRATION_MEMORY_TRUST_PROMOTION_PRIORITY_GATE_METHOD_ID
+        ),
+        "status": "verified_memory_trust_promotion_priority_records_available",
+        "safety": {
+            "read_only": True,
+            "priority_gate_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "queue_mutation": False,
+            "model_mutation": False,
+            "runtime_memory_mutation": False,
+            "source_identity_trust_store_mutation": False,
+            "direct_downstream_priority_mutation": False,
+            "downstream_priority_change_allowed_by_gate": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "summary": {
+            "priority_gate_record_count": 1,
+            "eligible_record_count": 1,
+            "invalid_record_count": 0,
+            "downstream_priority_eligible": True,
+            "policy_gate_only": True,
+            "queue_mutation": False,
+            "model_mutation": False,
+            "runtime_memory_mutation": False,
+            "source_identity_trust_store_mutation": False,
+            "direct_downstream_priority_mutation": False,
+            "downstream_priority_change_allowed_by_gate": False,
+            "live_write": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "can_import_to_queue": False,
+            "can_apply_live": False,
+            "eligible_source_candidate_ids": ["candidate-1"],
+            "invalid_record_ids": [],
+        },
+        "priority_records": [
+            {
+                "priority_gate_record_id": (
+                    "source_identity_memory_trust_promotion_priority_gate:apply-audit-1"
+                ),
+                "source_candidate_id": "candidate-1",
+                "source_type": "lead_vocal",
+                "target_trust_state": "trusted_for_downstream_priority",
+                "source_identity_downstream_gate_status": "trusted",
+                "rollback_verified": True,
+                "downstream_priority_eligible": True,
+                "eligible_for_downstream_priority_policy": True,
+                "policy_gate_only": True,
+                "proposal_priority_consumer_required": True,
+                "read_only": True,
+                "live_write": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "queue_mutation": False,
+                "model_mutation": False,
+                "runtime_memory_mutation": False,
+                "source_identity_trust_store_mutation": False,
+                "direct_downstream_priority_mutation": False,
+                "downstream_priority_change_allowed_by_gate": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+                "can_import_to_queue": False,
+                "can_apply_live": False,
+            }
+        ],
+    }
+    policy = build_source_identity_proposal_priority_policy(
+        proposals=proposals,
+        priority_gate=priority_gate,
+    )
+    ordering_preview = build_source_identity_proposal_ordering_preview(
+        proposals=proposals,
+        priority_policy=policy,
+    )
+    return proposals, build_source_identity_proposal_queue_ordering_plan(
+        ordering_preview=ordering_preview,
+    )
+
+
+@pytest.mark.asyncio
+async def test_source_identity_queue_import_handler_dry_run_does_not_mutate_queue(server):
+    proposals, plan = _source_identity_queue_import_fixture()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["import_source_identity_queue_ordering_plan"](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "source_identity_proposal_queue_importer"
+    assert payload["handler"] == "import_source_identity_queue_ordering_plan"
+    assert payload["status"] == "source_identity_proposal_queue_importer_dry_run_ready"
+    assert payload["summary"]["queue_import_spec_count"] == 2
+    assert payload["summary"]["queue_import_result_count"] == 0
+    assert payload["summary"]["queue_mutation"] is False
+    assert payload["summary"]["live_write"] is False
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_source_identity_queue_import_handler_requires_ack_for_apply(server):
+    proposals, plan = _source_identity_queue_import_fixture()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["import_source_identity_queue_ordering_plan"](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+            "apply": True,
+            "operator_ack": False,
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert (
+        payload["status"]
+        == "source_identity_proposal_queue_importer_operator_ack_required"
+    )
+    assert payload["summary"]["queue_import_result_count"] == 0
+    assert payload["summary"]["queue_mutation"] is False
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_source_identity_queue_import_handler_imports_with_ack_without_live_write(server):
+    proposals, plan = _source_identity_queue_import_fixture()
+    server.mixer_client = MagicMock()
+    server.mixer_client.set_gain = MagicMock()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["import_source_identity_queue_ordering_plan"](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+            "apply": True,
+            "operator_ack": True,
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    queue = build_decision_queue(server)
+    assert payload["status"] == "source_identity_proposal_queue_importer_applied"
+    assert payload["summary"]["queue_import_result_count"] == 2
+    assert payload["summary"]["queue_mutation"] is True
+    assert payload["summary"]["live_write"] is False
+    assert payload["summary"]["imported_proposal_ids"] == [
+        "proposal-vocal-gain",
+        "proposal-other",
+    ]
+    assert queue["summary"]["pending_count"] == 2
+    assert queue["pending_actions"][0]["id"] == "proposal-vocal-gain"
+    assert queue["pending_actions"][0]["requested_change"]["value_type"] == "gain"
+    assert queue["pending_actions"][1]["id"] == "proposal-other"
+    server.mixer_client.set_gain.assert_not_called()
+    server._apply_manual_console_write.assert_not_called()
+
+
 def test_import_soundcheck_recommendations_respects_analyze_mode(server):
     server.operator_mode = "analyze"
     workflow = NoWriteSoundcheckRecommendationWorkflow()

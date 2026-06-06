@@ -127,6 +127,7 @@
 - Source identity proposal ordering preview may render a recommended ordered view from priority-policy records only as read-only UI/policy evidence; it must keep Product Layer proposal payload order, operator queue contents, runtime memory, trust stores, models, direct downstream-priority mutation, live authority, and full autonomous readiness unchanged until a separate queue-ordering/import consumer is reviewed.
 - Source identity proposal queue-ordering plan may turn ordering-preview rows into read-only future queue-import candidates only; it must keep `operator_proposal_queue`, Product Layer proposal payload order, runtime memory, trust stores, models, direct downstream-priority mutation, live authority, and full autonomous readiness unchanged until a separate acknowledged queue-import consumer is reviewed.
 - Source identity proposal queue importer may mutate only an explicit caller-provided `OperatorProposalQueue` when invoked with `apply=true` and `operator_ack=true`; Product Layer must call it dry-run only, and it must keep live mixer state, runtime memory, source identity trust stores, models, direct downstream-priority mutation, live authority, and full autonomous readiness unchanged.
+- The Product Layer `import_source_identity_queue_ordering_plan` handler may expose source-identity queue import to operators, but it defaults to dry-run, requires `apply=true` plus `operator_ack=true` before passing `server.operator_proposal_queue`, and must never call mixer clients or supervised console apply directly.
 
 ## Memory Pipeline Lessons
 
