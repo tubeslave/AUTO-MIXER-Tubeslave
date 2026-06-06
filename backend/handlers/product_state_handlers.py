@@ -67,6 +67,24 @@ from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import
 from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_dry_run_result_consumer import (
     build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_dry_run_result_consumer,
 )
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_apply_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_apply_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_index import (
+    build_operator_proposal_apply_sequence_policy_memory_index,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_index_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_index_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_review import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_review,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_trust_review_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_trust_review_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
+)
 
 
 VERIFIED_MANUAL_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
@@ -908,6 +926,81 @@ def register_handlers(server):
         )
         result["handler"] = (
             "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_dry_run_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_apply_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_apply_result_consumer(
+                memory_writer_dry_run_result_consumer=(
+                    data.get("memory_writer_dry_run_result_consumer")
+                    or data.get("queue_import_memory_writer_dry_run_result_consumer")
+                    or data.get("consumer")
+                ),
+                memory_writer_apply_result=(
+                    data.get("memory_writer_apply_result")
+                    or data.get("memory_writer_result")
+                    or data.get("writer")
+                ),
+                root_path=data.get("root_path") or data.get("root"),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_apply_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_memory_index_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_index_result_consumer(
+                memory_writer_apply_result_consumer=(
+                    data.get("memory_writer_apply_result_consumer")
+                    or data.get("queue_import_memory_writer_apply_result_consumer")
+                    or data.get("consumer")
+                ),
+                memory_index_result=(
+                    data.get("memory_index_result")
+                    or data.get("memory_index")
+                    or data.get("index")
+                ),
+                current_sequence_review_freshness=(
+                    data.get("current_sequence_review_freshness")
+                    or data.get("sequence_review_freshness")
+                    or data.get("freshness")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_memory_index_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_memory_trust_review_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_trust_review_result_consumer(
+                memory_index_result_consumer=(
+                    data.get("memory_index_result_consumer")
+                    or data.get("queue_import_memory_index_result_consumer")
+                    or data.get("consumer")
+                ),
+                memory_trust_review_result=(
+                    data.get("memory_trust_review_result")
+                    or data.get("memory_trust_review")
+                    or data.get("review")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_memory_trust_review_result"
         )
         await server.send_to_client(websocket, result)
 
@@ -4643,6 +4736,47 @@ def register_handlers(server):
             ),
         )
 
+    async def handle_index_operator_proposal_apply_sequence_policy_memory(websocket, data):
+        result = build_operator_proposal_apply_sequence_policy_memory_index(
+            memory_text=data.get("memory_text"),
+            root=data.get("root_path") or data.get("root"),
+            target_memory_path=data.get("target_memory_path") or ".ai/memory/project.md",
+        )
+        result["handler"] = "index_operator_proposal_apply_sequence_policy_memory"
+        await server.send_to_client(websocket, result)
+
+    async def handle_review_operator_proposal_apply_sequence_policy_memory_trust(
+        websocket,
+        data,
+    ):
+        result = build_operator_proposal_apply_sequence_policy_memory_trust_review(
+            memory_index=data.get("memory_index"),
+            current_sequence_review_freshness=(
+                data.get("current_sequence_review_freshness")
+                or data.get("sequence_review_freshness")
+                or data.get("freshness")
+            ),
+        )
+        result["handler"] = "review_operator_proposal_apply_sequence_policy_memory_trust"
+        await server.send_to_client(websocket, result)
+
+    async def handle_record_operator_proposal_apply_sequence_policy_memory_trust_acceptance(
+        websocket,
+        data,
+    ):
+        result = build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger(
+            memory_trust_review=(
+                data.get("memory_trust_review")
+                or data.get("memory_trust_review_result")
+                or data.get("review")
+            ),
+            acceptance_records=data.get("acceptance_records"),
+        )
+        result["handler"] = (
+            "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
+        )
+        await server.send_to_client(websocket, result)
+
     return {
         "get_dashboard_snapshot": handle_get_dashboard_snapshot,
         "get_channel_inventory": handle_get_channel_inventory,
@@ -4711,6 +4845,15 @@ def register_handlers(server):
         "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_dry_run_result": (
             handle_verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_dry_run_result
         ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_apply_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_apply_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_index_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_memory_index_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_trust_review_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_memory_trust_review_result
+        ),
         "create_operator_proposal": handle_create_operator_proposal,
         "accept_operator_proposal": handle_accept_operator_proposal,
         "dismiss_operator_proposal": handle_dismiss_operator_proposal,
@@ -4741,6 +4884,15 @@ def register_handlers(server):
         ),
         "write_operator_proposal_apply_sequence_policy_memory": (
             handle_write_operator_proposal_apply_sequence_policy_memory
+        ),
+        "index_operator_proposal_apply_sequence_policy_memory": (
+            handle_index_operator_proposal_apply_sequence_policy_memory
+        ),
+        "review_operator_proposal_apply_sequence_policy_memory_trust": (
+            handle_review_operator_proposal_apply_sequence_policy_memory_trust
+        ),
+        "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance": (
+            handle_record_operator_proposal_apply_sequence_policy_memory_trust_acceptance
         ),
         "apply_operator_proposal": handle_apply_operator_proposal,
     }

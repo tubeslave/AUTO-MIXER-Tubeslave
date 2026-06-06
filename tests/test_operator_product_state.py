@@ -12255,7 +12255,7 @@ async def test_sequence_policy_queue_import_dry_run_result_consumer_feeds_execut
 
 
 @pytest.mark.asyncio
-async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audit_without_extra_write(server):
+async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audit_without_extra_write(server, tmp_path):
     proposals, plan = _sequence_policy_queue_import_fixture()
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
@@ -12693,6 +12693,368 @@ async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audi
         ]["memory_draft_records"][0]["proposal_id"]
         == "proposal-sequence-fader"
     )
+
+    writer_apply_request = dict(
+        writer_dry_run_consumer_payload["memory_writer_apply_request"]
+    )
+    writer_apply_request["apply"] = True
+    writer_apply_request["operator_ack"] = True
+    writer_apply_request["root_path"] = str(tmp_path)
+
+    await server._dispatch["write_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        writer_apply_request,
+    )
+
+    writer_apply_payload = server.send_to_client.await_args.args[1]
+    assert writer_apply_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_writer"
+    )
+    assert writer_apply_payload["status"] == "append_only_memory_write_applied"
+    assert writer_apply_payload["success"] is True
+    assert writer_apply_payload["summary"]["write_result_count"] == 1
+    assert writer_apply_payload["summary"]["append_only_memory_write_applied"] is True
+    assert writer_apply_payload["summary"]["operator_ack"] is True
+    assert writer_apply_payload["summary"]["apply_requested"] is True
+    assert writer_apply_payload["summary"]["memory_file_mutation"] is True
+    assert writer_apply_payload["summary"]["runtime_memory_mutation"] is False
+    assert writer_apply_payload["summary"]["policy_mutation"] is False
+    assert writer_apply_payload["summary"]["model_mutation"] is False
+    assert writer_apply_payload["summary"]["live_authority_granted"] is False
+    assert writer_apply_payload["summary"]["full_autonomous_ready"] is False
+    assert writer_apply_payload["safety"]["append_only_memory_file_write_applied"] is True
+    assert writer_apply_payload["safety"]["memory_file_mutation"] is True
+    assert writer_apply_payload["safety"]["live_write"] is False
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_apply_result"
+    ](
+        object(),
+        {
+            "memory_writer_dry_run_result_consumer": writer_dry_run_consumer_payload,
+            "memory_writer_apply_result": writer_apply_payload,
+            "root_path": str(tmp_path),
+        },
+    )
+
+    writer_apply_consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        writer_apply_consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_apply_result_consumer"
+    )
+    assert (
+        writer_apply_consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_apply_result"
+    )
+    assert (
+        writer_apply_consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_memory_index_request_available"
+    )
+    assert writer_apply_consumer_payload["summary"]["expected_memory_write_result_count"] == 1
+    assert writer_apply_consumer_payload["summary"]["memory_write_result_count"] == 1
+    assert writer_apply_consumer_payload["summary"]["invalid_record_count"] == 0
+    assert writer_apply_consumer_payload["summary"]["memory_index_request_available"] is True
+    assert writer_apply_consumer_payload["summary"]["memory_index_handler_invoked"] is False
+    assert writer_apply_consumer_payload["summary"]["memory_index_created"] is False
+    assert writer_apply_consumer_payload["summary"]["source_memory_file_write_applied"] is True
+    assert (
+        writer_apply_consumer_payload["summary"][
+            "memory_file_write_applied_by_consumer"
+        ]
+        is False
+    )
+    assert writer_apply_consumer_payload["summary"]["memory_file_mutation"] is False
+    assert writer_apply_consumer_payload["summary"]["runtime_memory_mutation"] is False
+    assert writer_apply_consumer_payload["summary"]["policy_mutation"] is False
+    assert writer_apply_consumer_payload["summary"]["model_mutation"] is False
+    assert writer_apply_consumer_payload["summary"]["live_authority_granted"] is False
+    assert writer_apply_consumer_payload["summary"]["full_autonomous_ready"] is False
+    assert writer_apply_consumer_payload["memory_index_request"]["handler"] == (
+        "index_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert (
+        writer_apply_consumer_payload["memory_index_request"]["root_path"]
+        == str(tmp_path)
+    )
+    assert (
+        writer_apply_consumer_payload["memory_index_request"]["target_memory_path"]
+        == ".ai/memory/project.md"
+    )
+
+    await server._dispatch["index_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        writer_apply_consumer_payload["memory_index_request"],
+    )
+
+    memory_index_payload = server.send_to_client.await_args.args[1]
+    assert memory_index_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_index"
+    )
+    assert memory_index_payload["handler"] == (
+        "index_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert memory_index_payload["status"] == "append_only_sequence_memory_index_available"
+    assert memory_index_payload["safety"]["read_only"] is True
+    assert memory_index_payload["safety"]["memory_file_read"] is True
+    assert memory_index_payload["safety"]["live_write"] is False
+    assert memory_index_payload["safety"]["policy_mutation"] is False
+    assert memory_index_payload["safety"]["runtime_memory_mutation"] is False
+    assert memory_index_payload["safety"]["model_mutation"] is False
+    assert memory_index_payload["summary"]["memory_record_count"] == 1
+    assert memory_index_payload["summary"]["invalid_record_count"] == 0
+    assert memory_index_payload["summary"]["indexed_proposal_ids"] == [
+        "proposal-sequence-fader"
+    ]
+    assert memory_index_payload["summary"]["live_authority_granted"] is False
+    assert memory_index_payload["summary"]["full_autonomous_ready"] is False
+    assert (
+        memory_index_payload["memory_records"][0]["proposal_id"]
+        == "proposal-sequence-fader"
+    )
+
+    fresh_sequence_review_context = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "stale_field_count": 0,
+        "read_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "queries_console": False,
+        "queue_mutation": False,
+        "policy_mutation": False,
+    }
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_index_result"
+    ](
+        object(),
+        {
+            "memory_writer_apply_result_consumer": writer_apply_consumer_payload,
+            "memory_index_result": memory_index_payload,
+            "current_sequence_review_freshness": fresh_sequence_review_context,
+        },
+    )
+
+    memory_index_consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        memory_index_consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_index_result_consumer"
+    )
+    assert (
+        memory_index_consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_memory_index_result"
+    )
+    assert (
+        memory_index_consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_memory_trust_review_request_available"
+    )
+    assert (
+        memory_index_consumer_payload["summary"]["expected_memory_index_record_count"]
+        == 1
+    )
+    assert memory_index_consumer_payload["summary"]["memory_index_record_count"] == 1
+    assert memory_index_consumer_payload["summary"]["invalid_record_count"] == 0
+    assert (
+        memory_index_consumer_payload["summary"][
+            "memory_trust_review_request_available"
+        ]
+        is True
+    )
+    assert (
+        memory_index_consumer_payload["summary"][
+            "memory_trust_review_handler_invoked"
+        ]
+        is False
+    )
+    assert memory_index_consumer_payload["summary"]["memory_trust_review_created"] is False
+    assert memory_index_consumer_payload["summary"]["source_memory_index_available"] is True
+    assert (
+        memory_index_consumer_payload["summary"][
+            "fresh_sequence_review_context_status"
+        ]
+        == "fresh"
+    )
+    assert memory_index_consumer_payload["summary"]["memory_file_mutation"] is False
+    assert memory_index_consumer_payload["summary"]["runtime_memory_mutation"] is False
+    assert memory_index_consumer_payload["summary"]["policy_mutation"] is False
+    assert memory_index_consumer_payload["summary"]["model_mutation"] is False
+    assert memory_index_consumer_payload["summary"]["live_authority_granted"] is False
+    assert memory_index_consumer_payload["summary"]["full_autonomous_ready"] is False
+    assert (
+        memory_index_consumer_payload["memory_trust_review_request"]["handler"]
+        == "review_operator_proposal_apply_sequence_policy_memory_trust"
+    )
+    assert (
+        memory_index_consumer_payload["memory_trust_review_request"][
+            "memory_index"
+        ]["status"]
+        == "append_only_sequence_memory_index_available"
+    )
+
+    await server._dispatch[
+        "review_operator_proposal_apply_sequence_policy_memory_trust"
+    ](
+        object(),
+        memory_index_consumer_payload["memory_trust_review_request"],
+    )
+
+    memory_trust_review_payload = server.send_to_client.await_args.args[1]
+    assert memory_trust_review_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_review"
+    )
+    assert memory_trust_review_payload["handler"] == (
+        "review_operator_proposal_apply_sequence_policy_memory_trust"
+    )
+    assert (
+        memory_trust_review_payload["status"]
+        == "sequence_memory_trust_review_candidate_available"
+    )
+    assert memory_trust_review_payload["summary"]["memory_record_count"] == 1
+    assert memory_trust_review_payload["summary"]["trust_review_candidate_count"] == 1
+    assert (
+        memory_trust_review_payload["summary"][
+            "current_sequence_review_freshness_status"
+        ]
+        == "fresh"
+    )
+    assert memory_trust_review_payload["summary"]["execution_allowed_by_review"] is False
+    assert memory_trust_review_payload["summary"]["policy_mutation"] is False
+    assert memory_trust_review_payload["summary"]["runtime_memory_mutation"] is False
+    assert memory_trust_review_payload["summary"]["model_mutation"] is False
+    assert memory_trust_review_payload["summary"]["live_authority_granted"] is False
+    assert memory_trust_review_payload["summary"]["full_autonomous_ready"] is False
+    assert (
+        memory_trust_review_payload["trust_review_candidates"][0]["proposal_id"]
+        == "proposal-sequence-fader"
+    )
+    assert (
+        memory_trust_review_payload["trust_review_candidates"][0][
+            "operator_review_required"
+        ]
+        is True
+    )
+    assert (
+        memory_trust_review_payload["trust_review_candidates"][0][
+            "execution_allowed_by_review"
+        ]
+        is False
+    )
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_trust_review_result"
+    ](
+        object(),
+        {
+            "memory_index_result_consumer": memory_index_consumer_payload,
+            "memory_trust_review_result": memory_trust_review_payload,
+        },
+    )
+
+    trust_review_consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        trust_review_consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_trust_review_result_consumer"
+    )
+    assert (
+        trust_review_consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_memory_trust_review_result"
+    )
+    assert (
+        trust_review_consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_memory_trust_acceptance_ledger_request_available"
+    )
+    assert (
+        trust_review_consumer_payload["summary"][
+            "expected_trust_review_candidate_count"
+        ]
+        == 1
+    )
+    assert trust_review_consumer_payload["summary"]["trust_review_candidate_count"] == 1
+    assert trust_review_consumer_payload["summary"]["invalid_record_count"] == 0
+    assert (
+        trust_review_consumer_payload["summary"][
+            "acceptance_ledger_request_available"
+        ]
+        is True
+    )
+    assert (
+        trust_review_consumer_payload["summary"][
+            "acceptance_ledger_handler_invoked"
+        ]
+        is False
+    )
+    assert trust_review_consumer_payload["summary"]["acceptance_ledger_created"] is False
+    assert trust_review_consumer_payload["summary"]["operator_acceptance_required"] is True
+    assert trust_review_consumer_payload["summary"]["memory_file_mutation"] is False
+    assert trust_review_consumer_payload["summary"]["runtime_memory_mutation"] is False
+    assert trust_review_consumer_payload["summary"]["policy_mutation"] is False
+    assert trust_review_consumer_payload["summary"]["model_mutation"] is False
+    assert trust_review_consumer_payload["summary"]["live_authority_granted"] is False
+    assert trust_review_consumer_payload["summary"]["full_autonomous_ready"] is False
+    assert (
+        trust_review_consumer_payload["acceptance_ledger_request"]["handler"]
+        == "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
+    )
+    assert (
+        trust_review_consumer_payload["acceptance_ledger_request"][
+            "acceptance_records"
+        ]
+        == []
+    )
+    assert (
+        trust_review_consumer_payload["acceptance_record_templates"][0]["proposal_id"]
+        == "proposal-sequence-fader"
+    )
+    assert trust_review_consumer_payload["acceptance_record_templates"][0][
+        "operator_must_choose_decision"
+    ] is True
+    assert trust_review_consumer_payload["acceptance_record_templates"][0][
+        "sequence_policy_promotion_allowed_by_acceptance"
+    ] is False
+
+    await server._dispatch[
+        "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
+    ](
+        object(),
+        trust_review_consumer_payload["acceptance_ledger_request"],
+    )
+
+    acceptance_ledger_payload = server.send_to_client.await_args.args[1]
+    assert acceptance_ledger_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger"
+    )
+    assert acceptance_ledger_payload["handler"] == (
+        "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
+    )
+    assert (
+        acceptance_ledger_payload["status"]
+        == "operator_sequence_memory_trust_acceptance_required"
+    )
+    assert acceptance_ledger_payload["summary"]["trust_review_candidate_count"] == 1
+    assert acceptance_ledger_payload["summary"]["acceptance_record_count"] == 0
+    assert acceptance_ledger_payload["summary"]["accepted_record_count"] == 0
+    assert acceptance_ledger_payload["summary"]["rejected_record_count"] == 0
+    assert acceptance_ledger_payload["summary"]["unreviewed_candidate_count"] == 1
+    assert acceptance_ledger_payload["summary"]["operator_review_required"] is True
+    assert (
+        acceptance_ledger_payload["summary"][
+            "sequence_policy_promotion_allowed_by_acceptance"
+        ]
+        is False
+    )
+    assert (
+        acceptance_ledger_payload["summary"]["execution_allowed_by_acceptance"]
+        is False
+    )
+    assert acceptance_ledger_payload["summary"]["policy_mutation_allowed_by_acceptance"] is False
+    assert (
+        acceptance_ledger_payload["summary"][
+            "runtime_memory_mutation_allowed_by_acceptance"
+        ]
+        is False
+    )
+    assert acceptance_ledger_payload["summary"]["live_authority_granted"] is False
+    assert acceptance_ledger_payload["summary"]["full_autonomous_ready"] is False
     assert server._apply_manual_console_write.await_count == 1
     assert "seq-import-audit:proposal-sequence-fader" in (
         server._operator_apply_idempotency_keys
