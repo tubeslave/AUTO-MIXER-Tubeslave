@@ -54,6 +54,9 @@ try:
     from source_identity_calibration_memory_trust_promotion_plan import (
         build_source_identity_calibration_memory_trust_promotion_plan,
     )
+    from source_identity_calibration_memory_trust_promotion_contract import (
+        build_source_identity_calibration_memory_trust_promotion_contract,
+    )
     from source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
         analyze_source_identity_replay_calibration,
@@ -106,6 +109,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_trust_promotion_plan import (
         build_source_identity_calibration_memory_trust_promotion_plan,
+    )
+    from backend.source_identity_calibration_memory_trust_promotion_contract import (
+        build_source_identity_calibration_memory_trust_promotion_contract,
     )
     from backend.source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
@@ -396,6 +402,33 @@ def _source_identity_memory_trust_acceptance_records(server: Any) -> List[Dict[s
     return [dict(record) for record in raw_records if isinstance(record, dict)]
 
 
+def _source_identity_memory_trust_promotion_rollback_evidence(
+    server: Any,
+) -> Dict[str, Any]:
+    raw_evidence = getattr(
+        server,
+        "source_identity_memory_trust_promotion_rollback_evidence",
+        None,
+    )
+    if raw_evidence is None:
+        raw_evidence = getattr(
+            server,
+            "source_identity_calibration_memory_trust_promotion_rollback_evidence",
+            None,
+        )
+    if raw_evidence is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_evidence = config.get(
+                "source_identity_memory_trust_promotion_rollback_evidence"
+            )
+            if raw_evidence is None:
+                raw_evidence = config.get(
+                    "source_identity_calibration_memory_trust_promotion_rollback_evidence"
+                )
+    return dict(raw_evidence) if isinstance(raw_evidence, dict) else {}
+
+
 def build_main_pipeline_preview(
     server: Any,
     *,
@@ -489,6 +522,18 @@ def build_main_pipeline_preview(
     )
     source_identity_memory_trust_promotion_summary = (
         source_identity_memory_trust_promotion_plan.get("summary", {})
+    )
+    source_identity_memory_trust_promotion_contract = (
+        build_source_identity_calibration_memory_trust_promotion_contract(
+            promotion_plan=source_identity_memory_trust_promotion_plan,
+            current_state_cache_freshness=_source_identity_replay_freshness(server),
+            rollback_evidence=(
+                _source_identity_memory_trust_promotion_rollback_evidence(server)
+            ),
+        )
+    )
+    source_identity_memory_trust_promotion_contract_summary = (
+        source_identity_memory_trust_promotion_contract.get("summary", {})
     )
 
     proposals = (
@@ -589,6 +634,13 @@ def build_main_pipeline_preview(
             "source_identity_calibration_memory_trust_promotion_candidate_count": int(
                 source_identity_memory_trust_promotion_summary.get(
                     "promotion_candidate_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_calibration_memory_trust_promotion_contract_record_count": int(
+                source_identity_memory_trust_promotion_contract_summary.get(
+                    "contract_record_count",
                     0,
                 )
                 or 0
@@ -728,6 +780,28 @@ def build_main_pipeline_preview(
                 ),
             },
             {
+                "adapter_id": (
+                    "source_identity_calibration_memory_trust_promotion_contract"
+                ),
+                "method_id": (
+                    "source_identity_calibration_memory_trust_promotion_contract"
+                ),
+                "status": source_identity_memory_trust_promotion_contract.get("status"),
+                "output": "source_identity_memory_trust_promotion_contract_review",
+                "reason": (
+                    ", ".join(
+                        source_identity_memory_trust_promotion_contract_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if source_identity_memory_trust_promotion_contract_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
                 "adapter_id": "registry_blockers",
                 "method_id": "processing_registry",
                 "status": "active",
@@ -778,6 +852,9 @@ def build_main_pipeline_preview(
         ),
         "source_identity_calibration_memory_trust_promotion_plan": (
             source_identity_memory_trust_promotion_plan
+        ),
+        "source_identity_calibration_memory_trust_promotion_contract": (
+            source_identity_memory_trust_promotion_contract
         ),
         "registry": {
             "summary": registry_snapshot.get("summary", {}),

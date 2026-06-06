@@ -115,6 +115,9 @@ try:
     from source_identity_calibration_memory_trust_promotion_plan import (
         build_source_identity_calibration_memory_trust_promotion_plan,
     )
+    from source_identity_calibration_memory_trust_promotion_contract import (
+        build_source_identity_calibration_memory_trust_promotion_contract,
+    )
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.bus_group_main_dca_physical_readback_contract import (
@@ -219,6 +222,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_trust_promotion_plan import (
         build_source_identity_calibration_memory_trust_promotion_plan,
+    )
+    from backend.source_identity_calibration_memory_trust_promotion_contract import (
+        build_source_identity_calibration_memory_trust_promotion_contract,
     )
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
 
@@ -637,6 +643,35 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "transport_free",
             "manual_promotion_plan_only",
             "memory_trust_acceptance_consumer",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_calibration_memory_trust_promotion_contract",
+        label="Source Identity Calibration Memory Trust Promotion Contract",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only contract that validates manual memory-trust promotion "
+            "candidates against fresh replay context and rollback evidence."
+        ),
+        module="backend/source_identity_calibration_memory_trust_promotion_contract.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="memory_trust_promotion_contract_is_review_not_executor",
+        promotion_next=(
+            "review contract-ready records manually; a separate executor is still "
+            "required before downstream priority can change"
+        ),
+        notes=(
+            "transport_free",
+            "promotion_contract_review_only",
+            "fresh_replay_context_required",
+            "rollback_evidence_required",
             "no_queue_mutation",
             "no_model_mutation",
             "no_runtime_memory_mutation",
@@ -1997,6 +2032,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
+            "source_identity_calibration_memory_trust_promotion_contract",
             "auto_fader_v1",
             "lufs_gain_staging",
             "live_shared_mix",
@@ -2087,6 +2123,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
+            "source_identity_calibration_memory_trust_promotion_contract",
             "bus_group_balance_proposal",
             "mute_management_proposal",
             "routing_management_proposal",
@@ -2136,6 +2173,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
+            "source_identity_calibration_memory_trust_promotion_contract",
             "cross_adaptive_eq",
             "autoeq_audit_validation",
             "diff_deq_playbook_bridge",
@@ -2284,6 +2322,13 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "build_source_identity_calibration_memory_trust_promotion_plan",
         "ui_surface": "Channel Intelligence, manual source identity memory trust promotion plan",
         "next_step": "Use accepted memory-trust records only as manual promotion candidates; downstream priority changes still require a separate promotion contract.",
+    },
+    "source_identity_calibration_memory_trust_promotion_contract": {
+        "entrypoint": (
+            "build_source_identity_calibration_memory_trust_promotion_contract"
+        ),
+        "ui_surface": "Channel Intelligence, source identity memory trust promotion contract",
+        "next_step": "Use contract-ready records only for operator review; downstream priority changes still require a separate executor and rollback path.",
     },
     "supervised_manual_fader_gain": {
         "entrypoint": "apply_operator_proposal -> supervised manual gate",
@@ -2783,6 +2828,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "source_identity_calibration_memory_trust_promotion_plan": (
             build_source_identity_calibration_memory_trust_promotion_plan()
+        ),
+        "source_identity_calibration_memory_trust_promotion_contract": (
+            build_source_identity_calibration_memory_trust_promotion_contract()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),
