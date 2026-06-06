@@ -226,6 +226,12 @@ try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer,
     )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -486,6 +492,12 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -2554,6 +2566,105 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         ),
     ),
     ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer",
+        label=(
+            "Operator Proposal Apply Sequence Policy Memory Trust Promotion "
+            "Queue Import Promotion Ordering Preview Result Consumer"
+        ),
+        domain="decision_evidence",
+        status="shadow_only",
+        summary=(
+            "Read-only verifier that matches ordering-preview rows back to "
+            "queue-import policy-consumer provenance before emitting a "
+            "queue-ordering-plan request template."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer_is_not_queue_ordering_plan_or_live_authority"
+        ),
+        promotion_next=(
+            "run the separate read-only queue-ordering plan only after this "
+            "consumer verifies ordering-preview rows against queue-import "
+            "policy-consumer provenance"
+        ),
+        notes=(
+            "transport_free",
+            "promotion_ordering_preview_result_consumer_only",
+            "promotion_queue_ordering_plan_request_template_only",
+            "promotion_queue_ordering_plan_handler_invoked_false",
+            "promotion_queue_ordering_plan_created_false",
+            "requires_ordered_preview_records",
+            "policy_mutation_false_by_consumer",
+            "runtime_memory_mutation_false_by_consumer",
+            "model_mutation_false",
+            "memory_file_mutation_false",
+            "idempotency_reserved_false_by_consumer",
+            "no_queue_mutation_by_consumer",
+            "no_proposal_order_mutation_by_consumer",
+            "no_model_mutation",
+            "no_runtime_memory_mutation_by_consumer",
+            "no_sequence_policy_trust_store_mutation_by_consumer",
+            "no_proposal_state_mutation_by_consumer",
+            "no_direct_sequence_execution",
+            "no_live_writes_by_consumer",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer",
+        label=(
+            "Operator Proposal Apply Sequence Policy Memory Trust Promotion "
+            "Queue Import Promotion Queue Ordering Plan Result Consumer"
+        ),
+        domain="decision_evidence",
+        status="shadow_only",
+        summary=(
+            "Read-only verifier that matches queue-ordering-plan records back "
+            "to queue-import ordering-preview provenance before emitting a "
+            "queue-importer request template."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer_is_not_queue_importer_or_live_authority"
+        ),
+        promotion_next=(
+            "run the separate queue importer dry-run only after this consumer "
+            "verifies queue-ordering-plan records against queue-import "
+            "ordering-preview provenance and operator proposal payloads are supplied"
+        ),
+        notes=(
+            "transport_free",
+            "promotion_queue_ordering_plan_result_consumer_only",
+            "promotion_queue_importer_request_template_only",
+            "promotion_queue_importer_handler_invoked_false",
+            "promotion_queue_importer_created_false",
+            "requires_queue_ordering_plan_records",
+            "proposal_payloads_required_from_operator",
+            "apply_false_by_template",
+            "operator_ack_false_by_template",
+            "policy_mutation_false_by_consumer",
+            "runtime_memory_mutation_false_by_consumer",
+            "model_mutation_false",
+            "memory_file_mutation_false",
+            "idempotency_reserved_false_by_consumer",
+            "no_queue_mutation_by_consumer",
+            "no_proposal_order_mutation_by_consumer",
+            "no_model_mutation",
+            "no_runtime_memory_mutation_by_consumer",
+            "no_sequence_policy_trust_store_mutation_by_consumer",
+            "no_proposal_state_mutation_by_consumer",
+            "no_direct_sequence_execution",
+            "no_live_writes_by_consumer",
+        ),
+    ),
+    ProcessingMethod(
         id="source_identity_calibration_memory_trust_review",
         label="Source Identity Calibration Memory Trust Review",
         domain="memory_learning",
@@ -4393,6 +4504,8 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -4535,6 +4648,8 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -4636,6 +4751,8 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -4984,6 +5101,16 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer",
         "ui_surface": "Decision Queue, sequence policy memory trust promotion queue import promotion-policy-consumer result consumer",
         "next_step": "Use verified promotion ordering-preview request templates only after policy-consumer records match queue-import sequence-policy gate provenance and operator proposals are supplied.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion queue import promotion-ordering-preview result consumer",
+        "next_step": "Use verified promotion queue-ordering-plan request templates only after ordering-preview rows match queue-import policy-consumer provenance.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion queue import promotion-queue-ordering-plan result consumer",
+        "next_step": "Use verified promotion queue-importer request templates only after queue-ordering-plan records match queue-import ordering-preview provenance and operator proposal payloads are supplied.",
     },
     "source_identity_calibration_memory_trust_review": {
         "entrypoint": "build_source_identity_calibration_memory_trust_review",
@@ -5685,6 +5812,12 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer": (
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer()
         ),
         "source_identity_calibration_memory_trust_review": (
             build_source_identity_calibration_memory_trust_review()

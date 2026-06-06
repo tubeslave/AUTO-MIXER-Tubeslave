@@ -608,13 +608,25 @@ def _validate_scope_repo_local_report_path(
         return []
 
     expected_path = str((project_root / ".paperclip" / "reports").resolve())
-    if expected_path in scope_body:
+    labeled_path_pattern = re.compile(
+        rf"{re.escape(REPO_LOCAL_REPORT_PATH_LABEL)}\s*`?"
+        rf"{re.escape(expected_path)}`?\.?"
+    )
+    if labeled_path_pattern.search(scope_body):
         return []
 
-    return [
-        "Scope must include repo-local report path under Automixer project: "
-        f"{expected_path}"
-    ]
+    errors = []
+    if expected_path not in scope_body:
+        errors.append(
+            "Scope must include repo-local report path under Automixer project: "
+            f"{expected_path}"
+        )
+
+    errors.append(
+        "Scope must attach repo-local report path to label: "
+        f"{REPO_LOCAL_REPORT_PATH_LABEL} {expected_path}"
+    )
+    return errors
 
 
 def _validate_project_boundary_contradictions(text: str) -> list[str]:

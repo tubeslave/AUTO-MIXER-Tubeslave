@@ -302,6 +302,31 @@ def test_cycle_report_validator_rejects_missing_repo_local_report_path_evidence(
     )
 
 
+def test_cycle_report_validator_rejects_unlabeled_repo_local_report_path(
+    tmp_path,
+):
+    validator = load_validator_module()
+    report_path = write_report(
+        tmp_path,
+        "automixer_codex_cycle_20260530T000000Z.md",
+        VALID_REPORT.replace(
+            "Repo-local report path:\n"
+            "`{PROJECT_ROOT}/.paperclip/reports`.\n",
+            "Repo-local report path:\n"
+            "Repo-local report directory was reviewed separately.\n"
+            "Observed path: `{PROJECT_ROOT}/.paperclip/reports`.\n",
+        ),
+    )
+
+    errors = validator.validate_report(report_path, project_root=tmp_path)
+
+    assert (
+        "Scope must attach repo-local report path to label: "
+        f"Repo-local report path: {tmp_path / '.paperclip' / 'reports'}"
+        in errors
+    )
+
+
 def test_cycle_report_validator_rejects_missing_codex_cli_agent_workflow_evidence(
     tmp_path,
 ):

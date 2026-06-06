@@ -115,6 +115,12 @@ from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import
 from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer import (
     build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer,
 )
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer,
+)
 from operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
     build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
 )
@@ -150,6 +156,9 @@ from operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consu
 )
 from operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview import (
     build_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan,
 )
 
 
@@ -1330,6 +1339,56 @@ def register_handlers(server):
         )
         result["handler"] = (
             "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_policy_consumer_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_ordering_preview_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer(
+                promotion_policy_consumer_result_consumer=(
+                    data.get("promotion_policy_consumer_result_consumer")
+                    or data.get("queue_import_promotion_policy_consumer_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_ordering_preview_result=(
+                    data.get("promotion_ordering_preview_result")
+                    or data.get("promotion_ordering_preview")
+                    or data.get("ordering_preview")
+                    or data.get("preview")
+                    or data.get("result")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_ordering_preview_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_ordering_plan_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer(
+                promotion_ordering_preview_result_consumer=(
+                    data.get("promotion_ordering_preview_result_consumer")
+                    or data.get("queue_import_promotion_ordering_preview_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_queue_ordering_plan_result=(
+                    data.get("promotion_queue_ordering_plan_result")
+                    or data.get("promotion_queue_ordering_plan")
+                    or data.get("queue_ordering_plan")
+                    or data.get("plan")
+                    or data.get("result")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_ordering_plan_result"
         )
         await server.send_to_client(websocket, result)
 
@@ -5329,6 +5388,25 @@ def register_handlers(server):
         )
         await server.send_to_client(websocket, result)
 
+    async def handle_plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan(
+                ordering_preview=(
+                    data.get("ordering_preview")
+                    or data.get("promotion_ordering_preview")
+                    or data.get("promotion_ordering_preview_result")
+                    or data.get("preview")
+                ),
+            )
+        )
+        result["handler"] = (
+            "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering"
+        )
+        await server.send_to_client(websocket, result)
+
     return {
         "get_dashboard_snapshot": handle_get_dashboard_snapshot,
         "get_channel_inventory": handle_get_channel_inventory,
@@ -5439,6 +5517,12 @@ def register_handlers(server):
         "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_policy_consumer_result": (
             handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_policy_consumer_result
         ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_ordering_preview_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_ordering_preview_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_ordering_plan_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_ordering_plan_result
+        ),
         "create_operator_proposal": handle_create_operator_proposal,
         "accept_operator_proposal": handle_accept_operator_proposal,
         "dismiss_operator_proposal": handle_dismiss_operator_proposal,
@@ -5511,6 +5595,9 @@ def register_handlers(server):
         ),
         "preview_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering": (
             handle_preview_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering
+        ),
+        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering": (
+            handle_plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering
         ),
         "apply_operator_proposal": handle_apply_operator_proposal,
     }
