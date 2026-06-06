@@ -16,8 +16,23 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
 
+try:
+    from wing_readonly_preflight_review_decision import (
+        build_wing_readonly_preflight_review_decision_ledger,
+    )
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.wing_readonly_preflight_review_decision import (
+        build_wing_readonly_preflight_review_decision_ledger,
+    )
+
 
 SUPERVISED_WING_PROOF_PLAN_METHOD_ID = "supervised_wing_proof_plan"
+READONLY_PREFLIGHT_CANDIDATE_BLOCKER = (
+    "readonly_preflight_candidate_required_before_supervised_proof"
+)
+READONLY_PREFLIGHT_REVIEW_DECISION_BLOCKER = (
+    "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+)
 PLAN_STATUSES = {
     "operator_proof_required",
     "manual_review_ready",
@@ -149,6 +164,43 @@ def _readonly_preflight_candidate_available(overlay: Mapping[str, Any]) -> bool:
         and overlay.get("live_authority_granted") is not True
         and overlay.get("full_autonomous_ready") is not True
     )
+
+
+def _readonly_preflight_review_decision_overlay(
+    autonomy_readiness_snapshot: Mapping[str, Any] | None,
+    explicit_ledger: Mapping[str, Any] | None,
+) -> Mapping[str, Any]:
+    if isinstance(explicit_ledger, Mapping):
+        return explicit_ledger
+    readiness = autonomy_readiness_snapshot or {}
+    summary = readiness.get("summary") if isinstance(readiness.get("summary"), Mapping) else {}
+    overlay = summary.get("wing_readonly_preflight_review_decision_ledger")
+    if isinstance(overlay, Mapping):
+        return overlay
+    return build_wing_readonly_preflight_review_decision_ledger()
+
+
+def _review_decision_summary(overlay: Mapping[str, Any]) -> Mapping[str, Any]:
+    summary = overlay.get("summary")
+    return summary if isinstance(summary, Mapping) else overlay
+
+
+def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> bool:
+    summary = _review_decision_summary(overlay)
+    return (
+        summary.get("manual_readiness_update_candidate_available") is True
+        and int(summary.get("accepted_record_count") or 0) > 0
+        and int(summary.get("invalid_record_count") or 0) == 0
+        and int(summary.get("unreviewed_candidate_count") or 0) == 0
+        and summary.get("readiness_matrix_update_allowed_by_decision") is not True
+        and summary.get("readiness_closure_allowed_by_decision") is not True
+        and summary.get("live_authority_granted") is not True
+        and summary.get("full_autonomous_ready") is not True
+    )
+
+
+def _readonly_preflight_review_decision_status(overlay: Mapping[str, Any]) -> Any:
+    return overlay.get("status") or _review_decision_summary(overlay).get("ledger_status")
 
 
 def _string_list(value: Any) -> list[str]:
@@ -344,6 +396,7 @@ def build_supervised_wing_proof_plan(
     promotion_evidence_snapshot: Mapping[str, Any],
     *,
     autonomy_readiness_snapshot: Mapping[str, Any] | None = None,
+    readonly_preflight_review_decision_ledger: Mapping[str, Any] | None = None,
     backend_url: str = DEFAULT_BACKEND_URL,
     artifact_root: str = DEFAULT_ARTIFACT_ROOT,
     channels_by_value_type: Mapping[str, Tuple[int, ...]] | None = None,
@@ -362,6 +415,12 @@ def build_supervised_wing_proof_plan(
     invalid = _invalid_artifacts_present(promotion_evidence_snapshot)
     preflight = _readonly_preflight_overlay(autonomy_readiness_snapshot)
     preflight_candidate = _readonly_preflight_candidate_available(preflight)
+    review_decision = _readonly_preflight_review_decision_overlay(
+        autonomy_readiness_snapshot,
+        readonly_preflight_review_decision_ledger,
+    )
+    review_summary = _review_decision_summary(review_decision)
+    review_decision_accepted = _readonly_preflight_review_decision_accepted(review_decision)
     preflight_steps: Tuple[WingReadonlyPreflightPlanStep, ...] = ()
     if invalid:
         steps: Tuple[WingProofPlanStep, ...] = ()
@@ -379,8 +438,15 @@ def build_supervised_wing_proof_plan(
             ),
         )
         global_blockers = [
-            "readonly_preflight_candidate_required_before_supervised_proof",
+            READONLY_PREFLIGHT_CANDIDATE_BLOCKER,
             *_string_list(preflight.get("blocked_by")),
+        ]
+    elif not review_decision_accepted:
+        steps = ()
+        status = "manual_review_ready"
+        global_blockers = [
+            READONLY_PREFLIGHT_REVIEW_DECISION_BLOCKER,
+            *_string_list(review_summary.get("blocked_by")),
         ]
     else:
         steps = _build_steps(
@@ -422,6 +488,21 @@ def build_supervised_wing_proof_plan(
                 preflight.get("next_required_actions")
             ),
             "readonly_preflight_step_count": len(preflight_steps),
+            "readonly_preflight_review_decision_required": True,
+            "readonly_preflight_review_decision_accepted": review_decision_accepted,
+            "readonly_preflight_review_decision_status": _readonly_preflight_review_decision_status(review_decision),
+            "readonly_preflight_review_decision_blocked_by": _string_list(
+                review_summary.get("blocked_by")
+            ),
+            "readonly_preflight_review_decision_accepted_record_count": int(
+                review_summary.get("accepted_record_count") or 0
+            ),
+            "readonly_preflight_review_decision_invalid_record_count": int(
+                review_summary.get("invalid_record_count") or 0
+            ),
+            "readonly_preflight_review_decision_unreviewed_candidate_count": int(
+                review_summary.get("unreviewed_candidate_count") or 0
+            ),
             "global_blockers": global_blockers,
         },
         "readonly_preflight_steps": [step.to_dict() for step in preflight_steps],

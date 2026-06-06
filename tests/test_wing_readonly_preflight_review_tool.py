@@ -113,6 +113,15 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert report["execution_allowed_by_review"] is False
     assert report["live_authority_granted"] is False
     assert report["full_autonomous_ready"] is False
+    assert report["manual_review_required_before_readiness_update"] is True
+    assert report["manual_review_decision_required"] is True
+    assert [row["id"] for row in report["manual_review_checklist"]] == [
+        "confirm_artifact_paths",
+        "confirm_operator_channel_scope",
+        "confirm_physical_readbacks",
+        "confirm_event_log_readonly_sequence",
+        "confirm_no_live_authority",
+    ]
     assert report["artifact_sources"] == [str(summary_path)]
     assert report["artifact_reviews"] == [
         {
@@ -135,6 +144,9 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert f"summary_path: `{summary_path}`" in markdown
     assert f"events_path: `{summary_path.parent / 'events.jsonl'}`" in markdown
     assert "operator_confirmed_channels: `[3]`" in markdown
+    assert "Manual Review Gate" in markdown
+    assert "confirm_event_log_readonly_sequence" in markdown
+    assert "manual_review_decision_required: `true`" in markdown
     assert "does not contact WING" in markdown
 
 
@@ -143,6 +155,8 @@ def test_review_report_blocks_missing_artifacts(tmp_path: Path):
 
     assert report["status"] == "blocked"
     assert report["artifact_count"] == 0
+    assert report["manual_review_required_before_readiness_update"] is True
+    assert report["manual_review_decision_required"] is False
     assert "operator_must_run_wing_readonly_preflight_runner" in report["blocked_by"]
     assert review_tool.exit_code_for_report(report) == 2
 

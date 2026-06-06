@@ -51,11 +51,13 @@ Use these files in this order:
 5. `Docs/runbooks/WING_READONLY_PREFLIGHT.md`
 6. `tools/wing_readonly_preflight_runner.py`
 7. `tools/review_wing_readonly_preflight_artifacts.py`
-8. `tools/no_wing_release_check.py`
-9. `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`
-10. `Docs/reports/MVP_PROGRESS_LATEST.md`
-11. `Docs/CORRECTION_METHODS_ROADMAP.md`
-12. `.ai/project-layer/correction_methods_backlog.md`
+8. `backend/wing_readonly_preflight_review_decision.py`
+9. `backend/supervised_wing_proof_plan.py`
+10. `tools/no_wing_release_check.py`
+11. `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`
+12. `Docs/reports/MVP_PROGRESS_LATEST.md`
+13. `Docs/CORRECTION_METHODS_ROADMAP.md`
+14. `.ai/project-layer/correction_methods_backlog.md`
 
 ## Definition Of Done
 
@@ -70,12 +72,13 @@ readiness candidates are not enough to close a blocker by themselves.
 1. Run read-only preflight against the intended WING backend.
 2. Verify physical readback from the artifact and event log.
 3. Review the clean preflight candidate manually.
-4. Run supervised fader proof only with explicit operator approval.
-5. Run supervised gain-down / trim proof only with explicit operator approval.
-6. Prove rollback.
-7. Prove emergency stop.
-8. Prove connection-loss / timeout fail-closed behavior.
-9. Update the readiness matrix from real evidence.
+4. Record an accepted operator decision JSON for that candidate.
+5. Run supervised fader proof only with explicit operator approval.
+6. Run supervised gain-down / trim proof only with explicit operator approval.
+7. Prove rollback.
+8. Prove emergency stop.
+9. Prove connection-loss / timeout fail-closed behavior.
+10. Update the readiness matrix from real evidence.
 
 ## Stop-The-Line Rules
 
@@ -88,6 +91,8 @@ Stop the current Codex work direction and return to the first open blocker if:
   readiness.
 - A supervised proof is planned before clean read-only preflight evidence is
   available for manual review.
+- A supervised proof is planned before the clean read-only preflight candidate
+  has an accepted review decision record.
 
 This is not a stop to development. Codex must continue uninterrupted Goal-mode
 work, but only on the first non-closed MVP blocker.

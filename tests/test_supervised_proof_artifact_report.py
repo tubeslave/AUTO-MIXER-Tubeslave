@@ -240,6 +240,10 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     assert preflight["evidence_status"] == "operator_preflight_required"
     assert preflight["readiness_update_candidate_available"] is False
     assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
+    decision = report["wing_readonly_preflight_review_decision_ledger"]
+    assert decision["safety"]["live_write"] is False
+    assert decision["summary"]["accepted_record_count"] == 0
+    assert decision["summary"]["manual_readiness_update_candidate_available"] is False
     assert report["autonomy_evidence_overlay"]["safety"]["live_widening_allowed"] is False
     assert report["autonomy_evidence_overlay"]["summary"]["autonomous_ready_target_ids"] == []
     assert report["autonomy_evidence_overlay"]["summary"]["manual_safety_review_candidate_target_ids"] == [
@@ -304,6 +308,18 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
         is False
     )
     assert report["next_wing_proof_plan"]["summary"]["readonly_preflight_step_count"] == 1
+    assert (
+        report["next_wing_proof_plan"]["summary"][
+            "readonly_preflight_review_decision_accepted"
+        ]
+        is False
+    )
+    assert (
+        report["next_wing_proof_plan"]["summary"][
+            "readonly_preflight_review_decision_status"
+        ]
+        == decision["status"]
+    )
     preflight_step = report["next_wing_proof_plan"]["readonly_preflight_steps"][0]
     assert preflight_step["read_only"] is True
     assert preflight_step["live_execution_required"] is False

@@ -1,0 +1,359 @@
+"""Read-only ledger for operator decisions on WING preflight candidates.
+
+This module validates operator review records against already-captured
+``wing_readonly_preflight.v1`` evidence. It never contacts WING, never executes
+tests, never mutates readiness files, and never grants live authority.
+"""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, Iterable, Mapping, Tuple
+
+try:
+    from wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
+
+
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID = (
+    "wing_readonly_preflight_review_decision_ledger"
+)
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_STATUSES = {
+    "operator_review_required",
+    "operator_review_decision_records_available",
+    "operator_review_decision_replacement_required",
+}
+REVIEW_DECISIONS = {"accepted", "rejected"}
+REQUIRED_REVIEW_CHECKLIST_IDS = (
+    "confirm_artifact_paths",
+    "confirm_operator_channel_scope",
+    "confirm_physical_readbacks",
+    "confirm_event_log_readonly_sequence",
+    "confirm_no_live_authority",
+)
+DEFAULT_WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOTS = (
+    "artifacts/wing_readonly_preflight_review_decisions",
+)
+UNSAFE_DECISION_FLAGS = (
+    "live_write",
+    "mutates_console_state",
+    "queries_console",
+    "executes_tests",
+    "execution_allowed_by_decision",
+    "readiness_closure_allowed_by_decision",
+    "readiness_matrix_update_allowed_by_decision",
+    "live_widening_allowed",
+    "live_authority_granted",
+    "full_autonomous_ready",
+)
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _string(value: Any) -> str:
+    return value if isinstance(value, str) and value else ""
+
+
+def _string_list(value: Any) -> Tuple[str, ...]:
+    if not isinstance(value, (list, tuple)):
+        return ()
+    return tuple(str(item) for item in value if isinstance(item, str) and item)
+
+
+def _record_list(value: Iterable[Mapping[str, Any]] | None) -> Tuple[Mapping[str, Any], ...]:
+    if value is None:
+        return ()
+    return tuple(item for item in value if isinstance(item, Mapping))
+
+
+def _decision_roots(decision_roots: Iterable[str | Path] | None) -> Tuple[Path, ...]:
+    roots = (
+        tuple(decision_roots)
+        if decision_roots is not None
+        else DEFAULT_WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOTS
+    )
+    return tuple(Path(root) for root in roots)
+
+
+def _discover_decision_paths(decision_roots: Iterable[str | Path] | None) -> Tuple[Path, ...]:
+    paths: list[Path] = []
+    for root in _decision_roots(decision_roots):
+        if root.is_file() and root.suffix == ".json":
+            paths.append(root)
+        if not root.is_dir():
+            continue
+        paths.extend(path for path in root.rglob("*.json") if path.is_file())
+    return tuple(sorted(dict.fromkeys(paths), key=lambda path: str(path)))
+
+
+def _load_json_decision(path: Path) -> Mapping[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, Mapping):
+        raise ValueError("review decision JSON root must be an object")
+    return payload
+
+
+def _decision_records(
+    *,
+    decision_records: Iterable[Mapping[str, Any]] | None,
+    decision_paths: Iterable[str | Path] | None,
+    decision_roots: Iterable[str | Path] | None,
+) -> Tuple[Mapping[str, Any], ...]:
+    records = list(_record_list(decision_records))
+    paths = (
+        tuple(Path(path) for path in decision_paths)
+        if decision_paths is not None
+        else _discover_decision_paths(decision_roots)
+    )
+    for path in paths:
+        try:
+            records.append(_load_json_decision(path))
+        except Exception as exc:  # pragma: no cover - defensive file parser
+            records.append(
+                {
+                    "review_id": str(path),
+                    "decision": "invalid",
+                    "load_error": type(exc).__name__,
+                }
+            )
+    return tuple(records)
+
+
+def _is_utc_timestamp(value: str) -> bool:
+    if not value:
+        return False
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        return False
+    return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
+
+
+def _candidate_items_by_source(evidence: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
+    artifacts = evidence.get("artifacts")
+    if not isinstance(artifacts, list):
+        return {}
+    return {
+        str(item["source_id"]): item
+        for item in artifacts
+        if isinstance(item, Mapping)
+        and isinstance(item.get("source_id"), str)
+        and item.get("accepted_as_readonly_preflight_candidate") is True
+    }
+
+
+def _record_id(record: Mapping[str, Any], index: int) -> str:
+    explicit = _string(record.get("review_id"))
+    if explicit:
+        return explicit
+    source_id = _string(record.get("artifact_source_id")) or "unknown_artifact"
+    return f"{source_id}:{index}"
+
+
+def _unsafe_flags(record: Mapping[str, Any]) -> Tuple[str, ...]:
+    return tuple(flag for flag in UNSAFE_DECISION_FLAGS if record.get(flag) is True)
+
+
+def _validated_record(
+    record: Mapping[str, Any],
+    *,
+    index: int,
+    candidates_by_source: Mapping[str, Mapping[str, Any]],
+) -> Dict[str, Any]:
+    record_id = _record_id(record, index)
+    artifact_source_id = _string(record.get("artifact_source_id"))
+    decision = _string(record.get("decision"))
+    reviewed_by = _string(record.get("reviewed_by"))
+    reviewed_at = _string(record.get("reviewed_at"))
+    run_id = _string(record.get("run_id"))
+    summary_path = _string(record.get("summary_path"))
+    events_path = _string(record.get("events_path"))
+    checklist_ids = _string_list(record.get("checklist_ids"))
+    candidate = _mapping(candidates_by_source.get(artifact_source_id))
+    unsafe_flags = _unsafe_flags(record)
+    violations: list[str] = []
+
+    if artifact_source_id not in candidates_by_source:
+        violations.append("review_decision_candidate_missing")
+    if decision not in REVIEW_DECISIONS:
+        violations.append("review_decision_unknown")
+    if not reviewed_by:
+        violations.append("review_decision_reviewer_missing")
+    if not reviewed_at:
+        violations.append("review_decision_reviewed_at_missing")
+    elif not _is_utc_timestamp(reviewed_at):
+        violations.append("review_decision_reviewed_at_invalid")
+    if not artifact_source_id:
+        violations.append("review_decision_artifact_source_missing")
+    if checklist_ids != REQUIRED_REVIEW_CHECKLIST_IDS:
+        violations.append("review_decision_checklist_ids_mismatch")
+    if candidate:
+        if run_id != candidate.get("run_id"):
+            violations.append("review_decision_run_id_mismatch")
+        if summary_path != candidate.get("summary_path"):
+            violations.append("review_decision_summary_path_mismatch")
+        if events_path != candidate.get("events_path"):
+            violations.append("review_decision_events_path_mismatch")
+    if unsafe_flags:
+        violations.append("review_decision_unsafe_authority_claim")
+
+    valid = not violations
+    return {
+        "review_id": record_id,
+        "artifact_source_id": artifact_source_id,
+        "run_id": run_id,
+        "summary_path": summary_path,
+        "events_path": events_path,
+        "decision": decision if decision in REVIEW_DECISIONS else "invalid",
+        "reviewed_by": reviewed_by,
+        "reviewed_at": reviewed_at,
+        "checklist_ids": list(checklist_ids),
+        "candidate_present": bool(candidate),
+        "candidate_status": candidate.get("status") or "missing",
+        "operator_accepted_readonly_preflight_candidate": valid and decision == "accepted",
+        "operator_rejected_readonly_preflight_candidate": valid and decision == "rejected",
+        "readiness_matrix_update_allowed_by_decision": False,
+        "readiness_closure_allowed_by_decision": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "unsafe_authority_flags": list(unsafe_flags),
+        "valid": valid,
+        "violations": violations,
+    }
+
+
+def build_wing_readonly_preflight_review_decision_ledger(
+    *,
+    preflight_evidence: Mapping[str, Any] | None = None,
+    decision_records: Iterable[Mapping[str, Any]] | None = None,
+    decision_paths: Iterable[str | Path] | None = None,
+    decision_roots: Iterable[str | Path] | None = None,
+) -> Dict[str, Any]:
+    """Build a fail-closed ledger for operator review decisions."""
+
+    evidence = _mapping(preflight_evidence) or build_wing_readonly_preflight_evidence()
+    candidates_by_source = _candidate_items_by_source(evidence)
+    records = tuple(
+        _validated_record(
+            record,
+            index=index,
+            candidates_by_source=candidates_by_source,
+        )
+        for index, record in enumerate(
+            _decision_records(
+                decision_records=decision_records,
+                decision_paths=decision_paths,
+                decision_roots=decision_roots,
+            )
+        )
+    )
+    valid_records = tuple(record for record in records if record["valid"])
+    accepted_records = tuple(
+        record
+        for record in valid_records
+        if record["operator_accepted_readonly_preflight_candidate"]
+    )
+    rejected_records = tuple(
+        record
+        for record in valid_records
+        if record["operator_rejected_readonly_preflight_candidate"]
+    )
+    invalid_records = tuple(record for record in records if not record["valid"])
+    reviewed_source_ids = {
+        str(record["artifact_source_id"])
+        for record in valid_records
+        if isinstance(record.get("artifact_source_id"), str)
+    }
+    unreviewed_candidate_source_ids = tuple(
+        source_id
+        for source_id in candidates_by_source
+        if source_id not in reviewed_source_ids
+    )
+
+    if invalid_records:
+        status = "operator_review_decision_replacement_required"
+        blocked_by = ("operator_must_replace_invalid_readonly_preflight_review_decisions",)
+    elif unreviewed_candidate_source_ids:
+        status = "operator_review_required"
+        blocked_by = ("operator_must_record_readonly_preflight_review_decision",)
+    elif accepted_records or rejected_records:
+        status = "operator_review_decision_records_available"
+        blocked_by = ("readiness_matrix_update_still_requires_separate_manual_action",)
+    else:
+        status = "operator_review_required"
+        blocked_by = ("operator_must_capture_valid_readonly_preflight_candidate_first",)
+
+    return {
+        "type": "wing_readonly_preflight_review_decision_ledger",
+        "generated_at": _utc_now(),
+        "method_id": WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
+        "source_method_id": "wing_readonly_preflight_evidence",
+        "status": status,
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_decision": False,
+            "readiness_matrix_update_allowed_by_decision": False,
+            "readiness_closure_allowed_by_decision": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "summary": {
+            "preflight_evidence_status": evidence.get("status") or "missing",
+            "decision_search_roots": [
+                str(root) for root in _decision_roots(decision_roots)
+            ],
+            "review_candidate_count": len(candidates_by_source),
+            "decision_record_count": len(records),
+            "accepted_record_count": len(accepted_records),
+            "rejected_record_count": len(rejected_records),
+            "invalid_record_count": len(invalid_records),
+            "unreviewed_candidate_count": len(unreviewed_candidate_source_ids),
+            "accepted_source_ids": [record["artifact_source_id"] for record in accepted_records],
+            "rejected_source_ids": [record["artifact_source_id"] for record in rejected_records],
+            "invalid_record_ids": [record["review_id"] for record in invalid_records],
+            "unreviewed_candidate_source_ids": list(unreviewed_candidate_source_ids),
+            "required_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
+            "operator_review_required": True,
+            "manual_readiness_update_candidate_available": bool(accepted_records)
+            and not invalid_records
+            and not unreviewed_candidate_source_ids,
+            "readiness_matrix_update_allowed_by_decision": False,
+            "readiness_closure_allowed_by_decision": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "blocked_by": list(blocked_by),
+            "next_global_step": (
+                "Operator replaces invalid read-only preflight review decisions."
+                if invalid_records
+                else (
+                    "Operator records a review decision for each clean preflight candidate."
+                    if unreviewed_candidate_source_ids
+                    else (
+                        "Manual readiness matrix update remains separate from review decisions."
+                        if accepted_records or rejected_records
+                        else "Operator captures a valid read-only preflight candidate first."
+                    )
+                )
+            ),
+        },
+        "records": list(records),
+    }

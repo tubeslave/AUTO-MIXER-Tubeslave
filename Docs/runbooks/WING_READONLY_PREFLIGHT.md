@@ -72,6 +72,45 @@ The event log must also be strict `send`/`recv` pairs. The request order must
 be `get_operator_mode`, `get_state`, then `query_mixer_parameter` rows, and each
 query must match its readback by channel, value type, and address.
 
+The offline review report must show:
+
+- `manual_review_required_before_readiness_update: true`
+- `manual_review_decision_required: true` only when a clean candidate exists
+- checklist rows for artifact paths, operator channel scope, physical
+  readbacks, read-only event-log sequence, and no live authority
+
+After a clean candidate is reviewed, record the operator decision as a JSON file
+under:
+
+`artifacts/wing_readonly_preflight_review_decisions/`
+
+Minimum accepted-decision shape:
+
+```json
+{
+  "review_id": "review-wing-readonly-<run_id>",
+  "artifact_source_id": "artifacts/wing_readonly_preflight/<run_id>/summary.json",
+  "run_id": "<run_id>",
+  "summary_path": "artifacts/wing_readonly_preflight/<run_id>/summary.json",
+  "events_path": "artifacts/wing_readonly_preflight/<run_id>/events.jsonl",
+  "decision": "accepted",
+  "reviewed_by": "<operator>",
+  "reviewed_at": "2026-06-07T00:00:00Z",
+  "checklist_ids": [
+    "confirm_artifact_paths",
+    "confirm_operator_channel_scope",
+    "confirm_physical_readbacks",
+    "confirm_event_log_readonly_sequence",
+    "confirm_no_live_authority"
+  ]
+}
+```
+
+Use `decision: "rejected"` if the operator does not accept the candidate. The
+decision ledger still does not grant live authority or close readiness rows by
+itself. The next supervised fader/gain proof plan remains blocked until a clean
+candidate has an accepted decision record.
+
 ## Review Command
 
 Run the offline artifact review after the artifact is captured:
@@ -93,6 +132,7 @@ Then run the focused validation checks:
 ```bash
 PYTHONPATH=backend python3 -m pytest -q \
   tests/test_wing_readonly_preflight_evidence.py \
+  tests/test_wing_readonly_preflight_review_decision.py \
   tests/test_wing_readonly_preflight_review_tool.py \
   tests/test_no_wing_release_check.py
 ```
@@ -113,10 +153,14 @@ Then update:
 - the run contacts the wrong mixer;
 - the operator cannot confirm the selected channel;
 - `operator_confirmed_channels` is missing or does not exactly match
-  `channels`.
+  `channels`;
+- the review report omits the manual review checklist;
+- the review decision JSON is missing, malformed, not UTC stamped, linked to
+  the wrong artifact/run, or claims live/readiness authority.
 
 ## Next Step
 
-Only after a clean artifact is manually reviewed, continue to:
+Only after a clean artifact is manually reviewed and an accepted decision JSON
+is recorded, continue to:
 
 `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`

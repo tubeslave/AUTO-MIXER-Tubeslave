@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import importlib.util
 import json
 import os
 import re
@@ -288,6 +289,11 @@ from backend.wing_readonly_preflight_evidence import (  # noqa: E402
     WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID,
     build_wing_readonly_preflight_evidence,
 )
+from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_STATUSES,
+    build_wing_readonly_preflight_review_decision_ledger,
+)
 from backend.read_surface_physical_readback_capture_plan import (  # noqa: E402
     READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PLAN_METHOD_ID,
     build_read_surface_physical_readback_capture_plan,
@@ -329,6 +335,13 @@ WING_READONLY_PREFLIGHT_REVIEW_EXIT_CODES = {
     "artifact_missing": 2,
     "invalid_artifact": 3,
 }
+WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = (
+    "confirm_artifact_paths",
+    "confirm_operator_channel_scope",
+    "confirm_physical_readbacks",
+    "confirm_event_log_readonly_sequence",
+    "confirm_no_live_authority",
+)
 
 
 def wing_readonly_preflight_capture_command_template() -> list[str]:
@@ -368,6 +381,38 @@ def wing_readonly_preflight_review_command() -> list[str]:
         "--output",
         WING_READONLY_PREFLIGHT_REVIEW_OUTPUT,
     ]
+
+
+def wing_readonly_preflight_review_manual_checklist_ids() -> list[str]:
+    review_tool_path = REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_TOOL
+    if not review_tool_path.is_file():
+        return []
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "_automixer_wing_readonly_preflight_review_tool",
+            review_tool_path,
+        )
+        if spec is None or spec.loader is None:
+            return []
+        review_tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(review_tool)
+        checklist_factory = getattr(review_tool, "manual_review_checklist", None)
+        if not callable(checklist_factory):
+            return []
+        checklist = checklist_factory()
+    except Exception:
+        return []
+    if not isinstance(checklist, list):
+        return []
+    ids: list[str] = []
+    for item in checklist:
+        if not isinstance(item, Mapping):
+            continue
+        item_id = item.get("id")
+        if isinstance(item_id, str) and item_id:
+            ids.append(item_id)
+    return ids
+
 
 FORBIDDEN_COMMAND_TOKENS = (
     "wing_operator_proposal_validation_runner.py",
@@ -564,6 +609,7 @@ def build_checks(
                 "tests/test_dlive_state_physical_readback_contract.py",
                 "tests/test_dlive_state_physical_readback_artifact_intake.py",
                 "tests/test_wing_readonly_preflight_evidence.py",
+                "tests/test_wing_readonly_preflight_review_decision.py",
                 "-q",
                 "--tb=short",
             ),
@@ -1571,6 +1617,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     capture_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_RUNNER_TOOL).is_file()
     review_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_TOOL).is_file()
     capture_command = wing_readonly_preflight_capture_command_template()
+    review_manual_checklist_ids = wing_readonly_preflight_review_manual_checklist_ids()
+    review_manual_checklist_complete = tuple(review_manual_checklist_ids) == (
+        WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+    )
     capture_channels = command_value_after_flag(capture_command, "--channels")
     capture_confirmed_channels = command_value_after_flag(
         capture_command,
@@ -1586,6 +1636,8 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_runner_tool_missing")
     if not review_tool_available:
         violations.append("wing_readonly_preflight_review_tool_missing")
+    if not review_manual_checklist_complete:
+        violations.append("wing_readonly_preflight_review_manual_checklist_incomplete")
     if "--operator-confirm-channels" not in capture_command:
         violations.append("wing_readonly_preflight_capture_operator_confirmation_missing")
     if "--channels" not in capture_command:
@@ -1702,6 +1754,8 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["review_tool_available"] = review_tool_available
     detail["review_command"] = wing_readonly_preflight_review_command()
     detail["review_exit_codes"] = dict(WING_READONLY_PREFLIGHT_REVIEW_EXIT_CODES)
+    detail["review_manual_checklist_ids"] = list(review_manual_checklist_ids)
+    detail["review_manual_checklist_complete"] = review_manual_checklist_complete
     detail["blocked_by"] = (
         list(summary.get("blocked_by"))
         if isinstance(summary.get("blocked_by"), list)
@@ -1711,6 +1765,133 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     finished = datetime.now(timezone.utc)
     return CheckResult(
         name="wing_readonly_preflight_evidence_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "wing_readonly_preflight_review_decision_is_readonly_operator_gate",
+    }
+    violations: list[str] = []
+
+    try:
+        ledger = build_wing_readonly_preflight_review_decision_ledger()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        ledger = {}
+        violations.append(f"wing_readonly_preflight_review_decision_build_error:{type(exc).__name__}")
+
+    summary = ledger.get("summary") if isinstance(ledger.get("summary"), Mapping) else {}
+    safety = ledger.get("safety") if isinstance(ledger.get("safety"), Mapping) else {}
+    records = ledger.get("records") if isinstance(ledger.get("records"), list) else []
+
+    if ledger.get("type") != "wing_readonly_preflight_review_decision_ledger":
+        violations.append("wing_readonly_preflight_review_decision_type_mismatch")
+    if ledger.get("method_id") != WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID:
+        violations.append("wing_readonly_preflight_review_decision_method_id_mismatch")
+    if ledger.get("status") not in WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_STATUSES:
+        violations.append("wing_readonly_preflight_review_decision_status_mismatch")
+
+    expected_true = ("read_only", "operator_required")
+    for key in expected_true:
+        if safety.get(key) is not True:
+            violations.append(f"wing_readonly_preflight_review_decision_{key}_not_true")
+    expected_false = (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_decision",
+        "readiness_matrix_update_allowed_by_decision",
+        "readiness_closure_allowed_by_decision",
+        "live_widening_allowed",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    )
+    for key in expected_false:
+        if safety.get(key) is not False:
+            violations.append(f"wing_readonly_preflight_review_decision_{key}_not_false")
+
+    review_candidate_count = int(summary.get("review_candidate_count") or 0)
+    decision_record_count = int(summary.get("decision_record_count") or 0)
+    accepted_record_count = int(summary.get("accepted_record_count") or 0)
+    rejected_record_count = int(summary.get("rejected_record_count") or 0)
+    invalid_record_count = int(summary.get("invalid_record_count") or 0)
+    unreviewed_candidate_count = int(summary.get("unreviewed_candidate_count") or 0)
+    if decision_record_count != len(records):
+        violations.append("wing_readonly_preflight_review_decision_record_count_mismatch")
+    if invalid_record_count:
+        violations.append("wing_readonly_preflight_review_decision_invalid_records_present")
+    if summary.get("operator_review_required") is not True:
+        violations.append("wing_readonly_preflight_review_decision_operator_review_not_true")
+    if summary.get("readiness_matrix_update_allowed_by_decision") is not False:
+        violations.append("wing_readonly_preflight_review_decision_readiness_update_not_false")
+    if summary.get("readiness_closure_allowed_by_decision") is not False:
+        violations.append("wing_readonly_preflight_review_decision_readiness_closure_not_false")
+    if summary.get("live_authority_granted") is not False:
+        violations.append("wing_readonly_preflight_review_decision_live_authority_not_false")
+    if summary.get("full_autonomous_ready") is not False:
+        violations.append("wing_readonly_preflight_review_decision_full_auto_not_false")
+
+    detail["ledger_status"] = ledger.get("status")
+    detail["preflight_evidence_status"] = summary.get("preflight_evidence_status")
+    detail["decision_search_roots"] = (
+        list(summary.get("decision_search_roots"))
+        if isinstance(summary.get("decision_search_roots"), list)
+        else []
+    )
+    detail["review_candidate_count"] = review_candidate_count
+    detail["decision_record_count"] = decision_record_count
+    detail["accepted_record_count"] = accepted_record_count
+    detail["rejected_record_count"] = rejected_record_count
+    detail["invalid_record_count"] = invalid_record_count
+    detail["unreviewed_candidate_count"] = unreviewed_candidate_count
+    detail["manual_readiness_update_candidate_available"] = (
+        summary.get("manual_readiness_update_candidate_available") is True
+    )
+    detail["operator_review_required"] = summary.get("operator_review_required")
+    detail["readiness_matrix_update_allowed_by_decision"] = summary.get(
+        "readiness_matrix_update_allowed_by_decision"
+    )
+    detail["readiness_closure_allowed_by_decision"] = summary.get(
+        "readiness_closure_allowed_by_decision"
+    )
+    detail["live_authority_granted"] = summary.get("live_authority_granted")
+    detail["full_autonomous_ready"] = summary.get("full_autonomous_ready")
+    detail["accepted_source_ids"] = (
+        list(summary.get("accepted_source_ids"))
+        if isinstance(summary.get("accepted_source_ids"), list)
+        else []
+    )
+    detail["rejected_source_ids"] = (
+        list(summary.get("rejected_source_ids"))
+        if isinstance(summary.get("rejected_source_ids"), list)
+        else []
+    )
+    detail["invalid_record_ids"] = (
+        list(summary.get("invalid_record_ids"))
+        if isinstance(summary.get("invalid_record_ids"), list)
+        else []
+    )
+    detail["unreviewed_candidate_source_ids"] = (
+        list(summary.get("unreviewed_candidate_source_ids"))
+        if isinstance(summary.get("unreviewed_candidate_source_ids"), list)
+        else []
+    )
+    detail["blocked_by"] = (
+        list(summary.get("blocked_by"))
+        if isinstance(summary.get("blocked_by"), list)
+        else []
+    )
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="wing_readonly_preflight_review_decision_ledger_schema",
         status="passed" if not violations else "failed",
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -6033,6 +6214,13 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     readonly_preflight_evidence_status: object = None
     readonly_preflight_blocked_by: list[str] = []
     readonly_preflight_step_count = 0
+    readonly_preflight_review_decision_required = False
+    readonly_preflight_review_decision_accepted = False
+    readonly_preflight_review_decision_status: object = None
+    readonly_preflight_review_decision_blocked_by: list[str] = []
+    readonly_preflight_review_decision_accepted_record_count = 0
+    readonly_preflight_review_decision_invalid_record_count = 0
+    readonly_preflight_review_decision_unreviewed_candidate_count = 0
     step_count = 0
     plan_status: object = None
 
@@ -6054,6 +6242,18 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             if isinstance(readiness_summary.get("wing_readonly_preflight_evidence"), Mapping)
             else {}
         )
+        review_decision = (
+            payload.get("wing_readonly_preflight_review_decision_ledger")
+            if isinstance(payload.get("wing_readonly_preflight_review_decision_ledger"), Mapping)
+            else readiness_summary.get("wing_readonly_preflight_review_decision_ledger")
+            if isinstance(readiness_summary.get("wing_readonly_preflight_review_decision_ledger"), Mapping)
+            else {}
+        )
+        review_summary = (
+            review_decision.get("summary")
+            if isinstance(review_decision.get("summary"), Mapping)
+            else review_decision
+        )
         safety = plan.get("safety") if isinstance(plan.get("safety"), Mapping) else {}
         summary = plan.get("summary") if isinstance(plan.get("summary"), Mapping) else {}
         preflight_steps = (
@@ -6070,6 +6270,8 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             violations.append("next_wing_proof_plan_readiness_snapshot_missing")
         if not preflight:
             violations.append("next_wing_proof_plan_preflight_overlay_missing")
+        if not review_decision:
+            violations.append("next_wing_proof_plan_review_decision_overlay_missing")
         if plan_status not in {
             "operator_proof_required",
             "manual_review_ready",
@@ -6114,10 +6316,39 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             else []
         )
         readonly_preflight_step_count = int(summary.get("readonly_preflight_step_count") or 0)
+        readonly_preflight_review_decision_required = (
+            summary.get("readonly_preflight_review_decision_required") is True
+        )
+        readonly_preflight_review_decision_accepted = (
+            summary.get("readonly_preflight_review_decision_accepted") is True
+        )
+        readonly_preflight_review_decision_status = summary.get(
+            "readonly_preflight_review_decision_status"
+        )
+        readonly_preflight_review_decision_blocked_by = (
+            [
+                str(item)
+                for item in summary.get("readonly_preflight_review_decision_blocked_by", [])
+                if item
+            ]
+            if isinstance(summary.get("readonly_preflight_review_decision_blocked_by"), list)
+            else []
+        )
+        readonly_preflight_review_decision_accepted_record_count = int(
+            summary.get("readonly_preflight_review_decision_accepted_record_count") or 0
+        )
+        readonly_preflight_review_decision_invalid_record_count = int(
+            summary.get("readonly_preflight_review_decision_invalid_record_count") or 0
+        )
+        readonly_preflight_review_decision_unreviewed_candidate_count = int(
+            summary.get("readonly_preflight_review_decision_unreviewed_candidate_count") or 0
+        )
         if readonly_preflight_step_count != len(preflight_steps):
             violations.append("next_wing_proof_plan_preflight_step_count_mismatch")
         if not readonly_preflight_required:
             violations.append("next_wing_proof_plan_readonly_preflight_required_not_true")
+        if not readonly_preflight_review_decision_required:
+            violations.append("next_wing_proof_plan_review_decision_required_not_true")
         if preflight:
             if readonly_preflight_evidence_status != preflight.get("evidence_status"):
                 violations.append("next_wing_proof_plan_preflight_status_mismatch")
@@ -6128,14 +6359,48 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             )
             if readonly_preflight_candidate_available != expected_candidate:
                 violations.append("next_wing_proof_plan_preflight_candidate_mismatch")
+        if review_decision:
+            expected_decision_status = review_decision.get("status") or review_summary.get("ledger_status")
+            if readonly_preflight_review_decision_status != expected_decision_status:
+                violations.append("next_wing_proof_plan_review_decision_status_mismatch")
+            if readonly_preflight_review_decision_blocked_by != _string_list(review_summary.get("blocked_by")):
+                violations.append("next_wing_proof_plan_review_decision_blockers_mismatch")
+            expected_decision_accepted = (
+                review_summary.get("manual_readiness_update_candidate_available") is True
+                and int(review_summary.get("accepted_record_count") or 0) > 0
+                and int(review_summary.get("invalid_record_count") or 0) == 0
+                and int(review_summary.get("unreviewed_candidate_count") or 0) == 0
+                and review_summary.get("readiness_matrix_update_allowed_by_decision") is not True
+                and review_summary.get("readiness_closure_allowed_by_decision") is not True
+                and review_summary.get("live_authority_granted") is not True
+                and review_summary.get("full_autonomous_ready") is not True
+            )
+            if readonly_preflight_review_decision_accepted != expected_decision_accepted:
+                violations.append("next_wing_proof_plan_review_decision_accepted_mismatch")
+            if readonly_preflight_review_decision_accepted_record_count != int(
+                review_summary.get("accepted_record_count") or 0
+            ):
+                violations.append("next_wing_proof_plan_review_decision_accepted_count_mismatch")
+            if readonly_preflight_review_decision_invalid_record_count != int(
+                review_summary.get("invalid_record_count") or 0
+            ):
+                violations.append("next_wing_proof_plan_review_decision_invalid_count_mismatch")
+            if readonly_preflight_review_decision_unreviewed_candidate_count != int(
+                review_summary.get("unreviewed_candidate_count") or 0
+            ):
+                violations.append("next_wing_proof_plan_review_decision_unreviewed_count_mismatch")
         if plan_status == "operator_proof_required" and step_count < 1:
             violations.append("next_wing_proof_plan_required_without_steps")
         if plan_status == "operator_proof_required" and "operator_must_approve_and_execute_manually" not in global_blockers:
             violations.append("next_wing_proof_plan_operator_blocker_missing")
         if plan_status == "operator_proof_required" and not readonly_preflight_candidate_available:
             violations.append("next_wing_proof_plan_preflight_candidate_missing_for_steps")
+        if plan_status == "operator_proof_required" and not readonly_preflight_review_decision_accepted:
+            violations.append("next_wing_proof_plan_operator_proof_without_review_decision")
         if step_count and not readonly_preflight_candidate_available:
             violations.append("next_wing_proof_plan_steps_without_readonly_preflight_candidate")
+        if step_count and not readonly_preflight_review_decision_accepted:
+            violations.append("next_wing_proof_plan_steps_without_accepted_review_decision")
         if plan_status == "blocked_by_readonly_preflight":
             if step_count:
                 violations.append("next_wing_proof_plan_preflight_blocked_with_steps")
@@ -6147,6 +6412,9 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 violations.append("next_wing_proof_plan_preflight_blocker_missing")
         if readonly_preflight_candidate_available and readonly_preflight_step_count:
             violations.append("next_wing_proof_plan_preflight_step_present_after_candidate")
+        if readonly_preflight_candidate_available and not readonly_preflight_review_decision_accepted:
+            if "accepted_readonly_preflight_review_decision_required_before_supervised_proof" not in global_blockers:
+                violations.append("next_wing_proof_plan_review_decision_blocker_missing")
 
         for index, step in enumerate(preflight_steps):
             if not isinstance(step, Mapping):
@@ -6208,6 +6476,27 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     detail["readonly_preflight_evidence_status"] = readonly_preflight_evidence_status
     detail["readonly_preflight_blocked_by"] = readonly_preflight_blocked_by
     detail["readonly_preflight_step_count"] = readonly_preflight_step_count
+    detail["readonly_preflight_review_decision_required"] = (
+        readonly_preflight_review_decision_required
+    )
+    detail["readonly_preflight_review_decision_accepted"] = (
+        readonly_preflight_review_decision_accepted
+    )
+    detail["readonly_preflight_review_decision_status"] = (
+        readonly_preflight_review_decision_status
+    )
+    detail["readonly_preflight_review_decision_blocked_by"] = (
+        readonly_preflight_review_decision_blocked_by
+    )
+    detail["readonly_preflight_review_decision_accepted_record_count"] = (
+        readonly_preflight_review_decision_accepted_record_count
+    )
+    detail["readonly_preflight_review_decision_invalid_record_count"] = (
+        readonly_preflight_review_decision_invalid_record_count
+    )
+    detail["readonly_preflight_review_decision_unreviewed_candidate_count"] = (
+        readonly_preflight_review_decision_unreviewed_candidate_count
+    )
     detail["global_blockers"] = global_blockers
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)
@@ -6607,6 +6896,7 @@ def wing_readonly_preflight_evidence_summary(
         capture_command = detail.get("capture_command_template")
         review_command = detail.get("review_command")
         review_exit_codes = detail.get("review_exit_codes")
+        review_manual_checklist_ids = detail.get("review_manual_checklist_ids")
         valid_candidate_count = int(detail.get("valid_candidate_count") or 0)
         invalid_candidate_count = int(detail.get("invalid_candidate_count") or 0)
         readiness_update_candidate_available = (
@@ -6674,6 +6964,85 @@ def wing_readonly_preflight_evidence_summary(
             ),
             "review_exit_codes": (
                 dict(review_exit_codes) if isinstance(review_exit_codes, Mapping) else {}
+            ),
+            "review_manual_checklist_ids": (
+                list(review_manual_checklist_ids)
+                if isinstance(review_manual_checklist_ids, list)
+                else []
+            ),
+            "review_manual_checklist_complete": (
+                detail.get("review_manual_checklist_complete") is True
+            ),
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
+def wing_readonly_preflight_review_decision_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "wing_readonly_preflight_review_decision_ledger_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        blocked_by = detail.get("blocked_by")
+        violations = detail.get("violations")
+        accepted_source_ids = detail.get("accepted_source_ids")
+        rejected_source_ids = detail.get("rejected_source_ids")
+        invalid_record_ids = detail.get("invalid_record_ids")
+        unreviewed_candidate_source_ids = detail.get("unreviewed_candidate_source_ids")
+        decision_search_roots = detail.get("decision_search_roots")
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_decision": False,
+            "readiness_matrix_update_allowed_by_decision": False,
+            "readiness_closure_allowed_by_decision": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "ledger_status": detail.get("ledger_status"),
+            "preflight_evidence_status": detail.get("preflight_evidence_status"),
+            "decision_search_roots": (
+                list(decision_search_roots)
+                if isinstance(decision_search_roots, list)
+                else []
+            ),
+            "review_candidate_count": int(detail.get("review_candidate_count") or 0),
+            "decision_record_count": int(detail.get("decision_record_count") or 0),
+            "accepted_record_count": int(detail.get("accepted_record_count") or 0),
+            "rejected_record_count": int(detail.get("rejected_record_count") or 0),
+            "invalid_record_count": int(detail.get("invalid_record_count") or 0),
+            "unreviewed_candidate_count": int(detail.get("unreviewed_candidate_count") or 0),
+            "manual_readiness_update_candidate_available": (
+                detail.get("manual_readiness_update_candidate_available") is True
+            ),
+            "operator_review_required": detail.get("operator_review_required") is True,
+            "accepted_source_ids": (
+                list(accepted_source_ids)
+                if isinstance(accepted_source_ids, list)
+                else []
+            ),
+            "rejected_source_ids": (
+                list(rejected_source_ids)
+                if isinstance(rejected_source_ids, list)
+                else []
+            ),
+            "invalid_record_ids": (
+                list(invalid_record_ids)
+                if isinstance(invalid_record_ids, list)
+                else []
+            ),
+            "unreviewed_candidate_source_ids": (
+                list(unreviewed_candidate_source_ids)
+                if isinstance(unreviewed_candidate_source_ids, list)
+                else []
             ),
             "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
             "violations": list(violations) if isinstance(violations, list) else [],
@@ -8687,6 +9056,9 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         planned_value_types = detail.get("planned_value_types")
         planned_channels = detail.get("planned_channels")
         readonly_preflight_blocked_by = detail.get("readonly_preflight_blocked_by")
+        readonly_preflight_review_decision_blocked_by = detail.get(
+            "readonly_preflight_review_decision_blocked_by"
+        )
         global_blockers = detail.get("global_blockers")
         violations = detail.get("violations")
         return {
@@ -8717,6 +9089,29 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
             "readonly_preflight_step_count": int(
                 detail.get("readonly_preflight_step_count") or 0
             ),
+            "readonly_preflight_review_decision_required": (
+                detail.get("readonly_preflight_review_decision_required") is True
+            ),
+            "readonly_preflight_review_decision_accepted": (
+                detail.get("readonly_preflight_review_decision_accepted") is True
+            ),
+            "readonly_preflight_review_decision_status": detail.get(
+                "readonly_preflight_review_decision_status"
+            ),
+            "readonly_preflight_review_decision_blocked_by": (
+                list(readonly_preflight_review_decision_blocked_by)
+                if isinstance(readonly_preflight_review_decision_blocked_by, list)
+                else []
+            ),
+            "readonly_preflight_review_decision_accepted_record_count": int(
+                detail.get("readonly_preflight_review_decision_accepted_record_count") or 0
+            ),
+            "readonly_preflight_review_decision_invalid_record_count": int(
+                detail.get("readonly_preflight_review_decision_invalid_record_count") or 0
+            ),
+            "readonly_preflight_review_decision_unreviewed_candidate_count": int(
+                detail.get("readonly_preflight_review_decision_unreviewed_candidate_count") or 0
+            ),
             "global_blockers": list(global_blockers) if isinstance(global_blockers, list) else [],
             "violations": list(violations) if isinstance(violations, list) else [],
         }
@@ -8732,6 +9127,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     read_remediation = read_surface_remediation_plan_summary(results)
     read_capture_plan = read_surface_physical_readback_capture_plan_summary(results)
     wing_readonly_preflight = wing_readonly_preflight_evidence_summary(results)
+    wing_readonly_preflight_review_decision = (
+        wing_readonly_preflight_review_decision_summary(results)
+    )
     raw_mixer_contract = raw_mixer_readback_contract_summary(results)
     raw_mixer_intake = raw_mixer_readback_artifact_intake_summary(results)
     channel_basic_contract = channel_basic_controls_readback_contract_summary(results)
@@ -8785,6 +9183,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["read_surface_physical_readback_capture_plan"] = read_capture_plan
     if wing_readonly_preflight is not None:
         summary["wing_readonly_preflight_evidence"] = wing_readonly_preflight
+    if wing_readonly_preflight_review_decision is not None:
+        summary["wing_readonly_preflight_review_decision_ledger"] = (
+            wing_readonly_preflight_review_decision
+        )
     if raw_mixer_contract is not None:
         summary["raw_mixer_state_physical_readback_contract"] = raw_mixer_contract
     if raw_mixer_intake is not None:
@@ -9066,8 +9468,60 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['review_command'])}`",
                 "- review_exit_codes: "
                 f"`{json.dumps(wing_readonly_preflight['review_exit_codes'], sort_keys=True)}`",
+                "- review_manual_checklist_ids: "
+                f"`{json.dumps(wing_readonly_preflight['review_manual_checklist_ids'])}`",
+                "- review_manual_checklist_complete: "
+                f"`{str(wing_readonly_preflight['review_manual_checklist_complete']).lower()}`",
                 f"- blocked_by: `{json.dumps(wing_readonly_preflight['blocked_by'])}`",
                 f"- violations: `{json.dumps(wing_readonly_preflight['violations'])}`",
+            ]
+        )
+    if wing_readonly_preflight_review_decision is not None:
+        lines.extend(
+            [
+                "",
+                "## WING Read-Only Preflight Review Decision Ledger",
+                "",
+                f"- schema_check: `{wing_readonly_preflight_review_decision['status']}`",
+                f"- read_only: `{str(wing_readonly_preflight_review_decision['read_only']).lower()}`",
+                f"- live_write: `{str(wing_readonly_preflight_review_decision['live_write']).lower()}`",
+                "- readiness_matrix_update_allowed_by_decision: "
+                f"`{str(wing_readonly_preflight_review_decision['readiness_matrix_update_allowed_by_decision']).lower()}`",
+                "- readiness_closure_allowed_by_decision: "
+                f"`{str(wing_readonly_preflight_review_decision['readiness_closure_allowed_by_decision']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(wing_readonly_preflight_review_decision['live_authority_granted']).lower()}`",
+                "- full_autonomous_ready: "
+                f"`{str(wing_readonly_preflight_review_decision['full_autonomous_ready']).lower()}`",
+                f"- ledger_status: `{wing_readonly_preflight_review_decision['ledger_status']}`",
+                "- preflight_evidence_status: "
+                f"`{wing_readonly_preflight_review_decision['preflight_evidence_status']}`",
+                "- decision_search_roots: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['decision_search_roots'])}`",
+                "- review_candidate_count: "
+                f"`{wing_readonly_preflight_review_decision['review_candidate_count']}`",
+                "- decision_record_count: "
+                f"`{wing_readonly_preflight_review_decision['decision_record_count']}`",
+                "- accepted_record_count: "
+                f"`{wing_readonly_preflight_review_decision['accepted_record_count']}`",
+                "- rejected_record_count: "
+                f"`{wing_readonly_preflight_review_decision['rejected_record_count']}`",
+                "- invalid_record_count: "
+                f"`{wing_readonly_preflight_review_decision['invalid_record_count']}`",
+                "- unreviewed_candidate_count: "
+                f"`{wing_readonly_preflight_review_decision['unreviewed_candidate_count']}`",
+                "- manual_readiness_update_candidate_available: "
+                f"`{str(wing_readonly_preflight_review_decision['manual_readiness_update_candidate_available']).lower()}`",
+                "- accepted_source_ids: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['accepted_source_ids'])}`",
+                "- rejected_source_ids: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['rejected_source_ids'])}`",
+                "- invalid_record_ids: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['invalid_record_ids'])}`",
+                "- unreviewed_candidate_source_ids: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['unreviewed_candidate_source_ids'])}`",
+                f"- blocked_by: `{json.dumps(wing_readonly_preflight_review_decision['blocked_by'])}`",
+                f"- violations: `{json.dumps(wing_readonly_preflight_review_decision['violations'])}`",
             ]
         )
     if raw_mixer_contract is not None:
@@ -10420,6 +10874,20 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(next_plan['readonly_preflight_blocked_by'])}`",
                 "- readonly_preflight_step_count: "
                 f"`{next_plan['readonly_preflight_step_count']}`",
+                "- readonly_preflight_review_decision_required: "
+                f"`{str(next_plan['readonly_preflight_review_decision_required']).lower()}`",
+                "- readonly_preflight_review_decision_accepted: "
+                f"`{str(next_plan['readonly_preflight_review_decision_accepted']).lower()}`",
+                "- readonly_preflight_review_decision_status: "
+                f"`{next_plan['readonly_preflight_review_decision_status']}`",
+                "- readonly_preflight_review_decision_blocked_by: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_blocked_by'])}`",
+                "- readonly_preflight_review_decision_accepted_record_count: "
+                f"`{next_plan['readonly_preflight_review_decision_accepted_record_count']}`",
+                "- readonly_preflight_review_decision_invalid_record_count: "
+                f"`{next_plan['readonly_preflight_review_decision_invalid_record_count']}`",
+                "- readonly_preflight_review_decision_unreviewed_candidate_count: "
+                f"`{next_plan['readonly_preflight_review_decision_unreviewed_candidate_count']}`",
                 f"- global_blockers: `{json.dumps(next_plan['global_blockers'])}`",
                 f"- violations: `{json.dumps(next_plan['violations'])}`",
             ]
@@ -10489,6 +10957,15 @@ def run_release_checks(
             results.append(wing_readonly_preflight_result)
             if (
                 wing_readonly_preflight_result.status != "passed"
+                and not continue_on_failure
+            ):
+                break
+            wing_readonly_preflight_review_decision_result = (
+                validate_wing_readonly_preflight_review_decision_ledger_snapshot()
+            )
+            results.append(wing_readonly_preflight_review_decision_result)
+            if (
+                wing_readonly_preflight_review_decision_result.status != "passed"
                 and not continue_on_failure
             ):
                 break

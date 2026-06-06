@@ -31,6 +31,9 @@ from backend.autonomy_promotion_readiness import build_autonomy_promotion_readin
 from backend.supervised_promotion_evidence import build_supervised_promotion_evidence_snapshot  # noqa: E402
 from backend.supervised_proof_remediation_plan import build_supervised_proof_remediation_plan  # noqa: E402
 from backend.supervised_wing_proof_plan import build_supervised_wing_proof_plan  # noqa: E402
+from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
+    build_wing_readonly_preflight_review_decision_ledger,
+)
 
 
 DEFAULT_ARTIFACT_ROOTS = (REPO_ROOT / "artifacts" / "wing_telemetry",)
@@ -333,12 +336,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     report["proof_remediation_plan"] = build_supervised_proof_remediation_plan(report)
     report["promotion_evidence"] = build_supervised_promotion_evidence_snapshot(report)
     report["autonomy_promotion_readiness"] = build_autonomy_promotion_readiness_snapshot()
+    report["wing_readonly_preflight_review_decision_ledger"] = (
+        build_wing_readonly_preflight_review_decision_ledger()
+    )
     report["autonomy_evidence_overlay"] = build_autonomy_evidence_overlay(report)
     report["autonomy_mode_transition_gate"] = build_autonomy_mode_transition_gate(report)
     report["summary"]["autonomy_gap_rollup"] = build_autonomy_gap_rollup(report)
     report["next_wing_proof_plan"] = build_supervised_wing_proof_plan(
         report["promotion_evidence"],
         autonomy_readiness_snapshot=report["autonomy_promotion_readiness"],
+        readonly_preflight_review_decision_ledger=report[
+            "wing_readonly_preflight_review_decision_ledger"
+        ],
     )
     output_path = args.output or DEFAULT_OUTPUT_ROOT / f"{compact_stamp()}_supervised_proof_artifact_report" / "report.json"
     report["report_path"] = str(output_path)

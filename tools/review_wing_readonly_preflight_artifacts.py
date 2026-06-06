@@ -24,6 +24,28 @@ from backend.wing_readonly_preflight_evidence import (  # noqa: E402
 
 
 DEFAULT_OUTPUT = REPO_ROOT / "artifacts" / "wing_readonly_preflight_review" / "latest_review.md"
+MANUAL_REVIEW_CHECKLIST = (
+    {
+        "id": "confirm_artifact_paths",
+        "label": "Confirm summary_path and events_path point to the intended real WING run.",
+    },
+    {
+        "id": "confirm_operator_channel_scope",
+        "label": "Confirm operator_confirmed_channels exactly match the queried channels.",
+    },
+    {
+        "id": "confirm_physical_readbacks",
+        "label": "Confirm every readback is verified_from_physical_readback for the declared value types.",
+    },
+    {
+        "id": "confirm_event_log_readonly_sequence",
+        "label": "Confirm events.jsonl contains only get_operator_mode, get_state, and query_mixer_parameter sends.",
+    },
+    {
+        "id": "confirm_no_live_authority",
+        "label": "Confirm the review does not grant live authority or close readiness rows.",
+    },
+)
 
 
 def utc_now() -> str:
@@ -32,6 +54,10 @@ def utc_now() -> str:
 
 def _string_list(value: Any) -> list[str]:
     return [str(item) for item in value if item] if isinstance(value, list) else []
+
+
+def manual_review_checklist() -> list[dict[str, str]]:
+    return [dict(item) for item in MANUAL_REVIEW_CHECKLIST]
 
 
 def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
@@ -99,6 +125,9 @@ def build_review_report(
         "execution_allowed_by_review": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,
+        "manual_review_required_before_readiness_update": True,
+        "manual_review_decision_required": candidate_available,
+        "manual_review_checklist": manual_review_checklist(),
         "evidence_status": evidence.get("status"),
         "artifact_count": int(summary.get("artifact_count") or 0),
         "valid_candidate_count": valid_candidate_count,
@@ -153,10 +182,30 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"- execution_allowed_by_review: `{str(report['execution_allowed_by_review']).lower()}`",
         f"- live_authority_granted: `{str(report['live_authority_granted']).lower()}`",
         f"- full_autonomous_ready: `{str(report['full_autonomous_ready']).lower()}`",
+        f"- manual_review_required_before_readiness_update: `{str(report['manual_review_required_before_readiness_update']).lower()}`",
+        f"- manual_review_decision_required: `{str(report['manual_review_decision_required']).lower()}`",
         "",
-        "## Blockers",
+        "## Manual Review Gate",
         "",
     ]
+    checklist = (
+        report.get("manual_review_checklist")
+        if isinstance(report.get("manual_review_checklist"), list)
+        else []
+    )
+    if checklist:
+        for item in checklist:
+            row = item if isinstance(item, Mapping) else {}
+            lines.append(f"- `{row.get('id')}`: {row.get('label')}")
+    else:
+        lines.append("- none")
+    lines.extend(
+        [
+            "",
+            "## Blockers",
+            "",
+        ]
+    )
     blocked_by = report.get("blocked_by") if isinstance(report.get("blocked_by"), list) else []
     lines.extend(f"- `{item}`" for item in blocked_by)
     if not blocked_by:

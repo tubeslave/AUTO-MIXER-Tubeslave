@@ -23,6 +23,37 @@ def evidence_row(value_type: str, *, review_candidate: bool = False, blockers=No
     }
 
 
+def accepted_review_decision_ledger() -> dict:
+    return {
+        "type": "wing_readonly_preflight_review_decision_ledger",
+        "status": "operator_review_decision_records_available",
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "execution_allowed_by_decision": False,
+            "readiness_matrix_update_allowed_by_decision": False,
+            "readiness_closure_allowed_by_decision": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "summary": {
+            "ledger_status": "operator_review_decision_records_available",
+            "accepted_record_count": 1,
+            "rejected_record_count": 0,
+            "invalid_record_count": 0,
+            "unreviewed_candidate_count": 0,
+            "manual_readiness_update_candidate_available": True,
+            "readiness_matrix_update_allowed_by_decision": False,
+            "readiness_closure_allowed_by_decision": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "blocked_by": [
+                "readiness_matrix_update_still_requires_separate_manual_action"
+            ],
+        },
+    }
+
+
 def preflight_ready_snapshot() -> dict:
     return {
         "type": "autonomy_promotion_readiness",
@@ -42,8 +73,33 @@ def preflight_ready_snapshot() -> dict:
                     "Manually review the read-only preflight candidate before updating readiness rows."
                 ],
             },
+            "wing_readonly_preflight_review_decision_ledger": accepted_review_decision_ledger(),
         },
     }
+
+
+def preflight_candidate_without_review_decision_snapshot() -> dict:
+    readiness = preflight_ready_snapshot()
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = {
+        "type": "wing_readonly_preflight_review_decision_ledger",
+        "status": "operator_review_required",
+        "summary": {
+            "ledger_status": "operator_review_required",
+            "accepted_record_count": 0,
+            "rejected_record_count": 0,
+            "invalid_record_count": 0,
+            "unreviewed_candidate_count": 1,
+            "manual_readiness_update_candidate_available": False,
+            "readiness_matrix_update_allowed_by_decision": False,
+            "readiness_closure_allowed_by_decision": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "blocked_by": [
+                "operator_must_record_readonly_preflight_review_decision"
+            ],
+        },
+    }
+    return readiness
 
 
 def test_supervised_wing_proof_plan_module_is_transport_free():
@@ -96,6 +152,13 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert plan["summary"]["readonly_preflight_candidate_available"] is True
     assert plan["summary"]["readonly_preflight_evidence_status"] == "readonly_preflight_candidate_available"
     assert plan["summary"]["readonly_preflight_step_count"] == 0
+    assert plan["summary"]["readonly_preflight_review_decision_required"] is True
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is True
+    assert (
+        plan["summary"]["readonly_preflight_review_decision_status"]
+        == "operator_review_decision_records_available"
+    )
+    assert plan["summary"]["readonly_preflight_review_decision_accepted_record_count"] == 1
     assert plan["readonly_preflight_steps"] == []
 
     gain_step = plan["steps"][0]
@@ -118,6 +181,37 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     fader_step = plan["steps"][1]
     assert "Review blocked prior proof artifacts for this value type before trusting a new result." in fader_step["prerequisites"]
     assert "blocked_artifacts_for_value_type" in fader_step["evidence_blockers_to_review"]
+
+
+def test_plan_blocks_physical_proof_steps_until_review_decision_is_accepted():
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(
+            evidence_row("gain", blockers=["physical_candidate_missing"]),
+            evidence_row("fader", blockers=["physical_candidate_missing"]),
+        ),
+        autonomy_readiness_snapshot=preflight_candidate_without_review_decision_snapshot(),
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_candidate_available"] is True
+    assert plan["summary"]["readonly_preflight_step_count"] == 0
+    assert plan["summary"]["readonly_preflight_review_decision_required"] is True
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
+    assert (
+        plan["summary"]["readonly_preflight_review_decision_status"]
+        == "operator_review_required"
+    )
+    assert (
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert (
+        "operator_must_record_readonly_preflight_review_decision"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["readonly_preflight_steps"] == []
+    assert plan["steps"] == []
 
 
 def test_plan_skips_value_type_that_already_has_manual_review_candidate():
