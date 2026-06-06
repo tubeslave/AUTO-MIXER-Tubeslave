@@ -151,6 +151,10 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "source_identity_calibration_persistence_plan",
             "source_identity_calibration_memory_draft",
             "source_identity_calibration_memory_writer",
+            "source_identity_calibration_memory_index",
+            "source_identity_calibration_memory_trust_review",
+            "source_identity_calibration_memory_trust_acceptance_ledger",
+            "source_identity_calibration_memory_trust_promotion_plan",
         ),
         support_paths=(
             "backend/ml/channel_classifier.py",
@@ -161,12 +165,17 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_calibration_persistence_plan.py",
             "backend/source_identity_calibration_memory_draft.py",
             "backend/source_identity_calibration_memory_writer.py",
+            "backend/source_identity_calibration_memory_index.py",
+            "backend/source_identity_calibration_memory_trust_review.py",
+            "backend/source_identity_calibration_memory_trust_acceptance_ledger.py",
+            "backend/source_identity_calibration_memory_trust_promotion_plan.py",
             "backend/source_identity_downstream_gate.py",
         ),
         next_step=(
             "Keep replay-calibrated source identity trust states in operator review, "
             "record acceptance, plan manual persistence, and draft append-only "
-            "memory before an acknowledged append-only memory write contract."
+            "memory before acknowledged writes, read-only indexing, and operator "
+            "memory-trust promotion planning."
         ),
     ),
     ProjectGoalCapabilityRow(
@@ -781,19 +790,27 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "long_term_memory_learning_proposal",
             "source_identity_calibration_memory_draft",
             "source_identity_calibration_memory_writer",
+            "source_identity_calibration_memory_index",
+            "source_identity_calibration_memory_trust_review",
+            "source_identity_calibration_memory_trust_acceptance_ledger",
+            "source_identity_calibration_memory_trust_promotion_plan",
             "product_operator_state",
         ),
         support_paths=(
             "backend/long_term_memory_learning_proposal.py",
             "backend/source_identity_calibration_memory_draft.py",
             "backend/source_identity_calibration_memory_writer.py",
+            "backend/source_identity_calibration_memory_index.py",
+            "backend/source_identity_calibration_memory_trust_review.py",
+            "backend/source_identity_calibration_memory_trust_acceptance_ledger.py",
+            "backend/source_identity_calibration_memory_trust_promotion_plan.py",
             "backend/source_identity_downstream_gate.py",
             "backend/decision_memory.py",
             "backend/telemetry/",
             ".ai/memory/project.md",
         ),
         blocker="Memory-learning proposals are review contracts, not autonomous console authority.",
-        next_step="Route trusted-source, fresh-context learning records through replay correlation and operator review, then append-only memory drafts before any audited memory write or future proposal-priority influence.",
+        next_step="Route trusted-source, fresh-context learning records through replay correlation and operator review, then append-only memory drafts, acknowledged writes, read-only indexing, memory-trust review, operator acceptance, and manual promotion planning before any future proposal-priority influence.",
     ),
 )
 

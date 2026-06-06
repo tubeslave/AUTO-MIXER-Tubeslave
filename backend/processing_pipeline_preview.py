@@ -42,6 +42,18 @@ try:
     from source_identity_calibration_memory_writer import (
         build_source_identity_calibration_memory_writer,
     )
+    from source_identity_calibration_memory_index import (
+        build_source_identity_calibration_memory_index,
+    )
+    from source_identity_calibration_memory_trust_review import (
+        build_source_identity_calibration_memory_trust_review,
+    )
+    from source_identity_calibration_memory_trust_acceptance_ledger import (
+        build_source_identity_calibration_memory_trust_acceptance_ledger,
+    )
+    from source_identity_calibration_memory_trust_promotion_plan import (
+        build_source_identity_calibration_memory_trust_promotion_plan,
+    )
     from source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
         analyze_source_identity_replay_calibration,
@@ -82,6 +94,18 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_writer import (
         build_source_identity_calibration_memory_writer,
+    )
+    from backend.source_identity_calibration_memory_index import (
+        build_source_identity_calibration_memory_index,
+    )
+    from backend.source_identity_calibration_memory_trust_review import (
+        build_source_identity_calibration_memory_trust_review,
+    )
+    from backend.source_identity_calibration_memory_trust_acceptance_ledger import (
+        build_source_identity_calibration_memory_trust_acceptance_ledger,
+    )
+    from backend.source_identity_calibration_memory_trust_promotion_plan import (
+        build_source_identity_calibration_memory_trust_promotion_plan,
     )
     from backend.source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
@@ -333,6 +357,45 @@ def _source_identity_calibration_acceptance_records(server: Any) -> List[Dict[st
     return [dict(record) for record in raw_records if isinstance(record, dict)]
 
 
+def _source_identity_calibration_memory_text(server: Any) -> Optional[str]:
+    raw_text = getattr(server, "source_identity_calibration_memory_text", None)
+    if raw_text is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_text = config.get("source_identity_calibration_memory_text")
+    return raw_text if isinstance(raw_text, str) else None
+
+
+def _source_identity_calibration_memory_root(server: Any) -> Optional[str]:
+    raw_root = getattr(server, "source_identity_calibration_memory_root", None)
+    if raw_root is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_root = config.get("source_identity_calibration_memory_root")
+    return str(raw_root) if raw_root else None
+
+
+def _source_identity_memory_trust_acceptance_records(server: Any) -> List[Dict[str, Any]]:
+    raw_records = getattr(server, "source_identity_memory_trust_acceptance_records", None)
+    if raw_records is None:
+        raw_records = getattr(
+            server,
+            "source_identity_calibration_memory_trust_acceptance_records",
+            None,
+        )
+    if raw_records is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_records = config.get("source_identity_memory_trust_acceptance_records")
+            if raw_records is None:
+                raw_records = config.get(
+                    "source_identity_calibration_memory_trust_acceptance_records"
+                )
+    if not isinstance(raw_records, (list, tuple)):
+        return []
+    return [dict(record) for record in raw_records if isinstance(record, dict)]
+
+
 def build_main_pipeline_preview(
     server: Any,
     *,
@@ -395,6 +458,38 @@ def build_main_pipeline_preview(
         operator_ack=False,
     )
     source_identity_memory_writer_summary = source_identity_memory_writer.get("summary", {})
+    source_identity_memory_index = build_source_identity_calibration_memory_index(
+        memory_text=_source_identity_calibration_memory_text(server),
+        root=_source_identity_calibration_memory_root(server),
+    )
+    source_identity_memory_index_summary = source_identity_memory_index.get("summary", {})
+    source_identity_memory_trust_review = (
+        build_source_identity_calibration_memory_trust_review(
+            memory_index=source_identity_memory_index,
+            current_state_cache_freshness=_source_identity_replay_freshness(server),
+        )
+    )
+    source_identity_memory_trust_review_summary = source_identity_memory_trust_review.get(
+        "summary",
+        {},
+    )
+    source_identity_memory_trust_acceptance_ledger = (
+        build_source_identity_calibration_memory_trust_acceptance_ledger(
+            memory_trust_review=source_identity_memory_trust_review,
+            acceptance_records=_source_identity_memory_trust_acceptance_records(server),
+        )
+    )
+    source_identity_memory_trust_acceptance_summary = (
+        source_identity_memory_trust_acceptance_ledger.get("summary", {})
+    )
+    source_identity_memory_trust_promotion_plan = (
+        build_source_identity_calibration_memory_trust_promotion_plan(
+            acceptance_ledger=source_identity_memory_trust_acceptance_ledger,
+        )
+    )
+    source_identity_memory_trust_promotion_summary = (
+        source_identity_memory_trust_promotion_plan.get("summary", {})
+    )
 
     proposals = (
         operator_proposals
@@ -463,6 +558,40 @@ def build_main_pipeline_preview(
             ),
             "source_identity_calibration_memory_writer_write_result_count": int(
                 source_identity_memory_writer_summary.get("write_result_count", 0) or 0
+            ),
+            "source_identity_calibration_memory_index_record_count": int(
+                source_identity_memory_index_summary.get("memory_record_count", 0) or 0
+            ),
+            "source_identity_calibration_memory_index_invalid_record_count": int(
+                source_identity_memory_index_summary.get("invalid_record_count", 0) or 0
+            ),
+            "source_identity_calibration_memory_trust_review_candidate_count": int(
+                source_identity_memory_trust_review_summary.get(
+                    "trust_review_candidate_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_calibration_memory_trust_acceptance_record_count": int(
+                source_identity_memory_trust_acceptance_summary.get(
+                    "acceptance_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_calibration_memory_trust_accepted_record_count": int(
+                source_identity_memory_trust_acceptance_summary.get(
+                    "accepted_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_calibration_memory_trust_promotion_candidate_count": int(
+                source_identity_memory_trust_promotion_summary.get(
+                    "promotion_candidate_count",
+                    0,
+                )
+                or 0
             ),
             "proposal_only_contract_count": len(proposal_only_contracts),
             "blocker_count": len(blockers),
@@ -543,6 +672,62 @@ def build_main_pipeline_preview(
                 ),
             },
             {
+                "adapter_id": "source_identity_calibration_memory_index",
+                "method_id": "source_identity_calibration_memory_index",
+                "status": source_identity_memory_index.get("status"),
+                "output": "source_identity_append_only_memory_index_review",
+                "reason": (
+                    ", ".join(source_identity_memory_index_summary.get("blocked_by", []))
+                    if source_identity_memory_index_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
+                "adapter_id": "source_identity_calibration_memory_trust_review",
+                "method_id": "source_identity_calibration_memory_trust_review",
+                "status": source_identity_memory_trust_review.get("status"),
+                "output": "source_identity_memory_trust_operator_review",
+                "reason": (
+                    ", ".join(
+                        source_identity_memory_trust_review_summary.get("blocked_by", [])
+                    )
+                    if source_identity_memory_trust_review_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
+                "adapter_id": "source_identity_calibration_memory_trust_acceptance_ledger",
+                "method_id": "source_identity_calibration_memory_trust_acceptance_ledger",
+                "status": source_identity_memory_trust_acceptance_ledger.get("status"),
+                "output": "source_identity_memory_trust_acceptance_ledger",
+                "reason": (
+                    ", ".join(
+                        source_identity_memory_trust_acceptance_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if source_identity_memory_trust_acceptance_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
+                "adapter_id": "source_identity_calibration_memory_trust_promotion_plan",
+                "method_id": "source_identity_calibration_memory_trust_promotion_plan",
+                "status": source_identity_memory_trust_promotion_plan.get("status"),
+                "output": "source_identity_memory_trust_manual_promotion_plan",
+                "reason": (
+                    ", ".join(
+                        source_identity_memory_trust_promotion_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if source_identity_memory_trust_promotion_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
                 "adapter_id": "registry_blockers",
                 "method_id": "processing_registry",
                 "status": "active",
@@ -584,6 +769,16 @@ def build_main_pipeline_preview(
         "source_identity_calibration_persistence_plan": source_identity_persistence_plan,
         "source_identity_calibration_memory_draft": source_identity_memory_draft,
         "source_identity_calibration_memory_writer": source_identity_memory_writer,
+        "source_identity_calibration_memory_index": source_identity_memory_index,
+        "source_identity_calibration_memory_trust_review": (
+            source_identity_memory_trust_review
+        ),
+        "source_identity_calibration_memory_trust_acceptance_ledger": (
+            source_identity_memory_trust_acceptance_ledger
+        ),
+        "source_identity_calibration_memory_trust_promotion_plan": (
+            source_identity_memory_trust_promotion_plan
+        ),
         "registry": {
             "summary": registry_snapshot.get("summary", {}),
             "pipeline_profiles": registry_snapshot.get("pipeline_profiles", []),

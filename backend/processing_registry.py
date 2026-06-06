@@ -103,6 +103,18 @@ try:
     from source_identity_calibration_memory_writer import (
         build_source_identity_calibration_memory_writer,
     )
+    from source_identity_calibration_memory_index import (
+        build_source_identity_calibration_memory_index,
+    )
+    from source_identity_calibration_memory_trust_review import (
+        build_source_identity_calibration_memory_trust_review,
+    )
+    from source_identity_calibration_memory_trust_acceptance_ledger import (
+        build_source_identity_calibration_memory_trust_acceptance_ledger,
+    )
+    from source_identity_calibration_memory_trust_promotion_plan import (
+        build_source_identity_calibration_memory_trust_promotion_plan,
+    )
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.bus_group_main_dca_physical_readback_contract import (
@@ -195,6 +207,18 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_writer import (
         build_source_identity_calibration_memory_writer,
+    )
+    from backend.source_identity_calibration_memory_index import (
+        build_source_identity_calibration_memory_index,
+    )
+    from backend.source_identity_calibration_memory_trust_review import (
+        build_source_identity_calibration_memory_trust_review,
+    )
+    from backend.source_identity_calibration_memory_trust_acceptance_ledger import (
+        build_source_identity_calibration_memory_trust_acceptance_ledger,
+    )
+    from backend.source_identity_calibration_memory_trust_promotion_plan import (
+        build_source_identity_calibration_memory_trust_promotion_plan,
     )
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
 
@@ -503,6 +527,119 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "operator_ack_required",
             "no_queue_mutation",
             "no_model_mutation",
+            "no_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_calibration_memory_index",
+        label="Source Identity Calibration Memory Index",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only index of append-only source identity calibration memory "
+            "blocks; exposes durable memory evidence without promotion authority."
+        ),
+        module="backend/source_identity_calibration_memory_index.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="memory_index_is_review_evidence_not_downstream_priority_authority",
+        promotion_next=(
+            "use indexed records only as review evidence; separate replay/trust "
+            "promotion must approve any downstream priority influence"
+        ),
+        notes=(
+            "transport_free",
+            "append_only_memory_index",
+            "read_only_memory_evidence",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_calibration_memory_trust_review",
+        label="Source Identity Calibration Memory Trust Review",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only operator-review candidates derived from indexed source "
+            "identity calibration memory and fresh replay context."
+        ),
+        module="backend/source_identity_calibration_memory_trust_review.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="memory_trust_review_requires_operator_promotion_before_priority",
+        promotion_next=(
+            "operator reviews indexed memory candidates with fresh replay context "
+            "before any separate downstream trust promotion can change priority"
+        ),
+        notes=(
+            "transport_free",
+            "operator_review_only",
+            "memory_index_consumer",
+            "fresh_replay_context_required",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_calibration_memory_trust_acceptance_ledger",
+        label="Source Identity Calibration Memory Trust Acceptance Ledger",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only ledger for operator accepted/rejected decisions on "
+            "source identity memory trust-review candidates."
+        ),
+        module="backend/source_identity_calibration_memory_trust_acceptance_ledger.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="memory_trust_acceptance_is_not_promotion_authority",
+        promotion_next=(
+            "use accepted memory-trust records only as evidence for a separate "
+            "promotion contract before downstream priority changes"
+        ),
+        notes=(
+            "transport_free",
+            "operator_acceptance_ledger_only",
+            "memory_trust_review_consumer",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_calibration_memory_trust_promotion_plan",
+        label="Source Identity Calibration Memory Trust Promotion Plan",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only manual promotion plan derived from accepted memory-trust "
+            "ledger records; does not change downstream priority."
+        ),
+        module="backend/source_identity_calibration_memory_trust_promotion_plan.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="memory_trust_promotion_plan_is_manual_not_authority",
+        promotion_next=(
+            "define a separate promotion contract with replay freshness and rollback "
+            "before accepted memory trust can influence downstream priority"
+        ),
+        notes=(
+            "transport_free",
+            "manual_promotion_plan_only",
+            "memory_trust_acceptance_consumer",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
             "no_downstream_priority_mutation",
             "no_live_writes",
         ),
@@ -1856,6 +1993,10 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_persistence_plan",
             "source_identity_calibration_memory_draft",
             "source_identity_calibration_memory_writer",
+            "source_identity_calibration_memory_index",
+            "source_identity_calibration_memory_trust_review",
+            "source_identity_calibration_memory_trust_acceptance_ledger",
+            "source_identity_calibration_memory_trust_promotion_plan",
             "auto_fader_v1",
             "lufs_gain_staging",
             "live_shared_mix",
@@ -1942,6 +2083,10 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_persistence_plan",
             "source_identity_calibration_memory_draft",
             "source_identity_calibration_memory_writer",
+            "source_identity_calibration_memory_index",
+            "source_identity_calibration_memory_trust_review",
+            "source_identity_calibration_memory_trust_acceptance_ledger",
+            "source_identity_calibration_memory_trust_promotion_plan",
             "bus_group_balance_proposal",
             "mute_management_proposal",
             "routing_management_proposal",
@@ -1987,6 +2132,10 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_persistence_plan",
             "source_identity_calibration_memory_draft",
             "source_identity_calibration_memory_writer",
+            "source_identity_calibration_memory_index",
+            "source_identity_calibration_memory_trust_review",
+            "source_identity_calibration_memory_trust_acceptance_ledger",
+            "source_identity_calibration_memory_trust_promotion_plan",
             "cross_adaptive_eq",
             "autoeq_audit_validation",
             "diff_deq_playbook_bridge",
@@ -2115,6 +2264,26 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "build_source_identity_calibration_memory_writer",
         "ui_surface": "Channel Intelligence, append-only source identity memory writer dry-run",
         "next_step": "Use preview as dry-run only; apply requires explicit operator acknowledgement and must not change runtime trust or live console state.",
+    },
+    "source_identity_calibration_memory_index": {
+        "entrypoint": "build_source_identity_calibration_memory_index",
+        "ui_surface": "Channel Intelligence, append-only source identity memory index",
+        "next_step": "Use indexed memory as review evidence only; separate replay/trust promotion is required before downstream priority changes.",
+    },
+    "source_identity_calibration_memory_trust_review": {
+        "entrypoint": "build_source_identity_calibration_memory_trust_review",
+        "ui_surface": "Channel Intelligence, source identity memory trust review",
+        "next_step": "Use only as operator-review evidence with fresh replay context; downstream priority changes still require a separate promotion contract.",
+    },
+    "source_identity_calibration_memory_trust_acceptance_ledger": {
+        "entrypoint": "build_source_identity_calibration_memory_trust_acceptance_ledger",
+        "ui_surface": "Channel Intelligence, source identity memory trust acceptance ledger",
+        "next_step": "Record operator accepted/rejected memory-trust decisions as evidence only; downstream priority changes still require a separate promotion contract.",
+    },
+    "source_identity_calibration_memory_trust_promotion_plan": {
+        "entrypoint": "build_source_identity_calibration_memory_trust_promotion_plan",
+        "ui_surface": "Channel Intelligence, manual source identity memory trust promotion plan",
+        "next_step": "Use accepted memory-trust records only as manual promotion candidates; downstream priority changes still require a separate promotion contract.",
     },
     "supervised_manual_fader_gain": {
         "entrypoint": "apply_operator_proposal -> supervised manual gate",
@@ -2602,6 +2771,18 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "source_identity_calibration_memory_writer": (
             build_source_identity_calibration_memory_writer()
+        ),
+        "source_identity_calibration_memory_index": (
+            build_source_identity_calibration_memory_index()
+        ),
+        "source_identity_calibration_memory_trust_review": (
+            build_source_identity_calibration_memory_trust_review()
+        ),
+        "source_identity_calibration_memory_trust_acceptance_ledger": (
+            build_source_identity_calibration_memory_trust_acceptance_ledger()
+        ),
+        "source_identity_calibration_memory_trust_promotion_plan": (
+            build_source_identity_calibration_memory_trust_promotion_plan()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),
