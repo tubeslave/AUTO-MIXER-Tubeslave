@@ -6,7 +6,7 @@ This note maps the current promotion queue-import memory boundary so operators
 and future agents do not confuse request templates with executed evidence or
 memory writes.
 
-The six newest promotion consumers are read-only verifiers. They may expose
+The seven newest promotion consumers are read-only verifiers. They may expose
 the next request payload shape only after matching generic evidence back to
 promotion provenance. They do not invoke downstream handlers, write memory
 files, mutate Product Layer state, reserve idempotency keys, or grant live
@@ -22,6 +22,7 @@ authority.
 | Promotion memory-writer apply result consumer | Explicit generic append-only writer result plus promotion dry-run provenance | Memory-index request template | Does not index memory, perform a consumer-side memory write, mutate policy/runtime/model state, reserve idempotency, or touch mixer transport |
 | Promotion memory-index result consumer | Read-only memory index result plus promotion writer-apply provenance and fresh sequence-review context | Memory-trust-review request template | Does not run trust review, mutate memory/policy/runtime/model state, mutate queues or proposals, reserve idempotency, or touch mixer transport |
 | Promotion memory-trust-review result consumer | Memory trust-review result plus promotion memory-index provenance | Acceptance-ledger request template with empty `acceptance_records` | Does not run acceptance ledger, accept or reject candidates, mutate memory/policy/runtime/model state, mutate queues or proposals, mutate sequence-policy trust stores, reserve idempotency, or touch mixer transport |
+| Promotion memory-trust acceptance-ledger result consumer | Explicit operator accept/reject ledger result plus promotion memory-trust-review provenance | Promotion-plan request template | Does not run promotion planning, promote policy, mutate memory/policy/runtime/model state, mutate queues or proposals, mutate sequence-policy trust stores, reserve idempotency, or touch mixer transport |
 
 ## Template Versus Execution
 
@@ -38,6 +39,8 @@ The current safety contract keeps these flags false at the consumer boundary:
 - `memory_trust_review_created`
 - `acceptance_ledger_handler_invoked`
 - `acceptance_ledger_created`
+- `promotion_plan_handler_invoked`
+- `promotion_plan_created`
 - `memory_file_write_applied`
 - `memory_file_write_applied_by_consumer`
 - `memory_file_mutation`
@@ -98,6 +101,20 @@ PYTHONPATH=backend python3 -m pytest -q \
 ```
 
 Observed result in the 2026-06-06 validation cycle: `24 passed`.
+
+Focused validation for the current promotion memory-trust acceptance-ledger
+result consumer, promotion-plan compatibility, contract handoff, and Product
+State route:
+
+```bash
+PYTHONPATH=backend python3 -m pytest -q \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_trust_acceptance_ledger_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_contract_result_consumer.py \
+  tests/test_operator_product_state.py::test_sequence_policy_queue_import_promotion_queue_importer_result_consumer_feeds_preflight_plan_without_live_write
+```
+
+Observed result in the 2026-06-06 validation cycle: `25 passed`.
 
 ## Live Safety
 

@@ -48,8 +48,29 @@ OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_PROM
     "sequence_memory_trust_promotion_queue_import_promotion_plan_result_consumer_blocked",
     "sequence_memory_trust_promotion_queue_import_promotion_contract_request_available",
 }
+OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_PROMOTION_MEMORY_TRUST_ACCEPTANCE_LEDGER_RESULT_CONSUMER_METHOD_ID = (
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_trust_acceptance_ledger_result_consumer"
+)
+OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_PROMOTION_MEMORY_TRUST_ACCEPTANCE_LEDGER_RESULT_CONSUMER_STATUSES = {
+    "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_acceptance_ledger_result_consumer_not_ready",
+    "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_acceptance_ledger_result_consumer_replacement_required",
+    "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_acceptance_ledger_result_consumer_blocked",
+    "sequence_memory_trust_promotion_queue_import_promotion_plan_request_available",
+}
 REQUIRED_ACCEPTANCE_LEDGER_RESULT_CONSUMER_TYPE = (
     "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_trust_acceptance_ledger_result_consumer"
+)
+ALLOWED_ACCEPTANCE_LEDGER_RESULT_CONSUMER_TYPES = {
+    REQUIRED_ACCEPTANCE_LEDGER_RESULT_CONSUMER_TYPE,
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_trust_acceptance_ledger_result_consumer",
+}
+ALLOWED_ACCEPTANCE_LEDGER_RESULT_CONSUMER_METHOD_IDS = {
+    OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_MEMORY_TRUST_ACCEPTANCE_LEDGER_RESULT_CONSUMER_METHOD_ID,
+    OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_PROMOTION_MEMORY_TRUST_ACCEPTANCE_LEDGER_RESULT_CONSUMER_METHOD_ID,
+}
+ALLOWED_ACCEPTANCE_LEDGER_RESULT_CONSUMER_STATUSES = (
+    OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_MEMORY_TRUST_ACCEPTANCE_LEDGER_RESULT_CONSUMER_STATUSES
+    | OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_PROMOTION_MEMORY_TRUST_ACCEPTANCE_LEDGER_RESULT_CONSUMER_STATUSES
 )
 REQUIRED_ACCEPTANCE_LEDGER_RESULT_CONSUMER_AVAILABLE_STATUS = (
     "sequence_memory_trust_promotion_queue_import_promotion_plan_request_available"
@@ -221,21 +242,15 @@ def _candidate_id(candidate: Mapping[str, Any], index: int) -> str:
 
 def _consumer_envelope_violations(consumer: Mapping[str, Any]) -> Tuple[str, ...]:
     violations = []
-    if consumer.get("type") != REQUIRED_ACCEPTANCE_LEDGER_RESULT_CONSUMER_TYPE:
+    if consumer.get("type") not in ALLOWED_ACCEPTANCE_LEDGER_RESULT_CONSUMER_TYPES:
         violations.append(
             "sequence_policy_promotion_plan_result_consumer_acceptance_consumer_type_mismatch"
         )
-    if (
-        consumer.get("method_id")
-        != OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_MEMORY_TRUST_ACCEPTANCE_LEDGER_RESULT_CONSUMER_METHOD_ID
-    ):
+    if consumer.get("method_id") not in ALLOWED_ACCEPTANCE_LEDGER_RESULT_CONSUMER_METHOD_IDS:
         violations.append(
             "sequence_policy_promotion_plan_result_consumer_acceptance_consumer_method_id_mismatch"
         )
-    if (
-        consumer.get("status")
-        not in OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_MEMORY_TRUST_ACCEPTANCE_LEDGER_RESULT_CONSUMER_STATUSES
-    ):
+    if consumer.get("status") not in ALLOWED_ACCEPTANCE_LEDGER_RESULT_CONSUMER_STATUSES:
         violations.append(
             "sequence_policy_promotion_plan_result_consumer_acceptance_consumer_status_unknown"
         )
