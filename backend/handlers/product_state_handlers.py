@@ -1204,7 +1204,9 @@ def register_handlers(server):
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_acceptance_ledger_result_consumer(
                 promotion_contract_result_consumer=(
                     data.get("promotion_contract_result_consumer")
+                    or data.get("promotion_memory_contract_result_consumer")
                     or data.get("queue_import_promotion_contract_result_consumer")
+                    or data.get("queue_import_promotion_memory_contract_result_consumer")
                     or data.get("consumer")
                 ),
                 promotion_acceptance_ledger_result=(
@@ -1228,7 +1230,11 @@ def register_handlers(server):
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_plan_result_consumer(
                 promotion_acceptance_ledger_result_consumer=(
                     data.get("promotion_acceptance_ledger_result_consumer")
+                    or data.get("promotion_memory_acceptance_ledger_result_consumer")
                     or data.get("queue_import_promotion_acceptance_ledger_result_consumer")
+                    or data.get(
+                        "queue_import_promotion_memory_acceptance_ledger_result_consumer"
+                    )
                     or data.get("consumer")
                 ),
                 promotion_execution_plan_result=(
@@ -1252,7 +1258,11 @@ def register_handlers(server):
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_dry_run_result_consumer(
                 promotion_execution_plan_result_consumer=(
                     data.get("promotion_execution_plan_result_consumer")
+                    or data.get("promotion_memory_execution_plan_result_consumer")
                     or data.get("queue_import_promotion_execution_plan_result_consumer")
+                    or data.get(
+                        "queue_import_promotion_memory_execution_plan_result_consumer"
+                    )
                     or data.get("consumer")
                 ),
                 promotion_executor_dry_run_result=(
@@ -1276,7 +1286,11 @@ def register_handlers(server):
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer(
                 promotion_executor_dry_run_result_consumer=(
                     data.get("promotion_executor_dry_run_result_consumer")
+                    or data.get("promotion_memory_executor_dry_run_result_consumer")
                     or data.get("queue_import_promotion_executor_dry_run_result_consumer")
+                    or data.get(
+                        "queue_import_promotion_memory_executor_dry_run_result_consumer"
+                    )
                     or data.get("consumer")
                 ),
                 promotion_executor_result=(
@@ -1299,7 +1313,11 @@ def register_handlers(server):
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer(
                 promotion_executor_result_consumer=(
                     data.get("promotion_executor_result_consumer")
+                    or data.get("promotion_memory_executor_result_consumer")
                     or data.get("queue_import_promotion_executor_result_consumer")
+                    or data.get(
+                        "queue_import_promotion_memory_executor_result_consumer"
+                    )
                     or data.get("consumer")
                 ),
                 promotion_apply_audit_result=(
@@ -1323,7 +1341,11 @@ def register_handlers(server):
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer(
                 promotion_apply_audit_result_consumer=(
                     data.get("promotion_apply_audit_result_consumer")
+                    or data.get("promotion_memory_apply_audit_result_consumer")
                     or data.get("queue_import_promotion_apply_audit_result_consumer")
+                    or data.get(
+                        "queue_import_promotion_memory_apply_audit_result_consumer"
+                    )
                     or data.get("consumer")
                 ),
                 promotion_rollback_verification_result=(
@@ -1348,7 +1370,13 @@ def register_handlers(server):
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer(
                 promotion_rollback_verification_result_consumer=(
                     data.get("promotion_rollback_verification_result_consumer")
+                    or data.get(
+                        "promotion_memory_rollback_verification_result_consumer"
+                    )
                     or data.get("queue_import_promotion_rollback_verification_result_consumer")
+                    or data.get(
+                        "queue_import_promotion_memory_rollback_verification_result_consumer"
+                    )
                     or data.get("consumer")
                 ),
                 promotion_sequence_policy_gate_result=(

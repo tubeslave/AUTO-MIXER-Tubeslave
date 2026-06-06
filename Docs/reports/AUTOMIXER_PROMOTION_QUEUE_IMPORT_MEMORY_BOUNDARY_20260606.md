@@ -41,6 +41,18 @@ The current safety contract keeps these flags false at the consumer boundary:
 - `acceptance_ledger_created`
 - `promotion_plan_handler_invoked`
 - `promotion_plan_created`
+- `promotion_executor_dry_run_handler_invoked`
+- `promotion_executor_dry_run_created`
+- `promotion_executor_handler_invoked`
+- `promotion_executor_created`
+- `promotion_apply_audit_handler_invoked`
+- `promotion_apply_audit_created`
+- `promotion_rollback_verification_handler_invoked`
+- `promotion_rollback_verification_created`
+- `promotion_sequence_policy_gate_handler_invoked`
+- `promotion_sequence_policy_gate_created`
+- `promotion_policy_consumer_handler_invoked`
+- `promotion_policy_consumer_created`
 - `memory_file_write_applied`
 - `memory_file_write_applied_by_consumer`
 - `memory_file_mutation`
@@ -70,6 +82,14 @@ already proves an explicit append-only memory write with `apply=true` and
 `operator_ack=true`. The promotion consumer itself still reports
 `memory_file_write_applied_by_consumer=false` and `memory_file_mutation=false`.
 
+A second intentional source-evidence exception is the promotion executor result:
+with `apply=true`, `operator_ack=true`, and an explicit caller-provided target
+store, the executor may report `runtime_memory_mutation=true` and
+`sequence_policy_trust_store_mutation=true` for that supplied trust store. The
+queue-import result consumers still keep their own mutation, idempotency,
+direct sequence execution, live mixer authority, and full autonomous flags
+false.
+
 ## Current Validation Evidence
 
 Focused validation for this boundary:
@@ -87,7 +107,8 @@ Expected result in the 2026-06-06 validation cycle: `21 passed`.
 PYTHONPATH=backend python3 -m pytest -q tests/test_operator_product_state.py
 ```
 
-Expected result in the 2026-06-06 validation cycle: `142 passed`.
+Observed result in the 2026-06-06 validation cycle after the ProductState
+promotion-memory apply-audit handoff: `142 passed`.
 
 Additional focused validation for the current writer-apply and memory-index
 handoffs plus the current memory-trust-review acceptance request handoff:
@@ -103,18 +124,29 @@ PYTHONPATH=backend python3 -m pytest -q \
 Observed result in the 2026-06-06 validation cycle: `24 passed`.
 
 Focused validation for the current promotion memory-trust acceptance-ledger
-result consumer, promotion-plan compatibility, contract handoff, and Product
-State route:
+result consumer, promotion-plan compatibility, contract handoff, promotion
+acceptance-ledger handoff, execution-plan handoff, executor dry-run handoff,
+preview executor-result blocking, supervised target-store apply evidence,
+apply-audit handoff, rollback-verification handoff, sequence-policy-gate
+handoff, policy-consumer request templating, and Product State route:
 
 ```bash
 PYTHONPATH=backend python3 -m pytest -q \
   tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_trust_acceptance_ledger_result_consumer.py \
   tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer.py \
   tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_contract_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_acceptance_ledger_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_plan_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_dry_run_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer.py \
+  tests/test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer.py \
   tests/test_operator_product_state.py::test_sequence_policy_queue_import_promotion_queue_importer_result_consumer_feeds_preflight_plan_without_live_write
 ```
 
-Observed result in the 2026-06-06 validation cycle: `25 passed`.
+Observed result in the 2026-06-06 validation cycle after the ProductState
+promotion-memory policy-consumer request handoff: `79 passed`.
 
 ## Live Safety
 
