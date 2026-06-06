@@ -5962,6 +5962,9 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     executor_dry_run = payload[
         "source_identity_calibration_memory_trust_promotion_executor_dry_run"
     ]
+    executor = payload[
+        "source_identity_calibration_memory_trust_promotion_executor"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
@@ -5979,6 +5982,12 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         for item in payload["adapters"]
         if item["adapter_id"]
         == "source_identity_calibration_memory_trust_promotion_executor_dry_run"
+    ][0]
+    executor_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "source_identity_calibration_memory_trust_promotion_executor"
     ][0]
 
     assert (
@@ -6006,6 +6015,12 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         == 1
     )
     assert (
+        payload["summary"][
+            "source_identity_calibration_memory_trust_promotion_executor_apply_result_count"
+        ]
+        == 0
+    )
+    assert (
         adapter["method_id"]
         == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
     )
@@ -6025,6 +6040,14 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert (
         dry_run_adapter["output"]
         == "source_identity_memory_trust_promotion_executor_dry_run"
+    )
+    assert (
+        executor_adapter["method_id"]
+        == "source_identity_calibration_memory_trust_promotion_executor"
+    )
+    assert (
+        executor_adapter["output"]
+        == "source_identity_memory_trust_promotion_executor"
     )
     assert (
         ledger["status"]
@@ -6109,6 +6132,15 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         ]
         is False
     )
+    assert executor["status"] == "memory_trust_promotion_executor_ready"
+    assert executor["summary"]["dry_run_record_count"] == 1
+    assert executor["summary"]["apply_result_count"] == 0
+    assert executor["summary"]["apply_requested"] is False
+    assert executor["summary"]["memory_trust_promotion_applied"] is False
+    assert executor["summary"]["runtime_memory_mutation"] is False
+    assert executor["summary"]["queue_mutation"] is False
+    assert executor["summary"]["live_write"] is False
+    assert executor["apply_results"] == []
     assert queue["summary"]["pending_count"] == 0
 
 

@@ -66,6 +66,9 @@ try:
     from source_identity_calibration_memory_trust_promotion_executor_dry_run import (
         build_source_identity_calibration_memory_trust_promotion_executor_dry_run,
     )
+    from source_identity_calibration_memory_trust_promotion_executor import (
+        build_source_identity_calibration_memory_trust_promotion_executor,
+    )
     from source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
         analyze_source_identity_replay_calibration,
@@ -130,6 +133,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_trust_promotion_executor_dry_run import (
         build_source_identity_calibration_memory_trust_promotion_executor_dry_run,
+    )
+    from backend.source_identity_calibration_memory_trust_promotion_executor import (
+        build_source_identity_calibration_memory_trust_promotion_executor,
     )
     from backend.source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
@@ -613,6 +619,16 @@ def build_main_pipeline_preview(
     source_identity_memory_trust_promotion_executor_dry_run_summary = (
         source_identity_memory_trust_promotion_executor_dry_run.get("summary", {})
     )
+    source_identity_memory_trust_promotion_executor = (
+        build_source_identity_calibration_memory_trust_promotion_executor(
+            executor_dry_run=source_identity_memory_trust_promotion_executor_dry_run,
+            apply=False,
+            operator_ack=False,
+        )
+    )
+    source_identity_memory_trust_promotion_executor_summary = (
+        source_identity_memory_trust_promotion_executor.get("summary", {})
+    )
 
     proposals = (
         operator_proposals
@@ -747,6 +763,13 @@ def build_main_pipeline_preview(
             "source_identity_calibration_memory_trust_promotion_executor_dry_run_record_count": int(
                 source_identity_memory_trust_promotion_executor_dry_run_summary.get(
                     "dry_run_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_calibration_memory_trust_promotion_executor_apply_result_count": int(
+                source_identity_memory_trust_promotion_executor_summary.get(
+                    "apply_result_count",
                     0,
                 )
                 or 0
@@ -984,6 +1007,28 @@ def build_main_pipeline_preview(
                 ),
             },
             {
+                "adapter_id": (
+                    "source_identity_calibration_memory_trust_promotion_executor"
+                ),
+                "method_id": (
+                    "source_identity_calibration_memory_trust_promotion_executor"
+                ),
+                "status": source_identity_memory_trust_promotion_executor.get("status"),
+                "output": "source_identity_memory_trust_promotion_executor",
+                "reason": (
+                    ", ".join(
+                        source_identity_memory_trust_promotion_executor_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if source_identity_memory_trust_promotion_executor_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
                 "adapter_id": "registry_blockers",
                 "method_id": "processing_registry",
                 "status": "active",
@@ -1046,6 +1091,9 @@ def build_main_pipeline_preview(
         ),
         "source_identity_calibration_memory_trust_promotion_executor_dry_run": (
             source_identity_memory_trust_promotion_executor_dry_run
+        ),
+        "source_identity_calibration_memory_trust_promotion_executor": (
+            source_identity_memory_trust_promotion_executor
         ),
         "registry": {
             "summary": registry_snapshot.get("summary", {}),
