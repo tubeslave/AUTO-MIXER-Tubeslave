@@ -127,6 +127,15 @@ try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan,
     )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_executor import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -288,6 +297,15 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_executor import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -885,6 +903,106 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "no_model_mutation",
             "no_runtime_memory_mutation",
             "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run",
+        label="Operator Proposal Apply Sequence Policy Memory Trust Promotion Executor Dry Run",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only dry-run executor contract that converts sequence-memory "
+            "promotion execution candidates into deterministic policy apply specs."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_executor_dry_run_does_not_apply"
+        ),
+        promotion_next=(
+            "validate dry-run policy specs, then add a separate operator-gated "
+            "executor contract before sequence policy can be promoted"
+        ),
+        notes=(
+            "transport_free",
+            "executor_dry_run_only",
+            "sequence_memory_trust_promotion_execution_plan_consumer",
+            "idempotent_policy_apply_spec",
+            "no_execution_authority",
+            "no_queue_mutation",
+            "no_policy_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_executor",
+        label="Operator Proposal Apply Sequence Policy Memory Trust Promotion Executor",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Operator-gated executor that can promote sequence-memory trust "
+            "only into an explicit caller-provided sequence policy store."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_executor.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_executor_requires_operator_ack_and_explicit_store"
+        ),
+        promotion_next=(
+            "audit applied policy-store results and verify rollback before any "
+            "sequence policy consumer can influence ordering or execution"
+        ),
+        notes=(
+            "transport_free",
+            "operator_gated_policy_store_executor",
+            "sequence_memory_trust_promotion_executor_dry_run_consumer",
+            "explicit_target_store_required",
+            "no_live_writes",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_proposal_state_mutation",
+            "no_direct_sequence_execution",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit",
+        label="Operator Proposal Apply Sequence Policy Memory Trust Promotion Apply Audit",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only rollback audit for applied sequence-policy trust promotion "
+            "executor results."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_apply_audit_is_not_sequence_or_live_authority"
+        ),
+        promotion_next=(
+            "verify rollback evidence before any sequence policy consumer can "
+            "use promoted memory trust records"
+        ),
+        notes=(
+            "transport_free",
+            "apply_audit_only",
+            "sequence_memory_trust_promotion_executor_consumer",
+            "rollback_evidence_required",
+            "no_live_writes",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_proposal_state_mutation",
+            "no_direct_sequence_execution",
         ),
     ),
     ProcessingMethod(
@@ -2694,6 +2812,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -2803,6 +2924,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -2871,6 +2995,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -3054,6 +3181,21 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan",
         "ui_surface": "Decision Queue, sequence policy memory trust promotion execution plan",
         "next_step": "Surface accepted promotion records only as non-executing candidates; policy and execution influence still require a separate acknowledged executor.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion executor dry-run",
+        "next_step": "Use dry-run specs as review evidence only; sequence policy promotion still requires a separate acknowledged executor.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion executor",
+        "next_step": "Apply only to an explicit policy store with operator acknowledgement; audit and rollback verification are still required before sequence policy consumption.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion apply audit",
+        "next_step": "Use audit records as rollback evidence only; rollback verification is still required before sequence policy consumption.",
     },
     "source_identity_calibration_memory_trust_review": {
         "entrypoint": "build_source_identity_calibration_memory_trust_review",
@@ -3656,6 +3798,15 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan": (
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit()
         ),
         "source_identity_calibration_memory_trust_review": (
             build_source_identity_calibration_memory_trust_review()

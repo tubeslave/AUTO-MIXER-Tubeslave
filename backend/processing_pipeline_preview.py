@@ -66,6 +66,15 @@ try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan,
     )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_executor import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -175,6 +184,15 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_executor import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -852,6 +870,34 @@ def build_main_pipeline_preview(
     sequence_policy_memory_trust_promotion_execution_summary = (
         sequence_policy_memory_trust_promotion_execution_plan.get("summary", {})
     )
+    sequence_policy_memory_trust_promotion_executor_dry_run = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run(
+            promotion_execution_plan=sequence_policy_memory_trust_promotion_execution_plan,
+            apply=False,
+            operator_ack=False,
+        )
+    )
+    sequence_policy_memory_trust_promotion_executor_dry_run_summary = (
+        sequence_policy_memory_trust_promotion_executor_dry_run.get("summary", {})
+    )
+    sequence_policy_memory_trust_promotion_executor = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor(
+            executor_dry_run=sequence_policy_memory_trust_promotion_executor_dry_run,
+            apply=False,
+            operator_ack=False,
+        )
+    )
+    sequence_policy_memory_trust_promotion_executor_summary = (
+        sequence_policy_memory_trust_promotion_executor.get("summary", {})
+    )
+    sequence_policy_memory_trust_promotion_apply_audit = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit(
+            promotion_executor=sequence_policy_memory_trust_promotion_executor,
+        )
+    )
+    sequence_policy_memory_trust_promotion_apply_audit_summary = (
+        sequence_policy_memory_trust_promotion_apply_audit.get("summary", {})
+    )
     source_identity_memory_trust_review = (
         build_source_identity_calibration_memory_trust_review(
             memory_index=source_identity_memory_index,
@@ -1134,6 +1180,27 @@ def build_main_pipeline_preview(
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_candidate_count": int(
                 sequence_policy_memory_trust_promotion_execution_summary.get(
                     "execution_candidate_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run_record_count": int(
+                sequence_policy_memory_trust_promotion_executor_dry_run_summary.get(
+                    "dry_run_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_apply_result_count": int(
+                sequence_policy_memory_trust_promotion_executor_summary.get(
+                    "apply_result_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit_record_count": int(
+                sequence_policy_memory_trust_promotion_apply_audit_summary.get(
+                    "apply_audit_record_count",
                     0,
                 )
                 or 0
@@ -1520,6 +1587,86 @@ def build_main_pipeline_preview(
                 ),
             },
             {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run"
+                ),
+                "status": (
+                    sequence_policy_memory_trust_promotion_executor_dry_run.get(
+                        "status"
+                    )
+                ),
+                "output": (
+                    "operator_proposal_apply_sequence_memory_trust_promotion_executor_dry_run"
+                ),
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_promotion_executor_dry_run_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_promotion_executor_dry_run_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
+                ),
+                "status": sequence_policy_memory_trust_promotion_executor.get(
+                    "status"
+                ),
+                "output": (
+                    "operator_proposal_apply_sequence_memory_trust_promotion_executor"
+                ),
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_promotion_executor_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_promotion_executor_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit"
+                ),
+                "status": sequence_policy_memory_trust_promotion_apply_audit.get(
+                    "status"
+                ),
+                "output": (
+                    "operator_proposal_apply_sequence_memory_trust_promotion_apply_audit"
+                ),
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_promotion_apply_audit_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_promotion_apply_audit_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
                 "adapter_id": "source_identity_calibration_memory_trust_review",
                 "method_id": "source_identity_calibration_memory_trust_review",
                 "status": source_identity_memory_trust_review.get("status"),
@@ -1889,6 +2036,15 @@ def build_main_pipeline_preview(
         ),
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan": (
             sequence_policy_memory_trust_promotion_execution_plan
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run": (
+            sequence_policy_memory_trust_promotion_executor_dry_run
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor": (
+            sequence_policy_memory_trust_promotion_executor
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit": (
+            sequence_policy_memory_trust_promotion_apply_audit
         ),
         "source_identity_calibration_memory_trust_review": (
             source_identity_memory_trust_review

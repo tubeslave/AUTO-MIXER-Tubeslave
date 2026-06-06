@@ -5683,6 +5683,15 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     execution_plan = payload[
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan"
     ]
+    executor_dry_run = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run"
+    ]
+    executor = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
+    ]
+    apply_audit = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
@@ -5723,6 +5732,24 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
         for item in payload["adapters"]
         if item["adapter_id"]
         == "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan"
+    ][0]
+    executor_dry_run_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run"
+    ][0]
+    executor_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
+    ][0]
+    apply_audit_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit"
     ][0]
 
     assert (
@@ -5785,6 +5812,24 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
         ]
         == 1
     )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run_record_count"
+        ]
+        == 1
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_apply_result_count"
+        ]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit_record_count"
+        ]
+        == 0
+    )
     assert adapter["method_id"] == "operator_proposal_apply_sequence_policy_memory_index"
     assert (
         adapter["output"]
@@ -5837,6 +5882,30 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     assert (
         execution_plan_adapter["output"]
         == "operator_proposal_apply_sequence_memory_trust_promotion_execution_plan"
+    )
+    assert (
+        executor_dry_run_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run"
+    )
+    assert (
+        executor_dry_run_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_executor_dry_run"
+    )
+    assert (
+        executor_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
+    )
+    assert (
+        executor_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_executor"
+    )
+    assert (
+        apply_audit_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit"
+    )
+    assert (
+        apply_audit_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_apply_audit"
     )
     assert index["status"] == "append_only_sequence_memory_index_available"
     assert index["summary"]["memory_record_count"] == 1
@@ -5983,6 +6052,66 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     assert (
         execution_plan["execution_candidates"][0]["live_authority_granted"] is False
     )
+    assert (
+        executor_dry_run["status"]
+        == "sequence_memory_trust_promotion_executor_dry_run_ready"
+    )
+    assert executor_dry_run["summary"]["dry_run_record_count"] == 1
+    assert executor_dry_run["summary"]["execution_allowed_by_dry_run"] is False
+    assert executor_dry_run["summary"]["sequence_policy_promotion_applied"] is False
+    assert (
+        executor_dry_run["summary"]["sequence_policy_promotion_allowed_by_dry_run"]
+        is False
+    )
+    assert executor_dry_run["summary"]["policy_mutation_allowed_by_dry_run"] is False
+    assert (
+        executor_dry_run["summary"]["runtime_memory_mutation_allowed_by_dry_run"]
+        is False
+    )
+    assert executor_dry_run["dry_run_records"][0]["target_policy_path"] == (
+        "operator_sequence_policy_trust_gate/"
+        "memory-write-applied/memory-write:memory-write-applied/trust_state"
+    )
+    assert executor_dry_run["dry_run_records"][0]["dry_run"] is True
+    assert (
+        executor_dry_run["dry_run_records"][0]["sequence_policy_promotion_applied"]
+        is False
+    )
+    assert (
+        executor_dry_run["dry_run_records"][0][
+            "runtime_memory_mutation_allowed_by_dry_run"
+        ]
+        is False
+    )
+    assert (
+        executor_dry_run["dry_run_records"][0]["live_authority_granted"] is False
+    )
+    assert executor["status"] == "sequence_memory_trust_promotion_executor_ready"
+    assert executor["summary"]["dry_run_record_count"] == 1
+    assert executor["summary"]["apply_result_count"] == 0
+    assert executor["summary"]["sequence_policy_promotion_applied"] is False
+    assert executor["summary"]["runtime_memory_mutation"] is False
+    assert executor["summary"]["sequence_policy_trust_store_mutation"] is False
+    assert executor["summary"]["queue_mutation"] is False
+    assert executor["summary"]["proposal_state_mutation"] is False
+    assert executor["summary"]["sequence_execution_allowed_by_executor"] is False
+    assert executor["summary"]["live_write"] is False
+    assert executor["summary"]["target_store_provided"] is False
+    assert executor["apply_results"] == []
+    assert (
+        apply_audit["status"]
+        == "sequence_memory_trust_promotion_apply_audit_not_ready"
+    )
+    assert apply_audit["summary"]["executor_apply_result_count"] == 0
+    assert apply_audit["summary"]["apply_audit_record_count"] == 0
+    assert apply_audit["summary"]["runtime_memory_mutation"] is False
+    assert apply_audit["summary"]["sequence_policy_trust_store_mutation"] is False
+    assert apply_audit["summary"]["queue_mutation"] is False
+    assert apply_audit["summary"]["proposal_state_mutation"] is False
+    assert apply_audit["summary"]["sequence_execution_allowed_by_audit"] is False
+    assert apply_audit["summary"]["live_write"] is False
+    assert apply_audit["summary"]["rollback_verified"] is False
+    assert apply_audit["audit_records"] == []
     assert queue["summary"]["pending_count"] == 0
 
 
