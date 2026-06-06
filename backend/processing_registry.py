@@ -130,6 +130,9 @@ try:
     from source_identity_calibration_memory_trust_promotion_executor import (
         build_source_identity_calibration_memory_trust_promotion_executor,
     )
+    from source_identity_calibration_memory_trust_promotion_apply_audit import (
+        build_source_identity_calibration_memory_trust_promotion_apply_audit,
+    )
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.bus_group_main_dca_physical_readback_contract import (
@@ -249,6 +252,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_trust_promotion_executor import (
         build_source_identity_calibration_memory_trust_promotion_executor,
+    )
+    from backend.source_identity_calibration_memory_trust_promotion_apply_audit import (
+        build_source_identity_calibration_memory_trust_promotion_apply_audit,
     )
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
 
@@ -824,6 +830,36 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "no_model_mutation",
             "no_live_writes",
             "not_product_layer_task_queue_executor",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_calibration_memory_trust_promotion_apply_audit",
+        label="Source Identity Calibration Memory Trust Promotion Apply Audit",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only rollback audit for operator-gated source identity memory "
+            "trust promotion apply results."
+        ),
+        module=(
+            "backend/source_identity_calibration_memory_trust_promotion_apply_audit.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="memory_trust_promotion_apply_audit_is_not_priority_or_live_authority",
+        promotion_next=(
+            "use audit records only as rollback evidence; a separate reviewed "
+            "downstream-priority gate is required before proposal policy changes"
+        ),
+        notes=(
+            "transport_free",
+            "rollback_audit_only",
+            "memory_trust_promotion_executor_consumer",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_downstream_priority_mutation",
+            "no_live_writes",
         ),
     ),
     ProcessingMethod(
@@ -2184,6 +2220,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_execution_plan",
             "source_identity_calibration_memory_trust_promotion_executor_dry_run",
             "source_identity_calibration_memory_trust_promotion_executor",
+            "source_identity_calibration_memory_trust_promotion_apply_audit",
             "auto_fader_v1",
             "lufs_gain_staging",
             "live_shared_mix",
@@ -2279,6 +2316,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_execution_plan",
             "source_identity_calibration_memory_trust_promotion_executor_dry_run",
             "source_identity_calibration_memory_trust_promotion_executor",
+            "source_identity_calibration_memory_trust_promotion_apply_audit",
             "bus_group_balance_proposal",
             "mute_management_proposal",
             "routing_management_proposal",
@@ -2333,6 +2371,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_execution_plan",
             "source_identity_calibration_memory_trust_promotion_executor_dry_run",
             "source_identity_calibration_memory_trust_promotion_executor",
+            "source_identity_calibration_memory_trust_promotion_apply_audit",
             "cross_adaptive_eq",
             "autoeq_audit_validation",
             "diff_deq_playbook_bridge",
@@ -2516,6 +2555,13 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         ),
         "ui_surface": "Channel Intelligence, source identity memory trust promotion executor",
         "next_step": "Use only with explicit operator acknowledgement and an explicit trust store; Product Layer preview remains non-mutating.",
+    },
+    "source_identity_calibration_memory_trust_promotion_apply_audit": {
+        "entrypoint": (
+            "build_source_identity_calibration_memory_trust_promotion_apply_audit"
+        ),
+        "ui_surface": "Channel Intelligence, source identity memory trust promotion apply audit",
+        "next_step": "Use rollback audit records as review evidence only; downstream priority still requires a separate reviewed gate.",
     },
     "supervised_manual_fader_gain": {
         "entrypoint": "apply_operator_proposal -> supervised manual gate",
@@ -3030,6 +3076,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "source_identity_calibration_memory_trust_promotion_executor": (
             build_source_identity_calibration_memory_trust_promotion_executor()
+        ),
+        "source_identity_calibration_memory_trust_promotion_apply_audit": (
+            build_source_identity_calibration_memory_trust_promotion_apply_audit()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),

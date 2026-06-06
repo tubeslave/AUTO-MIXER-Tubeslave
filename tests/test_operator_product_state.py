@@ -5965,6 +5965,9 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     executor = payload[
         "source_identity_calibration_memory_trust_promotion_executor"
     ]
+    apply_audit = payload[
+        "source_identity_calibration_memory_trust_promotion_apply_audit"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
@@ -5988,6 +5991,12 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         for item in payload["adapters"]
         if item["adapter_id"]
         == "source_identity_calibration_memory_trust_promotion_executor"
+    ][0]
+    apply_audit_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "source_identity_calibration_memory_trust_promotion_apply_audit"
     ][0]
 
     assert (
@@ -6021,6 +6030,12 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         == 0
     )
     assert (
+        payload["summary"][
+            "source_identity_calibration_memory_trust_promotion_apply_audit_record_count"
+        ]
+        == 0
+    )
+    assert (
         adapter["method_id"]
         == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
     )
@@ -6048,6 +6063,14 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert (
         executor_adapter["output"]
         == "source_identity_memory_trust_promotion_executor"
+    )
+    assert (
+        apply_audit_adapter["method_id"]
+        == "source_identity_calibration_memory_trust_promotion_apply_audit"
+    )
+    assert (
+        apply_audit_adapter["output"]
+        == "source_identity_memory_trust_promotion_apply_audit"
     )
     assert (
         ledger["status"]
@@ -6141,6 +6164,15 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert executor["summary"]["queue_mutation"] is False
     assert executor["summary"]["live_write"] is False
     assert executor["apply_results"] == []
+    assert apply_audit["status"] == "memory_trust_promotion_apply_audit_not_ready"
+    assert apply_audit["summary"]["executor_apply_result_count"] == 0
+    assert apply_audit["summary"]["apply_audit_record_count"] == 0
+    assert apply_audit["summary"]["runtime_memory_mutation"] is False
+    assert apply_audit["summary"]["direct_downstream_priority_mutation"] is False
+    assert apply_audit["summary"]["live_write"] is False
+    assert apply_audit["safety"]["read_only"] is True
+    assert apply_audit["safety"]["rollback_verified"] is False
+    assert apply_audit["audit_records"] == []
     assert queue["summary"]["pending_count"] == 0
 
 
