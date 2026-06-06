@@ -5956,11 +5956,20 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     ledger = payload[
         "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
     ]
+    execution_plan = payload[
+        "source_identity_calibration_memory_trust_promotion_execution_plan"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
         if item["adapter_id"]
         == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
+    ][0]
+    execution_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "source_identity_calibration_memory_trust_promotion_execution_plan"
     ][0]
 
     assert (
@@ -5976,10 +5985,24 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         == 1
     )
     assert (
+        payload["summary"][
+            "source_identity_calibration_memory_trust_promotion_execution_candidate_count"
+        ]
+        == 1
+    )
+    assert (
         adapter["method_id"]
         == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
     )
     assert adapter["output"] == "source_identity_memory_trust_promotion_acceptance_ledger"
+    assert (
+        execution_adapter["method_id"]
+        == "source_identity_calibration_memory_trust_promotion_execution_plan"
+    )
+    assert (
+        execution_adapter["output"]
+        == "source_identity_memory_trust_promotion_execution_plan"
+    )
     assert (
         ledger["status"]
         == "operator_memory_trust_promotion_acceptance_records_available"
@@ -5999,6 +6022,31 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         is False
     )
     assert ledger["records"][0]["runtime_memory_mutation_allowed_by_acceptance"] is False
+    assert (
+        execution_plan["status"]
+        == "manual_memory_trust_promotion_execution_candidate_available"
+    )
+    assert execution_plan["summary"]["execution_candidate_count"] == 1
+    assert execution_plan["summary"]["execution_allowed_by_plan"] is False
+    assert execution_plan["summary"]["memory_trust_promotion_allowed_by_plan"] is False
+    assert (
+        execution_plan["summary"]["downstream_priority_change_allowed_by_plan"]
+        is False
+    )
+    assert (
+        execution_plan["execution_candidates"][0]["separate_executor_required"]
+        is True
+    )
+    assert (
+        execution_plan["execution_candidates"][0]["execution_allowed_by_plan"]
+        is False
+    )
+    assert (
+        execution_plan["execution_candidates"][0][
+            "downstream_priority_change_allowed_by_plan"
+        ]
+        is False
+    )
     assert queue["summary"]["pending_count"] == 0
 
 

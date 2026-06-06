@@ -60,6 +60,9 @@ try:
     from source_identity_calibration_memory_trust_promotion_acceptance_ledger import (
         build_source_identity_calibration_memory_trust_promotion_acceptance_ledger,
     )
+    from source_identity_calibration_memory_trust_promotion_execution_plan import (
+        build_source_identity_calibration_memory_trust_promotion_execution_plan,
+    )
     from source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
         analyze_source_identity_replay_calibration,
@@ -118,6 +121,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_trust_promotion_acceptance_ledger import (
         build_source_identity_calibration_memory_trust_promotion_acceptance_ledger,
+    )
+    from backend.source_identity_calibration_memory_trust_promotion_execution_plan import (
+        build_source_identity_calibration_memory_trust_promotion_execution_plan,
     )
     from backend.source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
@@ -581,6 +587,16 @@ def build_main_pipeline_preview(
     source_identity_memory_trust_promotion_acceptance_summary = (
         source_identity_memory_trust_promotion_acceptance_ledger.get("summary", {})
     )
+    source_identity_memory_trust_promotion_execution_plan = (
+        build_source_identity_calibration_memory_trust_promotion_execution_plan(
+            promotion_acceptance_ledger=(
+                source_identity_memory_trust_promotion_acceptance_ledger
+            ),
+        )
+    )
+    source_identity_memory_trust_promotion_execution_summary = (
+        source_identity_memory_trust_promotion_execution_plan.get("summary", {})
+    )
 
     proposals = (
         operator_proposals
@@ -701,6 +717,13 @@ def build_main_pipeline_preview(
             "source_identity_calibration_memory_trust_promotion_accepted_record_count": int(
                 source_identity_memory_trust_promotion_acceptance_summary.get(
                     "accepted_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_calibration_memory_trust_promotion_execution_candidate_count": int(
+                source_identity_memory_trust_promotion_execution_summary.get(
+                    "execution_candidate_count",
                     0,
                 )
                 or 0
@@ -888,6 +911,30 @@ def build_main_pipeline_preview(
                 ),
             },
             {
+                "adapter_id": (
+                    "source_identity_calibration_memory_trust_promotion_execution_plan"
+                ),
+                "method_id": (
+                    "source_identity_calibration_memory_trust_promotion_execution_plan"
+                ),
+                "status": (
+                    source_identity_memory_trust_promotion_execution_plan.get("status")
+                ),
+                "output": "source_identity_memory_trust_promotion_execution_plan",
+                "reason": (
+                    ", ".join(
+                        source_identity_memory_trust_promotion_execution_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if source_identity_memory_trust_promotion_execution_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
                 "adapter_id": "registry_blockers",
                 "method_id": "processing_registry",
                 "status": "active",
@@ -944,6 +991,9 @@ def build_main_pipeline_preview(
         ),
         "source_identity_calibration_memory_trust_promotion_acceptance_ledger": (
             source_identity_memory_trust_promotion_acceptance_ledger
+        ),
+        "source_identity_calibration_memory_trust_promotion_execution_plan": (
+            source_identity_memory_trust_promotion_execution_plan
         ),
         "registry": {
             "summary": registry_snapshot.get("summary", {}),
