@@ -34,6 +34,12 @@ from processing_pipeline_preview import build_main_pipeline_preview
 from source_identity_proposal_queue_importer import (
     build_source_identity_proposal_queue_importer,
 )
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan,
+)
 
 
 VERIFIED_MANUAL_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
@@ -609,6 +615,66 @@ def register_handlers(server):
         )
         result["handler"] = "import_source_identity_queue_ordering_plan"
         result["pipeline_preview_generated"] = pipeline_preview is not None
+        await server.send_to_client(websocket, result)
+
+    async def handle_import_operator_proposal_apply_sequence_policy_queue_ordering_plan(
+        websocket,
+        data,
+    ):
+        pipeline_preview = None
+        queue_ordering_plan = data.get("queue_ordering_plan")
+        proposal_payloads = data.get("proposal_payloads")
+        if not isinstance(queue_ordering_plan, dict) or proposal_payloads is None:
+            pipeline_preview = build_main_pipeline_preview(
+                server,
+                total_channels=data.get("total_channels", 24),
+                include_methods=False,
+            )
+            queue_ordering_plan = pipeline_preview.get(
+                "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan"
+            )
+            proposal_payloads = pipeline_preview.get("proposals", [])
+
+        apply_requested = bool(data.get("apply", False))
+        operator_ack = bool(data.get("operator_ack", False))
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer(
+                queue_ordering_plan=queue_ordering_plan,
+                proposal_payloads=proposal_payloads,
+                target_queue=(
+                    server.operator_proposal_queue
+                    if apply_requested and operator_ack
+                    else None
+                ),
+                operator_mode=server.get_operator_mode_status(),
+                apply=apply_requested,
+                operator_ack=operator_ack,
+            )
+        )
+        result["handler"] = (
+            "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+        )
+        result["pipeline_preview_generated"] = pipeline_preview is not None
+        await server.send_to_client(websocket, result)
+
+    async def handle_plan_operator_proposal_apply_sequence_policy_queue_import_preflight(
+        websocket,
+        data,
+    ):
+        pending_actions = server.operator_proposal_queue.pending_actions()
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan(
+                pending_actions=pending_actions,
+                idempotency_key_prefix=data.get(
+                    "idempotency_key_prefix",
+                    "sequence-policy-queue-import",
+                ),
+                limit=data.get("limit", 20),
+            )
+        )
+        result["handler"] = (
+            "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
+        )
         await server.send_to_client(websocket, result)
 
     async def handle_create_operator_proposal(websocket, data):
@@ -4377,6 +4443,12 @@ def register_handlers(server):
         "import_soundcheck_recommendations": handle_import_soundcheck_recommendations,
         "import_source_identity_queue_ordering_plan": (
             handle_import_source_identity_queue_ordering_plan
+        ),
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan": (
+            handle_import_operator_proposal_apply_sequence_policy_queue_ordering_plan
+        ),
+        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight": (
+            handle_plan_operator_proposal_apply_sequence_policy_queue_import_preflight
         ),
         "create_operator_proposal": handle_create_operator_proposal,
         "accept_operator_proposal": handle_accept_operator_proposal,

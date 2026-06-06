@@ -90,6 +90,9 @@ try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan,
     )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -223,6 +226,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -1132,6 +1138,18 @@ def build_main_pipeline_preview(
     sequence_policy_memory_trust_promotion_queue_ordering_plan_summary = (
         sequence_policy_memory_trust_promotion_queue_ordering_plan.get("summary", {})
     )
+    sequence_policy_memory_trust_promotion_queue_importer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer(
+            queue_ordering_plan=sequence_policy_memory_trust_promotion_queue_ordering_plan,
+            proposal_payloads=proposals,
+            operator_mode=operator_mode,
+            apply=False,
+            operator_ack=False,
+        )
+    )
+    sequence_policy_memory_trust_promotion_queue_importer_summary = (
+        sequence_policy_memory_trust_promotion_queue_importer.get("summary", {})
+    )
     source_identity_proposal_priority_policy = (
         build_source_identity_proposal_priority_policy(
             proposals=proposals,
@@ -1373,6 +1391,20 @@ def build_main_pipeline_preview(
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan_ranked_record_count": int(
                 sequence_policy_memory_trust_promotion_queue_ordering_plan_summary.get(
                     "ranked_queue_candidate_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer_spec_count": int(
+                sequence_policy_memory_trust_promotion_queue_importer_summary.get(
+                    "queue_import_spec_count",
+                    0,
+                )
+                or 0
+            ),
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer_result_count": int(
+                sequence_policy_memory_trust_promotion_queue_importer_summary.get(
+                    "queue_import_result_count",
                     0,
                 )
                 or 0
@@ -1979,6 +2011,34 @@ def build_main_pipeline_preview(
                 ),
             },
             {
+                "adapter_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
+                ),
+                "method_id": (
+                    "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
+                ),
+                "status": (
+                    sequence_policy_memory_trust_promotion_queue_importer.get(
+                        "status"
+                    )
+                ),
+                "output": (
+                    "operator_proposal_apply_sequence_memory_trust_promotion_queue_importer_dry_run"
+                ),
+                "reason": (
+                    ", ".join(
+                        sequence_policy_memory_trust_promotion_queue_importer_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if sequence_policy_memory_trust_promotion_queue_importer_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
                 "adapter_id": "source_identity_calibration_memory_trust_review",
                 "method_id": "source_identity_calibration_memory_trust_review",
                 "status": source_identity_memory_trust_review.get("status"),
@@ -2372,6 +2432,9 @@ def build_main_pipeline_preview(
         ),
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan": (
             sequence_policy_memory_trust_promotion_queue_ordering_plan
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer": (
+            sequence_policy_memory_trust_promotion_queue_importer
         ),
         "source_identity_calibration_memory_trust_review": (
             source_identity_memory_trust_review

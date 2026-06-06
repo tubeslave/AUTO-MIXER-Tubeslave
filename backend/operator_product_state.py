@@ -29,6 +29,14 @@ except ImportError:  # pragma: no cover - package import compatibility
         build_processing_registry_snapshot,
     )
 try:
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan,
+    )
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan,
+    )
+try:
     from agentic_method_foundation import (
         build_agentic_recommendations,
         build_inter_channel_context,
@@ -94,6 +102,9 @@ TELEMETRY_ALERT_CONTEXT_ALLOWLIST = {
     "previous_fader_db",
 }
 SOURCE_IDENTITY_QUEUE_IMPORTER_SOURCE = "source_identity_proposal_queue_importer"
+SEQUENCE_POLICY_QUEUE_IMPORTER_SOURCE = (
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
+)
 
 FX_PARAMETER_SCHEMA_BY_FAMILY: Mapping[str, Dict[int, Dict[str, Any]]] = {
     "reverb": {
@@ -3290,6 +3301,108 @@ def _source_identity_queue_import_summary(
     }
 
 
+def _sequence_policy_queue_import_metadata(action: Mapping[str, Any]) -> Dict[str, Any]:
+    direct = action.get("sequence_policy_queue_import")
+    if isinstance(direct, Mapping):
+        return dict(direct)
+    raw = action.get("raw")
+    if isinstance(raw, Mapping):
+        nested = raw.get("sequence_policy_queue_import")
+        if isinstance(nested, Mapping):
+            return dict(nested)
+    return {}
+
+
+def _is_sequence_policy_queue_import_action(action: Mapping[str, Any]) -> bool:
+    if _sequence_policy_queue_import_metadata(action):
+        return True
+    if action.get("source") == SEQUENCE_POLICY_QUEUE_IMPORTER_SOURCE:
+        return True
+    raw = action.get("raw")
+    return (
+        isinstance(raw, Mapping)
+        and raw.get("source") == SEQUENCE_POLICY_QUEUE_IMPORTER_SOURCE
+    )
+
+
+def _sequence_policy_queue_import_summary(
+    pending: Iterable[Mapping[str, Any]],
+    history: Iterable[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    pending_imported = [
+        dict(action)
+        for action in pending
+        if _is_sequence_policy_queue_import_action(action)
+    ]
+    history_imported = [
+        dict(action)
+        for action in history
+        if _is_sequence_policy_queue_import_action(action)
+    ]
+    applyable_pending = [
+        action for action in pending_imported if action.get("can_apply") is True
+    ]
+    analysis_only_pending = [
+        action for action in pending_imported if action.get("can_apply") is not True
+    ]
+
+    def ids(actions: Iterable[Mapping[str, Any]]) -> List[str]:
+        return [
+            identifier
+            for identifier in (_action_id(action) for action in actions)
+            if identifier
+        ]
+
+    ranked_pending = []
+    unranked_pending = []
+    unknown_rank_pending = []
+    sequence_consumer_required = []
+    for action in pending_imported:
+        metadata = _sequence_policy_queue_import_metadata(action)
+        rank_source = metadata.get("rank_source")
+        if rank_source == "sequence_policy_consumer":
+            ranked_pending.append(action)
+        elif rank_source == "original_order":
+            unranked_pending.append(action)
+        else:
+            unknown_rank_pending.append(action)
+        if metadata.get("sequence_consumer_required_before_execution") is True:
+            sequence_consumer_required.append(action)
+
+    return {
+        "source": SEQUENCE_POLICY_QUEUE_IMPORTER_SOURCE,
+        "available": bool(pending_imported or history_imported),
+        "pending_count": len(pending_imported),
+        "history_count": len(history_imported),
+        "applyable_pending_count": len(applyable_pending),
+        "analysis_only_pending_count": len(analysis_only_pending),
+        "ranked_pending_count": len(ranked_pending),
+        "unranked_pending_count": len(unranked_pending),
+        "unknown_rank_pending_count": len(unknown_rank_pending),
+        "sequence_consumer_required_pending_count": len(sequence_consumer_required),
+        "pending_proposal_ids": ids(pending_imported),
+        "applyable_pending_proposal_ids": ids(applyable_pending),
+        "analysis_only_pending_proposal_ids": ids(analysis_only_pending),
+        "ranked_pending_proposal_ids": ids(ranked_pending),
+        "unranked_pending_proposal_ids": ids(unranked_pending),
+        "unknown_rank_pending_proposal_ids": ids(unknown_rank_pending),
+        "sequence_consumer_required_pending_proposal_ids": ids(
+            sequence_consumer_required
+        ),
+        "safety": {
+            "queue_visibility_only": True,
+            "live_write": False,
+            "can_apply_live": False,
+            "sequence_policy_import_can_apply_live": False,
+            "operator_proposal_apply_gate_required": True,
+            "operator_ack_required_before_import": True,
+            "sequence_consumer_required_before_execution": True,
+            "unsupported_actions_stay_analysis_only": True,
+            "live_apply_entrypoint": "apply_operator_proposal",
+        },
+    }
+
+
 def _decision_queue_apply_preflight_summary(
     pending: Iterable[Mapping[str, Any]],
     history: Iterable[Mapping[str, Any]],
@@ -3528,6 +3641,12 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
 
     if not mixing_agent and not proposal_queue:
         source_identity_import = _source_identity_queue_import_summary([], [])
+        sequence_policy_import = _sequence_policy_queue_import_summary([], [])
+        sequence_policy_preflight_plan = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan(
+                pending_actions=[],
+            )
+        )
         apply_preflight = _decision_queue_apply_preflight_summary([], [])
         batch_preflight = _decision_queue_batch_preflight_summary([])
         apply_sequence_plan = _decision_queue_apply_sequence_plan_summary([])
@@ -3563,6 +3682,20 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
                 "source_identity_queue_import_live_write": False,
                 "source_identity_queue_import_can_apply_live": False,
                 "source_identity_queue_import": source_identity_import,
+                "sequence_policy_queue_import_pending_count": 0,
+                "sequence_policy_queue_import_applyable_pending_count": 0,
+                "sequence_policy_queue_import_analysis_only_pending_count": 0,
+                "sequence_policy_queue_import_ranked_pending_count": 0,
+                "sequence_policy_queue_import_unranked_pending_count": 0,
+                "sequence_policy_queue_import_sequence_consumer_required_pending_count": 0,
+                "sequence_policy_queue_import_live_write": False,
+                "sequence_policy_queue_import_can_apply_live": False,
+                "sequence_policy_queue_import": sequence_policy_import,
+                "sequence_policy_queue_import_preflight_candidate_count": 0,
+                "sequence_policy_queue_import_preflight_live_write": False,
+                "sequence_policy_queue_import_preflight_plan": (
+                    sequence_policy_preflight_plan
+                ),
             },
             "pending_actions": [],
             "history": [],
@@ -3581,6 +3714,12 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
     pending = queue_pending + agent_pending
     history = (queue_history + agent_history)[-limit:]
     source_identity_import = _source_identity_queue_import_summary(pending, history)
+    sequence_policy_import = _sequence_policy_queue_import_summary(pending, history)
+    sequence_policy_preflight_plan = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan(
+            pending_actions=pending,
+        )
+    )
     apply_preflight = _decision_queue_apply_preflight_summary(pending, history)
     batch_preflight = _decision_queue_batch_preflight_summary(pending)
     apply_sequence_plan = _decision_queue_apply_sequence_plan_summary(pending)
@@ -3645,6 +3784,34 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
             "source_identity_queue_import_live_write": False,
             "source_identity_queue_import_can_apply_live": False,
             "source_identity_queue_import": source_identity_import,
+            "sequence_policy_queue_import_pending_count": sequence_policy_import["pending_count"],
+            "sequence_policy_queue_import_applyable_pending_count": (
+                sequence_policy_import["applyable_pending_count"]
+            ),
+            "sequence_policy_queue_import_analysis_only_pending_count": (
+                sequence_policy_import["analysis_only_pending_count"]
+            ),
+            "sequence_policy_queue_import_ranked_pending_count": (
+                sequence_policy_import["ranked_pending_count"]
+            ),
+            "sequence_policy_queue_import_unranked_pending_count": (
+                sequence_policy_import["unranked_pending_count"]
+            ),
+            "sequence_policy_queue_import_sequence_consumer_required_pending_count": (
+                sequence_policy_import["sequence_consumer_required_pending_count"]
+            ),
+            "sequence_policy_queue_import_live_write": False,
+            "sequence_policy_queue_import_can_apply_live": False,
+            "sequence_policy_queue_import": sequence_policy_import,
+            "sequence_policy_queue_import_preflight_candidate_count": (
+                sequence_policy_preflight_plan["summary"][
+                    "preflight_candidate_count"
+                ]
+            ),
+            "sequence_policy_queue_import_preflight_live_write": False,
+            "sequence_policy_queue_import_preflight_plan": (
+                sequence_policy_preflight_plan
+            ),
         },
         "pending_actions": pending,
         "history": history,

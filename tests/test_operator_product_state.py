@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -1843,9 +1844,13 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
 
 
 def proof_report_with_autonomy_overlay(report_status="ok"):
+    generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
+        "+00:00",
+        "Z",
+    )
     return {
         "type": "supervised_proof_artifact_report",
-        "generated_at": "2026-06-05T08:20:00Z",
+        "generated_at": generated_at,
         "status": report_status,
         "safety": {
             "read_only": False,
@@ -1859,7 +1864,7 @@ def proof_report_with_autonomy_overlay(report_status="ok"):
         },
         "autonomy_evidence_overlay": {
             "type": "autonomy_evidence_overlay",
-            "generated_at": "2026-06-05T08:20:00Z",
+            "generated_at": generated_at,
             "status": "dry_run_only",
             "safety": {
                 "read_only": False,
@@ -5707,6 +5712,9 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     queue_ordering_plan = payload[
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan"
     ]
+    queue_importer = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
@@ -5795,6 +5803,12 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
         for item in payload["adapters"]
         if item["adapter_id"]
         == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan"
+    ][0]
+    queue_importer_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
     ][0]
 
     assert (
@@ -5923,6 +5937,18 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
         ]
         == 0
     )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer_spec_count"
+        ]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer_result_count"
+        ]
+        == 0
+    )
     assert adapter["method_id"] == "operator_proposal_apply_sequence_policy_memory_index"
     assert (
         adapter["output"]
@@ -6039,6 +6065,14 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     assert (
         queue_ordering_plan_adapter["output"]
         == "operator_proposal_apply_sequence_memory_trust_promotion_queue_ordering_plan"
+    )
+    assert (
+        queue_importer_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
+    )
+    assert (
+        queue_importer_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_queue_importer_dry_run"
     )
     assert index["status"] == "append_only_sequence_memory_index_available"
     assert index["summary"]["memory_record_count"] == 1
@@ -6366,6 +6400,31 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     assert queue_ordering_plan["summary"]["can_import_to_queue"] is False
     assert queue_ordering_plan["summary"]["can_apply_live"] is False
     assert queue_ordering_plan["queue_ordering_plan_records"] == []
+    assert (
+        queue_importer["status"]
+        == "sequence_memory_trust_promotion_queue_importer_not_ready"
+    )
+    assert queue_importer["summary"]["queue_ordering_plan_record_count"] == 0
+    assert queue_importer["summary"]["queue_import_spec_count"] == 0
+    assert queue_importer["summary"]["queue_import_result_count"] == 0
+    assert queue_importer["summary"]["planned_import_proposal_ids"] == []
+    assert queue_importer["summary"]["queue_import_dry_run"] is True
+    assert queue_importer["summary"]["queue_import_applied"] is False
+    assert (
+        queue_importer["summary"]["sequence_consumer_required_before_execution"]
+        is True
+    )
+    assert queue_importer["summary"]["queue_mutation"] is False
+    assert queue_importer["summary"]["live_write"] is False
+    assert queue_importer["summary"]["can_import_to_queue"] is False
+    assert queue_importer["summary"]["can_apply_live"] is False
+    assert queue_importer["safety"]["read_only"] is True
+    assert queue_importer["safety"]["queue_import_dry_run"] is True
+    assert queue_importer["safety"]["queue_import_applied"] is False
+    assert queue_importer["safety"]["queue_mutation"] is False
+    assert queue_importer["safety"]["live_write"] is False
+    assert queue_importer["queue_import_specs"] == []
+    assert queue_importer["queue_import_results"] == []
     assert queue["summary"]["pending_count"] == 0
 
 
@@ -11127,6 +11186,161 @@ def _source_identity_queue_import_fixture():
     )
 
 
+def _sequence_policy_queue_import_fixture():
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate import (
+        OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_SEQUENCE_POLICY_GATE_METHOD_ID,
+    )
+
+    proposals = [
+        {
+            "proposal_id": "proposal-other",
+            "title": "Other channel review",
+            "method_id": "safe_gain",
+            "kind": "analysis",
+            "target": "ch/03",
+            "severity": "medium",
+            "confidence": 0.72,
+        },
+        {
+            "proposal_id": "proposal-sequence-fader",
+            "title": "Sequence policy: lower fader",
+            "method_id": "safe_gain",
+            "kind": "fader",
+            "target": "ch/02",
+            "severity": "high",
+            "confidence": 0.82,
+            "requested_change": {
+                "value_type": "fader",
+                "channel": 2,
+                "value": -8.5,
+                "current_value": -8.0,
+                "rollback_value": -8.0,
+            },
+            "evidence": {
+                "idempotency_key": "memory-write:proposal-sequence-fader",
+            },
+        },
+    ]
+    sequence_policy_gate = {
+        "type": (
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate"
+        ),
+        "generated_at": "2026-06-06T15:55:00Z",
+        "method_id": (
+            OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_SEQUENCE_POLICY_GATE_METHOD_ID
+        ),
+        "status": "verified_sequence_memory_trust_promotion_policy_records_available",
+        "safety": {
+            "read_only": True,
+            "policy_gate_only": True,
+            "live_write": False,
+            "apply_attempted": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "queue_mutation": False,
+            "model_mutation": False,
+            "runtime_memory_mutation": False,
+            "sequence_policy_trust_store_mutation": False,
+            "proposal_state_mutation": False,
+            "sequence_execution_allowed_by_gate": False,
+            "sequence_policy_change_allowed_by_gate": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "summary": {
+            "sequence_policy_gate_record_count": 1,
+            "eligible_record_count": 1,
+            "invalid_record_count": 0,
+            "sequence_policy_eligible": True,
+            "policy_gate_only": True,
+            "queue_mutation": False,
+            "model_mutation": False,
+            "runtime_memory_mutation": False,
+            "sequence_policy_trust_store_mutation": False,
+            "proposal_state_mutation": False,
+            "sequence_execution_allowed_by_gate": False,
+            "sequence_policy_change_allowed_by_gate": False,
+            "live_write": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "can_import_to_queue": False,
+            "can_apply_live": False,
+            "eligible_policy_keys": [
+                "proposal-sequence-fader/memory-write:proposal-sequence-fader"
+            ],
+            "invalid_record_ids": [],
+        },
+        "policy_records": [
+            {
+                "sequence_policy_gate_record_id": (
+                    "operator_sequence_memory_trust_promotion_sequence_policy_gate:"
+                    "apply-audit-1"
+                ),
+                "proposal_id": "proposal-sequence-fader",
+                "learning_scope": "supervised_fader_gain_sequence_execution",
+                "value_type": "fader",
+                "source_idempotency_key": (
+                    "memory-write:proposal-sequence-fader"
+                ),
+                "policy_key": (
+                    "proposal-sequence-fader/memory-write:proposal-sequence-fader"
+                ),
+                "target_policy_state": "trusted_for_sequence_policy",
+                "sequence_policy_gate_status": "trusted",
+                "rollback_verified": True,
+                "sequence_policy_eligible": True,
+                "eligible_for_sequence_policy_consumer": True,
+                "policy_gate_only": True,
+                "sequence_policy_consumer_required": True,
+                "read_only": True,
+                "live_write": False,
+                "apply_attempted": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "queue_mutation": False,
+                "model_mutation": False,
+                "runtime_memory_mutation": False,
+                "sequence_policy_trust_store_mutation": False,
+                "proposal_state_mutation": False,
+                "sequence_execution_allowed_by_gate": False,
+                "sequence_policy_change_allowed_by_gate": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+                "can_import_to_queue": False,
+                "can_apply_live": False,
+            }
+        ],
+    }
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer(
+            proposals=proposals,
+            sequence_policy_gate=sequence_policy_gate,
+        )
+    )
+    ordering_preview = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview(
+            proposals=proposals,
+            policy_consumer=consumer,
+        )
+    )
+    return proposals, (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan(
+            ordering_preview=ordering_preview,
+        )
+    )
+
+
 @pytest.mark.asyncio
 async def test_source_identity_queue_import_handler_dry_run_does_not_mutate_queue(server):
     proposals, plan = _source_identity_queue_import_fixture()
@@ -11213,6 +11427,103 @@ async def test_source_identity_queue_import_handler_imports_with_ack_without_liv
 
 
 @pytest.mark.asyncio
+async def test_sequence_policy_queue_import_handler_dry_run_does_not_mutate_queue(server):
+    proposals, plan = _sequence_policy_queue_import_fixture()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch[
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+    ](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert (
+        payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
+    )
+    assert (
+        payload["handler"]
+        == "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+    )
+    assert payload["status"] == "sequence_memory_trust_promotion_queue_importer_dry_run_ready"
+    assert payload["summary"]["queue_import_spec_count"] == 2
+    assert payload["summary"]["queue_import_result_count"] == 0
+    assert payload["summary"]["queue_mutation"] is False
+    assert payload["summary"]["live_write"] is False
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_sequence_policy_queue_import_handler_requires_ack_for_apply(server):
+    proposals, plan = _sequence_policy_queue_import_fixture()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch[
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+    ](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+            "apply": True,
+            "operator_ack": False,
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert (
+        payload["status"]
+        == "sequence_memory_trust_promotion_queue_importer_operator_ack_required"
+    )
+    assert payload["summary"]["queue_import_result_count"] == 0
+    assert payload["summary"]["queue_mutation"] is False
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_sequence_policy_queue_import_handler_imports_with_ack_without_live_write(server):
+    proposals, plan = _sequence_policy_queue_import_fixture()
+    server.mixer_client = MagicMock()
+    server.mixer_client.set_fader = MagicMock()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch[
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+    ](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+            "apply": True,
+            "operator_ack": True,
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    queue = build_decision_queue(server)
+    assert payload["status"] == "sequence_memory_trust_promotion_queue_importer_applied"
+    assert payload["summary"]["queue_import_result_count"] == 2
+    assert payload["summary"]["queue_mutation"] is True
+    assert payload["summary"]["live_write"] is False
+    assert payload["summary"]["imported_proposal_ids"] == [
+        "proposal-sequence-fader",
+        "proposal-other",
+    ]
+    assert queue["summary"]["pending_count"] == 2
+    assert queue["pending_actions"][0]["id"] == "proposal-sequence-fader"
+    assert queue["pending_actions"][0]["requested_change"]["value_type"] == "fader"
+    assert queue["pending_actions"][1]["id"] == "proposal-other"
+    server.mixer_client.set_fader.assert_not_called()
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_decision_queue_summarizes_source_identity_queue_import_visibility(server):
     proposals, plan = _source_identity_queue_import_fixture()
     server.mixer_client = MagicMock()
@@ -11274,6 +11585,220 @@ async def test_decision_queue_summarizes_source_identity_queue_import_visibility
     assert apply_preflight["safety"]["runs_preflight"] is False
     assert apply_preflight["safety"]["live_write"] is False
     server.mixer_client.set_gain.assert_not_called()
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_decision_queue_summarizes_sequence_policy_queue_import_visibility(server):
+    proposals, plan = _sequence_policy_queue_import_fixture()
+    server.mixer_client = MagicMock()
+    server.mixer_client.set_fader = MagicMock()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch[
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+    ](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+            "apply": True,
+            "operator_ack": True,
+        },
+    )
+
+    queue = build_decision_queue(server)
+    summary = queue["summary"]
+    sequence_policy_import = summary["sequence_policy_queue_import"]
+    sequence_policy_preflight_plan = summary[
+        "sequence_policy_queue_import_preflight_plan"
+    ]
+    apply_preflight = summary["apply_preflight"]
+    assert summary["sequence_policy_queue_import_pending_count"] == 2
+    assert summary["sequence_policy_queue_import_applyable_pending_count"] == 1
+    assert summary["sequence_policy_queue_import_analysis_only_pending_count"] == 1
+    assert summary["sequence_policy_queue_import_ranked_pending_count"] == 1
+    assert summary["sequence_policy_queue_import_unranked_pending_count"] == 1
+    assert (
+        summary[
+            "sequence_policy_queue_import_sequence_consumer_required_pending_count"
+        ]
+        == 2
+    )
+    assert summary["sequence_policy_queue_import_live_write"] is False
+    assert summary["sequence_policy_queue_import_can_apply_live"] is False
+    assert summary["sequence_policy_queue_import_preflight_candidate_count"] == 1
+    assert summary["sequence_policy_queue_import_preflight_live_write"] is False
+    assert sequence_policy_import["pending_proposal_ids"] == [
+        "proposal-sequence-fader",
+        "proposal-other",
+    ]
+    assert sequence_policy_import["applyable_pending_proposal_ids"] == [
+        "proposal-sequence-fader"
+    ]
+    assert sequence_policy_import["analysis_only_pending_proposal_ids"] == [
+        "proposal-other"
+    ]
+    assert sequence_policy_import["ranked_pending_proposal_ids"] == [
+        "proposal-sequence-fader"
+    ]
+    assert sequence_policy_import["unranked_pending_proposal_ids"] == [
+        "proposal-other"
+    ]
+    assert (
+        sequence_policy_import["sequence_consumer_required_pending_proposal_ids"]
+        == [
+            "proposal-sequence-fader",
+            "proposal-other",
+        ]
+    )
+    assert sequence_policy_import["safety"] == {
+        "queue_visibility_only": True,
+        "live_write": False,
+        "can_apply_live": False,
+        "sequence_policy_import_can_apply_live": False,
+        "operator_proposal_apply_gate_required": True,
+        "operator_ack_required_before_import": True,
+        "sequence_consumer_required_before_execution": True,
+        "unsupported_actions_stay_analysis_only": True,
+        "live_apply_entrypoint": "apply_operator_proposal",
+    }
+    assert (
+        sequence_policy_preflight_plan["status"]
+        == "sequence_memory_trust_promotion_queue_import_preflight_plan_available"
+    )
+    assert (
+        sequence_policy_preflight_plan["summary"][
+            "sequence_policy_imported_pending_count"
+        ]
+        == 2
+    )
+    assert (
+        sequence_policy_preflight_plan["summary"]["preflight_candidate_proposal_ids"]
+        == ["proposal-sequence-fader"]
+    )
+    assert sequence_policy_preflight_plan["summary"]["analysis_only_proposal_ids"] == [
+        "proposal-other"
+    ]
+    assert (
+        sequence_policy_preflight_plan["summary"]["batch_preflight_request_available"]
+        is True
+    )
+    assert sequence_policy_preflight_plan["summary"]["batch_preflight_invoked"] is False
+    assert sequence_policy_preflight_plan["summary"]["sequence_plan_created"] is False
+    assert (
+        sequence_policy_preflight_plan["summary"][
+            "sequence_execution_allowed_by_preflight_plan"
+        ]
+        is False
+    )
+    assert sequence_policy_preflight_plan["summary"]["idempotency_reserved"] is False
+    assert sequence_policy_preflight_plan["batch_preflight_request"][
+        "proposal_ids"
+    ] == ["proposal-sequence-fader"]
+    assert (
+        sequence_policy_preflight_plan["batch_preflight_request"][
+            "idempotency_key_prefix"
+        ]
+        == "sequence-policy-queue-import"
+    )
+    assert sequence_policy_preflight_plan["batch_preflight_request"]["approved"] is False
+    assert (
+        sequence_policy_preflight_plan["batch_preflight_request"][
+            "operator_must_set_approved_true"
+        ]
+        is True
+    )
+    assert summary["source_identity_queue_import_pending_count"] == 0
+    assert summary["apply_preflight_candidate_count"] == 1
+    assert summary["apply_preflight_analysis_only_count"] == 1
+    assert apply_preflight["pending_candidate_ids"] == ["proposal-sequence-fader"]
+    assert apply_preflight["pending_analysis_only_ids"] == ["proposal-other"]
+    assert apply_preflight["safety"]["runs_preflight"] is False
+    assert apply_preflight["safety"]["live_write"] is False
+    server.mixer_client.set_fader.assert_not_called()
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_sequence_policy_queue_import_preflight_plan_handler_feeds_batch_preflight_without_write(server):
+    proposals, plan = _sequence_policy_queue_import_fixture()
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch[
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+    ](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+            "apply": True,
+            "operator_ack": True,
+        },
+    )
+
+    await server._dispatch[
+        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
+    ](
+        object(),
+        {
+            "idempotency_key_prefix": "seq-import-preflight",
+        },
+    )
+
+    plan_payload = server.send_to_client.await_args.args[1]
+    assert (
+        plan_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan"
+    )
+    assert (
+        plan_payload["handler"]
+        == "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
+    )
+    assert (
+        plan_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_preflight_plan_available"
+    )
+    assert plan_payload["summary"]["preflight_candidate_proposal_ids"] == [
+        "proposal-sequence-fader"
+    ]
+    assert plan_payload["summary"]["batch_preflight_invoked"] is False
+    assert plan_payload["summary"]["idempotency_reserved"] is False
+    request = dict(plan_payload["batch_preflight_request"])
+    request["approved"] = True
+
+    await server._dispatch["preflight_operator_proposal_apply_batch"](
+        object(),
+        request,
+    )
+
+    preflight_payload = server.send_to_client.await_args.args[1]
+    assert preflight_payload["type"] == "operator_proposal_apply_preflight_batch"
+    assert preflight_payload["status"] == "ok"
+    assert preflight_payload["summary"]["selected_count"] == 1
+    assert preflight_payload["summary"]["ready_count"] == 1
+    assert preflight_payload["summary"]["ready_proposal_ids"] == [
+        "proposal-sequence-fader"
+    ]
+    assert preflight_payload["summary"]["idempotency_key_prefix"] == (
+        "seq-import-preflight"
+    )
+    assert preflight_payload["summary"]["live_write"] is False
+    assert preflight_payload["summary"]["apply_attempted"] is False
+    assert preflight_payload["summary"]["queue_mutation"] is False
+    assert preflight_payload["summary"]["idempotency_reserved"] is False
+    assert (
+        preflight_payload["preflight_results"][0]["idempotency"]["idempotency_key"]
+        == "seq-import-preflight:proposal-sequence-fader"
+    )
+    assert "seq-import-preflight:proposal-sequence-fader" not in (
+        server._operator_apply_idempotency_keys
+    )
+    assert build_decision_queue(server)["summary"]["pending_count"] == 2
     server._apply_manual_console_write.assert_not_called()
 
 
