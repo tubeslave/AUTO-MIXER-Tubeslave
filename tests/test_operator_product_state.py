@@ -5959,6 +5959,9 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     execution_plan = payload[
         "source_identity_calibration_memory_trust_promotion_execution_plan"
     ]
+    executor_dry_run = payload[
+        "source_identity_calibration_memory_trust_promotion_executor_dry_run"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
@@ -5970,6 +5973,12 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         for item in payload["adapters"]
         if item["adapter_id"]
         == "source_identity_calibration_memory_trust_promotion_execution_plan"
+    ][0]
+    dry_run_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "source_identity_calibration_memory_trust_promotion_executor_dry_run"
     ][0]
 
     assert (
@@ -5991,6 +6000,12 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         == 1
     )
     assert (
+        payload["summary"][
+            "source_identity_calibration_memory_trust_promotion_executor_dry_run_record_count"
+        ]
+        == 1
+    )
+    assert (
         adapter["method_id"]
         == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
     )
@@ -6002,6 +6017,14 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert (
         execution_adapter["output"]
         == "source_identity_memory_trust_promotion_execution_plan"
+    )
+    assert (
+        dry_run_adapter["method_id"]
+        == "source_identity_calibration_memory_trust_promotion_executor_dry_run"
+    )
+    assert (
+        dry_run_adapter["output"]
+        == "source_identity_memory_trust_promotion_executor_dry_run"
     )
     assert (
         ledger["status"]
@@ -6017,11 +6040,17 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         ledger["records"][0]["operator_accepted_memory_trust_promotion_contract"]
         is True
     )
+    assert ledger["records"][0]["read_only"] is True
+    assert ledger["records"][0]["live_write"] is False
+    assert ledger["records"][0]["queries_console"] is False
     assert (
         ledger["records"][0]["downstream_priority_change_allowed_by_acceptance"]
         is False
     )
+    assert ledger["records"][0]["downstream_priority_mutation"] is False
     assert ledger["records"][0]["runtime_memory_mutation_allowed_by_acceptance"] is False
+    assert ledger["records"][0]["can_import_to_queue"] is False
+    assert ledger["records"][0]["can_apply_live"] is False
     assert (
         execution_plan["status"]
         == "manual_memory_trust_promotion_execution_candidate_available"
@@ -6044,6 +6073,39 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert (
         execution_plan["execution_candidates"][0][
             "downstream_priority_change_allowed_by_plan"
+        ]
+        is False
+    )
+    assert executor_dry_run["status"] == "memory_trust_promotion_executor_dry_run_ready"
+    assert executor_dry_run["summary"]["dry_run_record_count"] == 1
+    assert executor_dry_run["summary"]["execution_allowed_by_dry_run"] is False
+    assert executor_dry_run["summary"]["memory_trust_promotion_applied"] is False
+    assert (
+        executor_dry_run["summary"][
+            "downstream_priority_change_allowed_by_dry_run"
+        ]
+        is False
+    )
+    assert (
+        executor_dry_run["dry_run_records"][0]["target_path"]
+        == "source_identity_downstream_gate/candidate-1/trust_state"
+    )
+    assert (
+        executor_dry_run["dry_run_records"][0]["idempotency_key"]
+        == (
+            "source_identity_memory_trust_promotion:"
+            "candidate-1:trusted_for_downstream_priority:"
+            "memory-trust-promotion-acceptance-1"
+        )
+    )
+    assert executor_dry_run["dry_run_records"][0]["dry_run"] is True
+    assert (
+        executor_dry_run["dry_run_records"][0]["memory_trust_promotion_applied"]
+        is False
+    )
+    assert (
+        executor_dry_run["dry_run_records"][0][
+            "runtime_memory_mutation_allowed_by_dry_run"
         ]
         is False
     )

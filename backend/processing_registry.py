@@ -124,6 +124,9 @@ try:
     from source_identity_calibration_memory_trust_promotion_execution_plan import (
         build_source_identity_calibration_memory_trust_promotion_execution_plan,
     )
+    from source_identity_calibration_memory_trust_promotion_executor_dry_run import (
+        build_source_identity_calibration_memory_trust_promotion_executor_dry_run,
+    )
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.bus_group_main_dca_physical_readback_contract import (
@@ -237,6 +240,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_trust_promotion_execution_plan import (
         build_source_identity_calibration_memory_trust_promotion_execution_plan,
+    )
+    from backend.source_identity_calibration_memory_trust_promotion_executor_dry_run import (
+        build_source_identity_calibration_memory_trust_promotion_executor_dry_run,
     )
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
 
@@ -745,6 +751,38 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "transport_free",
             "execution_plan_only",
             "memory_trust_promotion_acceptance_consumer",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_calibration_memory_trust_promotion_executor_dry_run",
+        label="Source Identity Calibration Memory Trust Promotion Executor Dry Run",
+        domain="memory_learning",
+        status="shadow_only",
+        summary=(
+            "Read-only dry-run executor contract that converts accepted "
+            "memory-trust promotion execution candidates into deterministic "
+            "apply specifications."
+        ),
+        module=(
+            "backend/source_identity_calibration_memory_trust_promotion_executor_dry_run.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="memory_trust_promotion_executor_dry_run_does_not_apply",
+        promotion_next=(
+            "validate dry-run apply specs, then add a separate operator-gated "
+            "executor contract before any downstream priority changes"
+        ),
+        notes=(
+            "transport_free",
+            "executor_dry_run_only",
+            "memory_trust_promotion_execution_plan_consumer",
+            "idempotent_apply_spec",
             "no_queue_mutation",
             "no_model_mutation",
             "no_runtime_memory_mutation",
@@ -2108,6 +2146,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_contract",
             "source_identity_calibration_memory_trust_promotion_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_execution_plan",
+            "source_identity_calibration_memory_trust_promotion_executor_dry_run",
             "auto_fader_v1",
             "lufs_gain_staging",
             "live_shared_mix",
@@ -2201,6 +2240,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_contract",
             "source_identity_calibration_memory_trust_promotion_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_execution_plan",
+            "source_identity_calibration_memory_trust_promotion_executor_dry_run",
             "bus_group_balance_proposal",
             "mute_management_proposal",
             "routing_management_proposal",
@@ -2253,6 +2293,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_contract",
             "source_identity_calibration_memory_trust_promotion_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_execution_plan",
+            "source_identity_calibration_memory_trust_promotion_executor_dry_run",
             "cross_adaptive_eq",
             "autoeq_audit_validation",
             "diff_deq_playbook_bridge",
@@ -2422,6 +2463,13 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         ),
         "ui_surface": "Channel Intelligence, source identity memory trust promotion execution plan",
         "next_step": "Use execution candidates as review evidence only; downstream priority changes still require a separate executor implementation and safety contract.",
+    },
+    "source_identity_calibration_memory_trust_promotion_executor_dry_run": {
+        "entrypoint": (
+            "build_source_identity_calibration_memory_trust_promotion_executor_dry_run"
+        ),
+        "ui_surface": "Channel Intelligence, source identity memory trust promotion executor dry-run",
+        "next_step": "Use dry-run apply specs as executor evidence only; applying trust promotion still requires a separate operator-gated executor contract.",
     },
     "supervised_manual_fader_gain": {
         "entrypoint": "apply_operator_proposal -> supervised manual gate",
@@ -2930,6 +2978,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "source_identity_calibration_memory_trust_promotion_execution_plan": (
             build_source_identity_calibration_memory_trust_promotion_execution_plan()
+        ),
+        "source_identity_calibration_memory_trust_promotion_executor_dry_run": (
+            build_source_identity_calibration_memory_trust_promotion_executor_dry_run()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),

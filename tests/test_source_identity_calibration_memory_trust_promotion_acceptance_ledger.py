@@ -221,10 +221,22 @@ def test_memory_trust_promotion_acceptance_records_operator_decision_without_aut
     record = ledger["records"][0]
     assert record["operator_accepted_memory_trust_promotion_contract"] is True
     assert record["operator_rejected_memory_trust_promotion_contract"] is False
+    assert record["read_only"] is True
+    assert record["live_write"] is False
+    assert record["mutates_console_state"] is False
+    assert record["queries_console"] is False
+    assert record["operator_review_required"] is True
+    assert record["queue_mutation"] is False
+    assert record["model_mutation"] is False
+    assert record["runtime_memory_mutation"] is False
+    assert record["downstream_priority_mutation"] is False
     assert record["memory_trust_promotion_allowed_by_acceptance"] is False
     assert record["downstream_priority_change_allowed_by_acceptance"] is False
     assert record["runtime_memory_mutation_allowed_by_acceptance"] is False
+    assert record["live_widening_allowed"] is False
     assert record["live_authority_granted"] is False
+    assert record["can_import_to_queue"] is False
+    assert record["can_apply_live"] is False
     assert "requested_change" not in ledger
 
 

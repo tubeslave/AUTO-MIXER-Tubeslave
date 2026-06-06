@@ -281,6 +281,32 @@ def test_memory_trust_promotion_execution_plan_rejects_unsafe_or_forged_ledger()
     )
 
 
+def test_memory_trust_promotion_execution_plan_rejects_record_level_live_authority():
+    ledger = _promotion_acceptance_ledger()
+    forged_ledger = {
+        **ledger,
+        "records": [
+            {
+                **ledger["records"][0],
+                "live_write": True,
+                "queries_console": True,
+                "downstream_priority_mutation": True,
+                "unsafe_authority_flags": [],
+            }
+        ],
+    }
+
+    plan = build_source_identity_calibration_memory_trust_promotion_execution_plan(
+        promotion_acceptance_ledger=forged_ledger,
+    )
+
+    assert plan["status"] == "memory_trust_promotion_execution_plan_replacement_required"
+    assert plan["summary"]["execution_candidate_count"] == 0
+    assert plan["summary"]["invalid_record_ids"] == [
+        "memory-trust-promotion-acceptance-1"
+    ]
+
+
 def test_memory_trust_promotion_execution_plan_is_registered_shadow_only():
     method = get_processing_method(
         "source_identity_calibration_memory_trust_promotion_execution_plan"

@@ -63,6 +63,9 @@ try:
     from source_identity_calibration_memory_trust_promotion_execution_plan import (
         build_source_identity_calibration_memory_trust_promotion_execution_plan,
     )
+    from source_identity_calibration_memory_trust_promotion_executor_dry_run import (
+        build_source_identity_calibration_memory_trust_promotion_executor_dry_run,
+    )
     from source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
         analyze_source_identity_replay_calibration,
@@ -124,6 +127,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_trust_promotion_execution_plan import (
         build_source_identity_calibration_memory_trust_promotion_execution_plan,
+    )
+    from backend.source_identity_calibration_memory_trust_promotion_executor_dry_run import (
+        build_source_identity_calibration_memory_trust_promotion_executor_dry_run,
     )
     from backend.source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
@@ -597,6 +603,16 @@ def build_main_pipeline_preview(
     source_identity_memory_trust_promotion_execution_summary = (
         source_identity_memory_trust_promotion_execution_plan.get("summary", {})
     )
+    source_identity_memory_trust_promotion_executor_dry_run = (
+        build_source_identity_calibration_memory_trust_promotion_executor_dry_run(
+            promotion_execution_plan=source_identity_memory_trust_promotion_execution_plan,
+            apply=False,
+            operator_ack=False,
+        )
+    )
+    source_identity_memory_trust_promotion_executor_dry_run_summary = (
+        source_identity_memory_trust_promotion_executor_dry_run.get("summary", {})
+    )
 
     proposals = (
         operator_proposals
@@ -724,6 +740,13 @@ def build_main_pipeline_preview(
             "source_identity_calibration_memory_trust_promotion_execution_candidate_count": int(
                 source_identity_memory_trust_promotion_execution_summary.get(
                     "execution_candidate_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_calibration_memory_trust_promotion_executor_dry_run_record_count": int(
+                source_identity_memory_trust_promotion_executor_dry_run_summary.get(
+                    "dry_run_record_count",
                     0,
                 )
                 or 0
@@ -935,6 +958,32 @@ def build_main_pipeline_preview(
                 ),
             },
             {
+                "adapter_id": (
+                    "source_identity_calibration_memory_trust_promotion_executor_dry_run"
+                ),
+                "method_id": (
+                    "source_identity_calibration_memory_trust_promotion_executor_dry_run"
+                ),
+                "status": (
+                    source_identity_memory_trust_promotion_executor_dry_run.get(
+                        "status"
+                    )
+                ),
+                "output": "source_identity_memory_trust_promotion_executor_dry_run",
+                "reason": (
+                    ", ".join(
+                        source_identity_memory_trust_promotion_executor_dry_run_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if source_identity_memory_trust_promotion_executor_dry_run_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
                 "adapter_id": "registry_blockers",
                 "method_id": "processing_registry",
                 "status": "active",
@@ -994,6 +1043,9 @@ def build_main_pipeline_preview(
         ),
         "source_identity_calibration_memory_trust_promotion_execution_plan": (
             source_identity_memory_trust_promotion_execution_plan
+        ),
+        "source_identity_calibration_memory_trust_promotion_executor_dry_run": (
+            source_identity_memory_trust_promotion_executor_dry_run
         ),
         "registry": {
             "summary": registry_snapshot.get("summary", {}),

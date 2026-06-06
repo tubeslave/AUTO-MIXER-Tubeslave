@@ -74,14 +74,24 @@ REQUIRED_ACCEPTANCE_FALSE_SUMMARY_FLAGS = (
     "full_autonomous_ready",
 )
 REQUIRED_ACCEPTANCE_RECORD_FALSE_FLAGS = (
+    "live_write",
+    "mutates_console_state",
+    "queries_console",
+    "queue_mutation",
+    "model_mutation",
+    "runtime_memory_mutation",
+    "downstream_priority_mutation",
     "execution_allowed_by_acceptance",
     "memory_trust_promotion_allowed_by_acceptance",
     "downstream_priority_change_allowed_by_acceptance",
     "queue_mutation_allowed_by_acceptance",
     "model_mutation_allowed_by_acceptance",
     "runtime_memory_mutation_allowed_by_acceptance",
+    "live_widening_allowed",
     "live_authority_granted",
     "full_autonomous_ready",
+    "can_import_to_queue",
+    "can_apply_live",
 )
 
 
@@ -204,6 +214,10 @@ def _accepted_record_violations(record: Mapping[str, Any]) -> Tuple[str, ...]:
         violations.append("memory_trust_promotion_execution_record_accepted_not_true")
     if record.get("operator_rejected_memory_trust_promotion_contract") is not False:
         violations.append("memory_trust_promotion_execution_record_rejected_not_false")
+    if record.get("read_only") is not True:
+        violations.append("memory_trust_promotion_execution_record_read_only_not_true")
+    if record.get("operator_review_required") is not True:
+        violations.append("memory_trust_promotion_execution_record_operator_review_not_true")
     if _string_list(record.get("unsafe_authority_flags")):
         violations.append("memory_trust_promotion_execution_record_unsafe_authority_claim")
     for flag in REQUIRED_ACCEPTANCE_RECORD_FALSE_FLAGS:
