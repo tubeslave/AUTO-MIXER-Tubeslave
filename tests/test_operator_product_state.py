@@ -5974,6 +5974,7 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     priority_gate = payload[
         "source_identity_calibration_memory_trust_promotion_priority_gate"
     ]
+    priority_policy = payload["source_identity_proposal_priority_policy"]
     adapter = [
         item
         for item in payload["adapters"]
@@ -6015,6 +6016,11 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         for item in payload["adapters"]
         if item["adapter_id"]
         == "source_identity_calibration_memory_trust_promotion_priority_gate"
+    ][0]
+    priority_policy_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"] == "source_identity_proposal_priority_policy"
     ][0]
 
     assert (
@@ -6072,6 +6078,16 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         == 0
     )
     assert (
+        payload["summary"]["source_identity_proposal_priority_policy_record_count"]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "source_identity_proposal_priority_policy_ranked_proposal_count"
+        ]
+        == 0
+    )
+    assert (
         adapter["method_id"]
         == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
     )
@@ -6123,6 +6139,11 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert (
         priority_gate_adapter["output"]
         == "source_identity_memory_trust_promotion_priority_gate"
+    )
+    assert priority_policy_adapter["method_id"] == "source_identity_proposal_priority_policy"
+    assert (
+        priority_policy_adapter["output"]
+        == "source_identity_proposal_priority_policy_projection"
     )
     assert (
         ledger["status"]
@@ -6253,6 +6274,27 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert priority_gate["safety"]["read_only"] is True
     assert priority_gate["safety"]["live_write"] is False
     assert priority_gate["priority_records"] == []
+    assert priority_policy["status"] == "source_identity_proposal_priority_policy_not_ready"
+    assert priority_policy["summary"]["policy_record_count"] == 0
+    assert priority_policy["summary"]["ranked_proposal_ids"] == []
+    assert priority_policy["summary"]["proposal_order_mutation"] is False
+    assert priority_policy["summary"]["queue_mutation"] is False
+    assert (
+        priority_policy["summary"]["downstream_priority_change_allowed_by_policy"]
+        is False
+    )
+    assert priority_policy["summary"]["live_widening_allowed"] is False
+    assert priority_policy["summary"]["can_import_to_queue"] is False
+    assert priority_policy["summary"]["can_apply_live"] is False
+    assert priority_policy["safety"]["read_only"] is True
+    assert priority_policy["safety"]["proposal_order_mutation"] is False
+    assert (
+        priority_policy["safety"]["downstream_priority_change_allowed_by_policy"]
+        is False
+    )
+    assert priority_policy["safety"]["live_widening_allowed"] is False
+    assert priority_policy["safety"]["live_write"] is False
+    assert priority_policy["policy_records"] == []
     assert queue["summary"]["pending_count"] == 0
 
 

@@ -139,6 +139,9 @@ try:
     from source_identity_calibration_memory_trust_promotion_priority_gate import (
         build_source_identity_calibration_memory_trust_promotion_priority_gate,
     )
+    from source_identity_proposal_priority_policy import (
+        build_source_identity_proposal_priority_policy,
+    )
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.bus_group_main_dca_physical_readback_contract import (
@@ -267,6 +270,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_trust_promotion_priority_gate import (
         build_source_identity_calibration_memory_trust_promotion_priority_gate,
+    )
+    from backend.source_identity_proposal_priority_policy import (
+        build_source_identity_proposal_priority_policy,
     )
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
 
@@ -930,6 +936,35 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "memory_trust_promotion_rollback_verification_consumer",
             "operator_review_required",
             "proposal_priority_consumer_required",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_direct_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_proposal_priority_policy",
+        label="Source Identity Proposal Priority Policy",
+        domain="decision_evidence",
+        status="shadow_only",
+        summary=(
+            "Read-only proposal-priority policy projection from trusted source "
+            "identity priority-gate records."
+        ),
+        module="backend/source_identity_proposal_priority_policy.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="source_identity_proposal_priority_policy_is_not_ordering_queue_or_live_authority",
+        promotion_next=(
+            "feed ranked policy records into a separate proposal-priority "
+            "consumer before mutating proposal order, queues, or live behavior"
+        ),
+        notes=(
+            "transport_free",
+            "policy_projection_only",
+            "source_identity_priority_gate_consumer",
+            "proposal_order_mutation_false",
             "no_queue_mutation",
             "no_model_mutation",
             "no_runtime_memory_mutation",
@@ -2298,6 +2333,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_apply_audit",
             "source_identity_calibration_memory_trust_promotion_rollback_verification",
             "source_identity_calibration_memory_trust_promotion_priority_gate",
+            "source_identity_proposal_priority_policy",
             "auto_fader_v1",
             "lufs_gain_staging",
             "live_shared_mix",
@@ -2396,6 +2432,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_apply_audit",
             "source_identity_calibration_memory_trust_promotion_rollback_verification",
             "source_identity_calibration_memory_trust_promotion_priority_gate",
+            "source_identity_proposal_priority_policy",
             "bus_group_balance_proposal",
             "mute_management_proposal",
             "routing_management_proposal",
@@ -2453,6 +2490,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_calibration_memory_trust_promotion_apply_audit",
             "source_identity_calibration_memory_trust_promotion_rollback_verification",
             "source_identity_calibration_memory_trust_promotion_priority_gate",
+            "source_identity_proposal_priority_policy",
             "cross_adaptive_eq",
             "autoeq_audit_validation",
             "diff_deq_playbook_bridge",
@@ -2657,6 +2695,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         ),
         "ui_surface": "Channel Intelligence, source identity memory trust promotion priority gate",
         "next_step": "Use eligible records only as proposal-priority policy evidence; direct priority, queue, model, memory, and live mutations remain blocked.",
+    },
+    "source_identity_proposal_priority_policy": {
+        "entrypoint": "build_source_identity_proposal_priority_policy",
+        "ui_surface": "Channel Intelligence, source identity proposal priority policy projection",
+        "next_step": "Use ranked records as read-only policy evidence only; proposal order, queue import, and live authority still require a separate consumer.",
     },
     "supervised_manual_fader_gain": {
         "entrypoint": "apply_operator_proposal -> supervised manual gate",
@@ -3180,6 +3223,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "source_identity_calibration_memory_trust_promotion_priority_gate": (
             build_source_identity_calibration_memory_trust_promotion_priority_gate()
+        ),
+        "source_identity_proposal_priority_policy": (
+            build_source_identity_proposal_priority_policy()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),
