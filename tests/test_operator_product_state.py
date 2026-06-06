@@ -5977,6 +5977,7 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     priority_policy = payload["source_identity_proposal_priority_policy"]
     ordering_preview = payload["source_identity_proposal_ordering_preview"]
     queue_ordering_plan = payload["source_identity_proposal_queue_ordering_plan"]
+    queue_importer = payload["source_identity_proposal_queue_importer"]
     adapter = [
         item
         for item in payload["adapters"]
@@ -6033,6 +6034,11 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         item
         for item in payload["adapters"]
         if item["adapter_id"] == "source_identity_proposal_queue_ordering_plan"
+    ][0]
+    queue_importer_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"] == "source_identity_proposal_queue_importer"
     ][0]
 
     assert (
@@ -6118,6 +6124,11 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         ]
         == 0
     )
+    assert payload["summary"]["source_identity_proposal_queue_importer_spec_count"] == 0
+    assert (
+        payload["summary"]["source_identity_proposal_queue_importer_result_count"]
+        == 0
+    )
     assert (
         adapter["method_id"]
         == "source_identity_calibration_memory_trust_promotion_acceptance_ledger"
@@ -6191,6 +6202,14 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert (
         queue_ordering_plan_adapter["output"]
         == "source_identity_proposal_queue_ordering_plan"
+    )
+    assert (
+        queue_importer_adapter["method_id"]
+        == "source_identity_proposal_queue_importer"
+    )
+    assert (
+        queue_importer_adapter["output"]
+        == "source_identity_proposal_queue_importer_dry_run"
     )
     assert (
         ledger["status"]
@@ -6410,6 +6429,26 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert queue_ordering_plan["safety"]["live_widening_allowed"] is False
     assert queue_ordering_plan["safety"]["live_write"] is False
     assert queue_ordering_plan["queue_ordering_plan_records"] == []
+    assert (
+        queue_importer["status"]
+        == "source_identity_proposal_queue_importer_not_ready"
+    )
+    assert queue_importer["summary"]["queue_import_spec_count"] == 0
+    assert queue_importer["summary"]["queue_import_result_count"] == 0
+    assert queue_importer["summary"]["planned_import_proposal_ids"] == []
+    assert queue_importer["summary"]["queue_import_dry_run"] is True
+    assert queue_importer["summary"]["queue_import_applied"] is False
+    assert queue_importer["summary"]["queue_mutation"] is False
+    assert queue_importer["summary"]["live_write"] is False
+    assert queue_importer["summary"]["can_import_to_queue"] is False
+    assert queue_importer["summary"]["can_apply_live"] is False
+    assert queue_importer["safety"]["read_only"] is True
+    assert queue_importer["safety"]["queue_import_dry_run"] is True
+    assert queue_importer["safety"]["queue_import_applied"] is False
+    assert queue_importer["safety"]["queue_mutation"] is False
+    assert queue_importer["safety"]["live_write"] is False
+    assert queue_importer["queue_import_specs"] == []
+    assert queue_importer["queue_import_results"] == []
     assert queue["summary"]["pending_count"] == 0
 
 

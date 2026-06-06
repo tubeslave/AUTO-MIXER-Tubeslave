@@ -87,6 +87,9 @@ try:
     from source_identity_proposal_queue_ordering_plan import (
         build_source_identity_proposal_queue_ordering_plan,
     )
+    from source_identity_proposal_queue_importer import (
+        build_source_identity_proposal_queue_importer,
+    )
     from source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
         analyze_source_identity_replay_calibration,
@@ -172,6 +175,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_proposal_queue_ordering_plan import (
         build_source_identity_proposal_queue_ordering_plan,
+    )
+    from backend.source_identity_proposal_queue_importer import (
+        build_source_identity_proposal_queue_importer,
     )
     from backend.source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
@@ -762,6 +768,18 @@ def build_main_pipeline_preview(
     source_identity_proposal_queue_ordering_plan_summary = (
         source_identity_proposal_queue_ordering_plan.get("summary", {})
     )
+    source_identity_proposal_queue_importer = (
+        build_source_identity_proposal_queue_importer(
+            queue_ordering_plan=source_identity_proposal_queue_ordering_plan,
+            proposal_payloads=proposals,
+            operator_mode=operator_mode,
+            apply=False,
+            operator_ack=False,
+        )
+    )
+    source_identity_proposal_queue_importer_summary = (
+        source_identity_proposal_queue_importer.get("summary", {})
+    )
     blockers = build_registry_blockers(pipeline_id=MAIN_PIPELINE_ID)
     proposal_only_contracts = build_proposal_only_method_contracts(pipeline_id=MAIN_PIPELINE_ID)
     registry_snapshot = build_processing_registry_snapshot(include_methods=include_methods)
@@ -966,6 +984,20 @@ def build_main_pipeline_preview(
             "source_identity_proposal_queue_ordering_plan_ranked_record_count": int(
                 source_identity_proposal_queue_ordering_plan_summary.get(
                     "ranked_queue_candidate_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_proposal_queue_importer_spec_count": int(
+                source_identity_proposal_queue_importer_summary.get(
+                    "queue_import_spec_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_proposal_queue_importer_result_count": int(
+                source_identity_proposal_queue_importer_summary.get(
+                    "queue_import_result_count",
                     0,
                 )
                 or 0
@@ -1351,6 +1383,22 @@ def build_main_pipeline_preview(
                 ),
             },
             {
+                "adapter_id": "source_identity_proposal_queue_importer",
+                "method_id": "source_identity_proposal_queue_importer",
+                "status": source_identity_proposal_queue_importer.get("status"),
+                "output": "source_identity_proposal_queue_importer_dry_run",
+                "reason": (
+                    ", ".join(
+                        source_identity_proposal_queue_importer_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if source_identity_proposal_queue_importer_summary.get("blocked_by")
+                    else None
+                ),
+            },
+            {
                 "adapter_id": "registry_blockers",
                 "method_id": "processing_registry",
                 "status": "active",
@@ -1434,6 +1482,9 @@ def build_main_pipeline_preview(
         ),
         "source_identity_proposal_queue_ordering_plan": (
             source_identity_proposal_queue_ordering_plan
+        ),
+        "source_identity_proposal_queue_importer": (
+            source_identity_proposal_queue_importer
         ),
         "registry": {
             "summary": registry_snapshot.get("summary", {}),

@@ -148,6 +148,9 @@ try:
     from source_identity_proposal_queue_ordering_plan import (
         build_source_identity_proposal_queue_ordering_plan,
     )
+    from source_identity_proposal_queue_importer import (
+        build_source_identity_proposal_queue_importer,
+    )
     from write_surface_inventory import build_write_surface_inventory_snapshot
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.bus_group_main_dca_physical_readback_contract import (
@@ -285,6 +288,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_proposal_queue_ordering_plan import (
         build_source_identity_proposal_queue_ordering_plan,
+    )
+    from backend.source_identity_proposal_queue_importer import (
+        build_source_identity_proposal_queue_importer,
     )
     from backend.write_surface_inventory import build_write_surface_inventory_snapshot
 
@@ -1038,6 +1044,36 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "queue_import_allowed_by_plan_false",
             "proposal_order_mutation_false",
             "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_source_identity_trust_store_mutation",
+            "no_direct_downstream_priority_mutation",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="source_identity_proposal_queue_importer",
+        label="Source Identity Proposal Queue Importer",
+        domain="decision_evidence",
+        status="shadow_only",
+        summary=(
+            "Operator-gated queue importer for source identity queue-ordering "
+            "plans; Product Layer uses dry-run only."
+        ),
+        module="backend/source_identity_proposal_queue_importer.py",
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason="source_identity_proposal_queue_importer_requires_operator_ack_and_explicit_queue",
+        promotion_next=(
+            "wire an operator-reviewed UI action that passes apply=true, "
+            "operator_ack=true, and the explicit target queue before queue mutation"
+        ),
+        notes=(
+            "transport_free",
+            "product_layer_dry_run_only",
+            "operator_ack_required",
+            "explicit_target_queue_required",
+            "source_identity_proposal_queue_ordering_plan_consumer",
             "no_model_mutation",
             "no_runtime_memory_mutation",
             "no_source_identity_trust_store_mutation",
@@ -2409,6 +2445,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_proposal_priority_policy",
             "source_identity_proposal_ordering_preview",
             "source_identity_proposal_queue_ordering_plan",
+            "source_identity_proposal_queue_importer",
             "auto_fader_v1",
             "lufs_gain_staging",
             "live_shared_mix",
@@ -2510,6 +2547,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_proposal_priority_policy",
             "source_identity_proposal_ordering_preview",
             "source_identity_proposal_queue_ordering_plan",
+            "source_identity_proposal_queue_importer",
             "bus_group_balance_proposal",
             "mute_management_proposal",
             "routing_management_proposal",
@@ -2570,6 +2608,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_proposal_priority_policy",
             "source_identity_proposal_ordering_preview",
             "source_identity_proposal_queue_ordering_plan",
+            "source_identity_proposal_queue_importer",
             "cross_adaptive_eq",
             "autoeq_audit_validation",
             "diff_deq_playbook_bridge",
@@ -2789,6 +2828,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "build_source_identity_proposal_queue_ordering_plan",
         "ui_surface": "Channel Intelligence, source identity proposal queue ordering plan",
         "next_step": "Use queue-ordering plan records as read-only import candidates only; an acknowledged queue import consumer is still required before queue mutation.",
+    },
+    "source_identity_proposal_queue_importer": {
+        "entrypoint": "build_source_identity_proposal_queue_importer",
+        "ui_surface": "Channel Intelligence, source identity proposal queue importer dry run",
+        "next_step": "Use Product Layer dry-run specs for operator review; queue mutation requires apply=true, operator acknowledgement, and an explicit target queue.",
     },
     "supervised_manual_fader_gain": {
         "entrypoint": "apply_operator_proposal -> supervised manual gate",
@@ -3321,6 +3365,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "source_identity_proposal_queue_ordering_plan": (
             build_source_identity_proposal_queue_ordering_plan()
+        ),
+        "source_identity_proposal_queue_importer": (
+            build_source_identity_proposal_queue_importer()
         ),
         "safety_coverage_matrix": build_safety_coverage_matrix_snapshot(),
         "write_surface_inventory": build_write_surface_inventory_snapshot(),
