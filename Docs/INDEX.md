@@ -43,12 +43,14 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_20260607.md` | Operator review decisions are file-backed, validated, and still do not grant live authority. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_20260607.md` | Offline artifact review can write a pending operator decision template, and a focused decision-review CLI validates the edited JSON without granting live authority. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_PACKET_20260607.md` | Offline operator packet captures the exact read-only preflight, review, decision-review, and validation sequence without contacting WING. |
+| `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated handoff packet as a read-only JSON operator gate. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_OFFLINE_PLAN_PREVIEW_20260607.md` | Offline plan-only preview exposes the exact WING read-only preflight request sequence before any backend/WING session opens. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_DECISION_GATED_PROOF_PLAN_20260607.md` | Next supervised fader/gain proof steps stay blocked until an accepted read-only preflight review decision exists. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_READINESS_BRIDGE_20260606.md` | Read-only preflight evidence overlay inside autonomy promotion readiness; manual review candidate only. |
 | `Docs/reports/AUTOMIXER_SUPERVISED_WING_PROOF_READONLY_PREFLIGHT_GATE_20260606.md` | Next supervised WING proof plan is blocked until clean read-only preflight evidence exists. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PACKET_20260607.md` | Offline operator packet renders the next read-surface physical-readback capture target without querying or mutating a console. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_PHYSICAL_READBACK_ACCEPTANCE_TEMPLATE_20260607.md` | Offline operator template renders pending acceptance records for valid read-surface physical-readback candidates without closing fixtures or granting live authority. |
+| `Docs/reports/AUTOMIXER_READ_SURFACE_ACCEPTANCE_TEMPLATE_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated acceptance-template JSON as a read-only operator gate. |
 | `Docs/reports/AUTOMIXER_WING_SUPERVISED_MVP_RAILS_20260606.md` | MVP contract, blocker table, runbooks, progress updater, and Project Director Agent. |
 | `Docs/reports/MVP_PROGRESS_LATEST.md` | Latest generated supervised WING MVP blocker status and first required action. |
 | `Docs/reports/AUTOMIXER_STREAMING_ALERTS_20260601.md` | Read-only streaming telemetry alert artifacts for dashboards, QA, and future learning labels. |

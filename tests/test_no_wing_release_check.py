@@ -31,12 +31,14 @@ from tools.no_wing_release_check import (
     raw_mixer_readback_artifact_intake_summary,
     raw_mixer_readback_contract_summary,
     read_surface_physical_readback_acceptance_template_path_for_run,
+    read_surface_physical_readback_acceptance_template_artifact_summary,
     read_surface_physical_readback_capture_packet_path_for_run,
     read_surface_physical_readback_artifact_review_queue_summary,
     read_surface_physical_readback_fixture_acceptance_ledger_summary,
     read_surface_physical_readback_fixture_closure_plan_summary,
     read_surface_physical_readback_capture_plan_summary,
     wing_readonly_preflight_evidence_summary,
+    wing_readonly_preflight_handoff_packet_artifact_summary,
     wing_readonly_preflight_plan_artifact_summary,
     wing_readonly_preflight_review_decision_summary,
     read_surface_fixture_evidence_summary,
@@ -64,9 +66,11 @@ from tools.no_wing_release_check import (
     validate_matrix_state_physical_readback_artifact_intake_snapshot,
     validate_matrix_state_physical_readback_contract_snapshot,
     validate_read_surface_physical_readback_artifact_review_queue_snapshot,
+    validate_read_surface_physical_readback_acceptance_template_artifact_snapshot,
     validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot,
     validate_read_surface_physical_readback_fixture_closure_plan_snapshot,
     validate_wing_readonly_preflight_evidence_snapshot,
+    validate_wing_readonly_preflight_handoff_packet_artifact_snapshot,
     validate_wing_readonly_preflight_plan_artifact_snapshot,
     validate_wing_readonly_preflight_review_decision_ledger_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
@@ -689,6 +693,311 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
     }
 
 
+def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dict:
+    return {
+        "type": "wing_readonly_preflight_handoff_packet",
+        "generated_at": "2026-06-07T00:00:00Z",
+        "status": "operator_hardware_step_required",
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "operator_required": True,
+        "execution_allowed_by_packet": False,
+        "readiness_matrix_update_allowed_by_packet": False,
+        "readiness_closure_allowed_by_packet": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "url": "ws://localhost:8765",
+        "channels": [3],
+        "value_types": ["fader", "gain"],
+        "artifact_root": "artifacts/wing_readonly_preflight",
+        "decision_root": "artifacts/wing_readonly_preflight_review_decisions",
+        "expected_run_artifact_glob": (
+            "artifacts/wing_readonly_preflight/<run_id>/summary.json"
+        ),
+        "expected_event_log_glob": (
+            "artifacts/wing_readonly_preflight/<run_id>/events.jsonl"
+        ),
+        "plan_output": str(plan_path),
+        "decision_template_output": (
+            "artifacts/wing_readonly_preflight_review_decisions/"
+            "pending_review_decision_template.json"
+        ),
+        "review_output": "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+        "decision_review_output": (
+            "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+        ),
+        "commands": {
+            "preview_readonly_request_plan": [
+                "python3",
+                "tools/wing_readonly_preflight_runner.py",
+                "--url",
+                "ws://localhost:8765",
+                "--channels",
+                "3",
+                "--operator-confirm-channels",
+                "3",
+                "--value-types",
+                "fader,gain",
+                "--require-physical-readback",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
+                "--plan-only",
+                "--plan-output",
+                str(plan_path),
+            ],
+            "capture_readonly_preflight": [
+                "python3",
+                "tools/wing_readonly_preflight_runner.py",
+                "--url",
+                "ws://localhost:8765",
+                "--channels",
+                "3",
+                "--operator-confirm-channels",
+                "3",
+                "--value-types",
+                "fader,gain",
+                "--require-physical-readback",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
+            ],
+            "review_artifact_and_write_pending_decision_template": [
+                "python3",
+                "tools/review_wing_readonly_preflight_artifacts.py",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
+                "--output",
+                "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+                "--decision-template-output",
+                "artifacts/wing_readonly_preflight_review_decisions/"
+                "pending_review_decision_template.json",
+            ],
+            "review_edited_decision_json": [
+                "python3",
+                "tools/review_wing_readonly_preflight_decisions.py",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
+                "--decision-root",
+                "artifacts/wing_readonly_preflight_review_decisions",
+                "--output",
+                "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
+            ],
+            "focused_validation": [
+                "PYTHONPATH=backend",
+                "python3",
+                "-m",
+                "pytest",
+                "-q",
+                "tests/test_wing_readonly_preflight_evidence.py",
+                "tests/test_wing_readonly_preflight_review_decision.py",
+                "tests/test_wing_readonly_preflight_review_tool.py",
+                "tests/test_wing_readonly_preflight_review_decision_tool.py",
+                "tests/test_no_wing_release_check.py",
+            ],
+        },
+        "operator_sequence": [
+            "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
+            "Confirm backend is connected to the intended WING Rack.",
+            "Confirm the selected channel numbers are safe to inspect.",
+            "Run capture_readonly_preflight.",
+            "Run review_artifact_and_write_pending_decision_template.",
+            "Edit the pending decision template into an accepted or rejected JSON record.",
+            "Run review_edited_decision_json.",
+            "Only after accepted_decision_ready, move to WING_SUPERVISED_FADER_GAIN_PROOF.",
+        ],
+        "required_review_checklist_ids": [
+            "confirm_artifact_paths",
+            "confirm_operator_channel_scope",
+            "confirm_physical_readbacks",
+            "confirm_event_log_readonly_sequence",
+            "confirm_no_live_authority",
+        ],
+        "forbidden_live_request_types": [
+            "apply_operator_proposal",
+            "rollback_last_manual_write",
+            "emergency_stop",
+            "set_operator_mode",
+            "connect_mixer",
+            "disconnect_mixer",
+        ],
+        "blockers_not_closed_by_packet": [
+            "wing_readonly_connection_proof",
+            "physical_console_readback_proof",
+            "supervised_fader_write_proof",
+            "supervised_gain_down_trim_proof",
+            "readiness_matrix_update_based_on_real_proof",
+        ],
+        "next_manual_artifact_required": "real wing_readonly_preflight.v1 summary.json",
+    }
+
+
+def valid_read_surface_acceptance_template_payload() -> dict:
+    return {
+        "type": "read_surface_physical_readback_fixture_acceptance_template",
+        "generated_at": "2026-06-07T00:00:00Z",
+        "status": "operator_candidate_missing",
+        "source_queue_status": "operator_artifact_capture_required",
+        "source_queue_method_id": "read_surface_physical_readback_artifact_review_queue",
+        "selected_surface_id": None,
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "operator_required": True,
+        "execution_allowed_by_template": False,
+        "fixture_closure_allowed_by_template": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "review_candidate_count": 0,
+        "template_record_count": 0,
+        "template_records": [],
+        "required_operator_edits": [
+            "decision",
+            "reviewed_by",
+            "reviewed_at",
+            "review_notes",
+        ],
+        "blocked_by": ["operator_must_capture_missing_physical_readback_artifacts"],
+        "operator_sequence": [
+            "Confirm the artifact is a valid review candidate from the review queue.",
+            "Set decision to accepted or rejected after manual review.",
+            "Set reviewed_by and reviewed_at using a UTC ISO timestamp.",
+            "Keep all authority and fixture-closure flags false.",
+            "Run the fixture acceptance ledger before any separate closure decision.",
+        ],
+        "commands": {
+            "focused_validation": [
+                "PYTHONPATH=backend",
+                "python3",
+                "-m",
+                "pytest",
+                "-q",
+                "tests/test_read_surface_physical_readback_fixture_acceptance_template.py",
+                "tests/test_read_surface_physical_readback_fixture_acceptance_ledger.py",
+            ],
+        },
+    }
+
+
+def test_no_wing_release_check_validates_read_surface_acceptance_template_artifact(
+    tmp_path,
+):
+    template_path = tmp_path / "read_surface_physical_readback_acceptance_template.json"
+    template_path.write_text(
+        json.dumps(valid_read_surface_acceptance_template_payload()),
+        encoding="utf-8",
+    )
+
+    result = validate_read_surface_physical_readback_acceptance_template_artifact_snapshot(
+        template_path
+    )
+
+    assert result.status == "passed"
+    assert (
+        result.detail["policy"]
+        == "read_surface_physical_readback_acceptance_template_artifact_is_readonly_operator_gate"
+    )
+    assert result.detail["template_path"] == str(template_path)
+    assert result.detail["template_status"] == "operator_candidate_missing"
+    assert result.detail["read_only"] is True
+    assert result.detail["live_write"] is False
+    assert result.detail["mutates_console_state"] is False
+    assert result.detail["queries_console"] is False
+    assert result.detail["executes_tests"] is False
+    assert result.detail["operator_required"] is True
+    assert result.detail["execution_allowed_by_template"] is False
+    assert result.detail["fixture_closure_allowed_by_template"] is False
+    assert result.detail["live_widening_allowed"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["review_candidate_count"] == 0
+    assert result.detail["template_record_count"] == 0
+    assert result.detail["required_operator_edits"] == [
+        "decision",
+        "reviewed_by",
+        "reviewed_at",
+        "review_notes",
+    ]
+    assert result.detail["operator_sequence_count"] == 5
+    assert result.detail["record_unsafe_flags"] == []
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_missing_read_surface_acceptance_template_artifact(
+    tmp_path,
+):
+    result = validate_read_surface_physical_readback_acceptance_template_artifact_snapshot(
+        tmp_path / "missing-acceptance-template.json"
+    )
+
+    assert result.status == "failed"
+    assert (
+        "read_surface_physical_readback_acceptance_template_artifact_missing_report"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_unsafe_read_surface_acceptance_template_artifact(
+    tmp_path,
+):
+    template_path = tmp_path / "unsafe-acceptance-template.json"
+    payload = valid_read_surface_acceptance_template_payload()
+    payload["status"] = "operator_acceptance_template_ready"
+    payload["live_authority_granted"] = True
+    payload["template_record_count"] = 1
+    payload["template_records"] = [
+        {
+            "review_id": "pending-raw-mixer",
+            "surface_id": "raw_mixer_state",
+            "artifact_source_id": "raw-mixer.json",
+            "required_contract_method_id": "raw_mixer_state_physical_readback_contract",
+            "decision": "accepted",
+            "reviewed_by": "operator",
+            "reviewed_at": "2026-06-07T12:00:00Z",
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "execution_allowed_by_acceptance": False,
+            "fixture_closure_allowed_by_acceptance": True,
+            "fixture_closure_allowed": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        }
+    ]
+    template_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_read_surface_physical_readback_acceptance_template_artifact_snapshot(
+        template_path
+    )
+
+    assert result.status == "failed"
+    assert "acceptance_template_artifact_live_authority_granted_not_false" in result.detail[
+        "violations"
+    ]
+    assert "acceptance_template_artifact_record_0_decision_not_pending" in result.detail[
+        "violations"
+    ]
+    assert "acceptance_template_artifact_record_0_reviewed_by_not_pending" in result.detail[
+        "violations"
+    ]
+    assert "acceptance_template_artifact_record_0_reviewed_at_not_pending" in result.detail[
+        "violations"
+    ]
+    assert (
+        "acceptance_template_artifact_record_0_fixture_closure_allowed_by_acceptance_not_false"
+        in result.detail["violations"]
+    )
+    assert result.detail["record_unsafe_flags"] == [
+        "record_0_fixture_closure_allowed_by_acceptance"
+    ]
+
+
 def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
     plan_path = tmp_path / "wing_readonly_preflight_plan.json"
     plan_path.write_text(
@@ -756,6 +1065,108 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
     assert "wing_readonly_preflight_plan_unsafe_request_type_present" in result.detail[
         "violations"
     ]
+
+
+def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "wing_readonly_preflight_handoff_packet.json"
+    packet_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_handoff_packet_payload(plan_path)),
+        encoding="utf-8",
+    )
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "passed"
+    assert (
+        result.detail["policy"]
+        == "wing_readonly_preflight_handoff_packet_is_readonly_operator_gate"
+    )
+    assert result.detail["packet_path"] == str(packet_path)
+    assert result.detail["expected_plan_output"] == str(plan_path)
+    assert result.detail["packet_status"] == "operator_hardware_step_required"
+    assert result.detail["read_only"] is True
+    assert result.detail["live_write"] is False
+    assert result.detail["mutates_console_state"] is False
+    assert result.detail["queries_console"] is False
+    assert result.detail["executes_tests"] is False
+    assert result.detail["operator_required"] is True
+    assert result.detail["execution_allowed_by_packet"] is False
+    assert result.detail["readiness_matrix_update_allowed_by_packet"] is False
+    assert result.detail["readiness_closure_allowed_by_packet"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["plan_output"] == str(plan_path)
+    assert result.detail["channels"] == [3]
+    assert result.detail["value_types"] == ["fader", "gain"]
+    assert result.detail["preview_command_uses_plan_only"] is True
+    assert result.detail["capture_command_requires_physical_readback"] is True
+    assert result.detail["review_command_writes_decision_template"] is True
+    assert "preview_readonly_request_plan" in result.detail["command_names"]
+    assert "confirm_no_live_authority" in result.detail[
+        "required_review_checklist_ids"
+    ]
+    assert "apply_operator_proposal" in result.detail["forbidden_live_request_types"]
+    assert "physical_console_readback_proof" in result.detail[
+        "blockers_not_closed_by_packet"
+    ]
+    assert result.detail["operator_sequence_count"] == 8
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_missing_wing_preflight_handoff_packet_artifact(
+    tmp_path,
+):
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        tmp_path / "missing-handoff.json",
+        plan_path=tmp_path / "wing_readonly_preflight_plan.json",
+    )
+
+    assert result.status == "failed"
+    assert "wing_readonly_preflight_handoff_packet_missing_report" in result.detail[
+        "violations"
+    ]
+
+
+def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_artifact(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "unsafe-handoff.json"
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["live_authority_granted"] = True
+    payload["queries_console"] = True
+    payload["commands"]["preview_readonly_request_plan"].remove("--plan-only")
+    payload["blockers_not_closed_by_packet"].remove("physical_console_readback_proof")
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert "wing_readonly_preflight_handoff_packet_queries_console_not_false" in result.detail[
+        "violations"
+    ]
+    assert "wing_readonly_preflight_handoff_packet_live_authority_granted_not_false" in result.detail[
+        "violations"
+    ]
+    assert "wing_readonly_preflight_handoff_packet_preview_readonly_request_plan_mismatch" in result.detail[
+        "violations"
+    ]
+    assert "wing_readonly_preflight_handoff_packet_preview_plan_only_missing" in result.detail[
+        "violations"
+    ]
+    assert (
+        "wing_readonly_preflight_handoff_packet_blocker_physical_console_readback_proof_missing"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_rejects_missing_wing_preflight_runner(
@@ -3007,6 +3418,8 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "3" in handoff_check.command
     assert "--plan-output" in handoff_check.command
     assert str(wing_readonly_preflight_plan_path_for_run(tmp_path)) in handoff_check.command
+    assert "--format" in handoff_check.command
+    assert "json" in handoff_check.command
     assert "--quiet" in handoff_check.command
     assert str(wing_readonly_preflight_handoff_packet_path_for_run(tmp_path)) in (
         handoff_check.command
@@ -3714,6 +4127,27 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
                 json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
                 encoding="utf-8",
             )
+        if check.name == "wing_readonly_preflight_handoff_packet":
+            plan_path = wing_readonly_preflight_plan_path_for_run(log_dir.parent)
+            packet_path = wing_readonly_preflight_handoff_packet_path_for_run(
+                log_dir.parent
+            )
+            packet_path.parent.mkdir(parents=True, exist_ok=True)
+            packet_path.write_text(
+                json.dumps(
+                    valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+                ),
+                encoding="utf-8",
+            )
+        if check.name == "read_surface_physical_readback_acceptance_template":
+            template_path = read_surface_physical_readback_acceptance_template_path_for_run(
+                log_dir.parent
+            )
+            template_path.parent.mkdir(parents=True, exist_ok=True)
+            template_path.write_text(
+                json.dumps(valid_read_surface_acceptance_template_payload()),
+                encoding="utf-8",
+            )
         if check.name == "supervised_proof_artifact_report":
             report_path = proof_report_path_for_run(log_dir.parent)
             report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3746,7 +4180,12 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "read_surface_physical_readback_capture_plan_schema" in result_names
     assert "wing_readonly_preflight_evidence_schema" in result_names
     assert "wing_readonly_preflight_plan_artifact_schema" in result_names
+    assert "wing_readonly_preflight_handoff_packet_artifact_schema" in result_names
     assert "wing_readonly_preflight_review_decision_ledger_schema" in result_names
+    assert (
+        "read_surface_physical_readback_acceptance_template_artifact_schema"
+        in result_names
+    )
     assert "raw_mixer_state_physical_readback_contract_schema" in result_names
     assert "raw_mixer_state_physical_readback_artifact_intake_schema" in result_names
     assert "channel_basic_controls_physical_readback_contract_schema" in result_names
@@ -3795,6 +4234,23 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert result_names.index(
         "wing_readonly_preflight_plan_artifact_schema"
     ) < result_names.index("read_surface_physical_readback_capture_packet")
+    assert result_names.index("read_surface_physical_readback_capture_packet") < result_names.index(
+        "read_surface_physical_readback_acceptance_template"
+    )
+    assert result_names.index(
+        "read_surface_physical_readback_acceptance_template"
+    ) < result_names.index(
+        "read_surface_physical_readback_acceptance_template_artifact_schema"
+    )
+    assert result_names.index(
+        "read_surface_physical_readback_acceptance_template_artifact_schema"
+    ) < result_names.index("wing_readonly_preflight_handoff_packet")
+    assert result_names.index("wing_readonly_preflight_handoff_packet") < result_names.index(
+        "wing_readonly_preflight_handoff_packet_artifact_schema"
+    )
+    assert result_names.index(
+        "wing_readonly_preflight_handoff_packet_artifact_schema"
+    ) < result_names.index("gain_dry_run_proof")
     assert result_names.index("wing_readonly_preflight_review_decision_ledger_schema") < result_names.index(
         "raw_mixer_state_physical_readback_contract_schema"
     )
@@ -5027,6 +5483,161 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert "contacts_backend: `false`" in markdown_summary
     assert "request_sequence_matches_expected: `true`" in markdown_summary
     assert "set_gain" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_artifact(
+    tmp_path,
+):
+    result = CheckResult(
+        name="wing_readonly_preflight_handoff_packet_artifact_schema",
+        status="passed",
+        started_at="2026-06-07T00:00:00Z",
+        finished_at="2026-06-07T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "packet_path": "/tmp/wing_readonly_preflight_handoff_packet.json",
+            "expected_plan_output": "/tmp/wing_readonly_preflight_plan.json",
+            "packet_type": "wing_readonly_preflight_handoff_packet",
+            "packet_status": "operator_hardware_step_required",
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_packet": False,
+            "readiness_matrix_update_allowed_by_packet": False,
+            "readiness_closure_allowed_by_packet": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "plan_output": "/tmp/wing_readonly_preflight_plan.json",
+            "channels": [3],
+            "value_types": ["fader", "gain"],
+            "command_names": [
+                "capture_readonly_preflight",
+                "focused_validation",
+                "preview_readonly_request_plan",
+                "review_artifact_and_write_pending_decision_template",
+                "review_edited_decision_json",
+            ],
+            "preview_command_uses_plan_only": True,
+            "capture_command_requires_physical_readback": True,
+            "review_command_writes_decision_template": True,
+            "required_review_checklist_ids": ["confirm_no_live_authority"],
+            "forbidden_live_request_types": ["apply_operator_proposal"],
+            "blockers_not_closed_by_packet": ["physical_console_readback_proof"],
+            "operator_sequence_count": 8,
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-07T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert wing_readonly_preflight_handoff_packet_artifact_summary([result]) == summary[
+        "wing_readonly_preflight_handoff_packet_artifact"
+    ]
+    artifact = json_summary["wing_readonly_preflight_handoff_packet_artifact"]
+    assert artifact["read_only"] is True
+    assert artifact["live_write"] is False
+    assert artifact["queries_console"] is False
+    assert artifact["executes_tests"] is False
+    assert artifact["execution_allowed_by_packet"] is False
+    assert artifact["readiness_matrix_update_allowed_by_packet"] is False
+    assert artifact["readiness_closure_allowed_by_packet"] is False
+    assert artifact["live_authority_granted"] is False
+    assert artifact["full_autonomous_ready"] is False
+    assert artifact["packet_status"] == "operator_hardware_step_required"
+    assert artifact["preview_command_uses_plan_only"] is True
+    assert artifact["capture_command_requires_physical_readback"] is True
+    assert artifact["review_command_writes_decision_template"] is True
+    assert artifact["operator_sequence_count"] == 8
+    assert artifact["violations"] == []
+    assert "## WING Read-Only Preflight Handoff Packet Artifact" in markdown_summary
+    assert "execution_allowed_by_packet: `false`" in markdown_summary
+    assert "preview_command_uses_plan_only: `true`" in markdown_summary
+    assert "capture_command_requires_physical_readback: `true`" in markdown_summary
+    assert "physical_console_readback_proof" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_read_surface_acceptance_template_artifact(
+    tmp_path,
+):
+    result = CheckResult(
+        name="read_surface_physical_readback_acceptance_template_artifact_schema",
+        status="passed",
+        started_at="2026-06-07T00:00:00Z",
+        finished_at="2026-06-07T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "template_path": "/tmp/read_surface_physical_readback_acceptance_template.json",
+            "template_type": "read_surface_physical_readback_fixture_acceptance_template",
+            "template_status": "operator_candidate_missing",
+            "source_queue_status": "operator_artifact_capture_required",
+            "selected_surface_id": None,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_template": False,
+            "fixture_closure_allowed_by_template": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "review_candidate_count": 0,
+            "template_record_count": 0,
+            "required_operator_edits": [
+                "decision",
+                "reviewed_by",
+                "reviewed_at",
+                "review_notes",
+            ],
+            "operator_sequence_count": 5,
+            "blocked_by": ["operator_must_capture_missing_physical_readback_artifacts"],
+            "record_unsafe_flags": [],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-07T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert read_surface_physical_readback_acceptance_template_artifact_summary(
+        [result]
+    ) == summary["read_surface_physical_readback_acceptance_template_artifact"]
+    artifact = json_summary[
+        "read_surface_physical_readback_acceptance_template_artifact"
+    ]
+    assert artifact["read_only"] is True
+    assert artifact["live_write"] is False
+    assert artifact["queries_console"] is False
+    assert artifact["executes_tests"] is False
+    assert artifact["operator_required"] is True
+    assert artifact["execution_allowed_by_template"] is False
+    assert artifact["fixture_closure_allowed_by_template"] is False
+    assert artifact["live_authority_granted"] is False
+    assert artifact["full_autonomous_ready"] is False
+    assert artifact["template_status"] == "operator_candidate_missing"
+    assert artifact["template_record_count"] == 0
+    assert artifact["required_operator_edits"] == [
+        "decision",
+        "reviewed_by",
+        "reviewed_at",
+        "review_notes",
+    ]
+    assert artifact["record_unsafe_flags"] == []
+    assert artifact["violations"] == []
+    assert (
+        "## Read Surface Physical Readback Acceptance Template Artifact"
+        in markdown_summary
+    )
+    assert "execution_allowed_by_template: `false`" in markdown_summary
+    assert "fixture_closure_allowed_by_template: `false`" in markdown_summary
+    assert "operator_must_capture_missing_physical_readback_artifacts" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(

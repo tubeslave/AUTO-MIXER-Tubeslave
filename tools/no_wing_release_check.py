@@ -824,6 +824,8 @@ def build_checks(
                 WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
                 "--plan-output",
                 str(wing_readonly_plan_output),
+                "--format",
+                "json",
                 "--output",
                 str(handoff_packet_output),
                 "--quiet",
@@ -947,7 +949,10 @@ def gain_proof_artifact_root_for_run(run_dir: Path | None) -> Path:
 
 
 def wing_readonly_preflight_handoff_packet_path_for_run(run_dir: Path | None) -> Path:
-    return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "wing_readonly_preflight_handoff_packet.md"
+    return (
+        (run_dir or DEFAULT_ARTIFACT_ROOT / "pending")
+        / "wing_readonly_preflight_handoff_packet.json"
+    )
 
 
 def validate_no_live_commands(checks: Iterable[CommandCheck]) -> None:
@@ -2232,6 +2237,398 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     finished = datetime.now(timezone.utc)
     return CheckResult(
         name="wing_readonly_preflight_plan_artifact_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+    packet_path: Path,
+    *,
+    plan_path: Path | None = None,
+) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    expected_plan_path = plan_path or wing_readonly_preflight_plan_path_for_run(
+        packet_path.parent
+    )
+    detail: dict[str, object] = {
+        "policy": "wing_readonly_preflight_handoff_packet_is_readonly_operator_gate",
+        "packet_path": str(packet_path),
+        "expected_plan_output": str(expected_plan_path),
+    }
+    violations: list[str] = []
+
+    payload, load_error = _json_object_from_path(packet_path)
+    packet = payload or {}
+    commands = packet.get("commands") if isinstance(packet.get("commands"), Mapping) else {}
+    operator_sequence = (
+        packet.get("operator_sequence")
+        if isinstance(packet.get("operator_sequence"), list)
+        else []
+    )
+    required_checklist = (
+        packet.get("required_review_checklist_ids")
+        if isinstance(packet.get("required_review_checklist_ids"), list)
+        else []
+    )
+    blockers = (
+        packet.get("blockers_not_closed_by_packet")
+        if isinstance(packet.get("blockers_not_closed_by_packet"), list)
+        else []
+    )
+    forbidden_request_types = (
+        packet.get("forbidden_live_request_types")
+        if isinstance(packet.get("forbidden_live_request_types"), list)
+        else []
+    )
+    expected_preview_command = [
+        "python3",
+        WING_READONLY_PREFLIGHT_RUNNER_TOOL,
+        "--url",
+        WING_READONLY_PREFLIGHT_RUNNER_URL,
+        "--channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--value-types",
+        WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        "--require-physical-readback",
+        "--artifact-root",
+        WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+        "--plan-only",
+        "--plan-output",
+        str(expected_plan_path),
+    ]
+    expected_commands = {
+        "preview_readonly_request_plan": expected_preview_command,
+        "capture_readonly_preflight": wing_readonly_preflight_capture_command_template(),
+        "review_artifact_and_write_pending_decision_template": (
+            wing_readonly_preflight_review_command()
+        ),
+        "review_edited_decision_json": wing_readonly_preflight_review_decision_command(),
+    }
+
+    if load_error:
+        violations.append(f"wing_readonly_preflight_handoff_packet_{load_error}")
+
+    if packet.get("type") != "wing_readonly_preflight_handoff_packet":
+        violations.append("wing_readonly_preflight_handoff_packet_type_mismatch")
+    if packet.get("status") != "operator_hardware_step_required":
+        violations.append("wing_readonly_preflight_handoff_packet_status_mismatch")
+    if packet.get("plan_output") != str(expected_plan_path):
+        violations.append("wing_readonly_preflight_handoff_packet_plan_output_mismatch")
+    if packet.get("artifact_root") != WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT:
+        violations.append("wing_readonly_preflight_handoff_packet_artifact_root_mismatch")
+    if packet.get("decision_root") != WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT:
+        violations.append("wing_readonly_preflight_handoff_packet_decision_root_mismatch")
+    if packet.get("channels") != _csv_ints(WING_READONLY_PREFLIGHT_RUNNER_CHANNELS):
+        violations.append("wing_readonly_preflight_handoff_packet_channels_mismatch")
+    if packet.get("value_types") != _csv_strings(WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES):
+        violations.append("wing_readonly_preflight_handoff_packet_value_types_mismatch")
+    if packet.get("expected_run_artifact_glob") != (
+        f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/<run_id>/summary.json"
+    ):
+        violations.append("wing_readonly_preflight_handoff_packet_summary_glob_mismatch")
+    if packet.get("expected_event_log_glob") != (
+        f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/<run_id>/events.jsonl"
+    ):
+        violations.append("wing_readonly_preflight_handoff_packet_events_glob_mismatch")
+
+    for key in ("read_only", "operator_required"):
+        if packet.get(key) is not True:
+            violations.append(f"wing_readonly_preflight_handoff_packet_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_packet",
+        "readiness_matrix_update_allowed_by_packet",
+        "readiness_closure_allowed_by_packet",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        if packet.get(key) is not False:
+            violations.append(f"wing_readonly_preflight_handoff_packet_{key}_not_false")
+
+    for command_name, expected_command in expected_commands.items():
+        if commands.get(command_name) != expected_command:
+            violations.append(
+                f"wing_readonly_preflight_handoff_packet_{command_name}_mismatch"
+            )
+    focused_validation = commands.get("focused_validation")
+    if not isinstance(focused_validation, list) or "tests/test_no_wing_release_check.py" not in focused_validation:
+        violations.append("wing_readonly_preflight_handoff_packet_focused_validation_missing")
+    if "--plan-only" not in commands.get("preview_readonly_request_plan", []):
+        violations.append("wing_readonly_preflight_handoff_packet_preview_plan_only_missing")
+    if "--require-physical-readback" not in commands.get("capture_readonly_preflight", []):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_capture_physical_readback_missing"
+        )
+    if "--decision-template-output" not in commands.get(
+        "review_artifact_and_write_pending_decision_template", []
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_decision_template_output_missing"
+        )
+
+    if required_checklist != list(WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS):
+        violations.append("wing_readonly_preflight_handoff_packet_checklist_mismatch")
+    for required_blocker in (
+        "wing_readonly_connection_proof",
+        "physical_console_readback_proof",
+        "readiness_matrix_update_based_on_real_proof",
+    ):
+        if required_blocker not in blockers:
+            violations.append(
+                f"wing_readonly_preflight_handoff_packet_blocker_{required_blocker}_missing"
+            )
+    for required_forbidden in (
+        "apply_operator_proposal",
+        "rollback_last_manual_write",
+        "emergency_stop",
+        "set_operator_mode",
+    ):
+        if required_forbidden not in forbidden_request_types:
+            violations.append(
+                "wing_readonly_preflight_handoff_packet_forbidden_"
+                f"{required_forbidden}_missing"
+            )
+    if len(operator_sequence) < 8:
+        violations.append("wing_readonly_preflight_handoff_packet_operator_sequence_short")
+    if packet.get("next_manual_artifact_required") != (
+        "real wing_readonly_preflight.v1 summary.json"
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_next_manual_artifact_mismatch"
+        )
+
+    detail["packet_type"] = packet.get("type")
+    detail["packet_status"] = packet.get("status")
+    detail["read_only"] = packet.get("read_only")
+    detail["live_write"] = packet.get("live_write")
+    detail["mutates_console_state"] = packet.get("mutates_console_state")
+    detail["queries_console"] = packet.get("queries_console")
+    detail["executes_tests"] = packet.get("executes_tests")
+    detail["operator_required"] = packet.get("operator_required")
+    detail["execution_allowed_by_packet"] = packet.get("execution_allowed_by_packet")
+    detail["readiness_matrix_update_allowed_by_packet"] = packet.get(
+        "readiness_matrix_update_allowed_by_packet"
+    )
+    detail["readiness_closure_allowed_by_packet"] = packet.get(
+        "readiness_closure_allowed_by_packet"
+    )
+    detail["live_authority_granted"] = packet.get("live_authority_granted")
+    detail["full_autonomous_ready"] = packet.get("full_autonomous_ready")
+    detail["plan_output"] = packet.get("plan_output")
+    detail["channels"] = packet.get("channels") if isinstance(packet.get("channels"), list) else []
+    detail["value_types"] = (
+        packet.get("value_types") if isinstance(packet.get("value_types"), list) else []
+    )
+    detail["command_names"] = sorted(commands)
+    detail["preview_command_uses_plan_only"] = (
+        "--plan-only" in commands.get("preview_readonly_request_plan", [])
+    )
+    detail["capture_command_requires_physical_readback"] = (
+        "--require-physical-readback" in commands.get("capture_readonly_preflight", [])
+    )
+    detail["review_command_writes_decision_template"] = (
+        "--decision-template-output"
+        in commands.get("review_artifact_and_write_pending_decision_template", [])
+    )
+    detail["required_review_checklist_ids"] = list(required_checklist)
+    detail["forbidden_live_request_types"] = list(forbidden_request_types)
+    detail["blockers_not_closed_by_packet"] = list(blockers)
+    detail["operator_sequence_count"] = len(operator_sequence)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="wing_readonly_preflight_handoff_packet_artifact_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def validate_read_surface_physical_readback_acceptance_template_artifact_snapshot(
+    template_path: Path,
+) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "read_surface_physical_readback_acceptance_template_artifact_is_readonly_operator_gate",
+        "template_path": str(template_path),
+    }
+    violations: list[str] = []
+
+    payload, load_error = _json_object_from_path(template_path)
+    template = payload or {}
+    records = (
+        template.get("template_records")
+        if isinstance(template.get("template_records"), list)
+        else []
+    )
+    required_edits = (
+        template.get("required_operator_edits")
+        if isinstance(template.get("required_operator_edits"), list)
+        else []
+    )
+    blocked_by = (
+        template.get("blocked_by")
+        if isinstance(template.get("blocked_by"), list)
+        else []
+    )
+    operator_sequence = (
+        template.get("operator_sequence")
+        if isinstance(template.get("operator_sequence"), list)
+        else []
+    )
+    commands = (
+        template.get("commands") if isinstance(template.get("commands"), Mapping) else {}
+    )
+
+    if load_error:
+        violations.append(
+            f"read_surface_physical_readback_acceptance_template_artifact_{load_error}"
+        )
+    if template.get("type") != "read_surface_physical_readback_fixture_acceptance_template":
+        violations.append("acceptance_template_artifact_type_mismatch")
+    if template.get("status") not in (
+        "operator_candidate_missing",
+        "operator_acceptance_template_ready",
+    ):
+        violations.append("acceptance_template_artifact_status_unknown")
+    if not isinstance(template.get("source_queue_status"), str):
+        violations.append("acceptance_template_artifact_source_queue_status_missing")
+
+    for key in ("read_only", "operator_required"):
+        if template.get(key) is not True:
+            violations.append(f"acceptance_template_artifact_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_template",
+        "fixture_closure_allowed_by_template",
+        "live_widening_allowed",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        if template.get(key) is not False:
+            violations.append(f"acceptance_template_artifact_{key}_not_false")
+
+    review_candidate_count = template.get("review_candidate_count")
+    template_record_count = template.get("template_record_count")
+    if not isinstance(review_candidate_count, int):
+        violations.append("acceptance_template_artifact_review_candidate_count_missing")
+        review_candidate_count = 0
+    if not isinstance(template_record_count, int) or template_record_count != len(records):
+        violations.append("acceptance_template_artifact_record_count_mismatch")
+        template_record_count = len(records)
+    if template.get("status") == "operator_candidate_missing" and template_record_count != 0:
+        violations.append("acceptance_template_artifact_missing_status_has_records")
+    if template.get("status") == "operator_acceptance_template_ready" and template_record_count < 1:
+        violations.append("acceptance_template_artifact_ready_status_has_no_records")
+    for required_edit in ("decision", "reviewed_by", "reviewed_at", "review_notes"):
+        if required_edit not in required_edits:
+            violations.append(
+                f"acceptance_template_artifact_required_edit_{required_edit}_missing"
+            )
+    if len(operator_sequence) < 5:
+        violations.append("acceptance_template_artifact_operator_sequence_short")
+    focused_validation = commands.get("focused_validation")
+    if not isinstance(focused_validation, list) or (
+        "tests/test_read_surface_physical_readback_fixture_acceptance_ledger.py"
+        not in focused_validation
+    ):
+        violations.append("acceptance_template_artifact_focused_validation_missing")
+
+    record_unsafe_flags: list[str] = []
+    for index, record in enumerate(records):
+        if not isinstance(record, Mapping):
+            violations.append(f"acceptance_template_artifact_record_{index}_not_object")
+            continue
+        for key in (
+            "review_id",
+            "surface_id",
+            "artifact_source_id",
+            "required_contract_method_id",
+        ):
+            if not isinstance(record.get(key), str) or not record.get(key):
+                violations.append(
+                    f"acceptance_template_artifact_record_{index}_{key}_missing"
+                )
+        if record.get("decision") != "<accepted|rejected>":
+            violations.append(
+                f"acceptance_template_artifact_record_{index}_decision_not_pending"
+            )
+        if record.get("reviewed_by") != "<operator-name>":
+            violations.append(
+                f"acceptance_template_artifact_record_{index}_reviewed_by_not_pending"
+            )
+        reviewed_at = record.get("reviewed_at")
+        if not isinstance(reviewed_at, str) or not reviewed_at.startswith(
+            "<UTC ISO timestamp"
+        ):
+            violations.append(
+                f"acceptance_template_artifact_record_{index}_reviewed_at_not_pending"
+            )
+        for key in (
+            "live_write",
+            "mutates_console_state",
+            "queries_console",
+            "executes_tests",
+            "execution_allowed_by_acceptance",
+            "fixture_closure_allowed_by_acceptance",
+            "fixture_closure_allowed",
+            "live_widening_allowed",
+            "live_authority_granted",
+            "full_autonomous_ready",
+        ):
+            if record.get(key) is not False:
+                flag = f"record_{index}_{key}"
+                record_unsafe_flags.append(flag)
+                violations.append(
+                    f"acceptance_template_artifact_{flag}_not_false"
+                )
+
+    if not blocked_by:
+        violations.append("acceptance_template_artifact_blocked_by_missing")
+
+    detail["template_type"] = template.get("type")
+    detail["template_status"] = template.get("status")
+    detail["source_queue_status"] = template.get("source_queue_status")
+    detail["selected_surface_id"] = template.get("selected_surface_id")
+    detail["read_only"] = template.get("read_only")
+    detail["live_write"] = template.get("live_write")
+    detail["mutates_console_state"] = template.get("mutates_console_state")
+    detail["queries_console"] = template.get("queries_console")
+    detail["executes_tests"] = template.get("executes_tests")
+    detail["operator_required"] = template.get("operator_required")
+    detail["execution_allowed_by_template"] = template.get(
+        "execution_allowed_by_template"
+    )
+    detail["fixture_closure_allowed_by_template"] = template.get(
+        "fixture_closure_allowed_by_template"
+    )
+    detail["live_widening_allowed"] = template.get("live_widening_allowed")
+    detail["live_authority_granted"] = template.get("live_authority_granted")
+    detail["full_autonomous_ready"] = template.get("full_autonomous_ready")
+    detail["review_candidate_count"] = review_candidate_count
+    detail["template_record_count"] = template_record_count
+    detail["required_operator_edits"] = list(required_edits)
+    detail["operator_sequence_count"] = len(operator_sequence)
+    detail["blocked_by"] = list(blocked_by)
+    detail["record_unsafe_flags"] = record_unsafe_flags
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="read_surface_physical_readback_acceptance_template_artifact_schema",
         status="passed" if not violations else "failed",
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -7573,6 +7970,71 @@ def wing_readonly_preflight_plan_artifact_summary(
     return None
 
 
+def wing_readonly_preflight_handoff_packet_artifact_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "wing_readonly_preflight_handoff_packet_artifact_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        violations = detail.get("violations")
+        command_names = detail.get("command_names")
+        checklist_ids = detail.get("required_review_checklist_ids")
+        forbidden_types = detail.get("forbidden_live_request_types")
+        blockers = detail.get("blockers_not_closed_by_packet")
+        return {
+            "status": result.status,
+            "read_only": detail.get("read_only") is True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": detail.get("operator_required") is True,
+            "execution_allowed_by_packet": False,
+            "readiness_matrix_update_allowed_by_packet": False,
+            "readiness_closure_allowed_by_packet": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "packet_path": detail.get("packet_path"),
+            "packet_type": detail.get("packet_type"),
+            "packet_status": detail.get("packet_status"),
+            "plan_output": detail.get("plan_output"),
+            "expected_plan_output": detail.get("expected_plan_output"),
+            "channels": (
+                list(detail.get("channels"))
+                if isinstance(detail.get("channels"), list)
+                else []
+            ),
+            "value_types": (
+                list(detail.get("value_types"))
+                if isinstance(detail.get("value_types"), list)
+                else []
+            ),
+            "command_names": list(command_names) if isinstance(command_names, list) else [],
+            "preview_command_uses_plan_only": (
+                detail.get("preview_command_uses_plan_only") is True
+            ),
+            "capture_command_requires_physical_readback": (
+                detail.get("capture_command_requires_physical_readback") is True
+            ),
+            "review_command_writes_decision_template": (
+                detail.get("review_command_writes_decision_template") is True
+            ),
+            "required_review_checklist_ids": (
+                list(checklist_ids) if isinstance(checklist_ids, list) else []
+            ),
+            "forbidden_live_request_types": (
+                list(forbidden_types) if isinstance(forbidden_types, list) else []
+            ),
+            "blockers_not_closed_by_packet": (
+                list(blockers) if isinstance(blockers, list) else []
+            ),
+            "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def wing_readonly_preflight_review_decision_summary(
     results: Sequence[CheckResult],
 ) -> dict[str, object] | None:
@@ -9519,6 +9981,53 @@ def read_surface_physical_readback_artifact_review_queue_summary(
     return None
 
 
+def read_surface_physical_readback_acceptance_template_artifact_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if (
+            result.name
+            != "read_surface_physical_readback_acceptance_template_artifact_schema"
+        ):
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        required_edits = detail.get("required_operator_edits")
+        blocked_by = detail.get("blocked_by")
+        unsafe_flags = detail.get("record_unsafe_flags")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": detail.get("read_only") is True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": detail.get("operator_required") is True,
+            "execution_allowed_by_template": False,
+            "fixture_closure_allowed_by_template": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "template_path": detail.get("template_path"),
+            "template_type": detail.get("template_type"),
+            "template_status": detail.get("template_status"),
+            "source_queue_status": detail.get("source_queue_status"),
+            "selected_surface_id": detail.get("selected_surface_id"),
+            "review_candidate_count": int(detail.get("review_candidate_count") or 0),
+            "template_record_count": int(detail.get("template_record_count") or 0),
+            "required_operator_edits": (
+                list(required_edits) if isinstance(required_edits, list) else []
+            ),
+            "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "record_unsafe_flags": (
+                list(unsafe_flags) if isinstance(unsafe_flags, list) else []
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def read_surface_physical_readback_fixture_acceptance_ledger_summary(
     results: Sequence[CheckResult],
 ) -> dict[str, object] | None:
@@ -9734,6 +10243,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     wing_readonly_preflight_plan_artifact = (
         wing_readonly_preflight_plan_artifact_summary(results)
     )
+    wing_readonly_preflight_handoff_packet_artifact = (
+        wing_readonly_preflight_handoff_packet_artifact_summary(results)
+    )
     wing_readonly_preflight_review_decision = (
         wing_readonly_preflight_review_decision_summary(results)
     )
@@ -9759,6 +10271,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     dlive_state_intake = dlive_state_readback_artifact_intake_summary(results)
     artifact_review_queue = read_surface_physical_readback_artifact_review_queue_summary(
         results
+    )
+    acceptance_template_artifact = (
+        read_surface_physical_readback_acceptance_template_artifact_summary(results)
     )
     fixture_acceptance_ledger = (
         read_surface_physical_readback_fixture_acceptance_ledger_summary(results)
@@ -9793,6 +10308,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     if wing_readonly_preflight_plan_artifact is not None:
         summary["wing_readonly_preflight_plan_artifact"] = (
             wing_readonly_preflight_plan_artifact
+        )
+    if wing_readonly_preflight_handoff_packet_artifact is not None:
+        summary["wing_readonly_preflight_handoff_packet_artifact"] = (
+            wing_readonly_preflight_handoff_packet_artifact
         )
     if wing_readonly_preflight_review_decision is not None:
         summary["wing_readonly_preflight_review_decision_ledger"] = (
@@ -9849,6 +10368,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     if artifact_review_queue is not None:
         summary["read_surface_physical_readback_artifact_review_queue"] = (
             artifact_review_queue
+        )
+    if acceptance_template_artifact is not None:
+        summary["read_surface_physical_readback_acceptance_template_artifact"] = (
+            acceptance_template_artifact
         )
     if fixture_acceptance_ledger is not None:
         summary["read_surface_physical_readback_fixture_acceptance_ledger"] = (
@@ -10147,6 +10670,54 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 "- forbidden_request_types: "
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['forbidden_request_types'])}`",
                 f"- violations: `{json.dumps(wing_readonly_preflight_plan_artifact['violations'])}`",
+            ]
+        )
+    if wing_readonly_preflight_handoff_packet_artifact is not None:
+        lines.extend(
+            [
+                "",
+                "## WING Read-Only Preflight Handoff Packet Artifact",
+                "",
+                "- schema_check: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['status']}`",
+                "- read_only: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['read_only']).lower()}`",
+                "- live_write: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['live_write']).lower()}`",
+                "- queries_console: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['queries_console']).lower()}`",
+                "- executes_tests: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['executes_tests']).lower()}`",
+                "- execution_allowed_by_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['execution_allowed_by_packet']).lower()}`",
+                "- readiness_matrix_update_allowed_by_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['readiness_matrix_update_allowed_by_packet']).lower()}`",
+                "- readiness_closure_allowed_by_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['readiness_closure_allowed_by_packet']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['live_authority_granted']).lower()}`",
+                "- full_autonomous_ready: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['full_autonomous_ready']).lower()}`",
+                "- packet_path: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['packet_path']}`",
+                "- packet_status: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['packet_status']}`",
+                "- plan_output: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['plan_output']}`",
+                "- command_names: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['command_names'])}`",
+                "- preview_command_uses_plan_only: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['preview_command_uses_plan_only']).lower()}`",
+                "- capture_command_requires_physical_readback: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['capture_command_requires_physical_readback']).lower()}`",
+                "- review_command_writes_decision_template: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_command_writes_decision_template']).lower()}`",
+                "- blockers_not_closed_by_packet: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['blockers_not_closed_by_packet'])}`",
+                "- operator_sequence_count: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_count']}`",
+                "- violations: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['violations'])}`",
             ]
         )
     if wing_readonly_preflight_review_decision is not None:
@@ -11404,6 +11975,49 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(artifact_review_queue['violations'])}`",
             ]
         )
+    if acceptance_template_artifact is not None:
+        lines.extend(
+            [
+                "",
+                "## Read Surface Physical Readback Acceptance Template Artifact",
+                "",
+                f"- schema_check: `{acceptance_template_artifact['status']}`",
+                f"- read_only: `{str(acceptance_template_artifact['read_only']).lower()}`",
+                f"- live_write: `{str(acceptance_template_artifact['live_write']).lower()}`",
+                "- mutates_console_state: "
+                f"`{str(acceptance_template_artifact['mutates_console_state']).lower()}`",
+                "- queries_console: "
+                f"`{str(acceptance_template_artifact['queries_console']).lower()}`",
+                "- executes_tests: "
+                f"`{str(acceptance_template_artifact['executes_tests']).lower()}`",
+                "- operator_required: "
+                f"`{str(acceptance_template_artifact['operator_required']).lower()}`",
+                "- execution_allowed_by_template: "
+                f"`{str(acceptance_template_artifact['execution_allowed_by_template']).lower()}`",
+                "- fixture_closure_allowed_by_template: "
+                f"`{str(acceptance_template_artifact['fixture_closure_allowed_by_template']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(acceptance_template_artifact['live_authority_granted']).lower()}`",
+                "- full_autonomous_ready: "
+                f"`{str(acceptance_template_artifact['full_autonomous_ready']).lower()}`",
+                f"- template_path: `{acceptance_template_artifact['template_path']}`",
+                f"- template_status: `{acceptance_template_artifact['template_status']}`",
+                "- source_queue_status: "
+                f"`{acceptance_template_artifact['source_queue_status']}`",
+                "- review_candidate_count: "
+                f"`{acceptance_template_artifact['review_candidate_count']}`",
+                "- template_record_count: "
+                f"`{acceptance_template_artifact['template_record_count']}`",
+                "- required_operator_edits: "
+                f"`{json.dumps(acceptance_template_artifact['required_operator_edits'])}`",
+                "- operator_sequence_count: "
+                f"`{acceptance_template_artifact['operator_sequence_count']}`",
+                f"- blocked_by: `{json.dumps(acceptance_template_artifact['blocked_by'])}`",
+                "- record_unsafe_flags: "
+                f"`{json.dumps(acceptance_template_artifact['record_unsafe_flags'])}`",
+                f"- violations: `{json.dumps(acceptance_template_artifact['violations'])}`",
+            ]
+        )
     if fixture_acceptance_ledger is not None:
         lines.extend(
             [
@@ -11622,6 +12236,33 @@ def run_release_checks(
             )
             results.append(plan_artifact_result)
             if plan_artifact_result.status != "passed" and not continue_on_failure:
+                break
+        if (
+            check.name == "wing_readonly_preflight_handoff_packet"
+            and result.status == "passed"
+        ):
+            handoff_artifact_result = (
+                validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+                    wing_readonly_preflight_handoff_packet_path_for_run(run_dir),
+                    plan_path=wing_readonly_preflight_plan_path_for_run(run_dir),
+                )
+            )
+            results.append(handoff_artifact_result)
+            if handoff_artifact_result.status != "passed" and not continue_on_failure:
+                break
+        if (
+            check.name == "read_surface_physical_readback_acceptance_template"
+            and result.status == "passed"
+        ):
+            acceptance_template_result = (
+                validate_read_surface_physical_readback_acceptance_template_artifact_snapshot(
+                    read_surface_physical_readback_acceptance_template_path_for_run(
+                        run_dir
+                    )
+                )
+            )
+            results.append(acceptance_template_result)
+            if acceptance_template_result.status != "passed" and not continue_on_failure:
                 break
         if check.name == "read_surface_fixture_evidence" and result.status == "passed":
             read_fixture_result = validate_read_surface_fixture_evidence_snapshot()
