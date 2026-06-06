@@ -532,7 +532,10 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "artifacts/wing_readonly_preflight",
         "--output",
         "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+        "--decision-template-output",
+        "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json",
     ]
+    assert result.detail["review_command_writes_decision_template"] is True
     assert result.detail["review_exit_codes"] == {
         "candidate_ready": 0,
         "artifact_missing": 2,
@@ -546,6 +549,18 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "confirm_no_live_authority",
     ]
     assert result.detail["review_manual_checklist_complete"] is True
+    assert result.detail["review_decision_template_required_fields"] == [
+        "review_id",
+        "artifact_source_id",
+        "run_id",
+        "summary_path",
+        "events_path",
+        "decision",
+        "reviewed_by",
+        "reviewed_at",
+        "checklist_ids",
+    ]
+    assert result.detail["review_decision_template_contract_complete"] is True
     assert result.detail["blocked_by"] == [
         "operator_must_run_wing_readonly_preflight_runner"
     ]
@@ -655,6 +670,32 @@ def test_no_wing_release_check_rejects_missing_wing_preflight_review_tool(
     assert "wing_readonly_preflight_review_tool_missing" in result.detail["violations"]
 
 
+def test_no_wing_release_check_rejects_review_command_without_decision_template_output(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_review_command",
+        lambda: [
+            "python3",
+            "tools/review_wing_readonly_preflight_artifacts.py",
+            "--artifact-root",
+            "artifacts/wing_readonly_preflight",
+            "--output",
+            "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+        ],
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["review_command_writes_decision_template"] is False
+    assert (
+        "wing_readonly_preflight_review_decision_template_output_missing"
+        in result.detail["violations"]
+    )
+
+
 def test_no_wing_release_check_reads_review_checklist_from_exported_tool_behavior(
     monkeypatch,
     tmp_path: Path,
@@ -685,8 +726,14 @@ def test_no_wing_release_check_reads_review_checklist_from_exported_tool_behavio
     assert result.detail["review_tool_available"] is True
     assert result.detail["review_manual_checklist_ids"] == ["confirm_artifact_paths"]
     assert result.detail["review_manual_checklist_complete"] is False
+    assert result.detail["review_decision_template_required_fields"] == []
+    assert result.detail["review_decision_template_contract_complete"] is False
     assert (
         "wing_readonly_preflight_review_manual_checklist_incomplete"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_template_contract_incomplete"
         in result.detail["violations"]
     )
 
@@ -707,6 +754,29 @@ def test_no_wing_release_check_rejects_incomplete_wing_preflight_review_checklis
     assert result.detail["review_manual_checklist_complete"] is False
     assert (
         "wing_readonly_preflight_review_manual_checklist_incomplete"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_incomplete_wing_preflight_decision_template_contract(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_review_decision_template_required_fields",
+        lambda: ["review_id", "artifact_source_id"],
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["review_decision_template_required_fields"] == [
+        "review_id",
+        "artifact_source_id",
+    ]
+    assert result.detail["review_decision_template_contract_complete"] is False
+    assert (
+        "wing_readonly_preflight_review_decision_template_contract_incomplete"
         in result.detail["violations"]
     )
 
@@ -801,6 +871,26 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
         == "wing_readonly_preflight_review_decision_is_readonly_operator_gate"
     )
     assert result.detail["ledger_status"] == "operator_review_required"
+    assert result.detail["review_tool_path"] == (
+        "tools/review_wing_readonly_preflight_decisions.py"
+    )
+    assert result.detail["review_tool_available"] is True
+    assert result.detail["review_command"] == [
+        "python3",
+        "tools/review_wing_readonly_preflight_decisions.py",
+        "--artifact-root",
+        "artifacts/wing_readonly_preflight",
+        "--decision-root",
+        "artifacts/wing_readonly_preflight_review_decisions",
+        "--output",
+        "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
+    ]
+    assert result.detail["review_exit_codes"] == {
+        "accepted_decision_ready": 0,
+        "preflight_candidate_missing": 2,
+        "decision_missing_or_invalid": 3,
+        "candidate_rejected": 4,
+    }
     assert result.detail["preflight_evidence_status"] == "operator_preflight_required"
     assert result.detail["decision_search_roots"] == [
         "artifacts/wing_readonly_preflight_review_decisions"
@@ -818,6 +908,31 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
     assert result.detail["live_authority_granted"] is False
     assert result.detail["full_autonomous_ready"] is False
     assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_missing_wing_preflight_decision_review_tool(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_REVIEW_DECISION_TOOL",
+        "tools/missing_wing_readonly_preflight_decisions.py",
+    )
+
+    result = validate_wing_readonly_preflight_review_decision_ledger_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["review_tool_available"] is False
+    assert result.detail["review_tool_path"] == (
+        "tools/missing_wing_readonly_preflight_decisions.py"
+    )
+    assert result.detail["review_command"][1] == (
+        "tools/missing_wing_readonly_preflight_decisions.py"
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_tool_missing"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_validates_raw_mixer_readback_contract_snapshot():
@@ -2565,7 +2680,9 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     )
     assert "tests/test_dlive_state_physical_readback_contract.py" in fixture_check.command
     assert "tests/test_wing_readonly_preflight_evidence.py" in fixture_check.command
+    assert "tests/test_wing_readonly_preflight_review_tool.py" in fixture_check.command
     assert "tests/test_wing_readonly_preflight_review_decision.py" in fixture_check.command
+    assert "tests/test_wing_readonly_preflight_review_decision_tool.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command
@@ -4272,7 +4389,10 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "artifacts/wing_readonly_preflight",
                 "--output",
                 "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+                "--decision-template-output",
+                "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json",
             ],
+            "review_command_writes_decision_template": True,
             "review_exit_codes": {
                 "candidate_ready": 0,
                 "artifact_missing": 2,
@@ -4286,6 +4406,18 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "confirm_no_live_authority",
             ],
             "review_manual_checklist_complete": True,
+            "review_decision_template_required_fields": [
+                "review_id",
+                "artifact_source_id",
+                "run_id",
+                "summary_path",
+                "events_path",
+                "decision",
+                "reviewed_by",
+                "reviewed_at",
+                "checklist_ids",
+            ],
+            "review_decision_template_contract_complete": True,
             "blocked_by": [
                 "operator_must_run_wing_readonly_preflight_runner"
             ],
@@ -4335,6 +4467,8 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["review_command"][1] == (
         "tools/review_wing_readonly_preflight_artifacts.py"
     )
+    assert "--decision-template-output" in preflight["review_command"]
+    assert preflight["review_command_writes_decision_template"] is True
     assert preflight["review_exit_codes"] == {
         "candidate_ready": 0,
         "artifact_missing": 2,
@@ -4348,6 +4482,18 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         "confirm_no_live_authority",
     ]
     assert preflight["review_manual_checklist_complete"] is True
+    assert preflight["review_decision_template_required_fields"] == [
+        "review_id",
+        "artifact_source_id",
+        "run_id",
+        "summary_path",
+        "events_path",
+        "decision",
+        "reviewed_by",
+        "reviewed_at",
+        "checklist_ids",
+    ]
+    assert preflight["review_decision_template_contract_complete"] is True
     assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
     assert "## WING Read-Only Preflight Evidence" in markdown_summary
     assert "readiness_closure_allowed_by_evidence: `false`" in markdown_summary
@@ -4364,9 +4510,13 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         in markdown_summary
     )
     assert "WING_READONLY_PREFLIGHT_REVIEW_LATEST.md" in markdown_summary
+    assert "pending_review_decision_template.json" in markdown_summary
     assert '"invalid_artifact": 3' in markdown_summary
+    assert "review_command_writes_decision_template: `true`" in markdown_summary
     assert "review_manual_checklist_complete: `true`" in markdown_summary
     assert "confirm_event_log_readonly_sequence" in markdown_summary
+    assert "review_decision_template_contract_complete: `true`" in markdown_summary
+    assert "artifact_source_id" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
@@ -4380,6 +4530,24 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
         duration_sec=1.0,
         detail={
             "ledger_status": "operator_review_required",
+            "review_tool_path": "tools/review_wing_readonly_preflight_decisions.py",
+            "review_tool_available": True,
+            "review_command": [
+                "python3",
+                "tools/review_wing_readonly_preflight_decisions.py",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
+                "--decision-root",
+                "artifacts/wing_readonly_preflight_review_decisions",
+                "--output",
+                "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
+            ],
+            "review_exit_codes": {
+                "accepted_decision_ready": 0,
+                "preflight_candidate_missing": 2,
+                "decision_missing_or_invalid": 3,
+                "candidate_rejected": 4,
+            },
             "preflight_evidence_status": "operator_preflight_required",
             "decision_search_roots": [
                 "artifacts/wing_readonly_preflight_review_decisions"
@@ -4418,6 +4586,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
     assert decision["live_write"] is False
     assert decision["operator_required"] is True
     assert decision["ledger_status"] == "operator_review_required"
+    assert decision["review_tool_path"] == "tools/review_wing_readonly_preflight_decisions.py"
+    assert decision["review_tool_available"] is True
+    assert decision["review_command"][1] == "tools/review_wing_readonly_preflight_decisions.py"
+    assert decision["review_exit_codes"]["accepted_decision_ready"] == 0
     assert decision["decision_search_roots"] == [
         "artifacts/wing_readonly_preflight_review_decisions"
     ]
@@ -4428,6 +4600,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
     assert decision["full_autonomous_ready"] is False
     assert "## WING Read-Only Preflight Review Decision Ledger" in markdown_summary
     assert "readiness_matrix_update_allowed_by_decision: `false`" in markdown_summary
+    assert "WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md" in markdown_summary
+    assert "accepted_decision_ready" in markdown_summary
     assert "wing_readonly_preflight_review_decisions" in markdown_summary
     assert "manual_readiness_update_candidate_available: `false`" in markdown_summary
 

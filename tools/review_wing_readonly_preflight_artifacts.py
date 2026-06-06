@@ -21,9 +21,31 @@ from backend.wing_readonly_preflight_evidence import (  # noqa: E402
     DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS,
     build_wing_readonly_preflight_evidence,
 )
+from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
+    REQUIRED_REVIEW_CHECKLIST_IDS,
+    UNSAFE_DECISION_FLAGS,
+)
 
 
 DEFAULT_OUTPUT = REPO_ROOT / "artifacts" / "wing_readonly_preflight_review" / "latest_review.md"
+DEFAULT_DECISION_TEMPLATE_OUTPUT = (
+    REPO_ROOT
+    / "artifacts"
+    / "wing_readonly_preflight_review_decisions"
+    / "pending_review_decision_template.json"
+)
+REVIEW_DECISION_TEMPLATE_STATUS = "operator_must_replace_placeholders_before_ledger_acceptance"
+REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
+    "review_id",
+    "artifact_source_id",
+    "run_id",
+    "summary_path",
+    "events_path",
+    "decision",
+    "reviewed_by",
+    "reviewed_at",
+    "checklist_ids",
+)
 MANUAL_REVIEW_CHECKLIST = (
     {
         "id": "confirm_artifact_paths",
@@ -60,6 +82,10 @@ def manual_review_checklist() -> list[dict[str, str]]:
     return [dict(item) for item in MANUAL_REVIEW_CHECKLIST]
 
 
+def review_decision_template_required_fields() -> list[str]:
+    return list(REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS)
+
+
 def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for item in artifacts:
@@ -89,6 +115,64 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def _valid_artifact_review_rows(report: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    rows = (
+        report.get("artifact_reviews")
+        if isinstance(report.get("artifact_reviews"), list)
+        else []
+    )
+    return [
+        row
+        for row in rows
+        if isinstance(row, Mapping)
+        and row.get("status") == "valid_readonly_preflight_artifact"
+        and not row.get("violations")
+    ]
+
+
+def build_review_decision_template(
+    report: Mapping[str, Any],
+    *,
+    artifact_source_id: str | None = None,
+    generated_at: str | None = None,
+) -> dict[str, Any]:
+    if report.get("readiness_update_candidate_available") is not True:
+        raise ValueError("clean_readonly_preflight_candidate_required")
+    candidates = _valid_artifact_review_rows(report)
+    if artifact_source_id:
+        candidates = [
+            row
+            for row in candidates
+            if str(row.get("source_id") or "") == artifact_source_id
+        ]
+        if not candidates:
+            raise ValueError("decision_template_artifact_source_not_found")
+    elif len(candidates) != 1:
+        raise ValueError("decision_template_requires_single_candidate_or_source_id")
+    candidate = candidates[0]
+    source_id = str(candidate.get("source_id") or "")
+    run_id = str(candidate.get("run_id") or "")
+    summary_path = str(candidate.get("summary_path") or "")
+    events_path = str(candidate.get("events_path") or "")
+    if not source_id or not run_id or not summary_path or not events_path:
+        raise ValueError("decision_template_candidate_identity_incomplete")
+    template = {
+        "template_status": REVIEW_DECISION_TEMPLATE_STATUS,
+        "template_generated_at": generated_at or utc_now(),
+        "review_id": f"review-wing-readonly-{run_id}",
+        "artifact_source_id": source_id,
+        "run_id": run_id,
+        "summary_path": summary_path,
+        "events_path": events_path,
+        "decision": "pending_operator_decision",
+        "reviewed_by": "",
+        "reviewed_at": "",
+        "checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
+    }
+    template.update({flag: False for flag in UNSAFE_DECISION_FLAGS})
+    return template
 
 
 def build_review_report(
@@ -128,6 +212,9 @@ def build_review_report(
         "manual_review_required_before_readiness_update": True,
         "manual_review_decision_required": candidate_available,
         "manual_review_checklist": manual_review_checklist(),
+        "review_decision_template_available": candidate_available,
+        "review_decision_template_required_fields": review_decision_template_required_fields(),
+        "review_decision_template_status": REVIEW_DECISION_TEMPLATE_STATUS,
         "evidence_status": evidence.get("status"),
         "artifact_count": int(summary.get("artifact_count") or 0),
         "valid_candidate_count": valid_candidate_count,
@@ -184,6 +271,8 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"- full_autonomous_ready: `{str(report['full_autonomous_ready']).lower()}`",
         f"- manual_review_required_before_readiness_update: `{str(report['manual_review_required_before_readiness_update']).lower()}`",
         f"- manual_review_decision_required: `{str(report['manual_review_decision_required']).lower()}`",
+        f"- review_decision_template_available: `{str(report['review_decision_template_available']).lower()}`",
+        f"- review_decision_template_status: `{report['review_decision_template_status']}`",
         "",
         "## Manual Review Gate",
         "",
@@ -199,6 +288,18 @@ def render_markdown(report: Mapping[str, Any]) -> str:
             lines.append(f"- `{row.get('id')}`: {row.get('label')}")
     else:
         lines.append("- none")
+    lines.extend(["", "## Review Decision Template", ""])
+    lines.extend(
+        [
+            f"- available: `{str(report.get('review_decision_template_available') is True).lower()}`",
+            "- required_fields: "
+            f"`{json.dumps(report.get('review_decision_template_required_fields') or [])}`",
+        ]
+    )
+    if report.get("decision_template_output"):
+        lines.append(f"- output: `{report['decision_template_output']}`")
+    if report.get("decision_template_error"):
+        lines.append(f"- error: `{report['decision_template_error']}`")
     lines.extend(
         [
             "",
@@ -285,6 +386,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Exact summary.json path to review. May be passed multiple times.",
     )
+    parser.add_argument(
+        "--decision-template-output",
+        default=None,
+        help=(
+            "Optional JSON path for a pending operator decision template. The "
+            "template is intentionally invalid until the operator fills decision, "
+            "reviewed_by, and reviewed_at."
+        ),
+    )
+    parser.add_argument(
+        "--decision-artifact-source-id",
+        default=None,
+        help="Artifact source id to use when multiple clean preflight candidates exist.",
+    )
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--quiet", action="store_true")
@@ -296,6 +411,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     roots = tuple(args.artifact_root) or DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS
     paths = tuple(args.artifact_path) or None
     report = build_review_report(artifact_roots=roots, artifact_paths=paths)
+    template_error: str | None = None
+    if args.decision_template_output:
+        try:
+            template = build_review_decision_template(
+                report,
+                artifact_source_id=args.decision_artifact_source_id,
+            )
+            template_output = Path(args.decision_template_output)
+            write_output(
+                template_output,
+                json.dumps(template, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            )
+            report["decision_template_output"] = str(template_output)
+        except ValueError as exc:
+            template_error = str(exc)
+            report["decision_template_error"] = template_error
     text = (
         json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
         if args.format == "json"
@@ -304,6 +435,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     write_output(Path(args.output), text)
     if not args.quiet:
         print(text)
+    if template_error is not None:
+        return 3
     return exit_code_for_report(report)
 
 

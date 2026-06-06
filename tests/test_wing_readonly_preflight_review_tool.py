@@ -1,6 +1,10 @@
 import json
 from pathlib import Path
 
+from backend.wing_readonly_preflight_review_decision import (
+    REQUIRED_REVIEW_CHECKLIST_IDS,
+    build_wing_readonly_preflight_review_decision_ledger,
+)
 from tools import review_wing_readonly_preflight_artifacts as review_tool
 
 
@@ -115,6 +119,18 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert report["full_autonomous_ready"] is False
     assert report["manual_review_required_before_readiness_update"] is True
     assert report["manual_review_decision_required"] is True
+    assert report["review_decision_template_available"] is True
+    assert report["review_decision_template_required_fields"] == [
+        "review_id",
+        "artifact_source_id",
+        "run_id",
+        "summary_path",
+        "events_path",
+        "decision",
+        "reviewed_by",
+        "reviewed_at",
+        "checklist_ids",
+    ]
     assert [row["id"] for row in report["manual_review_checklist"]] == [
         "confirm_artifact_paths",
         "confirm_operator_channel_scope",
@@ -147,7 +163,71 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert "Manual Review Gate" in markdown
     assert "confirm_event_log_readonly_sequence" in markdown
     assert "manual_review_decision_required: `true`" in markdown
+    assert "review_decision_template_available: `true`" in markdown
+    assert "Review Decision Template" in markdown
     assert "does not contact WING" in markdown
+
+
+def test_review_decision_template_links_clean_candidate_but_requires_operator_edit(tmp_path: Path):
+    summary_path = _write_artifact(tmp_path / "preflight" / "run")
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+
+    template = review_tool.build_review_decision_template(
+        report,
+        generated_at="2026-06-07T02:00:00Z",
+    )
+
+    assert template["template_status"] == (
+        "operator_must_replace_placeholders_before_ledger_acceptance"
+    )
+    assert template["template_generated_at"] == "2026-06-07T02:00:00Z"
+    assert template["review_id"] == "review-wing-readonly-20260606T120000Z_wing_readonly_preflight"
+    assert template["artifact_source_id"] == str(summary_path)
+    assert template["run_id"] == "20260606T120000Z_wing_readonly_preflight"
+    assert template["summary_path"] == str(summary_path)
+    assert template["events_path"] == str(summary_path.parent / "events.jsonl")
+    assert template["decision"] == "pending_operator_decision"
+    assert template["reviewed_by"] == ""
+    assert template["reviewed_at"] == ""
+    assert template["checklist_ids"] == list(REQUIRED_REVIEW_CHECKLIST_IDS)
+    assert template["live_authority_granted"] is False
+    assert template["readiness_matrix_update_allowed_by_decision"] is False
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=report["evidence"],
+        decision_records=[template],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    violations = set(ledger["records"][0]["violations"])
+    assert "review_decision_unknown" in violations
+    assert "review_decision_reviewer_missing" in violations
+    assert "review_decision_reviewed_at_missing" in violations
+
+
+def test_review_decision_template_requires_explicit_source_for_multiple_candidates(tmp_path: Path):
+    first_summary = _write_artifact(tmp_path / "preflight" / "run1")
+    second_summary = _write_artifact(tmp_path / "preflight" / "run2")
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+
+    try:
+        review_tool.build_review_decision_template(report)
+    except ValueError as exc:
+        assert str(exc) == "decision_template_requires_single_candidate_or_source_id"
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("expected explicit source id requirement")
+
+    template = review_tool.build_review_decision_template(
+        report,
+        artifact_source_id=str(second_summary),
+        generated_at="2026-06-07T02:00:00Z",
+    )
+
+    assert template["artifact_source_id"] == str(second_summary)
+    assert template["summary_path"] == str(second_summary)
+    assert template["artifact_source_id"] != str(first_summary)
 
 
 def test_review_report_blocks_missing_artifacts(tmp_path: Path):
@@ -157,6 +237,7 @@ def test_review_report_blocks_missing_artifacts(tmp_path: Path):
     assert report["artifact_count"] == 0
     assert report["manual_review_required_before_readiness_update"] is True
     assert report["manual_review_decision_required"] is False
+    assert report["review_decision_template_available"] is False
     assert "operator_must_run_wing_readonly_preflight_runner" in report["blocked_by"]
     assert review_tool.exit_code_for_report(report) == 2
 
@@ -177,6 +258,7 @@ def test_review_report_blocks_tampered_event_log(tmp_path: Path):
 def test_review_tool_main_writes_output_and_returns_gate_status(tmp_path: Path):
     _write_artifact(tmp_path / "preflight" / "run")
     output = tmp_path / "review.md"
+    template_output = tmp_path / "decision-template.json"
 
     exit_code = review_tool.main(
         [
@@ -184,12 +266,17 @@ def test_review_tool_main_writes_output_and_returns_gate_status(tmp_path: Path):
             str(tmp_path / "preflight"),
             "--output",
             str(output),
+            "--decision-template-output",
+            str(template_output),
             "--quiet",
         ]
     )
 
     assert exit_code == 0
     assert "WING Read-Only Preflight Artifact Review" in output.read_text(encoding="utf-8")
+    template = json.loads(template_output.read_text(encoding="utf-8"))
+    assert template["decision"] == "pending_operator_decision"
+    assert template["reviewed_by"] == ""
 
 
 def test_review_tool_is_transport_free():

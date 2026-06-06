@@ -330,10 +330,28 @@ WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = "artifacts/wing_readonly_preflig
 WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
 WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
 WING_READONLY_PREFLIGHT_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md"
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT = (
+    "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json"
+)
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_TOOL = (
+    "tools/review_wing_readonly_preflight_decisions.py"
+)
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT = (
+    "artifacts/wing_readonly_preflight_review_decisions"
+)
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_OUTPUT = (
+    "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+)
 WING_READONLY_PREFLIGHT_REVIEW_EXIT_CODES = {
     "candidate_ready": 0,
     "artifact_missing": 2,
     "invalid_artifact": 3,
+}
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_EXIT_CODES = {
+    "accepted_decision_ready": 0,
+    "preflight_candidate_missing": 2,
+    "decision_missing_or_invalid": 3,
+    "candidate_rejected": 4,
 }
 WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = (
     "confirm_artifact_paths",
@@ -341,6 +359,17 @@ WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = (
     "confirm_physical_readbacks",
     "confirm_event_log_readonly_sequence",
     "confirm_no_live_authority",
+)
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
+    "review_id",
+    "artifact_source_id",
+    "run_id",
+    "summary_path",
+    "events_path",
+    "decision",
+    "reviewed_by",
+    "reviewed_at",
+    "checklist_ids",
 )
 
 
@@ -380,22 +409,29 @@ def wing_readonly_preflight_review_command() -> list[str]:
         WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT,
         "--output",
         WING_READONLY_PREFLIGHT_REVIEW_OUTPUT,
+        "--decision-template-output",
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
+    ]
+
+
+def wing_readonly_preflight_review_decision_command() -> list[str]:
+    return [
+        "python3",
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TOOL,
+        "--artifact-root",
+        WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT,
+        "--decision-root",
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
+        "--output",
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_OUTPUT,
     ]
 
 
 def wing_readonly_preflight_review_manual_checklist_ids() -> list[str]:
-    review_tool_path = REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_TOOL
-    if not review_tool_path.is_file():
+    review_tool = load_wing_readonly_preflight_review_tool()
+    if review_tool is None:
         return []
     try:
-        spec = importlib.util.spec_from_file_location(
-            "_automixer_wing_readonly_preflight_review_tool",
-            review_tool_path,
-        )
-        if spec is None or spec.loader is None:
-            return []
-        review_tool = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(review_tool)
         checklist_factory = getattr(review_tool, "manual_review_checklist", None)
         if not callable(checklist_factory):
             return []
@@ -412,6 +448,38 @@ def wing_readonly_preflight_review_manual_checklist_ids() -> list[str]:
         if isinstance(item_id, str) and item_id:
             ids.append(item_id)
     return ids
+
+
+def load_wing_readonly_preflight_review_tool() -> object | None:
+    review_tool_path = REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_TOOL
+    if not review_tool_path.is_file():
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "_automixer_wing_readonly_preflight_review_tool",
+            review_tool_path,
+        )
+        if spec is None or spec.loader is None:
+            return None
+        review_tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(review_tool)
+    except Exception:
+        return None
+    return review_tool
+
+
+def wing_readonly_preflight_review_decision_template_required_fields() -> list[str]:
+    review_tool = load_wing_readonly_preflight_review_tool()
+    if review_tool is None:
+        return []
+    try:
+        fields_factory = getattr(review_tool, "review_decision_template_required_fields", None)
+        if not callable(fields_factory):
+            return []
+        fields = fields_factory()
+    except Exception:
+        return []
+    return [str(item) for item in fields if isinstance(item, str) and item] if isinstance(fields, list) else []
 
 
 FORBIDDEN_COMMAND_TOKENS = (
@@ -609,7 +677,9 @@ def build_checks(
                 "tests/test_dlive_state_physical_readback_contract.py",
                 "tests/test_dlive_state_physical_readback_artifact_intake.py",
                 "tests/test_wing_readonly_preflight_evidence.py",
+                "tests/test_wing_readonly_preflight_review_tool.py",
                 "tests/test_wing_readonly_preflight_review_decision.py",
+                "tests/test_wing_readonly_preflight_review_decision_tool.py",
                 "-q",
                 "--tb=short",
             ),
@@ -1617,10 +1687,17 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     capture_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_RUNNER_TOOL).is_file()
     review_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_TOOL).is_file()
     capture_command = wing_readonly_preflight_capture_command_template()
+    review_command = wing_readonly_preflight_review_command()
     review_manual_checklist_ids = wing_readonly_preflight_review_manual_checklist_ids()
+    review_decision_template_required_fields = (
+        wing_readonly_preflight_review_decision_template_required_fields()
+    )
     review_manual_checklist_complete = tuple(review_manual_checklist_ids) == (
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
     )
+    review_decision_template_contract_complete = tuple(
+        review_decision_template_required_fields
+    ) == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
     capture_channels = command_value_after_flag(capture_command, "--channels")
     capture_confirmed_channels = command_value_after_flag(
         capture_command,
@@ -1638,6 +1715,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_review_tool_missing")
     if not review_manual_checklist_complete:
         violations.append("wing_readonly_preflight_review_manual_checklist_incomplete")
+    if not review_decision_template_contract_complete:
+        violations.append("wing_readonly_preflight_review_decision_template_contract_incomplete")
+    if "--decision-template-output" not in review_command:
+        violations.append("wing_readonly_preflight_review_decision_template_output_missing")
     if "--operator-confirm-channels" not in capture_command:
         violations.append("wing_readonly_preflight_capture_operator_confirmation_missing")
     if "--channels" not in capture_command:
@@ -1752,10 +1833,19 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     detail["review_tool_path"] = WING_READONLY_PREFLIGHT_REVIEW_TOOL
     detail["review_tool_available"] = review_tool_available
-    detail["review_command"] = wing_readonly_preflight_review_command()
+    detail["review_command"] = review_command
+    detail["review_command_writes_decision_template"] = (
+        "--decision-template-output" in review_command
+    )
     detail["review_exit_codes"] = dict(WING_READONLY_PREFLIGHT_REVIEW_EXIT_CODES)
     detail["review_manual_checklist_ids"] = list(review_manual_checklist_ids)
     detail["review_manual_checklist_complete"] = review_manual_checklist_complete
+    detail["review_decision_template_required_fields"] = list(
+        review_decision_template_required_fields
+    )
+    detail["review_decision_template_contract_complete"] = (
+        review_decision_template_contract_complete
+    )
     detail["blocked_by"] = (
         list(summary.get("blocked_by"))
         if isinstance(summary.get("blocked_by"), list)
@@ -1789,6 +1879,10 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     summary = ledger.get("summary") if isinstance(ledger.get("summary"), Mapping) else {}
     safety = ledger.get("safety") if isinstance(ledger.get("safety"), Mapping) else {}
     records = ledger.get("records") if isinstance(ledger.get("records"), list) else []
+    review_decision_tool_available = (
+        REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_DECISION_TOOL
+    ).is_file()
+    review_decision_command = wing_readonly_preflight_review_decision_command()
 
     if ledger.get("type") != "wing_readonly_preflight_review_decision_ledger":
         violations.append("wing_readonly_preflight_review_decision_type_mismatch")
@@ -1796,6 +1890,14 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
         violations.append("wing_readonly_preflight_review_decision_method_id_mismatch")
     if ledger.get("status") not in WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_STATUSES:
         violations.append("wing_readonly_preflight_review_decision_status_mismatch")
+    if not review_decision_tool_available:
+        violations.append("wing_readonly_preflight_review_decision_tool_missing")
+    if "--artifact-root" not in review_decision_command:
+        violations.append("wing_readonly_preflight_review_decision_artifact_root_missing")
+    if "--decision-root" not in review_decision_command:
+        violations.append("wing_readonly_preflight_review_decision_root_missing")
+    if "--output" not in review_decision_command:
+        violations.append("wing_readonly_preflight_review_decision_output_missing")
 
     expected_true = ("read_only", "operator_required")
     for key in expected_true:
@@ -1839,6 +1941,10 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
         violations.append("wing_readonly_preflight_review_decision_full_auto_not_false")
 
     detail["ledger_status"] = ledger.get("status")
+    detail["review_tool_path"] = WING_READONLY_PREFLIGHT_REVIEW_DECISION_TOOL
+    detail["review_tool_available"] = review_decision_tool_available
+    detail["review_command"] = review_decision_command
+    detail["review_exit_codes"] = dict(WING_READONLY_PREFLIGHT_REVIEW_DECISION_EXIT_CODES)
     detail["preflight_evidence_status"] = summary.get("preflight_evidence_status")
     detail["decision_search_roots"] = (
         list(summary.get("decision_search_roots"))
@@ -6897,6 +7003,12 @@ def wing_readonly_preflight_evidence_summary(
         review_command = detail.get("review_command")
         review_exit_codes = detail.get("review_exit_codes")
         review_manual_checklist_ids = detail.get("review_manual_checklist_ids")
+        review_command_writes_decision_template = (
+            detail.get("review_command_writes_decision_template") is True
+        )
+        review_decision_template_required_fields = detail.get(
+            "review_decision_template_required_fields"
+        )
         valid_candidate_count = int(detail.get("valid_candidate_count") or 0)
         invalid_candidate_count = int(detail.get("invalid_candidate_count") or 0)
         readiness_update_candidate_available = (
@@ -6962,6 +7074,9 @@ def wing_readonly_preflight_evidence_summary(
             "review_command": (
                 list(review_command) if isinstance(review_command, list) else []
             ),
+            "review_command_writes_decision_template": (
+                review_command_writes_decision_template
+            ),
             "review_exit_codes": (
                 dict(review_exit_codes) if isinstance(review_exit_codes, Mapping) else {}
             ),
@@ -6972,6 +7087,14 @@ def wing_readonly_preflight_evidence_summary(
             ),
             "review_manual_checklist_complete": (
                 detail.get("review_manual_checklist_complete") is True
+            ),
+            "review_decision_template_required_fields": (
+                list(review_decision_template_required_fields)
+                if isinstance(review_decision_template_required_fields, list)
+                else []
+            ),
+            "review_decision_template_contract_complete": (
+                detail.get("review_decision_template_contract_complete") is True
             ),
             "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
             "violations": list(violations) if isinstance(violations, list) else [],
@@ -6993,6 +7116,8 @@ def wing_readonly_preflight_review_decision_summary(
         invalid_record_ids = detail.get("invalid_record_ids")
         unreviewed_candidate_source_ids = detail.get("unreviewed_candidate_source_ids")
         decision_search_roots = detail.get("decision_search_roots")
+        review_command = detail.get("review_command")
+        review_exit_codes = detail.get("review_exit_codes")
         return {
             "status": result.status,
             "read_only": True,
@@ -7008,6 +7133,14 @@ def wing_readonly_preflight_review_decision_summary(
             "live_authority_granted": False,
             "full_autonomous_ready": False,
             "ledger_status": detail.get("ledger_status"),
+            "review_tool_path": detail.get("review_tool_path"),
+            "review_tool_available": detail.get("review_tool_available") is True,
+            "review_command": (
+                list(review_command) if isinstance(review_command, list) else []
+            ),
+            "review_exit_codes": (
+                dict(review_exit_codes) if isinstance(review_exit_codes, Mapping) else {}
+            ),
             "preflight_evidence_status": detail.get("preflight_evidence_status"),
             "decision_search_roots": (
                 list(decision_search_roots)
@@ -9466,12 +9599,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight['review_tool_available']).lower()}`",
                 "- review_command: "
                 f"`{json.dumps(wing_readonly_preflight['review_command'])}`",
+                "- review_command_writes_decision_template: "
+                f"`{str(wing_readonly_preflight['review_command_writes_decision_template']).lower()}`",
                 "- review_exit_codes: "
                 f"`{json.dumps(wing_readonly_preflight['review_exit_codes'], sort_keys=True)}`",
                 "- review_manual_checklist_ids: "
                 f"`{json.dumps(wing_readonly_preflight['review_manual_checklist_ids'])}`",
                 "- review_manual_checklist_complete: "
                 f"`{str(wing_readonly_preflight['review_manual_checklist_complete']).lower()}`",
+                "- review_decision_template_required_fields: "
+                f"`{json.dumps(wing_readonly_preflight['review_decision_template_required_fields'])}`",
+                "- review_decision_template_contract_complete: "
+                f"`{str(wing_readonly_preflight['review_decision_template_contract_complete']).lower()}`",
                 f"- blocked_by: `{json.dumps(wing_readonly_preflight['blocked_by'])}`",
                 f"- violations: `{json.dumps(wing_readonly_preflight['violations'])}`",
             ]
@@ -9494,6 +9633,13 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 "- full_autonomous_ready: "
                 f"`{str(wing_readonly_preflight_review_decision['full_autonomous_ready']).lower()}`",
                 f"- ledger_status: `{wing_readonly_preflight_review_decision['ledger_status']}`",
+                f"- review_tool_path: `{wing_readonly_preflight_review_decision['review_tool_path']}`",
+                "- review_tool_available: "
+                f"`{str(wing_readonly_preflight_review_decision['review_tool_available']).lower()}`",
+                "- review_command: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['review_command'])}`",
+                "- review_exit_codes: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['review_exit_codes'], sort_keys=True)}`",
                 "- preflight_evidence_status: "
                 f"`{wing_readonly_preflight_review_decision['preflight_evidence_status']}`",
                 "- decision_search_roots: "

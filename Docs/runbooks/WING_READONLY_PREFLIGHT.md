@@ -118,7 +118,8 @@ Run the offline artifact review after the artifact is captured:
 ```bash
 python3 tools/review_wing_readonly_preflight_artifacts.py \
   --artifact-root artifacts/wing_readonly_preflight \
-  --output Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md
+  --output Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md \
+  --decision-template-output artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json
 ```
 
 Exit codes:
@@ -126,6 +127,27 @@ Exit codes:
 - `0`: clean candidate is ready for manual review;
 - `2`: no artifact was found;
 - `3`: invalid, corrupt, incomplete, or unsafe artifact evidence was found.
+
+The decision template is intentionally not a valid accepted decision yet. The
+operator must edit `decision`, `reviewed_by`, and `reviewed_at`, then save the
+file as a durable review decision. Keep `artifact_source_id`, `run_id`,
+`summary_path`, `events_path`, and `checklist_ids` aligned with the template.
+
+After editing the decision JSON, run the focused decision review:
+
+```bash
+python3 tools/review_wing_readonly_preflight_decisions.py \
+  --artifact-root artifacts/wing_readonly_preflight \
+  --decision-root artifacts/wing_readonly_preflight_review_decisions \
+  --output Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md
+```
+
+Exit codes:
+
+- `0`: an accepted decision is ready for the next manual WING MVP step;
+- `2`: no clean preflight candidate exists yet;
+- `3`: the decision record is missing, incomplete, invalid, or unsafe;
+- `4`: the operator rejected the candidate, so supervised proof remains blocked.
 
 Then run the focused validation checks:
 
