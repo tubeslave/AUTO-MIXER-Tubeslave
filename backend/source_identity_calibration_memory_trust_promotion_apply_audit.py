@@ -72,9 +72,12 @@ REQUIRED_EXECUTOR_FALSE_SUMMARY_FLAGS = (
 REQUIRED_APPLY_RESULT_FALSE_FLAGS = (
     "live_write",
     "mutates_console_state",
+    "queries_console",
     "queue_mutation",
     "model_mutation",
     "direct_downstream_priority_mutation",
+    "downstream_priority_change_allowed_by_executor",
+    "live_widening_allowed",
     "live_authority_granted",
     "full_autonomous_ready",
 )

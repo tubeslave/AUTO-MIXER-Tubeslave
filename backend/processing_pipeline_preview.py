@@ -72,6 +72,9 @@ try:
     from source_identity_calibration_memory_trust_promotion_apply_audit import (
         build_source_identity_calibration_memory_trust_promotion_apply_audit,
     )
+    from source_identity_calibration_memory_trust_promotion_rollback_verification import (
+        build_source_identity_calibration_memory_trust_promotion_rollback_verification,
+    )
     from source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
         analyze_source_identity_replay_calibration,
@@ -142,6 +145,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_trust_promotion_apply_audit import (
         build_source_identity_calibration_memory_trust_promotion_apply_audit,
+    )
+    from backend.source_identity_calibration_memory_trust_promotion_rollback_verification import (
+        build_source_identity_calibration_memory_trust_promotion_rollback_verification,
     )
     from backend.source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
@@ -488,6 +494,39 @@ def _source_identity_memory_trust_promotion_acceptance_records(
     return [dict(record) for record in raw_records if isinstance(record, dict)]
 
 
+def _source_identity_memory_trust_promotion_rollback_verification_records(
+    server: Any,
+) -> List[Dict[str, Any]]:
+    raw_records = getattr(
+        server,
+        "source_identity_memory_trust_promotion_rollback_verification_records",
+        None,
+    )
+    if raw_records is None:
+        raw_records = getattr(
+            server,
+            (
+                "source_identity_calibration_memory_trust_promotion_"
+                "rollback_verification_records"
+            ),
+            None,
+        )
+    if raw_records is None:
+        config = getattr(server, "config", {})
+        if isinstance(config, dict):
+            raw_records = config.get(
+                "source_identity_memory_trust_promotion_rollback_verification_records"
+            )
+            if raw_records is None:
+                raw_records = config.get(
+                    "source_identity_calibration_memory_trust_promotion_"
+                    "rollback_verification_records"
+                )
+    if not isinstance(raw_records, (list, tuple)):
+        return []
+    return [dict(record) for record in raw_records if isinstance(record, dict)]
+
+
 def build_main_pipeline_preview(
     server: Any,
     *,
@@ -643,6 +682,19 @@ def build_main_pipeline_preview(
     source_identity_memory_trust_promotion_apply_audit_summary = (
         source_identity_memory_trust_promotion_apply_audit.get("summary", {})
     )
+    source_identity_memory_trust_promotion_rollback_verification = (
+        build_source_identity_calibration_memory_trust_promotion_rollback_verification(
+            apply_audit=source_identity_memory_trust_promotion_apply_audit,
+            verification_records=(
+                _source_identity_memory_trust_promotion_rollback_verification_records(
+                    server
+                )
+            ),
+        )
+    )
+    source_identity_memory_trust_promotion_rollback_verification_summary = (
+        source_identity_memory_trust_promotion_rollback_verification.get("summary", {})
+    )
 
     proposals = (
         operator_proposals
@@ -791,6 +843,13 @@ def build_main_pipeline_preview(
             "source_identity_calibration_memory_trust_promotion_apply_audit_record_count": int(
                 source_identity_memory_trust_promotion_apply_audit_summary.get(
                     "apply_audit_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_calibration_memory_trust_promotion_rollback_verified_record_count": int(
+                source_identity_memory_trust_promotion_rollback_verification_summary.get(
+                    "rollback_verified_record_count",
                     0,
                 )
                 or 0
@@ -1074,6 +1133,34 @@ def build_main_pipeline_preview(
                 ),
             },
             {
+                "adapter_id": (
+                    "source_identity_calibration_memory_trust_promotion_rollback_verification"
+                ),
+                "method_id": (
+                    "source_identity_calibration_memory_trust_promotion_rollback_verification"
+                ),
+                "status": (
+                    source_identity_memory_trust_promotion_rollback_verification.get(
+                        "status"
+                    )
+                ),
+                "output": (
+                    "source_identity_memory_trust_promotion_rollback_verification"
+                ),
+                "reason": (
+                    ", ".join(
+                        source_identity_memory_trust_promotion_rollback_verification_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if source_identity_memory_trust_promotion_rollback_verification_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
                 "adapter_id": "registry_blockers",
                 "method_id": "processing_registry",
                 "status": "active",
@@ -1142,6 +1229,9 @@ def build_main_pipeline_preview(
         ),
         "source_identity_calibration_memory_trust_promotion_apply_audit": (
             source_identity_memory_trust_promotion_apply_audit
+        ),
+        "source_identity_calibration_memory_trust_promotion_rollback_verification": (
+            source_identity_memory_trust_promotion_rollback_verification
         ),
         "registry": {
             "summary": registry_snapshot.get("summary", {}),

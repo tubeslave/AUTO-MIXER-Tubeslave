@@ -287,6 +287,36 @@ def test_memory_trust_promotion_apply_audit_rejects_forged_executor_authority():
     ]["invalid_record_ids"]
 
 
+def test_memory_trust_promotion_apply_audit_rejects_forged_apply_result_safety_envelope():
+    executor = _applied_executor()
+    apply_result = executor["apply_results"][0]
+    forged = {
+        **executor,
+        "apply_results": [
+            {
+                **apply_result,
+                "queries_console": True,
+                "downstream_priority_change_allowed_by_executor": True,
+                "live_widening_allowed": True,
+            }
+        ],
+    }
+
+    audit = build_source_identity_calibration_memory_trust_promotion_apply_audit(
+        promotion_executor=forged,
+    )
+
+    assert audit["status"] == "memory_trust_promotion_apply_audit_replacement_required"
+    assert audit["summary"]["apply_audit_record_count"] == 0
+    assert apply_result["promotion_executor_apply_id"] in audit["summary"][
+        "invalid_record_ids"
+    ]
+    assert not any(
+        item.startswith("memory_trust_promotion_apply_audit_summary_")
+        for item in audit["summary"]["invalid_record_ids"]
+    )
+
+
 def test_memory_trust_promotion_apply_audit_is_registered_non_live():
     method = get_processing_method(
         SOURCE_IDENTITY_CALIBRATION_MEMORY_TRUST_PROMOTION_APPLY_AUDIT_METHOD_ID

@@ -273,8 +273,11 @@ def test_memory_trust_promotion_executor_applies_to_explicit_store_only():
     assert result["target_trust_state"] == "trusted_for_downstream_priority"
     assert result["applied"] is True
     assert result["live_write"] is False
+    assert result["queries_console"] is False
     assert result["queue_mutation"] is False
     assert result["direct_downstream_priority_mutation"] is False
+    assert result["downstream_priority_change_allowed_by_executor"] is False
+    assert result["live_widening_allowed"] is False
     assert "requested_change" not in executor
 
 

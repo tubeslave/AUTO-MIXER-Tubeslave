@@ -348,10 +348,13 @@ def _apply_record(
         "applied": True,
         "live_write": False,
         "mutates_console_state": False,
+        "queries_console": False,
         "queue_mutation": False,
         "model_mutation": False,
         "direct_downstream_priority_mutation": False,
+        "downstream_priority_change_allowed_by_executor": False,
         "source_identity_trust_store_mutation": True,
+        "live_widening_allowed": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,
     }
