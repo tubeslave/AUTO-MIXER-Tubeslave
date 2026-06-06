@@ -12174,8 +12174,326 @@ async def test_sequence_policy_queue_import_dry_run_result_consumer_feeds_execut
     assert "seq-import-gate:proposal-sequence-fader" not in (
         server._operator_apply_idempotency_keys
     )
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_execution_gate_result"
+    ](
+        object(),
+        {
+            "dry_run_result_consumer": dry_run_consumer_payload,
+            "execution_gate_result": gate_payload,
+        },
+    )
+
+    gate_consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        gate_consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer"
+    )
+    assert (
+        gate_consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_execution_gate_result"
+    )
+    assert (
+        gate_consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_executor_request_available"
+    )
+    assert gate_consumer_payload["summary"]["expected_gate_candidate_count"] == 1
+    assert gate_consumer_payload["summary"]["ready_for_executor_count"] == 1
+    assert gate_consumer_payload["summary"]["blocked_gate_result_count"] == 0
+    assert gate_consumer_payload["summary"]["executor_request_available"] is True
+    assert gate_consumer_payload["summary"]["sequence_executor_handler_invoked"] is False
+    assert gate_consumer_payload["summary"]["sequence_executor_created"] is False
+    assert gate_consumer_payload["summary"]["execution_allowed_by_consumer"] is False
+    assert gate_consumer_payload["summary"]["idempotency_reserved"] is False
+    assert gate_consumer_payload["executor_request"]["handler"] == (
+        "execute_operator_proposal_apply_sequence"
+    )
+    assert gate_consumer_payload["executor_request"]["execute"] is False
+    assert gate_consumer_payload["executor_request"]["operator_ack"] is False
+    assert gate_consumer_payload["executor_request"]["approved"] is False
+    assert (
+        gate_consumer_payload["executor_request"]["operator_must_set_execute_true"]
+        is True
+    )
+    assert (
+        gate_consumer_payload["executor_request"][
+            "operator_must_set_operator_ack_true"
+        ]
+        is True
+    )
+    assert (
+        gate_consumer_payload["executor_request"]["operator_must_set_approved_true"]
+        is True
+    )
+
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        gate_consumer_payload["executor_request"],
+    )
+
+    executor_payload = server.send_to_client.await_args.args[1]
+    assert executor_payload["type"] == "operator_proposal_apply_sequence_execution_result"
+    assert executor_payload["status"] == "blocked"
+    assert executor_payload["success"] is False
+    assert executor_payload["summary"]["input_candidate_count"] == 1
+    assert executor_payload["summary"]["attempted_count"] == 0
+    assert executor_payload["summary"]["applied_count"] == 0
+    assert executor_payload["summary"]["blocked_count"] == 3
+    assert executor_payload["summary"]["execute_requested"] is False
+    assert executor_payload["summary"]["operator_ack_received"] is False
+    assert executor_payload["summary"]["approved"] is False
+    assert executor_payload["summary"]["live_write"] is False
+    assert executor_payload["summary"]["idempotency_reserved"] is False
+    assert [item["reason"] for item in executor_payload["blocked_results"]] == [
+        "execute_true_required",
+        "operator_ack_required",
+        "approved_true_required",
+    ]
     assert build_decision_queue(server)["summary"]["pending_count"] == 2
     server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audit_without_extra_write(server):
+    proposals, plan = _sequence_policy_queue_import_fixture()
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -8.5,
+        "old_value": -8.0,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -8.5,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -8.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch[
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+    ](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+            "apply": True,
+            "operator_ack": True,
+        },
+    )
+    await server._dispatch[
+        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
+    ](
+        object(),
+        {
+            "idempotency_key_prefix": "seq-import-audit",
+        },
+    )
+    plan_payload = server.send_to_client.await_args.args[1]
+    request = dict(plan_payload["batch_preflight_request"])
+    request["approved"] = True
+    await server._dispatch["preflight_operator_proposal_apply_batch"](
+        object(),
+        request,
+    )
+    preflight_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_preflight_result"
+    ](
+        object(),
+        {
+            "queue_import_preflight_plan": plan_payload,
+            "batch_preflight_result": preflight_payload,
+        },
+    )
+    preflight_consumer_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["plan_operator_proposal_apply_sequence"](
+        object(),
+        preflight_consumer_payload["sequence_plan_request"],
+    )
+    sequence_plan_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_sequence_plan_result"
+    ](
+        object(),
+        {
+            "preflight_result_consumer": preflight_consumer_payload,
+            "sequence_plan_result": sequence_plan_payload,
+        },
+    )
+    sequence_plan_consumer_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["dry_run_operator_proposal_apply_sequence"](
+        object(),
+        sequence_plan_consumer_payload["dry_run_request"],
+    )
+    dry_run_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_dry_run_result"
+    ](
+        object(),
+        {
+            "sequence_plan_result_consumer": sequence_plan_consumer_payload,
+            "dry_run_result": dry_run_payload,
+        },
+    )
+    dry_run_consumer_payload = server.send_to_client.await_args.args[1]
+    gate_request = dict(dry_run_consumer_payload["execution_gate_request"])
+    gate_request["operator_ack"] = True
+    await server._dispatch["gate_operator_proposal_apply_sequence_execution"](
+        object(),
+        gate_request,
+    )
+    gate_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_execution_gate_result"
+    ](
+        object(),
+        {
+            "dry_run_result_consumer": dry_run_consumer_payload,
+            "execution_gate_result": gate_payload,
+        },
+    )
+    gate_consumer_payload = server.send_to_client.await_args.args[1]
+    executor_request = dict(gate_consumer_payload["executor_request"])
+    executor_request["execute"] = True
+    executor_request["operator_ack"] = True
+    executor_request["approved"] = True
+
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        executor_request,
+    )
+
+    execution_payload = server.send_to_client.await_args.args[1]
+    assert execution_payload["type"] == "operator_proposal_apply_sequence_execution_result"
+    assert execution_payload["status"] == "applied"
+    assert execution_payload["summary"]["applied_count"] == 1
+    assert execution_payload["summary"]["sequence_executor_called_apply_operator_proposal"] is True
+    assert execution_payload["summary"]["direct_live_write"] is False
+    assert server._apply_manual_console_write.await_count == 1
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_execution_result"
+    ](
+        object(),
+        {
+            "execution_gate_result_consumer": gate_consumer_payload,
+            "execution_result": execution_payload,
+        },
+    )
+
+    execution_consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        execution_consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer"
+    )
+    assert (
+        execution_consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_execution_result"
+    )
+    assert (
+        execution_consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_audit_request_available"
+    )
+    assert execution_consumer_payload["summary"]["expected_execution_result_count"] == 1
+    assert execution_consumer_payload["summary"]["execution_result_count"] == 1
+    assert execution_consumer_payload["summary"]["applied_execution_result_count"] == 1
+    assert execution_consumer_payload["summary"]["blocked_execution_result_count"] == 0
+    assert execution_consumer_payload["summary"]["audit_request_available"] is True
+    assert execution_consumer_payload["summary"]["audit_handler_invoked"] is False
+    assert execution_consumer_payload["summary"]["audit_created"] is False
+    assert execution_consumer_payload["summary"]["live_write"] is False
+    assert execution_consumer_payload["summary"]["idempotency_reserved"] is False
+    assert execution_consumer_payload["audit_request"]["handler"] == (
+        "audit_operator_proposal_apply_sequence_execution"
+    )
+    assert (
+        execution_consumer_payload["audit_request"]["execution_result_payload"][
+            "execution_results"
+        ][0]["apply_request"]["idempotency_key"]
+        == "seq-import-audit:proposal-sequence-fader"
+    )
+
+    await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+        object(),
+        execution_consumer_payload["audit_request"],
+    )
+
+    audit_payload = server.send_to_client.await_args.args[1]
+    assert audit_payload["type"] == "operator_proposal_apply_sequence_execution_audit"
+    assert audit_payload["status"] == "passed"
+    assert audit_payload["summary"]["passed_count"] == 1
+    assert audit_payload["summary"]["live_write"] is False
+    assert audit_payload["summary"]["idempotency_reserved"] is False
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_execution_audit_result"
+    ](
+        object(),
+        {
+            "execution_result_consumer": execution_consumer_payload,
+            "execution_audit_result": audit_payload,
+        },
+    )
+
+    audit_consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        audit_consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer"
+    )
+    assert (
+        audit_consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_execution_audit_result"
+    )
+    assert (
+        audit_consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_audit_policy_gate_request_available"
+    )
+    assert audit_consumer_payload["summary"]["expected_execution_audit_row_count"] == 1
+    assert audit_consumer_payload["summary"]["execution_audit_row_count"] == 1
+    assert audit_consumer_payload["summary"]["passed_execution_audit_row_count"] == 1
+    assert audit_consumer_payload["summary"]["blocked_execution_audit_row_count"] == 0
+    assert audit_consumer_payload["summary"]["audit_policy_gate_request_available"] is True
+    assert audit_consumer_payload["summary"]["audit_policy_gate_handler_invoked"] is False
+    assert audit_consumer_payload["summary"]["policy_gate_created"] is False
+    assert audit_consumer_payload["summary"]["live_write"] is False
+    assert audit_consumer_payload["summary"]["idempotency_reserved"] is False
+    assert audit_consumer_payload["summary"]["policy_mutation"] is False
+    assert audit_consumer_payload["audit_policy_gate_request"]["handler"] == (
+        "gate_operator_proposal_apply_sequence_audit_policy"
+    )
+    assert (
+        audit_consumer_payload["audit_policy_gate_request"][
+            "execution_audit_payload"
+        ]["audit_rows"][0]["idempotency_key"]
+        == "seq-import-audit:proposal-sequence-fader"
+    )
+
+    await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
+        object(),
+        audit_consumer_payload["audit_policy_gate_request"],
+    )
+
+    policy_gate_payload = server.send_to_client.await_args.args[1]
+    assert policy_gate_payload["type"] == (
+        "operator_proposal_apply_sequence_audit_policy_gate"
+    )
+    assert policy_gate_payload["status"] == "ready"
+    assert policy_gate_payload["summary"]["policy_evidence_ready_count"] == 1
+    assert policy_gate_payload["summary"]["live_write"] is False
+    assert policy_gate_payload["summary"]["policy_mutation"] is False
+    assert policy_gate_payload["summary"]["full_autonomous_ready"] is False
+    assert server._apply_manual_console_write.await_count == 1
+    assert "seq-import-audit:proposal-sequence-fader" in (
+        server._operator_apply_idempotency_keys
+    )
+    assert build_decision_queue(server)["summary"]["applied_count"] == 1
 
 
 def test_import_soundcheck_recommendations_respects_analyze_mode(server):

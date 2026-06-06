@@ -166,6 +166,15 @@ try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer,
     )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -366,6 +375,15 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -1467,6 +1485,144 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "no_proposal_state_mutation",
             "no_direct_sequence_execution",
             "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer",
+        label=(
+            "Operator Proposal Apply Sequence Policy Memory Trust Promotion "
+            "Queue Import Execution Gate Result Consumer"
+        ),
+        domain="decision_evidence",
+        status="shadow_only",
+        summary=(
+            "Read-only verifier that matches generic apply-sequence execution "
+            "gate results back to verified sequence-policy queue-import "
+            "provenance before emitting a sequence-executor request template."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_queue_import_execution_gate_result_consumer_is_not_executor_or_live_authority"
+        ),
+        promotion_next=(
+            "run the emitted generic sequence-executor request only after "
+            "explicit execute, operator acknowledgement, and approval flags; "
+            "this consumer does not invoke the executor or reserve idempotency"
+        ),
+        notes=(
+            "transport_free",
+            "execution_gate_result_consumer_only",
+            "executor_request_template_only",
+            "sequence_executor_handler_invoked_false",
+            "sequence_executor_created_false",
+            "execute_true_required_before_executor",
+            "operator_ack_required_before_executor",
+            "approved_true_required_before_executor",
+            "idempotency_reserved_false",
+            "sequence_consumer_required_before_execution",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_sequence_policy_trust_store_mutation",
+            "no_proposal_state_mutation",
+            "no_direct_sequence_execution",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer",
+        label=(
+            "Operator Proposal Apply Sequence Policy Memory Trust Promotion "
+            "Queue Import Execution Result Consumer"
+        ),
+        domain="decision_evidence",
+        status="shadow_only",
+        summary=(
+            "Read-only verifier that matches generic apply-sequence execution "
+            "results back to verified sequence-policy queue-import provenance "
+            "before emitting an execution-audit request template."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_queue_import_execution_result_consumer_is_not_audit_or_live_authority"
+        ),
+        promotion_next=(
+            "run the emitted generic execution-audit request only after this "
+            "consumer verifies executor-result provenance, delegated apply, "
+            "readback, rollback, and idempotency evidence"
+        ),
+        notes=(
+            "transport_free",
+            "execution_result_consumer_only",
+            "audit_request_template_only",
+            "audit_handler_invoked_false",
+            "audit_created_false",
+            "requires_apply_operator_proposal_delegation",
+            "readback_required",
+            "rollback_required",
+            "idempotency_reserved_false_by_consumer",
+            "sequence_consumer_required_before_audit",
+            "no_queue_mutation_by_consumer",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_sequence_policy_trust_store_mutation",
+            "no_proposal_state_mutation_by_consumer",
+            "no_direct_sequence_execution",
+            "no_live_writes_by_consumer",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer",
+        label=(
+            "Operator Proposal Apply Sequence Policy Memory Trust Promotion "
+            "Queue Import Execution Audit Result Consumer"
+        ),
+        domain="decision_evidence",
+        status="shadow_only",
+        summary=(
+            "Read-only verifier that matches generic apply-sequence execution "
+            "audits back to verified sequence-policy queue-import provenance "
+            "before emitting an audit-policy-gate request template."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_queue_import_execution_audit_result_consumer_is_not_policy_gate_or_live_authority"
+        ),
+        promotion_next=(
+            "run the emitted generic audit-policy gate only after this consumer "
+            "verifies audit provenance, passed rows, readback, rollback, and "
+            "idempotency evidence"
+        ),
+        notes=(
+            "transport_free",
+            "execution_audit_result_consumer_only",
+            "audit_policy_gate_request_template_only",
+            "audit_policy_gate_handler_invoked_false",
+            "policy_gate_created_false",
+            "policy_mutation_false",
+            "runtime_memory_mutation_false",
+            "model_mutation_false",
+            "idempotency_reserved_false_by_consumer",
+            "sequence_consumer_required_before_policy_gate",
+            "no_queue_mutation_by_consumer",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_sequence_policy_trust_store_mutation",
+            "no_proposal_state_mutation_by_consumer",
+            "no_direct_sequence_execution",
+            "no_live_writes_by_consumer",
         ),
     ),
     ProcessingMethod(
@@ -3289,6 +3445,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_sequence_plan_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -3411,6 +3570,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_sequence_plan_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -3492,6 +3654,9 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_sequence_plan_result_consumer",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -3740,6 +3905,21 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer",
         "ui_surface": "Decision Queue, sequence policy memory trust promotion queue import dry-run result consumer",
         "next_step": "Use verified execution-gate request templates only after generic dry-run results match the sequence-policy queue-import provenance; executor and live apply remain separate steps.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion queue import execution-gate result consumer",
+        "next_step": "Use verified sequence-executor request templates only after generic execution-gate results match the sequence-policy queue-import provenance; execute, operator ack, and approval remain explicit.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion queue import execution result consumer",
+        "next_step": "Use verified execution-audit request templates only after generic executor results match the sequence-policy queue-import provenance and delegated apply proof.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion queue import execution audit result consumer",
+        "next_step": "Use verified audit-policy-gate request templates only after generic execution audits match the sequence-policy queue-import provenance.",
     },
     "source_identity_calibration_memory_trust_review": {
         "entrypoint": "build_source_identity_calibration_memory_trust_review",
@@ -4381,6 +4561,15 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer": (
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_dry_run_result_consumer()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer()
         ),
         "source_identity_calibration_memory_trust_review": (
             build_source_identity_calibration_memory_trust_review()
