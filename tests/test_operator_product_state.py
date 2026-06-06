@@ -5701,6 +5701,12 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     policy_consumer = payload[
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer"
     ]
+    ordering_preview = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview"
+    ]
+    queue_ordering_plan = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
@@ -5777,6 +5783,18 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
         for item in payload["adapters"]
         if item["adapter_id"]
         == "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer"
+    ][0]
+    ordering_preview_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview"
+    ][0]
+    queue_ordering_plan_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan"
     ][0]
 
     assert (
@@ -5881,6 +5899,30 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
         ]
         == 0
     )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview_count"
+        ]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview_ranked_proposal_count"
+        ]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan_record_count"
+        ]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan_ranked_record_count"
+        ]
+        == 0
+    )
     assert adapter["method_id"] == "operator_proposal_apply_sequence_policy_memory_index"
     assert (
         adapter["output"]
@@ -5981,6 +6023,22 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     assert (
         policy_consumer_adapter["output"]
         == "operator_proposal_apply_sequence_memory_trust_promotion_policy_consumer"
+    )
+    assert (
+        ordering_preview_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview"
+    )
+    assert (
+        ordering_preview_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_ordering_preview"
+    )
+    assert (
+        queue_ordering_plan_adapter["method_id"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan"
+    )
+    assert (
+        queue_ordering_plan_adapter["output"]
+        == "operator_proposal_apply_sequence_memory_trust_promotion_queue_ordering_plan"
     )
     assert index["status"] == "append_only_sequence_memory_index_available"
     assert index["summary"]["memory_record_count"] == 1
@@ -6248,6 +6306,66 @@ def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(serv
     assert policy_consumer["summary"]["can_import_to_queue"] is False
     assert policy_consumer["summary"]["can_apply_live"] is False
     assert policy_consumer["consumer_records"] == []
+    assert (
+        ordering_preview["status"]
+        == "sequence_memory_trust_promotion_ordering_preview_not_ready"
+    )
+    assert ordering_preview["summary"]["consumer_record_count"] == 0
+    assert ordering_preview["summary"]["ordered_preview_count"] == 0
+    assert ordering_preview["summary"]["policy_ranked_proposal_count"] == 0
+    assert ordering_preview["summary"]["unranked_proposal_count"] == 0
+    assert ordering_preview["summary"]["proposal_order_mutation"] is False
+    assert ordering_preview["summary"]["queue_mutation"] is False
+    assert ordering_preview["summary"]["runtime_memory_mutation"] is False
+    assert ordering_preview["summary"]["sequence_policy_trust_store_mutation"] is False
+    assert ordering_preview["summary"]["proposal_state_mutation"] is False
+    assert (
+        ordering_preview["summary"]["sequence_execution_allowed_by_ordering_preview"]
+        is False
+    )
+    assert (
+        ordering_preview["summary"][
+            "sequence_policy_change_allowed_by_ordering_preview"
+        ]
+        is False
+    )
+    assert ordering_preview["summary"]["live_widening_allowed"] is False
+    assert ordering_preview["summary"]["live_write"] is False
+    assert ordering_preview["summary"]["can_import_to_queue"] is False
+    assert ordering_preview["summary"]["can_apply_live"] is False
+    assert ordering_preview["ordered_proposals"] == []
+    assert (
+        queue_ordering_plan["status"]
+        == "sequence_memory_trust_promotion_queue_ordering_plan_not_ready"
+    )
+    assert queue_ordering_plan["summary"]["input_ordering_preview_count"] == 0
+    assert queue_ordering_plan["summary"]["queue_ordering_plan_record_count"] == 0
+    assert queue_ordering_plan["summary"]["ranked_queue_candidate_count"] == 0
+    assert queue_ordering_plan["summary"]["unranked_queue_candidate_count"] == 0
+    assert queue_ordering_plan["summary"]["proposal_order_mutation"] is False
+    assert queue_ordering_plan["summary"]["queue_mutation"] is False
+    assert queue_ordering_plan["summary"]["queue_import_allowed_by_plan"] is False
+    assert queue_ordering_plan["summary"]["queue_reorder_allowed_by_plan"] is False
+    assert (
+        queue_ordering_plan["summary"]["sequence_consumer_required_before_execution"]
+        is True
+    )
+    assert queue_ordering_plan["summary"]["runtime_memory_mutation"] is False
+    assert queue_ordering_plan["summary"]["sequence_policy_trust_store_mutation"] is False
+    assert queue_ordering_plan["summary"]["proposal_state_mutation"] is False
+    assert (
+        queue_ordering_plan["summary"]["sequence_execution_allowed_by_plan"]
+        is False
+    )
+    assert (
+        queue_ordering_plan["summary"]["sequence_policy_change_allowed_by_plan"]
+        is False
+    )
+    assert queue_ordering_plan["summary"]["live_widening_allowed"] is False
+    assert queue_ordering_plan["summary"]["live_write"] is False
+    assert queue_ordering_plan["summary"]["can_import_to_queue"] is False
+    assert queue_ordering_plan["summary"]["can_apply_live"] is False
+    assert queue_ordering_plan["queue_ordering_plan_records"] == []
     assert queue["summary"]["pending_count"] == 0
 
 

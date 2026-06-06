@@ -145,6 +145,12 @@ try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer,
     )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview,
+    )
+    from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan,
+    )
     from source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
     )
@@ -324,6 +330,12 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview,
+    )
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan,
     )
     from backend.source_identity_calibration_memory_trust_review import (
         build_source_identity_calibration_memory_trust_review,
@@ -1129,6 +1141,85 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
             "policy_evidence_only",
             "sequence_policy_gate_consumer",
             "no_proposal_order_mutation",
+            "no_live_writes",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_policy_mutation",
+            "no_proposal_state_mutation",
+            "no_direct_sequence_execution",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview",
+        label=(
+            "Operator Proposal Apply Sequence Policy Memory Trust Promotion "
+            "Ordering Preview"
+        ),
+        domain="decision_evidence",
+        status="shadow_only",
+        summary=(
+            "Read-only recommended proposal-order view from sequence-policy "
+            "consumer records; does not mutate queues, proposal payloads, "
+            "policy stores, models, proposal state, or live transport."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_ordering_preview_is_not_queue_execution_or_live_authority"
+        ),
+        promotion_next=(
+            "route ordering-preview rows through a separate queue or sequence "
+            "consumer before mutating queues, proposal order, or execution behavior"
+        ),
+        notes=(
+            "transport_free",
+            "ordering_preview_only",
+            "sequence_policy_consumer_records",
+            "proposal_order_mutation_false",
+            "no_live_writes",
+            "no_queue_mutation",
+            "no_model_mutation",
+            "no_runtime_memory_mutation",
+            "no_policy_mutation",
+            "no_proposal_state_mutation",
+            "no_direct_sequence_execution",
+        ),
+    ),
+    ProcessingMethod(
+        id="operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan",
+        label=(
+            "Operator Proposal Apply Sequence Policy Memory Trust Promotion "
+            "Queue Ordering Plan"
+        ),
+        domain="decision_evidence",
+        status="shadow_only",
+        summary=(
+            "Read-only queue-ordering plan from sequence-policy ordering "
+            "preview rows; does not import or reorder queues, mutate proposal "
+            "payloads, policy stores, models, proposal state, or live transport."
+        ),
+        module=(
+            "backend/operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan.py"
+        ),
+        can_analyze=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "sequence_memory_trust_promotion_queue_ordering_plan_is_not_queue_execution_or_live_authority"
+        ),
+        promotion_next=(
+            "route queue-ordering plan records through a separate acknowledged "
+            "queue import or sequence consumer before mutating queues or execution"
+        ),
+        notes=(
+            "transport_free",
+            "queue_ordering_plan_only",
+            "sequence_policy_ordering_preview_consumer",
+            "queue_import_allowed_by_plan_false",
+            "proposal_order_mutation_false",
             "no_live_writes",
             "no_queue_mutation",
             "no_model_mutation",
@@ -2951,6 +3042,8 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -3066,6 +3159,8 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -3140,6 +3235,8 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate",
             "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview",
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan",
             "source_identity_calibration_memory_trust_review",
             "source_identity_calibration_memory_trust_acceptance_ledger",
             "source_identity_calibration_memory_trust_promotion_plan",
@@ -3353,6 +3450,16 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer",
         "ui_surface": "Decision Queue, sequence policy memory trust promotion policy consumer",
         "next_step": "Use consumer records only as read-only decision evidence before any separate ordering, queue, or execution consumer is reviewed.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion ordering preview",
+        "next_step": "Use ordering-preview rows only as read-only decision evidence before any separate queue or sequence consumer is reviewed.",
+    },
+    "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan": {
+        "entrypoint": "build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan",
+        "ui_surface": "Decision Queue, sequence policy memory trust promotion queue-ordering plan",
+        "next_step": "Use queue-ordering plan records only as read-only evidence before any separate acknowledged queue or sequence consumer is reviewed.",
     },
     "source_identity_calibration_memory_trust_review": {
         "entrypoint": "build_source_identity_calibration_memory_trust_review",
@@ -3973,6 +4080,12 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         ),
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer": (
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview()
+        ),
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan": (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan()
         ),
         "source_identity_calibration_memory_trust_review": (
             build_source_identity_calibration_memory_trust_review()
