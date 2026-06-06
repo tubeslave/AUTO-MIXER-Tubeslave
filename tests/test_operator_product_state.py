@@ -12489,6 +12489,210 @@ async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audi
     assert policy_gate_payload["summary"]["live_write"] is False
     assert policy_gate_payload["summary"]["policy_mutation"] is False
     assert policy_gate_payload["summary"]["full_autonomous_ready"] is False
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_audit_policy_gate_result"
+    ](
+        object(),
+        {
+            "execution_audit_result_consumer": audit_consumer_payload,
+            "audit_policy_gate_result": policy_gate_payload,
+        },
+    )
+
+    policy_gate_consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        policy_gate_consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_audit_policy_gate_result_consumer"
+    )
+    assert (
+        policy_gate_consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_audit_policy_gate_result"
+    )
+    assert (
+        policy_gate_consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_memory_draft_request_available"
+    )
+    assert policy_gate_consumer_payload["summary"]["expected_policy_evidence_count"] == 1
+    assert policy_gate_consumer_payload["summary"]["policy_evidence_count"] == 1
+    assert policy_gate_consumer_payload["summary"]["ready_policy_evidence_count"] == 1
+    assert policy_gate_consumer_payload["summary"]["blocked_policy_evidence_count"] == 0
+    assert policy_gate_consumer_payload["summary"]["memory_draft_request_available"] is True
+    assert policy_gate_consumer_payload["summary"]["memory_draft_handler_invoked"] is False
+    assert policy_gate_consumer_payload["summary"]["memory_draft_created"] is False
+    assert policy_gate_consumer_payload["summary"]["memory_write_allowed_by_consumer"] is False
+    assert policy_gate_consumer_payload["summary"]["live_write"] is False
+    assert policy_gate_consumer_payload["summary"]["idempotency_reserved"] is False
+    assert policy_gate_consumer_payload["summary"]["policy_mutation"] is False
+    assert policy_gate_consumer_payload["memory_draft_request"]["handler"] == (
+        "draft_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert (
+        policy_gate_consumer_payload["memory_draft_request"]["policy_gate_payload"][
+            "policy_evidence"
+        ][0]["idempotency_key"]
+        == "seq-import-audit:proposal-sequence-fader"
+    )
+
+    await server._dispatch["draft_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        policy_gate_consumer_payload["memory_draft_request"],
+    )
+
+    draft_payload = server.send_to_client.await_args.args[1]
+    assert draft_payload["type"] == "operator_proposal_apply_sequence_policy_memory_draft"
+    assert draft_payload["status"] == "ready"
+    assert draft_payload["summary"]["memory_draft_count"] == 1
+    assert draft_payload["summary"]["memory_draft_only"] is True
+    assert draft_payload["summary"]["memory_mutation"] is False
+    assert draft_payload["summary"]["runtime_memory_mutation"] is False
+    assert draft_payload["summary"]["policy_mutation"] is False
+    assert draft_payload["summary"]["full_autonomous_ready"] is False
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_draft_result"
+    ](
+        object(),
+        {
+            "audit_policy_gate_result_consumer": policy_gate_consumer_payload,
+            "memory_draft_result": draft_payload,
+        },
+    )
+
+    memory_draft_consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        memory_draft_consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_draft_result_consumer"
+    )
+    assert (
+        memory_draft_consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_memory_draft_result"
+    )
+    assert (
+        memory_draft_consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_memory_writer_request_available"
+    )
+    assert memory_draft_consumer_payload["summary"]["expected_memory_draft_count"] == 1
+    assert memory_draft_consumer_payload["summary"]["memory_draft_record_count"] == 1
+    assert (
+        memory_draft_consumer_payload["summary"]["ready_memory_draft_record_count"]
+        == 1
+    )
+    assert (
+        memory_draft_consumer_payload["summary"]["blocked_memory_draft_record_count"]
+        == 0
+    )
+    assert memory_draft_consumer_payload["summary"]["memory_writer_request_available"] is True
+    assert memory_draft_consumer_payload["summary"]["memory_writer_handler_invoked"] is False
+    assert memory_draft_consumer_payload["summary"]["memory_file_write_applied"] is False
+    assert memory_draft_consumer_payload["summary"]["memory_write_allowed_by_consumer"] is False
+    assert memory_draft_consumer_payload["summary"]["live_write"] is False
+    assert memory_draft_consumer_payload["summary"]["idempotency_reserved"] is False
+    assert memory_draft_consumer_payload["memory_writer_request"]["handler"] == (
+        "write_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert memory_draft_consumer_payload["memory_writer_request"]["apply"] is False
+    assert memory_draft_consumer_payload["memory_writer_request"]["operator_ack"] is False
+    assert (
+        memory_draft_consumer_payload["memory_writer_request"][
+            "memory_draft_payload"
+        ]["memory_draft_records"][0]["evidence"]["idempotency_key"]
+        == "seq-import-audit:proposal-sequence-fader"
+    )
+
+    await server._dispatch["write_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        memory_draft_consumer_payload["memory_writer_request"],
+    )
+
+    writer_payload = server.send_to_client.await_args.args[1]
+    assert writer_payload["type"] == "operator_proposal_apply_sequence_policy_memory_writer"
+    assert writer_payload["status"] == "append_only_memory_write_dry_run_ready"
+    assert writer_payload["summary"]["memory_draft_record_count"] == 1
+    assert writer_payload["summary"]["append_only_memory_write_applied"] is False
+    assert writer_payload["summary"]["apply_requested"] is False
+    assert writer_payload["summary"]["operator_ack"] is False
+    assert writer_payload["summary"]["memory_file_mutation"] is False
+    assert writer_payload["summary"]["runtime_memory_mutation"] is False
+    assert writer_payload["summary"]["policy_mutation"] is False
+    assert writer_payload["summary"]["full_autonomous_ready"] is False
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_dry_run_result"
+    ](
+        object(),
+        {
+            "memory_draft_result_consumer": memory_draft_consumer_payload,
+            "memory_writer_dry_run_result": writer_payload,
+        },
+    )
+
+    writer_dry_run_consumer_payload = server.send_to_client.await_args.args[1]
+    assert (
+        writer_dry_run_consumer_payload["type"]
+        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_dry_run_result_consumer"
+    )
+    assert (
+        writer_dry_run_consumer_payload["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_dry_run_result"
+    )
+    assert (
+        writer_dry_run_consumer_payload["status"]
+        == "sequence_memory_trust_promotion_queue_import_memory_writer_apply_request_available"
+    )
+    assert (
+        writer_dry_run_consumer_payload["summary"][
+            "expected_memory_writer_dry_run_count"
+        ]
+        == 1
+    )
+    assert (
+        writer_dry_run_consumer_payload["summary"][
+            "memory_writer_dry_run_record_count"
+        ]
+        == 1
+    )
+    assert writer_dry_run_consumer_payload["summary"]["dry_run_blocker_count"] == 1
+    assert writer_dry_run_consumer_payload["summary"]["invalid_record_count"] == 0
+    assert (
+        writer_dry_run_consumer_payload["summary"][
+            "memory_writer_apply_request_available"
+        ]
+        is True
+    )
+    assert writer_dry_run_consumer_payload["summary"]["memory_writer_handler_invoked"] is False
+    assert writer_dry_run_consumer_payload["summary"]["memory_file_write_applied"] is False
+    assert (
+        writer_dry_run_consumer_payload["summary"]["memory_write_allowed_by_consumer"]
+        is False
+    )
+    assert writer_dry_run_consumer_payload["summary"]["live_write"] is False
+    assert writer_dry_run_consumer_payload["memory_writer_apply_request"]["handler"] == (
+        "write_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert writer_dry_run_consumer_payload["memory_writer_apply_request"]["apply"] is False
+    assert (
+        writer_dry_run_consumer_payload["memory_writer_apply_request"]["operator_ack"]
+        is False
+    )
+    assert (
+        writer_dry_run_consumer_payload["memory_writer_apply_request"][
+            "operator_must_set_apply_true"
+        ]
+        is True
+    )
+    assert (
+        writer_dry_run_consumer_payload["memory_writer_apply_request"][
+            "operator_must_set_operator_ack_true"
+        ]
+        is True
+    )
+    assert (
+        writer_dry_run_consumer_payload["memory_writer_apply_request"][
+            "memory_draft_payload"
+        ]["memory_draft_records"][0]["proposal_id"]
+        == "proposal-sequence-fader"
+    )
     assert server._apply_manual_console_write.await_count == 1
     assert "seq-import-audit:proposal-sequence-fader" in (
         server._operator_apply_idempotency_keys

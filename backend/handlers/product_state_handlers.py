@@ -58,6 +58,15 @@ from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import
 from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer import (
     build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer,
 )
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_audit_policy_gate_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_audit_policy_gate_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_draft_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_draft_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_dry_run_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_dry_run_result_consumer,
+)
 
 
 VERIFIED_MANUAL_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
@@ -830,6 +839,75 @@ def register_handlers(server):
         )
         result["handler"] = (
             "verify_operator_proposal_apply_sequence_policy_queue_import_execution_audit_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_audit_policy_gate_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_audit_policy_gate_result_consumer(
+                execution_audit_result_consumer=(
+                    data.get("execution_audit_result_consumer")
+                    or data.get("queue_import_execution_audit_result_consumer")
+                    or data.get("consumer")
+                ),
+                audit_policy_gate_result=(
+                    data.get("audit_policy_gate_result")
+                    or data.get("policy_gate_payload")
+                    or data.get("policy_gate")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_audit_policy_gate_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_memory_draft_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_draft_result_consumer(
+                audit_policy_gate_result_consumer=(
+                    data.get("audit_policy_gate_result_consumer")
+                    or data.get("queue_import_audit_policy_gate_result_consumer")
+                    or data.get("consumer")
+                ),
+                memory_draft_result=(
+                    data.get("memory_draft_result")
+                    or data.get("memory_draft_payload")
+                    or data.get("draft")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_memory_draft_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_dry_run_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_dry_run_result_consumer(
+                memory_draft_result_consumer=(
+                    data.get("memory_draft_result_consumer")
+                    or data.get("queue_import_memory_draft_result_consumer")
+                    or data.get("consumer")
+                ),
+                memory_writer_dry_run_result=(
+                    data.get("memory_writer_dry_run_result")
+                    or data.get("memory_writer_result")
+                    or data.get("writer")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_dry_run_result"
         )
         await server.send_to_client(websocket, result)
 
@@ -4623,6 +4701,15 @@ def register_handlers(server):
         ),
         "verify_operator_proposal_apply_sequence_policy_queue_import_execution_audit_result": (
             handle_verify_operator_proposal_apply_sequence_policy_queue_import_execution_audit_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_audit_policy_gate_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_audit_policy_gate_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_draft_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_memory_draft_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_dry_run_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_dry_run_result
         ),
         "create_operator_proposal": handle_create_operator_proposal,
         "accept_operator_proposal": handle_accept_operator_proposal,
