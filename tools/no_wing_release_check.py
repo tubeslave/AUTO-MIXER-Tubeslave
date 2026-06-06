@@ -650,6 +650,7 @@ def build_checks(
     command_timeout_sec: float | None = DEFAULT_COMMAND_TIMEOUT_SEC,
 ) -> list[CommandCheck]:
     offline_artifact_root = (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "offline_validation"
+    handoff_packet_output = wing_readonly_preflight_handoff_packet_path_for_run(run_dir)
     gain_proof_root = gain_proof_artifact_root_for_run(run_dir)
     proof_report_path = proof_report_path_for_run(run_dir)
     checks = [
@@ -725,6 +726,19 @@ def build_checks(
                 "tools/offline_operator_validation_harness.py",
                 "--artifact-root",
                 str(offline_artifact_root),
+            ),
+            cwd=str(repo_root),
+        ),
+        CommandCheck(
+            name="wing_readonly_preflight_handoff_packet",
+            command=(
+                sys.executable,
+                WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL,
+                "--channels",
+                WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+                "--output",
+                str(handoff_packet_output),
+                "--quiet",
             ),
             cwd=str(repo_root),
         ),
@@ -825,6 +839,10 @@ def proof_report_path_for_run(run_dir: Path | None) -> Path:
 
 def gain_proof_artifact_root_for_run(run_dir: Path | None) -> Path:
     return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "gain_proof_dry_run"
+
+
+def wing_readonly_preflight_handoff_packet_path_for_run(run_dir: Path | None) -> Path:
+    return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "wing_readonly_preflight_handoff_packet.md"
 
 
 def validate_no_live_commands(checks: Iterable[CommandCheck]) -> None:

@@ -80,6 +80,7 @@ from tools.no_wing_release_check import (
     validate_supervised_proof_report_next_wing_plan,
     validate_supervised_proof_report_gain_dry_run,
     validate_supervised_proof_report_gap_rollup,
+    wing_readonly_preflight_handoff_packet_path_for_run,
     write_summary,
 )
 
@@ -2682,6 +2683,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "read_surface_fixture_evidence" in check_names
     assert "memory_lint" in check_names
     assert "gain_dry_run_proof" in check_names
+    assert "wing_readonly_preflight_handoff_packet" in check_names
     assert "supervised_proof_artifact_report" in check_names
     assert check_names.index("write_surface_static_scan") < check_names.index("backend_pytest")
     assert check_names.index("read_surface_fixture_evidence") < check_names.index("backend_pytest")
@@ -2689,6 +2691,9 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         "read_surface_fixture_evidence"
     )
     assert check_names.index("offline_operator_validation_harness") < check_names.index(
+        "wing_readonly_preflight_handoff_packet"
+    )
+    assert check_names.index("wing_readonly_preflight_handoff_packet") < check_names.index(
         "gain_dry_run_proof"
     )
     assert check_names.index("gain_dry_run_proof") < check_names.index(
@@ -2760,6 +2765,16 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert str(proof_report_path_for_run(tmp_path)) in report_check.command
     assert str(gain_proof_artifact_root_for_run(tmp_path)) in report_check.command
     assert report_check.command.count("--artifact-root") == 2
+    handoff_check = next(
+        check for check in checks if check.name == "wing_readonly_preflight_handoff_packet"
+    )
+    assert "tools/build_wing_readonly_preflight_handoff_packet.py" in handoff_check.command
+    assert "--channels" in handoff_check.command
+    assert "3" in handoff_check.command
+    assert "--quiet" in handoff_check.command
+    assert str(wing_readonly_preflight_handoff_packet_path_for_run(tmp_path)) in (
+        handoff_check.command
+    )
     gain_check = next(check for check in checks if check.name == "gain_dry_run_proof")
     assert "tools/gain_proof_dry_run_runner.py" in gain_check.command
     assert str(gain_proof_artifact_root_for_run(tmp_path)) in gain_check.command

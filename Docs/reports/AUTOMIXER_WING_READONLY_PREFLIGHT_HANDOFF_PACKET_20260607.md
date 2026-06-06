@@ -19,7 +19,9 @@ packet containing:
 
 `tools/no_wing_release_check.py` now exposes and validates that packet surface.
 It fails closed if the packet tool is missing or if the packet channel argument
-diverges from the read-only capture command.
+diverges from the read-only capture command. The no-WING command plan also runs
+the packet builder as an offline smoke command into the release-check run
+directory.
 
 ## Safety Boundary
 
@@ -64,6 +66,14 @@ diverges from the read-only capture command.
   `live_authority_granted` was `false`.
 - `python3 tools/memory/memory_lint.py` passed.
 - `/opt/homebrew/bin/git diff --check` passed.
+
+Additional continuation validation:
+
+- `PYTHONPATH=backend python3 -m pytest -q tests/test_no_wing_release_check.py::test_no_wing_release_check_quick_mode_still_runs_write_surface_scan`
+  passed after wiring `wing_readonly_preflight_handoff_packet` into the no-WING
+  command plan.
+- `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick --skip-frontend --artifact-root /tmp/automixer-no-wing-release-check-handoff-packet-smoke --command-timeout-sec 300`
+  passed with the packet builder included in the executed command plan.
 
 ## Remaining WING MVP Blocker
 
