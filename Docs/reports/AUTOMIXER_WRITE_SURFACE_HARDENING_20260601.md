@@ -75,6 +75,15 @@ Every other known write-capable or write-adjacent path is marked as
 - Offline render local mixer facades:
   `tools/offline_agent_mix.py`, `mix_agent/`,
   `backend/offline_validation_harness.py`.
+- Proof and release-check tooling:
+  `tools/no_wing_release_check.py`, `tools/gain_proof_dry_run_runner.py`,
+  `tools/wing_operator_proposal_validation_runner.py`,
+  `tools/wing_method_proof_runner.py`, `tools/wing_supervised_smoke_runner.py`,
+  `tools/wing_readonly_preflight_runner.py`,
+  `tools/review_wing_readonly_preflight_artifacts.py`, and
+  `backend/wing_readonly_preflight_evidence.py`. These may contain forbidden
+  write-token strings for audit/event-log validation, but they do not grant
+  live authority.
 - Latency benchmark tools:
   `tools/latency/audio_e2e.py`,
   `tools/latency/osc_rtt_benchmark.py`,

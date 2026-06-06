@@ -69,6 +69,11 @@ artifacts и app bundles могут содержать пробелы в пут�
 - `README.md`;
 - `AGENTS.md`;
 - `CLAUDE.md`;
+- `Docs/MVP_WING_SUPERVISED.md`;
+- `.ai/project-layer/wing_mvp_blockers.md`;
+- `Docs/CORRECTION_METHODS_ROADMAP.md`;
+- `.ai/project-layer/correction_methods_backlog.md`;
+- `Docs/reports/MVP_PROGRESS_LATEST.md`;
 - `.ai/memory/project.md`;
 - `Docs/PROJECT_IMPLEMENTATION_PLAN.md`;
 - relevant goal/roadmap/report files, если они есть.
@@ -131,23 +136,40 @@ Daily success измеряется закрытыми WING proof blockers, а н
 
 ## 2.2. Direction guard automation
 
-Перед выбором задачи запусти repo-local direction guard:
+Перед выбором задачи обнови MVP progress, запусти repo-local direction guard и
+Project Director Agent:
 
 ```bash
+python3 tools/codex_autoloop/update_mvp_progress.py
+
 python3 tools/codex_autoloop/codex_direction_guard.py \
   --format markdown \
   --output .paperclip/reports/codex_direction_guard_latest.md
+
+python3 tools/codex_autoloop/project_director_agent.py \
+  --format markdown \
+  --output .paperclip/reports/project_director_latest.md
 ```
 
-Прочитай результат guard-а до раздела `## 4. Написать краткий план`.
+Прочитай результат guard-а и Project Director Agent до раздела
+`## 4. Написать краткий план`.
 
 - Если status `drifting` или `mixed_needs_review`, не продолжай broad
   memory/queue/result-consumer/report-only/proposal-only работу. Выбери задачу
   только из WING proof blockers раздела 2.1.
+- Это не остановка разработки: продолжай непрерывный режим `Цель`, но
+  перенаправь работу на first non-closed MVP blocker.
+- Project Director Agent является рабочим директором цикла: выбери задачу из
+  его `Selected Work`, то есть из first non-closed row в
+  `.ai/project-layer/wing_mvp_blockers.md`.
 - Если WING Rack подключен, следующий шаг должен быть read-only preflight или
   ручной review реального preflight artifact.
 - Если WING Rack не подключен, разрешена только работа, которая прямо готовит
   физический read-only/supervised proof и имеет тест.
+- Методы коррекций Gain/Trim, Pan, EQ, Comp, FX, Balance и другие продолжай
+  развивать в режиме `Цель`, но до закрытия WING MVP они должны оставаться
+  offline/dry-run/proposal-only/read-only, если только они не являются уже
+  разрешенным supervised fader/gain proof.
 - Не считай guard доказательством live readiness: это только audit направления.
 
 ## 3. Найти нерешенные задачи
@@ -184,8 +206,11 @@ python3 tools/codex_autoloop/codex_direction_guard.py \
 - добавь или обнови тесты, если меняешь поведение;
 - запусти релевантные проверки;
 - запусти `python3 tools/memory/memory_lint.py` и зафиксируй результат;
-- перед финальным отчетом снова запусти direction guard:
-  `python3 tools/codex_autoloop/codex_direction_guard.py --format markdown --output .paperclip/reports/codex_direction_guard_final.md`;
+- перед финальным отчетом снова запусти MVP progress, direction guard и Project
+  Director Agent:
+  `python3 tools/codex_autoloop/update_mvp_progress.py`,
+  `python3 tools/codex_autoloop/codex_direction_guard.py --format markdown --output .paperclip/reports/codex_direction_guard_final.md`,
+  `python3 tools/codex_autoloop/project_director_agent.py --format markdown --output .paperclip/reports/project_director_final.md`;
 - не останавливайся на середине;
 - если безопасной кодовой задачи нет, улучши report/docs/tests только вокруг
   named WING proof blockers из раздела 2.1.
@@ -214,6 +239,8 @@ python3 tools/codex_autoloop/codex_direction_guard.py \
 - результат memory lint в отдельном разделе `## Memory Lint Result` с результатом `python3 tools/memory/memory_lint.py`;
 - результат direction guard: статус, score и краткое объяснение, почему задача
   двигала supervised WING Rack MVP;
+- результат Project Director Agent: выбранный blocker, его status и почему
+  задача была взята из first non-closed row;
 - что осталось;
 - какие риски есть;
 - ссылки на измененные файлы;

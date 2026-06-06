@@ -83,6 +83,20 @@ def test_direction_guard_markdown_and_json_outputs(tmp_path):
     output_path = tmp_path / "guard.json"
     guard.write_report(output_path, json.dumps(report, ensure_ascii=False))
     assert json.loads(output_path.read_text(encoding="utf-8"))["type"] == "codex_direction_guard"
+    assert report["mvp_blocker_table"] == ".ai/project-layer/wing_mvp_blockers.md"
+    assert report["continue_goal_mode"] is True
+    assert report["stop_scope"] == "broad_work_only"
+
+
+def test_direction_guard_stop_the_line_marks_drift():
+    guard = load_guard_module()
+
+    report = guard.analyze_evidence(
+        [("git_log", "Add promotion queue import result consumer chain")]
+    )
+
+    assert report["status"] == "drifting"
+    assert report["stop_the_line"] is True
 
 
 def test_codex_cycle_prompt_runs_direction_guard_before_plan_and_final_report():
@@ -93,6 +107,7 @@ def test_codex_cycle_prompt_runs_direction_guard_before_plan_and_final_report():
     assert "перед финальным отчетом" in text
     assert "codex_direction_guard_latest.md" in text
     assert "codex_direction_guard_final.md" in text
+    assert "project_director_agent.py" in text
 
 
 def test_codex_autoloop_readme_documents_direction_guard_activation_time():

@@ -105,6 +105,18 @@ you want the background automation active.
   memory/queue/result-consumer/report-only work. The wall-clock cadence remains
   the existing LaunchAgent interval of `1200` seconds when installed; no new
   background service is installed by the guard.
+- Project Director Agent activation is inside each Codex cycle after the
+  direction guard. `tools/codex_autoloop/project_director_agent.py` reads
+  `Docs/MVP_WING_SUPERVISED.md`, `.ai/project-layer/wing_mvp_blockers.md`, and
+  the guard result, then selects the first non-closed MVP blocker as the only
+  acceptable task direction. It writes `.paperclip/reports/project_director_latest.md`
+  and never writes code, contacts WING, or grants live authority.
+  If it detects broad-work drift, development still continues in Goal mode; the
+  next task is redirected to the first non-closed MVP blocker instead of
+  stopping the autonomous cycle.
+- `tools/codex_autoloop/update_mvp_progress.py` refreshes
+  `Docs/reports/MVP_PROGRESS_LATEST.md` from the blocker table before planning
+  and before the final report.
 - Focused offline release gates can use `tools/no_wing_release_check.py`; each
   subprocess check has a default timeout and records a `timeout` result instead
   of leaving an autonomous run silent indefinitely.

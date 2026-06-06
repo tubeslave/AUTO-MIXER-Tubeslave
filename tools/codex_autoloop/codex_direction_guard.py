@@ -22,6 +22,8 @@ from typing import Iterable, Sequence
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 REPORT_DIRS = (".paperclip/reports", "Docs/reports")
+MVP_BLOCKERS_PATH = ".ai/project-layer/wing_mvp_blockers.md"
+STOP_THE_LINE_STATUSES = {"drifting", "mixed_needs_review", "needs_direction"}
 
 TARGET_PATTERNS = (
     "wing read-only",
@@ -180,8 +182,12 @@ def analyze_evidence(raw_items: Iterable[tuple[str, str]]) -> dict:
             "before_final_report": True,
             "wall_clock_schedule": "every Codex autoloop cycle; LaunchAgent interval remains 1200 seconds when installed",
         },
+        "mvp_blocker_table": MVP_BLOCKERS_PATH,
         "status": status,
         "score": score,
+        "stop_the_line": status in STOP_THE_LINE_STATUSES,
+        "continue_goal_mode": True,
+        "stop_scope": "broad_work_only",
         "verdict": verdict,
         "summary": {
             "evidence_count": len(items),
@@ -324,6 +330,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exit non-zero when direction is drifting or mixed.",
     )
+    parser.add_argument(
+        "--stop-the-line",
+        action="store_true",
+        help="Exit non-zero when broad work should stop and Codex should return to the first open MVP blocker.",
+    )
     return parser
 
 
@@ -345,6 +356,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         write_report(Path(args.output), text)
     else:
         print(text)
+    if args.stop_the_line and report["stop_the_line"]:
+        return 2
     if args.fail_on_drift and report["status"] in {"drifting", "mixed_needs_review"}:
         return 2
     return 0

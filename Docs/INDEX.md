@@ -11,6 +11,8 @@ paths, Product Layer, or cleanup policy.
 | Document | Purpose |
 | --- | --- |
 | `Docs/PROJECT_IMPLEMENTATION_PLAN.md` | Product goal, MVP phases, safety boundaries, schedule. |
+| `Docs/MVP_WING_SUPERVISED.md` | Current supervised WING Rack MVP contract, blocker list, and stop-the-line rules. |
+| `Docs/CORRECTION_METHODS_ROADMAP.md` | Roadmap for Gain/Trim, Pan, EQ, Comp, FX, Balance, routing, scenes, and output correction methods. |
 | `Docs/PROJECT_STRUCTURE_MAP.md` | Canonical domain map and status labels. |
 | `Docs/PROCESSING_METHODS_INVENTORY.md` | Canonical processing-method and pipeline-profile selection. |
 | `Docs/memory_pipeline.md` | Agent Core + Project Layer + memory pipeline for Codex, Kimi, and Paperclip work. |
@@ -34,8 +36,11 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_RUNNER_20260606.md` | Read-only WING preflight runner for connection/state/physical-readback artifacts before supervised writes. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EVIDENCE_20260606.md` | Fail-closed evidence matrix for read-only WING preflight artifacts and manual readiness review. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EVIDENCE_FAIL_CLOSED_20260606.md` | Mixed valid+invalid WING preflight artifacts fail closed before readiness-matrix review. |
+| `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EVENT_LOG_CROSSCHECK_20260606.md` | Read-only preflight summaries must match their event logs before manual readiness review. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_READINESS_BRIDGE_20260606.md` | Read-only preflight evidence overlay inside autonomy promotion readiness; manual review candidate only. |
 | `Docs/reports/AUTOMIXER_SUPERVISED_WING_PROOF_READONLY_PREFLIGHT_GATE_20260606.md` | Next supervised WING proof plan is blocked until clean read-only preflight evidence exists. |
+| `Docs/reports/AUTOMIXER_WING_SUPERVISED_MVP_RAILS_20260606.md` | MVP contract, blocker table, runbooks, progress updater, and Project Director Agent. |
+| `Docs/reports/MVP_PROGRESS_LATEST.md` | Latest generated supervised WING MVP blocker status and first required action. |
 | `Docs/reports/AUTOMIXER_STREAMING_ALERTS_20260601.md` | Read-only streaming telemetry alert artifacts for dashboards, QA, and future learning labels. |
 | `Docs/STRUCTURING_COMPLETION_20260518.md` | What was moved, what remains, and the next work boundary. |
 | `Docs/PROJECT_CLEANUP_BACKLOG.md` | Remaining cleanup backlog and rules. |
@@ -66,6 +71,8 @@ paths, Product Layer, or cleanup policy.
 | Area | Documents |
 | --- | --- |
 | Product Layer plan | `Docs/PROJECT_IMPLEMENTATION_PLAN.md` |
+| Current WING MVP rails | `Docs/MVP_WING_SUPERVISED.md`, `.ai/project-layer/wing_mvp_blockers.md`, `Docs/runbooks/WING_READONLY_PREFLIGHT.md`, `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`, `Docs/reports/MVP_PROGRESS_LATEST.md` |
+| Correction method roadmap | `Docs/CORRECTION_METHODS_ROADMAP.md`, `.ai/project-layer/correction_methods_backlog.md` |
 | Processing pipeline selection | `Docs/PROCESSING_METHODS_INVENTORY.md`, `Docs/adr/processing-pipeline-selection.md` |
 | Automation foundation layer | `Docs/adr/automation-foundation-layer-20260527.md`, `Docs/reports/AUTOMIXER_AUTOMATION_FOUNDATION_LAYER_20260527.md` |
 | Paperclip/GPT workflow | `Docs/PAPERCLIP_DIRECTOR_WORKFLOW.md` |

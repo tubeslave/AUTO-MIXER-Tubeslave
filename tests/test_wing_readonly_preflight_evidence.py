@@ -65,6 +65,57 @@ def _valid_summary() -> dict:
     }
 
 
+def _event(seq: int, event_type: str, payload: dict) -> dict:
+    return {
+        "seq": seq,
+        "timestamp": "2026-06-06T12:00:00.000Z",
+        "event_type": event_type,
+        "payload": payload,
+    }
+
+
+def _valid_events(summary: dict) -> list[dict]:
+    events = [
+        _event(1, "send", {"type": "get_operator_mode"}),
+        _event(2, "recv", {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"}),
+        _event(3, "send", {"type": "get_state"}),
+        _event(4, "recv", {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}}),
+    ]
+    seq = 5
+    for row in summary["readbacks"]:
+        events.append(
+            _event(
+                seq,
+                "send",
+                {
+                    "type": "query_mixer_parameter",
+                    "channel": row["channel"],
+                    "value_type": row["value_type"],
+                    "address": row["address"],
+                },
+            )
+        )
+        events.append(_event(seq + 1, "recv", row))
+        seq += 2
+    return events
+
+
+def _write_file_artifact(artifact_dir: Path, summary: dict | None = None, events: list[dict] | None = None) -> Path:
+    artifact_dir.mkdir(parents=True)
+    artifact_path = artifact_dir / "summary.json"
+    events_path = artifact_dir / "events.jsonl"
+    payload = copy.deepcopy(summary or _valid_summary())
+    payload["events_path"] = str(events_path)
+    payload["summary_path"] = str(artifact_path)
+    artifact_path.write_text(json.dumps(payload), encoding="utf-8")
+    event_rows = events if events is not None else _valid_events(payload)
+    events_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in event_rows),
+        encoding="utf-8",
+    )
+    return artifact_path
+
+
 def test_wing_readonly_preflight_evidence_reports_missing_without_authority():
     evidence = build_wing_readonly_preflight_evidence(artifact_roots=("does-not-exist/preflight",))
 
@@ -167,9 +218,7 @@ def test_preflight_evidence_rejects_non_physical_or_forbidden_request_artifact()
 
 def test_wing_readonly_preflight_evidence_discovers_summary_json_files(tmp_path):
     artifact_dir = tmp_path / "preflight" / "run"
-    artifact_dir.mkdir(parents=True)
-    artifact_path = artifact_dir / "summary.json"
-    artifact_path.write_text(json.dumps(_valid_summary()), encoding="utf-8")
+    artifact_path = _write_file_artifact(artifact_dir)
     broken_dir = tmp_path / "preflight" / "broken"
     broken_dir.mkdir()
     (broken_dir / "summary.json").write_text("{", encoding="utf-8")
@@ -196,6 +245,118 @@ def test_wing_readonly_preflight_evidence_discovers_summary_json_files(tmp_path)
         "artifact_load_error:JSONDecodeError" in row["violations"]
         for row in evidence["artifacts"]
     )
+
+
+def test_file_preflight_artifact_requires_matching_event_log(tmp_path):
+    artifact_dir = tmp_path / "preflight" / "missing-events"
+    artifact_dir.mkdir(parents=True)
+    artifact_path = artifact_dir / "summary.json"
+    summary = _valid_summary()
+    summary["events_path"] = str(artifact_dir / "events.jsonl")
+    artifact_path.write_text(json.dumps(summary), encoding="utf-8")
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_missing" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_rejects_tampered_event_log_send_types(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events.insert(
+        2,
+        _event(
+            99,
+            "send",
+            {
+                "type": "set_gain",
+                "channel": 3,
+                "value_type": "gain",
+                "value": 1.0,
+            },
+        ),
+    )
+    _write_file_artifact(tmp_path / "preflight" / "tampered", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_sent_request_types_mismatch" in evidence["summary"]["violations"]
+    assert "event_log_unexpected_sent_request_types" in evidence["summary"]["violations"]
+    assert "event_log_forbidden_request_type_sent" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_rejects_wrong_event_request_order(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events[0], events[2] = events[2], events[0]
+    _write_file_artifact(tmp_path / "preflight" / "wrong-order", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_request_sequence_invalid" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_rejects_grouped_send_recv_events(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    grouped = [
+        events[0],
+        events[2],
+        events[1],
+        events[3],
+        *events[4:],
+    ]
+    _write_file_artifact(tmp_path / "preflight" / "grouped-events", summary=summary, events=grouped)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_send_recv_sequence_invalid" in evidence["summary"]["violations"]
+    assert "event_log_response_type_mismatch:0" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_rejects_non_contiguous_event_sequence(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events[3]["seq"] = 99
+    _write_file_artifact(tmp_path / "preflight" / "bad-seq", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_seq_sequence_invalid" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_rejects_query_readback_identity_mismatch(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events[5]["payload"] = {
+        **events[5]["payload"],
+        "channel": 4,
+        "address": "/ch/4/fdr",
+    }
+    _write_file_artifact(tmp_path / "preflight" / "identity-mismatch", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_readbacks_mismatch" in evidence["summary"]["violations"]
+    assert "event_log_query_readback_identity_mismatch:0" in evidence["summary"]["violations"]
 
 
 def test_wing_readonly_preflight_evidence_uses_repo_default_roots():

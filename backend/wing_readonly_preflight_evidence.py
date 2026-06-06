@@ -24,6 +24,40 @@ EVIDENCE_STATUSES = {
     "readonly_preflight_artifact_replacement_required",
 }
 ALLOWED_SENT_REQUEST_TYPES = {"get_operator_mode", "get_state", "query_mixer_parameter"}
+EXPECTED_READBACK_EVENT_TYPES = {"mixer_parameter_value", "mixer_parameter_read_blocked"}
+LIVE_WRITE_REQUEST_TYPES = {
+    "set_fader",
+    "set_gain",
+    "set_trim",
+    "set_input_trim",
+    "set_channel_trim",
+    "set_preamp_trim",
+    "set_preamp_gain",
+    "set_eq",
+    "set_compressor",
+    "route_output",
+    "load_snap",
+    "save_snap",
+    "reset",
+    "mute",
+    "unmute",
+    "set_insert",
+    "set_fx_model",
+    "set_fx_on",
+    "set_fx_mix",
+    "set_fx_parameter",
+}
+PROPOSAL_REQUEST_TYPES = {"create_operator_proposal", "apply_operator_proposal"}
+FORBIDDEN_REQUEST_TYPES = {
+    *LIVE_WRITE_REQUEST_TYPES,
+    "set_operator_mode",
+    *PROPOSAL_REQUEST_TYPES,
+    "rollback_last_manual_write",
+    "emergency_stop",
+    "connect_wing",
+    "disconnect_wing",
+    "disconnect_mixer",
+}
 PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
 PHYSICAL_READBACK_SOURCES = {
     "physical_readback",
@@ -132,6 +166,156 @@ def _load_json_artifact(path: Path) -> Mapping[str, Any]:
     return payload
 
 
+def _load_jsonl_events(path: Path) -> Tuple[Mapping[str, Any], ...]:
+    events: list[Mapping[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line_number, raw_line in enumerate(handle, start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            payload = json.loads(line)
+            if not isinstance(payload, Mapping):
+                raise ValueError(f"event log line {line_number} must be an object")
+            events.append(payload)
+    return tuple(events)
+
+
+def _event_payload(event: Mapping[str, Any]) -> Mapping[str, Any]:
+    return _mapping(event.get("payload"))
+
+
+def _summary_event_path(payload: Mapping[str, Any], summary_path: Path) -> Path | None:
+    raw_path = payload.get("events_path")
+    if not isinstance(raw_path, str) or not raw_path:
+        return None
+    event_path = Path(raw_path)
+    if event_path.is_absolute():
+        return event_path
+    cwd_candidate = Path.cwd() / event_path
+    if cwd_candidate.exists():
+        return cwd_candidate
+    return summary_path.parent / event_path
+
+
+def _validate_event_log(
+    payload: Mapping[str, Any],
+    summary_path: Path,
+    violations: list[str],
+) -> None:
+    event_path = _summary_event_path(payload, summary_path)
+    if event_path is None:
+        violations.append("event_log_path_missing")
+        return
+    if not event_path.exists():
+        violations.append("event_log_missing")
+        return
+    try:
+        events = _load_jsonl_events(event_path)
+    except Exception as exc:
+        violations.append(f"event_log_load_error:{type(exc).__name__}")
+        return
+    if not events:
+        violations.append("event_log_empty")
+        return
+    event_sequences = tuple(_safe_int(event.get("seq")) for event in events)
+    if event_sequences != tuple(range(1, len(events) + 1)):
+        violations.append("event_log_seq_sequence_invalid")
+    event_types = tuple(str(event.get("event_type") or "") for event in events)
+    if len(event_types) % 2 != 0 or any(
+        event_types[index : index + 2] != ("send", "recv")
+        for index in range(0, len(event_types), 2)
+    ):
+        violations.append("event_log_send_recv_sequence_invalid")
+
+    send_payloads = tuple(
+        _event_payload(event)
+        for event in events
+        if event.get("event_type") == "send"
+    )
+    event_request_types = tuple(
+        str(row.get("type") or "unknown")
+        for row in send_payloads
+    )
+    summary_request_types = _string_tuple(payload.get("sent_request_types"))
+    if event_request_types != summary_request_types:
+        violations.append("event_log_sent_request_types_mismatch")
+    unexpected_event_request_types = tuple(
+        sorted(set(event_request_types) - ALLOWED_SENT_REQUEST_TYPES)
+    )
+    if unexpected_event_request_types:
+        violations.append("event_log_unexpected_sent_request_types")
+    if set(event_request_types).intersection(FORBIDDEN_REQUEST_TYPES):
+        violations.append("event_log_forbidden_request_type_sent")
+    if (
+        len(event_request_types) < 3
+        or event_request_types[0] != "get_operator_mode"
+        or event_request_types[1] != "get_state"
+        or any(request_type != "query_mixer_parameter" for request_type in event_request_types[2:])
+    ):
+        violations.append("event_log_request_sequence_invalid")
+
+    recv_payloads = tuple(
+        _event_payload(event)
+        for event in events
+        if event.get("event_type") == "recv"
+    )
+    recv_types = {str(row.get("type") or "") for row in recv_payloads}
+    if "operator_mode_status" not in recv_types:
+        violations.append("event_log_operator_mode_status_missing")
+    if "state_update" not in recv_types:
+        violations.append("event_log_state_update_missing")
+
+    event_readbacks = tuple(
+        row
+        for row in recv_payloads
+        if str(row.get("type") or "") in EXPECTED_READBACK_EVENT_TYPES
+    )
+    readbacks_raw = payload.get("readbacks")
+    summary_readbacks = (
+        tuple(row for row in readbacks_raw if isinstance(row, Mapping))
+        if isinstance(readbacks_raw, list)
+        else ()
+    )
+    if event_readbacks != summary_readbacks:
+        violations.append("event_log_readbacks_mismatch")
+    query_payloads = tuple(
+        row
+        for row in send_payloads
+        if row.get("type") == "query_mixer_parameter"
+    )
+    if len(query_payloads) != len(event_readbacks):
+        violations.append("event_log_query_readback_count_mismatch")
+    for index, (query, readback) in enumerate(zip(query_payloads, event_readbacks)):
+        query_identity = (
+            _safe_int(query.get("channel")),
+            str(query.get("value_type") or ""),
+            str(query.get("address") or ""),
+        )
+        readback_identity = (
+            _safe_int(readback.get("channel")),
+            str(readback.get("value_type") or ""),
+            str(readback.get("address") or ""),
+        )
+        if query_identity != readback_identity:
+            violations.append(f"event_log_query_readback_identity_mismatch:{index}")
+
+    expected_recv_by_request_type = {
+        "get_operator_mode": {"operator_mode_status"},
+        "get_state": {"state_update"},
+        "query_mixer_parameter": EXPECTED_READBACK_EVENT_TYPES,
+    }
+    for index in range(0, len(events), 2):
+        if index + 1 >= len(events):
+            break
+        request = _event_payload(events[index])
+        response = _event_payload(events[index + 1])
+        request_type = str(request.get("type") or "")
+        response_type = str(response.get("type") or "")
+        expected_response_types = expected_recv_by_request_type.get(request_type, set())
+        if response_type not in expected_response_types:
+            violations.append(f"event_log_response_type_mismatch:{index // 2}")
+
+
 def _readback_is_physical(payload: Mapping[str, Any]) -> bool:
     return (
         payload.get("status") in PHYSICAL_READBACK_STATUSES
@@ -150,7 +334,11 @@ def _validate_readback_row(index: int, row: Mapping[str, Any], violations: list[
         violations.append(f"readback_{index}_invalid_channel")
 
 
-def validate_wing_readonly_preflight_artifact(payload: Mapping[str, Any]) -> Dict[str, Any]:
+def validate_wing_readonly_preflight_artifact(
+    payload: Mapping[str, Any],
+    *,
+    summary_path: Path | None = None,
+) -> Dict[str, Any]:
     """Validate one preflight summary without granting live authority."""
 
     violations: list[str] = []
@@ -206,6 +394,9 @@ def validate_wing_readonly_preflight_artifact(payload: Mapping[str, Any]) -> Dic
     for field in sorted(MUTATION_EVIDENCE_FIELDS):
         if field in payload:
             violations.append(f"mutation_evidence_field_present:{field}")
+
+    if summary_path is not None:
+        _validate_event_log(payload, summary_path, violations)
 
     accepted = not violations
     return {
@@ -280,7 +471,10 @@ def _artifact_records(
     )
     for path in paths:
         try:
-            validation = validate_wing_readonly_preflight_artifact(_load_json_artifact(path))
+            validation = validate_wing_readonly_preflight_artifact(
+                _load_json_artifact(path),
+                summary_path=path,
+            )
             records.append(_record_from_validation(str(path), validation))
         except Exception as exc:  # pragma: no cover - defensive artifact parser
             records.append(_record_from_load_error(str(path), exc))

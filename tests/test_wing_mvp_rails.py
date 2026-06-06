@@ -1,0 +1,111 @@
+import importlib.util
+import sys
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MVP_DOC = PROJECT_ROOT / "Docs" / "MVP_WING_SUPERVISED.md"
+CORRECTION_ROADMAP = PROJECT_ROOT / "Docs" / "CORRECTION_METHODS_ROADMAP.md"
+BLOCKERS_DOC = PROJECT_ROOT / ".ai" / "project-layer" / "wing_mvp_blockers.md"
+CORRECTION_BACKLOG = PROJECT_ROOT / ".ai" / "project-layer" / "correction_methods_backlog.md"
+READONLY_RUNBOOK = PROJECT_ROOT / "Docs" / "runbooks" / "WING_READONLY_PREFLIGHT.md"
+SUPERVISED_RUNBOOK = PROJECT_ROOT / "Docs" / "runbooks" / "WING_SUPERVISED_FADER_GAIN_PROOF.md"
+PROGRESS_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "update_mvp_progress.py"
+PROMPT = PROJECT_ROOT / "tools" / "codex_autoloop" / "codex_cycle_prompt.md"
+
+
+def load_progress_module():
+    spec = importlib.util.spec_from_file_location("update_mvp_progress", PROGRESS_TOOL)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_mvp_doc_declares_scope_and_stop_rules():
+    text = MVP_DOC.read_text(encoding="utf-8")
+
+    assert "Supervised WING Rack Proof" in text
+    assert "Full autonomous live mixing" in text
+    assert "Stop-The-Line Rules" in text
+    assert ".ai/project-layer/wing_mvp_blockers.md" in text
+    assert "Docs/runbooks/WING_READONLY_PREFLIGHT.md" in text
+    assert "readiness candidates are not enough" in text
+    assert "Docs/CORRECTION_METHODS_ROADMAP.md" in text
+
+
+def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
+    progress = load_progress_module()
+    rows = progress.parse_blocker_table(BLOCKERS_DOC)
+
+    assert len(rows) == 9
+    assert rows[0]["blocker"] == "WING read-only connection proof"
+    assert rows[0]["status"] == "tooling_ready_waits_real_wing"
+    assert all(row["status"] != "closed" for row in rows)
+    assert progress.first_open_blocker(rows)["blocker"] == "WING read-only connection proof"
+
+
+def test_runbooks_keep_readonly_before_supervised_execute():
+    readonly = READONLY_RUNBOOK.read_text(encoding="utf-8")
+    supervised = SUPERVISED_RUNBOOK.read_text(encoding="utf-8")
+
+    assert "wing_readonly_preflight_runner.py" in readonly
+    assert "review_wing_readonly_preflight_artifacts.py" in readonly
+    assert "--require-physical-readback" in readonly
+    assert "--execute" not in readonly
+    assert "write_request_sent: false" in readonly
+    assert "strict `send`/`recv` pairs" in readonly
+    assert "channel, value type, and address" in readonly
+    assert "wing_operator_proposal_validation_runner.py" in supervised
+    assert "--execute" in supervised
+    assert "blocked until a clean read-only preflight" in supervised
+    assert "negative delta" in supervised
+    assert "Full autonomous" not in supervised
+
+
+def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
+    progress = load_progress_module()
+    rows = progress.parse_blocker_table(BLOCKERS_DOC)
+    report = progress.build_progress_report(rows, generated_at="2026-06-06T00:00:00Z")
+
+    assert "Total blockers: 9" in report
+    assert "Closed blockers: 0" in report
+    assert "Current first open blocker: WING read-only connection proof" in report
+    assert "Offline tooling, shadow" in report
+
+    output = tmp_path / "MVP_PROGRESS_LATEST.md"
+    progress.write_report(output, report)
+    assert output.read_text(encoding="utf-8") == report
+
+
+def test_correction_methods_roadmap_preserves_full_console_goal_without_live_widening():
+    roadmap = CORRECTION_ROADMAP.read_text(encoding="utf-8")
+    backlog = CORRECTION_BACKLOG.read_text(encoding="utf-8")
+
+    for family in (
+        "Gain / Trim",
+        "Pan / Stereo Placement",
+        "EQ",
+        "Compressor",
+        "FX / Sends",
+        "Fader / Balance",
+    ):
+        assert family in roadmap
+
+    assert "offline analysis" in roadmap
+    assert "proposal-only" in roadmap
+    assert "No method may skip stages." in roadmap
+    assert "must not widen live writes" in roadmap
+    assert "separate ADR after WING MVP" in backlog
+    assert "Do not widen live writes" in backlog
+
+
+def test_codex_prompt_requires_mvp_rails_before_new_work():
+    text = PROMPT.read_text(encoding="utf-8")
+
+    assert "Docs/MVP_WING_SUPERVISED.md" in text
+    assert "Docs/CORRECTION_METHODS_ROADMAP.md" in text
+    assert ".ai/project-layer/wing_mvp_blockers.md" in text
+    assert "Docs/reports/MVP_PROGRESS_LATEST.md" in text
+    assert "first non-closed row" in text
