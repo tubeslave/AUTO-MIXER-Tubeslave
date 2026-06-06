@@ -122,6 +122,7 @@
 - Source identity memory trust promotion executor apply-result rows must carry their own no-query/no-priority/no-live-widening safety envelope, and the apply audit must reject forged row-level authority even if the executor summary appears internally consistent.
 - Source identity calibration memory trust promotion apply audit may turn valid applied executor results into rollback evidence records only; it must keep runtime-memory mutation, direct downstream-priority mutation, queue mutation, model mutation, live authority, and full autonomous readiness false, with `rollback_verified=false` until a separate rollback verification gate exists.
 - Source identity calibration memory trust promotion rollback verification may mark apply-audit records as `rollback_verified=true` only from explicit operator-reviewed verification records; verified records are evidence for a future downstream-priority gate, not queue import, live apply, runtime-memory mutation, direct priority mutation, or autonomous authority.
+- Source identity calibration memory trust promotion priority gate may mark verified rollback records as downstream-priority eligible only as read-only policy-gate evidence; it must keep proposal ordering, queue import, runtime-memory mutation, trust-store mutation, model mutation, direct downstream-priority mutation, live authority, and full autonomous readiness false until a separate proposal-priority policy consumer exists.
 
 ## Memory Pipeline Lessons
 

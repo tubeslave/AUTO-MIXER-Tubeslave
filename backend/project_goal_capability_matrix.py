@@ -162,6 +162,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "source_identity_calibration_memory_trust_promotion_executor",
             "source_identity_calibration_memory_trust_promotion_apply_audit",
             "source_identity_calibration_memory_trust_promotion_rollback_verification",
+            "source_identity_calibration_memory_trust_promotion_priority_gate",
         ),
         support_paths=(
             "backend/ml/channel_classifier.py",
@@ -183,6 +184,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_calibration_memory_trust_promotion_executor.py",
             "backend/source_identity_calibration_memory_trust_promotion_apply_audit.py",
             "backend/source_identity_calibration_memory_trust_promotion_rollback_verification.py",
+            "backend/source_identity_calibration_memory_trust_promotion_priority_gate.py",
             "backend/source_identity_downstream_gate.py",
         ),
         next_step=(
@@ -191,8 +193,8 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "memory before acknowledged writes, read-only indexing, and operator "
             "memory-trust promotion acceptance plus non-executing execution "
             "planning, executor dry-run specs, operator-gated trust-store apply, "
-            "rollback audit, and rollback verification before downstream-priority "
-            "policy use."
+            "rollback audit, rollback verification, and read-only priority-gate "
+            "eligibility before downstream-priority policy consumer use."
         ),
     ),
     ProjectGoalCapabilityRow(
@@ -818,6 +820,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "source_identity_calibration_memory_trust_promotion_executor",
             "source_identity_calibration_memory_trust_promotion_apply_audit",
             "source_identity_calibration_memory_trust_promotion_rollback_verification",
+            "source_identity_calibration_memory_trust_promotion_priority_gate",
             "product_operator_state",
         ),
         support_paths=(
@@ -835,13 +838,14 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_calibration_memory_trust_promotion_executor.py",
             "backend/source_identity_calibration_memory_trust_promotion_apply_audit.py",
             "backend/source_identity_calibration_memory_trust_promotion_rollback_verification.py",
+            "backend/source_identity_calibration_memory_trust_promotion_priority_gate.py",
             "backend/source_identity_downstream_gate.py",
             "backend/decision_memory.py",
             "backend/telemetry/",
             ".ai/memory/project.md",
         ),
         blocker="Memory-learning proposals are review contracts, not autonomous console authority.",
-        next_step="Route trusted-source, fresh-context learning records through replay correlation and operator review, then append-only memory drafts, acknowledged writes, read-only indexing, memory-trust review, operator acceptance, manual promotion planning, promotion contract review, promotion acceptance, non-executing execution planning, executor dry-run specs, operator-gated trust-store apply, rollback audit, and rollback verification before any future live console authority.",
+        next_step="Route trusted-source, fresh-context learning records through replay correlation and operator review, then append-only memory drafts, acknowledged writes, read-only indexing, memory-trust review, operator acceptance, manual promotion planning, promotion contract review, promotion acceptance, non-executing execution planning, executor dry-run specs, operator-gated trust-store apply, rollback audit, rollback verification, and read-only priority-gate eligibility before any future policy consumer or live console authority.",
     ),
 )
 

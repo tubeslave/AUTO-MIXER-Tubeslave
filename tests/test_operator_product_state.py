@@ -5971,6 +5971,9 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     rollback_verification = payload[
         "source_identity_calibration_memory_trust_promotion_rollback_verification"
     ]
+    priority_gate = payload[
+        "source_identity_calibration_memory_trust_promotion_priority_gate"
+    ]
     adapter = [
         item
         for item in payload["adapters"]
@@ -6006,6 +6009,12 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
         for item in payload["adapters"]
         if item["adapter_id"]
         == "source_identity_calibration_memory_trust_promotion_rollback_verification"
+    ][0]
+    priority_gate_adapter = [
+        item
+        for item in payload["adapters"]
+        if item["adapter_id"]
+        == "source_identity_calibration_memory_trust_promotion_priority_gate"
     ][0]
 
     assert (
@@ -6047,6 +6056,18 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert (
         payload["summary"][
             "source_identity_calibration_memory_trust_promotion_rollback_verified_record_count"
+        ]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "source_identity_calibration_memory_trust_promotion_priority_gate_record_count"
+        ]
+        == 0
+    )
+    assert (
+        payload["summary"][
+            "source_identity_calibration_memory_trust_promotion_priority_eligible_record_count"
         ]
         == 0
     )
@@ -6094,6 +6115,14 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert (
         rollback_verification_adapter["output"]
         == "source_identity_memory_trust_promotion_rollback_verification"
+    )
+    assert (
+        priority_gate_adapter["method_id"]
+        == "source_identity_calibration_memory_trust_promotion_priority_gate"
+    )
+    assert (
+        priority_gate_adapter["output"]
+        == "source_identity_memory_trust_promotion_priority_gate"
     )
     assert (
         ledger["status"]
@@ -6211,6 +6240,19 @@ def test_main_pipeline_preview_exposes_source_identity_memory_trust_promotion_ac
     assert rollback_verification["safety"]["read_only"] is True
     assert rollback_verification["safety"]["rollback_verified"] is False
     assert rollback_verification["verified_records"] == []
+    assert (
+        priority_gate["status"]
+        == "memory_trust_promotion_priority_gate_not_ready"
+    )
+    assert priority_gate["summary"]["rollback_verified_record_count"] == 0
+    assert priority_gate["summary"]["priority_gate_record_count"] == 0
+    assert priority_gate["summary"]["eligible_record_count"] == 0
+    assert priority_gate["summary"]["direct_downstream_priority_mutation"] is False
+    assert priority_gate["summary"]["can_import_to_queue"] is False
+    assert priority_gate["summary"]["can_apply_live"] is False
+    assert priority_gate["safety"]["read_only"] is True
+    assert priority_gate["safety"]["live_write"] is False
+    assert priority_gate["priority_records"] == []
     assert queue["summary"]["pending_count"] == 0
 
 

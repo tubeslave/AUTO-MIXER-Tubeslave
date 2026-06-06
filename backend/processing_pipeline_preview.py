@@ -75,6 +75,9 @@ try:
     from source_identity_calibration_memory_trust_promotion_rollback_verification import (
         build_source_identity_calibration_memory_trust_promotion_rollback_verification,
     )
+    from source_identity_calibration_memory_trust_promotion_priority_gate import (
+        build_source_identity_calibration_memory_trust_promotion_priority_gate,
+    )
     from source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
         analyze_source_identity_replay_calibration,
@@ -148,6 +151,9 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.source_identity_calibration_memory_trust_promotion_rollback_verification import (
         build_source_identity_calibration_memory_trust_promotion_rollback_verification,
+    )
+    from backend.source_identity_calibration_memory_trust_promotion_priority_gate import (
+        build_source_identity_calibration_memory_trust_promotion_priority_gate,
     )
     from backend.source_identity_replay_calibration import (
         SourceIdentityReplayEvent,
@@ -695,6 +701,16 @@ def build_main_pipeline_preview(
     source_identity_memory_trust_promotion_rollback_verification_summary = (
         source_identity_memory_trust_promotion_rollback_verification.get("summary", {})
     )
+    source_identity_memory_trust_promotion_priority_gate = (
+        build_source_identity_calibration_memory_trust_promotion_priority_gate(
+            rollback_verification=(
+                source_identity_memory_trust_promotion_rollback_verification
+            ),
+        )
+    )
+    source_identity_memory_trust_promotion_priority_gate_summary = (
+        source_identity_memory_trust_promotion_priority_gate.get("summary", {})
+    )
 
     proposals = (
         operator_proposals
@@ -850,6 +866,20 @@ def build_main_pipeline_preview(
             "source_identity_calibration_memory_trust_promotion_rollback_verified_record_count": int(
                 source_identity_memory_trust_promotion_rollback_verification_summary.get(
                     "rollback_verified_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_calibration_memory_trust_promotion_priority_gate_record_count": int(
+                source_identity_memory_trust_promotion_priority_gate_summary.get(
+                    "priority_gate_record_count",
+                    0,
+                )
+                or 0
+            ),
+            "source_identity_calibration_memory_trust_promotion_priority_eligible_record_count": int(
+                source_identity_memory_trust_promotion_priority_gate_summary.get(
+                    "eligible_record_count",
                     0,
                 )
                 or 0
@@ -1161,6 +1191,30 @@ def build_main_pipeline_preview(
                 ),
             },
             {
+                "adapter_id": (
+                    "source_identity_calibration_memory_trust_promotion_priority_gate"
+                ),
+                "method_id": (
+                    "source_identity_calibration_memory_trust_promotion_priority_gate"
+                ),
+                "status": (
+                    source_identity_memory_trust_promotion_priority_gate.get("status")
+                ),
+                "output": "source_identity_memory_trust_promotion_priority_gate",
+                "reason": (
+                    ", ".join(
+                        source_identity_memory_trust_promotion_priority_gate_summary.get(
+                            "blocked_by",
+                            [],
+                        )
+                    )
+                    if source_identity_memory_trust_promotion_priority_gate_summary.get(
+                        "blocked_by"
+                    )
+                    else None
+                ),
+            },
+            {
                 "adapter_id": "registry_blockers",
                 "method_id": "processing_registry",
                 "status": "active",
@@ -1232,6 +1286,9 @@ def build_main_pipeline_preview(
         ),
         "source_identity_calibration_memory_trust_promotion_rollback_verification": (
             source_identity_memory_trust_promotion_rollback_verification
+        ),
+        "source_identity_calibration_memory_trust_promotion_priority_gate": (
+            source_identity_memory_trust_promotion_priority_gate
         ),
         "registry": {
             "summary": registry_snapshot.get("summary", {}),
