@@ -15380,6 +15380,299 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
     assert executor_request["idempotency_reserved"] is False
     assert executor_request["live_authority_granted"] is False
     assert len(executor_request["execution_gate_payload"]["ready_for_executor"]) == 1
+
+    promotion_execution_payload = {
+        "type": "operator_proposal_apply_sequence_execution_result",
+        "status": "applied",
+        "success": True,
+        "reason": None,
+        "generated_at": 123.0,
+        "operator_mode": {"mode": "supervised"},
+        "summary": {
+            "input_candidate_count": 1,
+            "attempted_count": 1,
+            "applied_count": 1,
+            "blocked_count": 0,
+            "applied_proposal_ids": ["proposal-first"],
+            "blocked_proposal_ids": [],
+            "operator_mode_allows_apply_now": True,
+            "operator_ack_received": True,
+            "execute_requested": True,
+            "approved": True,
+            "requires_gate_ready": True,
+            "uses_existing_apply_operator_proposal": True,
+            "sequence_executor_called_apply_operator_proposal": True,
+            "live_apply_entrypoint": "apply_operator_proposal",
+            "live_write": True,
+            "direct_live_write": False,
+            "apply_attempted": True,
+            "queue_mutation": True,
+            "proposal_status_mutation": True,
+            "idempotency_reserved": True,
+            "idempotency_reserved_by_executor_directly": False,
+            "idempotency_reservation_delegated_to_apply_operator_proposal": True,
+            "manual_console_write_called_by_apply_operator_proposal": True,
+            "manual_console_write_called_by_sequence_executor": False,
+            "direct_manual_console_write_called": False,
+            "mutates_console_state": True,
+            "queries_console": False,
+            "live_widening_allowed": False,
+            "stopped_on_block": False,
+            "queue_freshness_checked": True,
+        },
+        "safety": {
+            "sequence_executor": True,
+            "execution_gate_payload_required": True,
+            "ready_for_executor_required": True,
+            "requires_execute_true": True,
+            "requires_operator_ack": True,
+            "requires_approved_true": True,
+            "requires_gate_ready": True,
+            "uses_existing_apply_operator_proposal": True,
+            "live_apply_entrypoint": "apply_operator_proposal",
+            "allowed_live_write_kinds": ["fader", "gain"],
+            "live_write": True,
+            "direct_live_write": False,
+            "apply_attempted": True,
+            "queue_mutation_by_executor_directly": False,
+            "proposal_status_mutation_by_executor_directly": False,
+            "idempotency_reserved_by_executor_directly": False,
+            "idempotency_reservation_delegated_to_apply_operator_proposal": True,
+            "does_not_call_manual_console_write_directly": True,
+            "manual_console_write_called_by_sequence_executor": False,
+            "direct_manual_console_write_called": False,
+            "manual_console_write_called_by_apply_operator_proposal": True,
+            "mutates_console_state": True,
+            "queries_console": False,
+            "live_widening_allowed": False,
+        },
+        "execution_results": [
+            {
+                "planned_apply_index": 0,
+                "proposal_id": "proposal-first",
+                "candidate_index": 0,
+                "status": "applied",
+                "apply_attempted": True,
+                "apply_request": {
+                    "type": "apply_operator_proposal",
+                    "proposal_id": "proposal-first",
+                    "approved": True,
+                    "idempotency_key": "promotion-import:proposal-first",
+                },
+                "proposal": {
+                    "id": "proposal-first",
+                    "status": "applied",
+                    "can_apply": False,
+                },
+                "apply_result": {
+                    "status": "applied",
+                    "channel": 2,
+                    "value_type": "fader",
+                    "effective_value": -8.5,
+                    "old_value": -8.0,
+                    "pre_read_status": "verified_from_cache",
+                    "pre_read_source": "mixer_state_cache",
+                    "readback_value": -8.5,
+                    "readback_status": "verified_from_cache",
+                    "readback_source": "mixer_state_cache",
+                    "proof_status": "verified",
+                    "rollback_available": True,
+                    "rollback_value": -8.0,
+                },
+            }
+        ],
+        "blocked_results": [],
+    }
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_result"
+    ](
+        object(),
+        {
+            "promotion_execution_gate_result_consumer": (
+                gate_result_consumer_payload
+            ),
+            "promotion_execution_result": promotion_execution_payload,
+        },
+    )
+
+    execution_result_consumer_payload = server.send_to_client.await_args.args[1]
+    assert execution_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_result_consumer"
+    )
+    assert execution_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_result"
+    )
+    assert execution_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_execution_audit_request_available"
+    )
+    assert (
+        execution_result_consumer_payload["summary"][
+            "promotion_execution_audit_request_available"
+        ]
+        is True
+    )
+    assert (
+        execution_result_consumer_payload["summary"][
+            "execution_audit_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        execution_result_consumer_payload["summary"]["execution_audit_created"]
+        is False
+    )
+    assert (
+        execution_result_consumer_payload["summary"]["idempotency_reserved"]
+        is False
+    )
+    assert execution_result_consumer_payload["summary"]["live_write"] is False
+
+    audit_request = execution_result_consumer_payload[
+        "promotion_execution_audit_request"
+    ]
+    assert audit_request["handler"] == (
+        "audit_operator_proposal_apply_sequence_execution"
+    )
+    assert audit_request["read_only_template"] is True
+    assert audit_request["promotion_execution_audit_request_template_only"] is True
+    assert audit_request["execution_audit_created"] is False
+    assert audit_request["idempotency_reserved"] is False
+    assert audit_request["live_authority_granted"] is False
+    assert (
+        audit_request["execution_result_payload"]["execution_results"][0][
+            "apply_request"
+        ]["idempotency_key"]
+        == "promotion-import:proposal-first"
+    )
+
+    promotion_execution_audit_payload = {
+        "type": "operator_proposal_apply_sequence_execution_audit",
+        "status": "passed",
+        "success": True,
+        "reason": None,
+        "generated_at": 123.0,
+        "source_execution_status": "applied",
+        "summary": {
+            "input_execution_result_count": 1,
+            "audited_count": 1,
+            "passed_count": 1,
+            "blocked_count": 0,
+            "passed_proposal_ids": ["proposal-first"],
+            "blocked_proposal_ids": [],
+            "audit_only": True,
+            "execution_allowed_by_audit": False,
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+        },
+        "safety": {
+            "audit_only": True,
+            "execution_result_payload_required": True,
+            "does_not_call_apply_operator_proposal": True,
+            "does_not_call_manual_console_write": True,
+            "live_apply_entrypoint_required": "apply_operator_proposal",
+            "allowed_live_write_kinds": ["fader", "gain"],
+            "execution_allowed_by_audit": False,
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+        },
+        "audit_rows": [
+            {
+                "proposal_id": "proposal-first",
+                "execution_result_index": 0,
+                "status": "passed",
+                "value_type": "fader",
+                "channel": 2,
+                "effective_value": -8.5,
+                "idempotency_key": "promotion-import:proposal-first",
+                "readback_status": "verified_from_cache",
+                "proof_status": "verified",
+                "rollback_available": True,
+                "live_apply_entrypoint": "apply_operator_proposal",
+            }
+        ],
+        "blocked_results": [],
+    }
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_audit_result"
+    ](
+        object(),
+        {
+            "promotion_execution_result_consumer": (
+                execution_result_consumer_payload
+            ),
+            "promotion_execution_audit_result": promotion_execution_audit_payload,
+        },
+    )
+
+    execution_audit_result_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert execution_audit_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_audit_result_consumer"
+    )
+    assert execution_audit_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_audit_result"
+    )
+    assert execution_audit_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_audit_policy_gate_request_available"
+    )
+    assert (
+        execution_audit_result_consumer_payload["summary"][
+            "promotion_audit_policy_gate_request_available"
+        ]
+        is True
+    )
+    assert (
+        execution_audit_result_consumer_payload["summary"][
+            "audit_policy_gate_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        execution_audit_result_consumer_payload["summary"]["policy_gate_created"]
+        is False
+    )
+    assert (
+        execution_audit_result_consumer_payload["summary"]["policy_mutation"]
+        is False
+    )
+    assert execution_audit_result_consumer_payload["summary"]["live_write"] is False
+
+    policy_gate_request = execution_audit_result_consumer_payload[
+        "promotion_audit_policy_gate_request"
+    ]
+    assert policy_gate_request["handler"] == (
+        "gate_operator_proposal_apply_sequence_audit_policy"
+    )
+    assert policy_gate_request["read_only_template"] is True
+    assert policy_gate_request["promotion_audit_policy_gate_request_template_only"] is True
+    assert policy_gate_request["policy_gate_created"] is False
+    assert policy_gate_request["policy_mutation"] is False
+    assert policy_gate_request["live_authority_granted"] is False
+    assert (
+        policy_gate_request["execution_audit_payload"]["audit_rows"][0][
+            "idempotency_key"
+        ]
+        == "promotion-import:proposal-first"
+    )
     assert "promotion-import:proposal-first" not in (
         server._operator_apply_idempotency_keys
     )

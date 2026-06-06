@@ -51,9 +51,16 @@ Automixer.
 документации Automixer. Исключай vendored/generated/reference шум:
 `external/`, `models/training_state.json`, `backend/ai/knowledge/`,
 `frontend/node_modules/`, `node_modules/`, `**/node_modules/`,
-`backend/venv/`, `**/.venv/`, `artifacts/`, `Docs/archive/`, `Docs/manuals/`,
-`Docs/Behringer_WING_Official/`. Если TODO/FIXME найден только в таких путях,
-отметь это как excluded scan noise, а не как активную задачу.
+`backend/venv/`, `**/.venv/`, `artifacts/`, `frontend/dist/`,
+`logs/codex_autoloop/`, `.paperclip/reports/`, `Docs/archive/`,
+`Docs/manuals/`, `Docs/Behringer_WING_Official/`. Если TODO/FIXME найден
+только в таких путях, отметь это как excluded scan noise, а не как активную
+задачу.
+
+Для самого scan используй `rg --hidden --glob ...` с перечисленными
+исключениями. Не используй `find ... | xargs rg` для TODO/FIXME scan: build
+artifacts и app bundles могут содержать пробелы в путях и превращать scan в
+ложный generated noise.
 
 ## 2. Свериться с целью проекта
 

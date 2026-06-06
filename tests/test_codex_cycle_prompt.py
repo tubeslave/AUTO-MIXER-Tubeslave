@@ -126,6 +126,9 @@ def test_codex_cycle_prompt_keeps_todo_scan_focused_on_owned_project_paths():
         "`backend/venv/`",
         "`**/.venv/`",
         "`artifacts/`",
+        "`frontend/dist/`",
+        "`logs/codex_autoloop/`",
+        "`.paperclip/reports/`",
         "`Docs/archive/`",
         "`Docs/manuals/`",
         "`Docs/Behringer_WING_Official/`",
@@ -133,3 +136,7 @@ def test_codex_cycle_prompt_keeps_todo_scan_focused_on_owned_project_paths():
 
     for path in excluded_noise_paths:
         assert path in text
+
+    assert "`rg --hidden --glob ...`" in text
+    assert "`find ... | xargs rg`" in text
+    assert "пробелы в путях" in text

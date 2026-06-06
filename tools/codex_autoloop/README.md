@@ -36,8 +36,11 @@ you want the background automation active.
   corpora such as `external/`, `models/training_state.json`,
   `backend/ai/knowledge/`, `frontend/node_modules/`, nested
   `**/node_modules/`, `backend/venv/`, `**/.venv/`, `artifacts/`, and
-  archived/manual docs are treated as scan noise unless the selected task
-  explicitly targets them.
+  generated/log/report-history paths such as `frontend/dist/`,
+  `logs/codex_autoloop/`, `.paperclip/reports/`, plus archived/manual docs are
+  treated as scan noise unless the selected task explicitly targets them. The
+  TODO/FIXME scan should use `rg --hidden --glob ...` directly rather than
+  `find ... | xargs rg`, because generated app bundle paths can contain spaces.
 - Does not run immediately at login; `launchd` starts it on the 20-minute
   interval.
 - Uses a lock directory at `.codex_autoloop.lock` to avoid parallel runs.

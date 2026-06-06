@@ -170,6 +170,11 @@ def test_codex_autoloop_readme_documents_nested_dependency_todo_scan_noise():
     assert "`**/node_modules/`" in readme_text
     assert "`backend/venv/`" in readme_text
     assert "`**/.venv/`" in readme_text
+    assert "`frontend/dist/`" in readme_text
+    assert "`logs/codex_autoloop/`" in readme_text
+    assert "`.paperclip/reports/`" in readme_text
+    assert "`rg --hidden --glob ...`" in readme_text
+    assert "`find ... | xargs rg`" in readme_text
     assert (
         "scan noise unless the selected task explicitly targets them"
         in normalized_readme_text
