@@ -6741,6 +6741,21 @@ async def test_decision_queue_summarizes_apply_preflight_candidates(server):
     assert apply_sequence_plan["execution_gate_handler"] == (
         "gate_operator_proposal_apply_sequence_execution"
     )
+    assert apply_sequence_plan["sequence_executor_handler"] == (
+        "execute_operator_proposal_apply_sequence"
+    )
+    assert apply_sequence_plan["sequence_execution_audit_handler"] == (
+        "audit_operator_proposal_apply_sequence_execution"
+    )
+    assert apply_sequence_plan["sequence_audit_policy_gate_handler"] == (
+        "gate_operator_proposal_apply_sequence_audit_policy"
+    )
+    assert apply_sequence_plan["sequence_policy_memory_draft_handler"] == (
+        "draft_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert apply_sequence_plan["sequence_policy_memory_writer_handler"] == (
+        "write_operator_proposal_apply_sequence_policy_memory"
+    )
     assert apply_sequence_plan["source_preflight_handler"] == (
         "preflight_operator_proposal_apply_batch"
     )
@@ -6751,6 +6766,21 @@ async def test_decision_queue_summarizes_apply_preflight_candidates(server):
     assert apply_sequence_plan["accepts_batch_preflight_results"] is True
     assert apply_sequence_plan["dry_run_required_before_executor"] is True
     assert apply_sequence_plan["execution_gate_required_before_executor"] is True
+    assert apply_sequence_plan["executor_requires_execute_true"] is True
+    assert apply_sequence_plan["executor_requires_operator_ack"] is True
+    assert apply_sequence_plan["executor_requires_gate_ready"] is True
+    assert apply_sequence_plan["executor_routes_through_apply_operator_proposal"] is True
+    assert apply_sequence_plan["execution_audit_required_after_executor"] is True
+    assert apply_sequence_plan["execution_audit_is_not_apply_authority"] is True
+    assert apply_sequence_plan["audit_policy_gate_required_before_policy_consumer"] is True
+    assert apply_sequence_plan["audit_policy_gate_is_not_apply_authority"] is True
+    assert apply_sequence_plan["policy_memory_draft_available_after_policy_gate"] is True
+    assert apply_sequence_plan["policy_memory_draft_is_not_persistence"] is True
+    assert apply_sequence_plan["policy_memory_writer_requires_apply_true"] is True
+    assert apply_sequence_plan["policy_memory_writer_requires_operator_ack"] is True
+    assert apply_sequence_plan["policy_memory_writer_append_only_target"] == (
+        ".ai/memory/project.md"
+    )
     assert apply_sequence_plan["default_candidate_ids"] == ["preflight-candidate"]
     assert apply_sequence_plan["planned_apply_count_known_from_snapshot"] is False
     assert apply_sequence_plan["sequence_plan_is_not_apply_authority"] is True
@@ -6762,12 +6792,43 @@ async def test_decision_queue_summarizes_apply_preflight_candidates(server):
         "dry_run_only": False,
         "dry_run_required_before_executor": True,
         "execution_gate_required_before_executor": True,
+        "executor_requires_execute_true": True,
+        "executor_requires_operator_ack": True,
+        "executor_requires_gate_ready": True,
+        "executor_routes_through_apply_operator_proposal": True,
+        "execution_audit_required_after_executor": True,
+        "execution_audit_is_not_apply_authority": True,
+        "audit_policy_gate_required_before_policy_consumer": True,
+        "audit_policy_gate_is_not_apply_authority": True,
+        "policy_memory_draft_available_after_policy_gate": True,
+        "policy_memory_draft_is_not_persistence": True,
+        "policy_memory_writer_requires_apply_true": True,
+        "policy_memory_writer_requires_operator_ack": True,
+        "policy_memory_writer_append_only_target": ".ai/memory/project.md",
+        "audit_only": False,
+        "does_not_call_apply_operator_proposal_in_audit": True,
+        "policy_gate_only": False,
+        "policy_mutation": False,
+        "does_not_call_apply_operator_proposal_in_policy_gate": True,
+        "memory_draft_only": False,
+        "append_only_memory_write_allowed_by_draft": False,
+        "requires_separate_memory_writer": True,
+        "append_only_memory_file_write_applied": False,
         "live_write": False,
         "apply_attempted": False,
         "queue_mutation": False,
         "proposal_status_mutation": False,
         "idempotency_reserved": False,
+        "idempotency_reserved_by_executor_directly": False,
         "manual_console_write_called": False,
+        "manual_console_write_called_by_executor_directly": False,
+        "manual_console_write_called_by_audit": False,
+        "live_authority_granted_by_audit": False,
+        "manual_console_write_called_by_policy_gate": False,
+        "live_authority_granted_by_policy_gate": False,
+        "memory_mutation": False,
+        "runtime_memory_mutation": False,
+        "full_autonomous_ready": False,
         "mutates_console_state": False,
         "queries_console": False,
         "live_widening_allowed": False,
@@ -8204,6 +8265,1274 @@ async def test_gate_operator_proposal_apply_sequence_execution_blocks_stale_dry_
     assert payload["blocked_results"][0]["current_proposal"]["status"] == "accepted"
     assert "gate-stale:gate-stale" not in server._operator_apply_idempotency_keys
     server._apply_manual_console_write.assert_not_called()
+
+
+async def _build_gate_ready_apply_sequence(server, *, idempotency_prefix):
+    await server._dispatch["preflight_operator_proposal_apply_batch"](
+        object(),
+        {
+            "approved": True,
+            "idempotency_key_prefix": idempotency_prefix,
+        },
+    )
+    batch_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["plan_operator_proposal_apply_sequence"](
+        object(),
+        {"preflight_results": batch_payload["preflight_results"]},
+    )
+    plan_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["dry_run_operator_proposal_apply_sequence"](
+        object(),
+        {"sequence_plan": plan_payload},
+    )
+    dry_run_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["gate_operator_proposal_apply_sequence_execution"](
+        object(),
+        {
+            "dry_run_payload": dry_run_payload,
+            "operator_ack": True,
+        },
+    )
+    return server.send_to_client.await_args.args[1]
+
+
+@pytest.mark.asyncio
+async def test_execute_operator_proposal_apply_sequence_applies_gate_ready_row_via_apply_handler(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -8.5,
+        "old_value": -8.0,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -8.5,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -8.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "execute-ready",
+            "title": "Lead Vocal: execute ready fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="execute-ready",
+    )
+
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+
+    server._apply_manual_console_write.assert_awaited_once()
+    call = server._apply_manual_console_write.await_args
+    assert call.kwargs["channel"] == 2
+    assert call.kwargs["value_type"] == "fader"
+    assert call.kwargs["value"] == -8.5
+    delegated_payload = server.send_to_client.await_args_list[-2].args[1]
+    assert delegated_payload["type"] == "operator_proposal_apply_result"
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_execution_result"
+    assert payload["status"] == "applied"
+    assert payload["success"] is True
+    assert payload["summary"]["input_candidate_count"] == 1
+    assert payload["summary"]["attempted_count"] == 1
+    assert payload["summary"]["applied_count"] == 1
+    assert payload["summary"]["blocked_count"] == 0
+    assert payload["summary"]["applied_proposal_ids"] == ["execute-ready"]
+    assert payload["summary"]["operator_ack_received"] is True
+    assert payload["summary"]["execute_requested"] is True
+    assert payload["summary"]["approved"] is True
+    assert payload["summary"]["requires_gate_ready"] is True
+    assert payload["summary"]["uses_existing_apply_operator_proposal"] is True
+    assert payload["summary"]["sequence_executor_called_apply_operator_proposal"] is True
+    assert payload["summary"]["live_apply_entrypoint"] == "apply_operator_proposal"
+    assert payload["summary"]["live_write"] is True
+    assert payload["summary"]["direct_live_write"] is False
+    assert payload["summary"]["apply_attempted"] is True
+    assert payload["summary"]["queue_mutation"] is True
+    assert payload["summary"]["proposal_status_mutation"] is True
+    assert payload["summary"]["idempotency_reserved"] is True
+    assert payload["summary"]["idempotency_reserved_by_executor_directly"] is False
+    assert (
+        payload["summary"][
+            "idempotency_reservation_delegated_to_apply_operator_proposal"
+        ]
+        is True
+    )
+    assert payload["summary"]["manual_console_write_called_by_apply_operator_proposal"] is True
+    assert payload["summary"]["manual_console_write_called_by_sequence_executor"] is False
+    assert payload["summary"]["direct_manual_console_write_called"] is False
+    assert payload["summary"]["mutates_console_state"] is True
+    assert payload["summary"]["queries_console"] is False
+    assert payload["summary"]["live_widening_allowed"] is False
+    assert payload["summary"]["stopped_on_block"] is False
+    assert payload["safety"]["sequence_executor"] is True
+    assert payload["safety"]["uses_existing_apply_operator_proposal"] is True
+    assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain"]
+    assert payload["safety"]["direct_live_write"] is False
+    assert payload["safety"]["queue_mutation_by_executor_directly"] is False
+    assert payload["safety"]["idempotency_reserved_by_executor_directly"] is False
+    assert payload["safety"]["does_not_call_manual_console_write_directly"] is True
+    assert payload["safety"]["direct_manual_console_write_called"] is False
+    assert payload["execution_results"][0]["proposal_id"] == "execute-ready"
+    assert payload["execution_results"][0]["status"] == "applied"
+    assert (
+        payload["execution_results"][0]["apply_request"]["idempotency_key"]
+        == "execute-ready:execute-ready"
+    )
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+    assert build_decision_queue(server)["summary"]["applied_count"] == 1
+    assert "execute-ready:execute-ready" in server._operator_apply_idempotency_keys
+
+
+@pytest.mark.asyncio
+async def test_execute_operator_proposal_apply_sequence_requires_execute_ack_and_approval(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "execute-ack-required",
+            "title": "Lead Vocal: execute ack required",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="execute-ack",
+    )
+
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {"execution_gate_payload": gate_payload},
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_execution_result"
+    assert payload["status"] == "blocked"
+    assert payload["success"] is False
+    assert payload["reason"] == "sequence_executor_blocked"
+    assert payload["summary"]["input_candidate_count"] == 1
+    assert payload["summary"]["attempted_count"] == 0
+    assert payload["summary"]["applied_count"] == 0
+    assert payload["summary"]["blocked_count"] == 3
+    assert payload["summary"]["operator_ack_received"] is False
+    assert payload["summary"]["execute_requested"] is False
+    assert payload["summary"]["approved"] is False
+    assert payload["summary"]["live_write"] is False
+    assert payload["summary"]["apply_attempted"] is False
+    assert payload["summary"]["idempotency_reserved"] is False
+    assert payload["summary"]["idempotency_reserved_by_executor_directly"] is False
+    assert payload["summary"]["direct_manual_console_write_called"] is False
+    assert [item["reason"] for item in payload["blocked_results"]] == [
+        "execute_true_required",
+        "operator_ack_required",
+        "approved_true_required",
+    ]
+    assert "execute-ack:execute-ack-required" not in server._operator_apply_idempotency_keys
+    assert build_decision_queue(server)["summary"]["pending_count"] == 1
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_execute_operator_proposal_apply_sequence_blocks_stale_gate_row_before_write(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "execute-stale",
+            "title": "Lead Vocal: execute stale fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="execute-stale",
+    )
+    await server._dispatch["accept_operator_proposal"](
+        object(),
+        {"proposal_id": "execute-stale"},
+    )
+
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_execution_result"
+    assert payload["status"] == "blocked"
+    assert payload["success"] is False
+    assert payload["summary"]["input_candidate_count"] == 1
+    assert payload["summary"]["attempted_count"] == 0
+    assert payload["summary"]["applied_count"] == 0
+    assert payload["summary"]["blocked_count"] == 1
+    assert payload["summary"]["live_write"] is False
+    assert payload["summary"]["apply_attempted"] is False
+    assert payload["summary"]["idempotency_reserved"] is False
+    assert payload["blocked_results"][0]["proposal_id"] == "execute-stale"
+    assert payload["blocked_results"][0]["reason"] == "proposal_not_pending"
+    assert payload["blocked_results"][0]["current_proposal"]["status"] == "accepted"
+    assert payload["execution_results"] == []
+    assert "execute-stale:execute-stale" not in server._operator_apply_idempotency_keys
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_execute_operator_proposal_apply_sequence_blocks_forged_unsupported_gate_change(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "execute-forged-eq",
+            "title": "Lead Vocal: forged EQ should not execute",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="execute-forged",
+    )
+    gate_payload["ready_for_executor"][0]["normalized_changes"][0]["value_type"] = "eq"
+
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_execution_result"
+    assert payload["status"] == "blocked"
+    assert payload["success"] is False
+    assert payload["reason"] == "sequence_executor_blocked"
+    assert payload["summary"]["input_candidate_count"] == 1
+    assert payload["summary"]["attempted_count"] == 0
+    assert payload["summary"]["applied_count"] == 0
+    assert payload["summary"]["blocked_count"] == 1
+    assert payload["summary"]["live_write"] is False
+    assert payload["summary"]["apply_attempted"] is False
+    assert payload["summary"]["idempotency_reserved"] is False
+    assert payload["summary"]["manual_console_write_called_by_sequence_executor"] is False
+    assert payload["summary"]["manual_console_write_called_by_apply_operator_proposal"] is False
+    assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain"]
+    assert payload["safety"]["direct_manual_console_write_called"] is False
+    assert payload["blocked_results"][0]["proposal_id"] == "execute-forged-eq"
+    assert payload["blocked_results"][0]["reason"] == (
+        "planned_change_value_type_not_dry_run_eligible"
+    )
+    assert payload["execution_results"] == []
+    assert "execute-forged:execute-forged-eq" not in server._operator_apply_idempotency_keys
+    assert build_decision_queue(server)["summary"]["pending_count"] == 1
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_audit_operator_proposal_apply_sequence_execution_passes_verified_executor_result(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -8.5,
+        "old_value": -8.0,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -8.5,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -8.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "audit-ready",
+            "title": "Lead Vocal: audit ready fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="audit-ready",
+    )
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+    execution_payload = server.send_to_client.await_args.args[1]
+
+    await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+        object(),
+        {"execution_result_payload": execution_payload},
+    )
+
+    assert server._apply_manual_console_write.await_count == 1
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_execution_audit"
+    assert payload["status"] == "passed"
+    assert payload["success"] is True
+    assert payload["source_execution_status"] == "applied"
+    assert payload["summary"] == {
+        "input_execution_result_count": 1,
+        "audited_count": 1,
+        "passed_count": 1,
+        "blocked_count": 0,
+        "passed_proposal_ids": ["audit-ready"],
+        "blocked_proposal_ids": [],
+        "audit_only": True,
+        "execution_allowed_by_audit": False,
+        "live_write": False,
+        "apply_attempted": False,
+        "queue_mutation": False,
+        "proposal_status_mutation": False,
+        "idempotency_reserved": False,
+        "manual_console_write_called": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+    }
+    assert payload["safety"] == {
+        "audit_only": True,
+        "execution_result_payload_required": True,
+        "does_not_call_apply_operator_proposal": True,
+        "does_not_call_manual_console_write": True,
+        "live_apply_entrypoint_required": "apply_operator_proposal",
+        "allowed_live_write_kinds": ["fader", "gain"],
+        "execution_allowed_by_audit": False,
+        "live_write": False,
+        "apply_attempted": False,
+        "queue_mutation": False,
+        "proposal_status_mutation": False,
+        "idempotency_reserved": False,
+        "manual_console_write_called": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+    }
+    assert payload["audit_rows"] == [
+        {
+            "proposal_id": "audit-ready",
+            "execution_result_index": 0,
+            "status": "passed",
+            "value_type": "fader",
+            "channel": 2,
+            "effective_value": -8.5,
+            "idempotency_key": "audit-ready:audit-ready",
+            "readback_status": "verified_from_cache",
+            "proof_status": "verified",
+            "rollback_available": True,
+            "live_apply_entrypoint": "apply_operator_proposal",
+        }
+    ]
+    assert payload["blocked_results"] == []
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_audit_operator_proposal_apply_sequence_execution_blocks_forged_direct_write_claim(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -8.5,
+        "old_value": -8.0,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -8.5,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -8.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "audit-forged",
+            "title": "Lead Vocal: forged audit fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="audit-forged",
+    )
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+    forged_payload = dict(server.send_to_client.await_args.args[1])
+    forged_payload["summary"] = dict(forged_payload["summary"])
+    forged_payload["safety"] = dict(forged_payload["safety"])
+    forged_payload["summary"]["direct_manual_console_write_called"] = True
+    forged_payload["safety"]["direct_manual_console_write_called"] = True
+    forged_payload["safety"]["allowed_live_write_kinds"] = ["fader", "gain", "eq"]
+
+    await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+        object(),
+        {"execution_result_payload": forged_payload},
+    )
+
+    assert server._apply_manual_console_write.await_count == 1
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_execution_audit"
+    assert payload["status"] == "blocked"
+    assert payload["success"] is False
+    assert payload["summary"]["audit_only"] is True
+    assert payload["summary"]["live_write"] is False
+    assert payload["summary"]["apply_attempted"] is False
+    assert payload["summary"]["manual_console_write_called"] is False
+    assert payload["summary"]["live_authority_granted"] is False
+    assert payload["audit_rows"][0]["proposal_id"] == "audit-forged"
+    assert payload["audit_rows"][0]["status"] == "passed"
+    reasons = [item["reason"] for item in payload["blocked_results"]]
+    assert "summary_direct_manual_console_write_called_true" in reasons
+    assert "safety_direct_manual_console_write_called_true" in reasons
+    assert "safety_allowed_live_write_kinds_widened" in reasons
+    assert "audit-forged:audit-forged" in server._operator_apply_idempotency_keys
+
+
+@pytest.mark.asyncio
+async def test_gate_operator_proposal_apply_sequence_audit_policy_marks_passed_audit_ready(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -8.5,
+        "old_value": -8.0,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -8.5,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -8.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "policy-ready",
+            "title": "Lead Vocal: policy ready fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="policy-ready",
+    )
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+    execution_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+        object(),
+        {"execution_result_payload": execution_payload},
+    )
+    audit_payload = server.send_to_client.await_args.args[1]
+
+    await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
+        object(),
+        {"execution_audit_payload": audit_payload},
+    )
+
+    assert server._apply_manual_console_write.await_count == 1
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_audit_policy_gate"
+    assert payload["status"] == "ready"
+    assert payload["success"] is True
+    assert payload["source_audit_status"] == "passed"
+    assert payload["summary"] == {
+        "input_audit_row_count": 1,
+        "policy_evidence_ready_count": 1,
+        "blocked_count": 0,
+        "policy_evidence_ready_proposal_ids": ["policy-ready"],
+        "blocked_proposal_ids": [],
+        "policy_gate_only": True,
+        "audit_payload_required": True,
+        "execution_allowed_by_policy_gate": False,
+        "execution_allowed_by_audit": False,
+        "live_write": False,
+        "apply_attempted": False,
+        "queue_mutation": False,
+        "proposal_status_mutation": False,
+        "idempotency_reserved": False,
+        "manual_console_write_called": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "policy_mutation": False,
+        "runtime_memory_mutation": False,
+        "model_mutation": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
+    assert payload["safety"] == {
+        "policy_gate_only": True,
+        "audit_payload_required": True,
+        "does_not_call_apply_operator_proposal": True,
+        "does_not_call_manual_console_write": True,
+        "allowed_live_write_kinds": ["fader", "gain"],
+        "execution_allowed_by_policy_gate": False,
+        "execution_allowed_by_audit": False,
+        "live_write": False,
+        "apply_attempted": False,
+        "queue_mutation": False,
+        "proposal_status_mutation": False,
+        "idempotency_reserved": False,
+        "manual_console_write_called": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "policy_mutation": False,
+        "runtime_memory_mutation": False,
+        "model_mutation": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
+    assert payload["policy_evidence"] == [
+        {
+            "proposal_id": "policy-ready",
+            "audit_row_index": 0,
+            "status": "policy_evidence_ready",
+            "eligible_for_supervised_sequence_policy": True,
+            "execution_allowed_by_policy_gate": False,
+            "policy_mutation_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "value_type": "fader",
+            "channel": 2,
+            "effective_value": -8.5,
+            "idempotency_key": "policy-ready:policy-ready",
+            "readback_status": "verified_from_cache",
+            "proof_status": "verified",
+            "rollback_available": True,
+            "live_apply_entrypoint": "apply_operator_proposal",
+        }
+    ]
+    assert payload["blocked_results"] == []
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_gate_operator_proposal_apply_sequence_audit_policy_blocks_forged_live_authority(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -8.5,
+        "old_value": -8.0,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -8.5,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -8.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "policy-forged",
+            "title": "Lead Vocal: forged policy fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="policy-forged",
+    )
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+    execution_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+        object(),
+        {"execution_result_payload": execution_payload},
+    )
+    forged_audit = dict(server.send_to_client.await_args.args[1])
+    forged_audit["summary"] = dict(forged_audit["summary"])
+    forged_audit["safety"] = dict(forged_audit["safety"])
+    forged_audit["summary"]["live_authority_granted"] = True
+    forged_audit["safety"]["live_authority_granted"] = True
+    forged_audit["safety"]["allowed_live_write_kinds"] = ["fader", "gain", "eq"]
+
+    await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
+        object(),
+        {"execution_audit_payload": forged_audit},
+    )
+
+    assert server._apply_manual_console_write.await_count == 1
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_audit_policy_gate"
+    assert payload["status"] == "blocked"
+    assert payload["success"] is False
+    assert payload["summary"]["policy_gate_only"] is True
+    assert payload["summary"]["live_write"] is False
+    assert payload["summary"]["apply_attempted"] is False
+    assert payload["summary"]["policy_mutation"] is False
+    assert payload["summary"]["live_authority_granted"] is False
+    assert payload["summary"]["full_autonomous_ready"] is False
+    assert payload["policy_evidence"][0]["proposal_id"] == "policy-forged"
+    assert payload["policy_evidence"][0]["status"] == "policy_evidence_ready"
+    reasons = [item["reason"] for item in payload["blocked_results"]]
+    assert "summary_live_authority_granted_true" in reasons
+    assert "safety_live_authority_granted_true" in reasons
+    assert "safety_allowed_live_write_kinds_widened" in reasons
+    assert "policy-forged:policy-forged" in server._operator_apply_idempotency_keys
+
+
+@pytest.mark.asyncio
+async def test_draft_operator_proposal_apply_sequence_policy_memory_creates_read_only_draft(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -8.5,
+        "old_value": -8.0,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -8.5,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -8.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "memory-draft-ready",
+            "title": "Lead Vocal: memory draft ready",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="memory-draft",
+    )
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+    execution_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+        object(),
+        {"execution_result_payload": execution_payload},
+    )
+    audit_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
+        object(),
+        {"execution_audit_payload": audit_payload},
+    )
+    policy_gate_payload = server.send_to_client.await_args.args[1]
+
+    await server._dispatch["draft_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        {"policy_gate_payload": policy_gate_payload},
+    )
+
+    assert server._apply_manual_console_write.await_count == 1
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_policy_memory_draft"
+    assert payload["status"] == "ready"
+    assert payload["success"] is True
+    assert payload["source_policy_gate_status"] == "ready"
+    assert payload["summary"] == {
+        "input_policy_evidence_count": 1,
+        "memory_draft_count": 1,
+        "blocked_count": 0,
+        "memory_draft_proposal_ids": ["memory-draft-ready"],
+        "blocked_proposal_ids": [],
+        "memory_draft_only": True,
+        "policy_gate_payload_required": True,
+        "append_only_memory_write_allowed_by_draft": False,
+        "requires_separate_memory_writer": True,
+        "execution_allowed_by_draft": False,
+        "live_write": False,
+        "apply_attempted": False,
+        "queue_mutation": False,
+        "proposal_status_mutation": False,
+        "idempotency_reserved": False,
+        "manual_console_write_called": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "policy_mutation": False,
+        "memory_mutation": False,
+        "runtime_memory_mutation": False,
+        "model_mutation": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
+    assert payload["safety"] == {
+        "memory_draft_only": True,
+        "policy_gate_payload_required": True,
+        "does_not_call_apply_operator_proposal": True,
+        "does_not_call_manual_console_write": True,
+        "allowed_live_write_kinds": ["fader", "gain"],
+        "append_only_memory_write_allowed_by_draft": False,
+        "requires_separate_memory_writer": True,
+        "execution_allowed_by_draft": False,
+        "live_write": False,
+        "apply_attempted": False,
+        "queue_mutation": False,
+        "proposal_status_mutation": False,
+        "idempotency_reserved": False,
+        "manual_console_write_called": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "policy_mutation": False,
+        "memory_mutation": False,
+        "runtime_memory_mutation": False,
+        "model_mutation": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
+    assert payload["memory_draft_records"] == [
+        {
+            "draft_id": (
+                "operator-sequence-policy-memory:"
+                "memory-draft-ready:memory-draft:memory-draft-ready"
+            ),
+            "proposal_id": "memory-draft-ready",
+            "policy_evidence_index": 0,
+            "status": "memory_draft_ready",
+            "learning_scope": "supervised_fader_gain_sequence_execution",
+            "target_memory_path": ".ai/memory/project.md",
+            "target_section": "Project Memory Lessons",
+            "append_only": True,
+            "memory_write_allowed_by_draft": False,
+            "append_only_memory_write_allowed_by_draft": False,
+            "requires_separate_memory_writer": True,
+            "operator_ack_required_for_write": True,
+            "memory_mutation": False,
+            "runtime_memory_mutation": False,
+            "policy_mutation": False,
+            "model_mutation": False,
+            "queue_mutation": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "evidence": {
+                "value_type": "fader",
+                "channel": 2,
+                "effective_value": -8.5,
+                "idempotency_key": "memory-draft:memory-draft-ready",
+                "readback_status": "verified_from_cache",
+                "proof_status": "verified",
+                "rollback_available": True,
+                "live_apply_entrypoint": "apply_operator_proposal",
+            },
+            "draft_text": (
+                "Supervised fader/gain sequence execution was verified from "
+                "`memory-draft-ready` with `fader` evidence, idempotency "
+                "`memory-draft:memory-draft-ready`, readback `verified_from_cache`, "
+                "and rollback available. Future policy or autonomous use still "
+                "requires separate audited gates and safety limits."
+            ),
+        }
+    ]
+    assert payload["blocked_results"] == []
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_draft_operator_proposal_apply_sequence_policy_memory_blocks_forged_memory_write_claim(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -8.5,
+        "old_value": -8.0,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -8.5,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -8.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "memory-draft-forged",
+            "title": "Lead Vocal: forged memory draft",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="memory-forged",
+    )
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+    execution_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+        object(),
+        {"execution_result_payload": execution_payload},
+    )
+    audit_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
+        object(),
+        {"execution_audit_payload": audit_payload},
+    )
+    forged_policy_gate = dict(server.send_to_client.await_args.args[1])
+    forged_policy_gate["summary"] = dict(forged_policy_gate["summary"])
+    forged_policy_gate["safety"] = dict(forged_policy_gate["safety"])
+    forged_policy_gate["summary"]["runtime_memory_mutation"] = True
+    forged_policy_gate["safety"]["runtime_memory_mutation"] = True
+    forged_policy_gate["summary"]["policy_mutation"] = True
+
+    await server._dispatch["draft_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        {"policy_gate_payload": forged_policy_gate},
+    )
+
+    assert server._apply_manual_console_write.await_count == 1
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_policy_memory_draft"
+    assert payload["status"] == "blocked"
+    assert payload["success"] is False
+    assert payload["summary"]["memory_draft_only"] is True
+    assert payload["summary"]["append_only_memory_write_allowed_by_draft"] is False
+    assert payload["summary"]["memory_mutation"] is False
+    assert payload["summary"]["runtime_memory_mutation"] is False
+    assert payload["summary"]["policy_mutation"] is False
+    assert payload["summary"]["live_authority_granted"] is False
+    assert payload["summary"]["full_autonomous_ready"] is False
+    assert payload["memory_draft_records"][0]["proposal_id"] == "memory-draft-forged"
+    assert payload["memory_draft_records"][0]["status"] == "memory_draft_ready"
+    reasons = [item["reason"] for item in payload["blocked_results"]]
+    assert "summary_runtime_memory_mutation_true" in reasons
+    assert "safety_runtime_memory_mutation_true" in reasons
+    assert "summary_policy_mutation_true" in reasons
+    assert "memory-forged:memory-draft-forged" in server._operator_apply_idempotency_keys
+
+
+@pytest.mark.asyncio
+async def test_write_operator_proposal_apply_sequence_policy_memory_requires_operator_ack(server, tmp_path):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -8.5,
+        "old_value": -8.0,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -8.5,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -8.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "memory-write-ack-required",
+            "title": "Lead Vocal: memory write ack required",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="memory-write-ack",
+    )
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+    execution_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+        object(),
+        {"execution_result_payload": execution_payload},
+    )
+    audit_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
+        object(),
+        {"execution_audit_payload": audit_payload},
+    )
+    policy_gate_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["draft_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        {"policy_gate_payload": policy_gate_payload},
+    )
+    memory_draft_payload = server.send_to_client.await_args.args[1]
+
+    await server._dispatch["write_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        {
+            "memory_draft_payload": memory_draft_payload,
+            "apply": True,
+            "root_path": str(tmp_path),
+        },
+    )
+
+    assert server._apply_manual_console_write.await_count == 1
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_policy_memory_writer"
+    assert payload["status"] == "memory_write_operator_ack_required"
+    assert payload["success"] is False
+    assert payload["summary"]["write_result_count"] == 0
+    assert payload["summary"]["append_only_memory_write_applied"] is False
+    assert payload["summary"]["operator_ack_required"] is True
+    assert payload["summary"]["operator_ack"] is False
+    assert payload["summary"]["apply_requested"] is True
+    assert payload["summary"]["target_memory_path"] == ".ai/memory/project.md"
+    for field in (
+        "live_write",
+        "apply_attempted",
+        "queue_mutation",
+        "manual_console_write_called",
+        "policy_mutation",
+        "memory_file_mutation",
+        "runtime_memory_mutation",
+        "model_mutation",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        assert payload["summary"][field] is False
+    reasons = [item["reason"] for item in payload["blocked_results"]]
+    assert "operator_ack_required_before_append_only_memory_write" in reasons
+    assert not (tmp_path / ".ai/memory/project.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_write_operator_proposal_apply_sequence_policy_memory_blocks_forged_target_path(server, tmp_path):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -8.5,
+        "old_value": -8.0,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -8.5,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -8.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "memory-write-forged-target",
+            "title": "Lead Vocal: memory write forged target",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="memory-write-forged-target",
+    )
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+    execution_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+        object(),
+        {"execution_result_payload": execution_payload},
+    )
+    audit_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
+        object(),
+        {"execution_audit_payload": audit_payload},
+    )
+    policy_gate_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["draft_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        {"policy_gate_payload": policy_gate_payload},
+    )
+    forged_memory_draft_payload = dict(server.send_to_client.await_args.args[1])
+    forged_record = dict(forged_memory_draft_payload["memory_draft_records"][0])
+    forged_record["target_memory_path"] = ".env"
+    forged_memory_draft_payload["memory_draft_records"] = [forged_record]
+
+    await server._dispatch["write_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        {
+            "memory_draft_payload": forged_memory_draft_payload,
+            "apply": True,
+            "operator_ack": True,
+            "root_path": str(tmp_path),
+        },
+    )
+
+    assert server._apply_manual_console_write.await_count == 1
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_policy_memory_writer"
+    assert payload["status"] == "memory_write_replacement_required"
+    assert payload["success"] is False
+    assert payload["summary"]["write_result_count"] == 0
+    assert payload["summary"]["append_only_memory_write_applied"] is False
+    assert payload["summary"]["memory_file_mutation"] is False
+    assert payload["summary"]["runtime_memory_mutation"] is False
+    assert payload["summary"]["live_authority_granted"] is False
+    assert payload["summary"]["full_autonomous_ready"] is False
+    assert payload["safety"]["append_only_memory_file_write_applied"] is False
+    assert payload["safety"]["memory_file_mutation"] is False
+    assert payload["safety"]["live_write"] is False
+    reasons = [item["reason"] for item in payload["blocked_results"]]
+    assert "memory_draft_record_target_path_not_allowed" in reasons
+    assert not (tmp_path / ".env").exists()
+    assert not (tmp_path / ".ai/memory/project.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_write_operator_proposal_apply_sequence_policy_memory_appends_with_operator_ack(server, tmp_path):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -8.5,
+        "old_value": -8.0,
+        "pre_read_status": "verified_from_cache",
+        "pre_read_source": "mixer_state_cache",
+        "readback_value": -8.5,
+        "readback_status": "verified_from_cache",
+        "readback_source": "mixer_state_cache",
+        "proof_status": "verified",
+        "rollback_available": True,
+        "rollback_value": -8.0,
+    })
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "memory-write-applied",
+            "title": "Lead Vocal: memory write applied",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="memory-write",
+    )
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+    execution_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+        object(),
+        {"execution_result_payload": execution_payload},
+    )
+    audit_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
+        object(),
+        {"execution_audit_payload": audit_payload},
+    )
+    policy_gate_payload = server.send_to_client.await_args.args[1]
+    await server._dispatch["draft_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        {"policy_gate_payload": policy_gate_payload},
+    )
+    memory_draft_payload = server.send_to_client.await_args.args[1]
+
+    await server._dispatch["write_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        {
+            "memory_draft_payload": memory_draft_payload,
+            "apply": True,
+            "operator_ack": True,
+            "root_path": str(tmp_path),
+        },
+    )
+
+    assert server._apply_manual_console_write.await_count == 1
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_sequence_policy_memory_writer"
+    assert payload["status"] == "append_only_memory_write_applied"
+    assert payload["success"] is True
+    assert payload["summary"]["write_result_count"] == 1
+    assert payload["summary"]["append_only_memory_write_applied"] is True
+    assert payload["summary"]["memory_file_mutation"] is True
+    assert payload["summary"]["runtime_memory_mutation"] is False
+    assert payload["summary"]["live_authority_granted"] is False
+    assert payload["summary"]["full_autonomous_ready"] is False
+    assert payload["safety"]["append_only_memory_file_write_applied"] is True
+    assert payload["safety"]["memory_file_mutation"] is True
+    assert payload["safety"]["live_write"] is False
+    assert payload["write_results"][0]["target_memory_path"] == ".ai/memory/project.md"
+    assert payload["write_results"][0]["applied"] is True
+    assert payload["write_results"][0]["bytes_appended"] > 0
+
+    memory_file = tmp_path / ".ai/memory/project.md"
+    assert memory_file.exists()
+    content = memory_file.read_text(encoding="utf-8")
+    assert "### Supervised sequence policy memory" in content
+    assert "memory-write-applied" in content
+    assert "memory-write:memory-write-applied" in content
+    assert "no live, queue, model, or policy mutation" in content
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,7 @@
 """Read-only operator cockpit state handlers."""
 
 import time
+from pathlib import Path
 
 from operator_product_state import (
     build_agent_communications_snapshot,
@@ -2610,6 +2611,1738 @@ def register_handlers(server):
         remember_applied_delta(normalized_change, apply_result)
         await server.send_to_client(websocket, {"type": "operator_proposal_apply_result", **result})
 
+    def executor_ready_rows_from_data(data):
+        raw_payload = data.get("execution_gate_payload")
+        if isinstance(raw_payload, dict):
+            raw_rows = raw_payload.get("ready_for_executor")
+        else:
+            raw_rows = data.get("ready_for_executor")
+        if isinstance(raw_rows, list):
+            return raw_rows
+        return None
+
+    def sequence_executor_row_from_gate_candidate(
+        candidate,
+        candidate_index,
+        seen_idempotency_keys,
+    ):
+        proposal_id = str(candidate.get("proposal_id") or "").strip()
+        planned_apply_index = candidate.get("planned_apply_index", candidate_index)
+        if candidate.get("status") != "ready_for_executor":
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id or None,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "gate_row_not_ready_for_executor",
+            }
+        if candidate.get("requires_separate_executor") is not True:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id or None,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "gate_row_missing_separate_executor_requirement",
+            }
+        if candidate.get("execution_allowed_by_gate") is not False:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id or None,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "gate_row_execution_authority_forged",
+            }
+        if not proposal_id:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": None,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "missing_gate_proposal_id",
+            }
+
+        current_proposal, current_reason = current_queue_proposal_for_sequence_step(
+            candidate,
+            proposal_id,
+        )
+        if current_reason:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": current_reason,
+                "current_proposal": current_proposal,
+            }
+
+        apply_request = candidate.get("apply_request")
+        if not isinstance(apply_request, dict):
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "missing_apply_request",
+            }
+        if apply_request.get("type") != "apply_operator_proposal":
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "apply_request_type_mismatch",
+            }
+        if str(apply_request.get("proposal_id") or "").strip() != proposal_id:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "apply_request_proposal_id_mismatch",
+            }
+        if apply_request.get("approved") is not True:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "apply_request_approval_required",
+            }
+
+        idempotency_key = str(apply_request.get("idempotency_key") or "").strip()
+        if not idempotency_key:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "missing_idempotency_key",
+            }
+        store = getattr(server, "_operator_apply_idempotency_keys", {})
+        if isinstance(store, dict) and idempotency_key in store:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "duplicate_idempotency_key",
+            }
+        if idempotency_key in seen_idempotency_keys:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "duplicate_idempotency_key_in_sequence",
+            }
+        seen_idempotency_keys.add(idempotency_key)
+
+        raw_changes = candidate.get("normalized_changes")
+        if not isinstance(raw_changes, list) or not raw_changes:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "missing_planned_changes",
+            }
+        changes = []
+        for raw_change in raw_changes:
+            change, blocker = dry_run_step_change(raw_change)
+            if blocker:
+                return None, {
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "candidate_index": candidate_index,
+                    "status": "blocked",
+                    "reason": blocker,
+                }
+            changes.append(change)
+
+        return {
+            "planned_apply_index": planned_apply_index,
+            "proposal_id": proposal_id,
+            "candidate_index": candidate_index,
+            "status": "executor_ready",
+            "apply_request": {
+                "type": "apply_operator_proposal",
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": idempotency_key,
+            },
+            "current_proposal": current_proposal,
+            "normalized_changes": changes,
+        }, None
+
+    def sequence_executor_payload(
+        *,
+        status,
+        candidates,
+        results=None,
+        blocked=None,
+        reason=None,
+        operator_ack=False,
+        execute=False,
+        approved=False,
+    ):
+        results = results or []
+        blocked = blocked or []
+        applied = [item for item in results if item.get("status") == "applied"]
+        apply_blocked = [item for item in results if item.get("status") == "blocked"]
+        attempted = [item for item in results if item.get("apply_attempted")]
+        applied_count = len(applied)
+        attempted_count = len(attempted)
+        live_write = applied_count > 0
+        delegated_apply_attempted = attempted_count > 0
+        operator_mode = server.get_operator_mode_status()
+        return {
+            "type": "operator_proposal_apply_sequence_execution_result",
+            "status": status,
+            "success": status == "applied",
+            "reason": reason,
+            "generated_at": time.time(),
+            "operator_mode": operator_mode,
+            "summary": {
+                "input_candidate_count": len(candidates),
+                "attempted_count": attempted_count,
+                "applied_count": applied_count,
+                "blocked_count": len(blocked) + len(apply_blocked),
+                "applied_proposal_ids": [
+                    item["proposal_id"] for item in applied if item.get("proposal_id")
+                ],
+                "blocked_proposal_ids": [
+                    item["proposal_id"]
+                    for item in [*blocked, *apply_blocked]
+                    if item.get("proposal_id")
+                ],
+                "operator_mode_allows_apply_now": bool(
+                    operator_mode.get("capabilities", {}).get("can_apply_to_console")
+                ),
+                "operator_ack_received": operator_ack,
+                "execute_requested": execute,
+                "approved": approved,
+                "requires_gate_ready": True,
+                "uses_existing_apply_operator_proposal": True,
+                "sequence_executor_called_apply_operator_proposal": (
+                    delegated_apply_attempted
+                ),
+                "live_apply_entrypoint": "apply_operator_proposal",
+                "live_write": live_write,
+                "direct_live_write": False,
+                "apply_attempted": delegated_apply_attempted,
+                "queue_mutation": live_write,
+                "proposal_status_mutation": live_write,
+                "idempotency_reserved": delegated_apply_attempted,
+                "idempotency_reserved_by_executor_directly": False,
+                "idempotency_reservation_delegated_to_apply_operator_proposal": (
+                    delegated_apply_attempted
+                ),
+                "manual_console_write_called_by_apply_operator_proposal": live_write,
+                "manual_console_write_called_by_sequence_executor": False,
+                "direct_manual_console_write_called": False,
+                "mutates_console_state": live_write,
+                "queries_console": False,
+                "live_widening_allowed": False,
+                "stopped_on_block": bool(apply_blocked),
+                "queue_freshness_checked": True,
+            },
+            "safety": {
+                "sequence_executor": True,
+                "execution_gate_payload_required": True,
+                "ready_for_executor_required": True,
+                "requires_execute_true": True,
+                "requires_operator_ack": True,
+                "requires_approved_true": True,
+                "requires_gate_ready": True,
+                "uses_existing_apply_operator_proposal": True,
+                "live_apply_entrypoint": "apply_operator_proposal",
+                "allowed_live_write_kinds": ["fader", "gain"],
+                "live_write": live_write,
+                "direct_live_write": False,
+                "apply_attempted": delegated_apply_attempted,
+                "queue_mutation_by_executor_directly": False,
+                "proposal_status_mutation_by_executor_directly": False,
+                "idempotency_reserved_by_executor_directly": False,
+                "idempotency_reservation_delegated_to_apply_operator_proposal": (
+                    delegated_apply_attempted
+                ),
+                "does_not_call_manual_console_write_directly": True,
+                "manual_console_write_called_by_sequence_executor": False,
+                "direct_manual_console_write_called": False,
+                "manual_console_write_called_by_apply_operator_proposal": live_write,
+                "mutates_console_state": live_write,
+                "queries_console": False,
+                "live_widening_allowed": False,
+            },
+            "execution_results": results,
+            "blocked_results": blocked,
+        }
+
+    async def handle_execute_operator_proposal_apply_sequence(websocket, data):
+        raw_candidates = executor_ready_rows_from_data(data)
+        operator_ack = bool(data.get("operator_ack", False))
+        execute = bool(data.get("execute", False))
+        approved = bool(data.get("approved", False))
+        if raw_candidates is None:
+            await server.send_to_client(
+                websocket,
+                sequence_executor_payload(
+                    status="blocked",
+                    reason="missing_ready_for_executor",
+                    candidates=[],
+                    operator_ack=operator_ack,
+                    execute=execute,
+                    approved=approved,
+                ),
+            )
+            return
+
+        candidates = [
+            candidate for candidate in raw_candidates if isinstance(candidate, dict)
+        ]
+        blocked = []
+        invalid_count = len(raw_candidates) - len(candidates)
+        if invalid_count:
+            blocked.append({
+                "planned_apply_index": None,
+                "proposal_id": None,
+                "candidate_index": None,
+                "status": "blocked",
+                "reason": "invalid_ready_for_executor_row",
+                "count": invalid_count,
+            })
+
+        if not execute:
+            blocked.append({
+                "planned_apply_index": None,
+                "proposal_id": None,
+                "candidate_index": None,
+                "status": "blocked",
+                "reason": "execute_true_required",
+            })
+        if not operator_ack:
+            blocked.append({
+                "planned_apply_index": None,
+                "proposal_id": None,
+                "candidate_index": None,
+                "status": "blocked",
+                "reason": "operator_ack_required",
+            })
+        if not approved:
+            blocked.append({
+                "planned_apply_index": None,
+                "proposal_id": None,
+                "candidate_index": None,
+                "status": "blocked",
+                "reason": "approved_true_required",
+            })
+
+        operator_mode = server.get_operator_mode_status()
+        if not operator_mode.get("capabilities", {}).get("can_apply_to_console"):
+            blocked.append({
+                "planned_apply_index": None,
+                "proposal_id": None,
+                "candidate_index": None,
+                "status": "blocked",
+                "reason": "operator_mode_blocks_live_write",
+            })
+
+        ready_rows = []
+        seen_idempotency_keys = set()
+        for candidate_index, candidate in enumerate(candidates):
+            ready_row, blocker = sequence_executor_row_from_gate_candidate(
+                candidate,
+                candidate_index,
+                seen_idempotency_keys,
+            )
+            if blocker:
+                blocked.append(blocker)
+            else:
+                ready_rows.append(ready_row)
+
+        if blocked or not ready_rows:
+            await server.send_to_client(
+                websocket,
+                sequence_executor_payload(
+                    status="blocked",
+                    reason="sequence_executor_blocked",
+                    candidates=candidates,
+                    blocked=blocked or [{
+                        "planned_apply_index": None,
+                        "proposal_id": None,
+                        "candidate_index": None,
+                        "status": "blocked",
+                        "reason": "no_ready_for_executor_rows",
+                    }],
+                    operator_ack=operator_ack,
+                    execute=execute,
+                    approved=approved,
+                ),
+            )
+            return
+
+        results = []
+        for ready_row in ready_rows:
+            apply_request = dict(ready_row["apply_request"])
+            await handle_apply_operator_proposal(websocket, apply_request)
+            proposal = server.operator_proposal_queue.find(
+                proposal_id=ready_row["proposal_id"],
+            )
+            proposal_snapshot = proposal.to_dict() if proposal is not None else None
+            apply_result = (
+                proposal_snapshot.get("result")
+                if isinstance(proposal_snapshot, dict)
+                else None
+            )
+            row_applied = (
+                isinstance(proposal_snapshot, dict)
+                and proposal_snapshot.get("status") == "applied"
+            )
+            result_row = {
+                "planned_apply_index": ready_row["planned_apply_index"],
+                "proposal_id": ready_row["proposal_id"],
+                "candidate_index": ready_row["candidate_index"],
+                "status": "applied" if row_applied else "blocked",
+                "apply_attempted": True,
+                "apply_request": apply_request,
+                "proposal": proposal_snapshot,
+                "apply_result": apply_result,
+            }
+            if not row_applied:
+                result_row["reason"] = (
+                    (apply_result or {}).get("reason")
+                    or (proposal_snapshot or {}).get("status")
+                    or "apply_not_applied"
+                )
+            results.append(result_row)
+            if not row_applied:
+                break
+
+        applied_count = sum(1 for item in results if item.get("status") == "applied")
+        blocked_count = sum(1 for item in results if item.get("status") == "blocked")
+        if applied_count == len(ready_rows) and blocked_count == 0:
+            status = "applied"
+            reason = None
+        elif applied_count > 0:
+            status = "partial"
+            reason = "sequence_executor_stopped_on_block"
+        else:
+            status = "blocked"
+            reason = "sequence_executor_stopped_on_block"
+
+        await server.send_to_client(
+            websocket,
+            sequence_executor_payload(
+                status=status,
+                reason=reason,
+                candidates=candidates,
+                results=results,
+                operator_ack=operator_ack,
+                execute=execute,
+                approved=approved,
+            ),
+        )
+
+    def sequence_execution_payload_from_data(data):
+        raw_payload = data.get("execution_result_payload")
+        if isinstance(raw_payload, dict):
+            return raw_payload
+        if isinstance(data.get("execution_results"), list):
+            return data
+        return None
+
+    def sequence_execution_audit_blocker(reason, *, proposal_id=None, row_index=None):
+        return {
+            "proposal_id": proposal_id,
+            "execution_result_index": row_index,
+            "status": "blocked",
+            "reason": reason,
+        }
+
+    def audit_sequence_execution_envelope(payload):
+        blockers = []
+        summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+        safety = payload.get("safety") if isinstance(payload.get("safety"), dict) else {}
+        if payload.get("type") != "operator_proposal_apply_sequence_execution_result":
+            blockers.append(
+                sequence_execution_audit_blocker("execution_payload_type_mismatch")
+            )
+        if payload.get("status") != "applied":
+            blockers.append(
+                sequence_execution_audit_blocker("execution_payload_not_applied")
+            )
+        if summary.get("uses_existing_apply_operator_proposal") is not True:
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "summary_missing_apply_operator_proposal_delegation"
+                )
+            )
+        if safety.get("uses_existing_apply_operator_proposal") is not True:
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "safety_missing_apply_operator_proposal_delegation"
+                )
+            )
+        if summary.get("live_apply_entrypoint") != "apply_operator_proposal":
+            blockers.append(
+                sequence_execution_audit_blocker("summary_live_apply_entrypoint_mismatch")
+            )
+        if safety.get("live_apply_entrypoint") != "apply_operator_proposal":
+            blockers.append(
+                sequence_execution_audit_blocker("safety_live_apply_entrypoint_mismatch")
+            )
+        for field in (
+            "direct_live_write",
+            "direct_manual_console_write_called",
+            "manual_console_write_called_by_sequence_executor",
+            "idempotency_reserved_by_executor_directly",
+            "live_widening_allowed",
+            "queries_console",
+        ):
+            if summary.get(field) not in (False, None):
+                blockers.append(sequence_execution_audit_blocker(f"summary_{field}_true"))
+            if safety.get(field) not in (False, None):
+                blockers.append(sequence_execution_audit_blocker(f"safety_{field}_true"))
+        if safety.get("does_not_call_manual_console_write_directly") is not True:
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "safety_missing_direct_manual_write_denial"
+                )
+            )
+        allowed = set(safety.get("allowed_live_write_kinds") or [])
+        if not allowed or allowed - {"fader", "gain"}:
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "safety_allowed_live_write_kinds_widened"
+                )
+            )
+        return blockers
+
+    def audit_sequence_execution_row(row, row_index):
+        proposal_id = str(row.get("proposal_id") or "").strip() or None
+        blockers = []
+        if row.get("status") != "applied":
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_not_applied",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if row.get("apply_attempted") is not True:
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_apply_not_attempted",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+
+        apply_request = row.get("apply_request")
+        if not isinstance(apply_request, dict):
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_missing_apply_request",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+            apply_request = {}
+        if apply_request.get("type") != "apply_operator_proposal":
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_apply_request_type_mismatch",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if apply_request.get("approved") is not True:
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_apply_request_not_approved",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        idempotency_key = str(apply_request.get("idempotency_key") or "").strip()
+        if not idempotency_key:
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_missing_idempotency_key",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+
+        apply_result = row.get("apply_result")
+        if not isinstance(apply_result, dict):
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_missing_apply_result",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+            apply_result = {}
+        if apply_result.get("status") != "applied":
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_apply_result_not_applied",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        value_type = str(apply_result.get("value_type") or "").strip().lower()
+        if value_type not in {"fader", "gain"}:
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_value_type_not_live_allowed",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        effective_value = coerce_float(apply_result.get("effective_value"))
+        if value_type == "fader" and effective_value is not None and effective_value > 0.0:
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_fader_ceiling_exceeded",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if not manual_write_result_verified(apply_result):
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_readback_not_verified",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if apply_result.get("rollback_available") is not True:
+            blockers.append(
+                sequence_execution_audit_blocker(
+                    "execution_row_rollback_unavailable",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if blockers:
+            return None, blockers
+
+        return {
+            "proposal_id": proposal_id,
+            "execution_result_index": row_index,
+            "status": "passed",
+            "value_type": value_type,
+            "channel": apply_result.get("channel"),
+            "effective_value": effective_value,
+            "idempotency_key": idempotency_key,
+            "readback_status": apply_result.get("readback_status"),
+            "proof_status": apply_result.get("proof_status", "verified"),
+            "rollback_available": bool(apply_result.get("rollback_available")),
+            "live_apply_entrypoint": "apply_operator_proposal",
+        }, []
+
+    def sequence_execution_audit_payload(*, status, source_payload, rows, blockers):
+        rows = rows or []
+        blockers = blockers or []
+        passed_ids = [row["proposal_id"] for row in rows if row.get("proposal_id")]
+        blocked_ids = [
+            item["proposal_id"] for item in blockers if item.get("proposal_id")
+        ]
+        return {
+            "type": "operator_proposal_apply_sequence_execution_audit",
+            "status": status,
+            "success": status == "passed",
+            "reason": None if status == "passed" else "sequence_execution_audit_blocked",
+            "generated_at": time.time(),
+            "source_execution_status": source_payload.get("status"),
+            "summary": {
+                "input_execution_result_count": len(
+                    source_payload.get("execution_results") or []
+                ),
+                "audited_count": len(rows),
+                "passed_count": len(rows),
+                "blocked_count": len(blockers),
+                "passed_proposal_ids": passed_ids,
+                "blocked_proposal_ids": blocked_ids,
+                "audit_only": True,
+                "execution_allowed_by_audit": False,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+            },
+            "safety": {
+                "audit_only": True,
+                "execution_result_payload_required": True,
+                "does_not_call_apply_operator_proposal": True,
+                "does_not_call_manual_console_write": True,
+                "live_apply_entrypoint_required": "apply_operator_proposal",
+                "allowed_live_write_kinds": ["fader", "gain"],
+                "execution_allowed_by_audit": False,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+            },
+            "audit_rows": rows,
+            "blocked_results": blockers,
+        }
+
+    async def handle_audit_operator_proposal_apply_sequence_execution(websocket, data):
+        source_payload = sequence_execution_payload_from_data(data)
+        if not isinstance(source_payload, dict):
+            await server.send_to_client(
+                websocket,
+                sequence_execution_audit_payload(
+                    status="blocked",
+                    source_payload={},
+                    rows=[],
+                    blockers=[
+                        sequence_execution_audit_blocker(
+                            "missing_execution_result_payload"
+                        )
+                    ],
+                ),
+            )
+            return
+
+        raw_rows = source_payload.get("execution_results")
+        if not isinstance(raw_rows, list):
+            await server.send_to_client(
+                websocket,
+                sequence_execution_audit_payload(
+                    status="blocked",
+                    source_payload=source_payload,
+                    rows=[],
+                    blockers=[
+                        sequence_execution_audit_blocker(
+                            "missing_execution_result_rows"
+                        )
+                    ],
+                ),
+            )
+            return
+
+        blockers = audit_sequence_execution_envelope(source_payload)
+        audit_rows = []
+        for row_index, row in enumerate(raw_rows):
+            if not isinstance(row, dict):
+                blockers.append(
+                    sequence_execution_audit_blocker(
+                        "invalid_execution_result_row",
+                        row_index=row_index,
+                    )
+                )
+                continue
+            audit_row, row_blockers = audit_sequence_execution_row(row, row_index)
+            blockers.extend(row_blockers)
+            if audit_row:
+                audit_rows.append(audit_row)
+
+        await server.send_to_client(
+            websocket,
+            sequence_execution_audit_payload(
+                status="passed" if audit_rows and not blockers else "blocked",
+                source_payload=source_payload,
+                rows=audit_rows,
+                blockers=blockers,
+            ),
+        )
+
+    def sequence_execution_audit_payload_from_data(data):
+        raw_payload = data.get("execution_audit_payload") or data.get("audit_payload")
+        if isinstance(raw_payload, dict):
+            return raw_payload
+        if isinstance(data.get("audit_rows"), list):
+            return data
+        return None
+
+    def audit_policy_gate_blocker(reason, *, proposal_id=None, row_index=None):
+        return {
+            "proposal_id": proposal_id,
+            "audit_row_index": row_index,
+            "status": "blocked",
+            "reason": reason,
+        }
+
+    def audit_policy_gate_envelope_blockers(payload):
+        blockers = []
+        summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+        safety = payload.get("safety") if isinstance(payload.get("safety"), dict) else {}
+        if payload.get("type") != "operator_proposal_apply_sequence_execution_audit":
+            blockers.append(audit_policy_gate_blocker("audit_payload_type_mismatch"))
+        if payload.get("status") != "passed":
+            blockers.append(audit_policy_gate_blocker("audit_payload_not_passed"))
+        if summary.get("audit_only") is not True:
+            blockers.append(audit_policy_gate_blocker("summary_audit_only_not_true"))
+        if safety.get("audit_only") is not True:
+            blockers.append(audit_policy_gate_blocker("safety_audit_only_not_true"))
+        if safety.get("does_not_call_apply_operator_proposal") is not True:
+            blockers.append(
+                audit_policy_gate_blocker(
+                    "safety_missing_apply_operator_proposal_denial"
+                )
+            )
+        if safety.get("does_not_call_manual_console_write") is not True:
+            blockers.append(
+                audit_policy_gate_blocker("safety_missing_manual_console_write_denial")
+            )
+        for field in (
+            "execution_allowed_by_audit",
+            "live_write",
+            "apply_attempted",
+            "queue_mutation",
+            "proposal_status_mutation",
+            "idempotency_reserved",
+            "manual_console_write_called",
+            "mutates_console_state",
+            "queries_console",
+            "live_widening_allowed",
+            "live_authority_granted",
+        ):
+            if summary.get(field) not in (False, None):
+                blockers.append(audit_policy_gate_blocker(f"summary_{field}_true"))
+            if safety.get(field) not in (False, None):
+                blockers.append(audit_policy_gate_blocker(f"safety_{field}_true"))
+        allowed = set(safety.get("allowed_live_write_kinds") or [])
+        if not allowed or allowed - {"fader", "gain"}:
+            blockers.append(
+                audit_policy_gate_blocker("safety_allowed_live_write_kinds_widened")
+            )
+        blocked_results = payload.get("blocked_results")
+        if isinstance(blocked_results, list) and blocked_results:
+            blockers.append(audit_policy_gate_blocker("audit_payload_has_blocked_results"))
+        return blockers
+
+    def audit_policy_gate_row(row, row_index):
+        proposal_id = str(row.get("proposal_id") or "").strip() or None
+        blockers = []
+        if row.get("status") != "passed":
+            blockers.append(
+                audit_policy_gate_blocker(
+                    "audit_row_not_passed",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        value_type = str(row.get("value_type") or "").strip().lower()
+        if value_type not in {"fader", "gain"}:
+            blockers.append(
+                audit_policy_gate_blocker(
+                    "audit_row_value_type_not_policy_allowed",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        idempotency_key = str(row.get("idempotency_key") or "").strip()
+        if not idempotency_key:
+            blockers.append(
+                audit_policy_gate_blocker(
+                    "audit_row_missing_idempotency_key",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        readback_status = row.get("readback_status")
+        if readback_status not in VERIFIED_MANUAL_READBACK_STATUSES:
+            blockers.append(
+                audit_policy_gate_blocker(
+                    "audit_row_readback_not_verified",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        proof_status = str(row.get("proof_status") or "").strip()
+        if proof_status != "verified":
+            blockers.append(
+                audit_policy_gate_blocker(
+                    "audit_row_proof_not_verified",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if row.get("rollback_available") is not True:
+            blockers.append(
+                audit_policy_gate_blocker(
+                    "audit_row_rollback_unavailable",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        effective_value = coerce_float(row.get("effective_value"))
+        if value_type == "fader" and effective_value is not None and effective_value > 0.0:
+            blockers.append(
+                audit_policy_gate_blocker(
+                    "audit_row_fader_ceiling_exceeded",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if blockers:
+            return None, blockers
+
+        return {
+            "proposal_id": proposal_id,
+            "audit_row_index": row_index,
+            "status": "policy_evidence_ready",
+            "eligible_for_supervised_sequence_policy": True,
+            "execution_allowed_by_policy_gate": False,
+            "policy_mutation_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "value_type": value_type,
+            "channel": row.get("channel"),
+            "effective_value": effective_value,
+            "idempotency_key": idempotency_key,
+            "readback_status": readback_status,
+            "proof_status": proof_status,
+            "rollback_available": True,
+            "live_apply_entrypoint": "apply_operator_proposal",
+        }, []
+
+    def audit_policy_gate_payload(*, status, source_payload, candidates, blockers):
+        candidates = candidates or []
+        blockers = blockers or []
+        return {
+            "type": "operator_proposal_apply_sequence_audit_policy_gate",
+            "status": status,
+            "success": status == "ready",
+            "reason": None if status == "ready" else "sequence_audit_policy_gate_blocked",
+            "generated_at": time.time(),
+            "source_audit_status": source_payload.get("status"),
+            "summary": {
+                "input_audit_row_count": len(source_payload.get("audit_rows") or []),
+                "policy_evidence_ready_count": len(candidates),
+                "blocked_count": len(blockers),
+                "policy_evidence_ready_proposal_ids": [
+                    item["proposal_id"]
+                    for item in candidates
+                    if item.get("proposal_id")
+                ],
+                "blocked_proposal_ids": [
+                    item["proposal_id"] for item in blockers if item.get("proposal_id")
+                ],
+                "policy_gate_only": True,
+                "audit_payload_required": True,
+                "execution_allowed_by_policy_gate": False,
+                "execution_allowed_by_audit": False,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "policy_mutation": False,
+                "runtime_memory_mutation": False,
+                "model_mutation": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+            "safety": {
+                "policy_gate_only": True,
+                "audit_payload_required": True,
+                "does_not_call_apply_operator_proposal": True,
+                "does_not_call_manual_console_write": True,
+                "allowed_live_write_kinds": ["fader", "gain"],
+                "execution_allowed_by_policy_gate": False,
+                "execution_allowed_by_audit": False,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "policy_mutation": False,
+                "runtime_memory_mutation": False,
+                "model_mutation": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+            "policy_evidence": candidates,
+            "blocked_results": blockers,
+        }
+
+    async def handle_gate_operator_proposal_apply_sequence_audit_policy(websocket, data):
+        source_payload = sequence_execution_audit_payload_from_data(data)
+        if not isinstance(source_payload, dict):
+            await server.send_to_client(
+                websocket,
+                audit_policy_gate_payload(
+                    status="blocked",
+                    source_payload={},
+                    candidates=[],
+                    blockers=[
+                        audit_policy_gate_blocker("missing_execution_audit_payload")
+                    ],
+                ),
+            )
+            return
+
+        raw_rows = source_payload.get("audit_rows")
+        if not isinstance(raw_rows, list):
+            await server.send_to_client(
+                websocket,
+                audit_policy_gate_payload(
+                    status="blocked",
+                    source_payload=source_payload,
+                    candidates=[],
+                    blockers=[audit_policy_gate_blocker("missing_audit_rows")],
+                ),
+            )
+            return
+
+        blockers = audit_policy_gate_envelope_blockers(source_payload)
+        candidates = []
+        for row_index, row in enumerate(raw_rows):
+            if not isinstance(row, dict):
+                blockers.append(
+                    audit_policy_gate_blocker(
+                        "invalid_audit_row",
+                        row_index=row_index,
+                    )
+                )
+                continue
+            candidate, row_blockers = audit_policy_gate_row(row, row_index)
+            blockers.extend(row_blockers)
+            if candidate:
+                candidates.append(candidate)
+
+        await server.send_to_client(
+            websocket,
+            audit_policy_gate_payload(
+                status="ready" if candidates and not blockers else "blocked",
+                source_payload=source_payload,
+                candidates=candidates,
+                blockers=blockers,
+            ),
+        )
+
+    def sequence_policy_gate_payload_from_data(data):
+        raw_payload = data.get("policy_gate_payload")
+        if isinstance(raw_payload, dict):
+            return raw_payload
+        if isinstance(data.get("policy_evidence"), list):
+            return data
+        return None
+
+    def policy_memory_draft_blocker(reason, *, proposal_id=None, row_index=None):
+        return {
+            "proposal_id": proposal_id,
+            "policy_evidence_index": row_index,
+            "status": "blocked",
+            "reason": reason,
+        }
+
+    def policy_memory_draft_envelope_blockers(payload):
+        blockers = []
+        summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+        safety = payload.get("safety") if isinstance(payload.get("safety"), dict) else {}
+        if payload.get("type") != "operator_proposal_apply_sequence_audit_policy_gate":
+            blockers.append(policy_memory_draft_blocker("policy_gate_payload_type_mismatch"))
+        if payload.get("status") != "ready":
+            blockers.append(policy_memory_draft_blocker("policy_gate_payload_not_ready"))
+        if summary.get("policy_gate_only") is not True:
+            blockers.append(policy_memory_draft_blocker("summary_policy_gate_only_not_true"))
+        if safety.get("policy_gate_only") is not True:
+            blockers.append(policy_memory_draft_blocker("safety_policy_gate_only_not_true"))
+        if safety.get("does_not_call_apply_operator_proposal") is not True:
+            blockers.append(
+                policy_memory_draft_blocker(
+                    "safety_missing_apply_operator_proposal_denial"
+                )
+            )
+        if safety.get("does_not_call_manual_console_write") is not True:
+            blockers.append(
+                policy_memory_draft_blocker("safety_missing_manual_console_write_denial")
+            )
+        for field in (
+            "execution_allowed_by_policy_gate",
+            "execution_allowed_by_audit",
+            "live_write",
+            "apply_attempted",
+            "queue_mutation",
+            "proposal_status_mutation",
+            "idempotency_reserved",
+            "manual_console_write_called",
+            "mutates_console_state",
+            "queries_console",
+            "policy_mutation",
+            "runtime_memory_mutation",
+            "model_mutation",
+            "live_widening_allowed",
+            "live_authority_granted",
+            "full_autonomous_ready",
+        ):
+            if summary.get(field) not in (False, None):
+                blockers.append(policy_memory_draft_blocker(f"summary_{field}_true"))
+            if safety.get(field) not in (False, None):
+                blockers.append(policy_memory_draft_blocker(f"safety_{field}_true"))
+        allowed = set(safety.get("allowed_live_write_kinds") or [])
+        if not allowed or allowed - {"fader", "gain"}:
+            blockers.append(
+                policy_memory_draft_blocker("safety_allowed_live_write_kinds_widened")
+            )
+        blocked_results = payload.get("blocked_results")
+        if isinstance(blocked_results, list) and blocked_results:
+            blockers.append(policy_memory_draft_blocker("policy_gate_has_blocked_results"))
+        return blockers
+
+    def policy_memory_draft_record(row, row_index):
+        proposal_id = str(row.get("proposal_id") or "").strip() or None
+        blockers = []
+        if row.get("status") != "policy_evidence_ready":
+            blockers.append(
+                policy_memory_draft_blocker(
+                    "policy_evidence_not_ready",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if row.get("eligible_for_supervised_sequence_policy") is not True:
+            blockers.append(
+                policy_memory_draft_blocker(
+                    "policy_evidence_not_supervised_sequence_eligible",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        for field in (
+            "execution_allowed_by_policy_gate",
+            "policy_mutation_allowed",
+            "live_authority_granted",
+            "full_autonomous_ready",
+        ):
+            if row.get(field) not in (False, None):
+                blockers.append(
+                    policy_memory_draft_blocker(
+                        f"policy_evidence_{field}_true",
+                        proposal_id=proposal_id,
+                        row_index=row_index,
+                    )
+                )
+        value_type = str(row.get("value_type") or "").strip().lower()
+        if value_type not in {"fader", "gain"}:
+            blockers.append(
+                policy_memory_draft_blocker(
+                    "policy_evidence_value_type_not_memory_allowed",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        idempotency_key = str(row.get("idempotency_key") or "").strip()
+        if not idempotency_key:
+            blockers.append(
+                policy_memory_draft_blocker(
+                    "policy_evidence_missing_idempotency_key",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if row.get("readback_status") not in VERIFIED_MANUAL_READBACK_STATUSES:
+            blockers.append(
+                policy_memory_draft_blocker(
+                    "policy_evidence_readback_not_verified",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if str(row.get("proof_status") or "").strip() != "verified":
+            blockers.append(
+                policy_memory_draft_blocker(
+                    "policy_evidence_proof_not_verified",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if row.get("rollback_available") is not True:
+            blockers.append(
+                policy_memory_draft_blocker(
+                    "policy_evidence_rollback_unavailable",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if row.get("live_apply_entrypoint") != "apply_operator_proposal":
+            blockers.append(
+                policy_memory_draft_blocker(
+                    "policy_evidence_live_apply_entrypoint_mismatch",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        effective_value = coerce_float(row.get("effective_value"))
+        if value_type == "fader" and effective_value is not None and effective_value > 0.0:
+            blockers.append(
+                policy_memory_draft_blocker(
+                    "policy_evidence_fader_ceiling_exceeded",
+                    proposal_id=proposal_id,
+                    row_index=row_index,
+                )
+            )
+        if blockers:
+            return None, blockers
+
+        return {
+            "draft_id": f"operator-sequence-policy-memory:{proposal_id}:{idempotency_key}",
+            "proposal_id": proposal_id,
+            "policy_evidence_index": row_index,
+            "status": "memory_draft_ready",
+            "learning_scope": "supervised_fader_gain_sequence_execution",
+            "target_memory_path": ".ai/memory/project.md",
+            "target_section": "Project Memory Lessons",
+            "append_only": True,
+            "memory_write_allowed_by_draft": False,
+            "append_only_memory_write_allowed_by_draft": False,
+            "requires_separate_memory_writer": True,
+            "operator_ack_required_for_write": True,
+            "memory_mutation": False,
+            "runtime_memory_mutation": False,
+            "policy_mutation": False,
+            "model_mutation": False,
+            "queue_mutation": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "evidence": {
+                "value_type": value_type,
+                "channel": row.get("channel"),
+                "effective_value": effective_value,
+                "idempotency_key": idempotency_key,
+                "readback_status": row.get("readback_status"),
+                "proof_status": row.get("proof_status"),
+                "rollback_available": True,
+                "live_apply_entrypoint": "apply_operator_proposal",
+            },
+            "draft_text": (
+                "Supervised fader/gain sequence execution was verified from "
+                f"`{proposal_id}` with `{value_type}` evidence, idempotency "
+                f"`{idempotency_key}`, readback `{row.get('readback_status')}`, "
+                "and rollback available. Future policy or autonomous use still "
+                "requires separate audited gates and safety limits."
+            ),
+        }, []
+
+    def policy_memory_draft_payload(*, status, source_payload, drafts, blockers):
+        drafts = drafts or []
+        blockers = blockers or []
+        return {
+            "type": "operator_proposal_apply_sequence_policy_memory_draft",
+            "status": status,
+            "success": status == "ready",
+            "reason": None if status == "ready" else "sequence_policy_memory_draft_blocked",
+            "generated_at": time.time(),
+            "source_policy_gate_status": source_payload.get("status"),
+            "summary": {
+                "input_policy_evidence_count": len(source_payload.get("policy_evidence") or []),
+                "memory_draft_count": len(drafts),
+                "blocked_count": len(blockers),
+                "memory_draft_proposal_ids": [
+                    item["proposal_id"] for item in drafts if item.get("proposal_id")
+                ],
+                "blocked_proposal_ids": [
+                    item["proposal_id"] for item in blockers if item.get("proposal_id")
+                ],
+                "memory_draft_only": True,
+                "policy_gate_payload_required": True,
+                "append_only_memory_write_allowed_by_draft": False,
+                "requires_separate_memory_writer": True,
+                "execution_allowed_by_draft": False,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "policy_mutation": False,
+                "memory_mutation": False,
+                "runtime_memory_mutation": False,
+                "model_mutation": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+            "safety": {
+                "memory_draft_only": True,
+                "policy_gate_payload_required": True,
+                "does_not_call_apply_operator_proposal": True,
+                "does_not_call_manual_console_write": True,
+                "allowed_live_write_kinds": ["fader", "gain"],
+                "append_only_memory_write_allowed_by_draft": False,
+                "requires_separate_memory_writer": True,
+                "execution_allowed_by_draft": False,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "policy_mutation": False,
+                "memory_mutation": False,
+                "runtime_memory_mutation": False,
+                "model_mutation": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+            "memory_draft_records": drafts,
+            "blocked_results": blockers,
+        }
+
+    async def handle_draft_operator_proposal_apply_sequence_policy_memory(websocket, data):
+        source_payload = sequence_policy_gate_payload_from_data(data)
+        if not isinstance(source_payload, dict):
+            await server.send_to_client(
+                websocket,
+                policy_memory_draft_payload(
+                    status="blocked",
+                    source_payload={},
+                    drafts=[],
+                    blockers=[
+                        policy_memory_draft_blocker("missing_policy_gate_payload")
+                    ],
+                ),
+            )
+            return
+
+        raw_rows = source_payload.get("policy_evidence")
+        if not isinstance(raw_rows, list):
+            await server.send_to_client(
+                websocket,
+                policy_memory_draft_payload(
+                    status="blocked",
+                    source_payload=source_payload,
+                    drafts=[],
+                    blockers=[policy_memory_draft_blocker("missing_policy_evidence")],
+                ),
+            )
+            return
+
+        blockers = policy_memory_draft_envelope_blockers(source_payload)
+        drafts = []
+        for row_index, row in enumerate(raw_rows):
+            if not isinstance(row, dict):
+                blockers.append(
+                    policy_memory_draft_blocker(
+                        "invalid_policy_evidence",
+                        row_index=row_index,
+                    )
+                )
+                continue
+            draft, row_blockers = policy_memory_draft_record(row, row_index)
+            blockers.extend(row_blockers)
+            if draft:
+                drafts.append(draft)
+
+        await server.send_to_client(
+            websocket,
+            policy_memory_draft_payload(
+                status="ready" if drafts and not blockers else "blocked",
+                source_payload=source_payload,
+                drafts=drafts,
+                blockers=blockers,
+            ),
+        )
+
+    def sequence_policy_memory_draft_payload_from_data(data):
+        raw_payload = data.get("memory_draft_payload") or data.get("draft_payload")
+        if isinstance(raw_payload, dict):
+            return raw_payload
+        if isinstance(data.get("memory_draft_records"), list):
+            return data
+        return None
+
+    def policy_memory_writer_blocker(reason, *, draft_id=None, row_index=None):
+        return {
+            "draft_id": draft_id,
+            "memory_draft_index": row_index,
+            "status": "blocked",
+            "reason": reason,
+        }
+
+    def _sequence_policy_memory_target_allowed(path_value):
+        if path_value != ".ai/memory/project.md":
+            return False
+        path = Path(str(path_value))
+        return not path.is_absolute() and ".." not in path.parts
+
+    def policy_memory_writer_envelope_blockers(payload):
+        blockers = []
+        summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+        safety = payload.get("safety") if isinstance(payload.get("safety"), dict) else {}
+        if payload.get("type") != "operator_proposal_apply_sequence_policy_memory_draft":
+            blockers.append(policy_memory_writer_blocker("memory_draft_payload_type_mismatch"))
+        if payload.get("status") != "ready":
+            blockers.append(policy_memory_writer_blocker("memory_draft_payload_not_ready"))
+        if summary.get("memory_draft_only") is not True:
+            blockers.append(policy_memory_writer_blocker("summary_memory_draft_only_not_true"))
+        if safety.get("memory_draft_only") is not True:
+            blockers.append(policy_memory_writer_blocker("safety_memory_draft_only_not_true"))
+        if safety.get("does_not_call_apply_operator_proposal") is not True:
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "safety_missing_apply_operator_proposal_denial"
+                )
+            )
+        if safety.get("does_not_call_manual_console_write") is not True:
+            blockers.append(
+                policy_memory_writer_blocker("safety_missing_manual_console_write_denial")
+            )
+        for field in (
+            "append_only_memory_write_allowed_by_draft",
+            "execution_allowed_by_draft",
+            "live_write",
+            "apply_attempted",
+            "queue_mutation",
+            "proposal_status_mutation",
+            "idempotency_reserved",
+            "manual_console_write_called",
+            "mutates_console_state",
+            "queries_console",
+            "policy_mutation",
+            "memory_mutation",
+            "runtime_memory_mutation",
+            "model_mutation",
+            "live_widening_allowed",
+            "live_authority_granted",
+            "full_autonomous_ready",
+        ):
+            if summary.get(field) not in (False, None):
+                blockers.append(policy_memory_writer_blocker(f"summary_{field}_true"))
+            if safety.get(field) not in (False, None):
+                blockers.append(policy_memory_writer_blocker(f"safety_{field}_true"))
+        allowed = set(safety.get("allowed_live_write_kinds") or [])
+        if not allowed or allowed - {"fader", "gain"}:
+            blockers.append(
+                policy_memory_writer_blocker("safety_allowed_live_write_kinds_widened")
+            )
+        blocked_results = payload.get("blocked_results")
+        if isinstance(blocked_results, list) and blocked_results:
+            blockers.append(policy_memory_writer_blocker("memory_draft_has_blocked_results"))
+        return blockers
+
+    def policy_memory_writer_record(record, row_index):
+        draft_id = str(record.get("draft_id") or "").strip() or None
+        blockers = []
+        if record.get("status") != "memory_draft_ready":
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "memory_draft_record_not_ready",
+                    draft_id=draft_id,
+                    row_index=row_index,
+                )
+            )
+        if record.get("append_only") is not True:
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "memory_draft_record_append_only_not_true",
+                    draft_id=draft_id,
+                    row_index=row_index,
+                )
+            )
+        if not _sequence_policy_memory_target_allowed(record.get("target_memory_path")):
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "memory_draft_record_target_path_not_allowed",
+                    draft_id=draft_id,
+                    row_index=row_index,
+                )
+            )
+        if not isinstance(record.get("draft_text"), str) or not record.get("draft_text").strip():
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "memory_draft_record_draft_text_missing",
+                    draft_id=draft_id,
+                    row_index=row_index,
+                )
+            )
+        for field in (
+            "memory_write_allowed_by_draft",
+            "append_only_memory_write_allowed_by_draft",
+            "memory_mutation",
+            "runtime_memory_mutation",
+            "policy_mutation",
+            "model_mutation",
+            "queue_mutation",
+            "live_authority_granted",
+            "full_autonomous_ready",
+        ):
+            if record.get(field) not in (False, None):
+                blockers.append(
+                    policy_memory_writer_blocker(
+                        f"memory_draft_record_{field}_true",
+                        draft_id=draft_id,
+                        row_index=row_index,
+                    )
+                )
+        evidence = record.get("evidence") if isinstance(record.get("evidence"), dict) else {}
+        value_type = str(evidence.get("value_type") or "").strip().lower()
+        if value_type not in {"fader", "gain"}:
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "memory_draft_record_value_type_not_allowed",
+                    draft_id=draft_id,
+                    row_index=row_index,
+                )
+            )
+        if evidence.get("live_apply_entrypoint") != "apply_operator_proposal":
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "memory_draft_record_live_apply_entrypoint_mismatch",
+                    draft_id=draft_id,
+                    row_index=row_index,
+                )
+            )
+        if not str(evidence.get("idempotency_key") or "").strip():
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "memory_draft_record_idempotency_missing",
+                    draft_id=draft_id,
+                    row_index=row_index,
+                )
+            )
+        if evidence.get("readback_status") not in VERIFIED_MANUAL_READBACK_STATUSES:
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "memory_draft_record_readback_not_verified",
+                    draft_id=draft_id,
+                    row_index=row_index,
+                )
+            )
+        if str(evidence.get("proof_status") or "").strip() != "verified":
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "memory_draft_record_proof_not_verified",
+                    draft_id=draft_id,
+                    row_index=row_index,
+                )
+            )
+        if evidence.get("rollback_available") is not True:
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "memory_draft_record_rollback_unavailable",
+                    draft_id=draft_id,
+                    row_index=row_index,
+                )
+            )
+        return blockers
+
+    def render_sequence_policy_memory_block(record):
+        evidence = record.get("evidence") if isinstance(record.get("evidence"), dict) else {}
+        return "\n".join(
+            [
+                "---",
+                "",
+                "### Supervised sequence policy memory",
+                "",
+                f"- Draft ID: `{record.get('draft_id')}`",
+                f"- Proposal ID: `{record.get('proposal_id')}`",
+                f"- Learning scope: `{record.get('learning_scope')}`",
+                f"- Value type: `{evidence.get('value_type')}`",
+                f"- Channel: `{evidence.get('channel')}`",
+                f"- Effective value: `{evidence.get('effective_value')}`",
+                f"- Idempotency key: `{evidence.get('idempotency_key')}`",
+                f"- Readback status: `{evidence.get('readback_status')}`",
+                f"- Proof status: `{evidence.get('proof_status')}`",
+                "- Runtime authority: no live, queue, model, or policy mutation",
+                "",
+                str(record.get("draft_text") or "").strip(),
+                "",
+            ]
+        )
+
+    def append_sequence_policy_memory_records(root, records):
+        results = []
+        root_path = Path(root or ".").resolve()
+        for record in records:
+            target = root_path / str(record["target_memory_path"])
+            target.parent.mkdir(parents=True, exist_ok=True)
+            current = (
+                target.read_text(encoding="utf-8")
+                if target.exists()
+                else "# Project Memory\n"
+            )
+            block = render_sequence_policy_memory_block(record)
+            target.write_text(current.rstrip() + "\n\n" + block, encoding="utf-8")
+            results.append({
+                "draft_id": record.get("draft_id"),
+                "target_memory_path": record.get("target_memory_path"),
+                "applied": True,
+                "bytes_appended": len(block.encode("utf-8")),
+            })
+        return results
+
+    def policy_memory_writer_payload(
+        *,
+        status,
+        source_payload,
+        records,
+        blockers,
+        write_results=None,
+        apply_requested=False,
+        operator_ack=False,
+    ):
+        records = records or []
+        blockers = blockers or []
+        write_results = write_results or []
+        applied = status == "append_only_memory_write_applied"
+        return {
+            "type": "operator_proposal_apply_sequence_policy_memory_writer",
+            "status": status,
+            "success": applied,
+            "reason": None if applied else "sequence_policy_memory_write_not_applied",
+            "generated_at": time.time(),
+            "source_memory_draft_status": source_payload.get("status"),
+            "summary": {
+                "memory_draft_record_count": len(records),
+                "invalid_record_count": len(blockers),
+                "write_result_count": len(write_results),
+                "append_only_memory_write_applied": applied,
+                "operator_ack_required": True,
+                "operator_ack": operator_ack,
+                "apply_requested": apply_requested,
+                "target_memory_path": ".ai/memory/project.md",
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "policy_mutation": False,
+                "memory_file_mutation": applied,
+                "runtime_memory_mutation": False,
+                "model_mutation": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+                "blocked_by": [item["reason"] for item in blockers],
+            },
+            "safety": {
+                "operator_required": True,
+                "operator_ack_required": True,
+                "apply_requested": apply_requested,
+                "operator_ack": operator_ack,
+                "append_only_memory_file_write_applied": applied,
+                "target_memory_path": ".ai/memory/project.md",
+                "does_not_call_apply_operator_proposal": True,
+                "does_not_call_manual_console_write": True,
+                "allowed_live_write_kinds": ["fader", "gain"],
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "policy_mutation": False,
+                "memory_file_mutation": applied,
+                "runtime_memory_mutation": False,
+                "model_mutation": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+            "write_results": write_results,
+            "blocked_results": blockers,
+        }
+
+    async def handle_write_operator_proposal_apply_sequence_policy_memory(websocket, data):
+        source_payload = sequence_policy_memory_draft_payload_from_data(data)
+        apply_requested = bool(data.get("apply", False))
+        operator_ack = bool(data.get("operator_ack", False))
+        if not isinstance(source_payload, dict):
+            await server.send_to_client(
+                websocket,
+                policy_memory_writer_payload(
+                    status="memory_write_not_ready",
+                    source_payload={},
+                    records=[],
+                    blockers=[policy_memory_writer_blocker("missing_memory_draft_payload")],
+                    apply_requested=apply_requested,
+                    operator_ack=operator_ack,
+                ),
+            )
+            return
+
+        raw_records = source_payload.get("memory_draft_records")
+        records = [item for item in raw_records if isinstance(item, dict)] if isinstance(raw_records, list) else []
+        blockers = policy_memory_writer_envelope_blockers(source_payload)
+        if not isinstance(raw_records, list):
+            blockers.append(policy_memory_writer_blocker("missing_memory_draft_records"))
+        invalid_count = (len(raw_records) - len(records)) if isinstance(raw_records, list) else 0
+        if invalid_count:
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "invalid_memory_draft_record",
+                    row_index=None,
+                )
+            )
+        for row_index, record in enumerate(records):
+            blockers.extend(policy_memory_writer_record(record, row_index))
+
+        write_results = []
+        if blockers:
+            status = "memory_write_replacement_required"
+        elif not records:
+            status = "memory_write_not_ready"
+            blockers.append(policy_memory_writer_blocker("memory_draft_records_required"))
+        elif apply_requested and not operator_ack:
+            status = "memory_write_operator_ack_required"
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "operator_ack_required_before_append_only_memory_write"
+                )
+            )
+        elif apply_requested and operator_ack:
+            status = "append_only_memory_write_applied"
+            root = data.get("root_path") or data.get("root") or "."
+            write_results = append_sequence_policy_memory_records(root, records)
+        else:
+            status = "append_only_memory_write_dry_run_ready"
+            blockers.append(
+                policy_memory_writer_blocker(
+                    "operator_ack_and_apply_required_before_append_only_memory_write"
+                )
+            )
+
+        await server.send_to_client(
+            websocket,
+            policy_memory_writer_payload(
+                status=status,
+                source_payload=source_payload,
+                records=records,
+                blockers=blockers,
+                write_results=write_results,
+                apply_requested=apply_requested,
+                operator_ack=operator_ack,
+            ),
+        )
+
     return {
         "get_dashboard_snapshot": handle_get_dashboard_snapshot,
         "get_channel_inventory": handle_get_channel_inventory,
@@ -2660,6 +4393,21 @@ def register_handlers(server):
         ),
         "gate_operator_proposal_apply_sequence_execution": (
             handle_gate_operator_proposal_apply_sequence_execution
+        ),
+        "execute_operator_proposal_apply_sequence": (
+            handle_execute_operator_proposal_apply_sequence
+        ),
+        "audit_operator_proposal_apply_sequence_execution": (
+            handle_audit_operator_proposal_apply_sequence_execution
+        ),
+        "gate_operator_proposal_apply_sequence_audit_policy": (
+            handle_gate_operator_proposal_apply_sequence_audit_policy
+        ),
+        "draft_operator_proposal_apply_sequence_policy_memory": (
+            handle_draft_operator_proposal_apply_sequence_policy_memory
+        ),
+        "write_operator_proposal_apply_sequence_policy_memory": (
+            handle_write_operator_proposal_apply_sequence_policy_memory
         ),
         "apply_operator_proposal": handle_apply_operator_proposal,
     }
