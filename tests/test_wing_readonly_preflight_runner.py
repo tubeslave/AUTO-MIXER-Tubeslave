@@ -1,0 +1,264 @@
+"""Offline tests for the read-only WING preflight runner."""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+from pathlib import Path
+
+import pytest
+
+
+RUNNER_PATH = Path(__file__).resolve().parents[1] / "tools" / "wing_readonly_preflight_runner.py"
+SPEC = importlib.util.spec_from_file_location("wing_readonly_preflight_runner", RUNNER_PATH)
+assert SPEC is not None
+runner = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader is not None
+SPEC.loader.exec_module(runner)
+
+
+class FakeWebSocket:
+    def __init__(self, responses: list[dict]):
+        self.responses = list(responses)
+        self.sent: list[dict] = []
+        self.url: str | None = None
+
+    async def send(self, payload: str) -> None:
+        self.sent.append(json.loads(payload))
+
+    async def recv(self) -> str:
+        if not self.responses:
+            raise AssertionError("No fake WebSocket response queued")
+        return json.dumps(self.responses.pop(0))
+
+
+class FakeWebSocketConnect:
+    def __init__(self, websocket: FakeWebSocket):
+        self.websocket = websocket
+
+    async def __aenter__(self) -> FakeWebSocket:
+        return self.websocket
+
+    async def __aexit__(self, exc_type, exc, tb) -> bool:
+        return False
+
+
+def patch_websocket_connect(monkeypatch: pytest.MonkeyPatch, websocket: FakeWebSocket) -> None:
+    def fake_connect(url: str) -> FakeWebSocketConnect:
+        websocket.url = url
+        return FakeWebSocketConnect(websocket)
+
+    monkeypatch.setattr(runner.websockets, "connect", fake_connect)
+
+
+def parse_args(tmp_path: Path, *argv: str):
+    return runner.build_parser().parse_args(
+        [
+            "--url",
+            "ws://fake-backend",
+            "--artifact-root",
+            str(tmp_path),
+            "--timeout",
+            "0.2",
+            *argv,
+        ]
+    )
+
+
+def read_summary(artifact_root: Path) -> dict:
+    summaries = list(artifact_root.glob("*/summary.json"))
+    assert len(summaries) == 1
+    return json.loads(summaries[0].read_text(encoding="utf-8"))
+
+
+def read_events(summary: dict) -> list[dict]:
+    events_path = Path(summary["events_path"])
+    return [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_forbidden_request_types_cover_hard_safety_boundary() -> None:
+    expected = {
+        "set_fader",
+        "set_gain",
+        "set_trim",
+        "set_input_trim",
+        "set_channel_trim",
+        "set_preamp_trim",
+        "set_preamp_gain",
+        "set_eq",
+        "set_compressor",
+        "route_output",
+        "load_snap",
+        "save_snap",
+        "reset",
+        "mute",
+        "unmute",
+        "set_insert",
+        "set_fx_model",
+        "set_fx_on",
+        "set_fx_mix",
+        "set_fx_parameter",
+        "set_operator_mode",
+        "create_operator_proposal",
+        "apply_operator_proposal",
+        "rollback_last_manual_write",
+        "emergency_stop",
+        "connect_wing",
+        "disconnect_wing",
+        "disconnect_mixer",
+    }
+
+    assert expected <= runner.FORBIDDEN_REQUEST_TYPES
+    assert expected & {"get_operator_mode", "get_state", "query_mixer_parameter"} == set()
+
+
+@pytest.mark.parametrize(
+    ("argv", "expected_error"),
+    [
+        (["--channels", "0"], "--channels values must be in 1..48"),
+        (["--channels", "49"], "--channels values must be in 1..48"),
+        (["--channels", ""], "--channels must include at least one channel"),
+        (["--value-types", "fader,eq"], "--value-types unsupported: eq"),
+        (["--timeout", "0"], "--timeout must be positive"),
+    ],
+)
+def test_validate_args_blocks_invalid_preflight_requests(
+    tmp_path: Path,
+    argv: list[str],
+    expected_error: str,
+) -> None:
+    args = parse_args(tmp_path, *argv)
+
+    assert runner.validate_args(args) == expected_error
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_passes_with_physical_readbacks_without_write_messages(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
+            {
+                "type": "mixer_parameter_value",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "fader",
+                "address": "/ch/3/fdr",
+                "value": -12.0,
+            },
+            {
+                "type": "mixer_parameter_value",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "gain",
+                "address": "/ch/3/in/set/trim",
+                "value": -0.25,
+            },
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader,gain",
+        "--require-physical-readback",
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 0
+    assert websocket.url == "ws://fake-backend"
+    assert [request["type"] for request in websocket.sent] == [
+        "get_operator_mode",
+        "get_state",
+        "query_mixer_parameter",
+        "query_mixer_parameter",
+    ]
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "passed"
+    assert summary["reason"] == "wing_readonly_preflight_passed"
+    assert summary["connection_mode"] == "wing"
+    assert summary["read_only"] is True
+    assert summary["live_write"] is False
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
+    assert summary["physical_readback_count"] == 2
+    assert summary["forbidden_request_types_sent"] == []
+    assert [event["event_type"] for event in read_events(summary)] == [
+        "send",
+        "recv",
+        "send",
+        "recv",
+        "send",
+        "recv",
+        "send",
+        "recv",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_blocks_when_backend_is_not_wing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "offline"},
+            {"type": "state_update", "mode": "offline", "state": {}},
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    args = parse_args(tmp_path, "--channels", "3", "--value-types", "gain", "--require-physical-readback")
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 3
+    assert [request["type"] for request in websocket.sent] == ["get_operator_mode", "get_state"]
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "backend_not_in_wing_mode"
+    assert summary["connection_mode"] == "offline"
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_blocks_missing_physical_readback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
+            {
+                "type": "mixer_parameter_value",
+                "status": "verified_from_cache",
+                "source": "mixer_state_cache",
+                "channel": 3,
+                "value_type": "fader",
+                "address": "/ch/3/fdr",
+                "value": -12.0,
+            },
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    args = parse_args(tmp_path, "--channels", "3", "--value-types", "fader", "--require-physical-readback")
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 4
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "wing_readonly_preflight_blocked"
+    assert summary["physical_readback_count"] == 0
+    assert summary["blockers"] == ["physical_readback_missing:ch3:fader"]
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False

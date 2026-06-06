@@ -223,12 +223,14 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "tools/gain_proof_dry_run_runner.py",
             "tools/wing_method_proof_runner.py",
             "tools/wing_supervised_smoke_runner.py",
+            "tools/wing_readonly_preflight_runner.py",
         ),
         entrypoints=(
             "no-WING release check",
             "fake gain proof",
             "method proof runner",
             "supervised WING smoke runner",
+            "read-only WING preflight runner",
         ),
         write_kinds=("proof_fader", "proof_gain", "proof_eq", "forbidden_token_scan"),
         allowed_live=False,
@@ -238,7 +240,9 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         ),
         current_policy=(
             "Dry-run by default; real-WING proof requires separate operator approval "
-            "and explicit flags."
+            "and explicit flags. Read-only preflight may query backend-observed "
+            "state/readback only and must not send write, proposal, connect, "
+            "disconnect, rollback, or emergency-stop messages."
         ),
         next_action=(
             "Keep proof artifacts separate from live readiness claims until physical "
