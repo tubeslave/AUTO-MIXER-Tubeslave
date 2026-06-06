@@ -103,6 +103,15 @@ from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import
 from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer import (
     build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer,
 )
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer,
+)
 from operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
     build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
 )
@@ -126,6 +135,12 @@ from operator_proposal_apply_sequence_policy_memory_trust_promotion_executor imp
 )
 from operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit import (
     build_operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate,
 )
 
 
@@ -1208,6 +1223,80 @@ def register_handlers(server):
         )
         result["handler"] = (
             "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_apply_audit_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer(
+                promotion_executor_result_consumer=(
+                    data.get("promotion_executor_result_consumer")
+                    or data.get("queue_import_promotion_executor_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_apply_audit_result=(
+                    data.get("promotion_apply_audit_result")
+                    or data.get("promotion_apply_audit")
+                    or data.get("apply_audit")
+                    or data.get("audit")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_apply_audit_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_rollback_verification_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer(
+                promotion_apply_audit_result_consumer=(
+                    data.get("promotion_apply_audit_result_consumer")
+                    or data.get("queue_import_promotion_apply_audit_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_rollback_verification_result=(
+                    data.get("promotion_rollback_verification_result")
+                    or data.get("promotion_rollback_verification")
+                    or data.get("rollback_verification")
+                    or data.get("rollback")
+                    or data.get("verification")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_rollback_verification_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_policy_gate_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer(
+                promotion_rollback_verification_result_consumer=(
+                    data.get("promotion_rollback_verification_result_consumer")
+                    or data.get("queue_import_promotion_rollback_verification_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_sequence_policy_gate_result=(
+                    data.get("promotion_sequence_policy_gate_result")
+                    or data.get("promotion_sequence_policy_gate")
+                    or data.get("sequence_policy_gate")
+                    or data.get("policy_gate")
+                    or data.get("gate")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_policy_gate_result"
         )
         await server.send_to_client(websocket, result)
 
@@ -5122,6 +5211,45 @@ def register_handlers(server):
         )
         await server.send_to_client(websocket, result)
 
+    async def handle_verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback(
+        websocket,
+        data,
+    ):
+        result = build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification(
+            apply_audit=(
+                data.get("apply_audit")
+                or data.get("promotion_apply_audit")
+                or data.get("promotion_apply_audit_result")
+                or data.get("audit")
+            ),
+            verification_records=(
+                data.get("verification_records")
+                or data.get("rollback_verification_records")
+                or data.get("records")
+            ),
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy(
+        websocket,
+        data,
+    ):
+        result = build_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate(
+            rollback_verification=(
+                data.get("rollback_verification")
+                or data.get("promotion_rollback_verification")
+                or data.get("promotion_rollback_verification_result")
+                or data.get("verification")
+            ),
+        )
+        result["handler"] = (
+            "gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy"
+        )
+        await server.send_to_client(websocket, result)
+
     return {
         "get_dashboard_snapshot": handle_get_dashboard_snapshot,
         "get_channel_inventory": handle_get_channel_inventory,
@@ -5220,6 +5348,15 @@ def register_handlers(server):
         "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result": (
             handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result
         ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_apply_audit_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_apply_audit_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_rollback_verification_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_rollback_verification_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_policy_gate_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_policy_gate_result
+        ),
         "create_operator_proposal": handle_create_operator_proposal,
         "accept_operator_proposal": handle_accept_operator_proposal,
         "dismiss_operator_proposal": handle_dismiss_operator_proposal,
@@ -5280,6 +5417,12 @@ def register_handlers(server):
         ),
         "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion": (
             handle_audit_operator_proposal_apply_sequence_policy_memory_trust_promotion
+        ),
+        "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback": (
+            handle_verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback
+        ),
+        "gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy": (
+            handle_gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy
         ),
         "apply_operator_proposal": handle_apply_operator_proposal,
     }

@@ -14008,6 +14008,344 @@ async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audi
         is False
     )
     assert promotion_apply_audit_payload["summary"]["rollback_verified"] is False
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_apply_audit_result"
+    ](
+        object(),
+        {
+            "promotion_executor_result_consumer": (
+                promotion_executor_result_consumer_payload
+            ),
+            "promotion_apply_audit_result": promotion_apply_audit_payload,
+        },
+    )
+
+    promotion_apply_audit_result_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert promotion_apply_audit_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer"
+    )
+    assert promotion_apply_audit_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_apply_audit_result"
+    )
+    assert promotion_apply_audit_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_rollback_verification_request_available"
+    )
+    assert (
+        promotion_apply_audit_result_consumer_payload["summary"][
+            "promotion_rollback_verification_request_available"
+        ]
+        is True
+    )
+    assert (
+        promotion_apply_audit_result_consumer_payload["summary"][
+            "promotion_rollback_verification_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        promotion_apply_audit_result_consumer_payload["summary"][
+            "promotion_rollback_verification_created"
+        ]
+        is False
+    )
+    assert (
+        promotion_apply_audit_result_consumer_payload["summary"]["policy_mutation"]
+        is False
+    )
+    assert (
+        promotion_apply_audit_result_consumer_payload["summary"][
+            "runtime_memory_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_apply_audit_result_consumer_payload["summary"][
+            "live_authority_granted"
+        ]
+        is False
+    )
+    assert (
+        promotion_apply_audit_result_consumer_payload[
+            "promotion_rollback_verification_request"
+        ]["handler"]
+        == "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
+    )
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
+    ](
+        object(),
+        promotion_apply_audit_result_consumer_payload[
+            "promotion_rollback_verification_request"
+        ],
+    )
+
+    promotion_rollback_verification_payload = server.send_to_client.await_args.args[1]
+    assert promotion_rollback_verification_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification"
+    )
+    assert promotion_rollback_verification_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
+    )
+    assert promotion_rollback_verification_payload["status"] == (
+        "sequence_memory_trust_promotion_rollback_verification_not_ready"
+    )
+    assert (
+        promotion_rollback_verification_payload["summary"][
+            "apply_audit_record_count"
+        ]
+        == 1
+    )
+    assert (
+        promotion_rollback_verification_payload["summary"][
+            "verification_record_count"
+        ]
+        == 0
+    )
+    assert (
+        promotion_rollback_verification_payload["summary"][
+            "unverified_apply_audit_record_count"
+        ]
+        == 1
+    )
+    assert (
+        promotion_rollback_verification_payload["summary"][
+            "runtime_memory_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_rollback_verification_payload["summary"][
+            "sequence_policy_trust_store_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_rollback_verification_payload["summary"][
+            "live_authority_granted"
+        ]
+        is False
+    )
+    assert promotion_rollback_verification_payload["summary"]["rollback_verified"] is False
+    assert promotion_rollback_verification_payload["verified_records"] == []
+
+    apply_audit_record = promotion_apply_audit_payload["audit_records"][0]
+    rollback_verification_request = dict(
+        promotion_apply_audit_result_consumer_payload[
+            "promotion_rollback_verification_request"
+        ]
+    )
+    rollback_verification_request["verification_records"] = [
+        {
+            "rollback_verification_id": "queue-import-rollback-verification-1",
+            "promotion_apply_audit_id": apply_audit_record[
+                "promotion_apply_audit_id"
+            ],
+            "promotion_executor_apply_id": apply_audit_record[
+                "promotion_executor_apply_id"
+            ],
+            "proposal_id": apply_audit_record["proposal_id"],
+            "learning_scope": apply_audit_record["learning_scope"],
+            "value_type": apply_audit_record["value_type"],
+            "source_idempotency_key": apply_audit_record[
+                "source_idempotency_key"
+            ],
+            "policy_key": apply_audit_record["policy_key"],
+            "target_policy_store": apply_audit_record["target_policy_store"],
+            "target_policy_path": apply_audit_record["target_policy_path"],
+            "target_policy_state": apply_audit_record["target_policy_state"],
+            "rollback_target_policy_state": apply_audit_record[
+                "rollback_target_policy_state"
+            ],
+            "rollback_strategy": apply_audit_record["rollback_strategy"],
+            "verification_evidence_status": "reviewed",
+            "decision": "verified",
+            "verified_by": "operator",
+            "verified_at": "2026-06-06T14:00:00Z",
+            "rollback_verified": True,
+            "read_only": True,
+            "operator_review_required": True,
+            "separate_sequence_policy_gate_required": True,
+            "live_write": False,
+            "apply_attempted": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "queue_mutation": False,
+            "model_mutation": False,
+            "runtime_memory_mutation": False,
+            "sequence_policy_trust_store_mutation": False,
+            "proposal_state_mutation": False,
+            "sequence_execution_allowed_by_verification": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "can_import_to_queue": False,
+            "can_apply_live": False,
+        }
+    ]
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
+    ](
+        object(),
+        rollback_verification_request,
+    )
+
+    promotion_rollback_verified_payload = server.send_to_client.await_args.args[1]
+    assert promotion_rollback_verified_payload["status"] == (
+        "operator_sequence_memory_trust_promotion_rollback_verified_records_available"
+    )
+    assert (
+        promotion_rollback_verified_payload["summary"][
+            "rollback_verified_record_count"
+        ]
+        == 1
+    )
+    assert (
+        promotion_rollback_verified_payload["summary"][
+            "sequence_execution_allowed_by_verification"
+        ]
+        is False
+    )
+    assert (
+        promotion_rollback_verified_payload["summary"]["live_authority_granted"]
+        is False
+    )
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_rollback_verification_result"
+    ](
+        object(),
+        {
+            "promotion_apply_audit_result_consumer": (
+                promotion_apply_audit_result_consumer_payload
+            ),
+            "promotion_rollback_verification_result": (
+                promotion_rollback_verified_payload
+            ),
+        },
+    )
+
+    promotion_rollback_verification_result_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert promotion_rollback_verification_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer"
+    )
+    assert promotion_rollback_verification_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_rollback_verification_result"
+    )
+    assert promotion_rollback_verification_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_request_available"
+    )
+    assert (
+        promotion_rollback_verification_result_consumer_payload["summary"][
+            "promotion_sequence_policy_gate_request_available"
+        ]
+        is True
+    )
+    assert (
+        promotion_rollback_verification_result_consumer_payload["summary"][
+            "promotion_sequence_policy_gate_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        promotion_rollback_verification_result_consumer_payload["summary"][
+            "promotion_sequence_policy_gate_created"
+        ]
+        is False
+    )
+    assert (
+        promotion_rollback_verification_result_consumer_payload["summary"][
+            "policy_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_rollback_verification_result_consumer_payload["summary"][
+            "runtime_memory_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_rollback_verification_result_consumer_payload["summary"][
+            "live_authority_granted"
+        ]
+        is False
+    )
+    assert (
+        promotion_rollback_verification_result_consumer_payload[
+            "promotion_sequence_policy_gate_request"
+        ]["handler"]
+        == "gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy"
+    )
+
+    await server._dispatch[
+        "gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy"
+    ](
+        object(),
+        promotion_rollback_verification_result_consumer_payload[
+            "promotion_sequence_policy_gate_request"
+        ],
+    )
+
+    promotion_sequence_policy_gate_payload = server.send_to_client.await_args.args[1]
+    assert promotion_sequence_policy_gate_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate"
+    )
+    assert promotion_sequence_policy_gate_payload["handler"] == (
+        "gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy"
+    )
+    assert promotion_sequence_policy_gate_payload["status"] == (
+        "verified_sequence_memory_trust_promotion_policy_records_available"
+    )
+    assert (
+        promotion_sequence_policy_gate_payload["summary"][
+            "rollback_verified_record_count"
+        ]
+        == 1
+    )
+    assert (
+        promotion_sequence_policy_gate_payload["summary"][
+            "sequence_policy_gate_record_count"
+        ]
+        == 1
+    )
+    assert (
+        promotion_sequence_policy_gate_payload["summary"]["eligible_record_count"]
+        == 1
+    )
+    assert (
+        promotion_sequence_policy_gate_payload["summary"][
+            "sequence_policy_trust_store_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_sequence_policy_gate_payload["summary"]["queue_mutation"]
+        is False
+    )
+    assert (
+        promotion_sequence_policy_gate_payload["summary"][
+            "live_authority_granted"
+        ]
+        is False
+    )
+    assert (
+        promotion_sequence_policy_gate_payload["policy_records"][0][
+            "can_import_to_queue"
+        ]
+        is False
+    )
+    assert (
+        promotion_sequence_policy_gate_payload["policy_records"][0][
+            "can_apply_live"
+        ]
+        is False
+    )
     assert server._apply_manual_console_write.await_count == 1
     assert "seq-import-audit:proposal-sequence-fader" in (
         server._operator_apply_idempotency_keys
