@@ -121,6 +121,12 @@ from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import
 from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer import (
     build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer,
 )
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_importer_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_importer_result_consumer,
+)
+from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_preflight_plan_result_consumer import (
+    build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_preflight_plan_result_consumer,
+)
 from operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger import (
     build_operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger,
 )
@@ -1389,6 +1395,61 @@ def register_handlers(server):
         )
         result["handler"] = (
             "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_ordering_plan_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_importer_result_consumer(
+                promotion_queue_ordering_plan_result_consumer=(
+                    data.get("promotion_queue_ordering_plan_result_consumer")
+                    or data.get("queue_import_promotion_queue_ordering_plan_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_queue_importer_result=(
+                    data.get("promotion_queue_importer_result")
+                    or data.get("queue_importer_result")
+                    or data.get("queue_importer")
+                    or data.get("importer")
+                    or data.get("result")
+                ),
+                idempotency_key_prefix=data.get(
+                    "idempotency_key_prefix",
+                    "sequence-policy-queue-import",
+                ),
+                limit=data.get("limit", 20),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result"
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result(
+        websocket,
+        data,
+    ):
+        result = (
+            build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_preflight_plan_result_consumer(
+                promotion_queue_importer_result_consumer=(
+                    data.get("promotion_queue_importer_result_consumer")
+                    or data.get("queue_import_promotion_queue_importer_result_consumer")
+                    or data.get("consumer")
+                ),
+                promotion_queue_import_preflight_plan_result=(
+                    data.get("promotion_queue_import_preflight_plan_result")
+                    or data.get("queue_import_preflight_plan")
+                    or data.get("preflight_plan")
+                    or data.get("plan")
+                    or data.get("result")
+                ),
+            )
+        )
+        result["handler"] = (
+            "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result"
         )
         await server.send_to_client(websocket, result)
 
@@ -5522,6 +5583,12 @@ def register_handlers(server):
         ),
         "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_ordering_plan_result": (
             handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_ordering_plan_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result
+        ),
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result": (
+            handle_verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result
         ),
         "create_operator_proposal": handle_create_operator_proposal,
         "accept_operator_proposal": handle_accept_operator_proposal,

@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import time
+from copy import deepcopy
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -14897,6 +14898,197 @@ async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audi
         server._operator_apply_idempotency_keys
     )
     assert build_decision_queue(server)["summary"]["applied_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_sequence_policy_queue_import_promotion_queue_importer_result_consumer_feeds_preflight_plan_without_live_write(
+    server,
+    tmp_path,
+):
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer,
+    )
+    from tests.test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer import (
+        _queue_ordering_plan_ready,
+    )
+
+    server.send_to_client = AsyncMock()
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock()
+    promotion_ordering_preview_result_consumer, queue_ordering_plan, proposals = (
+        _queue_ordering_plan_ready(tmp_path)
+    )
+    promotion_queue_ordering_plan_result_consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer(
+            promotion_ordering_preview_result_consumer=(
+                promotion_ordering_preview_result_consumer
+            ),
+            promotion_queue_ordering_plan_result=queue_ordering_plan,
+        )
+    )
+    queue_importer_request = dict(
+        promotion_queue_ordering_plan_result_consumer[
+            "promotion_queue_importer_request"
+        ]
+    )
+    applyable_proposals = deepcopy(proposals)
+    for proposal in applyable_proposals:
+        if proposal.get("proposal_id") == "proposal-first":
+            proposal["kind"] = "fader"
+            proposal["requested_change"] = {
+                "value_type": "fader",
+                "channel": 2,
+                "value": -8.5,
+                "current_value": -8.0,
+                "rollback_value": -8.0,
+            }
+    queue_importer_request["proposal_payloads"] = applyable_proposals
+    queue_importer_request["apply"] = True
+    queue_importer_request["operator_ack"] = True
+
+    await server._dispatch[
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
+    ](
+        object(),
+        queue_importer_request,
+    )
+
+    queue_importer_payload = server.send_to_client.await_args.args[1]
+    assert queue_importer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_importer_applied"
+    )
+    assert queue_importer_payload["summary"]["queue_mutation"] is True
+    assert queue_importer_payload["summary"]["live_write"] is False
+    assert build_decision_queue(server)["summary"]["pending_count"] == 1
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result"
+    ](
+        object(),
+        {
+            "promotion_queue_ordering_plan_result_consumer": (
+                promotion_queue_ordering_plan_result_consumer
+            ),
+            "promotion_queue_importer_result": queue_importer_payload,
+            "idempotency_key_prefix": "promotion-import",
+            "limit": 5,
+        },
+    )
+
+    consumer_payload = server.send_to_client.await_args.args[1]
+    assert consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_importer_result_consumer"
+    )
+    assert consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result"
+    )
+    assert consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_queue_import_preflight_plan_request_available"
+    )
+    assert (
+        consumer_payload["summary"]["promotion_preflight_plan_request_available"]
+        is True
+    )
+    assert consumer_payload["summary"]["promotion_preflight_plan_handler_invoked"] is False
+    assert consumer_payload["summary"]["promotion_preflight_plan_created"] is False
+    assert consumer_payload["summary"]["queue_mutation"] is False
+    assert consumer_payload["summary"]["live_write"] is False
+
+    preflight_plan_request = consumer_payload["promotion_preflight_plan_request"]
+    assert preflight_plan_request["handler"] == (
+        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
+    )
+    assert preflight_plan_request["read_only_template"] is True
+    assert preflight_plan_request["idempotency_key_prefix"] == "promotion-import"
+    assert preflight_plan_request["limit"] == 5
+    assert preflight_plan_request["queue_mutation"] is False
+    assert preflight_plan_request["live_write"] is False
+
+    await server._dispatch[
+        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
+    ](
+        object(),
+        preflight_plan_request,
+    )
+
+    preflight_plan_payload = server.send_to_client.await_args.args[1]
+    assert preflight_plan_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_preflight_plan_available"
+    )
+    assert preflight_plan_payload["handler"] == (
+        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
+    )
+    assert preflight_plan_payload["summary"]["preflight_candidate_count"] == 1
+    assert preflight_plan_payload["summary"]["idempotency_reserved"] is False
+    assert preflight_plan_payload["summary"]["queue_mutation"] is False
+    assert preflight_plan_payload["summary"]["live_write"] is False
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result"
+    ](
+        object(),
+        {
+            "promotion_queue_importer_result_consumer": consumer_payload,
+            "promotion_queue_import_preflight_plan_result": preflight_plan_payload,
+        },
+    )
+
+    preflight_plan_consumer_payload = server.send_to_client.await_args.args[1]
+    assert preflight_plan_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_preflight_plan_result_consumer"
+    )
+    assert preflight_plan_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result"
+    )
+    assert preflight_plan_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_batch_preflight_request_available"
+    )
+    assert (
+        preflight_plan_consumer_payload["summary"][
+            "promotion_batch_preflight_request_available"
+        ]
+        is True
+    )
+    assert (
+        preflight_plan_consumer_payload["summary"][
+            "promotion_batch_preflight_handler_invoked"
+        ]
+        is False
+    )
+    assert preflight_plan_consumer_payload["summary"]["queue_mutation"] is False
+    assert preflight_plan_consumer_payload["summary"]["idempotency_reserved"] is False
+    assert preflight_plan_consumer_payload["summary"]["live_write"] is False
+
+    batch_preflight_request = dict(
+        preflight_plan_consumer_payload["promotion_batch_preflight_request"]
+    )
+    assert batch_preflight_request["handler"] == "preflight_operator_proposal_apply_batch"
+    assert batch_preflight_request["approved"] is False
+    assert batch_preflight_request["operator_must_set_approved_true"] is True
+    assert batch_preflight_request["idempotency_key_prefix"] == "promotion-import"
+    assert batch_preflight_request["limit"] == 5
+    assert batch_preflight_request["queue_mutation"] is False
+    assert batch_preflight_request["idempotency_reserved"] is False
+    batch_preflight_request["approved"] = True
+
+    await server._dispatch["preflight_operator_proposal_apply_batch"](
+        object(),
+        batch_preflight_request,
+    )
+
+    batch_preflight_payload = server.send_to_client.await_args.args[1]
+    assert batch_preflight_payload["type"] == "operator_proposal_apply_preflight_batch"
+    assert batch_preflight_payload["status"] == "ok"
+    assert batch_preflight_payload["summary"]["selected_count"] == 1
+    assert batch_preflight_payload["summary"]["ready_count"] == 1
+    assert batch_preflight_payload["summary"]["idempotency_key_prefix"] == (
+        "promotion-import"
+    )
+    assert batch_preflight_payload["summary"]["queue_mutation"] is False
+    assert batch_preflight_payload["summary"]["idempotency_reserved"] is False
+    assert batch_preflight_payload["summary"]["live_write"] is False
+    assert server._apply_manual_console_write.await_count == 0
 
 
 def test_import_soundcheck_recommendations_respects_analyze_mode(server):
