@@ -93,6 +93,7 @@ TELEMETRY_ALERT_CONTEXT_ALLOWLIST = {
     "peak_dbfs",
     "previous_fader_db",
 }
+SOURCE_IDENTITY_QUEUE_IMPORTER_SOURCE = "source_identity_proposal_queue_importer"
 
 FX_PARAMETER_SCHEMA_BY_FAMILY: Mapping[str, Dict[int, Dict[str, Any]]] = {
     "reverb": {
@@ -3190,6 +3191,210 @@ def _normalize_action(action: Any, index: int) -> Dict[str, Any]:
     }
 
 
+def _source_identity_queue_import_metadata(action: Mapping[str, Any]) -> Dict[str, Any]:
+    direct = action.get("source_identity_queue_import")
+    if isinstance(direct, Mapping):
+        return dict(direct)
+    raw = action.get("raw")
+    if isinstance(raw, Mapping):
+        nested = raw.get("source_identity_queue_import")
+        if isinstance(nested, Mapping):
+            return dict(nested)
+    return {}
+
+
+def _is_source_identity_queue_import_action(action: Mapping[str, Any]) -> bool:
+    if _source_identity_queue_import_metadata(action):
+        return True
+    if action.get("source") == SOURCE_IDENTITY_QUEUE_IMPORTER_SOURCE:
+        return True
+    raw = action.get("raw")
+    return (
+        isinstance(raw, Mapping)
+        and raw.get("source") == SOURCE_IDENTITY_QUEUE_IMPORTER_SOURCE
+    )
+
+
+def _action_id(action: Mapping[str, Any]) -> str:
+    value = action.get("id") or action.get("proposal_id")
+    return str(value) if value is not None else ""
+
+
+def _source_identity_queue_import_summary(
+    pending: Iterable[Mapping[str, Any]],
+    history: Iterable[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    pending_imported = [
+        dict(action)
+        for action in pending
+        if _is_source_identity_queue_import_action(action)
+    ]
+    history_imported = [
+        dict(action)
+        for action in history
+        if _is_source_identity_queue_import_action(action)
+    ]
+    applyable_pending = [
+        action for action in pending_imported if action.get("can_apply") is True
+    ]
+    analysis_only_pending = [
+        action for action in pending_imported if action.get("can_apply") is not True
+    ]
+
+    def ids(actions: Iterable[Mapping[str, Any]]) -> List[str]:
+        return [
+            identifier
+            for identifier in (_action_id(action) for action in actions)
+            if identifier
+        ]
+
+    ranked_pending = []
+    unranked_pending = []
+    unknown_rank_pending = []
+    for action in pending_imported:
+        metadata = _source_identity_queue_import_metadata(action)
+        rank_source = metadata.get("rank_source")
+        if rank_source == "source_identity_policy":
+            ranked_pending.append(action)
+        elif rank_source == "original_order":
+            unranked_pending.append(action)
+        else:
+            unknown_rank_pending.append(action)
+
+    return {
+        "source": SOURCE_IDENTITY_QUEUE_IMPORTER_SOURCE,
+        "available": bool(pending_imported or history_imported),
+        "pending_count": len(pending_imported),
+        "history_count": len(history_imported),
+        "applyable_pending_count": len(applyable_pending),
+        "analysis_only_pending_count": len(analysis_only_pending),
+        "ranked_pending_count": len(ranked_pending),
+        "unranked_pending_count": len(unranked_pending),
+        "unknown_rank_pending_count": len(unknown_rank_pending),
+        "pending_proposal_ids": ids(pending_imported),
+        "applyable_pending_proposal_ids": ids(applyable_pending),
+        "analysis_only_pending_proposal_ids": ids(analysis_only_pending),
+        "ranked_pending_proposal_ids": ids(ranked_pending),
+        "unranked_pending_proposal_ids": ids(unranked_pending),
+        "unknown_rank_pending_proposal_ids": ids(unknown_rank_pending),
+        "safety": {
+            "queue_visibility_only": True,
+            "live_write": False,
+            "can_apply_live": False,
+            "source_identity_import_can_apply_live": False,
+            "operator_proposal_apply_gate_required": True,
+            "operator_ack_required_before_import": True,
+            "unsupported_actions_stay_analysis_only": True,
+            "live_apply_entrypoint": "apply_operator_proposal",
+        },
+    }
+
+
+def _decision_queue_apply_preflight_summary(
+    pending: Iterable[Mapping[str, Any]],
+    history: Iterable[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    pending_actions = [dict(action) for action in pending]
+    history_actions = [dict(action) for action in history]
+    candidates = [
+        action for action in pending_actions if action.get("can_apply") is True
+    ]
+    analysis_only = [
+        action for action in pending_actions if action.get("can_apply") is not True
+    ]
+
+    def ids(actions: Iterable[Mapping[str, Any]]) -> List[str]:
+        return [
+            identifier
+            for identifier in (_action_id(action) for action in actions)
+            if identifier
+        ]
+
+    return {
+        "available": True,
+        "handler": "preflight_operator_proposal_apply",
+        "live_apply_entrypoint": "apply_operator_proposal",
+        "pending_candidate_count": len(candidates),
+        "pending_analysis_only_count": len(analysis_only),
+        "history_count": len(history_actions),
+        "pending_candidate_ids": ids(candidates),
+        "pending_analysis_only_ids": ids(analysis_only),
+        "preflight_required_before_apply": True,
+        "approval_required_for_preflight_ready": True,
+        "idempotency_key_required_for_preflight_ready": True,
+        "safety": {
+            "queue_visibility_only": True,
+            "runs_preflight": False,
+            "preflight_only": True,
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "candidate_is_not_apply_readiness": True,
+            "live_apply_entrypoint": "apply_operator_proposal",
+        },
+    }
+
+
+def _decision_queue_batch_preflight_summary(
+    pending: Iterable[Mapping[str, Any]],
+    *,
+    default_limit: int = 20,
+) -> Dict[str, Any]:
+    pending_actions = [dict(action) for action in pending]
+    limit = max(1, min(int(default_limit or 20), 50))
+    candidates = [
+        action for action in pending_actions if action.get("can_apply") is True
+    ]
+    analysis_only = [
+        action for action in pending_actions if action.get("can_apply") is not True
+    ]
+    default_selected = candidates[:limit]
+
+    def ids(actions: Iterable[Mapping[str, Any]]) -> List[str]:
+        return [
+            identifier
+            for identifier in (_action_id(action) for action in actions)
+            if identifier
+        ]
+
+    return {
+        "available": True,
+        "handler": "preflight_operator_proposal_apply_batch",
+        "live_apply_entrypoint": "apply_operator_proposal",
+        "requires_explicit_request": True,
+        "default_limit": limit,
+        "max_limit": 50,
+        "include_analysis_only_default": False,
+        "idempotency_key_prefix_supported": True,
+        "idempotency_keys_map_supported": True,
+        "default_candidate_count": len(default_selected),
+        "skipped_analysis_only_count": len(analysis_only),
+        "remaining_candidate_count_after_default_limit": max(
+            0,
+            len(candidates) - len(default_selected),
+        ),
+        "default_candidate_ids": ids(default_selected),
+        "skipped_analysis_only_ids": ids(analysis_only),
+        "batch_preflight_required_before_apply": True,
+        "safety": {
+            "queue_visibility_only": True,
+            "runs_preflight": False,
+            "batch_preflight_only": True,
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "candidate_is_not_apply_readiness": True,
+            "live_apply_entrypoint": "apply_operator_proposal",
+        },
+    }
+
+
 def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
     limit = max(1, min(int(limit or 50), 200))
     operator_mode = server.get_operator_mode_status()
@@ -3205,6 +3410,9 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
         queue_summary = proposal_queue.summary()
 
     if not mixing_agent and not proposal_queue:
+        source_identity_import = _source_identity_queue_import_summary([], [])
+        apply_preflight = _decision_queue_apply_preflight_summary([], [])
+        batch_preflight = _decision_queue_batch_preflight_summary([])
         return {
             "type": "decision_queue",
             "generated_at": _utc_now(),
@@ -3218,6 +3426,22 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
                 "applied_count": 0,
                 "queue_accepts_proposals": bool(operator_mode["capabilities"]["can_create_proposals"]),
                 "can_apply": bool(operator_mode["capabilities"]["can_apply_to_console"]),
+                "apply_preflight_candidate_count": 0,
+                "apply_preflight_analysis_only_count": 0,
+                "apply_preflight_live_write": False,
+                "apply_preflight": apply_preflight,
+                "batch_preflight_candidate_count": 0,
+                "batch_preflight_skipped_analysis_only_count": 0,
+                "batch_preflight_live_write": False,
+                "batch_preflight": batch_preflight,
+                "source_identity_queue_import_pending_count": 0,
+                "source_identity_queue_import_applyable_pending_count": 0,
+                "source_identity_queue_import_analysis_only_pending_count": 0,
+                "source_identity_queue_import_ranked_pending_count": 0,
+                "source_identity_queue_import_unranked_pending_count": 0,
+                "source_identity_queue_import_live_write": False,
+                "source_identity_queue_import_can_apply_live": False,
+                "source_identity_queue_import": source_identity_import,
             },
             "pending_actions": [],
             "history": [],
@@ -3235,6 +3459,9 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
     agent_history = [_normalize_action(action, index) for index, action in enumerate(history_raw or [])]
     pending = queue_pending + agent_pending
     history = (queue_history + agent_history)[-limit:]
+    source_identity_import = _source_identity_queue_import_summary(pending, history)
+    apply_preflight = _decision_queue_apply_preflight_summary(pending, history)
+    batch_preflight = _decision_queue_batch_preflight_summary(pending)
     applied_count = int(queue_summary.get("applied_count", 0)) + sum(
         1 for item in agent_history if item.get("status") in {"applied", "approved", "done"}
     )
@@ -3261,6 +3488,36 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
             "blocked_count": int(queue_summary.get("blocked_count", 0)),
             "queue_accepts_proposals": bool(operator_mode["capabilities"]["can_create_proposals"]),
             "can_apply": bool(operator_mode["capabilities"]["can_apply_to_console"]),
+            "apply_preflight_candidate_count": apply_preflight["pending_candidate_count"],
+            "apply_preflight_analysis_only_count": (
+                apply_preflight["pending_analysis_only_count"]
+            ),
+            "apply_preflight_live_write": False,
+            "apply_preflight": apply_preflight,
+            "batch_preflight_candidate_count": (
+                batch_preflight["default_candidate_count"]
+            ),
+            "batch_preflight_skipped_analysis_only_count": (
+                batch_preflight["skipped_analysis_only_count"]
+            ),
+            "batch_preflight_live_write": False,
+            "batch_preflight": batch_preflight,
+            "source_identity_queue_import_pending_count": source_identity_import["pending_count"],
+            "source_identity_queue_import_applyable_pending_count": (
+                source_identity_import["applyable_pending_count"]
+            ),
+            "source_identity_queue_import_analysis_only_pending_count": (
+                source_identity_import["analysis_only_pending_count"]
+            ),
+            "source_identity_queue_import_ranked_pending_count": (
+                source_identity_import["ranked_pending_count"]
+            ),
+            "source_identity_queue_import_unranked_pending_count": (
+                source_identity_import["unranked_pending_count"]
+            ),
+            "source_identity_queue_import_live_write": False,
+            "source_identity_queue_import_can_apply_live": False,
+            "source_identity_queue_import": source_identity_import,
         },
         "pending_actions": pending,
         "history": history,

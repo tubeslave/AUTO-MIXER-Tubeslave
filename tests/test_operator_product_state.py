@@ -6651,6 +6651,91 @@ async def test_operator_proposal_without_complete_change_is_analysis_only(server
 
 
 @pytest.mark.asyncio
+async def test_decision_queue_summarizes_apply_preflight_candidates(server):
+    server.mixer_client = MagicMock()
+    server.mixer_client.set_fader = MagicMock()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "preflight-candidate",
+            "title": "Lead Vocal: lower fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -1.5,
+            "reason": "unit",
+        },
+    )
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "analysis-only",
+            "title": "Lead Vocal: inspect EQ",
+            "kind": "eq",
+            "channel": 2,
+            "reason": "missing target value",
+        },
+    )
+
+    queue = build_decision_queue(server)
+    apply_preflight = queue["summary"]["apply_preflight"]
+    batch_preflight = queue["summary"]["batch_preflight"]
+    assert queue["summary"]["apply_preflight_candidate_count"] == 1
+    assert queue["summary"]["apply_preflight_analysis_only_count"] == 1
+    assert queue["summary"]["apply_preflight_live_write"] is False
+    assert apply_preflight["handler"] == "preflight_operator_proposal_apply"
+    assert apply_preflight["live_apply_entrypoint"] == "apply_operator_proposal"
+    assert apply_preflight["pending_candidate_ids"] == ["preflight-candidate"]
+    assert apply_preflight["pending_analysis_only_ids"] == ["analysis-only"]
+    assert apply_preflight["preflight_required_before_apply"] is True
+    assert apply_preflight["idempotency_key_required_for_preflight_ready"] is True
+    assert apply_preflight["safety"] == {
+        "queue_visibility_only": True,
+        "runs_preflight": False,
+        "preflight_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "queue_mutation": False,
+        "proposal_status_mutation": False,
+        "idempotency_reserved": False,
+        "manual_console_write_called": False,
+        "candidate_is_not_apply_readiness": True,
+        "live_apply_entrypoint": "apply_operator_proposal",
+    }
+    assert queue["summary"]["batch_preflight_candidate_count"] == 1
+    assert queue["summary"]["batch_preflight_skipped_analysis_only_count"] == 1
+    assert queue["summary"]["batch_preflight_live_write"] is False
+    assert batch_preflight["handler"] == "preflight_operator_proposal_apply_batch"
+    assert batch_preflight["live_apply_entrypoint"] == "apply_operator_proposal"
+    assert batch_preflight["requires_explicit_request"] is True
+    assert batch_preflight["default_limit"] == 20
+    assert batch_preflight["max_limit"] == 50
+    assert batch_preflight["include_analysis_only_default"] is False
+    assert batch_preflight["idempotency_key_prefix_supported"] is True
+    assert batch_preflight["idempotency_keys_map_supported"] is True
+    assert batch_preflight["default_candidate_ids"] == ["preflight-candidate"]
+    assert batch_preflight["skipped_analysis_only_ids"] == ["analysis-only"]
+    assert batch_preflight["batch_preflight_required_before_apply"] is True
+    assert batch_preflight["safety"] == {
+        "queue_visibility_only": True,
+        "runs_preflight": False,
+        "batch_preflight_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "queue_mutation": False,
+        "proposal_status_mutation": False,
+        "idempotency_reserved": False,
+        "manual_console_write_called": False,
+        "candidate_is_not_apply_readiness": True,
+        "live_apply_entrypoint": "apply_operator_proposal",
+    }
+    server.mixer_client.set_fader.assert_not_called()
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_operator_proposal_apply_is_blocked_outside_supervised_mode(server):
     server.send_to_client = AsyncMock()
 
@@ -7027,6 +7112,246 @@ async def test_supervised_apply_requires_idempotency_key(server):
     payload = server.send_to_client.await_args.args[1]
     assert payload["type"] == "operator_proposal_apply_blocked"
     assert payload["reason"] == "missing_idempotency_key"
+
+
+@pytest.mark.asyncio
+async def test_preflight_operator_proposal_apply_reports_ready_without_live_write(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    stale_history_entry = {"ts": time.monotonic() - 1000.0, "delta_db": -2.0}
+    server._operator_apply_delta_history = {
+        (2, "fader"): [stale_history_entry],
+    }
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "preflight-ready",
+            "title": "Lead Vocal: preflight fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+
+    await server._dispatch["preflight_operator_proposal_apply"](
+        object(),
+        {
+            "proposal_id": "preflight-ready",
+            "approved": True,
+            "idempotency_key": "preflight-ready-key",
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_preflight"
+    assert payload["status"] == "ready"
+    assert payload["success"] is True
+    assert payload["ready_to_apply"] is True
+    assert payload["normalized_change"]["value_type"] == "fader"
+    assert payload["normalized_change"]["channel"] == 2
+    assert payload["normalized_change"]["delta_db"] == -0.5
+    assert payload["normalized_change"]["pre_read_status"] == "verified_from_cache"
+    assert payload["idempotency"]["provided"] is True
+    assert payload["idempotency"]["reserved"] is False
+    assert payload["idempotency"]["would_reserve_on_apply"] is True
+    assert payload["safety"]["live_write"] is False
+    assert payload["safety"]["apply_attempted"] is False
+    assert payload["safety"]["queue_mutation"] is False
+    assert payload["safety"]["proposal_status_mutation"] is False
+    assert payload["safety"]["idempotency_reserved"] is False
+    assert payload["safety"]["manual_console_write_called"] is False
+    assert payload["safety"]["live_apply_entrypoint"] == "apply_operator_proposal"
+    assert build_decision_queue(server)["summary"]["pending_count"] == 1
+    assert "preflight-ready-key" not in server._operator_apply_idempotency_keys
+    assert server._operator_apply_delta_history[(2, "fader")] == [stale_history_entry]
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_preflight_operator_proposal_apply_blocks_stale_pre_read_without_mutation(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server.mixer_client.state_timestamps["/ch/2/fdr"] = time.time() - 120.0
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "preflight-stale",
+            "title": "Lead Vocal: stale preflight fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+
+    await server._dispatch["preflight_operator_proposal_apply"](
+        object(),
+        {
+            "proposal_id": "preflight-stale",
+            "approved": True,
+            "idempotency_key": "preflight-stale-key",
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_preflight"
+    assert payload["status"] == "blocked"
+    assert payload["success"] is False
+    assert payload["ready_to_apply"] is False
+    assert payload["reason"] == "pre_read_cache_not_fresh"
+    assert payload["cache_freshness"]["status"] == "stale"
+    assert payload["safety"]["live_write"] is False
+    assert payload["safety"]["apply_attempted"] is False
+    assert build_decision_queue(server)["summary"]["pending_count"] == 1
+    assert "preflight-stale-key" not in server._operator_apply_idempotency_keys
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_preflight_operator_proposal_apply_blocks_unsupported_kind_without_mutation(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "preflight-eq",
+            "title": "Lead Vocal: preflight EQ",
+            "requested_change": {
+                "value_type": "eq",
+                "channel": 2,
+                "value": -2.0,
+                "current_value": 0.0,
+            },
+            "reason": "unit",
+        },
+    )
+
+    await server._dispatch["preflight_operator_proposal_apply"](
+        object(),
+        {
+            "proposal_id": "preflight-eq",
+            "approved": True,
+            "idempotency_key": "preflight-eq-key",
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_proposal_apply_preflight"
+    assert payload["status"] == "blocked"
+    assert payload["reason"] == "unsupported_value_type"
+    assert payload["value_type"] == "eq"
+    assert payload["allowed_live_write_kinds"] == ["fader", "gain"]
+    assert payload["safety"]["live_write"] is False
+    assert payload["safety"]["apply_attempted"] is False
+    assert build_decision_queue(server)["summary"]["pending_count"] == 1
+    assert "preflight-eq-key" not in server._operator_apply_idempotency_keys
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_batch_preflight_operator_proposal_apply_reports_ready_and_blocked_without_live_write(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    stale_history_entry = {"ts": time.monotonic() - 1000.0, "delta_db": -2.0}
+    server._operator_apply_delta_history = {
+        (2, "fader"): [stale_history_entry],
+    }
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "batch-ready",
+            "title": "Lead Vocal: batch ready fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "batch-large-delta",
+            "title": "Lead Vocal: batch large fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -10.0,
+            "reason": "unit",
+        },
+    )
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "batch-analysis-only",
+            "title": "Lead Vocal: batch inspect EQ",
+            "kind": "eq",
+            "channel": 2,
+            "reason": "unit",
+        },
+    )
+
+    await server._dispatch["preflight_operator_proposal_apply_batch"](
+        object(),
+        {
+            "approved": True,
+            "idempotency_key_prefix": "batch-preflight",
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    results_by_id = {
+        result["proposal"]["id"]: result
+        for result in payload["preflight_results"]
+        if result.get("proposal")
+    }
+    assert payload["type"] == "operator_proposal_apply_preflight_batch"
+    assert payload["status"] == "ok"
+    assert payload["summary"]["selected_count"] == 2
+    assert payload["summary"]["preflight_result_count"] == 2
+    assert payload["summary"]["ready_count"] == 1
+    assert payload["summary"]["blocked_count"] == 1
+    assert payload["summary"]["skipped_analysis_only_count"] == 1
+    assert payload["summary"]["ready_proposal_ids"] == ["batch-ready"]
+    assert payload["summary"]["blocked_proposal_ids"] == ["batch-large-delta"]
+    assert payload["summary"]["skipped_analysis_only_ids"] == ["batch-analysis-only"]
+    assert payload["summary"]["live_write"] is False
+    assert payload["summary"]["apply_attempted"] is False
+    assert payload["summary"]["queue_mutation"] is False
+    assert payload["summary"]["idempotency_reserved"] is False
+    assert payload["safety"] == {
+        "batch_preflight_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "queue_mutation": False,
+        "proposal_status_mutation": False,
+        "idempotency_reserved": False,
+        "manual_console_write_called": False,
+        "live_apply_entrypoint": "apply_operator_proposal",
+    }
+    assert results_by_id["batch-ready"]["status"] == "ready"
+    assert results_by_id["batch-ready"]["idempotency"]["idempotency_key"] == (
+        "batch-preflight:batch-ready"
+    )
+    assert results_by_id["batch-ready"]["idempotency"]["reserved"] is False
+    assert results_by_id["batch-large-delta"]["status"] == "blocked"
+    assert results_by_id["batch-large-delta"]["reason"] == "delta_limit_exceeded"
+    assert build_decision_queue(server)["summary"]["pending_count"] == 3
+    assert "batch-preflight:batch-ready" not in server._operator_apply_idempotency_keys
+    assert "batch-preflight:batch-large-delta" not in server._operator_apply_idempotency_keys
+    assert server._operator_apply_delta_history[(2, "fader")] == [stale_history_entry]
+    server._apply_manual_console_write.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -7891,6 +8216,71 @@ async def test_source_identity_queue_import_handler_imports_with_ack_without_liv
     assert queue["pending_actions"][0]["id"] == "proposal-vocal-gain"
     assert queue["pending_actions"][0]["requested_change"]["value_type"] == "gain"
     assert queue["pending_actions"][1]["id"] == "proposal-other"
+    server.mixer_client.set_gain.assert_not_called()
+    server._apply_manual_console_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_decision_queue_summarizes_source_identity_queue_import_visibility(server):
+    proposals, plan = _source_identity_queue_import_fixture()
+    server.mixer_client = MagicMock()
+    server.mixer_client.set_gain = MagicMock()
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["import_source_identity_queue_ordering_plan"](
+        object(),
+        {
+            "queue_ordering_plan": plan,
+            "proposal_payloads": proposals,
+            "apply": True,
+            "operator_ack": True,
+        },
+    )
+
+    queue = build_decision_queue(server)
+    summary = queue["summary"]
+    source_identity_import = summary["source_identity_queue_import"]
+    apply_preflight = summary["apply_preflight"]
+    assert summary["source_identity_queue_import_pending_count"] == 2
+    assert summary["source_identity_queue_import_applyable_pending_count"] == 1
+    assert summary["source_identity_queue_import_analysis_only_pending_count"] == 1
+    assert summary["source_identity_queue_import_ranked_pending_count"] == 1
+    assert summary["source_identity_queue_import_unranked_pending_count"] == 1
+    assert summary["source_identity_queue_import_live_write"] is False
+    assert summary["source_identity_queue_import_can_apply_live"] is False
+    assert source_identity_import["pending_proposal_ids"] == [
+        "proposal-vocal-gain",
+        "proposal-other",
+    ]
+    assert source_identity_import["applyable_pending_proposal_ids"] == [
+        "proposal-vocal-gain"
+    ]
+    assert source_identity_import["analysis_only_pending_proposal_ids"] == [
+        "proposal-other"
+    ]
+    assert source_identity_import["ranked_pending_proposal_ids"] == [
+        "proposal-vocal-gain"
+    ]
+    assert source_identity_import["unranked_pending_proposal_ids"] == [
+        "proposal-other"
+    ]
+    assert source_identity_import["safety"] == {
+        "queue_visibility_only": True,
+        "live_write": False,
+        "can_apply_live": False,
+        "source_identity_import_can_apply_live": False,
+        "operator_proposal_apply_gate_required": True,
+        "operator_ack_required_before_import": True,
+        "unsupported_actions_stay_analysis_only": True,
+        "live_apply_entrypoint": "apply_operator_proposal",
+    }
+    assert summary["apply_preflight_candidate_count"] == 1
+    assert summary["apply_preflight_analysis_only_count"] == 1
+    assert apply_preflight["pending_candidate_ids"] == ["proposal-vocal-gain"]
+    assert apply_preflight["pending_analysis_only_ids"] == ["proposal-other"]
+    assert apply_preflight["safety"]["runs_preflight"] is False
+    assert apply_preflight["safety"]["live_write"] is False
     server.mixer_client.set_gain.assert_not_called()
     server._apply_manual_console_write.assert_not_called()
 

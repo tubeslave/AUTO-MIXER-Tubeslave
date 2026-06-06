@@ -77,7 +77,7 @@ def register_handlers(server):
             setattr(server, "_operator_apply_delta_history", history)
         return history
 
-    def cumulative_delta_blocker(normalized_change):
+    def cumulative_delta_blocker(normalized_change, *, update_history=True):
         value_type = normalized_change.get("value_type")
         limit = CUMULATIVE_DELTA_LIMITS_DB.get(value_type)
         if limit is None:
@@ -87,13 +87,19 @@ def register_handlers(server):
             return None
         key = (int(normalized_change["channel"]), value_type)
         now = time.monotonic()
-        history = operator_apply_delta_history()
+        if update_history:
+            history = operator_apply_delta_history()
+        else:
+            history = getattr(server, "_operator_apply_delta_history", {})
+            if not isinstance(history, dict):
+                history = {}
         entries = [
             entry
             for entry in history.get(key, [])
             if now - float(entry.get("ts", 0.0)) <= CUMULATIVE_DELTA_WINDOW_SEC
         ]
-        history[key] = entries
+        if update_history:
+            history[key] = entries
         used = round(sum(abs(float(entry.get("delta_db", 0.0))) for entry in entries), 3)
         requested = round(abs(float(delta)), 3)
         if used + requested > limit:
@@ -225,6 +231,7 @@ def register_handlers(server):
         data,
         operator_mode,
         linked=False,
+        update_delta_history=True,
     ):
         normalized, error = normalize_linked_change(change)
         if error:
@@ -289,7 +296,10 @@ def register_handlers(server):
                 "value_type": normalized["value_type"],
                 "delta_db": normalized["delta_db"],
             }
-        cumulative_error = cumulative_delta_blocker(normalized)
+        cumulative_error = cumulative_delta_blocker(
+            normalized,
+            update_history=update_delta_history,
+        )
         if cumulative_error:
             return normalized, cumulative_error
         return normalized, None
@@ -895,6 +905,475 @@ def register_handlers(server):
         )
         await server.send_to_client(websocket, {"type": "operator_proposal_apply_result", **result})
 
+    def idempotency_preflight(data):
+        idempotency_key = str(data.get("idempotency_key") or "").strip()
+        store = getattr(server, "_operator_apply_idempotency_keys", {})
+        duplicate = bool(
+            idempotency_key
+            and isinstance(store, dict)
+            and idempotency_key in store
+        )
+        return {
+            "required": True,
+            "provided": bool(idempotency_key),
+            "idempotency_key": idempotency_key or None,
+            "reserved": False,
+            "would_reserve_on_apply": bool(idempotency_key and not duplicate),
+            "duplicate": duplicate,
+            "first_seen": store.get(idempotency_key)
+            if duplicate and isinstance(store, dict)
+            else None,
+        }
+
+    def operator_apply_preflight_payload(
+        *,
+        proposal=None,
+        operator_mode=None,
+        status="blocked",
+        reason=None,
+        idempotency=None,
+        requested_change=None,
+        requested_changes=None,
+        normalized_change=None,
+        normalized_changes=None,
+        extra=None,
+    ):
+        payload = {
+            "type": "operator_proposal_apply_preflight",
+            "status": status,
+            "success": status == "ready",
+            "ready_to_apply": status == "ready",
+            "reason": reason,
+            "proposal": proposal.to_dict() if proposal else None,
+            "operator_mode": operator_mode,
+            "idempotency": idempotency or {},
+            "requested_change": requested_change,
+            "requested_changes": requested_changes,
+            "normalized_change": normalized_change,
+            "normalized_changes": normalized_changes or [],
+            "safety": {
+                "preflight_only": True,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "allowed_live_write_kinds": (
+                    sorted(
+                        set(
+                            (operator_mode or {})
+                            .get("capabilities", {})
+                            .get("allowed_live_write_kinds")
+                            or []
+                        )
+                    )
+                    if isinstance(operator_mode, dict)
+                    else []
+                ),
+                "live_apply_entrypoint": "apply_operator_proposal",
+            },
+        }
+        if extra:
+            payload.update(extra)
+        return payload
+
+    async def handle_preflight_operator_proposal_apply(websocket, data):
+        proposal_id, index = proposal_id_or_index(data)
+        proposal = server.operator_proposal_queue.find(proposal_id=proposal_id, index=index)
+        operator_mode = server.get_operator_mode_status()
+        idempotency = idempotency_preflight(data)
+        if proposal is None:
+            await server.send_to_client(
+                websocket,
+                operator_apply_preflight_payload(
+                    operator_mode=operator_mode,
+                    reason="proposal_not_found",
+                    idempotency=idempotency,
+                    extra={"proposal_id": proposal_id, "index": index},
+                ),
+            )
+            return
+
+        await server.send_to_client(
+            websocket,
+            await build_operator_proposal_apply_preflight_result(proposal, data),
+        )
+
+    def batch_idempotency_key(data, proposal_id):
+        key_map = data.get("idempotency_keys")
+        if isinstance(key_map, dict) and proposal_id in key_map:
+            return str(key_map.get(proposal_id) or "").strip()
+        prefix = str(data.get("idempotency_key_prefix") or "").strip()
+        if prefix and proposal_id:
+            return f"{prefix}:{proposal_id}"
+        return str(data.get("idempotency_key") or "").strip()
+
+    async def build_operator_proposal_apply_preflight_result(
+        proposal,
+        data,
+        *,
+        batch=False,
+    ):
+        proposal_id = getattr(proposal, "id", None)
+        preflight_data = dict(data)
+        preflight_data["proposal_id"] = proposal_id
+        preflight_data["idempotency_key"] = (
+            batch_idempotency_key(data, proposal_id)
+            if batch
+            else str(data.get("idempotency_key") or "").strip()
+        )
+        operator_mode = server.get_operator_mode_status()
+        idempotency = idempotency_preflight(preflight_data)
+        preflight_extra = {"batch": True} if batch else {}
+
+        if proposal.is_expired():
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                reason="proposal_expired",
+                idempotency=idempotency,
+                extra={
+                    **preflight_extra,
+                    "expires_at": proposal.expires_at,
+                    "ttl_seconds": proposal.ttl_seconds,
+                },
+            )
+
+        if not idempotency["provided"]:
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                reason="missing_idempotency_key",
+                idempotency=idempotency,
+                extra=preflight_extra,
+            )
+        if idempotency["duplicate"]:
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                reason="duplicate_idempotency_key",
+                idempotency=idempotency,
+                extra=preflight_extra,
+            )
+
+        requested_changes = getattr(proposal, "requested_changes", []) or []
+        if requested_changes:
+            allowed_kinds = set(
+                operator_mode["capabilities"].get("allowed_live_write_kinds") or []
+            )
+            if not operator_mode["capabilities"]["can_apply_to_console"]:
+                return operator_apply_preflight_payload(
+                    proposal=proposal,
+                    operator_mode=operator_mode,
+                    reason="operator_mode_blocks_live_write",
+                    idempotency=idempotency,
+                    requested_changes=requested_changes,
+                    extra=preflight_extra,
+                )
+            if not bool(data.get("approved", False)):
+                return operator_apply_preflight_payload(
+                    proposal=proposal,
+                    operator_mode=operator_mode,
+                    reason="approval_required",
+                    idempotency=idempotency,
+                    requested_changes=requested_changes,
+                    extra=preflight_extra,
+                )
+            if not server.mixer_client or not getattr(server.mixer_client, "is_connected", True):
+                return operator_apply_preflight_payload(
+                    proposal=proposal,
+                    operator_mode=operator_mode,
+                    reason="mixer_not_connected",
+                    idempotency=idempotency,
+                    requested_changes=requested_changes,
+                    extra=preflight_extra,
+                )
+            if getattr(server, "_apply_manual_console_write", None) is None:
+                return operator_apply_preflight_payload(
+                    proposal=proposal,
+                    operator_mode=operator_mode,
+                    reason="supervised_apply_path_unavailable",
+                    idempotency=idempotency,
+                    requested_changes=requested_changes,
+                    extra=preflight_extra,
+                )
+
+            normalized_changes = []
+            for change_index, raw_change in enumerate(requested_changes):
+                normalized, error = await validate_change_before_apply(
+                    raw_change,
+                    proposal=proposal,
+                    data=preflight_data,
+                    operator_mode=operator_mode,
+                    linked=True,
+                    update_delta_history=False,
+                )
+                if error:
+                    return operator_apply_preflight_payload(
+                        proposal=proposal,
+                        operator_mode=operator_mode,
+                        reason=error["reason"],
+                        idempotency=idempotency,
+                        requested_change=raw_change,
+                        requested_changes=requested_changes,
+                        normalized_change=normalized,
+                        normalized_changes=normalized_changes,
+                        extra={
+                            **preflight_extra,
+                            "blocked_change_index": change_index,
+                            **{
+                                key: value
+                                for key, value in error.items()
+                                if key != "reason"
+                            },
+                        },
+                    )
+                if normalized["value_type"] not in allowed_kinds:
+                    return operator_apply_preflight_payload(
+                        proposal=proposal,
+                        operator_mode=operator_mode,
+                        reason="unsupported_value_type",
+                        idempotency=idempotency,
+                        requested_change=raw_change,
+                        requested_changes=requested_changes,
+                        normalized_change=normalized,
+                        normalized_changes=normalized_changes,
+                        extra={
+                            **preflight_extra,
+                            "blocked_change_index": change_index,
+                            "value_type": normalized["value_type"],
+                            "allowed_live_write_kinds": sorted(allowed_kinds),
+                        },
+                    )
+                normalized_changes.append(normalized)
+
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                status="ready",
+                idempotency=idempotency,
+                requested_changes=requested_changes,
+                normalized_changes=normalized_changes,
+                extra={**preflight_extra, "linked": True},
+            )
+
+        requested_change = proposal.requested_change or {}
+        value_type = str(requested_change.get("value_type") or "").strip().lower()
+        allowed_kinds = set(operator_mode["capabilities"].get("allowed_live_write_kinds") or [])
+        if (
+            not value_type
+            or requested_change.get("channel") is None
+            or requested_change.get("value") is None
+        ):
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                reason="proposal_has_no_applyable_requested_change",
+                idempotency=idempotency,
+                requested_change=requested_change or None,
+                extra=preflight_extra,
+            )
+
+        if not operator_mode["capabilities"]["can_apply_to_console"]:
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                reason="operator_mode_blocks_live_write",
+                idempotency=idempotency,
+                requested_change=requested_change,
+                extra=preflight_extra,
+            )
+
+        if value_type not in allowed_kinds:
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                reason="unsupported_value_type",
+                idempotency=idempotency,
+                requested_change=requested_change,
+                extra={
+                    **preflight_extra,
+                    "value_type": value_type,
+                    "allowed_live_write_kinds": sorted(allowed_kinds),
+                },
+            )
+
+        if not bool(data.get("approved", False)):
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                reason="approval_required",
+                idempotency=idempotency,
+                requested_change=requested_change,
+                extra=preflight_extra,
+            )
+
+        if not server.mixer_client or not getattr(server.mixer_client, "is_connected", True):
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                reason="mixer_not_connected",
+                idempotency=idempotency,
+                requested_change=requested_change,
+                extra=preflight_extra,
+            )
+
+        if getattr(server, "_apply_manual_console_write", None) is None:
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                reason="supervised_apply_path_unavailable",
+                idempotency=idempotency,
+                requested_change=requested_change,
+                extra=preflight_extra,
+            )
+
+        normalized_change, safety_error = await validate_change_before_apply(
+            requested_change,
+            proposal=proposal,
+            data=preflight_data,
+            operator_mode=operator_mode,
+            linked=False,
+            update_delta_history=False,
+        )
+        if safety_error:
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                reason=safety_error["reason"],
+                idempotency=idempotency,
+                requested_change=requested_change,
+                normalized_change=normalized_change,
+                extra={
+                    **preflight_extra,
+                    **{
+                        key: value
+                        for key, value in safety_error.items()
+                        if key != "reason"
+                    },
+                },
+            )
+
+        return operator_apply_preflight_payload(
+            proposal=proposal,
+            operator_mode=operator_mode,
+            status="ready",
+            idempotency=idempotency,
+            requested_change=requested_change,
+            normalized_change=normalized_change,
+            extra=preflight_extra,
+        )
+
+    def batch_result_id(result):
+        proposal = result.get("proposal")
+        if isinstance(proposal, dict):
+            return str(proposal.get("id") or "")
+        return str(result.get("proposal_id") or "")
+
+    async def handle_preflight_operator_proposal_apply_batch(websocket, data):
+        raw_ids = data.get("proposal_ids")
+        explicit_ids = [
+            str(item)
+            for item in raw_ids
+            if str(item).strip()
+        ] if isinstance(raw_ids, list) else []
+        try:
+            limit = int(data.get("limit", 20))
+        except (TypeError, ValueError):
+            limit = 20
+        limit = max(1, min(limit, 50))
+        include_analysis_only = bool(data.get("include_analysis_only", False))
+
+        pending_actions = server.operator_proposal_queue.pending_actions()
+        skipped_analysis_only_ids = []
+        selected_ids = []
+        if explicit_ids:
+            selected_ids = explicit_ids[:limit]
+        else:
+            for action in pending_actions:
+                proposal_id = str(action.get("id") or "")
+                if not proposal_id:
+                    continue
+                if action.get("can_apply") is True or include_analysis_only:
+                    selected_ids.append(proposal_id)
+                else:
+                    skipped_analysis_only_ids.append(proposal_id)
+                if len(selected_ids) >= limit:
+                    break
+
+        results = []
+        not_found_ids = []
+        for proposal_id in selected_ids:
+            proposal = server.operator_proposal_queue.find(proposal_id=proposal_id)
+            if proposal is None:
+                not_found_ids.append(proposal_id)
+                results.append(
+                    operator_apply_preflight_payload(
+                        operator_mode=server.get_operator_mode_status(),
+                        reason="proposal_not_found",
+                        idempotency=idempotency_preflight({
+                            **dict(data),
+                            "proposal_id": proposal_id,
+                            "idempotency_key": batch_idempotency_key(data, proposal_id),
+                        }),
+                        extra={"batch": True, "proposal_id": proposal_id},
+                    )
+                )
+                continue
+            results.append(
+                await build_operator_proposal_apply_preflight_result(
+                    proposal,
+                    data,
+                    batch=True,
+                )
+            )
+
+        ready_results = [result for result in results if result.get("ready_to_apply")]
+        blocked_results = [result for result in results if not result.get("ready_to_apply")]
+        ready_ids = [batch_result_id(result) for result in ready_results if batch_result_id(result)]
+        blocked_ids = [batch_result_id(result) for result in blocked_results if batch_result_id(result)]
+        await server.send_to_client(
+            websocket,
+            {
+                "type": "operator_proposal_apply_preflight_batch",
+                "status": "ok",
+                "success": True,
+                "generated_at": time.time(),
+                "summary": {
+                    "selected_count": len(selected_ids),
+                    "preflight_result_count": len(results),
+                    "ready_count": len(ready_results),
+                    "blocked_count": len(blocked_results),
+                    "skipped_analysis_only_count": len(skipped_analysis_only_ids),
+                    "not_found_count": len(not_found_ids),
+                    "ready_proposal_ids": ready_ids,
+                    "blocked_proposal_ids": blocked_ids,
+                    "skipped_analysis_only_ids": skipped_analysis_only_ids,
+                    "not_found_ids": not_found_ids,
+                    "approved": bool(data.get("approved", False)),
+                    "idempotency_key_prefix": (
+                        str(data.get("idempotency_key_prefix") or "").strip() or None
+                    ),
+                    "live_write": False,
+                    "apply_attempted": False,
+                    "queue_mutation": False,
+                    "idempotency_reserved": False,
+                },
+                "safety": {
+                    "batch_preflight_only": True,
+                    "live_write": False,
+                    "apply_attempted": False,
+                    "queue_mutation": False,
+                    "proposal_status_mutation": False,
+                    "idempotency_reserved": False,
+                    "manual_console_write_called": False,
+                    "live_apply_entrypoint": "apply_operator_proposal",
+                },
+                "preflight_results": results,
+            },
+        )
+
     async def handle_apply_operator_proposal(websocket, data):
         proposal_id, index = proposal_id_or_index(data)
         proposal = server.operator_proposal_queue.find(proposal_id=proposal_id, index=index)
@@ -1212,5 +1691,9 @@ def register_handlers(server):
         "create_operator_proposal": handle_create_operator_proposal,
         "accept_operator_proposal": handle_accept_operator_proposal,
         "dismiss_operator_proposal": handle_dismiss_operator_proposal,
+        "preflight_operator_proposal_apply": handle_preflight_operator_proposal_apply,
+        "preflight_operator_proposal_apply_batch": (
+            handle_preflight_operator_proposal_apply_batch
+        ),
         "apply_operator_proposal": handle_apply_operator_proposal,
     }
