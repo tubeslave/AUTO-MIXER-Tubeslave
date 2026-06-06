@@ -283,6 +283,11 @@ from backend.user_presets_physical_readback_artifact_intake import (  # noqa: E4
     USER_PRESETS_PHYSICAL_READBACK_ARTIFACT_INTAKE_METHOD_ID,
     build_user_presets_physical_readback_artifact_intake,
 )
+from backend.wing_readonly_preflight_evidence import (  # noqa: E402
+    EVIDENCE_STATUSES as WING_READONLY_PREFLIGHT_EVIDENCE_STATUSES,
+    WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID,
+    build_wing_readonly_preflight_evidence,
+)
 from backend.read_surface_physical_readback_capture_plan import (  # noqa: E402
     READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PLAN_METHOD_ID,
     build_read_surface_physical_readback_capture_plan,
@@ -506,6 +511,7 @@ def build_checks(
                 "tests/test_user_presets_physical_readback_artifact_intake.py",
                 "tests/test_dlive_state_physical_readback_contract.py",
                 "tests/test_dlive_state_physical_readback_artifact_intake.py",
+                "tests/test_wing_readonly_preflight_evidence.py",
                 "-q",
                 "--tb=short",
             ),
@@ -1477,6 +1483,129 @@ def validate_read_surface_physical_readback_capture_plan_snapshot() -> CheckResu
     finished = datetime.now(timezone.utc)
     return CheckResult(
         name="read_surface_physical_readback_capture_plan_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "wing_readonly_preflight_evidence_is_readonly_candidate_matrix",
+    }
+    violations: list[str] = []
+
+    try:
+        evidence = build_wing_readonly_preflight_evidence()
+    except Exception as exc:  # pragma: no cover - defensive release-check guard
+        evidence = {}
+        violations.append(f"wing_readonly_preflight_evidence_build_error:{type(exc).__name__}")
+
+    summary = evidence.get("summary") if isinstance(evidence.get("summary"), Mapping) else {}
+    safety = evidence.get("safety") if isinstance(evidence.get("safety"), Mapping) else {}
+    matrix = (
+        evidence.get("mvp_blocker_matrix")
+        if isinstance(evidence.get("mvp_blocker_matrix"), list)
+        else []
+    )
+    artifacts = evidence.get("artifacts") if isinstance(evidence.get("artifacts"), list) else []
+
+    if evidence.get("type") != "wing_readonly_preflight_evidence":
+        violations.append("wing_readonly_preflight_evidence_type_mismatch")
+    if evidence.get("method_id") != WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID:
+        violations.append("wing_readonly_preflight_evidence_method_id_mismatch")
+    if evidence.get("status") not in WING_READONLY_PREFLIGHT_EVIDENCE_STATUSES:
+        violations.append("wing_readonly_preflight_evidence_status_mismatch")
+    if len(matrix) != 4:
+        violations.append("wing_readonly_preflight_evidence_matrix_count_mismatch")
+
+    expected_true = ("read_only", "operator_required")
+    for key in expected_true:
+        if safety.get(key) is not True:
+            violations.append(f"wing_readonly_preflight_evidence_{key}_not_true")
+    expected_false = (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_evidence",
+        "readiness_closure_allowed_by_evidence",
+        "live_widening_allowed",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    )
+    for key in expected_false:
+        if safety.get(key) is not False:
+            violations.append(f"wing_readonly_preflight_evidence_{key}_not_false")
+
+    valid_candidate_count = int(summary.get("valid_candidate_count") or 0)
+    invalid_candidate_count = int(summary.get("invalid_candidate_count") or 0)
+    accepted = summary.get("accepted_as_readonly_preflight_candidate") is True
+    update_allowed = summary.get("readiness_matrix_update_allowed") is True
+    closure_allowed = summary.get("readiness_closure_allowed_by_evidence") is True
+    live_authority = summary.get("live_authority_granted") is True
+    full_auto = summary.get("full_autonomous_ready") is True
+
+    if invalid_candidate_count:
+        violations.append("wing_readonly_preflight_invalid_artifacts_present")
+    if accepted != bool(valid_candidate_count):
+        violations.append("wing_readonly_preflight_candidate_summary_mismatch")
+    if update_allowed != bool(valid_candidate_count):
+        violations.append("wing_readonly_preflight_readiness_update_allowed_mismatch")
+    if closure_allowed:
+        violations.append("wing_readonly_preflight_readiness_closure_allowed")
+    if live_authority:
+        violations.append("wing_readonly_preflight_live_authority_granted")
+    if full_auto:
+        violations.append("wing_readonly_preflight_full_autonomous_ready")
+
+    matrix_ids = [row.get("id") for row in matrix if isinstance(row, Mapping)]
+    expected_matrix_ids = [
+        "wing_readonly_connection_proof",
+        "physical_console_readback_proof",
+        "operator_visible_evidence_report",
+        "readiness_matrix_update_based_on_real_proof",
+    ]
+    if matrix_ids != expected_matrix_ids:
+        violations.append("wing_readonly_preflight_matrix_ids_mismatch")
+    for row in matrix:
+        row_map = row if isinstance(row, Mapping) else {}
+        if row_map.get("closed") is not False:
+            violations.append("wing_readonly_preflight_matrix_row_closed_not_false")
+        if row_map.get("manual_review_required") is not True:
+            violations.append("wing_readonly_preflight_matrix_manual_review_not_true")
+        if row_map.get("automatic_live_authority_allowed") is not False:
+            violations.append("wing_readonly_preflight_matrix_live_authority_not_false")
+
+    detail["evidence_status"] = evidence.get("status")
+    detail["artifact_count"] = int(summary.get("artifact_count") or len(artifacts))
+    detail["valid_candidate_count"] = valid_candidate_count
+    detail["invalid_candidate_count"] = invalid_candidate_count
+    detail["accepted_as_readonly_preflight_candidate"] = accepted
+    detail["readiness_matrix_update_allowed"] = update_allowed
+    detail["readiness_closure_allowed_by_evidence"] = closure_allowed
+    detail["live_authority_granted"] = live_authority
+    detail["full_autonomous_ready"] = full_auto
+    detail["mvp_blocker_candidate_count"] = int(summary.get("mvp_blocker_candidate_count") or 0)
+    detail["mvp_blockers_closed_by_evidence"] = (
+        list(summary.get("mvp_blockers_closed_by_evidence"))
+        if isinstance(summary.get("mvp_blockers_closed_by_evidence"), list)
+        else []
+    )
+    detail["mvp_blocker_matrix_ids"] = matrix_ids
+    detail["latest_valid_candidate_run_id"] = summary.get("latest_valid_candidate_run_id")
+    detail["blocked_by"] = (
+        list(summary.get("blocked_by"))
+        if isinstance(summary.get("blocked_by"), list)
+        else []
+    )
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="wing_readonly_preflight_evidence_schema",
         status="passed" if not violations else "failed",
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -6249,6 +6378,65 @@ def read_surface_physical_readback_capture_plan_summary(
     return None
 
 
+def wing_readonly_preflight_evidence_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "wing_readonly_preflight_evidence_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        blocked_by = detail.get("blocked_by")
+        matrix_ids = detail.get("mvp_blocker_matrix_ids")
+        closed_ids = detail.get("mvp_blockers_closed_by_evidence")
+        violations = detail.get("violations")
+        valid_candidate_count = int(detail.get("valid_candidate_count") or 0)
+        invalid_candidate_count = int(detail.get("invalid_candidate_count") or 0)
+        readiness_update_candidate_available = (
+            result.status == "passed"
+            and valid_candidate_count > 0
+            and invalid_candidate_count == 0
+            and detail.get("readiness_matrix_update_allowed") is True
+            and detail.get("readiness_closure_allowed_by_evidence") is not True
+            and detail.get("live_authority_granted") is not True
+        )
+        return {
+            "status": result.status,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_evidence": False,
+            "readiness_closure_allowed_by_evidence": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "evidence_status": detail.get("evidence_status"),
+            "artifact_count": int(detail.get("artifact_count") or 0),
+            "valid_candidate_count": valid_candidate_count,
+            "invalid_candidate_count": invalid_candidate_count,
+            "accepted_as_readonly_preflight_candidate": (
+                detail.get("accepted_as_readonly_preflight_candidate") is True
+            ),
+            "readiness_matrix_update_allowed": (
+                detail.get("readiness_matrix_update_allowed") is True
+            ),
+            "readiness_update_candidate_available": readiness_update_candidate_available,
+            "mvp_blocker_candidate_count": int(detail.get("mvp_blocker_candidate_count") or 0),
+            "mvp_blockers_closed_by_evidence": (
+                list(closed_ids) if isinstance(closed_ids, list) else []
+            ),
+            "mvp_blocker_matrix_ids": (
+                list(matrix_ids) if isinstance(matrix_ids, list) else []
+            ),
+            "latest_valid_candidate_run_id": detail.get("latest_valid_candidate_run_id"),
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def raw_mixer_readback_contract_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "raw_mixer_state_physical_readback_contract_schema":
@@ -8281,6 +8469,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     read_fixture = read_surface_fixture_evidence_summary(results)
     read_remediation = read_surface_remediation_plan_summary(results)
     read_capture_plan = read_surface_physical_readback_capture_plan_summary(results)
+    wing_readonly_preflight = wing_readonly_preflight_evidence_summary(results)
     raw_mixer_contract = raw_mixer_readback_contract_summary(results)
     raw_mixer_intake = raw_mixer_readback_artifact_intake_summary(results)
     channel_basic_contract = channel_basic_controls_readback_contract_summary(results)
@@ -8332,6 +8521,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["read_surface_remediation_plan"] = read_remediation
     if read_capture_plan is not None:
         summary["read_surface_physical_readback_capture_plan"] = read_capture_plan
+    if wing_readonly_preflight is not None:
+        summary["wing_readonly_preflight_evidence"] = wing_readonly_preflight
     if raw_mixer_contract is not None:
         summary["raw_mixer_state_physical_readback_contract"] = raw_mixer_contract
     if raw_mixer_intake is not None:
@@ -8564,6 +8755,36 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- step_surface_id: `{read_capture_plan['step_surface_id']}`",
                 f"- step_remediation_action_id: `{read_capture_plan['step_remediation_action_id']}`",
                 f"- violations: `{json.dumps(read_capture_plan['violations'])}`",
+            ]
+        )
+    if wing_readonly_preflight is not None:
+        lines.extend(
+            [
+                "",
+                "## WING Read-Only Preflight Evidence",
+                "",
+                f"- schema_check: `{wing_readonly_preflight['status']}`",
+                f"- read_only: `{str(wing_readonly_preflight['read_only']).lower()}`",
+                f"- live_write: `{str(wing_readonly_preflight['live_write']).lower()}`",
+                f"- queries_console: `{str(wing_readonly_preflight['queries_console']).lower()}`",
+                f"- executes_tests: `{str(wing_readonly_preflight['executes_tests']).lower()}`",
+                f"- operator_required: `{str(wing_readonly_preflight['operator_required']).lower()}`",
+                f"- readiness_closure_allowed_by_evidence: `{str(wing_readonly_preflight['readiness_closure_allowed_by_evidence']).lower()}`",
+                f"- live_authority_granted: `{str(wing_readonly_preflight['live_authority_granted']).lower()}`",
+                f"- full_autonomous_ready: `{str(wing_readonly_preflight['full_autonomous_ready']).lower()}`",
+                f"- evidence_status: `{wing_readonly_preflight['evidence_status']}`",
+                f"- artifact_count: `{wing_readonly_preflight['artifact_count']}`",
+                f"- valid_candidate_count: `{wing_readonly_preflight['valid_candidate_count']}`",
+                f"- invalid_candidate_count: `{wing_readonly_preflight['invalid_candidate_count']}`",
+                f"- readiness_update_candidate_available: `{str(wing_readonly_preflight['readiness_update_candidate_available']).lower()}`",
+                "- mvp_blocker_matrix_ids: "
+                f"`{json.dumps(wing_readonly_preflight['mvp_blocker_matrix_ids'])}`",
+                "- mvp_blockers_closed_by_evidence: "
+                f"`{json.dumps(wing_readonly_preflight['mvp_blockers_closed_by_evidence'])}`",
+                "- latest_valid_candidate_run_id: "
+                f"`{wing_readonly_preflight['latest_valid_candidate_run_id']}`",
+                f"- blocked_by: `{json.dumps(wing_readonly_preflight['blocked_by'])}`",
+                f"- violations: `{json.dumps(wing_readonly_preflight['violations'])}`",
             ]
         )
     if raw_mixer_contract is not None:
@@ -9968,6 +10189,15 @@ def run_release_checks(
             )
             results.append(read_capture_plan_result)
             if read_capture_plan_result.status != "passed" and not continue_on_failure:
+                break
+            wing_readonly_preflight_result = (
+                validate_wing_readonly_preflight_evidence_snapshot()
+            )
+            results.append(wing_readonly_preflight_result)
+            if (
+                wing_readonly_preflight_result.status != "passed"
+                and not continue_on_failure
+            ):
                 break
             raw_mixer_contract_result = validate_raw_mixer_state_physical_readback_contract_snapshot()
             results.append(raw_mixer_contract_result)

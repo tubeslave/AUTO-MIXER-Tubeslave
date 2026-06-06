@@ -34,6 +34,7 @@ from tools.no_wing_release_check import (
     read_surface_physical_readback_fixture_acceptance_ledger_summary,
     read_surface_physical_readback_fixture_closure_plan_summary,
     read_surface_physical_readback_capture_plan_summary,
+    wing_readonly_preflight_evidence_summary,
     read_surface_fixture_evidence_summary,
     read_surface_remediation_plan_summary,
     routing_sends_readback_contract_summary,
@@ -61,6 +62,7 @@ from tools.no_wing_release_check import (
     validate_read_surface_physical_readback_artifact_review_queue_snapshot,
     validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot,
     validate_read_surface_physical_readback_fixture_closure_plan_snapshot,
+    validate_wing_readonly_preflight_evidence_snapshot,
     validate_read_surface_fixture_evidence_snapshot,
     validate_read_surface_physical_readback_capture_plan_snapshot,
     validate_raw_mixer_state_physical_readback_artifact_intake_snapshot,
@@ -472,6 +474,112 @@ def test_no_wing_release_check_rejects_capture_plan_execution_authority(monkeypa
     assert "read_surface_capture_plan_step_operator_required_not_true" in result.detail["violations"]
     assert "read_surface_capture_plan_step_execution_allowed_by_plan_not_false" in result.detail["violations"]
     assert "read_surface_capture_plan_step_live_write_not_false" in result.detail["violations"]
+
+
+def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapshot():
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["evidence_status"] == "operator_preflight_required"
+    assert result.detail["artifact_count"] == 0
+    assert result.detail["valid_candidate_count"] == 0
+    assert result.detail["invalid_candidate_count"] == 0
+    assert result.detail["accepted_as_readonly_preflight_candidate"] is False
+    assert result.detail["readiness_matrix_update_allowed"] is False
+    assert result.detail["readiness_closure_allowed_by_evidence"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["mvp_blocker_candidate_count"] == 0
+    assert result.detail["mvp_blockers_closed_by_evidence"] == []
+    assert result.detail["mvp_blocker_matrix_ids"] == [
+        "wing_readonly_connection_proof",
+        "physical_console_readback_proof",
+        "operator_visible_evidence_report",
+        "readiness_matrix_update_based_on_real_proof",
+    ]
+    assert result.detail["blocked_by"] == [
+        "operator_must_run_wing_readonly_preflight_runner"
+    ]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_wing_preflight_evidence_authority_claim(
+    monkeypatch,
+):
+    corrupted = {
+        "type": "wing_readonly_preflight_evidence",
+        "method_id": "wing_readonly_preflight_evidence",
+        "status": "readonly_preflight_candidate_available",
+        "safety": {
+            "read_only": True,
+            "live_write": True,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": False,
+            "execution_allowed_by_evidence": True,
+            "readiness_closure_allowed_by_evidence": True,
+            "live_widening_allowed": True,
+            "live_authority_granted": True,
+            "full_autonomous_ready": True,
+        },
+        "summary": {
+            "artifact_count": 1,
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 1,
+            "accepted_as_readonly_preflight_candidate": True,
+            "readiness_matrix_update_allowed": True,
+            "readiness_closure_allowed_by_evidence": True,
+            "live_authority_granted": True,
+            "full_autonomous_ready": True,
+            "mvp_blocker_candidate_count": 4,
+            "mvp_blockers_closed_by_evidence": ["wing_readonly_connection_proof"],
+            "blocked_by": [],
+        },
+        "mvp_blocker_matrix": [
+            {
+                "id": "wing_readonly_connection_proof",
+                "status": "candidate_available",
+                "closed": True,
+                "manual_review_required": False,
+                "automatic_live_authority_allowed": True,
+            }
+        ],
+        "artifacts": [],
+    }
+
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_evidence",
+        lambda: corrupted,
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    violations = set(result.detail["violations"])
+    assert "wing_readonly_preflight_evidence_live_write_not_false" in violations
+    assert "wing_readonly_preflight_evidence_operator_required_not_true" in violations
+    assert (
+        "wing_readonly_preflight_evidence_execution_allowed_by_evidence_not_false"
+        in violations
+    )
+    assert (
+        "wing_readonly_preflight_evidence_readiness_closure_allowed_by_evidence_not_false"
+        in violations
+    )
+    assert "wing_readonly_preflight_evidence_live_widening_allowed_not_false" in violations
+    assert "wing_readonly_preflight_evidence_live_authority_granted_not_false" in violations
+    assert "wing_readonly_preflight_evidence_full_autonomous_ready_not_false" in violations
+    assert "wing_readonly_preflight_invalid_artifacts_present" in violations
+    assert "wing_readonly_preflight_readiness_closure_allowed" in violations
+    assert "wing_readonly_preflight_live_authority_granted" in violations
+    assert "wing_readonly_preflight_full_autonomous_ready" in violations
+    assert "wing_readonly_preflight_evidence_matrix_count_mismatch" in violations
+    assert "wing_readonly_preflight_matrix_ids_mismatch" in violations
+    assert "wing_readonly_preflight_matrix_row_closed_not_false" in violations
+    assert "wing_readonly_preflight_matrix_manual_review_not_true" in violations
+    assert "wing_readonly_preflight_matrix_live_authority_not_false" in violations
 
 
 def test_no_wing_release_check_validates_raw_mixer_readback_contract_snapshot():
@@ -2218,6 +2326,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         in fixture_check.command
     )
     assert "tests/test_dlive_state_physical_readback_contract.py" in fixture_check.command
+    assert "tests/test_wing_readonly_preflight_evidence.py" in fixture_check.command
     report_check = next(check for check in checks if check.name == "supervised_proof_artifact_report")
     assert "tools/evaluate_supervised_proof_artifacts.py" in report_check.command
     assert "--quiet" in report_check.command
@@ -2684,6 +2793,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "read_surface_fixture_evidence_schema" in result_names
     assert "read_surface_remediation_plan_schema" in result_names
     assert "read_surface_physical_readback_capture_plan_schema" in result_names
+    assert "wing_readonly_preflight_evidence_schema" in result_names
     assert "raw_mixer_state_physical_readback_contract_schema" in result_names
     assert "raw_mixer_state_physical_readback_artifact_intake_schema" in result_names
     assert "channel_basic_controls_physical_readback_contract_schema" in result_names
@@ -2721,6 +2831,9 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "read_surface_physical_readback_capture_plan_schema"
     )
     assert result_names.index("read_surface_physical_readback_capture_plan_schema") < result_names.index(
+        "wing_readonly_preflight_evidence_schema"
+    )
+    assert result_names.index("wing_readonly_preflight_evidence_schema") < result_names.index(
         "raw_mixer_state_physical_readback_contract_schema"
     )
     assert result_names.index("raw_mixer_state_physical_readback_contract_schema") < result_names.index(
@@ -3621,6 +3734,73 @@ def test_no_wing_release_check_summary_embeds_read_surface_capture_plan(tmp_path
     assert "execution_allowed_by_plan: `false`" in markdown_summary
     assert "live_authority_granted: `false`" in markdown_summary
     assert "step_remediation_action_id" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
+    tmp_path,
+):
+    result = CheckResult(
+        name="wing_readonly_preflight_evidence_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "evidence_status": "operator_preflight_required",
+            "artifact_count": 0,
+            "valid_candidate_count": 0,
+            "invalid_candidate_count": 0,
+            "accepted_as_readonly_preflight_candidate": False,
+            "readiness_matrix_update_allowed": False,
+            "readiness_closure_allowed_by_evidence": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "mvp_blocker_candidate_count": 0,
+            "mvp_blockers_closed_by_evidence": [],
+            "mvp_blocker_matrix_ids": [
+                "wing_readonly_connection_proof",
+                "physical_console_readback_proof",
+                "operator_visible_evidence_report",
+                "readiness_matrix_update_based_on_real_proof",
+            ],
+            "latest_valid_candidate_run_id": None,
+            "blocked_by": [
+                "operator_must_run_wing_readonly_preflight_runner"
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-05T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert (
+        wing_readonly_preflight_evidence_summary([result])
+        == summary["wing_readonly_preflight_evidence"]
+    )
+    preflight = json_summary["wing_readonly_preflight_evidence"]
+    assert preflight["read_only"] is True
+    assert preflight["live_write"] is False
+    assert preflight["queries_console"] is False
+    assert preflight["executes_tests"] is False
+    assert preflight["operator_required"] is True
+    assert preflight["execution_allowed_by_evidence"] is False
+    assert preflight["readiness_closure_allowed_by_evidence"] is False
+    assert preflight["live_authority_granted"] is False
+    assert preflight["full_autonomous_ready"] is False
+    assert preflight["readiness_update_candidate_available"] is False
+    assert preflight["mvp_blocker_matrix_ids"] == [
+        "wing_readonly_connection_proof",
+        "physical_console_readback_proof",
+        "operator_visible_evidence_report",
+        "readiness_matrix_update_based_on_real_proof",
+    ]
+    assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
+    assert "## WING Read-Only Preflight Evidence" in markdown_summary
+    assert "readiness_closure_allowed_by_evidence: `false`" in markdown_summary
+    assert "live_authority_granted: `false`" in markdown_summary
+    assert "readiness_update_candidate_available: `false`" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_raw_mixer_readback_contract(tmp_path):

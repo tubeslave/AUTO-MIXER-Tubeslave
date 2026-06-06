@@ -90,6 +90,7 @@ try:
     from user_presets_physical_readback_artifact_intake import (
         build_user_presets_physical_readback_artifact_intake,
     )
+    from wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from safety_coverage_matrix import build_safety_coverage_matrix_snapshot
     from source_identity_calibration_acceptance_ledger import (
         build_source_identity_calibration_acceptance_ledger,
@@ -402,6 +403,7 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.user_presets_physical_readback_artifact_intake import (
         build_user_presets_physical_readback_artifact_intake,
     )
+    from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from backend.safety_coverage_matrix import build_safety_coverage_matrix_snapshot
     from backend.source_identity_calibration_acceptance_ledger import (
         build_source_identity_calibration_acceptance_ledger,
@@ -4001,6 +4003,24 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         notes=("transport_free", "proof_plan_only", "no_live_writes", "execution_allowed_by_plan_false"),
     ),
     ProcessingMethod(
+        id="wing_readonly_preflight_evidence",
+        label="WING Read-Only Preflight Evidence",
+        domain="evaluation",
+        status="shadow_only",
+        summary="Read-only intake matrix for WING preflight runner artifacts; surfaces connection/readback candidates without closing readiness or granting live authority.",
+        module="backend/wing_readonly_preflight_evidence.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="operator_must_review_readonly_preflight_candidate_before_readiness_update",
+        promotion_next="review a valid physical read-only preflight artifact before updating WING readiness rows",
+        notes=(
+            "transport_free",
+            "preflight_evidence_only",
+            "no_live_writes",
+            "readiness_closure_allowed_by_evidence_false",
+        ),
+    ),
+    ProcessingMethod(
         id="supervised_proof_remediation_plan",
         label="Supervised Proof Remediation Plan",
         domain="evaluation",
@@ -5542,6 +5562,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "supervised_proof_artifact_evaluator",
             "supervised_promotion_evidence_bridge",
             "supervised_wing_proof_plan",
+            "wing_readonly_preflight_evidence",
             "supervised_proof_remediation_plan",
             "autonomy_evidence_overlay",
             "autonomy_mode_transition_gate",
@@ -5676,6 +5697,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "supervised_proof_artifact_evaluator",
             "supervised_promotion_evidence_bridge",
             "supervised_wing_proof_plan",
+            "wing_readonly_preflight_evidence",
             "ml_processing_graph",
         ),
         can_write_live=False,
@@ -6177,6 +6199,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Proof artifact report, next WING test runbook",
         "next_step": "Use only as an operator checklist; do not execute physical proof without explicit approval.",
     },
+    "wing_readonly_preflight_evidence": {
+        "entrypoint": "build_wing_readonly_preflight_evidence",
+        "ui_surface": "Processing registry, WING read-only preflight readiness matrix",
+        "next_step": "Use only to surface operator-captured read-only preflight candidates; manual review still gates readiness updates.",
+    },
     "supervised_proof_remediation_plan": {
         "entrypoint": "build_supervised_proof_remediation_plan",
         "ui_surface": "Proof artifact report, blocked proof remediation checklist",
@@ -6565,6 +6592,7 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
             build_read_surface_physical_readback_capture_plan()
         ),
         "read_surface_fixture_evidence": build_read_surface_fixture_evidence_snapshot(),
+        "wing_readonly_preflight_evidence": build_wing_readonly_preflight_evidence(),
         "raw_mixer_state_physical_readback_contract": build_raw_mixer_state_physical_readback_contract(),
         "raw_mixer_state_physical_readback_artifact_intake": (
             build_raw_mixer_state_physical_readback_artifact_intake()
