@@ -1271,6 +1271,963 @@ def register_handlers(server):
             return str(proposal.get("id") or "")
         return str(result.get("proposal_id") or "")
 
+    def preflight_result_normalized_changes(result):
+        changes = result.get("normalized_changes")
+        if isinstance(changes, list) and changes:
+            return [change for change in changes if isinstance(change, dict)]
+        change = result.get("normalized_change")
+        if isinstance(change, dict) and change:
+            return [change]
+        return []
+
+    def preflight_result_title(result):
+        proposal = result.get("proposal")
+        if isinstance(proposal, dict):
+            return proposal.get("title")
+        return None
+
+    def plan_eligible_preflight_safety(result):
+        safety = result.get("safety")
+        if not isinstance(safety, dict):
+            return False, "missing_preflight_safety"
+        required_false = (
+            "live_write",
+            "apply_attempted",
+            "queue_mutation",
+            "proposal_status_mutation",
+            "idempotency_reserved",
+            "manual_console_write_called",
+        )
+        for key in required_false:
+            if safety.get(key) is not False:
+                return False, f"preflight_safety_{key}_not_false"
+        if safety.get("live_apply_entrypoint") != "apply_operator_proposal":
+            return False, "preflight_live_apply_entrypoint_mismatch"
+        if safety.get("preflight_only") is not True:
+            return False, "preflight_only_flag_missing"
+        return True, None
+
+    def plan_eligible_preflight_idempotency(result):
+        idempotency = result.get("idempotency")
+        if not isinstance(idempotency, dict):
+            return False, "missing_preflight_idempotency", None
+        key = str(idempotency.get("idempotency_key") or "").strip()
+        if not key:
+            return False, "missing_preflight_idempotency_key", None
+        if idempotency.get("provided") is not True:
+            return False, "preflight_idempotency_not_provided", key
+        if idempotency.get("reserved") is not False:
+            return False, "preflight_idempotency_already_reserved", key
+        if idempotency.get("duplicate") is True:
+            return False, "preflight_idempotency_duplicate", key
+        return True, None, key
+
+    def current_queue_proposal_for_plan(result, proposal_id):
+        proposal = server.operator_proposal_queue.find(proposal_id=proposal_id)
+        if proposal is None:
+            return None, "proposal_not_found"
+        current = proposal.to_dict()
+        if current.get("status") != "pending":
+            return current, "proposal_not_pending"
+        if current.get("expired") is True:
+            return current, "proposal_expired"
+        if current.get("can_apply") is not True:
+            return current, "proposal_no_longer_applyable"
+
+        preflight_proposal = result.get("proposal")
+        if isinstance(preflight_proposal, dict):
+            preflight_updated_at = preflight_proposal.get("updated_at")
+            current_updated_at = current.get("updated_at")
+            if (
+                preflight_updated_at
+                and current_updated_at
+                and preflight_updated_at != current_updated_at
+            ):
+                return current, "proposal_changed_since_preflight"
+            for key in ("requested_change", "requested_changes"):
+                if preflight_proposal.get(key) != current.get(key):
+                    return current, f"proposal_{key}_changed_since_preflight"
+        return current, None
+
+    def current_queue_proposal_for_sequence_step(step, proposal_id):
+        proposal = server.operator_proposal_queue.find(proposal_id=proposal_id)
+        if proposal is None:
+            return None, "proposal_not_found"
+        current = proposal.to_dict()
+        if current.get("status") != "pending":
+            return current, "proposal_not_pending"
+        if current.get("expired") is True:
+            return current, "proposal_expired"
+        if current.get("can_apply") is not True:
+            return current, "proposal_no_longer_applyable"
+
+        step_proposal = step.get("current_proposal")
+        if isinstance(step_proposal, dict):
+            for key in ("updated_at", "requested_change", "requested_changes"):
+                if step_proposal.get(key) != current.get(key):
+                    return current, f"proposal_{key}_changed_since_plan"
+        return current, None
+
+    def plan_change_from_preflight(result, change, change_index):
+        safety = result.get("safety") if isinstance(result.get("safety"), dict) else {}
+        allowed = set(safety.get("allowed_live_write_kinds") or [])
+        if not allowed:
+            allowed = {"fader", "gain"}
+        value_type = str(change.get("value_type") or "").strip().lower()
+        if value_type not in {"fader", "gain"} or value_type not in allowed:
+            return None, "preflight_change_value_type_not_plan_eligible"
+        channel = change.get("channel")
+        if channel is None:
+            return None, "preflight_change_missing_channel"
+        effective_value = coerce_float(change.get("effective_value"))
+        if effective_value is None:
+            return None, "preflight_change_missing_effective_value"
+        if value_type == "fader" and effective_value > 0.0:
+            return None, "preflight_change_fader_ceiling_exceeded"
+        pre_read_value = change.get("pre_read_value", change.get("old_value"))
+        return {
+            "change_index": change_index,
+            "channel": channel,
+            "value_type": value_type,
+            "address": change.get("address"),
+            "old_value": change.get("old_value"),
+            "pre_read_value": pre_read_value,
+            "pre_read_status": change.get("pre_read_status"),
+            "pre_read_source": change.get("pre_read_source"),
+            "pre_read_cache_freshness": change.get("pre_read_cache_freshness"),
+            "effective_value": effective_value,
+            "delta_db": change.get("delta_db"),
+            "rollback_value": pre_read_value,
+            "rollback_expected": pre_read_value is not None,
+        }, None
+
+    def apply_sequence_plan_payload(
+        *,
+        status,
+        preflight_results,
+        planned_steps=None,
+        blocked_results=None,
+        reason=None,
+    ):
+        planned_steps = planned_steps or []
+        blocked_results = blocked_results or []
+        ready_count = sum(
+            1
+            for result in preflight_results
+            if isinstance(result, dict) and result.get("ready_to_apply") is True
+        )
+        blocked_count = len(preflight_results) - ready_count
+        operator_mode = server.get_operator_mode_status()
+        return {
+            "type": "operator_proposal_apply_sequence_plan",
+            "status": status,
+            "success": status == "ok",
+            "reason": reason,
+            "generated_at": time.time(),
+            "operator_mode": operator_mode,
+            "summary": {
+                "input_preflight_result_count": len(preflight_results),
+                "ready_result_count": ready_count,
+                "blocked_result_count": blocked_count,
+                "planned_apply_count": len(planned_steps),
+                "plan_blocked_count": len(blocked_results),
+                "planned_apply_proposal_ids": [
+                    step["proposal_id"] for step in planned_steps
+                ],
+                "blocked_proposal_ids": [
+                    item["proposal_id"]
+                    for item in blocked_results
+                    if item.get("proposal_id")
+                ],
+                "operator_mode_allows_apply_now": bool(
+                    operator_mode.get("capabilities", {}).get("can_apply_to_console")
+                ),
+                "execution_allowed_by_plan": False,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "live_widening_allowed": False,
+                "queue_freshness_checked": True,
+            },
+            "safety": {
+                "sequence_plan_only": True,
+                "preflight_results_required": True,
+                "current_queue_proposal_required": True,
+                "preflight_result_is_not_apply_authority": True,
+                "requires_operator_apply": True,
+                "execution_allowed_by_plan": False,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "live_widening_allowed": False,
+                "live_apply_entrypoint": "apply_operator_proposal",
+                "allowed_live_write_kinds": ["fader", "gain"],
+            },
+            "planned_apply_sequence": planned_steps,
+            "blocked_results": blocked_results,
+        }
+
+    async def handle_plan_operator_proposal_apply_sequence(websocket, data):
+        raw_results = data.get("preflight_results")
+        if not isinstance(raw_results, list):
+            await server.send_to_client(
+                websocket,
+                apply_sequence_plan_payload(
+                    status="blocked",
+                    reason="missing_preflight_results",
+                    preflight_results=[],
+                ),
+            )
+            return
+
+        preflight_results = [
+            result for result in raw_results if isinstance(result, dict)
+        ]
+        invalid_count = len(raw_results) - len(preflight_results)
+        planned_steps = []
+        blocked_results = []
+        if invalid_count:
+            blocked_results.append({
+                "proposal_id": None,
+                "preflight_result_index": None,
+                "reason": "invalid_preflight_result",
+                "count": invalid_count,
+            })
+
+        for result_index, result in enumerate(preflight_results):
+            proposal_id = batch_result_id(result)
+            if result.get("ready_to_apply") is not True or result.get("status") != "ready":
+                blocked_results.append({
+                    "proposal_id": proposal_id,
+                    "preflight_result_index": result_index,
+                    "reason": result.get("reason") or "preflight_result_not_ready",
+                    "preflight_status": result.get("status"),
+                })
+                continue
+            if not proposal_id:
+                blocked_results.append({
+                    "proposal_id": None,
+                    "preflight_result_index": result_index,
+                    "reason": "missing_preflight_proposal_id",
+                })
+                continue
+
+            current_proposal, current_proposal_reason = current_queue_proposal_for_plan(
+                result,
+                proposal_id,
+            )
+            if current_proposal_reason:
+                blocked_results.append({
+                    "proposal_id": proposal_id,
+                    "preflight_result_index": result_index,
+                    "reason": current_proposal_reason,
+                    "current_proposal": current_proposal,
+                })
+                continue
+
+            safety_ok, safety_reason = plan_eligible_preflight_safety(result)
+            if not safety_ok:
+                blocked_results.append({
+                    "proposal_id": proposal_id,
+                    "preflight_result_index": result_index,
+                    "reason": safety_reason,
+                })
+                continue
+
+            idempotency_ok, idempotency_reason, idempotency_key = (
+                plan_eligible_preflight_idempotency(result)
+            )
+            if not idempotency_ok:
+                blocked_results.append({
+                    "proposal_id": proposal_id,
+                    "preflight_result_index": result_index,
+                    "reason": idempotency_reason,
+                })
+                continue
+
+            normalized_changes = preflight_result_normalized_changes(result)
+            if not normalized_changes:
+                blocked_results.append({
+                    "proposal_id": proposal_id,
+                    "preflight_result_index": result_index,
+                    "reason": "preflight_has_no_normalized_change",
+                })
+                continue
+
+            planned_changes = []
+            blocked_change_reason = None
+            for change_index, change in enumerate(normalized_changes):
+                planned_change, blocked_change_reason = plan_change_from_preflight(
+                    result,
+                    change,
+                    change_index,
+                )
+                if blocked_change_reason:
+                    break
+                planned_changes.append(planned_change)
+            if blocked_change_reason:
+                blocked_results.append({
+                    "proposal_id": proposal_id,
+                    "preflight_result_index": result_index,
+                    "reason": blocked_change_reason,
+                })
+                continue
+
+            planned_steps.append({
+                "planned_apply_index": len(planned_steps),
+                "proposal_id": proposal_id,
+                "proposal_title": preflight_result_title(result),
+                "idempotency_key": idempotency_key,
+                "approval_required": True,
+                "requires_operator_apply": True,
+                "live_apply_entrypoint": "apply_operator_proposal",
+                "execution_allowed_by_plan": False,
+                "current_proposal": current_proposal,
+                "change_count": len(planned_changes),
+                "normalized_changes": planned_changes,
+                "apply_request": {
+                    "type": "apply_operator_proposal",
+                    "proposal_id": proposal_id,
+                    "approved": True,
+                    "idempotency_key": idempotency_key,
+                },
+            })
+
+        await server.send_to_client(
+            websocket,
+            apply_sequence_plan_payload(
+                status="ok",
+                preflight_results=preflight_results,
+                planned_steps=planned_steps,
+                blocked_results=blocked_results,
+            ),
+        )
+
+    def planned_sequence_from_data(data):
+        raw_plan = data.get("sequence_plan")
+        if isinstance(raw_plan, dict):
+            raw_steps = raw_plan.get("planned_apply_sequence")
+        else:
+            raw_steps = data.get("planned_apply_sequence")
+        if isinstance(raw_steps, list):
+            return raw_steps
+        return None
+
+    def dry_run_results_from_data(data):
+        raw_payload = data.get("dry_run_payload")
+        if isinstance(raw_payload, dict):
+            raw_results = raw_payload.get("dry_run_results")
+        else:
+            raw_results = data.get("dry_run_results")
+        if isinstance(raw_results, list):
+            return raw_results
+        return None
+
+    def dry_run_step_change(change):
+        if not isinstance(change, dict):
+            return None, "invalid_planned_change"
+        value_type = str(change.get("value_type") or "").strip().lower()
+        if value_type not in {"fader", "gain"}:
+            return None, "planned_change_value_type_not_dry_run_eligible"
+        channel = change.get("channel")
+        if channel is None:
+            return None, "planned_change_missing_channel"
+        effective_value = coerce_float(change.get("effective_value"))
+        if effective_value is None:
+            return None, "planned_change_missing_effective_value"
+        if value_type == "fader" and effective_value > 0.0:
+            return None, "planned_change_fader_ceiling_exceeded"
+        return {
+            "change_index": change.get("change_index"),
+            "channel": channel,
+            "value_type": value_type,
+            "address": change.get("address"),
+            "effective_value": effective_value,
+            "delta_db": change.get("delta_db"),
+            "pre_read_value": change.get("pre_read_value"),
+            "pre_read_status": change.get("pre_read_status"),
+            "rollback_value": change.get("rollback_value"),
+            "rollback_expected": bool(change.get("rollback_expected")),
+        }, None
+
+    def dry_run_sequence_payload(*, status, steps, results=None, reason=None):
+        results = results or []
+        would_apply = [item for item in results if item.get("status") == "would_apply"]
+        blocked = [item for item in results if item.get("status") == "blocked"]
+        return {
+            "type": "operator_proposal_apply_sequence_dry_run",
+            "status": status,
+            "success": status == "ok",
+            "reason": reason,
+            "generated_at": time.time(),
+            "summary": {
+                "input_step_count": len(steps),
+                "result_count": len(results),
+                "would_apply_count": len(would_apply),
+                "blocked_count": len(blocked),
+                "would_apply_proposal_ids": [
+                    item["proposal_id"] for item in would_apply if item.get("proposal_id")
+                ],
+                "blocked_proposal_ids": [
+                    item["proposal_id"] for item in blocked if item.get("proposal_id")
+                ],
+                "execution_allowed_by_dry_run": False,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "live_widening_allowed": False,
+                "queue_freshness_checked": True,
+            },
+            "safety": {
+                "dry_run_only": True,
+                "sequence_plan_required": True,
+                "current_queue_proposal_required": True,
+                "does_not_call_apply_operator_proposal": True,
+                "execution_allowed_by_dry_run": False,
+                "requires_operator_apply": True,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "live_widening_allowed": False,
+                "live_apply_entrypoint": "apply_operator_proposal",
+                "allowed_live_write_kinds": ["fader", "gain"],
+            },
+            "dry_run_results": results,
+        }
+
+    def execution_gate_payload(
+        *,
+        status,
+        dry_run_results,
+        candidates=None,
+        blocked=None,
+        reason=None,
+        operator_ack=False,
+    ):
+        candidates = candidates or []
+        blocked = blocked or []
+        operator_mode = server.get_operator_mode_status()
+        return {
+            "type": "operator_proposal_apply_sequence_execution_gate",
+            "status": status,
+            "success": status == "ready",
+            "reason": reason,
+            "generated_at": time.time(),
+            "operator_mode": operator_mode,
+            "summary": {
+                "input_dry_run_result_count": len(dry_run_results),
+                "ready_for_executor_count": len(candidates),
+                "blocked_count": len(blocked),
+                "ready_for_executor_proposal_ids": [
+                    item["proposal_id"] for item in candidates if item.get("proposal_id")
+                ],
+                "blocked_proposal_ids": [
+                    item["proposal_id"] for item in blocked if item.get("proposal_id")
+                ],
+                "operator_mode_allows_apply_now": bool(
+                    operator_mode.get("capabilities", {}).get("can_apply_to_console")
+                ),
+                "operator_ack_received": operator_ack,
+                "execution_allowed_by_gate": False,
+                "requires_separate_executor": True,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "live_widening_allowed": False,
+                "queue_freshness_checked": True,
+            },
+            "safety": {
+                "execution_gate_only": True,
+                "dry_run_results_required": True,
+                "operator_ack_required": True,
+                "current_queue_proposal_required": True,
+                "does_not_call_apply_operator_proposal": True,
+                "execution_allowed_by_gate": False,
+                "requires_separate_executor": True,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "live_widening_allowed": False,
+                "live_apply_entrypoint": "apply_operator_proposal",
+                "allowed_live_write_kinds": ["fader", "gain"],
+            },
+            "ready_for_executor": candidates,
+            "blocked_results": blocked,
+        }
+
+    def execution_gate_row_from_dry_run(result, result_index, seen_idempotency_keys):
+        proposal_id = str(result.get("proposal_id") or "").strip()
+        planned_apply_index = result.get("planned_apply_index", result_index)
+        if result.get("status") != "would_apply":
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id or None,
+                "dry_run_result_index": result_index,
+                "status": "blocked",
+                "reason": result.get("reason") or "dry_run_result_not_would_apply",
+            }
+        if not proposal_id:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": None,
+                "dry_run_result_index": result_index,
+                "status": "blocked",
+                "reason": "missing_dry_run_proposal_id",
+            }
+
+        current_proposal, current_reason = current_queue_proposal_for_sequence_step(
+            result,
+            proposal_id,
+        )
+        if current_reason:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "dry_run_result_index": result_index,
+                "status": "blocked",
+                "reason": current_reason,
+                "current_proposal": current_proposal,
+            }
+
+        apply_request = result.get("apply_request")
+        if not isinstance(apply_request, dict):
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "dry_run_result_index": result_index,
+                "status": "blocked",
+                "reason": "missing_apply_request",
+            }
+        if apply_request.get("type") != "apply_operator_proposal":
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "dry_run_result_index": result_index,
+                "status": "blocked",
+                "reason": "apply_request_type_mismatch",
+            }
+        if str(apply_request.get("proposal_id") or "").strip() != proposal_id:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "dry_run_result_index": result_index,
+                "status": "blocked",
+                "reason": "apply_request_proposal_id_mismatch",
+            }
+        if apply_request.get("approved") is not True:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "dry_run_result_index": result_index,
+                "status": "blocked",
+                "reason": "apply_request_approval_required",
+            }
+
+        idempotency_key = str(apply_request.get("idempotency_key") or "").strip()
+        if not idempotency_key:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "dry_run_result_index": result_index,
+                "status": "blocked",
+                "reason": "missing_idempotency_key",
+            }
+        store = getattr(server, "_operator_apply_idempotency_keys", {})
+        if isinstance(store, dict) and idempotency_key in store:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "dry_run_result_index": result_index,
+                "status": "blocked",
+                "reason": "duplicate_idempotency_key",
+            }
+        if idempotency_key in seen_idempotency_keys:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "dry_run_result_index": result_index,
+                "status": "blocked",
+                "reason": "duplicate_idempotency_key_in_sequence",
+            }
+        seen_idempotency_keys.add(idempotency_key)
+
+        raw_changes = result.get("normalized_changes")
+        if not isinstance(raw_changes, list) or not raw_changes:
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "dry_run_result_index": result_index,
+                "status": "blocked",
+                "reason": "missing_planned_changes",
+            }
+        changes = []
+        for raw_change in raw_changes:
+            change, blocker = dry_run_step_change(raw_change)
+            if blocker:
+                return None, {
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "dry_run_result_index": result_index,
+                    "status": "blocked",
+                    "reason": blocker,
+                }
+            changes.append(change)
+
+        return {
+            "planned_apply_index": planned_apply_index,
+            "proposal_id": proposal_id,
+            "dry_run_result_index": result_index,
+            "status": "ready_for_executor",
+            "execution_allowed_by_gate": False,
+            "requires_separate_executor": True,
+            "apply_request": {
+                "type": "apply_operator_proposal",
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": idempotency_key,
+            },
+            "current_proposal": current_proposal,
+            "normalized_changes": changes,
+        }, None
+
+    async def handle_gate_operator_proposal_apply_sequence_execution(websocket, data):
+        raw_results = dry_run_results_from_data(data)
+        operator_ack = bool(data.get("operator_ack", False))
+        if raw_results is None:
+            await server.send_to_client(
+                websocket,
+                execution_gate_payload(
+                    status="blocked",
+                    reason="missing_dry_run_results",
+                    dry_run_results=[],
+                    operator_ack=operator_ack,
+                ),
+            )
+            return
+
+        dry_run_results = [
+            result for result in raw_results if isinstance(result, dict)
+        ]
+        blocked = []
+        invalid_count = len(raw_results) - len(dry_run_results)
+        if invalid_count:
+            blocked.append({
+                "planned_apply_index": None,
+                "proposal_id": None,
+                "dry_run_result_index": None,
+                "status": "blocked",
+                "reason": "invalid_dry_run_result",
+                "count": invalid_count,
+            })
+
+        if not operator_ack:
+            await server.send_to_client(
+                websocket,
+                execution_gate_payload(
+                    status="blocked",
+                    reason="operator_ack_required",
+                    dry_run_results=dry_run_results,
+                    operator_ack=operator_ack,
+                    blocked=[
+                        *blocked,
+                        {
+                            "planned_apply_index": None,
+                            "proposal_id": None,
+                            "dry_run_result_index": None,
+                            "status": "blocked",
+                            "reason": "operator_ack_required",
+                        },
+                    ],
+                ),
+            )
+            return
+
+        operator_mode = server.get_operator_mode_status()
+        if not operator_mode.get("capabilities", {}).get("can_apply_to_console"):
+            await server.send_to_client(
+                websocket,
+                execution_gate_payload(
+                    status="blocked",
+                    reason="operator_mode_blocks_live_write",
+                    dry_run_results=dry_run_results,
+                    operator_ack=operator_ack,
+                    blocked=[
+                        *blocked,
+                        {
+                            "planned_apply_index": None,
+                            "proposal_id": None,
+                            "dry_run_result_index": None,
+                            "status": "blocked",
+                            "reason": "operator_mode_blocks_live_write",
+                        },
+                    ],
+                ),
+            )
+            return
+
+        candidates = []
+        seen_idempotency_keys = set()
+        for result_index, result in enumerate(dry_run_results):
+            candidate, blocker = execution_gate_row_from_dry_run(
+                result,
+                result_index,
+                seen_idempotency_keys,
+            )
+            if blocker:
+                blocked.append(blocker)
+            else:
+                candidates.append(candidate)
+
+        await server.send_to_client(
+            websocket,
+            execution_gate_payload(
+                status="ready" if candidates and not blocked else "blocked",
+                dry_run_results=dry_run_results,
+                candidates=candidates,
+                blocked=blocked,
+                operator_ack=operator_ack,
+                reason=None if candidates and not blocked else "execution_gate_blocked",
+            ),
+        )
+
+    async def handle_dry_run_operator_proposal_apply_sequence(websocket, data):
+        raw_steps = planned_sequence_from_data(data)
+        if raw_steps is None:
+            await server.send_to_client(
+                websocket,
+                dry_run_sequence_payload(
+                    status="blocked",
+                    reason="missing_planned_apply_sequence",
+                    steps=[],
+                ),
+            )
+            return
+
+        steps = [step for step in raw_steps if isinstance(step, dict)]
+        invalid_count = len(raw_steps) - len(steps)
+        results = []
+        if invalid_count:
+            results.append({
+                "planned_apply_index": None,
+                "proposal_id": None,
+                "status": "blocked",
+                "reason": "invalid_planned_step",
+                "count": invalid_count,
+            })
+
+        idempotency_store = getattr(server, "_operator_apply_idempotency_keys", {})
+        if not isinstance(idempotency_store, dict):
+            idempotency_store = {}
+        seen_idempotency_keys = set()
+
+        for step_index, step in enumerate(steps):
+            proposal_id = str(step.get("proposal_id") or "").strip()
+            planned_apply_index = step.get("planned_apply_index", step_index)
+            if not proposal_id:
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": None,
+                    "status": "blocked",
+                    "reason": "missing_planned_proposal_id",
+                })
+                continue
+            if step.get("requires_operator_apply") is not True:
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "planned_step_missing_operator_apply_requirement",
+                })
+                continue
+            if step.get("execution_allowed_by_plan") is not False:
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "planned_step_execution_authority_forged",
+                })
+                continue
+            if step.get("live_apply_entrypoint") != "apply_operator_proposal":
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "planned_step_live_apply_entrypoint_mismatch",
+                })
+                continue
+
+            current_proposal, current_reason = current_queue_proposal_for_sequence_step(
+                step,
+                proposal_id,
+            )
+            if current_reason:
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": current_reason,
+                    "current_proposal": current_proposal,
+                })
+                continue
+
+            apply_request = step.get("apply_request")
+            if not isinstance(apply_request, dict):
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "missing_apply_request",
+                })
+                continue
+            if apply_request.get("type") != "apply_operator_proposal":
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "apply_request_type_mismatch",
+                })
+                continue
+            if str(apply_request.get("proposal_id") or "").strip() != proposal_id:
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "apply_request_proposal_id_mismatch",
+                })
+                continue
+            if apply_request.get("approved") is not True:
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "apply_request_approval_required",
+                })
+                continue
+            step_idempotency_key = str(step.get("idempotency_key") or "").strip()
+            request_idempotency_key = str(
+                apply_request.get("idempotency_key") or ""
+            ).strip()
+            if (
+                step_idempotency_key
+                and request_idempotency_key
+                and step_idempotency_key != request_idempotency_key
+            ):
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "idempotency_key_mismatch",
+                })
+                continue
+            idempotency_key = str(
+                step_idempotency_key
+                or request_idempotency_key
+                or ""
+            ).strip()
+            if not idempotency_key:
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "missing_idempotency_key",
+                })
+                continue
+            if idempotency_key in idempotency_store:
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "duplicate_idempotency_key",
+                })
+                continue
+            if idempotency_key in seen_idempotency_keys:
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "duplicate_idempotency_key_in_sequence",
+                })
+                continue
+            seen_idempotency_keys.add(idempotency_key)
+
+            raw_changes = step.get("normalized_changes")
+            if not isinstance(raw_changes, list) or not raw_changes:
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": "missing_planned_changes",
+                })
+                continue
+            changes = []
+            change_blocker = None
+            for raw_change in raw_changes:
+                change, change_blocker = dry_run_step_change(raw_change)
+                if change_blocker:
+                    break
+                changes.append(change)
+            if change_blocker:
+                results.append({
+                    "planned_apply_index": planned_apply_index,
+                    "proposal_id": proposal_id,
+                    "status": "blocked",
+                    "reason": change_blocker,
+                })
+                continue
+
+            results.append({
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "status": "would_apply",
+                "reason": None,
+                "apply_request": {
+                    "type": "apply_operator_proposal",
+                    "proposal_id": proposal_id,
+                    "approved": bool(apply_request.get("approved", True)),
+                    "idempotency_key": idempotency_key,
+                },
+                "current_proposal": current_proposal,
+                "normalized_changes": changes,
+            })
+
+        await server.send_to_client(
+            websocket,
+            dry_run_sequence_payload(
+                status="ok",
+                steps=steps,
+                results=results,
+            ),
+        )
+
     async def handle_preflight_operator_proposal_apply_batch(websocket, data):
         raw_ids = data.get("proposal_ids")
         explicit_ids = [
@@ -1694,6 +2651,15 @@ def register_handlers(server):
         "preflight_operator_proposal_apply": handle_preflight_operator_proposal_apply,
         "preflight_operator_proposal_apply_batch": (
             handle_preflight_operator_proposal_apply_batch
+        ),
+        "plan_operator_proposal_apply_sequence": (
+            handle_plan_operator_proposal_apply_sequence
+        ),
+        "dry_run_operator_proposal_apply_sequence": (
+            handle_dry_run_operator_proposal_apply_sequence
+        ),
+        "gate_operator_proposal_apply_sequence_execution": (
+            handle_gate_operator_proposal_apply_sequence_execution
         ),
         "apply_operator_proposal": handle_apply_operator_proposal,
     }

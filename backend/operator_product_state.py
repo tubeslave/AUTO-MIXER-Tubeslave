@@ -3395,6 +3395,66 @@ def _decision_queue_batch_preflight_summary(
     }
 
 
+def _decision_queue_apply_sequence_plan_summary(
+    pending: Iterable[Mapping[str, Any]],
+    *,
+    default_limit: int = 20,
+) -> Dict[str, Any]:
+    pending_actions = [dict(action) for action in pending]
+    limit = max(1, min(int(default_limit or 20), 50))
+    candidates = [
+        action for action in pending_actions if action.get("can_apply") is True
+    ]
+    default_selected = candidates[:limit]
+
+    def ids(actions: Iterable[Mapping[str, Any]]) -> List[str]:
+        return [
+            identifier
+            for identifier in (_action_id(action) for action in actions)
+            if identifier
+        ]
+
+    return {
+        "available": True,
+        "handler": "plan_operator_proposal_apply_sequence",
+        "dry_run_handler": "dry_run_operator_proposal_apply_sequence",
+        "execution_gate_handler": "gate_operator_proposal_apply_sequence_execution",
+        "source_preflight_handler": "preflight_operator_proposal_apply_batch",
+        "live_apply_entrypoint": "apply_operator_proposal",
+        "requires_explicit_request": True,
+        "preflight_results_required": True,
+        "current_queue_proposal_required": True,
+        "accepts_batch_preflight_results": True,
+        "dry_run_required_before_executor": True,
+        "execution_gate_required_before_executor": True,
+        "default_candidate_count": len(default_selected),
+        "default_candidate_ids": ids(default_selected),
+        "planned_apply_count_known_from_snapshot": False,
+        "sequence_plan_is_not_apply_authority": True,
+        "safety": {
+            "queue_visibility_only": True,
+            "runs_preflight": False,
+            "sequence_plan_only": True,
+            "current_queue_proposal_required": True,
+            "dry_run_only": False,
+            "dry_run_required_before_executor": True,
+            "execution_gate_required_before_executor": True,
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "live_widening_allowed": False,
+            "candidate_is_not_apply_readiness": True,
+            "preflight_result_is_not_apply_authority": True,
+            "live_apply_entrypoint": "apply_operator_proposal",
+        },
+    }
+
+
 def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
     limit = max(1, min(int(limit or 50), 200))
     operator_mode = server.get_operator_mode_status()
@@ -3413,6 +3473,7 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
         source_identity_import = _source_identity_queue_import_summary([], [])
         apply_preflight = _decision_queue_apply_preflight_summary([], [])
         batch_preflight = _decision_queue_batch_preflight_summary([])
+        apply_sequence_plan = _decision_queue_apply_sequence_plan_summary([])
         return {
             "type": "decision_queue",
             "generated_at": _utc_now(),
@@ -3434,6 +3495,9 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
                 "batch_preflight_skipped_analysis_only_count": 0,
                 "batch_preflight_live_write": False,
                 "batch_preflight": batch_preflight,
+                "apply_sequence_plan_candidate_count": 0,
+                "apply_sequence_plan_live_write": False,
+                "apply_sequence_plan": apply_sequence_plan,
                 "source_identity_queue_import_pending_count": 0,
                 "source_identity_queue_import_applyable_pending_count": 0,
                 "source_identity_queue_import_analysis_only_pending_count": 0,
@@ -3462,6 +3526,7 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
     source_identity_import = _source_identity_queue_import_summary(pending, history)
     apply_preflight = _decision_queue_apply_preflight_summary(pending, history)
     batch_preflight = _decision_queue_batch_preflight_summary(pending)
+    apply_sequence_plan = _decision_queue_apply_sequence_plan_summary(pending)
     applied_count = int(queue_summary.get("applied_count", 0)) + sum(
         1 for item in agent_history if item.get("status") in {"applied", "approved", "done"}
     )
@@ -3502,6 +3567,11 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
             ),
             "batch_preflight_live_write": False,
             "batch_preflight": batch_preflight,
+            "apply_sequence_plan_candidate_count": (
+                apply_sequence_plan["default_candidate_count"]
+            ),
+            "apply_sequence_plan_live_write": False,
+            "apply_sequence_plan": apply_sequence_plan,
             "source_identity_queue_import_pending_count": source_identity_import["pending_count"],
             "source_identity_queue_import_applyable_pending_count": (
                 source_identity_import["applyable_pending_count"]
