@@ -357,6 +357,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         "proposal_state_mutation": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,
+        "can_import_to_queue": False,
         "can_apply_live": False,
     }
     if request_available:
@@ -393,6 +394,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "proposal_state_mutation": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
+            "can_import_to_queue": False,
             "can_apply_live": False,
         }
         for spec in generic_specs
@@ -438,6 +440,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "proposal_state_mutation": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
+            "can_import_to_queue": False,
             "can_apply_live": False,
         },
         "summary": {
@@ -474,6 +477,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "proposal_state_mutation": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
+            "can_import_to_queue": False,
             "can_apply_live": False,
             "memory_writer_dry_run_proposal_ids": list(
                 _string_list(generic_summary.get("memory_writer_dry_run_proposal_ids"))

@@ -16141,6 +16141,453 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
         ]["idempotency_key"]
         == "promotion-import:proposal-first"
     )
+
+    writer_records = writer_apply_request["memory_draft_payload"][
+        "memory_draft_records"
+    ]
+    promotion_memory_writer_apply_payload = {
+        "type": "operator_proposal_apply_sequence_policy_memory_writer",
+        "status": "append_only_memory_write_applied",
+        "success": True,
+        "reason": None,
+        "generated_at": 123.0,
+        "source_memory_draft_status": "ready",
+        "summary": {
+            "memory_draft_record_count": 1,
+            "invalid_record_count": 0,
+            "write_result_count": 1,
+            "append_only_memory_write_applied": True,
+            "operator_ack_required": True,
+            "operator_ack": True,
+            "apply_requested": True,
+            "target_memory_path": ".ai/memory/project.md",
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "policy_mutation": False,
+            "memory_file_mutation": True,
+            "runtime_memory_mutation": False,
+            "model_mutation": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "blocked_by": [],
+        },
+        "safety": {
+            "operator_required": True,
+            "operator_ack_required": True,
+            "apply_requested": True,
+            "operator_ack": True,
+            "append_only_memory_file_write_applied": True,
+            "target_memory_path": ".ai/memory/project.md",
+            "does_not_call_apply_operator_proposal": True,
+            "does_not_call_manual_console_write": True,
+            "allowed_live_write_kinds": ["fader", "gain"],
+            "live_write": False,
+            "apply_attempted": False,
+            "queue_mutation": False,
+            "proposal_status_mutation": False,
+            "idempotency_reserved": False,
+            "manual_console_write_called": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "policy_mutation": False,
+            "memory_file_mutation": True,
+            "runtime_memory_mutation": False,
+            "model_mutation": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "write_results": [
+            {
+                "draft_id": writer_records[0]["draft_id"],
+                "target_memory_path": ".ai/memory/project.md",
+                "applied": True,
+                "bytes_appended": 192,
+            }
+        ],
+        "blocked_results": [],
+    }
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_writer_apply_result"
+    ](
+        object(),
+        {
+            "promotion_memory_writer_dry_run_result_consumer": (
+                memory_writer_dry_run_result_consumer_payload
+            ),
+            "promotion_memory_writer_apply_result": (
+                promotion_memory_writer_apply_payload
+            ),
+            "root_path": str(tmp_path),
+        },
+    )
+
+    memory_writer_apply_result_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert memory_writer_apply_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_writer_apply_result_consumer"
+    )
+    assert memory_writer_apply_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_writer_apply_result"
+    )
+    assert memory_writer_apply_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_index_request_available"
+    )
+    assert (
+        memory_writer_apply_result_consumer_payload["summary"][
+            "promotion_memory_index_request_available"
+        ]
+        is True
+    )
+    assert (
+        memory_writer_apply_result_consumer_payload["summary"][
+            "source_memory_file_write_applied"
+        ]
+        is True
+    )
+    assert (
+        memory_writer_apply_result_consumer_payload["summary"][
+            "memory_file_write_applied_by_consumer"
+        ]
+        is False
+    )
+    assert (
+        memory_writer_apply_result_consumer_payload["summary"]["memory_file_mutation"]
+        is False
+    )
+    assert (
+        memory_writer_apply_result_consumer_payload["summary"]["live_write"]
+        is False
+    )
+
+    memory_index_request = memory_writer_apply_result_consumer_payload[
+        "promotion_memory_index_request"
+    ]
+    assert memory_index_request["handler"] == (
+        "index_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert memory_index_request["root_path"] == str(tmp_path)
+    assert memory_index_request["read_only_template"] is True
+    assert memory_index_request[
+        "promotion_memory_index_request_template_only"
+    ] is True
+    assert memory_index_request["memory_index_handler_invoked"] is False
+    assert memory_index_request["memory_index_created"] is False
+    assert memory_index_request["memory_file_mutation"] is False
+    assert memory_index_request["live_authority_granted"] is False
+    assert memory_index_request["promotion_memory_writer_apply_result_consumer"][
+        "memory_write_result_proposal_ids"
+    ] == ["proposal-first"]
+
+    memory_target = tmp_path / ".ai" / "memory" / "project.md"
+    memory_target.parent.mkdir(parents=True, exist_ok=True)
+    memory_target.write_text(
+        "\n".join(
+            [
+                "# Project Memory",
+                "",
+                "---",
+                "",
+                "### Supervised sequence policy memory",
+                "",
+                f"- Draft ID: `{writer_records[0]['draft_id']}`",
+                "- Proposal ID: `proposal-first`",
+                "- Learning scope: `supervised_fader_gain_sequence_execution`",
+                "- Value type: `fader`",
+                "- Channel: `2`",
+                "- Effective value: `-8.5`",
+                "- Idempotency key: `promotion-import:proposal-first`",
+                "- Readback status: `verified_from_cache`",
+                "- Proof status: `verified`",
+                "- Runtime authority: no live, queue, model, or policy mutation",
+                "",
+                "Promotion sequence policy memory was verified.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    await server._dispatch["index_operator_proposal_apply_sequence_policy_memory"](
+        object(),
+        memory_index_request,
+    )
+
+    promotion_memory_index_payload = server.send_to_client.await_args.args[1]
+    assert promotion_memory_index_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_index"
+    )
+    assert promotion_memory_index_payload["handler"] == (
+        "index_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert (
+        promotion_memory_index_payload["status"]
+        == "append_only_sequence_memory_index_available"
+    )
+    assert promotion_memory_index_payload["safety"]["read_only"] is True
+    assert promotion_memory_index_payload["safety"]["memory_file_read"] is True
+    assert promotion_memory_index_payload["safety"]["live_write"] is False
+    assert promotion_memory_index_payload["safety"]["policy_mutation"] is False
+    assert promotion_memory_index_payload["safety"]["runtime_memory_mutation"] is False
+    assert promotion_memory_index_payload["safety"]["model_mutation"] is False
+    assert promotion_memory_index_payload["summary"]["memory_record_count"] == 1
+    assert promotion_memory_index_payload["summary"]["invalid_record_count"] == 0
+    assert promotion_memory_index_payload["summary"]["indexed_proposal_ids"] == [
+        "proposal-first"
+    ]
+    assert (
+        promotion_memory_index_payload["memory_records"][0]["draft_id"]
+        == writer_records[0]["draft_id"]
+    )
+    assert (
+        promotion_memory_index_payload["memory_records"][0][
+            "execution_allowed_by_index"
+        ]
+        is False
+    )
+    assert (
+        promotion_memory_index_payload["memory_records"][0][
+            "live_authority_granted"
+        ]
+        is False
+    )
+
+    fresh_sequence_review_context = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "stale_field_count": 0,
+        "read_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "queries_console": False,
+        "queue_mutation": False,
+        "policy_mutation": False,
+    }
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_index_result"
+    ](
+        object(),
+        {
+            "promotion_memory_writer_apply_result_consumer": (
+                memory_writer_apply_result_consumer_payload
+            ),
+            "promotion_memory_index_result": promotion_memory_index_payload,
+            "current_sequence_review_freshness": fresh_sequence_review_context,
+        },
+    )
+
+    memory_index_result_consumer_payload = server.send_to_client.await_args.args[1]
+    assert memory_index_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_index_result_consumer"
+    )
+    assert memory_index_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_index_result"
+    )
+    assert memory_index_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_review_request_available"
+    )
+    assert (
+        memory_index_result_consumer_payload["summary"][
+            "promotion_memory_trust_review_request_available"
+        ]
+        is True
+    )
+    assert (
+        memory_index_result_consumer_payload["summary"][
+            "source_memory_index_available"
+        ]
+        is True
+    )
+    assert (
+        memory_index_result_consumer_payload["summary"][
+            "memory_trust_review_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        memory_index_result_consumer_payload["summary"][
+            "memory_trust_review_created"
+        ]
+        is False
+    )
+    assert (
+        memory_index_result_consumer_payload["summary"]["memory_file_mutation"]
+        is False
+    )
+    assert memory_index_result_consumer_payload["summary"]["live_write"] is False
+
+    trust_review_request = memory_index_result_consumer_payload[
+        "promotion_memory_trust_review_request"
+    ]
+    assert trust_review_request["handler"] == (
+        "review_operator_proposal_apply_sequence_policy_memory_trust"
+    )
+    assert trust_review_request["read_only_template"] is True
+    assert trust_review_request[
+        "promotion_memory_trust_review_request_template_only"
+    ] is True
+    assert trust_review_request["memory_trust_review_handler_invoked"] is False
+    assert trust_review_request["memory_trust_review_created"] is False
+    assert trust_review_request["memory_file_mutation"] is False
+    assert trust_review_request["live_authority_granted"] is False
+    assert trust_review_request["promotion_memory_index_result_consumer"][
+        "memory_index_record_proposal_ids"
+    ] == ["proposal-first"]
+
+    await server._dispatch["review_operator_proposal_apply_sequence_policy_memory_trust"](
+        object(),
+        trust_review_request,
+    )
+
+    promotion_memory_trust_review_payload = server.send_to_client.await_args.args[1]
+    assert promotion_memory_trust_review_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_review"
+    )
+    assert promotion_memory_trust_review_payload["handler"] == (
+        "review_operator_proposal_apply_sequence_policy_memory_trust"
+    )
+    assert promotion_memory_trust_review_payload["status"] == (
+        "sequence_memory_trust_review_candidate_available"
+    )
+    assert (
+        promotion_memory_trust_review_payload["summary"][
+            "trust_review_candidate_count"
+        ]
+        == 1
+    )
+    assert (
+        promotion_memory_trust_review_payload["summary"][
+            "execution_allowed_by_review"
+        ]
+        is False
+    )
+    assert (
+        promotion_memory_trust_review_payload["summary"]["policy_mutation"]
+        is False
+    )
+    assert (
+        promotion_memory_trust_review_payload["summary"][
+            "runtime_memory_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_memory_trust_review_payload["summary"]["model_mutation"]
+        is False
+    )
+    assert (
+        promotion_memory_trust_review_payload["summary"][
+            "live_authority_granted"
+        ]
+        is False
+    )
+    assert (
+        promotion_memory_trust_review_payload["summary"][
+            "full_autonomous_ready"
+        ]
+        is False
+    )
+
+    await server._dispatch[
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_trust_review_result"
+    ](
+        object(),
+        {
+            "promotion_memory_index_result_consumer": (
+                memory_index_result_consumer_payload
+            ),
+            "promotion_memory_trust_review_result": (
+                promotion_memory_trust_review_payload
+            ),
+        },
+    )
+
+    promotion_trust_review_result_consumer_payload = (
+        server.send_to_client.await_args.args[1]
+    )
+    assert promotion_trust_review_result_consumer_payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_trust_review_result_consumer"
+    )
+    assert promotion_trust_review_result_consumer_payload["handler"] == (
+        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_trust_review_result"
+    )
+    assert promotion_trust_review_result_consumer_payload["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_acceptance_ledger_request_available"
+    )
+    assert (
+        promotion_trust_review_result_consumer_payload["summary"][
+            "promotion_acceptance_ledger_request_available"
+        ]
+        is True
+    )
+    assert (
+        promotion_trust_review_result_consumer_payload["summary"][
+            "acceptance_ledger_handler_invoked"
+        ]
+        is False
+    )
+    assert (
+        promotion_trust_review_result_consumer_payload["summary"][
+            "acceptance_ledger_created"
+        ]
+        is False
+    )
+    assert (
+        promotion_trust_review_result_consumer_payload["summary"][
+            "operator_acceptance_required"
+        ]
+        is True
+    )
+    assert (
+        promotion_trust_review_result_consumer_payload["summary"][
+            "memory_file_mutation"
+        ]
+        is False
+    )
+    assert (
+        promotion_trust_review_result_consumer_payload["summary"]["live_write"]
+        is False
+    )
+
+    acceptance_ledger_request = promotion_trust_review_result_consumer_payload[
+        "promotion_acceptance_ledger_request"
+    ]
+    assert acceptance_ledger_request["handler"] == (
+        "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
+    )
+    assert acceptance_ledger_request["read_only_template"] is True
+    assert acceptance_ledger_request[
+        "promotion_acceptance_ledger_request_template_only"
+    ] is True
+    assert acceptance_ledger_request["acceptance_ledger_handler_invoked"] is False
+    assert acceptance_ledger_request["acceptance_ledger_created"] is False
+    assert acceptance_ledger_request["acceptance_records"] == []
+    assert acceptance_ledger_request["memory_file_mutation"] is False
+    assert acceptance_ledger_request["runtime_memory_mutation"] is False
+    assert acceptance_ledger_request["policy_mutation"] is False
+    assert acceptance_ledger_request["live_authority_granted"] is False
+
+    acceptance_template = promotion_trust_review_result_consumer_payload[
+        "promotion_acceptance_record_templates"
+    ][0]
+    assert acceptance_template["proposal_id"] == "proposal-first"
+    assert acceptance_template["operator_must_choose_decision"] is True
+    assert acceptance_template["sequence_policy_trust_store_mutation"] is False
+    assert acceptance_template["proposal_state_mutation"] is False
+    assert acceptance_template["can_import_to_queue"] is False
+    assert acceptance_template["can_apply_live"] is False
+
     assert "promotion-import:proposal-first" not in (
         server._operator_apply_idempotency_keys
     )
