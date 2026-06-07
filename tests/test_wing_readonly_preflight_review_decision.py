@@ -22,6 +22,7 @@ def _valid_summary() -> dict:
         "operator_confirmed_channels": [3],
         "value_types": ["fader", "gain"],
         "require_physical_readback": True,
+        "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -38,6 +39,7 @@ def _valid_summary() -> dict:
         "readbacks": [
             {
                 "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:fader",
                 "status": "verified_from_physical_readback",
                 "source": "physical_readback",
                 "channel": 3,
@@ -47,6 +49,7 @@ def _valid_summary() -> dict:
             },
             {
                 "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:gain",
                 "status": "verified_from_physical_readback",
                 "source": "physical_readback",
                 "channel": 3,

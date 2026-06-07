@@ -658,6 +658,7 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "live_write": False,
         "operator_required": True,
         "manual_review_required_before_readiness_update": True,
+        "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "contacts_backend": False,
         "queries_console": False,
         "execution_allowed_by_plan": False,
@@ -685,12 +686,14 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
             {"type": "get_state"},
             {
                 "type": "query_mixer_parameter",
+                "request_id": "wing-readonly-preflight:ch3:fader",
                 "channel": 3,
                 "value_type": "fader",
                 "address": "/ch/3/fdr",
             },
             {
                 "type": "query_mixer_parameter",
+                "request_id": "wing-readonly-preflight:ch3:gain",
                 "channel": 3,
                 "value_type": "gain",
                 "address": "/ch/3/in/set/trim",

@@ -29,6 +29,7 @@ def _valid_summary() -> dict:
         "operator_confirmed_channels": [3],
         "value_types": ["fader", "gain"],
         "require_physical_readback": True,
+        "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -45,6 +46,7 @@ def _valid_summary() -> dict:
         "readbacks": [
             {
                 "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:fader",
                 "status": "verified_from_physical_readback",
                 "source": "physical_readback",
                 "channel": 3,
@@ -54,6 +56,7 @@ def _valid_summary() -> dict:
             },
             {
                 "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:gain",
                 "status": "verified_from_physical_readback",
                 "source": "physical_readback",
                 "channel": 3,
@@ -91,6 +94,7 @@ def _valid_events(summary: dict) -> list[dict]:
                 "send",
                 {
                     "type": "query_mixer_parameter",
+                    "request_id": row["request_id"],
                     "channel": row["channel"],
                     "value_type": row["value_type"],
                     "address": row["address"],
@@ -403,6 +407,25 @@ def test_file_preflight_artifact_rejects_query_readback_identity_mismatch(tmp_pa
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert evidence["summary"]["invalid_candidate_count"] == 1
     assert "event_log_readbacks_mismatch" in evidence["summary"]["violations"]
+    assert "event_log_query_readback_identity_mismatch:0" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_rejects_query_readback_request_id_mismatch(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events[5]["payload"] = {
+        **events[5]["payload"],
+        "request_id": "stale:ch3:fader",
+    }
+    _write_file_artifact(tmp_path / "preflight" / "request-id-mismatch", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_readbacks_mismatch" in evidence["summary"]["violations"]
+    assert "event_log_query_readback_request_id_mismatch:0" in evidence["summary"]["violations"]
     assert "event_log_query_readback_identity_mismatch:0" in evidence["summary"]["violations"]
 
 

@@ -91,6 +91,7 @@ The summary must show:
 - `proposal_request_sent: false`
 - `forbidden_request_types_sent: []`
 - `require_physical_readback: true`
+- `request_id_policy: required_for_every_query_mixer_parameter_response`
 - `physical_readback_count == readback_count`
 
 The event log must show only these request types:
@@ -101,7 +102,7 @@ The event log must show only these request types:
 
 The event log must also be strict `send`/`recv` pairs. The request order must
 be `get_operator_mode`, `get_state`, then `query_mixer_parameter` rows, and each
-query must match its readback by channel, value type, and address.
+query must match its readback by request id, channel, value type, and address.
 
 The offline review report must show:
 
@@ -203,6 +204,7 @@ Then update:
 - `events.jsonl` is missing or does not match `summary.json`;
 - `events.jsonl` is not strict `send`/`recv` pairs;
 - a `query_mixer_parameter` response does not match its request identity;
+- a `query_mixer_parameter` response omits or mismatches the request id;
 - the run contacts the wrong mixer;
 - the operator cannot confirm the selected channel;
 - `operator_confirmed_channels` is missing or does not exactly match

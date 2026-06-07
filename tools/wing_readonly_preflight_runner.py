@@ -80,6 +80,10 @@ def address_for(channel: int, value_type: str) -> str:
     raise ValueError(f"Unsupported value_type: {value_type}")
 
 
+def request_id_for(channel: int, value_type: str) -> str:
+    return f"wing-readonly-preflight:ch{channel}:{value_type}"
+
+
 def parse_csv_ints(value: str) -> tuple[int, ...]:
     items: list[int] = []
     for raw in str(value).split(","):
@@ -113,10 +117,18 @@ def readback_identity_matches(
     payload: Dict[str, Any],
 ) -> bool:
     return (
-        payload.get("channel") == request.get("channel")
+        payload.get("request_id") == request.get("request_id")
+        and payload.get("channel") == request.get("channel")
         and payload.get("value_type") == request.get("value_type")
         and payload.get("address") == request.get("address")
     )
+
+
+def response_request_id_matches(
+    request: Dict[str, Any],
+    payload: Dict[str, Any],
+) -> bool:
+    return payload.get("request_id") == request.get("request_id")
 
 
 class EventRecorder:
@@ -254,6 +266,7 @@ def build_read_requests(channels: tuple[int, ...], value_types: tuple[str, ...])
             requests.append(
                 {
                     "type": "query_mixer_parameter",
+                    "request_id": request_id_for(channel, value_type),
                     "channel": channel,
                     "value_type": value_type,
                     "address": address_for(channel, value_type),
@@ -300,6 +313,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
             {"type": "get_state"},
             *read_requests,
         ],
+        "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "expected_artifacts": [
             f"{artifact_root}/<run_id>/summary.json",
             f"{artifact_root}/<run_id>/events.jsonl",
@@ -324,6 +338,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
             "operator_channel_confirmation_mismatch",
             "physical_readback_missing",
             "readback_identity_mismatch",
+            "readback_request_id_mismatch",
             "forbidden_request_type_sent",
             "event_log_missing_or_invalid",
             "manual_review_decision_missing_or_invalid",
@@ -388,6 +403,7 @@ async def run(args: argparse.Namespace) -> int:
         "write_request_sent": False,
         "proposal_request_sent": False,
         "physical_preflight_requires_existing_backend_connection": True,
+        "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "forbidden_request_types": sorted(FORBIDDEN_REQUEST_TYPES),
         "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     }
@@ -443,6 +459,11 @@ async def run(args: argparse.Namespace) -> int:
                     timeout=args.timeout,
                 )
                 readbacks.append(payload)
+                if not response_request_id_matches(request, payload):
+                    blockers.append(
+                        "readback_request_id_mismatch:"
+                        f"ch{request['channel']}:{request['value_type']}"
+                    )
                 if payload.get("type") == "mixer_parameter_read_blocked":
                     blockers.append(f"{payload.get('reason')}:ch{request['channel']}:{request['value_type']}")
                     continue

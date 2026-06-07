@@ -167,6 +167,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
             {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
             {
                 "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:fader",
                 "status": "verified_from_physical_readback",
                 "source": "physical_readback",
                 "channel": 3,
@@ -176,6 +177,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
             },
             {
                 "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:gain",
                 "status": "verified_from_physical_readback",
                 "source": "physical_readback",
                 "channel": 3,
@@ -213,6 +215,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
     assert summary["connection_mode"] == "wing"
     assert summary["operator_channel_confirmation_required"] is True
     assert summary["operator_confirmed_channels"] == [3]
+    assert summary["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
     assert summary["read_only"] is True
     assert summary["live_write"] is False
     assert summary["write_request_sent"] is False
@@ -277,6 +280,7 @@ async def test_readonly_preflight_blocks_missing_physical_readback(
             {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
             {
                 "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:fader",
                 "status": "verified_from_cache",
                 "source": "mixer_state_cache",
                 "channel": 3,
@@ -321,6 +325,7 @@ async def test_readonly_preflight_blocks_readback_identity_mismatch(
             {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
             {
                 "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:fader",
                 "status": "verified_from_physical_readback",
                 "source": "physical_readback",
                 "channel": 4,
@@ -352,6 +357,51 @@ async def test_readonly_preflight_blocks_readback_identity_mismatch(
     assert summary["blockers"] == ["readback_identity_mismatch:ch3:fader"]
     assert summary["write_request_sent"] is False
     assert summary["proposal_request_sent"] is False
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_blocks_readback_request_id_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "stale:ch3:fader",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "fader",
+                "address": "/ch/3/fdr",
+                "value": -12.0,
+            },
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 4
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "wing_readonly_preflight_blocked"
+    assert summary["blockers"] == [
+        "readback_request_id_mismatch:ch3:fader",
+        "readback_identity_mismatch:ch3:fader",
+    ]
 
 
 @pytest.mark.asyncio
@@ -396,6 +446,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["live_authority_granted"] is False
     assert written["operator_required"] is True
     assert written["manual_review_required_before_readiness_update"] is True
+    assert written["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
     assert written["read_only"] is True
     assert written["live_write"] is False
     assert written["channels"] == [3]
@@ -406,7 +457,9 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
         "query_mixer_parameter",
         "query_mixer_parameter",
     ]
+    assert written["request_sequence"][2]["request_id"] == "wing-readonly-preflight:ch3:fader"
     assert written["request_sequence"][2]["address"] == "/ch/3/fdr"
+    assert written["request_sequence"][3]["request_id"] == "wing-readonly-preflight:ch3:gain"
     assert written["request_sequence"][3]["address"] == "/ch/3/in/set/trim"
     assert "set_gain" in written["forbidden_request_types"]
     assert written["post_run_review_commands"] == [
@@ -425,6 +478,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
         ),
     ]
     assert "physical_readback_missing" in written["fail_closed_conditions"]
+    assert "readback_request_id_mismatch" in written["fail_closed_conditions"]
     assert "manual_review_decision_missing_or_invalid" in written["fail_closed_conditions"]
     assert not list(tmp_path.glob("*/summary.json"))
 

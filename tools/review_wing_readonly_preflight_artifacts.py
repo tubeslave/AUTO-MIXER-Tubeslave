@@ -19,6 +19,7 @@ for path in (str(REPO_ROOT), str(BACKEND_ROOT)):
 
 from backend.wing_readonly_preflight_evidence import (  # noqa: E402
     DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS,
+    REQUEST_ID_POLICY,
     build_wing_readonly_preflight_evidence,
 )
 from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
@@ -211,6 +212,8 @@ def build_review_report(
         "full_autonomous_ready": False,
         "manual_review_required_before_readiness_update": True,
         "manual_review_decision_required": candidate_available,
+        "request_id_policy": REQUEST_ID_POLICY,
+        "request_id_correlation_required": True,
         "manual_review_checklist": manual_review_checklist(),
         "review_decision_template_available": candidate_available,
         "review_decision_template_required_fields": review_decision_template_required_fields(),
@@ -271,6 +274,8 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"- full_autonomous_ready: `{str(report['full_autonomous_ready']).lower()}`",
         f"- manual_review_required_before_readiness_update: `{str(report['manual_review_required_before_readiness_update']).lower()}`",
         f"- manual_review_decision_required: `{str(report['manual_review_decision_required']).lower()}`",
+        f"- request_id_policy: `{report['request_id_policy']}`",
+        f"- request_id_correlation_required: `{str(report['request_id_correlation_required']).lower()}`",
         f"- review_decision_template_available: `{str(report['review_decision_template_available']).lower()}`",
         f"- review_decision_template_status: `{report['review_decision_template_status']}`",
         "",

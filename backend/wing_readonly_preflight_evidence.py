@@ -74,6 +74,7 @@ MUTATION_EVIDENCE_FIELDS = {
     "operator_proposal",
     "write_policy",
 }
+REQUEST_ID_POLICY = "required_for_every_query_mixer_parameter_response"
 
 
 @dataclass(frozen=True)
@@ -188,6 +189,10 @@ def _event_payload(event: Mapping[str, Any]) -> Mapping[str, Any]:
     return _mapping(event.get("payload"))
 
 
+def _request_id_for(channel: int, value_type: str) -> str:
+    return f"wing-readonly-preflight:ch{channel}:{value_type}"
+
+
 def _summary_event_path(payload: Mapping[str, Any], summary_path: Path) -> Path | None:
     raw_path = payload.get("events_path")
     if not isinstance(raw_path, str) or not raw_path:
@@ -290,12 +295,22 @@ def _validate_event_log(
     if len(query_payloads) != len(event_readbacks):
         violations.append("event_log_query_readback_count_mismatch")
     for index, (query, readback) in enumerate(zip(query_payloads, event_readbacks)):
+        query_request_id = str(query.get("request_id") or "")
+        readback_request_id = str(readback.get("request_id") or "")
+        if not query_request_id:
+            violations.append(f"event_log_query_request_id_missing:{index}")
+        if not readback_request_id:
+            violations.append(f"event_log_readback_request_id_missing:{index}")
+        if query_request_id != readback_request_id:
+            violations.append(f"event_log_query_readback_request_id_mismatch:{index}")
         query_identity = (
+            query_request_id,
             _safe_int(query.get("channel")),
             str(query.get("value_type") or ""),
             str(query.get("address") or ""),
         )
         readback_identity = (
+            readback_request_id,
             _safe_int(readback.get("channel")),
             str(readback.get("value_type") or ""),
             str(readback.get("address") or ""),
@@ -330,6 +345,8 @@ def _readback_is_physical(payload: Mapping[str, Any]) -> bool:
 def _validate_readback_row(index: int, row: Mapping[str, Any], violations: list[str]) -> None:
     if not _readback_is_physical(row):
         violations.append(f"readback_{index}_not_physical")
+    if not str(row.get("request_id") or ""):
+        violations.append(f"readback_{index}_request_id_missing")
     value_type = str(row.get("value_type") or "")
     if value_type not in {"fader", "gain"}:
         violations.append(f"readback_{index}_unsupported_value_type")
@@ -347,6 +364,14 @@ def _readback_pairs(readbacks: Tuple[Mapping[str, Any], ...]) -> Tuple[Tuple[int
         (_safe_int(row.get("channel")), str(row.get("value_type") or ""))
         for row in readbacks
     )
+
+
+def _target_request_ids(channels: Tuple[int, ...], value_types: Tuple[str, ...]) -> Tuple[str, ...]:
+    return tuple(_request_id_for(channel, value_type) for channel in channels for value_type in value_types)
+
+
+def _readback_request_ids(readbacks: Tuple[Mapping[str, Any], ...]) -> Tuple[str, ...]:
+    return tuple(str(row.get("request_id") or "") for row in readbacks)
 
 
 def validate_wing_readonly_preflight_artifact(
@@ -367,6 +392,8 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("reason_not_passed")
     if payload.get("connection_mode") != "wing":
         violations.append("connection_mode_not_wing")
+    if payload.get("request_id_policy") != REQUEST_ID_POLICY:
+        violations.append("request_id_policy_missing_or_invalid")
     if payload.get("require_physical_readback") is not True:
         violations.append("require_physical_readback_not_true")
     channels = _int_tuple(payload.get("channels"))
@@ -419,6 +446,8 @@ def validate_wing_readonly_preflight_artifact(
         actual_pairs = _readback_pairs(readbacks)
         if actual_pairs != expected_pairs:
             violations.append("readback_targets_do_not_match_declared_channels_and_value_types")
+        if _readback_request_ids(readbacks) != _target_request_ids(channels, value_types):
+            violations.append("readback_request_ids_do_not_match_declared_targets")
 
     for field in sorted(MUTATION_EVIDENCE_FIELDS):
         if field in payload:

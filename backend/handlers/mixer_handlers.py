@@ -44,6 +44,7 @@ def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int]
 def _readonly_parameter_blocked_payload(data: dict, reason: str) -> dict[str, Any]:
     return {
         "type": "mixer_parameter_read_blocked",
+        "request_id": data.get("request_id"),
         "status": "blocked",
         "reason": reason,
         "request": {
@@ -175,6 +176,7 @@ def register_handlers(server):
         )
         await server.send_to_client(websocket, {
             "type": "mixer_parameter_value",
+            "request_id": data.get("request_id"),
             "status": result.get("status") or "readback_unavailable",
             "channel": channel,
             "value_type": value_type,

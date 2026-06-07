@@ -21,6 +21,7 @@ def _valid_summary() -> dict:
         "operator_confirmed_channels": [3],
         "value_types": ["fader", "gain"],
         "require_physical_readback": True,
+        "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -37,6 +38,7 @@ def _valid_summary() -> dict:
         "readbacks": [
             {
                 "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:fader",
                 "status": "verified_from_physical_readback",
                 "source": "physical_readback",
                 "channel": 3,
@@ -46,6 +48,7 @@ def _valid_summary() -> dict:
             },
             {
                 "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:gain",
                 "status": "verified_from_physical_readback",
                 "source": "physical_readback",
                 "channel": 3,
@@ -81,6 +84,7 @@ def _valid_events(summary: dict) -> list[dict]:
                 "send",
                 {
                     "type": "query_mixer_parameter",
+                    "request_id": row["request_id"],
                     "channel": row["channel"],
                     "value_type": row["value_type"],
                     "address": row["address"],
@@ -119,6 +123,8 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert report["full_autonomous_ready"] is False
     assert report["manual_review_required_before_readiness_update"] is True
     assert report["manual_review_decision_required"] is True
+    assert report["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
+    assert report["request_id_correlation_required"] is True
     assert report["review_decision_template_available"] is True
     assert report["review_decision_template_required_fields"] == [
         "review_id",
@@ -163,6 +169,8 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert "Manual Review Gate" in markdown
     assert "confirm_event_log_readonly_sequence" in markdown
     assert "manual_review_decision_required: `true`" in markdown
+    assert "request_id_policy: `required_for_every_query_mixer_parameter_response`" in markdown
+    assert "request_id_correlation_required: `true`" in markdown
     assert "review_decision_template_available: `true`" in markdown
     assert "Review Decision Template" in markdown
     assert "does not contact WING" in markdown

@@ -401,6 +401,7 @@ WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS = (
     "operator_channel_confirmation_mismatch",
     "physical_readback_missing",
     "readback_identity_mismatch",
+    "readback_request_id_mismatch",
     "forbidden_request_type_sent",
     "event_log_missing_or_invalid",
     "manual_review_decision_missing_or_invalid",
@@ -2954,6 +2955,7 @@ def _expected_wing_read_request(channel: int, value_type: str) -> dict[str, obje
     address = f"/ch/{channel}/fdr" if value_type == "fader" else f"/ch/{channel}/in/set/trim"
     return {
         "type": "query_mixer_parameter",
+        "request_id": f"wing-readonly-preflight:ch{channel}:{value_type}",
         "channel": channel,
         "value_type": value_type,
         "address": address,
@@ -3027,6 +3029,8 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_manual_review_boundary_not_true"
         )
+    if plan.get("request_id_policy") != "required_for_every_query_mixer_parameter_response":
+        violations.append("wing_readonly_preflight_plan_request_id_policy_missing")
 
     for key in (
         "read_only",
@@ -3127,6 +3131,7 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["request_count"] = len(request_sequence)
     detail["expected_request_count"] = len(expected_requests)
     detail["request_sequence_matches_expected"] = request_sequence == expected_requests
+    detail["request_id_policy"] = plan.get("request_id_policy")
     detail["read_only"] = plan.get("read_only")
     detail["live_write"] = plan.get("live_write")
     detail["contacts_backend"] = plan.get("contacts_backend")

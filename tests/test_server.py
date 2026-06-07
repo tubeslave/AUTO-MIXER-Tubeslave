@@ -1319,11 +1319,17 @@ class TestWingDeploymentWriteBoundary:
 
         await handlers["query_mixer_parameter"](
             websocket,
-            {"channel": 3, "value_type": "gain", "address": "/ch/3/in/set/trim"},
+            {
+                "request_id": "wing-readonly-preflight:ch3:gain",
+                "channel": 3,
+                "value_type": "gain",
+                "address": "/ch/3/in/set/trim",
+            },
         )
 
         payload = self._decode_last_message(websocket)
         assert payload["type"] == "mixer_parameter_value"
+        assert payload["request_id"] == "wing-readonly-preflight:ch3:gain"
         assert payload["status"] == "verified_from_physical_readback"
         assert payload["source"] == "physical_readback"
         assert payload["channel"] == 3
@@ -1344,11 +1350,15 @@ class TestWingDeploymentWriteBoundary:
 
         await handlers["query_mixer_parameter"](
             websocket,
-            {"address": "/main/1/fdr"},
+            {
+                "request_id": "wing-readonly-preflight:main:fader",
+                "address": "/main/1/fdr",
+            },
         )
 
         payload = self._decode_last_message(websocket)
         assert payload["type"] == "mixer_parameter_read_blocked"
+        assert payload["request_id"] == "wing-readonly-preflight:main:fader"
         assert payload["status"] == "blocked"
         assert payload["reason"] == "unsupported_address"
         server.mixer_client.query_parameter.assert_not_called()
