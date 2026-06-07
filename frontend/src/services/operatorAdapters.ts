@@ -794,6 +794,122 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     }]
     : [];
 
+  const projectGoalCapabilityMatrix = asRecord(data.project_goal_capability_matrix);
+  const projectGoalRows = asArray(projectGoalCapabilityMatrix.rows);
+  const projectGoalCapabilitySummary = asRecord(projectGoalCapabilityMatrix.summary);
+  const projectGoalCapabilityRows: ModuleStatusRecord[] = projectGoalRows.map(row => {
+    const status = str(row.status, 'unknown');
+    const canWriteLive = Boolean(row.currently_live_writable);
+    const goalArea = str(row.goal_area, 'unscoped');
+    const blocker = str(row.blocker, '').trim();
+    const methods = stringList(row.method_ids);
+    const supportPaths = stringList(row.support_paths);
+    const liveKinds = stringList(row.current_live_write_kinds);
+    const targetSurfaces = stringList(row.target_console_surfaces);
+    const statusCountTags = Object.entries(asRecord(projectGoalCapabilitySummary.status_counts))
+      .map(([statusName, statusCount]) => `status:${statusName}=${num(statusCount, 0)}`)
+      .sort();
+
+    return {
+      moduleId: `project_goal_capability:${str(row.id, 'unknown_capability')}`,
+      label: str(row.label, str(row.id, 'Unnamed capability')),
+      domain: 'project_goal_capability',
+      status,
+      entrypoint: methods[0] || str(row.goal_area, 'project_goal_capability_matrix'),
+      module: str(row.goal_area, 'project_goal_capability'),
+      uiSurface: 'Project goal capability matrix',
+      canWriteLive,
+      liveWriteKinds: liveKinds,
+      pipelineProfiles: [
+        `area:${goalArea}`,
+        `ceiling:${str(row.autonomy_mode_ceiling, 'unknown')}`,
+        `blockers:${blocker ? 1 : 0}`,
+        `target_surfaces:${targetSurfaces.length}`,
+        `support_paths:${supportPaths.length}`,
+        `methods:${methods.length}`,
+        `current_live_writable:${canWriteLive}`,
+        `goal_next_step:${str(row.next_step, '').slice(0, 64)}`,
+        ...statusCountTags.slice(0, 1),
+      ].filter(Boolean),
+      blockedReason: blocker
+        ? blocker
+        : `No explicit blocker currently recorded for ${str(row.label, 'this capability')}.`,
+      nextStep: str(row.next_step, str(projectGoalCapabilitySummary.next_global_step, 'Advance roadmap proof and safety checks.')),
+      tone: toneForModuleStatus(status, canWriteLive),
+    };
+  });
+  const projectGoalCapabilitySummaryRows: ModuleStatusRecord[] = Object.keys(projectGoalCapabilitySummary).length
+    ? [{
+      moduleId: 'project_goal_capability_summary',
+      label: 'Project goal capability matrix summary',
+      domain: 'project_goal_capability',
+      status: str(projectGoalCapabilityMatrix.status, 'available'),
+      entrypoint: 'project_goal_capability_matrix.summary',
+      module: `project_goal_capability_matrix.row_count:${Math.trunc(num(projectGoalCapabilitySummary.row_count, 0))}`,
+      uiSurface: 'Project goal capability matrix summary',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `row_count:${Math.trunc(num(projectGoalCapabilitySummary.row_count, 0))}`,
+        `missing_capability_count:${asArray(projectGoalCapabilitySummary.missing_capability_ids).length}`,
+        `blocked_live_count:${asArray(projectGoalCapabilitySummary.blocked_live_capability_ids).length}`,
+        `currently_live_writable_capability_count:${asArray(projectGoalCapabilitySummary.currently_live_writable_capability_ids).length}`,
+        `next_global_step:${str(projectGoalCapabilitySummary.next_global_step, '').slice(0, 96)}`,
+      ].filter(Boolean),
+      blockedReason: asArray(projectGoalCapabilitySummary.blocked_live_capability_ids).length > 0
+        ? `Blocked capabilities: ${asArray(projectGoalCapabilitySummary.blocked_live_capability_ids).slice(0, 8).join(', ')}`
+        : 'No blocked-live capabilities currently listed by capability-matrix summary.',
+      nextStep: str(projectGoalCapabilitySummary.next_global_step, 'Continue roadmap proof and safety work.'),
+      tone: asArray(projectGoalCapabilitySummary.blocked_live_capability_ids).length
+        ? 'red'
+        : asArray(projectGoalCapabilitySummary.missing_capability_ids).length
+          ? 'yellow'
+          : 'blue',
+    }]
+    : [];
+
+  const progressSnapshot = asRecord(data.project_goal_capability_progress_snapshot);
+  const progressSummary = asRecord(progressSnapshot.summary);
+  const progressRows = asArray(progressSnapshot.next_steps);
+  const progressSummaryRows: ModuleStatusRecord[] = Object.keys(progressSummary).length
+    ? [{
+      moduleId: 'project_goal_capability_progress_summary',
+      label: 'Project goal capability progress summary',
+      domain: 'project_goal_capability',
+      status: str(progressSnapshot.status, 'available'),
+      entrypoint: 'project_goal_capability_progress_snapshot.summary',
+      module: `project_goal_progress_snapshot.row_count:${Math.trunc(num(progressSummary.row_count, 0))}`,
+      uiSurface: 'Project goal capability progress',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `row_count:${Math.trunc(num(progressSummary.row_count, 0))}`,
+        `missing:${asArray(progressSummary.missing_capability_ids).length}`,
+        `blocked_live:${asArray(progressSummary.blocked_live_capability_ids).length}`,
+        `proposal_only:${asArray(progressSummary.proposal_only_capability_ids).length}`,
+        `current_supervised_candidates:${asArray(progressSummary.supervised_narrow_live_candidates).length}`,
+        `goal_areas_with_blockers:${asArray(progressSummary.goal_areas_with_blockers).join(',')}`,
+        `next_global_step:${str(progressSummary.next_global_step, '').slice(0, 96)}`,
+      ].filter(Boolean),
+      blockedReason: progressRows.length
+        ? `Next actions remain for ${progressRows.length} capability(s).`
+        : `Roadmap progress snapshot has no explicit next actions. ${str(progressSummary.next_global_step, 'Keep adding proof and safety evidence.')}`,
+      nextStep: asArray(progressRows).slice(0, 3).map(progressRow => {
+        const capabilityId = str(progressRow.capability_id, '');
+        if (!capabilityId) return '';
+        const area = str(progressRow.goal_area, 'unknown');
+        const target = str(progressRow.autonomy_mode_ceiling, 'unknown');
+        const summary = str(progressRow.next_step, 'Next step available in pipeline snapshot.');
+        return `${capabilityId} (${area}/${target}): ${summary}`;
+      }).filter(Boolean).join(' / ') || str(progressSummary.next_global_step, ''),
+      tone: asArray(progressSummary.blocked_live_capability_ids).length > 0
+        ? 'red'
+        : asArray(progressSummary.missing_capability_ids).length > 0
+          ? 'yellow'
+          : 'blue',
+    }]
+    : [];
+
   const proofEvidence = asRecord(data.supervised_proof_evidence);
   const proofSummary = asRecord(proofEvidence.summary);
   const proofEvidenceRows: ModuleStatusRecord[] = Object.keys(proofEvidence).length ? (() => {
@@ -2904,6 +3020,9 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     ...moduleRows,
     ...surfaceRows,
     ...coverageRows,
+    ...projectGoalCapabilityRows,
+    ...projectGoalCapabilitySummaryRows,
+    ...progressSummaryRows,
     ...modeGateRows,
     ...readinessRows,
     ...proofEvidenceRows,
