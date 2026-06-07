@@ -1822,6 +1822,20 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
     assert goal_matrix["type"] == "project_goal_capability_matrix"
     assert goal_matrix["safety"]["live_write"] is False
     assert goal_matrix["safety"]["live_widening_allowed"] is False
+    goal_progress = payload["project_goal_capability_progress_snapshot"]
+    assert goal_progress["type"] == "project_goal_capability_progress_snapshot"
+    assert goal_progress["summary"]["row_count"] == goal_matrix["summary"]["row_count"]
+    assert (
+        goal_progress["summary"]["missing_capability_ids"]
+        == goal_matrix["summary"]["missing_capability_ids"]
+    )
+    assert (
+        goal_progress["summary"]["currently_live_writable_capability_ids"]
+        == goal_matrix["summary"]["currently_live_writable_capability_ids"]
+    )
+    assert goal_progress["summary"]["goal_area_counts"]
+    assert goal_progress["summary"]["runtime_mode_ceiling_by_id"]
+    assert goal_progress["next_steps"]
     assert "mode_full_autonomous" in goal_matrix["summary"]["blocked_live_capability_ids"]
     assert "console_fader_control" in goal_matrix["summary"][
         "currently_live_writable_capability_ids"
