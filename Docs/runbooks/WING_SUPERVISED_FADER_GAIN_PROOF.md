@@ -40,6 +40,8 @@ Forbidden live writes:
 - The read-only artifact was manually reviewed.
 - The review decision ledger has exactly one accepted decision for the clean
   preflight candidate and no duplicate or conflicting decision records.
+- The next supervised proof plan lists the accepted read-only preflight
+  `summary.json` source id that anchors the physical proof.
 - `.ai/project-layer/wing_mvp_blockers.md` shows read-only preflight as reviewed
   or ready for supervised proof.
 - The operator explicitly approves the exact channel, value type, and delta.

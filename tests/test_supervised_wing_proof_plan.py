@@ -40,6 +40,10 @@ def accepted_review_decision_ledger() -> dict:
             "ledger_status": "operator_review_decision_records_available",
             "accepted_record_count": 1,
             "rejected_record_count": 0,
+            "accepted_source_ids": [
+                "artifacts/wing_readonly_preflight/run/summary.json"
+            ],
+            "rejected_source_ids": [],
             "invalid_record_count": 0,
             "unreviewed_candidate_count": 0,
             "manual_readiness_update_candidate_available": True,
@@ -190,6 +194,10 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
         == "operator_review_decision_records_available"
     )
     assert plan["summary"]["readonly_preflight_review_decision_accepted_record_count"] == 1
+    assert plan["summary"]["readonly_preflight_review_decision_accepted_source_ids"] == [
+        "artifacts/wing_readonly_preflight/run/summary.json"
+    ]
+    assert plan["summary"]["readonly_preflight_review_decision_rejected_source_ids"] == []
     assert plan["readonly_preflight_steps"] == []
 
     gain_step = plan["steps"][0]

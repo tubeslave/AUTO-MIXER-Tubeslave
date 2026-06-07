@@ -4800,6 +4800,10 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "ledger_status": "operator_review_decision_records_available",
                 "accepted_record_count": 1,
                 "rejected_record_count": 0,
+                "accepted_source_ids": [
+                    "artifacts/wing_readonly_preflight/run/summary.json"
+                ],
+                "rejected_source_ids": [],
                 "invalid_record_count": 0,
                 "unreviewed_candidate_count": 0,
                 "manual_readiness_update_candidate_available": True,
@@ -4845,6 +4849,10 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     "readiness_matrix_update_still_requires_separate_manual_action"
                 ],
                 "readonly_preflight_review_decision_accepted_record_count": 1,
+                "readonly_preflight_review_decision_accepted_source_ids": [
+                    "artifacts/wing_readonly_preflight/run/summary.json"
+                ],
+                "readonly_preflight_review_decision_rejected_source_ids": [],
                 "readonly_preflight_review_decision_invalid_record_count": 0,
                 "readonly_preflight_review_decision_unreviewed_candidate_count": 0,
                 "global_blockers": [
@@ -4958,6 +4966,23 @@ def test_no_wing_release_check_validates_next_wing_proof_plan_schema(tmp_path):
     assert result.detail["violations"] == []
 
 
+def test_no_wing_release_check_rejects_next_wing_plan_with_stale_review_source_ids(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["next_wing_proof_plan"]["summary"][
+        "readonly_preflight_review_decision_accepted_source_ids"
+    ] = ["artifacts/wing_readonly_preflight/stale/summary.json"]
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "failed"
+    assert (
+        "next_wing_proof_plan_review_decision_accepted_sources_mismatch"
+        in result.detail["violations"]
+    )
+
+
 def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_path):
     report_path = tmp_path / "supervised_proof_artifact_report.json"
     payload = valid_proof_report_with_gap_rollup()
@@ -4973,6 +4998,8 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
     decision["status"] = "operator_review_required"
     decision["summary"]["accepted_record_count"] = 0
     decision["summary"]["rejected_record_count"] = 0
+    decision["summary"]["accepted_source_ids"] = []
+    decision["summary"]["rejected_source_ids"] = []
     decision["summary"]["invalid_record_count"] = 0
     decision["summary"]["unreviewed_candidate_count"] = 0
     decision["summary"]["manual_readiness_update_candidate_available"] = False
@@ -4996,6 +5023,8 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
         "operator_must_capture_valid_readonly_preflight_candidate_first"
     ]
     plan["summary"]["readonly_preflight_review_decision_accepted_record_count"] = 0
+    plan["summary"]["readonly_preflight_review_decision_accepted_source_ids"] = []
+    plan["summary"]["readonly_preflight_review_decision_rejected_source_ids"] = []
     plan["summary"]["readonly_preflight_review_decision_invalid_record_count"] = 0
     plan["summary"]["readonly_preflight_review_decision_unreviewed_candidate_count"] = 0
     plan["summary"]["global_blockers"] = [
@@ -5054,6 +5083,8 @@ def test_no_wing_release_check_allows_next_wing_plan_waiting_on_review_decision(
     decision["status"] = "operator_review_required"
     decision["summary"]["accepted_record_count"] = 0
     decision["summary"]["rejected_record_count"] = 0
+    decision["summary"]["accepted_source_ids"] = []
+    decision["summary"]["rejected_source_ids"] = []
     decision["summary"]["invalid_record_count"] = 0
     decision["summary"]["unreviewed_candidate_count"] = 1
     decision["summary"]["manual_readiness_update_candidate_available"] = False
@@ -5071,6 +5102,8 @@ def test_no_wing_release_check_allows_next_wing_plan_waiting_on_review_decision(
         "operator_must_record_readonly_preflight_review_decision"
     ]
     plan["summary"]["readonly_preflight_review_decision_accepted_record_count"] = 0
+    plan["summary"]["readonly_preflight_review_decision_accepted_source_ids"] = []
+    plan["summary"]["readonly_preflight_review_decision_rejected_source_ids"] = []
     plan["summary"]["readonly_preflight_review_decision_invalid_record_count"] = 0
     plan["summary"]["readonly_preflight_review_decision_unreviewed_candidate_count"] = 1
     plan["summary"]["global_blockers"] = [
@@ -5125,6 +5158,7 @@ def test_no_wing_release_check_rejects_next_wing_steps_without_accepted_review_d
     decision = payload["wing_readonly_preflight_review_decision_ledger"]
     decision["status"] = "operator_review_required"
     decision["summary"]["accepted_record_count"] = 0
+    decision["summary"]["accepted_source_ids"] = []
     decision["summary"]["invalid_record_count"] = 0
     decision["summary"]["unreviewed_candidate_count"] = 1
     decision["summary"]["manual_readiness_update_candidate_available"] = False
@@ -5138,6 +5172,7 @@ def test_no_wing_release_check_rejects_next_wing_steps_without_accepted_review_d
         "operator_must_record_readonly_preflight_review_decision"
     ]
     plan["summary"]["readonly_preflight_review_decision_accepted_record_count"] = 0
+    plan["summary"]["readonly_preflight_review_decision_accepted_source_ids"] = []
     plan["summary"]["readonly_preflight_review_decision_invalid_record_count"] = 0
     plan["summary"]["readonly_preflight_review_decision_unreviewed_candidate_count"] = 1
     report_path.write_text(json.dumps(payload), encoding="utf-8")
@@ -9787,6 +9822,10 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
                 "readiness_matrix_update_still_requires_separate_manual_action"
             ],
             "readonly_preflight_review_decision_accepted_record_count": 1,
+            "readonly_preflight_review_decision_accepted_source_ids": [
+                "artifacts/wing_readonly_preflight/run/summary.json"
+            ],
+            "readonly_preflight_review_decision_rejected_source_ids": [],
             "readonly_preflight_review_decision_invalid_record_count": 0,
             "readonly_preflight_review_decision_invalid_record_ids": [],
             "readonly_preflight_review_decision_duplicate_source_ids": [],
@@ -9833,6 +9872,18 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     )
     assert (
         json_summary["next_wing_proof_plan"][
+            "readonly_preflight_review_decision_accepted_source_ids"
+        ]
+        == ["artifacts/wing_readonly_preflight/run/summary.json"]
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_review_decision_rejected_source_ids"
+        ]
+        == []
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
             "readonly_preflight_review_decision_invalid_record_ids"
         ]
         == []
@@ -9854,6 +9905,12 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     assert "readonly_preflight_candidate_available: `true`" in markdown_summary
     assert "readonly_preflight_step_count: `0`" in markdown_summary
     assert "readonly_preflight_review_decision_accepted: `true`" in markdown_summary
+    assert (
+        'readonly_preflight_review_decision_accepted_source_ids: '
+        '`["artifacts/wing_readonly_preflight/run/summary.json"]`'
+        in markdown_summary
+    )
+    assert "readonly_preflight_review_decision_rejected_source_ids: `[]`" in markdown_summary
     assert "readonly_preflight_review_decision_duplicate_source_ids: `[]`" in markdown_summary
 
 

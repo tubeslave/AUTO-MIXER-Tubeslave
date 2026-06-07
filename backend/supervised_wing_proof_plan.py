@@ -497,6 +497,12 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_review_decision_accepted_record_count": int(
                 review_summary.get("accepted_record_count") or 0
             ),
+            "readonly_preflight_review_decision_accepted_source_ids": _string_list(
+                review_summary.get("accepted_source_ids")
+            ),
+            "readonly_preflight_review_decision_rejected_source_ids": _string_list(
+                review_summary.get("rejected_source_ids")
+            ),
             "readonly_preflight_review_decision_invalid_record_count": int(
                 review_summary.get("invalid_record_count") or 0
             ),
