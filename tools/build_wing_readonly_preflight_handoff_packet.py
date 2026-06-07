@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from tools import no_wing_release_check
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_URL = "ws://localhost:8765"
@@ -36,37 +37,9 @@ FOCUSED_VALIDATION_COMMAND = [
     "tests/test_wing_readonly_preflight_review_decision_tool.py",
     "tests/test_no_wing_release_check.py",
 ]
-FORBIDDEN_LIVE_REQUEST_TYPES = [
-    "create_operator_proposal",
-    "apply_operator_proposal",
-    "rollback_last_manual_write",
-    "emergency_stop",
-    "set_operator_mode",
-    "set_fader",
-    "set_gain",
-    "set_trim",
-    "set_input_trim",
-    "set_channel_trim",
-    "set_preamp_trim",
-    "set_preamp_gain",
-    "set_eq",
-    "set_compressor",
-    "route_output",
-    "load_snap",
-    "save_snap",
-    "reset",
-    "mute",
-    "unmute",
-    "set_insert",
-    "set_fx_model",
-    "set_fx_on",
-    "set_fx_mix",
-    "set_fx_parameter",
-    "connect_wing",
-    "disconnect_wing",
-    "connect_mixer",
-    "disconnect_mixer",
-]
+FORBIDDEN_LIVE_REQUEST_TYPES = list(
+    no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
+)
 REQUIRED_REVIEW_CHECKLIST_IDS = [
     "confirm_artifact_paths",
     "confirm_operator_channel_scope",
