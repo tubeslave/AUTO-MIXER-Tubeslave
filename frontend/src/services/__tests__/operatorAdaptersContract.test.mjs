@@ -3485,6 +3485,7 @@ test('Settings Module Status inspector includes project goal capability summarie
   const source = await fs.readFile(path.join(srcRoot, 'views/SettingsView.tsx'), 'utf8');
 
   assert.match(source, /row\.domain === 'project_goal_capability'/);
+  assert.match(source, /label: 'Goal', predicate: row => row\.domain === 'project_goal_capability'/);
   assert.match(source, /label: 'Goal capabilities'/);
   assert.match(source, /label: 'Goal blockers'/);
   assert.match(source, /writeScope: string;/);

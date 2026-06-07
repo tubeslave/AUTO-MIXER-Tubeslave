@@ -242,6 +242,7 @@ function ModuleStatusTable({
           { label: 'All', predicate: () => true },
           { label: 'Live', predicate: row => row.canWriteLive },
           { label: 'Write Surface', predicate: row => row.domain === 'write_surface' },
+          { label: 'Goal', predicate: row => row.domain === 'project_goal_capability' },
           { label: 'Proof', predicate: row => row.domain === 'supervised_proof_evidence' || row.domain === 'autonomy_evidence_overlay' || row.domain === 'read_surface_contract' },
           { label: 'Review', predicate: row => row.status.includes('proposal') || !row.canWriteLive },
           { label: 'Blocked', predicate: row => row.status.includes('blocked') || row.status.includes('quarantined') || row.pipelineProfiles.includes('quarantine') }
