@@ -806,9 +806,6 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const supportPaths = stringList(row.support_paths);
     const liveKinds = stringList(row.current_live_write_kinds);
     const targetSurfaces = stringList(row.target_console_surfaces);
-    const statusCountTags = Object.entries(asRecord(projectGoalCapabilitySummary.status_counts))
-      .map(([statusName, statusCount]) => `status:${statusName}=${num(statusCount, 0)}`)
-      .sort();
 
     return {
       moduleId: `project_goal_capability:${str(row.id, 'unknown_capability')}`,
@@ -829,7 +826,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `methods:${methods.length}`,
         `current_live_writable:${canWriteLive}`,
         `goal_next_step:${str(row.next_step, '').slice(0, 64)}`,
-        ...statusCountTags.slice(0, 1),
+        `status:${status}=1`,
       ].filter(Boolean),
       blockedReason: blocker
         ? blocker

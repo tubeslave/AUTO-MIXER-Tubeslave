@@ -3425,7 +3425,7 @@ test('adaptModuleStatusRecords surfaces project goal capability matrix and progr
   assert.equal(capabilityRows[0].pipelineProfiles.includes('blockers:0'), true);
   assert.equal(capabilityRows[0].pipelineProfiles.includes('target_surfaces:1'), true);
   assert.equal(capabilityRows[0].pipelineProfiles.includes('methods:2'), true);
-  assert.equal(capabilityRows[0].pipelineProfiles.includes('status:blocked=1'), true);
+  assert.equal(capabilityRows[0].pipelineProfiles.includes('status:limited_available=1'), true);
 
   const eqRow = rows.find((row) => row.moduleId === 'project_goal_capability:cg_room_mic_eq');
   assert.equal(eqRow?.status, 'blocked');
