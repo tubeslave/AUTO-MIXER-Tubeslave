@@ -45,6 +45,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_PACKET_20260607.md` | Offline operator packet captures the exact read-only preflight, review, decision-review, and validation sequence without contacting WING. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated handoff packet as a read-only JSON operator gate. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_OFFLINE_PLAN_PREVIEW_20260607.md` | Offline plan-only preview exposes the exact WING read-only preflight request sequence before any backend/WING session opens. |
+| `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_PLAN_CONTEXT_GATE_20260607.md` | No-WING release checks require MVP blocker, manual review, fail-closed, review-command context, and a valid referenced plan for the offline preflight handoff. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_DECISION_GATED_PROOF_PLAN_20260607.md` | Next supervised fader/gain proof steps stay blocked until an accepted read-only preflight review decision exists. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_READINESS_BRIDGE_20260606.md` | Read-only preflight evidence overlay inside autonomy promotion readiness; manual review candidate only. |
 | `Docs/reports/AUTOMIXER_SUPERVISED_WING_PROOF_READONLY_PREFLIGHT_GATE_20260606.md` | Next supervised WING proof plan is blocked until clean read-only preflight evidence exists. |

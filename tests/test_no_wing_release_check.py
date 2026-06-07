@@ -645,6 +645,8 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "status": "ready_for_operator_review",
         "proof_artifact_schema": "wing_readonly_preflight.v1",
         "proof_runner": "wing_readonly_preflight_runner",
+        "selected_mvp_blocker": "WING read-only connection proof",
+        "selected_mvp_blocker_status": "tooling_ready_waits_real_wing",
         "url": "ws://localhost:8765",
         "artifact_root": "artifacts/wing_readonly_preflight",
         "channels": [3],
@@ -654,6 +656,8 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "require_physical_readback": True,
         "read_only": True,
         "live_write": False,
+        "operator_required": True,
+        "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
         "queries_console": False,
         "execution_allowed_by_plan": False,
@@ -696,6 +700,13 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
             "artifacts/wing_readonly_preflight/<run_id>/summary.json",
             "artifacts/wing_readonly_preflight/<run_id>/events.jsonl",
         ],
+        "post_run_review_commands": [
+            " ".join(release_check.wing_readonly_preflight_review_command()),
+            " ".join(release_check.wing_readonly_preflight_review_decision_command()),
+        ],
+        "fail_closed_conditions": list(
+            release_check.WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS
+        ),
         "next_step": (
             "Run without --plan-only only when the intended backend/WING "
             "session is ready."
@@ -2008,9 +2019,20 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
     assert result.detail["live_write"] is False
     assert result.detail["contacts_backend"] is False
     assert result.detail["queries_console"] is False
+    assert result.detail["operator_required"] is True
+    assert result.detail["manual_review_required_before_readiness_update"] is True
     assert result.detail["execution_allowed_by_plan"] is False
     assert result.detail["live_authority_granted"] is False
+    assert result.detail["selected_mvp_blocker"] == "WING read-only connection proof"
+    assert result.detail["selected_mvp_blocker_status"] == "tooling_ready_waits_real_wing"
     assert "set_gain" in result.detail["forbidden_request_types"]
+    assert result.detail["fail_closed_conditions"] == list(
+        release_check.WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS
+    )
+    assert result.detail["post_run_review_commands"] == [
+        " ".join(release_check.wing_readonly_preflight_review_command()),
+        " ".join(release_check.wing_readonly_preflight_review_decision_command()),
+    ]
     assert result.detail["violations"] == []
 
 
@@ -2030,6 +2052,9 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
     payload = valid_wing_readonly_preflight_plan_payload(plan_path)
     payload["contacts_backend"] = True
     payload["live_authority_granted"] = True
+    payload["manual_review_required_before_readiness_update"] = False
+    payload["fail_closed_conditions"] = ["backend_not_in_wing_mode"]
+    payload["post_run_review_commands"] = []
     payload["request_sequence"].append({"type": "set_gain", "channel": 3})
     plan_path.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -2042,6 +2067,17 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
     assert "wing_readonly_preflight_plan_live_authority_granted_not_false" in result.detail[
         "violations"
     ]
+    assert "wing_readonly_preflight_plan_manual_review_boundary_not_true" in result.detail[
+        "violations"
+    ]
+    assert (
+        "wing_readonly_preflight_plan_fail_closed_condition_physical_readback_missing_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_plan_post_run_review_commands_mismatch"
+        in result.detail["violations"]
+    )
     assert "wing_readonly_preflight_plan_request_sequence_mismatch" in result.detail[
         "violations"
     ]
@@ -2055,6 +2091,10 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
 ):
     plan_path = tmp_path / "wing_readonly_preflight_plan.json"
     packet_path = tmp_path / "wing_readonly_preflight_handoff_packet.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
     packet_path.write_text(
         json.dumps(valid_wing_readonly_preflight_handoff_packet_payload(plan_path)),
         encoding="utf-8",
@@ -2073,6 +2113,8 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["packet_path"] == str(packet_path)
     assert result.detail["expected_plan_output"] == str(plan_path)
     assert result.detail["packet_status"] == "operator_hardware_step_required"
+    assert result.detail["plan_artifact_status"] == "passed"
+    assert result.detail["plan_artifact_violations"] == []
     assert result.detail["read_only"] is True
     assert result.detail["live_write"] is False
     assert result.detail["mutates_console_state"] is False
@@ -2121,6 +2163,10 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
 ):
     plan_path = tmp_path / "wing_readonly_preflight_plan.json"
     packet_path = tmp_path / "unsafe-handoff.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
     payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
     payload["live_authority_granted"] = True
     payload["queries_console"] = True
@@ -2148,6 +2194,36 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     ]
     assert (
         "wing_readonly_preflight_handoff_packet_blocker_physical_console_readback_proof_missing"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_with_invalid_wing_preflight_plan(
+    tmp_path,
+):
+    plan_path = tmp_path / "invalid-wing-readonly-plan.json"
+    packet_path = tmp_path / "handoff-with-invalid-plan.json"
+    plan_payload = valid_wing_readonly_preflight_plan_payload(plan_path)
+    plan_payload["live_authority_granted"] = True
+    plan_path.write_text(json.dumps(plan_payload), encoding="utf-8")
+    packet_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_handoff_packet_payload(plan_path)),
+        encoding="utf-8",
+    )
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["plan_artifact_status"] == "failed"
+    assert (
+        "wing_readonly_preflight_plan_live_authority_granted_not_false"
+        in result.detail["plan_artifact_violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_plan_artifact_invalid"
         in result.detail["violations"]
     )
 
@@ -6809,9 +6885,22 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "live_write": False,
             "contacts_backend": False,
             "queries_console": False,
+            "operator_required": True,
+            "manual_review_required_before_readiness_update": True,
             "execution_allowed_by_plan": False,
             "live_authority_granted": False,
+            "selected_mvp_blocker": "WING read-only connection proof",
+            "selected_mvp_blocker_status": "tooling_ready_waits_real_wing",
             "forbidden_request_types": ["apply_operator_proposal", "set_gain"],
+            "fail_closed_conditions": [
+                "backend_not_in_wing_mode",
+                "operator_channel_confirmation_mismatch",
+                "physical_readback_missing",
+            ],
+            "post_run_review_commands": [
+                "python3 tools/review_wing_readonly_preflight_artifacts.py",
+                "python3 tools/review_wing_readonly_preflight_decisions.py",
+            ],
             "violations": [],
         },
     )
@@ -6828,9 +6917,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["live_write"] is False
     assert artifact["contacts_backend"] is False
     assert artifact["queries_console"] is False
+    assert artifact["operator_required"] is True
+    assert artifact["manual_review_required_before_readiness_update"] is True
     assert artifact["execution_allowed_by_plan"] is False
     assert artifact["live_authority_granted"] is False
     assert artifact["plan_status"] == "ready_for_operator_review"
+    assert artifact["selected_mvp_blocker"] == "WING read-only connection proof"
+    assert artifact["selected_mvp_blocker_status"] == "tooling_ready_waits_real_wing"
     assert artifact["channels"] == [3]
     assert artifact["operator_confirmed_channels"] == [3]
     assert artifact["value_types"] == ["fader", "gain"]
@@ -6838,9 +6931,22 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["expected_request_count"] == 4
     assert artifact["request_sequence_matches_expected"] is True
     assert artifact["forbidden_request_types"] == ["apply_operator_proposal", "set_gain"]
+    assert artifact["fail_closed_conditions"] == [
+        "backend_not_in_wing_mode",
+        "operator_channel_confirmation_mismatch",
+        "physical_readback_missing",
+    ]
+    assert artifact["post_run_review_commands"] == [
+        "python3 tools/review_wing_readonly_preflight_artifacts.py",
+        "python3 tools/review_wing_readonly_preflight_decisions.py",
+    ]
     assert artifact["violations"] == []
     assert "## WING Read-Only Preflight Plan Artifact" in markdown_summary
     assert "contacts_backend: `false`" in markdown_summary
+    assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
+    assert "WING read-only connection proof" in markdown_summary
+    assert "physical_readback_missing" in markdown_summary
+    assert "review_wing_readonly_preflight_decisions.py" in markdown_summary
     assert "request_sequence_matches_expected: `true`" in markdown_summary
     assert "set_gain" in markdown_summary
 
@@ -6859,6 +6965,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "expected_plan_output": "/tmp/wing_readonly_preflight_plan.json",
             "packet_type": "wing_readonly_preflight_handoff_packet",
             "packet_status": "operator_hardware_step_required",
+            "plan_artifact_status": "passed",
+            "plan_artifact_violations": [],
             "read_only": True,
             "live_write": False,
             "mutates_console_state": False,
@@ -6909,12 +7017,15 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["live_authority_granted"] is False
     assert artifact["full_autonomous_ready"] is False
     assert artifact["packet_status"] == "operator_hardware_step_required"
+    assert artifact["plan_artifact_status"] == "passed"
+    assert artifact["plan_artifact_violations"] == []
     assert artifact["preview_command_uses_plan_only"] is True
     assert artifact["capture_command_requires_physical_readback"] is True
     assert artifact["review_command_writes_decision_template"] is True
     assert artifact["operator_sequence_count"] == 8
     assert artifact["violations"] == []
     assert "## WING Read-Only Preflight Handoff Packet Artifact" in markdown_summary
+    assert "plan_artifact_status: `passed`" in markdown_summary
     assert "execution_allowed_by_packet: `false`" in markdown_summary
     assert "preview_command_uses_plan_only: `true`" in markdown_summary
     assert "capture_command_requires_physical_readback: `true`" in markdown_summary
