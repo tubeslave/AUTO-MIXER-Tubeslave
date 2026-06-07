@@ -1,6 +1,7 @@
 import { DataTable, Knob, Panel, StatusBadge } from '../components/prototype/AutomixerComponents';
 import type { OperatorViewData } from '../services/useOperatorBackend';
 import type { ModuleStatusRecord, TelemetryAlertsSnapshot, Tone, UiActions, UiState } from '../types';
+import { getModeDisplayLabel } from '../utils/prototypeTone';
 import { tableView, TechnicalChecklist } from './viewHelpers';
 
 const settingsSections = [
@@ -123,10 +124,10 @@ function modePolicyRows(ui: UiState, modules: ModuleStatusRecord[], writeScope: 
   const auto = modeGateRow(modules, 'auto');
   const supervisedWriteKinds = modeGateWriteKinds(supervised);
   return [
-    { label: 'Current mode', value: ui.mode, tone: ui.mode === 'Supervised' ? 'yellow' as const : ui.mode === 'Auto' ? 'red' as const : 'blue' as const },
+    { label: 'Current mode', value: getModeDisplayLabel(ui.mode), tone: ui.mode === 'Supervised' ? 'yellow' as const : ui.mode === 'Auto' ? 'red' as const : 'blue' as const },
     { label: 'Supervised gate', value: supervised ? readableStatus(supervised.status) : 'Unknown', tone: supervised?.tone ?? 'yellow' as const },
     { label: 'Supervised scope', value: supervisedWriteKinds.length ? supervisedWriteKinds.join(', ') : writeScope, tone: supervisedWriteKinds.length ? 'yellow' as const : 'red' as const },
-    { label: 'Full Auto', value: auto ? readableStatus(auto.status) : 'Unknown', tone: auto?.tone ?? 'red' as const }
+    { label: 'Full Autonomous Mixing', value: auto ? readableStatus(auto.status) : 'Unknown', tone: auto?.tone ?? 'red' as const }
   ];
 }
 

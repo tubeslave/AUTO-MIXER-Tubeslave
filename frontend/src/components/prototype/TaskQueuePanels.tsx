@@ -6,7 +6,7 @@ import {
   StatusBadge
 } from './AutomixerComponents';
 import { applyPlanForTask, ensembleEvidenceForTask, safetyEvidenceForTask } from '../../mock/automixerData';
-import { textClassForTone, toneForMode, toneForPriority, toneFromState } from '../../utils/prototypeTone';
+import { getModeDisplayLabel, textClassForTone, toneForMode, toneForPriority, toneFromState } from '../../utils/prototypeTone';
 import type {
   ApplyPlanStep,
   ChannelIntelligenceRecord,
@@ -95,7 +95,7 @@ export function TaskDetailsPanel({
       <h3 className="text-base font-bold">{task.title}</h3>
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
         <StatusBadge tone={toneFromState(task.status)}>{task.status}</StatusBadge>
-        <StatusBadge tone={toneForMode(ui.mode)}>{ui.mode}</StatusBadge>
+        <StatusBadge tone={toneForMode(ui.mode)}>{getModeDisplayLabel(ui.mode)}</StatusBadge>
         {task.reviewOnly && <StatusBadge tone="red">Review only</StatusBadge>}
         <span className="rounded-[4px] border border-line bg-row px-1.5 py-0.5 text-muted">{task.agent}</span>
         <span className="font-mono text-muted">{task.time}</span>
@@ -210,7 +210,7 @@ function OperatorDecisionPanel({ ui, policy }: { ui: UiState; policy: DecisionPo
     <Panel title="Operator Decision">
       <div className="space-y-2">
         {[
-          { label: 'Current mode', value: ui.mode, tone: toneForMode(ui.mode) },
+          { label: 'Current mode', value: getModeDisplayLabel(ui.mode), tone: toneForMode(ui.mode) },
           { label: 'Apply result', value: policy.apply, tone: toneForMode(ui.mode) },
           { label: 'Write path', value: ui.backend.applyPath, tone: ui.backend.canApplyToConsole ? 'yellow' as const : 'red' as const },
           { label: 'Backend', value: ui.backend.statusLabel, tone: ui.backend.statusTone }

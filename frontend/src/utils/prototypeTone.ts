@@ -21,6 +21,17 @@ export function toneForMode(mode: AutomixerMode): Tone {
   return 'blue';
 }
 
+export const modeDisplayLabel: Record<AutomixerMode, string> = {
+  Analyze: 'Analysis Mode',
+  Assist: 'Assisted Mixing',
+  Supervised: 'Supervised AutoMix',
+  Auto: 'Full Autonomous Mixing'
+};
+
+export function getModeDisplayLabel(mode: AutomixerMode): string {
+  return modeDisplayLabel[mode];
+}
+
 export function textClassForTone(tone?: Tone): string {
   if (tone === 'red') return 'text-danger';
   if (tone === 'yellow') return 'text-warn';

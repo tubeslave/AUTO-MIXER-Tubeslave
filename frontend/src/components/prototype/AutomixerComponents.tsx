@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Agent, AutomixerMode, Channel, DirectorRuntime, LogRecord, Metric, NavItem, RouteId, Tone, UiActions, UiState, ViewModel } from '../../types';
+import { getModeDisplayLabel } from '../../utils/prototypeTone';
 
 const toneClass: Record<Tone, string> = {
   green: 'text-online border-online/30 bg-online/10',
@@ -579,7 +580,7 @@ export function TopStatusBar({
     ...(!mockDataOnly ? [{ label: 'Session', value: 'Live Club', tone: 'blue' as Tone }] : []),
     { label: 'Status', value: statusLabel, tone: mockDataOnly ? 'green' : ui.backend.statusTone },
     { label: 'Data', value: mockDataOnly ? 'Mock fallback' : ui.backend.dataStateLabel, tone: mockDataOnly ? 'blue' : ui.backend.dataStateTone },
-    { label: 'Mode', value: mode, tone: policyForMode(mode).tone, interactive: true },
+    { label: 'Mode', value: getModeDisplayLabel(mode), tone: policyForMode(mode).tone, interactive: true },
     { label: 'Safe', value: safeValue, tone: mockDataOnly ? 'green' : (ui.backend.canApplyToConsole ? 'yellow' : 'green') },
     { label: 'Connected To', value: connectionLabel, tone: mockDataOnly ? 'green' : (ui.backend.connectionState === 'connected' ? 'green' : 'blue') }
   ];
@@ -603,10 +604,10 @@ export function TopStatusBar({
                   onChange={event => onModeChange(event.target.value as AutomixerMode)}
                   className={`rounded-[3px] border bg-[#0a1119] px-1.5 py-0.5 text-[9px] font-semibold uppercase outline-none ${toneClass[item.tone]}`}
                 >
-                  <option value="Analyze">Analyze</option>
-                  <option value="Assist">Assist</option>
-                  <option value="Supervised">Supervised</option>
-                  <option value="Auto">Auto</option>
+                  <option value="Analyze">Analysis Mode</option>
+                  <option value="Assist">Assisted Mixing</option>
+                  <option value="Supervised">Supervised AutoMix</option>
+                  <option value="Auto">Full Autonomous Mixing</option>
                 </select>
               ) : (
                 <StatusBadge tone={item.tone}>{item.value}</StatusBadge>
@@ -681,7 +682,7 @@ export function BottomTransportBar({ ui, actions, dashboardMode = false }: { ui:
       <div className="border-r border-line px-3">
         <div className="am-label">Automation</div>
         <div className="mt-1 flex min-w-0 items-center gap-2">
-          <StatusBadge tone={policy.tone}>{ui.mode}</StatusBadge>
+          <StatusBadge tone={policy.tone}>{getModeDisplayLabel(ui.mode)}</StatusBadge>
           <span className="truncate text-text">Ride On</span>
           <span className="text-muted">Writes <b className={ui.backend.canApplyToConsole ? 'text-warn' : 'text-danger'}>{writesLabel}</b></span>
         </div>
@@ -747,10 +748,10 @@ function CompactOperatorView({
           onChange={event => onModeChange(event.target.value as AutomixerMode)}
           className={`mt-3 w-full rounded-[5px] border bg-[#0a1119] px-2 py-2 text-[11px] font-semibold uppercase outline-none ${toneClass[policyForMode(mode).tone]}`}
         >
-          <option value="Analyze">Analyze</option>
-          <option value="Assist">Assist</option>
-          <option value="Supervised">Supervised</option>
-          <option value="Auto">Auto</option>
+          <option value="Analyze">Analysis Mode</option>
+          <option value="Assist">Assisted Mixing</option>
+          <option value="Supervised">Supervised AutoMix</option>
+          <option value="Auto">Full Autonomous Mixing</option>
         </select>
       </header>
       <main className="am-scrollbar flex-1 space-y-2 overflow-auto p-3">
@@ -807,7 +808,7 @@ function ModePolicyTray({ mode }: { mode: AutomixerMode }) {
   const policy = policyForMode(mode);
 
   return (
-    <Panel title="Mode Guard" className="shrink-0" action={<StatusBadge tone={policy.tone}>{mode}</StatusBadge>}>
+    <Panel title="Mode Guard" className="shrink-0" action={<StatusBadge tone={policy.tone}>{getModeDisplayLabel(mode)}</StatusBadge>}>
       <div className="text-[12px] font-bold text-text">{policy.title}</div>
       <div className="mt-2 grid grid-cols-3 gap-1 text-[9px]">
         <div className="rounded-[5px] border border-line bg-row px-1.5 py-1">
