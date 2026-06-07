@@ -650,6 +650,34 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
   const readinessSummary = asRecord(readiness.summary);
   const gapSummary = asRecord(readinessSummary.promotion_gap_summary);
   const modeGate = asRecord(data.autonomy_mode_transition_gate);
+  const autonomyPromotionFullAutonomousReady = Boolean(readinessSummary.autonomy_promotion_full_autonomous_ready);
+  const autonomyModeTransitionFullAutonomousReady = Boolean(readinessSummary.autonomy_mode_transition_full_autonomous_ready);
+  const autonomyPromotionSupervisedLiveAllowedTargetCount = Math.trunc(
+    num(readinessSummary.autonomy_promotion_supervised_live_allowed_target_count, 0),
+  );
+  const autonomyPromotionBlockedTargetCount = Math.trunc(
+    num(readinessSummary.autonomy_promotion_blocked_target_count, 0),
+  );
+  const autonomyModeTransitionGateModeCount = Math.trunc(num(readinessSummary.autonomy_mode_transition_gate_mode_count, 0));
+  const autonomyModeTransitionGateBlockedModeCount = Math.trunc(
+    num(readinessSummary.autonomy_mode_transition_gate_blocked_mode_count, 0),
+  );
+  const autonomyModeTransitionGateBlockedModes = stringList(readinessSummary.autonomy_mode_transition_gate_blocked_modes);
+  const autonomyModeTransitionGateLiveApplyAllowedModes = stringList(readinessSummary.autonomy_mode_transition_gate_live_apply_allowed_modes);
+  const autonomyModeTransitionGateSupervisedCurrentLiveWriteKinds = stringList(
+    readinessSummary.autonomy_mode_transition_gate_supervised_current_live_write_kinds,
+  );
+  const hasAutonomyReadinessSummarySignals = (
+    autonomyPromotionFullAutonomousReady
+    || autonomyModeTransitionFullAutonomousReady
+    || autonomyPromotionSupervisedLiveAllowedTargetCount > 0
+    || autonomyPromotionBlockedTargetCount > 0
+    || autonomyModeTransitionGateModeCount > 0
+    || autonomyModeTransitionGateBlockedModeCount > 0
+    || autonomyModeTransitionGateBlockedModes.length > 0
+    || autonomyModeTransitionGateLiveApplyAllowedModes.length > 0
+    || autonomyModeTransitionGateSupervisedCurrentLiveWriteKinds.length > 0
+  );
   const modeGateRows = asArray(modeGate.rows).map(row => {
     const mode = str(row.mode, 'unknown_mode');
     const status = str(row.status, 'unknown');
@@ -729,6 +757,42 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       tone: toneForModuleStatus(status, false)
     };
   });
+
+  const readinessSummaryRows = hasAutonomyReadinessSummarySignals
+    ? [{
+      moduleId: 'autonomy_promotion_summary',
+      label: 'Autonomy readiness summary',
+      domain: 'autonomy_promotion_summary',
+      status: autonomyPromotionFullAutonomousReady && autonomyModeTransitionFullAutonomousReady
+        ? 'available'
+        : 'blocked',
+      entrypoint: 'main_pipeline_preview.summary',
+      module: 'main_pipeline_preview.summary',
+      uiSurface: 'Autonomy readiness summary',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `promotion_full_autonomous_ready:${autonomyPromotionFullAutonomousReady}`,
+        `mode_transition_full_autonomous_ready:${autonomyModeTransitionFullAutonomousReady}`,
+        `promotion_supervised_live_allowed_target_count:${autonomyPromotionSupervisedLiveAllowedTargetCount}`,
+        `promotion_blocked_target_count:${autonomyPromotionBlockedTargetCount}`,
+        `mode_transition_gate_mode_count:${autonomyModeTransitionGateModeCount}`,
+        `mode_transition_gate_blocked_mode_count:${autonomyModeTransitionGateBlockedModeCount}`,
+        ...autonomyModeTransitionGateBlockedModes.map(mode => `mode_transition_gate_blocked_mode:${mode}`),
+        ...autonomyModeTransitionGateLiveApplyAllowedModes.map(mode => `mode_transition_gate_live_apply_mode:${mode}`),
+        ...autonomyModeTransitionGateSupervisedCurrentLiveWriteKinds.map(kind => `supervised_current_live_write_kind:${kind}`),
+      ],
+      blockedReason: autonomyPromotionFullAutonomousReady && autonomyModeTransitionFullAutonomousReady
+        ? 'No outstanding autonomy readiness blockers.'
+        : `Mode transition full autonomous ready: ${autonomyModeTransitionFullAutonomousReady}; Promotion full autonomous ready: ${autonomyPromotionFullAutonomousReady}`,
+      nextStep: [
+        `supervised_live_allowed_target_count:${autonomyPromotionSupervisedLiveAllowedTargetCount}`,
+        `blocked_target_count:${autonomyPromotionBlockedTargetCount}`,
+        ...autonomyModeTransitionGateBlockedModes.map(mode => `blocked_transition_mode:${mode}`),
+      ].join(' / '),
+      tone: autonomyPromotionFullAutonomousReady && autonomyModeTransitionFullAutonomousReady ? 'green' : 'red'
+    }]
+    : [];
 
   const proofEvidence = asRecord(data.supervised_proof_evidence);
   const proofSummary = asRecord(proofEvidence.summary);
@@ -2845,7 +2909,8 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     ...proofEvidenceRows,
     ...readSurfaceRemediationRows,
     ...overlayRows,
-    ...gapRows
+    ...gapRows,
+    ...readinessSummaryRows
   ];
 }
 

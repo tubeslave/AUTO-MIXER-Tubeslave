@@ -384,6 +384,15 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     },
     autonomy_promotion_readiness: {
       summary: {
+        autonomy_promotion_full_autonomous_ready: false,
+        autonomy_mode_transition_full_autonomous_ready: true,
+        autonomy_promotion_supervised_live_allowed_target_count: 2,
+        autonomy_promotion_blocked_target_count: 4,
+        autonomy_mode_transition_gate_mode_count: 3,
+        autonomy_mode_transition_gate_blocked_mode_count: 1,
+        autonomy_mode_transition_gate_blocked_modes: ['analyze'],
+        autonomy_mode_transition_gate_live_apply_allowed_modes: ['supervised'],
+        autonomy_mode_transition_gate_supervised_current_live_write_kinds: ['fader'],
         promotion_gap_summary: {
           read_only: true,
           live_write: false,
@@ -1480,6 +1489,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
       'promotion_gap:read_surface',
       'promotion_gap:write_surface',
       'promotion_gap:evidence_requirement',
+      'autonomy_promotion_summary',
     ],
   );
 
@@ -1539,6 +1549,34 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.equal(scenePresetReadiness.tone, 'red');
   assert.match(scenePresetReadiness.blockedReason, /safety_status_blocked/);
   assert.match(scenePresetReadiness.nextStep, /read_only_scoped_diff_evidence/);
+
+  const autonomySummary = rows.find(row => row.moduleId === 'autonomy_promotion_summary');
+  assert.equal(autonomySummary.domain, 'autonomy_promotion_summary');
+  assert.equal(autonomySummary.canWriteLive, false);
+  assert.deepEqual(autonomySummary.liveWriteKinds, []);
+  assert.equal(autonomySummary.status, 'blocked');
+  assert.equal(autonomySummary.entrypoint, 'main_pipeline_preview.summary');
+  assert.equal(autonomySummary.module, 'main_pipeline_preview.summary');
+  assert.equal(autonomySummary.tone, 'red');
+  assert.deepEqual(autonomySummary.pipelineProfiles, [
+    'promotion_full_autonomous_ready:false',
+    'mode_transition_full_autonomous_ready:true',
+    'promotion_supervised_live_allowed_target_count:2',
+    'promotion_blocked_target_count:4',
+    'mode_transition_gate_mode_count:3',
+    'mode_transition_gate_blocked_mode_count:1',
+    'mode_transition_gate_blocked_mode:analyze',
+    'mode_transition_gate_live_apply_mode:supervised',
+    'supervised_current_live_write_kind:fader',
+  ]);
+  assert.equal(
+    autonomySummary.blockedReason,
+    'Mode transition full autonomous ready: true; Promotion full autonomous ready: false',
+  );
+  assert.equal(
+    autonomySummary.nextStep,
+    'supervised_live_allowed_target_count:2 / blocked_target_count:4 / blocked_transition_mode:analyze',
+  );
 
   const proofEvidence = rows.find(row => row.moduleId === 'supervised_proof_evidence');
   assert.equal(proofEvidence.domain, 'supervised_proof_evidence');
