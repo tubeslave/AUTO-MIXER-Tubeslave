@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 from pathlib import Path
 
@@ -116,9 +117,20 @@ def _write_file_artifact(artifact_dir: Path, summary: dict | None = None, events
     artifact_dir.mkdir(parents=True)
     artifact_path = artifact_dir / "summary.json"
     events_path = artifact_dir / "events.jsonl"
+    plan_path = artifact_dir / "expected_plan.json"
+    plan_bytes = json.dumps(
+        {
+            "type": "wing_readonly_preflight_offline_plan",
+            "status": "ready_for_operator_review",
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+    plan_path.write_bytes(plan_bytes)
     payload = copy.deepcopy(summary or _valid_summary())
     payload["events_path"] = str(events_path)
     payload["summary_path"] = str(artifact_path)
+    payload["expected_plan_path"] = str(plan_path)
+    payload["expected_plan_sha256"] = hashlib.sha256(plan_bytes).hexdigest()
     artifact_path.write_text(json.dumps(payload), encoding="utf-8")
     event_rows = events if events is not None else _valid_events(payload)
     events_path.write_text(
@@ -351,6 +363,42 @@ def test_file_preflight_artifact_requires_matching_event_log(tmp_path):
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert evidence["summary"]["invalid_candidate_count"] == 1
     assert "event_log_missing" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_requires_existing_expected_plan_file(tmp_path):
+    artifact_dir = tmp_path / "preflight" / "missing-plan"
+    artifact_dir.mkdir(parents=True)
+    artifact_path = artifact_dir / "summary.json"
+    events_path = artifact_dir / "events.jsonl"
+    summary = _valid_summary()
+    summary["summary_path"] = str(artifact_path)
+    summary["events_path"] = str(events_path)
+    summary["expected_plan_path"] = str(artifact_dir / "missing_plan.json")
+    artifact_path.write_text(json.dumps(summary), encoding="utf-8")
+    events_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in _valid_events(summary)),
+        encoding="utf-8",
+    )
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert "expected_plan_file_missing" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_requires_matching_expected_plan_sha(tmp_path):
+    artifact_dir = tmp_path / "preflight" / "tampered-plan"
+    _write_file_artifact(artifact_dir)
+    summary_path = artifact_dir / "summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    Path(summary["expected_plan_path"]).write_text("tampered", encoding="utf-8")
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert "expected_plan_sha256_mismatch" in evidence["summary"]["violations"]
 
 
 def test_file_preflight_artifact_rejects_tampered_event_log_send_types(tmp_path):

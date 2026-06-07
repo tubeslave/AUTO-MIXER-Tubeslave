@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -107,8 +108,19 @@ def _write_artifact(run_dir: Path, *, tamper_events: bool = False) -> Path:
     summary = _valid_summary()
     summary_path = run_dir / "summary.json"
     events_path = run_dir / "events.jsonl"
+    plan_path = run_dir / "expected_plan.json"
+    plan_bytes = json.dumps(
+        {
+            "type": "wing_readonly_preflight_offline_plan",
+            "status": "ready_for_operator_review",
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+    plan_path.write_bytes(plan_bytes)
     summary["summary_path"] = str(summary_path)
     summary["events_path"] = str(events_path)
+    summary["expected_plan_path"] = str(plan_path)
+    summary["expected_plan_sha256"] = hashlib.sha256(plan_bytes).hexdigest()
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     events = _valid_events(summary)
     if tamper_events:

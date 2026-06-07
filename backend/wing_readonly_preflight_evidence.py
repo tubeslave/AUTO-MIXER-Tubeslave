@@ -7,6 +7,7 @@ turns a preflight artifact into supervised apply permission.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -204,6 +205,52 @@ def _summary_event_path(payload: Mapping[str, Any], summary_path: Path) -> Path 
     if cwd_candidate.exists():
         return cwd_candidate
     return summary_path.parent / event_path
+
+
+def _summary_expected_plan_path(
+    payload: Mapping[str, Any],
+    summary_path: Path,
+) -> Path | None:
+    raw_path = payload.get("expected_plan_path")
+    if not isinstance(raw_path, str) or not raw_path:
+        return None
+    plan_path = Path(raw_path)
+    if plan_path.is_absolute():
+        return plan_path
+    cwd_candidate = Path.cwd() / plan_path
+    if cwd_candidate.exists():
+        return cwd_candidate
+    return summary_path.parent / plan_path
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _validate_expected_plan_file(
+    payload: Mapping[str, Any],
+    summary_path: Path,
+    violations: list[str],
+) -> None:
+    plan_path = _summary_expected_plan_path(payload, summary_path)
+    if plan_path is None:
+        violations.append("expected_plan_file_path_missing")
+        return
+    if not plan_path.exists():
+        violations.append("expected_plan_file_missing")
+        return
+    expected_sha = str(payload.get("expected_plan_sha256") or "")
+    try:
+        actual_sha = _sha256_file(plan_path)
+    except Exception as exc:
+        violations.append(f"expected_plan_file_hash_error:{type(exc).__name__}")
+        return
+    if actual_sha != expected_sha:
+        violations.append("expected_plan_sha256_mismatch")
 
 
 def _validate_event_log(
@@ -469,6 +516,7 @@ def validate_wing_readonly_preflight_artifact(
             violations.append(f"mutation_evidence_field_present:{field}")
 
     if summary_path is not None:
+        _validate_expected_plan_file(payload, summary_path, violations)
         _validate_event_log(payload, summary_path, violations)
 
     accepted = not violations

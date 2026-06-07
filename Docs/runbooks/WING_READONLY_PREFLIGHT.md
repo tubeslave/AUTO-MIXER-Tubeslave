@@ -101,7 +101,8 @@ The summary must show:
 - `expected_plan_path: artifacts/wing_readonly_preflight_plan/latest_plan.json`
 - `expected_plan_match: true`
 - `expected_plan_violations: []`
-- `expected_plan_sha256` is non-empty
+- `expected_plan_sha256` is non-empty and matches the referenced offline plan
+  file during artifact review
 - `physical_readback_count == readback_count`
 
 The event log must show only these request types:
@@ -217,6 +218,8 @@ Then update:
 - a `query_mixer_parameter` response does not match its request identity;
 - a `query_mixer_parameter` response omits or mismatches the request id;
 - the real run omits the expected offline plan or does not match it;
+- the referenced offline plan file is missing or its SHA256 does not match
+  `expected_plan_sha256`;
 - the summary does not prove the run required an already-connected
   backend/WING session;
 - the run contacts the wrong mixer;
