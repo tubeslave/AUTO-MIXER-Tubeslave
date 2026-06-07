@@ -18,7 +18,11 @@ for path in (str(REPO_ROOT), str(BACKEND_ROOT)):
         sys.path.insert(0, path)
 
 from backend.read_surface_physical_readback_capture_plan import (  # noqa: E402
+    PHYSICAL_READBACK_CONTRACT_METHOD_BY_SURFACE,
     build_read_surface_physical_readback_capture_plan,
+)
+from backend.read_surface_remediation_plan import (  # noqa: E402
+    build_read_surface_remediation_plan,
 )
 
 
@@ -50,15 +54,78 @@ def _command_text(command: Sequence[str]) -> str:
     return " ".join(command)
 
 
+def _distinct(items: Sequence[str]) -> list[str]:
+    return list(dict.fromkeys(item for item in items if item))
+
+
+def _target_from_action(action: Mapping[str, Any]) -> dict[str, Any]:
+    surface_id = str(action.get("surface_id") or "")
+    contract_method_id = PHYSICAL_READBACK_CONTRACT_METHOD_BY_SURFACE.get(
+        surface_id, ""
+    )
+    missing_contracts = _string_list(action.get("missing_contracts"))
+    return {
+        "surface_id": surface_id,
+        "remediation_action_id": str(action.get("id") or f"remediate_{surface_id}"),
+        "target_console_surface": str(action.get("target_console_surface") or ""),
+        "read_mode": str(action.get("read_mode") or ""),
+        "requires_connection": bool(action.get("requires_connection")),
+        "contract_method_id": contract_method_id,
+        "required_artifact_contracts": _distinct(
+            ["physical_readback_fixture", contract_method_id] + missing_contracts
+        ),
+        "expected_artifacts": _string_list(action.get("expected_artifacts")),
+        "blockers_to_clear": _distinct(
+            _string_list(action.get("blockers"))
+            + _string_list(action.get("fixture_remaining_gaps"))
+            + missing_contracts
+        ),
+        "next_physical_readback_target": action.get("next_physical_readback_target")
+        is True,
+        "execution_allowed_by_target": False,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+    }
+
+
+def _remaining_capture_targets(
+    remediation_plan: Mapping[str, Any] | None,
+    physical_ids: Sequence[str],
+) -> list[dict[str, Any]]:
+    if remediation_plan is None:
+        return []
+    wanted = set(physical_ids)
+    actions = remediation_plan.get("actions")
+    if not isinstance(actions, list):
+        return []
+    return [
+        _target_from_action(action)
+        for action in actions
+        if isinstance(action, Mapping)
+        and action.get("physical_readback_gap") is True
+        and action.get("surface_id") in wanted
+    ]
+
+
 def build_capture_packet(
     *,
     capture_plan: Mapping[str, Any] | None = None,
+    remediation_plan: Mapping[str, Any] | None = None,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
+    use_default_plan = capture_plan is None
     plan = (
         capture_plan
         if capture_plan is not None
         else build_read_surface_physical_readback_capture_plan()
+    )
+    source_remediation_plan = (
+        remediation_plan
+        if remediation_plan is not None
+        else build_read_surface_remediation_plan()
+        if use_default_plan
+        else None
     )
     summary = _mapping(plan.get("summary"))
     safety = _mapping(plan.get("safety"))
@@ -67,6 +134,7 @@ def build_capture_packet(
     physical_ids = _string_list(summary.get("physical_fixture_missing_surface_ids"))
     next_surface_id = summary.get("next_physical_readback_surface_id")
     next_action_id = summary.get("next_physical_readback_action_id")
+    remaining_targets = _remaining_capture_targets(source_remediation_plan, physical_ids)
     packet_status = (
         "operator_capture_required"
         if next_surface_id
@@ -90,6 +158,8 @@ def build_capture_packet(
         "full_autonomous_ready": safety.get("full_autonomous_ready") is True,
         "physical_fixture_missing_surface_ids": physical_ids,
         "physical_gap_surface_count": len(physical_ids),
+        "remaining_capture_target_count": len(remaining_targets),
+        "remaining_capture_targets": remaining_targets,
         "next_physical_readback_surface_id": next_surface_id,
         "next_physical_readback_action_id": next_action_id,
         "target_action_consistency": summary.get("target_action_consistency") is True,
@@ -145,6 +215,7 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"- remediation_action_id: `{packet['next_physical_readback_action_id']}`",
         f"- capture_step_count: `{packet['capture_step_count']}`",
         f"- physical_gap_surface_count: `{packet['physical_gap_surface_count']}`",
+        f"- remaining_capture_target_count: `{packet['remaining_capture_target_count']}`",
         f"- target_action_consistency: `{_bool(packet['target_action_consistency'])}`",
         "- required_artifact_contracts: "
         f"`{json.dumps(packet['required_artifact_contracts'])}`",
@@ -173,6 +244,18 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         )
         for item in step.get("forbidden_actions") or []:
             lines.append(f"- {item}")
+    else:
+        lines.append("- none")
+    lines.extend(["", "## Remaining Capture Targets", ""])
+    targets = packet.get("remaining_capture_targets")
+    if isinstance(targets, list) and targets:
+        for target in targets:
+            row = _mapping(target)
+            lines.append(
+                "- "
+                f"{row.get('surface_id')} -> {row.get('remediation_action_id')} "
+                f"({row.get('contract_method_id')}, {row.get('read_mode')})"
+            )
     else:
         lines.append("- none")
     focused_validation = commands.get("focused_validation")

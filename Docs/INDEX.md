@@ -50,6 +50,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_SUPERVISED_WING_PROOF_READONLY_PREFLIGHT_GATE_20260606.md` | Next supervised WING proof plan is blocked until clean read-only preflight evidence exists. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PACKET_20260607.md` | Offline operator packet renders the next read-surface physical-readback capture target without querying or mutating a console. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_CAPTURE_PACKET_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated capture-packet JSON as a read-only operator gate. |
+| `Docs/reports/AUTOMIXER_READ_SURFACE_CAPTURE_PACKET_TARGET_MANIFEST_20260607.md` | Capture packets list every remaining physical-readback target while keeping the handoff non-executing. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_ARTIFACT_REVIEW_QUEUE_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated artifact-review queue JSON before acceptance-template generation. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_PHYSICAL_READBACK_ACCEPTANCE_TEMPLATE_20260607.md` | Offline operator template renders pending acceptance records for valid read-surface physical-readback candidates without closing fixtures or granting live authority. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_ACCEPTANCE_TEMPLATE_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated acceptance-template JSON as a read-only operator gate. |

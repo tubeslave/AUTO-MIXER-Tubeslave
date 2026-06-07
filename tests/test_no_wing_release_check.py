@@ -863,6 +863,59 @@ def valid_read_surface_capture_packet_payload() -> dict:
             "channel_identity_and_basic_controls",
         ],
         "physical_gap_surface_count": 2,
+        "remaining_capture_target_count": 2,
+        "remaining_capture_targets": [
+            {
+                "surface_id": "raw_mixer_state_cache",
+                "remediation_action_id": "remediate_raw_mixer_state_cache",
+                "target_console_surface": "all_cached_addresses",
+                "read_mode": "cached_state",
+                "requires_connection": True,
+                "contract_method_id": "raw_mixer_state_physical_readback_contract",
+                "required_artifact_contracts": [
+                    "physical_readback_fixture",
+                    "raw_mixer_state_physical_readback_contract",
+                ],
+                "expected_artifacts": [
+                    "Read DTO for all_cached_addresses with explicit coverage flags.",
+                    "Raw mixer-state physical readback artifact validated by raw_mixer_state_physical_readback_contract.",
+                ],
+                "blockers_to_clear": [
+                    "physical_readback_fixture_missing",
+                    "hardware_parity_unproven",
+                ],
+                "next_physical_readback_target": True,
+                "execution_allowed_by_target": False,
+                "live_write": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+            },
+            {
+                "surface_id": "channel_identity_and_basic_controls",
+                "remediation_action_id": "remediate_channel_identity_and_basic_controls",
+                "target_console_surface": "channels",
+                "read_mode": "product_snapshot",
+                "requires_connection": True,
+                "contract_method_id": "channel_basic_controls_physical_readback_contract",
+                "required_artifact_contracts": [
+                    "physical_readback_fixture",
+                    "channel_basic_controls_physical_readback_contract",
+                ],
+                "expected_artifacts": [
+                    "Read DTO for channels with explicit coverage flags.",
+                    "Channel identity/basic-control physical readback artifact validated by channel_basic_controls_physical_readback_contract.",
+                ],
+                "blockers_to_clear": [
+                    "physical_readback_fixture_missing",
+                    "hardware_parity_unproven",
+                ],
+                "next_physical_readback_target": False,
+                "execution_allowed_by_target": False,
+                "live_write": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+            },
+        ],
         "next_physical_readback_surface_id": "raw_mixer_state_cache",
         "next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
         "target_action_consistency": True,
@@ -1173,6 +1226,20 @@ def test_no_wing_release_check_validates_read_surface_capture_packet_artifact(
     assert result.detail["live_authority_granted"] is False
     assert result.detail["full_autonomous_ready"] is False
     assert result.detail["physical_gap_surface_count"] == 2
+    assert result.detail["remaining_capture_target_count"] == 2
+    assert result.detail["remaining_capture_target_surface_ids"] == [
+        "raw_mixer_state_cache",
+        "channel_identity_and_basic_controls",
+    ]
+    assert result.detail["remaining_capture_target_action_ids"] == [
+        "remediate_raw_mixer_state_cache",
+        "remediate_channel_identity_and_basic_controls",
+    ]
+    assert result.detail["remaining_capture_target_contract_ids"] == [
+        "raw_mixer_state_physical_readback_contract",
+        "channel_basic_controls_physical_readback_contract",
+    ]
+    assert result.detail["remaining_capture_target_forbidden_flags"] == []
     assert result.detail["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
     assert (
         result.detail["next_physical_readback_action_id"]
@@ -1217,6 +1284,7 @@ def test_no_wing_release_check_rejects_unsafe_read_surface_capture_packet_artifa
     payload["execution_allowed_by_packet"] = True
     payload["live_authority_granted"] = True
     payload["physical_gap_surface_count"] = 3
+    payload["remaining_capture_targets"][0]["queries_console"] = True
     payload["step"]["forbidden_actions"] = [
         "do not apply fader, gain, trim, pan, mute, EQ, dynamics, gate, routing, DCA, matrix, FX, scene, or preset changes",
     ]
@@ -1241,6 +1309,10 @@ def test_no_wing_release_check_rejects_unsafe_read_surface_capture_packet_artifa
     assert "read_surface_capture_packet_artifact_gap_count_mismatch" in result.detail[
         "violations"
     ]
+    assert (
+        "read_surface_capture_packet_artifact_target_0_queries_console_not_false"
+        in result.detail["violations"]
+    )
     assert (
         "read_surface_capture_packet_artifact_forbidden_action_missing:do not transmit osc"
         in result.detail["violations"]
@@ -5836,6 +5908,13 @@ def test_no_wing_release_check_summary_embeds_read_surface_capture_packet_artifa
             "full_autonomous_ready": False,
             "physical_fixture_missing_surface_ids": ["raw_mixer_state_cache"],
             "physical_gap_surface_count": 1,
+            "remaining_capture_target_count": 1,
+            "remaining_capture_target_surface_ids": ["raw_mixer_state_cache"],
+            "remaining_capture_target_action_ids": ["remediate_raw_mixer_state_cache"],
+            "remaining_capture_target_contract_ids": [
+                "raw_mixer_state_physical_readback_contract",
+            ],
+            "remaining_capture_target_forbidden_flags": [],
             "next_physical_readback_surface_id": "raw_mixer_state_cache",
             "next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
             "target_action_consistency": True,
@@ -5885,6 +5964,15 @@ def test_no_wing_release_check_summary_embeds_read_surface_capture_packet_artifa
     assert artifact["live_authority_granted"] is False
     assert artifact["full_autonomous_ready"] is False
     assert artifact["packet_status"] == "operator_capture_required"
+    assert artifact["remaining_capture_target_count"] == 1
+    assert artifact["remaining_capture_target_surface_ids"] == ["raw_mixer_state_cache"]
+    assert artifact["remaining_capture_target_action_ids"] == [
+        "remediate_raw_mixer_state_cache"
+    ]
+    assert artifact["remaining_capture_target_contract_ids"] == [
+        "raw_mixer_state_physical_readback_contract"
+    ]
+    assert artifact["remaining_capture_target_forbidden_flags"] == []
     assert artifact["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
     assert artifact["target_action_consistency"] is True
     assert "physical_readback_fixture" in artifact["required_artifact_contracts"]
@@ -5895,6 +5983,7 @@ def test_no_wing_release_check_summary_embeds_read_surface_capture_packet_artifa
         in markdown_summary
     )
     assert "execution_allowed_by_packet: `false`" in markdown_summary
+    assert "remaining_capture_target_surface_ids" in markdown_summary
     assert "all_cached_addresses" in markdown_summary
     assert "do not transmit OSC" in markdown_summary
 

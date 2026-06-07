@@ -20,6 +20,28 @@ def test_capture_packet_wraps_read_surface_capture_plan_without_live_authority()
     assert packet["live_widening_allowed"] is False
     assert packet["live_authority_granted"] is False
     assert packet["full_autonomous_ready"] is False
+    assert packet["physical_gap_surface_count"] == 10
+    assert packet["remaining_capture_target_count"] == 10
+    assert [target["surface_id"] for target in packet["remaining_capture_targets"]] == [
+        "raw_mixer_state_cache",
+        "channel_identity_and_basic_controls",
+        "channel_eq_dynamics_gate",
+        "bus_group_main_dca_state",
+        "matrix_state",
+        "fx_slots_and_inserts",
+        "routing_and_sends",
+        "snapshots_scenes",
+        "user_presets",
+        "dlive_state",
+    ]
+    first_target = packet["remaining_capture_targets"][0]
+    assert first_target["surface_id"] == "raw_mixer_state_cache"
+    assert first_target["remediation_action_id"] == "remediate_raw_mixer_state_cache"
+    assert first_target["contract_method_id"] == "raw_mixer_state_physical_readback_contract"
+    assert first_target["execution_allowed_by_target"] is False
+    assert first_target["live_write"] is False
+    assert first_target["mutates_console_state"] is False
+    assert first_target["queries_console"] is False
     assert packet["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
     assert packet["next_physical_readback_action_id"] == "remediate_raw_mixer_state_cache"
     assert packet["target_action_consistency"] is True
@@ -64,6 +86,8 @@ def test_capture_packet_reports_complete_plan_without_steps():
 
     assert packet["status"] == "read_surface_physical_readback_complete"
     assert packet["capture_step_count"] == 0
+    assert packet["remaining_capture_target_count"] == 0
+    assert packet["remaining_capture_targets"] == []
     assert packet["step"] == {}
     assert packet["live_authority_granted"] is False
 
@@ -77,6 +101,8 @@ def test_capture_packet_markdown_renders_boundary_target_and_forbidden_actions()
     assert "execution_allowed_by_packet: `false`" in markdown
     assert "raw_mixer_state_cache" in markdown
     assert "raw_mixer_state_physical_readback_contract" in markdown
+    assert "Remaining Capture Targets" in markdown
+    assert "channel_identity_and_basic_controls" in markdown
     assert "do not transmit OSC" in markdown
     assert "tests/test_read_surface_physical_readback_capture_plan.py" in markdown
 

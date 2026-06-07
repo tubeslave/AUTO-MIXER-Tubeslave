@@ -1901,6 +1901,11 @@ def validate_read_surface_physical_readback_capture_packet_artifact_snapshot(
     blocked_by = (
         packet.get("blocked_by") if isinstance(packet.get("blocked_by"), list) else []
     )
+    remaining_targets = (
+        packet.get("remaining_capture_targets")
+        if isinstance(packet.get("remaining_capture_targets"), list)
+        else []
+    )
     operator_sequence = (
         packet.get("operator_sequence")
         if isinstance(packet.get("operator_sequence"), list)
@@ -1967,10 +1972,85 @@ def validate_read_surface_physical_readback_capture_packet_artifact_snapshot(
     if not isinstance(capture_step_count, int):
         violations.append("read_surface_capture_packet_artifact_step_count_missing")
         capture_step_count = 0
+    remaining_target_count = packet.get("remaining_capture_target_count")
+    if (
+        not isinstance(remaining_target_count, int)
+        or remaining_target_count != len(remaining_targets)
+    ):
+        violations.append(
+            "read_surface_capture_packet_artifact_remaining_target_count_mismatch"
+        )
+        remaining_target_count = len(remaining_targets)
 
     next_surface_id = packet.get("next_physical_readback_surface_id")
     next_action_id = packet.get("next_physical_readback_action_id")
     capture_required = packet.get("status") == "operator_capture_required"
+    target_surface_ids: list[str] = []
+    target_action_ids: list[str] = []
+    target_contract_ids: list[str] = []
+    target_forbidden_flags: list[str] = []
+    for index, target in enumerate(remaining_targets):
+        if not isinstance(target, Mapping):
+            violations.append(
+                f"read_surface_capture_packet_artifact_target_{index}_not_object"
+            )
+            continue
+        surface_id = target.get("surface_id")
+        action_id = target.get("remediation_action_id")
+        contract_id = target.get("contract_method_id")
+        if not isinstance(surface_id, str) or not surface_id:
+            violations.append(
+                f"read_surface_capture_packet_artifact_target_{index}_surface_missing"
+            )
+        else:
+            target_surface_ids.append(surface_id)
+        if not isinstance(action_id, str) or not action_id:
+            violations.append(
+                f"read_surface_capture_packet_artifact_target_{index}_action_missing"
+            )
+        else:
+            target_action_ids.append(action_id)
+        if not isinstance(contract_id, str) or not contract_id:
+            violations.append(
+                f"read_surface_capture_packet_artifact_target_{index}_contract_missing"
+            )
+        else:
+            target_contract_ids.append(contract_id)
+        for key in ("target_console_surface", "read_mode"):
+            if not isinstance(target.get(key), str) or not target.get(key):
+                violations.append(
+                    f"read_surface_capture_packet_artifact_target_{index}_{key}_missing"
+                )
+        target_contracts = (
+            target.get("required_artifact_contracts")
+            if isinstance(target.get("required_artifact_contracts"), list)
+            else []
+        )
+        if "physical_readback_fixture" not in target_contracts:
+            violations.append(
+                "read_surface_capture_packet_artifact_target_"
+                f"{index}_physical_fixture_contract_missing"
+            )
+        if isinstance(contract_id, str) and contract_id and contract_id not in target_contracts:
+            violations.append(
+                f"read_surface_capture_packet_artifact_target_{index}_contract_not_required"
+            )
+        for key in (
+            "execution_allowed_by_target",
+            "live_write",
+            "mutates_console_state",
+            "queries_console",
+        ):
+            if target.get(key) is not False:
+                target_forbidden_flags.append(f"{index}:{key}")
+                violations.append(
+                    f"read_surface_capture_packet_artifact_target_{index}_{key}_not_false"
+                )
+        for key in ("expected_artifacts", "blockers_to_clear"):
+            if not isinstance(target.get(key), list) or not target.get(key):
+                violations.append(
+                    f"read_surface_capture_packet_artifact_target_{index}_{key}_missing"
+                )
     if capture_required:
         if not isinstance(next_surface_id, str) or not next_surface_id:
             violations.append("read_surface_capture_packet_artifact_next_surface_missing")
@@ -1981,6 +2061,24 @@ def validate_read_surface_physical_readback_capture_packet_artifact_snapshot(
         if packet.get("target_action_consistency") is not True:
             violations.append(
                 "read_surface_capture_packet_artifact_target_action_consistency_not_true"
+            )
+        if not remaining_targets:
+            violations.append("read_surface_capture_packet_artifact_targets_missing")
+        if target_surface_ids != physical_ids:
+            violations.append(
+                "read_surface_capture_packet_artifact_target_surface_sequence_mismatch"
+            )
+        if target_surface_ids and target_surface_ids[0] != next_surface_id:
+            violations.append(
+                "read_surface_capture_packet_artifact_first_target_surface_mismatch"
+            )
+        if target_action_ids and target_action_ids[0] != next_action_id:
+            violations.append(
+                "read_surface_capture_packet_artifact_first_target_action_mismatch"
+            )
+        if target_surface_ids and len(set(target_surface_ids)) != len(target_surface_ids):
+            violations.append(
+                "read_surface_capture_packet_artifact_duplicate_target_surface"
             )
         if capture_step_count < 1:
             violations.append("read_surface_capture_packet_artifact_step_count_too_low")
@@ -2027,6 +2125,8 @@ def validate_read_surface_physical_readback_capture_packet_artifact_snapshot(
             violations.append(
                 "read_surface_capture_packet_artifact_complete_target_consistency_not_false"
             )
+        if remaining_target_count != 0 or remaining_targets:
+            violations.append("read_surface_capture_packet_artifact_complete_targets_present")
 
     if len(operator_sequence) < 5:
         violations.append("read_surface_capture_packet_artifact_operator_sequence_short")
@@ -2072,6 +2172,11 @@ def validate_read_surface_physical_readback_capture_packet_artifact_snapshot(
     detail["full_autonomous_ready"] = packet.get("full_autonomous_ready")
     detail["physical_fixture_missing_surface_ids"] = list(physical_ids)
     detail["physical_gap_surface_count"] = physical_gap_surface_count
+    detail["remaining_capture_target_count"] = remaining_target_count
+    detail["remaining_capture_target_surface_ids"] = list(target_surface_ids)
+    detail["remaining_capture_target_action_ids"] = list(target_action_ids)
+    detail["remaining_capture_target_contract_ids"] = list(target_contract_ids)
+    detail["remaining_capture_target_forbidden_flags"] = list(target_forbidden_flags)
     detail["next_physical_readback_surface_id"] = next_surface_id
     detail["next_physical_readback_action_id"] = next_action_id
     detail["target_action_consistency"] = packet.get("target_action_consistency")
@@ -8597,6 +8702,10 @@ def read_surface_physical_readback_capture_packet_artifact_summary(
         physical_missing = detail.get("physical_fixture_missing_surface_ids")
         required_contracts = detail.get("required_artifact_contracts")
         blocked_by = detail.get("blocked_by")
+        target_surface_ids = detail.get("remaining_capture_target_surface_ids")
+        target_action_ids = detail.get("remaining_capture_target_action_ids")
+        target_contract_ids = detail.get("remaining_capture_target_contract_ids")
+        target_forbidden_flags = detail.get("remaining_capture_target_forbidden_flags")
         forbidden_actions = detail.get("step_forbidden_actions")
         focused_validation = detail.get("focused_validation")
         violations = detail.get("violations")
@@ -8622,6 +8731,27 @@ def read_surface_physical_readback_capture_packet_artifact_summary(
             ),
             "physical_fixture_missing_surface_ids": (
                 list(physical_missing) if isinstance(physical_missing, list) else []
+            ),
+            "remaining_capture_target_count": int(
+                detail.get("remaining_capture_target_count") or 0
+            ),
+            "remaining_capture_target_surface_ids": (
+                list(target_surface_ids)
+                if isinstance(target_surface_ids, list)
+                else []
+            ),
+            "remaining_capture_target_action_ids": (
+                list(target_action_ids) if isinstance(target_action_ids, list) else []
+            ),
+            "remaining_capture_target_contract_ids": (
+                list(target_contract_ids)
+                if isinstance(target_contract_ids, list)
+                else []
+            ),
+            "remaining_capture_target_forbidden_flags": (
+                list(target_forbidden_flags)
+                if isinstance(target_forbidden_flags, list)
+                else []
             ),
             "next_physical_readback_surface_id": detail.get(
                 "next_physical_readback_surface_id"
@@ -11690,6 +11820,16 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- physical_gap_surface_count: `{read_capture_packet_artifact['physical_gap_surface_count']}`",
                 "- physical_fixture_missing_surface_ids: "
                 f"`{json.dumps(read_capture_packet_artifact['physical_fixture_missing_surface_ids'])}`",
+                "- remaining_capture_target_count: "
+                f"`{read_capture_packet_artifact['remaining_capture_target_count']}`",
+                "- remaining_capture_target_surface_ids: "
+                f"`{json.dumps(read_capture_packet_artifact['remaining_capture_target_surface_ids'])}`",
+                "- remaining_capture_target_action_ids: "
+                f"`{json.dumps(read_capture_packet_artifact['remaining_capture_target_action_ids'])}`",
+                "- remaining_capture_target_contract_ids: "
+                f"`{json.dumps(read_capture_packet_artifact['remaining_capture_target_contract_ids'])}`",
+                "- remaining_capture_target_forbidden_flags: "
+                f"`{json.dumps(read_capture_packet_artifact['remaining_capture_target_forbidden_flags'])}`",
                 "- next_physical_readback_surface_id: "
                 f"`{read_capture_packet_artifact['next_physical_readback_surface_id']}`",
                 "- next_physical_readback_action_id: "
