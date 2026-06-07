@@ -19,8 +19,7 @@ import {
   DashboardView,
   TransportBar,
 } from './components/ControlCenterViews';
-import { toUiMode } from './services/operatorAdapters';
-import { getModeDisplayLabel } from './utils/prototypeTone';
+import { formatOperatorModeLabel } from './utils/prototypeTone';
 
 // Color map for routing roles
 const ROLE_COLORS = {
@@ -56,23 +55,6 @@ const NAV_ITEMS = [
 ];
 
 const CONTROL_CENTER_TABS = new Set(['dashboard', 'agentsConsole', 'channelList', 'connections']);
-
-function formatOperatorModeLabel(modeValue) {
-  const normalized = String(modeValue || '').trim().toLowerCase();
-  if (['analyze', 'analysis', 'analysis mode', 'analysis_mode', 'analysismode'].includes(normalized)) {
-    return getModeDisplayLabel('Analyze');
-  }
-  if (['assist', 'assisted', 'assisted mixing', 'assistedmixing', 'assist mode'].includes(normalized)) {
-    return getModeDisplayLabel('Assist');
-  }
-  if (['supervised', 'supervised automix', 'supervised automix mode', 'supervised mode'].includes(normalized)) {
-    return getModeDisplayLabel('Supervised');
-  }
-  if (['auto', 'autonomous', 'full autonomous', 'full autonomous mixing', 'full autonomous mixing mode', 'auto mode'].includes(normalized)) {
-    return getModeDisplayLabel('Auto');
-  }
-  return getModeDisplayLabel(toUiMode(normalized));
-}
 
 function App() {
   const [serverConnected, setServerConnected] = useState(false);
