@@ -357,6 +357,20 @@ def test_review_decision_ledger_rejects_invalid_candidate_forbidden_request_type
     assert "review_decision_candidate_missing" in ledger["records"][0]["violations"]
 
 
+def test_review_decision_ledger_rejects_records_without_artifact_source_id():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[_accepted_record(artifact_source_id="")],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["invalid_record_count"] == 1
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert ledger["records"][0]["valid"] is False
+    assert "review_decision_candidate_missing" in ledger["records"][0]["violations"]
+    assert "review_decision_artifact_source_missing" in ledger["records"][0]["violations"]
+
+
 def test_review_decision_ledger_is_transport_free():
     source = Path("backend/wing_readonly_preflight_review_decision.py").read_text(
         encoding="utf-8"
