@@ -339,6 +339,8 @@ async def test_readonly_preflight_blocks_when_backend_is_not_wing(
     summary = read_summary(tmp_path)
     assert summary["status"] == "blocked"
     assert summary["reason"] == "backend_not_in_wing_mode"
+    assert summary["fail_closed"] is True
+    assert summary["blockers"] == ["event_log_wing_mode_not_proven"]
     assert summary["connection_mode"] == "offline"
     assert summary["write_request_sent"] is False
     assert summary["proposal_request_sent"] is False

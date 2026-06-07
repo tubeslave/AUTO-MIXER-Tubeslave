@@ -620,7 +620,14 @@ async def run(args: argparse.Namespace) -> int:
             )
 
             if connection_mode != "wing":
-                summary.update({"status": "blocked", "reason": "backend_not_in_wing_mode"})
+                summary.update(
+                    {
+                        "status": "blocked",
+                        "reason": "backend_not_in_wing_mode",
+                        "fail_closed": True,
+                        "blockers": ["event_log_wing_mode_not_proven"],
+                    }
+                )
                 recorder.write_summary(summary)
                 print(json.dumps(summary, indent=2, sort_keys=True))
                 return 3
