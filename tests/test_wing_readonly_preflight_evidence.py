@@ -30,6 +30,10 @@ def _valid_summary() -> dict:
         "value_types": ["fader", "gain"],
         "require_physical_readback": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
+        "expected_plan_path": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+        "expected_plan_sha256": "0" * 64,
+        "expected_plan_match": True,
+        "expected_plan_violations": [],
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -237,6 +241,22 @@ def test_preflight_evidence_rejects_missing_operator_channel_confirmation():
     assert "operator_channel_confirmation_required_not_true" in validation["violations"]
     assert "operator_confirmed_channels_missing" in validation["violations"]
     assert "operator_confirmed_channels_mismatch" in validation["violations"]
+
+
+def test_preflight_evidence_rejects_missing_expected_plan_link():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact.pop("expected_plan_path")
+    artifact.pop("expected_plan_sha256")
+    artifact.pop("expected_plan_match")
+    artifact.pop("expected_plan_violations")
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "expected_plan_path_missing" in validation["violations"]
+    assert "expected_plan_sha256_missing" in validation["violations"]
+    assert "expected_plan_match_not_true" in validation["violations"]
+    assert "expected_plan_violations_not_empty" in validation["violations"]
 
 
 def test_preflight_evidence_rejects_operator_channel_confirmation_mismatch():

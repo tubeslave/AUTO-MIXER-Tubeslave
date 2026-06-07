@@ -565,12 +565,18 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "--require-physical-readback",
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
+        "--expected-plan",
+        "artifacts/wing_readonly_preflight_plan/latest_plan.json",
     ]
     assert result.detail["capture_command_channels"] == "3"
     assert result.detail["capture_command_operator_confirmed_channels"] == "3"
     assert result.detail["capture_command_requires_operator_channel_confirmation"] is True
     assert result.detail["capture_command_operator_confirmation_matches_channels"] is True
     assert result.detail["capture_command_requires_physical_readback"] is True
+    assert result.detail["capture_command_expected_plan"] == (
+        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+    )
+    assert result.detail["capture_command_expected_plan_matches_plan_output"] is True
     assert result.detail["review_tool_path"] == (
         "tools/review_wing_readonly_preflight_artifacts.py"
     )
@@ -787,6 +793,8 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
+                "--expected-plan",
+                str(plan_path),
             ],
             "review_artifact_and_write_pending_decision_template": [
                 "python3",
@@ -4999,6 +5007,8 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
+                "--expected-plan",
+                "artifacts/wing_readonly_preflight_plan/latest_plan.json",
             ],
             "rationale": "read-only preflight required",
             "prerequisites": ["operator present"],
@@ -6662,12 +6672,16 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
+                "--expected-plan",
+                "artifacts/wing_readonly_preflight_plan/latest_plan.json",
             ],
             "capture_command_channels": "3",
             "capture_command_operator_confirmed_channels": "3",
             "capture_command_requires_operator_channel_confirmation": True,
             "capture_command_operator_confirmation_matches_channels": True,
             "capture_command_requires_physical_readback": True,
+            "capture_command_expected_plan": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+            "capture_command_expected_plan_matches_plan_output": True,
             "review_tool_path": "tools/review_wing_readonly_preflight_artifacts.py",
             "review_tool_available": True,
             "review_command": [
@@ -6778,9 +6792,14 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["capture_command_operator_confirmed_channels"] == "3"
     assert "--operator-confirm-channels" in preflight["capture_command_template"]
     assert "--require-physical-readback" in preflight["capture_command_template"]
+    assert "--expected-plan" in preflight["capture_command_template"]
     assert preflight["capture_command_requires_operator_channel_confirmation"] is True
     assert preflight["capture_command_operator_confirmation_matches_channels"] is True
     assert preflight["capture_command_requires_physical_readback"] is True
+    assert preflight["capture_command_expected_plan"] == (
+        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+    )
+    assert preflight["capture_command_expected_plan_matches_plan_output"] is True
     assert preflight["review_tool_path"] == (
         "tools/review_wing_readonly_preflight_artifacts.py"
     )

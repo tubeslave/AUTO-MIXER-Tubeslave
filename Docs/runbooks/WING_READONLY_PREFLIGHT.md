@@ -59,7 +59,9 @@ python3 tools/wing_readonly_preflight_runner.py \
 ```
 
 Then run the real read-only preflight only when the intended backend/WING
-session is ready:
+session is ready. The real run must point at the offline plan generated above;
+if the runtime arguments or request sequence do not match that plan, the runner
+fails closed before opening WebSocket:
 
 ```bash
 python3 tools/wing_readonly_preflight_runner.py \
@@ -68,7 +70,8 @@ python3 tools/wing_readonly_preflight_runner.py \
   --operator-confirm-channels 3 \
   --value-types fader,gain \
   --require-physical-readback \
-  --artifact-root artifacts/wing_readonly_preflight
+  --artifact-root artifacts/wing_readonly_preflight \
+  --expected-plan artifacts/wing_readonly_preflight_plan/latest_plan.json
 ```
 
 ## Expected Result
@@ -92,6 +95,10 @@ The summary must show:
 - `forbidden_request_types_sent: []`
 - `require_physical_readback: true`
 - `request_id_policy: required_for_every_query_mixer_parameter_response`
+- `expected_plan_path: artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- `expected_plan_match: true`
+- `expected_plan_violations: []`
+- `expected_plan_sha256` is non-empty
 - `physical_readback_count == readback_count`
 
 The event log must show only these request types:
@@ -205,6 +212,7 @@ Then update:
 - `events.jsonl` is not strict `send`/`recv` pairs;
 - a `query_mixer_parameter` response does not match its request identity;
 - a `query_mixer_parameter` response omits or mismatches the request id;
+- the real run omits the expected offline plan or does not match it;
 - the run contacts the wrong mixer;
 - the operator cannot confirm the selected channel;
 - `operator_confirmed_channels` is missing or does not exactly match

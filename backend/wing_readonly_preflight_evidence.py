@@ -394,6 +394,14 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("connection_mode_not_wing")
     if payload.get("request_id_policy") != REQUEST_ID_POLICY:
         violations.append("request_id_policy_missing_or_invalid")
+    if not str(payload.get("expected_plan_path") or ""):
+        violations.append("expected_plan_path_missing")
+    if not str(payload.get("expected_plan_sha256") or ""):
+        violations.append("expected_plan_sha256_missing")
+    if payload.get("expected_plan_match") is not True:
+        violations.append("expected_plan_match_not_true")
+    if payload.get("expected_plan_violations") not in ([], ()):
+        violations.append("expected_plan_violations_not_empty")
     if payload.get("require_physical_readback") is not True:
         violations.append("require_physical_readback_not_true")
     channels = _int_tuple(payload.get("channels"))

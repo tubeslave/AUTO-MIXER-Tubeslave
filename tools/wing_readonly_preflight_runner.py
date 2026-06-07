@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import sys
 import time
@@ -59,6 +60,37 @@ FORBIDDEN_REQUEST_TYPES = {
 }
 PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
 PHYSICAL_READBACK_SOURCES = {"physical_readback", "wing_physical_readback", "physical_wing", "wing"}
+EXPECTED_PLAN_MATCH_KEYS = (
+    "type",
+    "status",
+    "proof_artifact_schema",
+    "proof_runner",
+    "selected_mvp_blocker",
+    "selected_mvp_blocker_status",
+    "url",
+    "artifact_root",
+    "channels",
+    "operator_channel_confirmation_required",
+    "operator_confirmed_channels",
+    "value_types",
+    "require_physical_readback",
+    "read_only",
+    "live_write",
+    "operator_required",
+    "manual_review_required_before_readiness_update",
+    "contacts_backend",
+    "queries_console",
+    "execution_allowed_by_plan",
+    "live_authority_granted",
+    "allowed_request_types",
+    "forbidden_request_types",
+    "request_sequence",
+    "request_id_policy",
+    "expected_artifacts",
+    "post_run_review_commands",
+    "fail_closed_conditions",
+    "next_step",
+)
 
 
 def utc_stamp() -> str:
@@ -70,6 +102,10 @@ def json_default(value: Any) -> Any:
         return str(value)
     except Exception:
         return "<unserializable>"
+
+
+def sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
 
 
 def address_for(channel: int, value_type: str) -> str:
@@ -221,6 +257,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional JSON output path for --plan-only.",
     )
+    parser.add_argument(
+        "--expected-plan",
+        default="",
+        help=(
+            "Optional JSON plan produced by --plan-only. A real preflight run "
+            "validates runtime args and request sequence against this file "
+            "before opening WebSocket."
+        ),
+    )
     parser.add_argument("--timeout", type=float, default=5.0, help="Timeout per WebSocket step")
     parser.add_argument("--artifact-root", default="artifacts/wing_readonly_preflight", help="Artifact root directory")
     return parser
@@ -273,6 +318,15 @@ def build_read_requests(channels: tuple[int, ...], value_types: tuple[str, ...])
                 }
             )
     return requests
+
+
+def load_expected_plan(path: str) -> tuple[Dict[str, Any], str]:
+    plan_path = Path(path)
+    raw = plan_path.read_bytes()
+    payload = json.loads(raw.decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("expected plan JSON root must be an object")
+    return payload, sha256_bytes(raw)
 
 
 def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
@@ -339,12 +393,24 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
             "physical_readback_missing",
             "readback_identity_mismatch",
             "readback_request_id_mismatch",
+            "expected_plan_missing_or_mismatch",
             "forbidden_request_type_sent",
             "event_log_missing_or_invalid",
             "manual_review_decision_missing_or_invalid",
         ],
         "next_step": "Run without --plan-only only when the intended backend/WING session is ready.",
     }
+
+
+def validate_expected_plan(args: argparse.Namespace, plan: Dict[str, Any]) -> list[str]:
+    expected = build_offline_preflight_plan(args)
+    violations: list[str] = []
+    for key in EXPECTED_PLAN_MATCH_KEYS:
+        if plan.get(key) != expected.get(key):
+            violations.append(f"expected_plan_{key}_mismatch")
+    if plan.get("plan_output") != args.expected_plan:
+        violations.append("expected_plan_output_path_mismatch")
+    return violations
 
 
 async def run(args: argparse.Namespace) -> int:
@@ -413,6 +479,45 @@ async def run(args: argparse.Namespace) -> int:
         recorder.write_summary(summary)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 2
+
+    if args.expected_plan:
+        expected_plan_path = str(args.expected_plan)
+        summary["expected_plan_path"] = expected_plan_path
+        try:
+            expected_plan, expected_plan_sha256 = load_expected_plan(expected_plan_path)
+        except Exception as exc:
+            summary.update(
+                {
+                    "status": "blocked",
+                    "reason": "expected_plan_missing_or_invalid",
+                    "expected_plan_match": False,
+                    "expected_plan_error": {
+                        "type": type(exc).__name__,
+                        "message": str(exc),
+                    },
+                }
+            )
+            recorder.write_summary(summary)
+            print(json.dumps(summary, indent=2, sort_keys=True))
+            return 2
+        expected_plan_violations = validate_expected_plan(args, expected_plan)
+        summary.update(
+            {
+                "expected_plan_sha256": expected_plan_sha256,
+                "expected_plan_match": not expected_plan_violations,
+                "expected_plan_violations": expected_plan_violations,
+            }
+        )
+        if expected_plan_violations:
+            summary.update(
+                {
+                    "status": "blocked",
+                    "reason": "expected_plan_mismatch",
+                }
+            )
+            recorder.write_summary(summary)
+            print(json.dumps(summary, indent=2, sort_keys=True))
+            return 2
 
     try:
         async with websockets.connect(args.url) as ws:

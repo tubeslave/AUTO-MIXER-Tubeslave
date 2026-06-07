@@ -53,6 +53,8 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "--require-physical-readback",
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
+        "--expected-plan",
+        "artifacts/wing_readonly_preflight_plan/latest_plan.json",
     ]
     assert "--decision-template-output" in packet["commands"][
         "review_artifact_and_write_pending_decision_template"

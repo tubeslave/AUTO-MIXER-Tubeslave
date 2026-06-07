@@ -76,6 +76,24 @@ def read_events(summary: dict) -> list[dict]:
     return [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines()]
 
 
+def write_expected_plan(tmp_path: Path, *argv: str) -> Path:
+    plan_path = tmp_path / "expected-plan.json"
+    args = parse_args(
+        tmp_path,
+        *argv,
+        "--plan-only",
+        "--plan-output",
+        str(plan_path),
+    )
+    plan = runner.build_offline_preflight_plan(args)
+    plan["plan_output"] = str(plan_path)
+    plan_path.write_text(
+        json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return plan_path
+
+
 def test_forbidden_request_types_cover_hard_safety_boundary() -> None:
     expected = {
         "set_fader",
@@ -188,6 +206,16 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
         ]
     )
     patch_websocket_connect(monkeypatch, websocket)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader,gain",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+    )
     args = parse_args(
         tmp_path,
         "--channels",
@@ -197,6 +225,8 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--expected-plan",
+        str(expected_plan),
     )
 
     exit_code = await runner.run(args)
@@ -215,6 +245,10 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
     assert summary["connection_mode"] == "wing"
     assert summary["operator_channel_confirmation_required"] is True
     assert summary["operator_confirmed_channels"] == [3]
+    assert summary["expected_plan_path"] == str(expected_plan)
+    assert summary["expected_plan_match"] is True
+    assert summary["expected_plan_sha256"]
+    assert summary["expected_plan_violations"] == []
     assert summary["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
     assert summary["read_only"] is True
     assert summary["live_write"] is False
@@ -405,6 +439,50 @@ async def test_readonly_preflight_blocks_readback_request_id_mismatch(
 
 
 @pytest.mark.asyncio
+async def test_readonly_preflight_blocks_expected_plan_mismatch_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"expected-plan mismatch must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "4",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "4",
+    )
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "expected_plan_mismatch"
+    assert summary["expected_plan_match"] is False
+    assert "expected_plan_channels_mismatch" in summary["expected_plan_violations"]
+    assert "expected_plan_request_sequence_mismatch" in summary["expected_plan_violations"]
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
 async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_artifacts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -479,6 +557,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     ]
     assert "physical_readback_missing" in written["fail_closed_conditions"]
     assert "readback_request_id_mismatch" in written["fail_closed_conditions"]
+    assert "expected_plan_missing_or_mismatch" in written["fail_closed_conditions"]
     assert "manual_review_decision_missing_or_invalid" in written["fail_closed_conditions"]
     assert not list(tmp_path.glob("*/summary.json"))
 

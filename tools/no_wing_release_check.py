@@ -402,6 +402,7 @@ WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS = (
     "physical_readback_missing",
     "readback_identity_mismatch",
     "readback_request_id_mismatch",
+    "expected_plan_missing_or_mismatch",
     "forbidden_request_type_sent",
     "event_log_missing_or_invalid",
     "manual_review_decision_missing_or_invalid",
@@ -423,6 +424,8 @@ def wing_readonly_preflight_capture_command_template() -> list[str]:
         "--require-physical-readback",
         "--artifact-root",
         WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+        "--expected-plan",
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     ]
 
 
@@ -2738,6 +2741,7 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     plan_output = command_value_after_flag(plan_command, "--plan-output")
     capture_value_types = command_value_after_flag(capture_command, "--value-types")
     capture_artifact_root = command_value_after_flag(capture_command, "--artifact-root")
+    capture_expected_plan = command_value_after_flag(capture_command, "--expected-plan")
     plan_matches_capture = (
         bool(plan_channels)
         and bool(plan_confirmed_channels)
@@ -2788,6 +2792,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_capture_operator_confirmation_mismatch")
     if "--require-physical-readback" not in capture_command:
         violations.append("wing_readonly_preflight_capture_physical_readback_missing")
+    if "--expected-plan" not in capture_command or not capture_expected_plan:
+        violations.append("wing_readonly_preflight_capture_expected_plan_missing")
+    if capture_expected_plan != plan_output:
+        violations.append("wing_readonly_preflight_capture_expected_plan_mismatch")
 
     if evidence.get("type") != "wing_readonly_preflight_evidence":
         violations.append("wing_readonly_preflight_evidence_type_mismatch")
@@ -2895,6 +2903,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     detail["capture_command_requires_physical_readback"] = (
         "--require-physical-readback" in capture_command
+    )
+    detail["capture_command_expected_plan"] = capture_expected_plan
+    detail["capture_command_expected_plan_matches_plan_output"] = (
+        bool(capture_expected_plan) and capture_expected_plan == plan_output
     )
     detail["review_tool_path"] = WING_READONLY_PREFLIGHT_REVIEW_TOOL
     detail["review_tool_available"] = review_tool_available
@@ -3229,9 +3241,26 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         "--plan-output",
         str(expected_plan_path),
     ]
+    expected_capture_command = [
+        "python3",
+        WING_READONLY_PREFLIGHT_RUNNER_TOOL,
+        "--url",
+        WING_READONLY_PREFLIGHT_RUNNER_URL,
+        "--channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--value-types",
+        WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        "--require-physical-readback",
+        "--artifact-root",
+        WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+        "--expected-plan",
+        str(expected_plan_path),
+    ]
     expected_commands = {
         "preview_readonly_request_plan": expected_preview_command,
-        "capture_readonly_preflight": wing_readonly_preflight_capture_command_template(),
+        "capture_readonly_preflight": expected_capture_command,
         "review_artifact_and_write_pending_decision_template": (
             wing_readonly_preflight_review_command()
         ),
@@ -9661,6 +9690,10 @@ def wing_readonly_preflight_evidence_summary(
             "capture_command_requires_physical_readback": (
                 detail.get("capture_command_requires_physical_readback") is True
             ),
+            "capture_command_expected_plan": detail.get("capture_command_expected_plan"),
+            "capture_command_expected_plan_matches_plan_output": (
+                detail.get("capture_command_expected_plan_matches_plan_output") is True
+            ),
             "review_tool_path": detail.get("review_tool_path"),
             "review_tool_available": detail.get("review_tool_available") is True,
             "review_command": (
@@ -12792,6 +12825,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight['capture_command_operator_confirmation_matches_channels']).lower()}`",
                 "- capture_command_requires_physical_readback: "
                 f"`{str(wing_readonly_preflight['capture_command_requires_physical_readback']).lower()}`",
+                f"- capture_command_expected_plan: `{wing_readonly_preflight['capture_command_expected_plan']}`",
+                "- capture_command_expected_plan_matches_plan_output: "
+                f"`{str(wing_readonly_preflight['capture_command_expected_plan_matches_plan_output']).lower()}`",
                 f"- review_tool_path: `{wing_readonly_preflight['review_tool_path']}`",
                 "- review_tool_available: "
                 f"`{str(wing_readonly_preflight['review_tool_available']).lower()}`",

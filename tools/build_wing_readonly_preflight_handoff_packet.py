@@ -88,6 +88,7 @@ def capture_command(
     channels: str,
     value_types: str,
     artifact_root: str,
+    expected_plan: str,
 ) -> list[str]:
     return [
         "python3",
@@ -103,6 +104,8 @@ def capture_command(
         "--require-physical-readback",
         "--artifact-root",
         artifact_root,
+        "--expected-plan",
+        expected_plan,
     ]
 
 
@@ -196,6 +199,7 @@ def build_handoff_packet(
         channels=channels,
         value_types=value_types,
         artifact_root=artifact_root,
+        expected_plan=plan_output,
     )
     review = artifact_review_command(
         artifact_root=artifact_root,
