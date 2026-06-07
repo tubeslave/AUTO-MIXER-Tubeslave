@@ -7607,6 +7607,20 @@ async def test_operator_mode_handlers_round_trip(server):
 
 
 @pytest.mark.asyncio
+async def test_operator_mode_handlers_normalizes_alias_variants(server):
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["set_operator_mode"](
+        object(),
+        {"mode": "full autonomous mode", "reason": "alias_mode_change"},
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == "operator_mode_status"
+    assert payload["mode"] == "auto"
+
+
+@pytest.mark.asyncio
 async def test_operator_proposal_create_is_blocked_in_analyze_mode(server):
     server.operator_mode = "analyze"
     server.send_to_client = AsyncMock()
