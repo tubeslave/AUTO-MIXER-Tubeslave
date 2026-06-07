@@ -93,6 +93,20 @@ FORBIDDEN_NEXT_ACTIONS = (
     "Do not widen live writes beyond supervised fader/gain without a separate ADR and hardware proof.",
 )
 
+DRIFT_POLICY_SECTION_TITLES = frozenset(
+    {
+        "forbidden next actions",
+        "forbidden scope",
+    }
+)
+DERIVATIVE_GUARD_SECTION_TITLES = frozenset(
+    {
+        "target evidence",
+        "drift evidence",
+        "mixed evidence",
+    }
+)
+
 
 @dataclass(frozen=True)
 class EvidenceItem:
@@ -130,12 +144,61 @@ def pattern_matches(text: str, patterns: Iterable[str]) -> tuple[str, ...]:
     return tuple(matches)
 
 
+def markdown_heading_level(line: str) -> int | None:
+    stripped = line.lstrip()
+    if not stripped.startswith("#"):
+        return None
+    level = len(stripped) - len(stripped.lstrip("#"))
+    if level == 0 or level > 6:
+        return None
+    if len(stripped) == level or stripped[level] != " ":
+        return None
+    return level
+
+
+def markdown_heading_title(line: str) -> str:
+    stripped = line.lstrip()
+    return stripped.lstrip("#").strip().lower()
+
+
+def text_without_markdown_sections(text: str, section_titles: Iterable[str]) -> str:
+    skipped_titles = set(section_titles)
+    lines: list[str] = []
+    skipping_section = False
+    for line in text.splitlines():
+        level = markdown_heading_level(line)
+        if level is not None and level <= 2:
+            title = markdown_heading_title(line)
+            if title in skipped_titles:
+                skipping_section = True
+                continue
+            skipping_section = False
+        if not skipping_section:
+            lines.append(line)
+    return "\n".join(lines)
+
+
+def is_generated_direction_guard_report(source: str, text: str) -> bool:
+    return source.startswith("report:") and (
+        "codex_direction_guard_" in source
+        or "# Codex Direction Guard" in text[:300]
+    )
+
+
+def text_for_drift_scoring(source: str, text: str) -> str:
+    ignored_sections = set(DRIFT_POLICY_SECTION_TITLES)
+    if is_generated_direction_guard_report(source, text):
+        ignored_sections.update(DERIVATIVE_GUARD_SECTION_TITLES)
+    return text_without_markdown_sections(text, ignored_sections)
+
+
 def classify_item(source: str, text: str) -> EvidenceItem:
+    drift_text = text_for_drift_scoring(source, text)
     return EvidenceItem(
         source=source,
         text=text.strip(),
         target_matches=pattern_matches(text, TARGET_PATTERNS),
-        drift_matches=pattern_matches(text, DRIFT_PATTERNS),
+        drift_matches=pattern_matches(drift_text, DRIFT_PATTERNS),
     )
 
 

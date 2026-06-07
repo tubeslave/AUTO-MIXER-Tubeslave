@@ -47,6 +47,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_OFFLINE_PLAN_PREVIEW_20260607.md` | Offline plan-only preview exposes the exact WING read-only preflight request sequence before any backend/WING session opens. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_PLAN_CONTEXT_GATE_20260607.md` | No-WING release checks require MVP blocker, manual review, fail-closed, review-command context, and a valid referenced plan for the offline preflight handoff. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_READBACK_IDENTITY_GATE_20260607.md` | Read-only preflight runner blocks physical-looking readbacks whose channel, value type, or address does not match the query. |
+| `Docs/reports/AUTOMIXER_WING_MVP_DIRECTION_GUARD_SELF_REPORT_FILTER_20260607.md` | Direction guard drift scoring ignores its own policy warnings and generated evidence tables while preserving real drift detection. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_DECISION_GATED_PROOF_PLAN_20260607.md` | Next supervised fader/gain proof steps stay blocked until an accepted read-only preflight review decision exists. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_READINESS_BRIDGE_20260606.md` | Read-only preflight evidence overlay inside autonomy promotion readiness; manual review candidate only. |
 | `Docs/reports/AUTOMIXER_SUPERVISED_WING_PROOF_READONLY_PREFLIGHT_GATE_20260606.md` | Next supervised WING proof plan is blocked until clean read-only preflight evidence exists. |

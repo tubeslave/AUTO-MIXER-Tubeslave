@@ -69,6 +69,105 @@ def test_direction_guard_marks_mixed_work_for_review():
     assert report["summary"]["drift_item_count"] == 1
 
 
+def test_direction_guard_ignores_forbidden_policy_sections_when_scoring_drift():
+    guard = load_guard_module()
+
+    report = guard.analyze_evidence(
+        [
+            (
+                "report",
+                """
+# Project Director Agent Directive
+
+## Selected Work
+
+- Selected blocker: `WING read-only connection proof`
+- Selected action: Run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`.
+
+## Forbidden Scope
+
+- No new memory-trust chains unless they close the selected blocker.
+- No new queue-import chains unless they close the selected blocker.
+- No new result-consumer/report-only/read-model work unless it closes the selected blocker.
+
+## Required Files
+
+- `tools/wing_readonly_preflight_runner.py`
+""",
+            ),
+            ("git_log", "Add WING read-only preflight readback identity gate"),
+            ("report", "physical readback and timeout fail-closed proof context"),
+        ]
+    )
+
+    assert report["status"] == "on_target"
+    assert report["summary"]["drift_item_count"] == 0
+    assert report["summary"]["mixed_item_count"] == 0
+
+
+def test_direction_guard_ignores_generated_guard_evidence_sections_when_scoring_drift():
+    guard = load_guard_module()
+
+    report = guard.analyze_evidence(
+        [
+            (
+                "report:.paperclip/reports/codex_direction_guard_final.md",
+                """
+codex_direction_guard_final.md
+# Codex Direction Guard
+
+## Verdict
+
+There is WING proof progress.
+
+## Next Allowed Actions
+
+- Run read-only preflight and capture physical readback.
+
+## Mixed Evidence
+
+- `report:.paperclip/reports/old.md`: WING read-only preflight plus memory-trust queue-import result consumer.
+  - target: `wing read-only`
+  - drift: `memory-trust, queue-import, result consumer`
+""",
+            ),
+            ("git_log", "Add WING read-only preflight readback identity gate"),
+            ("report", "physical readback and timeout fail-closed proof context"),
+        ]
+    )
+
+    assert report["status"] == "on_target"
+    assert report["summary"]["drift_item_count"] == 0
+    assert report["summary"]["mixed_item_count"] == 0
+
+
+def test_direction_guard_still_flags_drift_outside_forbidden_policy_sections():
+    guard = load_guard_module()
+
+    report = guard.analyze_evidence(
+        [
+            (
+                "report",
+                """
+# Cycle Report
+
+## Summary
+
+Implemented a memory-trust queue-import result consumer around the WING read-only preflight handoff.
+
+## Forbidden Scope
+
+- No new memory-trust chains unless they close the selected blocker.
+""",
+            )
+        ]
+    )
+
+    assert report["status"] == "mixed_needs_review"
+    assert report["summary"]["mixed_item_count"] == 1
+    assert report["mixed_items"][0]["drift_matches"]
+
+
 def test_direction_guard_markdown_and_json_outputs(tmp_path):
     guard = load_guard_module()
     report = guard.analyze_evidence(
