@@ -3,6 +3,7 @@ import { AppShell } from './components/prototype/AutomixerComponents';
 import { navItems } from './mock/automixerData';
 import { useOperatorBackend } from './services/useOperatorBackend';
 import type { ActionFocus, AutomixerMode, RouteId, Task, ToastState, Tone, UiActions, UiState } from './types';
+import { getModeDisplayLabel, toneForMode } from './utils/prototypeTone';
 import { buildView } from './views/AutomixerViews';
 
 const routeIds = new Set<RouteId>(navItems.map(item => item.id));
@@ -10,13 +11,6 @@ const routeIds = new Set<RouteId>(navItems.map(item => item.id));
 function readHashRoute(): RouteId {
   const raw = window.location.hash.replace(/^#\/?/, '') as RouteId;
   return routeIds.has(raw) ? raw : 'dashboard';
-}
-
-function toneForMode(mode: AutomixerMode): Tone {
-  if (mode === 'Auto') return 'red';
-  if (mode === 'Supervised') return 'yellow';
-  if (mode === 'Assist') return 'purple';
-  return 'blue';
 }
 
 export default function App() {
@@ -71,14 +65,16 @@ export default function App() {
   const updateMode = useCallback((nextMode: AutomixerMode) => {
     if (connected) {
       backendActions.setBackendMode(nextMode);
-      setLastAction(`Mode request ${nextMode}`);
-      pushToast(`Mode request sent to backend: ${nextMode}.`, toneForMode(nextMode));
+      const displayMode = getModeDisplayLabel(nextMode);
+      setLastAction(`Mode request ${displayMode}`);
+      pushToast(`Mode request sent to backend: ${displayMode}.`, toneForMode(nextMode));
       return;
     }
 
     setMode(nextMode);
-    setLastAction(`Mode changed to ${nextMode}`);
-    pushToast(`Mode changed to ${nextMode}. Mock fallback only.`, toneForMode(nextMode));
+    const displayMode = getModeDisplayLabel(nextMode);
+    setLastAction(`Mode changed to ${displayMode}`);
+    pushToast(`Mode changed to ${displayMode}. Mock fallback only.`, toneForMode(nextMode));
   }, [backendActions, connected, pushToast]);
 
   const setTaskStatus = useCallback((id: string, status: Task['status']) => {
@@ -90,8 +86,9 @@ export default function App() {
         tone: 'red',
         timestamp: '10:24:15'
       });
-      setLastAction(`${id} blocked by Analyze mode`);
-      pushToast(`${id} blocked: Analyze mode is read-only.`, 'red');
+      const displayMode = getModeDisplayLabel('Analyze');
+      setLastAction(`${id} blocked by ${displayMode}`);
+      pushToast(`${id} blocked: ${displayMode} is read-only.`, 'red');
       return;
     }
 
@@ -104,8 +101,9 @@ export default function App() {
         tone: 'yellow',
         timestamp: '10:24:15'
       });
+      const displayMode = getModeDisplayLabel('Assist');
       setLastAction(`${id} queued for review`);
-      pushToast(`${id} queued for review. Assist mode does not apply changes.`, 'yellow');
+      pushToast(`${id} queued for review. ${displayMode} does not apply changes.`, 'yellow');
       return;
     }
 
@@ -123,12 +121,12 @@ export default function App() {
         setActionFocus({
           action: 'Apply Blocked',
           target: proposalId,
-          detail: 'Backend apply is only available in Supervised mode. Analyze and Assist cannot send console applies.',
+          detail: `Backend apply is only available in ${getModeDisplayLabel('Supervised')} mode. ${getModeDisplayLabel('Analyze')} and ${getModeDisplayLabel('Assist')} cannot send console applies.`,
           tone: 'red',
           timestamp: '10:24:15'
         });
         setLastAction(`${proposalId} blocked by mode`);
-        pushToast(`${proposalId} blocked: switch to Supervised for approved apply.`, 'red');
+        pushToast(`${proposalId} blocked: switch to ${getModeDisplayLabel('Supervised')} for approved apply.`, 'red');
         return;
       }
 
@@ -152,14 +150,15 @@ export default function App() {
     }
 
     setTaskStatusOverrides(current => ({ ...current, [id]: status }));
+    const displayMode = getModeDisplayLabel(mode);
     setActionFocus({
       action: status === 'Rejected' ? 'Reject' : 'Apply',
       target: id,
       detail: status === 'Rejected'
         ? 'Task rejected in local prototype state. No mixer command was sent.'
         : mode === 'Auto'
-          ? 'Auto mode simulated the apply locally. Live writes remain disabled in this prototype.'
-          : 'Task approved in local prototype state. No mixer command was sent.',
+          ? `${displayMode} mode simulated the apply locally. Live writes remain disabled in this prototype.`
+          : `${displayMode} mode updated task status locally. No mixer command was sent.`,
       tone: status === 'Rejected' ? 'red' : mode === 'Auto' ? 'yellow' : 'green',
       timestamp: '10:24:15'
     });
