@@ -1593,6 +1593,117 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_operator_proposal_apply_linked_is_rolled_back_when_second_apply_fails(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        server.mixer_client.state.update({
+            "/ch/1/fdr": -8.0,
+            "/ch/2/in/set/trim": 1.0,
+        })
+        now = time.time()
+        server.mixer_client.state_timestamps.update({
+            "/ch/1/fdr": now,
+            "/ch/2/in/set/trim": now,
+        })
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "title": "Lead Vocal: linked rollback failover",
+                "value_type": "fader",
+                "requested_changes": [
+                    {"value_type": "fader", "channel": 1, "value": -9.0},
+                    {"value_type": "gain", "channel": 2, "value": 1.0},
+                ],
+                "reason": "unit",
+            },
+        )
+        create_payload = self._decode_last_message(websocket)
+        assert create_payload["type"] == "operator_proposal_created"
+        assert create_payload["status"] == "created"
+        proposal_id = create_payload["proposal"]["id"]
+        server._apply_manual_console_write = AsyncMock(
+            side_effect=[
+                {
+                    "status": "applied",
+                    "success": True,
+                    "channel": 1,
+                    "value_type": "fader",
+                    "approval_id": f"{proposal_id}:1",
+                    "effective_value": -9.0,
+                    "old_value": -8.0,
+                    "readback_value": -9.0,
+                    "readback_status": "verified_from_cache",
+                    "rollback_available": True,
+                    "rollback_value": -8.0,
+                },
+                {
+                    "status": "blocked",
+                    "success": False,
+                    "reason": "mixer_write_failed",
+                    "channel": 2,
+                    "value_type": "gain",
+                    "approval_id": f"{proposal_id}:2",
+                    "effective_value": 1.0,
+                    "old_value": 1.0,
+                    "rollback_available": False,
+                },
+                {
+                    "status": "applied",
+                    "success": True,
+                    "channel": 1,
+                    "value_type": "fader",
+                    "effective_value": -8.0,
+                    "old_value": -9.0,
+                    "readback_value": -8.0,
+                    "readback_status": "verified_from_cache",
+                    "rollback_available": True,
+                    "rollback_value": -9.0,
+                    "rollback_of": f"{proposal_id}:1",
+                    "rollback": True,
+                },
+            ]
+        )
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": "unit-auto-linked-fail",
+            },
+        )
+
+        apply_payload = self._decode_last_message(websocket)
+        assert apply_payload["type"] == "operator_proposal_apply_blocked"
+        assert apply_payload["status"] == "apply_blocked"
+        assert apply_payload["apply_result"]["reason"] == "linked_apply_failed_rolled_back"
+        assert apply_payload["apply_result"]["failed_result"]["reason"] == "mixer_write_failed"
+        assert apply_payload["apply_result"]["failed_result"]["status"] == "blocked"
+        assert any(
+            step["rollback_of"] == f"{proposal_id}:1"
+            for step in apply_payload["apply_result"]["rollback_results"]
+        )
+        assert server._apply_manual_console_write.await_count == 3
+        first_call = server._apply_manual_console_write.await_args_list[0].kwargs
+        second_call = server._apply_manual_console_write.await_args_list[1].kwargs
+        third_call = server._apply_manual_console_write.await_args_list[2].kwargs
+        assert first_call["source"] == f"operator_proposal_linked:{proposal_id}:1"
+        assert second_call["source"] == f"operator_proposal_linked:{proposal_id}:2"
+        assert first_call["approval_id"] == f"{proposal_id}:1"
+        assert second_call["approval_id"] == f"{proposal_id}:2"
+        assert third_call["source"] == f"operator_proposal_linked_rollback:{proposal_id}"
+        assert third_call["approval_id"] == f"rollback:{proposal_id}:1"
+        assert third_call["bypass_cooldown"] is True
+        server.mixer_client.set_channel_gain.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_websocket_fader_blocks_when_cache_pre_read_is_stale(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
