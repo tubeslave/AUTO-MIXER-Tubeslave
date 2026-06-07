@@ -1197,6 +1197,54 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_operator_proposal_apply_is_blocked_for_auto_mode_with_wing_boundary(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        server._apply_manual_console_write = AsyncMock()
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "title": "Lead Vocal: auto fader",
+                "channel": 1,
+                "value_type": "fader",
+                "value": -6.0,
+                "reason": "unit",
+            },
+        )
+        create_payload = self._decode_last_message(websocket)
+        assert create_payload["type"] == "operator_proposal_created"
+        assert create_payload["status"] == "created"
+        proposal_id = create_payload["proposal"]["id"]
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": "unit-auto-boundary",
+            },
+        )
+
+        apply_payload = self._decode_last_message(websocket)
+        assert apply_payload["type"] == "operator_proposal_apply_blocked"
+        assert apply_payload["status"] == "apply_blocked"
+        assert apply_payload["apply_result"]["reason"] == "operator_mode_blocks_live_write"
+        assert (
+            apply_payload["apply_result"]["operator_mode"]["capabilities"]["can_apply_to_console"]
+            is False
+        )
+        assert (
+            apply_payload["apply_result"]["operator_mode"]["capabilities"]["allowed_live_write_kinds"]
+            == []
+        )
+        server._apply_manual_console_write.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_websocket_fader_blocks_when_cache_pre_read_is_stale(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
