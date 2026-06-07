@@ -122,6 +122,8 @@ The event log must show only these request types:
 The event log must also be strict `send`/`recv` pairs. The request order must
 be `get_operator_mode`, `get_state`, then `query_mixer_parameter` rows, and each
 query must match its readback by request id, channel, value type, and address.
+The `operator_mode_status.connection_mode` and `state_update.mode` event
+payloads must prove `wing` mode.
 Event timestamps must be valid UTC values, monotonic in event order, and not
 later than `summary.json` `captured_at`. Event payloads must not include
 mutation evidence such as apply/rollback/write results, requested changes, or
@@ -241,6 +243,8 @@ Then update:
 - backend returns an unexpected response type for the request in flight;
 - `events.jsonl` is missing or does not match `summary.json`;
 - `events.jsonl` is not strict `send`/`recv` pairs;
+- `events.jsonl` does not prove WING mode from both `operator_mode_status` and
+  `state_update` payloads;
 - `events.jsonl` timestamps are invalid, non-monotonic, or later than
   `captured_at`;
 - `events.jsonl` payloads include apply/write/rollback evidence or grant live

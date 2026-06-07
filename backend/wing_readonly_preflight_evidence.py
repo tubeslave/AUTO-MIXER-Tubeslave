@@ -492,8 +492,27 @@ def _validate_event_log(
     recv_types = {str(row.get("type") or "") for row in recv_payloads}
     if "operator_mode_status" not in recv_types:
         violations.append("event_log_operator_mode_status_missing")
+    else:
+        operator_mode_payloads = tuple(
+            row
+            for row in recv_payloads
+            if str(row.get("type") or "") == "operator_mode_status"
+        )
+        if any(
+            str(row.get("connection_mode") or "") != "wing"
+            for row in operator_mode_payloads
+        ):
+            violations.append("event_log_operator_mode_connection_mode_not_wing")
     if "state_update" not in recv_types:
         violations.append("event_log_state_update_missing")
+    else:
+        state_update_payloads = tuple(
+            row
+            for row in recv_payloads
+            if str(row.get("type") or "") == "state_update"
+        )
+        if any(str(row.get("mode") or "") != "wing" for row in state_update_payloads):
+            violations.append("event_log_state_update_mode_not_wing")
 
     event_readbacks = tuple(
         row

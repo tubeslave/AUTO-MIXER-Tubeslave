@@ -598,6 +598,55 @@ def test_file_preflight_artifact_rejects_nested_event_payload_live_authority(tmp
     )
 
 
+def test_file_preflight_artifact_rejects_non_wing_operator_mode_event(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events[1]["payload"] = {
+        **events[1]["payload"],
+        "connection_mode": "offline",
+    }
+    _write_file_artifact(
+        tmp_path / "preflight" / "operator-offline",
+        summary=summary,
+        events=events,
+    )
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_roots=(tmp_path / "preflight",)
+    )
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert (
+        "event_log_operator_mode_connection_mode_not_wing"
+        in evidence["summary"]["violations"]
+    )
+
+
+def test_file_preflight_artifact_rejects_non_wing_state_update_event(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events[3]["payload"] = {
+        **events[3]["payload"],
+        "mode": "offline",
+    }
+    _write_file_artifact(
+        tmp_path / "preflight" / "state-offline",
+        summary=summary,
+        events=events,
+    )
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_roots=(tmp_path / "preflight",)
+    )
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_state_update_mode_not_wing" in evidence["summary"]["violations"]
+
+
 def test_file_preflight_artifact_rejects_wrong_event_request_order(tmp_path):
     summary = _valid_summary()
     events = _valid_events(summary)
