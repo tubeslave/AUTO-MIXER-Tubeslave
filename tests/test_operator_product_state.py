@@ -5224,6 +5224,17 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     assert goal_progress["summary"]["row_count"] > 0
     assert goal_progress["summary"]["runtime_mode_ceiling_by_id"]
     assert (
+        main_pipeline_registry["project_goal_capability_matrix"]["summary"]["row_count"]
+        == goal_progress["summary"]["row_count"]
+    )
+    assert (
+        main_pipeline_registry["autonomy_promotion_readiness"]["type"]
+        == "autonomy_promotion_readiness"
+    )
+    assert "autonomous_ready_target_ids" in main_pipeline_registry[
+        "autonomy_promotion_readiness"
+    ]["summary"]
+    assert (
         main_pipeline_registry[
             "project_goal_capability_matrix"
         ]["type"]
@@ -7501,6 +7512,16 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
             "autonomy_mode_transition_gate"
         ]["type"]
         == "autonomy_mode_transition_gate"
+    )
+    assert (
+        main_preview["registry"]["autonomy_promotion_readiness"]["type"]
+        == "autonomy_promotion_readiness"
+    )
+    assert (
+        by_type["processing_pipeline_snapshot"][
+            "autonomy_promotion_readiness"
+        ]["summary"]
+        == main_preview["registry"]["autonomy_promotion_readiness"]["summary"]
     )
     assert (
         by_type["processing_pipeline_snapshot"]["autonomy_mode_transition_gate"][
