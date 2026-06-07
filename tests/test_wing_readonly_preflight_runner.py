@@ -280,6 +280,16 @@ async def test_readonly_preflight_blocks_when_backend_is_not_wing(
         ]
     )
     patch_websocket_connect(monkeypatch, websocket)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "gain",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+    )
     args = parse_args(
         tmp_path,
         "--channels",
@@ -289,6 +299,8 @@ async def test_readonly_preflight_blocks_when_backend_is_not_wing(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--expected-plan",
+        str(expected_plan),
     )
 
     exit_code = await runner.run(args)
@@ -325,6 +337,16 @@ async def test_readonly_preflight_blocks_missing_physical_readback(
         ]
     )
     patch_websocket_connect(monkeypatch, websocket)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+    )
     args = parse_args(
         tmp_path,
         "--channels",
@@ -334,6 +356,8 @@ async def test_readonly_preflight_blocks_missing_physical_readback(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--expected-plan",
+        str(expected_plan),
     )
 
     exit_code = await runner.run(args)
@@ -370,6 +394,16 @@ async def test_readonly_preflight_blocks_readback_identity_mismatch(
         ]
     )
     patch_websocket_connect(monkeypatch, websocket)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+    )
     args = parse_args(
         tmp_path,
         "--channels",
@@ -379,6 +413,8 @@ async def test_readonly_preflight_blocks_readback_identity_mismatch(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--expected-plan",
+        str(expected_plan),
     )
 
     exit_code = await runner.run(args)
@@ -415,6 +451,50 @@ async def test_readonly_preflight_blocks_readback_request_id_mismatch(
         ]
     )
     patch_websocket_connect(monkeypatch, websocket)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+    )
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 4
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "wing_readonly_preflight_blocked"
+    assert summary["blockers"] == [
+        "readback_request_id_mismatch:ch3:fader",
+        "readback_identity_mismatch:ch3:fader",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_requires_expected_plan_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"missing expected-plan must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
     args = parse_args(
         tmp_path,
         "--channels",
@@ -428,14 +508,14 @@ async def test_readonly_preflight_blocks_readback_request_id_mismatch(
 
     exit_code = await runner.run(args)
 
-    assert exit_code == 4
+    assert exit_code == 2
     summary = read_summary(tmp_path)
     assert summary["status"] == "blocked"
-    assert summary["reason"] == "wing_readonly_preflight_blocked"
-    assert summary["blockers"] == [
-        "readback_request_id_mismatch:ch3:fader",
-        "readback_identity_mismatch:ch3:fader",
-    ]
+    assert summary["reason"] == "expected_plan_missing"
+    assert summary["expected_plan_required_for_real_run"] is True
+    assert summary["expected_plan_match"] is False
+    assert summary["expected_plan_violations"] == ["expected_plan_missing"]
+    assert summary["sent_request_types"] == []
 
 
 @pytest.mark.asyncio
@@ -523,6 +603,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["execution_allowed_by_plan"] is False
     assert written["live_authority_granted"] is False
     assert written["operator_required"] is True
+    assert written["expected_plan_required_for_real_run"] is True
     assert written["manual_review_required_before_readiness_update"] is True
     assert written["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
     assert written["read_only"] is True

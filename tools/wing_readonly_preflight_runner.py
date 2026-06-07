@@ -77,6 +77,7 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "read_only",
     "live_write",
     "operator_required",
+    "expected_plan_required_for_real_run",
     "manual_review_required_before_readiness_update",
     "contacts_backend",
     "queries_console",
@@ -261,9 +262,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--expected-plan",
         default="",
         help=(
-            "Optional JSON plan produced by --plan-only. A real preflight run "
-            "validates runtime args and request sequence against this file "
-            "before opening WebSocket."
+            "Required JSON plan for real preflight runs, produced by "
+            "--plan-only. Non-plan-only runs fail closed before WebSocket when "
+            "this file is omitted or mismatched."
         ),
     )
     parser.add_argument("--timeout", type=float, default=5.0, help="Timeout per WebSocket step")
@@ -351,6 +352,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "read_only": True,
         "live_write": False,
         "operator_required": True,
+        "expected_plan_required_for_real_run": True,
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
         "queries_console": False,
@@ -464,6 +466,7 @@ async def run(args: argparse.Namespace) -> int:
         ),
         "value_types": list(value_types),
         "require_physical_readback": bool(args.require_physical_readback),
+        "expected_plan_required_for_real_run": True,
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -476,6 +479,19 @@ async def run(args: argparse.Namespace) -> int:
 
     if validation_error:
         summary.update({"status": "blocked", "reason": validation_error})
+        recorder.write_summary(summary)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 2
+
+    if not args.expected_plan:
+        summary.update(
+            {
+                "status": "blocked",
+                "reason": "expected_plan_missing",
+                "expected_plan_match": False,
+                "expected_plan_violations": ["expected_plan_missing"],
+            }
+        )
         recorder.write_summary(summary)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 2
