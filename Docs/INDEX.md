@@ -38,6 +38,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EVIDENCE_FAIL_CLOSED_20260606.md` | Mixed valid+invalid WING preflight artifacts fail closed before readiness-matrix review. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EVENT_LOG_CROSSCHECK_20260606.md` | Read-only preflight summaries must match their event logs before manual readiness review. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_OPERATOR_CONFIRMATION_20260607.md` | Physical readback preflight artifacts must include operator-confirmed channels matching the queried channels. |
+| `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_SESSION_CONFIRMATION_GATE_20260607.md` | Physical readback preflight artifacts must include explicit operator confirmation that the intended backend/WING session is ready for read-only inspection. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_RELEASE_GATE_20260607.md` | No-WING release summaries expose the preflight capture/review commands and fail closed if either tool is missing. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_MANUAL_REVIEW_CHECKLIST_20260607.md` | Offline artifact review exposes a required operator checklist before readiness updates. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_20260607.md` | Operator review decisions are file-backed, validated, and still do not grant live authority. |

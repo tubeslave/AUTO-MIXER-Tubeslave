@@ -155,6 +155,16 @@ def test_forbidden_request_types_cover_hard_safety_boundary() -> None:
         ),
         (
             [
+                "--channels",
+                "3",
+                "--operator-confirm-channels",
+                "3",
+                "--require-physical-readback",
+            ],
+            "--operator-confirm-session-ready is required when --require-physical-readback is set",
+        ),
+        (
+            [
                 "--operator-confirm-channels",
                 "bad",
                 "--require-physical-readback",
@@ -215,6 +225,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
     )
     args = parse_args(
         tmp_path,
@@ -225,6 +236,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--expected-plan",
         str(expected_plan),
     )
@@ -245,6 +257,8 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
     assert summary["connection_mode"] == "wing"
     assert summary["operator_channel_confirmation_required"] is True
     assert summary["operator_confirmed_channels"] == [3]
+    assert summary["operator_session_confirmation_required"] is True
+    assert summary["operator_confirmed_session_ready"] is True
     assert summary["expected_plan_path"] == str(expected_plan)
     assert summary["expected_plan_match"] is True
     assert summary["expected_plan_sha256"]
@@ -289,6 +303,7 @@ async def test_readonly_preflight_blocks_when_backend_is_not_wing(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
     )
     args = parse_args(
         tmp_path,
@@ -299,6 +314,7 @@ async def test_readonly_preflight_blocks_when_backend_is_not_wing(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--expected-plan",
         str(expected_plan),
     )
@@ -337,6 +353,7 @@ async def test_readonly_preflight_blocks_unexpected_response_type(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
     )
     args = parse_args(
         tmp_path,
@@ -347,6 +364,7 @@ async def test_readonly_preflight_blocks_unexpected_response_type(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--expected-plan",
         str(expected_plan),
     )
@@ -407,6 +425,7 @@ async def test_readonly_preflight_blocks_missing_physical_readback(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
     )
     args = parse_args(
         tmp_path,
@@ -417,6 +436,7 @@ async def test_readonly_preflight_blocks_missing_physical_readback(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--expected-plan",
         str(expected_plan),
     )
@@ -464,6 +484,7 @@ async def test_readonly_preflight_blocks_readback_identity_mismatch(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
     )
     args = parse_args(
         tmp_path,
@@ -474,6 +495,7 @@ async def test_readonly_preflight_blocks_readback_identity_mismatch(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--expected-plan",
         str(expected_plan),
     )
@@ -521,6 +543,7 @@ async def test_readonly_preflight_blocks_readback_request_id_mismatch(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
     )
     args = parse_args(
         tmp_path,
@@ -531,6 +554,7 @@ async def test_readonly_preflight_blocks_readback_request_id_mismatch(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--expected-plan",
         str(expected_plan),
     )
@@ -565,6 +589,7 @@ async def test_readonly_preflight_requires_expected_plan_before_websocket(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
     )
 
     exit_code = await runner.run(args)
@@ -597,6 +622,7 @@ async def test_readonly_preflight_blocks_expected_plan_mismatch_before_websocket
         "--require-physical-readback",
         "--operator-confirm-channels",
         "4",
+        "--operator-confirm-session-ready",
     )
     args = parse_args(
         tmp_path,
@@ -607,6 +633,7 @@ async def test_readonly_preflight_blocks_expected_plan_mismatch_before_websocket
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--expected-plan",
         str(expected_plan),
     )
@@ -643,6 +670,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--plan-only",
         "--plan-output",
         str(plan_output),
@@ -672,6 +700,8 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["live_write"] is False
     assert written["channels"] == [3]
     assert written["operator_confirmed_channels"] == [3]
+    assert written["operator_session_confirmation_required"] is True
+    assert written["operator_confirmed_session_ready"] is True
     assert [request["type"] for request in written["request_sequence"]] == [
         "get_operator_mode",
         "get_state",
@@ -699,6 +729,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
         ),
     ]
     assert "physical_readback_missing" in written["fail_closed_conditions"]
+    assert "operator_session_confirmation_missing" in written["fail_closed_conditions"]
     assert "readback_request_id_mismatch" in written["fail_closed_conditions"]
     assert "expected_plan_missing_or_mismatch" in written["fail_closed_conditions"]
     assert (
@@ -730,6 +761,7 @@ async def test_plan_only_blocks_invalid_channel_confirmation_before_websocket(
         "--require-physical-readback",
         "--operator-confirm-channels",
         "4",
+        "--operator-confirm-session-ready",
         "--plan-only",
         "--plan-output",
         str(plan_output),

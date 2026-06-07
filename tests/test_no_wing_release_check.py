@@ -533,6 +533,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "3",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--value-types",
         "fader,gain",
         "--require-physical-readback",
@@ -548,6 +549,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     )
     assert result.detail["plan_command_channels"] == "3"
     assert result.detail["plan_command_operator_confirmed_channels"] == "3"
+    assert result.detail["plan_command_confirms_session_ready"] is True
     assert result.detail["plan_command_value_types"] == "fader,gain"
     assert result.detail["plan_command_artifact_root"] == (
         "artifacts/wing_readonly_preflight"
@@ -562,6 +564,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "3",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--value-types",
         "fader,gain",
         "--require-physical-readback",
@@ -574,6 +577,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     assert result.detail["capture_command_operator_confirmed_channels"] == "3"
     assert result.detail["capture_command_requires_operator_channel_confirmation"] is True
     assert result.detail["capture_command_operator_confirmation_matches_channels"] is True
+    assert result.detail["capture_command_confirms_session_ready"] is True
     assert result.detail["capture_command_requires_physical_readback"] is True
     assert result.detail["capture_command_expected_plan"] == (
         "artifacts/wing_readonly_preflight_plan/latest_plan.json"
@@ -660,6 +664,8 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "channels": [3],
         "operator_channel_confirmation_required": True,
         "operator_confirmed_channels": [3],
+        "operator_session_confirmation_required": True,
+        "operator_confirmed_session_ready": True,
         "value_types": ["fader", "gain"],
         "require_physical_readback": True,
         "read_only": True,
@@ -774,6 +780,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "3",
                 "--operator-confirm-channels",
                 "3",
+                "--operator-confirm-session-ready",
                 "--value-types",
                 "fader,gain",
                 "--require-physical-readback",
@@ -792,6 +799,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "3",
                 "--operator-confirm-channels",
                 "3",
+                "--operator-confirm-session-ready",
                 "--value-types",
                 "fader,gain",
                 "--require-physical-readback",
@@ -2427,6 +2435,7 @@ def test_no_wing_release_check_rejects_wing_preflight_plan_command_mismatch(
             "4",
             "--operator-confirm-channels",
             "4",
+                "--operator-confirm-session-ready",
             "--value-types",
             "fader,gain",
             "--require-physical-readback",
@@ -4591,6 +4600,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         wing_plan_check.command
     )
     assert "--operator-confirm-channels" in wing_plan_check.command
+    assert "--operator-confirm-session-ready" in wing_plan_check.command
     assert "--require-physical-readback" in wing_plan_check.command
     read_acceptance_template_check = next(
         check
@@ -5090,6 +5100,7 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
                 "3",
                 "--operator-confirm-channels",
                 "3",
+                "--operator-confirm-session-ready",
                 "--value-types",
                 "fader,gain",
                 "--require-physical-readback",
@@ -6821,6 +6832,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "3",
                 "--operator-confirm-channels",
                 "3",
+                "--operator-confirm-session-ready",
                 "--value-types",
                 "fader,gain",
                 "--require-physical-readback",
@@ -6834,6 +6846,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "plan_command_output": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
             "plan_command_channels": "3",
             "plan_command_operator_confirmed_channels": "3",
+            "plan_command_confirms_session_ready": True,
             "plan_command_value_types": "fader,gain",
             "plan_command_artifact_root": "artifacts/wing_readonly_preflight",
             "plan_command_matches_capture": True,
@@ -6846,6 +6859,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "3",
                 "--operator-confirm-channels",
                 "3",
+                "--operator-confirm-session-ready",
                 "--value-types",
                 "fader,gain",
                 "--require-physical-readback",
@@ -6858,6 +6872,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "capture_command_operator_confirmed_channels": "3",
             "capture_command_requires_operator_channel_confirmation": True,
             "capture_command_operator_confirmation_matches_channels": True,
+            "capture_command_confirms_session_ready": True,
             "capture_command_requires_physical_readback": True,
             "capture_command_expected_plan": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
             "capture_command_expected_plan_matches_plan_output": True,
@@ -6963,6 +6978,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     )
     assert preflight["plan_command_channels"] == "3"
     assert preflight["plan_command_operator_confirmed_channels"] == "3"
+    assert preflight["plan_command_confirms_session_ready"] is True
     assert preflight["plan_command_value_types"] == "fader,gain"
     assert preflight["plan_command_artifact_root"] == "artifacts/wing_readonly_preflight"
     assert preflight["plan_command_matches_capture"] is True
@@ -6970,10 +6986,12 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["capture_command_channels"] == "3"
     assert preflight["capture_command_operator_confirmed_channels"] == "3"
     assert "--operator-confirm-channels" in preflight["capture_command_template"]
+    assert "--operator-confirm-session-ready" in preflight["capture_command_template"]
     assert "--require-physical-readback" in preflight["capture_command_template"]
     assert "--expected-plan" in preflight["capture_command_template"]
     assert preflight["capture_command_requires_operator_channel_confirmation"] is True
     assert preflight["capture_command_operator_confirmation_matches_channels"] is True
+    assert preflight["capture_command_confirms_session_ready"] is True
     assert preflight["capture_command_requires_physical_readback"] is True
     assert preflight["capture_command_expected_plan"] == (
         "artifacts/wing_readonly_preflight_plan/latest_plan.json"
@@ -7041,6 +7059,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "capture_command_operator_confirmed_channels: `3`" in markdown_summary
     assert "capture_command_operator_confirmation_matches_channels: `true`" in markdown_summary
     assert "--operator-confirm-channels" in markdown_summary
+    assert "--operator-confirm-session-ready" in markdown_summary
     assert "--require-physical-readback" in markdown_summary
     assert (
         "review_tool_path: `tools/review_wing_readonly_preflight_artifacts.py`"
@@ -7078,6 +7097,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "expected_plan_output": "/tmp/wing_readonly_preflight_plan.json",
             "channels": [3],
             "operator_confirmed_channels": [3],
+            "operator_session_confirmation_required": True,
+            "operator_confirmed_session_ready": True,
             "value_types": ["fader", "gain"],
             "request_count": 4,
             "expected_request_count": 4,
@@ -7098,6 +7119,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "fail_closed_conditions": [
                 "backend_not_in_wing_mode",
                 "operator_channel_confirmation_mismatch",
+                "operator_session_confirmation_missing",
                 "physical_readback_missing",
             ],
             "post_run_review_commands": [
@@ -7131,6 +7153,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["selected_mvp_blocker_status"] == "tooling_ready_waits_real_wing"
     assert artifact["channels"] == [3]
     assert artifact["operator_confirmed_channels"] == [3]
+    assert artifact["operator_session_confirmation_required"] is True
+    assert artifact["operator_confirmed_session_ready"] is True
     assert artifact["value_types"] == ["fader", "gain"]
     assert artifact["request_count"] == 4
     assert artifact["expected_request_count"] == 4
@@ -7139,6 +7163,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["fail_closed_conditions"] == [
         "backend_not_in_wing_mode",
         "operator_channel_confirmation_mismatch",
+        "operator_session_confirmation_missing",
         "physical_readback_missing",
     ]
     assert artifact["post_run_review_commands"] == [
@@ -7154,6 +7179,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
         in markdown_summary
     )
     assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
+    assert "operator_session_confirmation_required: `true`" in markdown_summary
+    assert "operator_confirmed_session_ready: `true`" in markdown_summary
     assert "WING read-only connection proof" in markdown_summary
     assert "physical_readback_missing" in markdown_summary
     assert "review_wing_readonly_preflight_decisions.py" in markdown_summary

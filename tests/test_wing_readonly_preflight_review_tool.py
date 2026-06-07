@@ -20,6 +20,8 @@ def _valid_summary() -> dict:
         "channels": [3],
         "operator_channel_confirmation_required": True,
         "operator_confirmed_channels": [3],
+        "operator_session_confirmation_required": True,
+        "operator_confirmed_session_ready": True,
         "value_types": ["fader", "gain"],
         "require_physical_readback": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
@@ -131,6 +133,12 @@ def _valid_expected_plan(summary: dict) -> dict:
             "operator_channel_confirmation_required"
         ],
         "operator_confirmed_channels": summary["operator_confirmed_channels"],
+        "operator_session_confirmation_required": summary[
+            "operator_session_confirmation_required"
+        ],
+        "operator_confirmed_session_ready": summary[
+            "operator_confirmed_session_ready"
+        ],
         "value_types": summary["value_types"],
         "require_physical_readback": summary["require_physical_readback"],
         "read_only": summary["read_only"],

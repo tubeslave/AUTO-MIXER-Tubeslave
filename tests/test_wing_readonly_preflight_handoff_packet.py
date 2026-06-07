@@ -30,6 +30,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "3",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--value-types",
         "fader,gain",
         "--require-physical-readback",
@@ -48,6 +49,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "3",
         "--operator-confirm-channels",
         "3",
+        "--operator-confirm-session-ready",
         "--value-types",
         "fader,gain",
         "--require-physical-readback",
@@ -81,9 +83,11 @@ def test_handoff_packet_supports_custom_channel_confirmation():
     preview = packet["commands"]["preview_readonly_request_plan"]
     assert preview[preview.index("--channels") + 1] == "2,4"
     assert preview[preview.index("--operator-confirm-channels") + 1] == "2,4"
+    assert "--operator-confirm-session-ready" in preview
     command = packet["commands"]["capture_readonly_preflight"]
     assert command[command.index("--channels") + 1] == "2,4"
     assert command[command.index("--operator-confirm-channels") + 1] == "2,4"
+    assert "--operator-confirm-session-ready" in command
 
 
 def test_handoff_packet_rejects_invalid_channels():
@@ -116,6 +120,7 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "live_write: `false`" in markdown
     assert "preview_readonly_request_plan" in markdown
     assert "--plan-only" in markdown
+    assert "--operator-confirm-session-ready" in markdown
     assert "capture_readonly_preflight" in markdown
     assert "review_edited_decision_json" in markdown
     assert "pending_review_decision_template.json" in markdown

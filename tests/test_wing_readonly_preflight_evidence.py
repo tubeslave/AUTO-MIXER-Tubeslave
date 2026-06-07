@@ -28,6 +28,8 @@ def _valid_summary() -> dict:
         "channels": [3],
         "operator_channel_confirmation_required": True,
         "operator_confirmed_channels": [3],
+        "operator_session_confirmation_required": True,
+        "operator_confirmed_session_ready": True,
         "value_types": ["fader", "gain"],
         "require_physical_readback": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
@@ -141,6 +143,12 @@ def _valid_expected_plan(summary: dict) -> dict:
             "operator_channel_confirmation_required"
         ],
         "operator_confirmed_channels": summary["operator_confirmed_channels"],
+        "operator_session_confirmation_required": summary[
+            "operator_session_confirmation_required"
+        ],
+        "operator_confirmed_session_ready": summary[
+            "operator_confirmed_session_ready"
+        ],
         "value_types": summary["value_types"],
         "require_physical_readback": summary["require_physical_readback"],
         "read_only": summary["read_only"],
@@ -306,6 +314,18 @@ def test_preflight_evidence_rejects_missing_operator_channel_confirmation():
     assert "operator_channel_confirmation_required_not_true" in validation["violations"]
     assert "operator_confirmed_channels_missing" in validation["violations"]
     assert "operator_confirmed_channels_mismatch" in validation["violations"]
+
+
+def test_preflight_evidence_rejects_missing_operator_session_confirmation():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact.pop("operator_session_confirmation_required")
+    artifact.pop("operator_confirmed_session_ready")
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "operator_session_confirmation_required_not_true" in validation["violations"]
+    assert "operator_confirmed_session_ready_not_true" in validation["violations"]
 
 
 def test_preflight_evidence_rejects_missing_expected_plan_link():

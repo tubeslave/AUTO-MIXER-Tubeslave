@@ -20,6 +20,8 @@ def _valid_summary() -> dict:
         "channels": [3],
         "operator_channel_confirmation_required": True,
         "operator_confirmed_channels": [3],
+        "operator_session_confirmation_required": True,
+        "operator_confirmed_session_ready": True,
         "value_types": ["fader", "gain"],
         "require_physical_readback": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",

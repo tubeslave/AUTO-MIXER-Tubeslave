@@ -399,6 +399,7 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
 WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS = (
     "backend_not_in_wing_mode",
     "operator_channel_confirmation_mismatch",
+    "operator_session_confirmation_missing",
     "physical_readback_missing",
     "readback_identity_mismatch",
     "readback_request_id_mismatch",
@@ -420,6 +421,7 @@ def wing_readonly_preflight_capture_command_template() -> list[str]:
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
         "--operator-confirm-channels",
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-session-ready",
         "--value-types",
         WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
         "--require-physical-readback",
@@ -440,6 +442,7 @@ def wing_readonly_preflight_plan_command() -> list[str]:
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
         "--operator-confirm-channels",
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-session-ready",
         "--value-types",
         WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
         "--require-physical-readback",
@@ -823,6 +826,7 @@ def build_checks(
                 WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
                 "--operator-confirm-channels",
                 WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+                "--operator-confirm-session-ready",
                 "--value-types",
                 WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
                 "--require-physical-readback",
@@ -2732,11 +2736,15 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         and bool(capture_confirmed_channels)
         and capture_channels == capture_confirmed_channels
     )
+    capture_confirms_session_ready = (
+        "--operator-confirm-session-ready" in capture_command
+    )
     plan_channels = command_value_after_flag(plan_command, "--channels")
     plan_confirmed_channels = command_value_after_flag(
         plan_command,
         "--operator-confirm-channels",
     )
+    plan_confirms_session_ready = "--operator-confirm-session-ready" in plan_command
     plan_value_types = command_value_after_flag(plan_command, "--value-types")
     plan_artifact_root = command_value_after_flag(plan_command, "--artifact-root")
     plan_output = command_value_after_flag(plan_command, "--plan-output")
@@ -2783,6 +2791,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_review_decision_template_output_missing")
     if "--operator-confirm-channels" not in capture_command:
         violations.append("wing_readonly_preflight_capture_operator_confirmation_missing")
+    if "--operator-confirm-session-ready" not in capture_command:
+        violations.append("wing_readonly_preflight_capture_session_confirmation_missing")
+    if "--operator-confirm-session-ready" not in plan_command:
+        violations.append("wing_readonly_preflight_plan_session_confirmation_missing")
     if "--channels" not in capture_command:
         violations.append("wing_readonly_preflight_capture_channels_missing")
     if (
@@ -2890,6 +2902,7 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["plan_command_output"] = plan_output
     detail["plan_command_channels"] = plan_channels
     detail["plan_command_operator_confirmed_channels"] = plan_confirmed_channels
+    detail["plan_command_confirms_session_ready"] = plan_confirms_session_ready
     detail["plan_command_value_types"] = plan_value_types
     detail["plan_command_artifact_root"] = plan_artifact_root
     detail["plan_command_matches_capture"] = plan_matches_capture
@@ -2902,6 +2915,7 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["capture_command_operator_confirmation_matches_channels"] = (
         capture_confirmation_matches_channels
     )
+    detail["capture_command_confirms_session_ready"] = capture_confirms_session_ready
     detail["capture_command_requires_physical_readback"] = (
         "--require-physical-readback" in capture_command
     )
@@ -3030,6 +3044,10 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append("wing_readonly_preflight_plan_value_types_mismatch")
     if plan.get("operator_channel_confirmation_required") is not True:
         violations.append("wing_readonly_preflight_plan_operator_confirmation_not_required")
+    if plan.get("operator_session_confirmation_required") is not True:
+        violations.append("wing_readonly_preflight_plan_session_confirmation_not_required")
+    if plan.get("operator_confirmed_session_ready") is not True:
+        violations.append("wing_readonly_preflight_plan_session_not_confirmed_ready")
     if plan.get("require_physical_readback") is not True:
         violations.append("wing_readonly_preflight_plan_physical_readback_not_required")
     if plan.get("selected_mvp_blocker") != "WING read-only connection proof":
@@ -3146,6 +3164,12 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         if isinstance(plan.get("operator_confirmed_channels"), list)
         else []
     )
+    detail["operator_session_confirmation_required"] = plan.get(
+        "operator_session_confirmation_required"
+    )
+    detail["operator_confirmed_session_ready"] = plan.get(
+        "operator_confirmed_session_ready"
+    )
     detail["value_types"] = (
         plan.get("value_types") if isinstance(plan.get("value_types"), list) else []
     )
@@ -3247,6 +3271,7 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
         "--operator-confirm-channels",
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-session-ready",
         "--value-types",
         WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
         "--require-physical-readback",
@@ -3265,6 +3290,7 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
         "--operator-confirm-channels",
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-session-ready",
         "--value-types",
         WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
         "--require-physical-readback",
@@ -3337,9 +3363,21 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append("wing_readonly_preflight_handoff_packet_focused_validation_missing")
     if "--plan-only" not in commands.get("preview_readonly_request_plan", []):
         violations.append("wing_readonly_preflight_handoff_packet_preview_plan_only_missing")
+    if "--operator-confirm-session-ready" not in commands.get(
+        "preview_readonly_request_plan", []
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_preview_session_confirmation_missing"
+        )
     if "--require-physical-readback" not in commands.get("capture_readonly_preflight", []):
         violations.append(
             "wing_readonly_preflight_handoff_packet_capture_physical_readback_missing"
+        )
+    if "--operator-confirm-session-ready" not in commands.get(
+        "capture_readonly_preflight", []
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_capture_session_confirmation_missing"
         )
     if "--decision-template-output" not in commands.get(
         "review_artifact_and_write_pending_decision_template", []
@@ -9999,6 +10037,9 @@ def wing_readonly_preflight_evidence_summary(
             "plan_command_operator_confirmed_channels": detail.get(
                 "plan_command_operator_confirmed_channels"
             ),
+            "plan_command_confirms_session_ready": (
+                detail.get("plan_command_confirms_session_ready") is True
+            ),
             "plan_command_value_types": detail.get("plan_command_value_types"),
             "plan_command_artifact_root": detail.get("plan_command_artifact_root"),
             "plan_command_matches_capture": (
@@ -10016,6 +10057,9 @@ def wing_readonly_preflight_evidence_summary(
             ),
             "capture_command_operator_confirmation_matches_channels": (
                 detail.get("capture_command_operator_confirmation_matches_channels") is True
+            ),
+            "capture_command_confirms_session_ready": (
+                detail.get("capture_command_confirms_session_ready") is True
             ),
             "capture_command_requires_physical_readback": (
                 detail.get("capture_command_requires_physical_readback") is True
@@ -10118,6 +10162,12 @@ def wing_readonly_preflight_plan_artifact_summary(
                 list(detail.get("operator_confirmed_channels"))
                 if isinstance(detail.get("operator_confirmed_channels"), list)
                 else []
+            ),
+            "operator_session_confirmation_required": (
+                detail.get("operator_session_confirmation_required") is True
+            ),
+            "operator_confirmed_session_ready": (
+                detail.get("operator_confirmed_session_ready") is True
             ),
             "value_types": (
                 list(detail.get("value_types"))
@@ -13267,6 +13317,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_plan_artifact['physical_preflight_requires_existing_backend_connection']).lower()}`",
                 "- manual_review_required_before_readiness_update: "
                 f"`{str(wing_readonly_preflight_plan_artifact['manual_review_required_before_readiness_update']).lower()}`",
+                "- operator_session_confirmation_required: "
+                f"`{str(wing_readonly_preflight_plan_artifact['operator_session_confirmation_required']).lower()}`",
+                "- operator_confirmed_session_ready: "
+                f"`{str(wing_readonly_preflight_plan_artifact['operator_confirmed_session_ready']).lower()}`",
                 "- execution_allowed_by_plan: "
                 f"`{str(wing_readonly_preflight_plan_artifact['execution_allowed_by_plan']).lower()}`",
                 "- live_authority_granted: "

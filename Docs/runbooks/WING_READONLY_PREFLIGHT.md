@@ -52,6 +52,7 @@ python3 tools/wing_readonly_preflight_runner.py \
   --url ws://localhost:8765 \
   --channels 3 \
   --operator-confirm-channels 3 \
+  --operator-confirm-session-ready \
   --value-types fader,gain \
   --require-physical-readback \
   --artifact-root artifacts/wing_readonly_preflight \
@@ -70,6 +71,7 @@ python3 tools/wing_readonly_preflight_runner.py \
   --url ws://localhost:8765 \
   --channels 3 \
   --operator-confirm-channels 3 \
+  --operator-confirm-session-ready \
   --value-types fader,gain \
   --require-physical-readback \
   --artifact-root artifacts/wing_readonly_preflight \
@@ -90,6 +92,8 @@ The summary must show:
 - `connection_mode: wing`
 - `operator_channel_confirmation_required: true`
 - `operator_confirmed_channels == channels`
+- `operator_session_confirmation_required: true`
+- `operator_confirmed_session_ready: true`
 - `read_only: true`
 - `live_write: false`
 - `write_request_sent: false`
@@ -216,6 +220,8 @@ Then update:
 - backend is not in WING mode;
 - any readback comes from cache instead of physical readback;
 - any forbidden request type is sent;
+- `--operator-confirm-session-ready` is missing for a physical read-only
+  preflight;
 - backend returns an unexpected response type for the request in flight;
 - `events.jsonl` is missing or does not match `summary.json`;
 - `events.jsonl` is not strict `send`/`recv` pairs;

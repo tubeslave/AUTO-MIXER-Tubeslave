@@ -82,6 +82,8 @@ EXPECTED_PLAN_SUMMARY_FIELDS = (
     "channels",
     "operator_channel_confirmation_required",
     "operator_confirmed_channels",
+    "operator_session_confirmation_required",
+    "operator_confirmed_session_ready",
     "value_types",
     "require_physical_readback",
     "read_only",
@@ -536,6 +538,10 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("operator_confirmed_channels_missing")
     if confirmed_channels != channels:
         violations.append("operator_confirmed_channels_mismatch")
+    if payload.get("operator_session_confirmation_required") is not True:
+        violations.append("operator_session_confirmation_required_not_true")
+    if payload.get("operator_confirmed_session_ready") is not True:
+        violations.append("operator_confirmed_session_ready_not_true")
     if payload.get("read_only") is not True:
         violations.append("read_only_not_true")
     if payload.get("live_write") is not False:

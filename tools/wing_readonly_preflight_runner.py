@@ -71,6 +71,8 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "channels",
     "operator_channel_confirmation_required",
     "operator_confirmed_channels",
+    "operator_session_confirmation_required",
+    "operator_confirmed_session_ready",
     "value_types",
     "require_physical_readback",
     "read_only",
@@ -266,6 +268,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--operator-confirm-session-ready",
+        action="store_true",
+        help=(
+            "Confirm the intended backend/WING session is ready for read-only "
+            "preflight; required with --require-physical-readback."
+        ),
+    )
+    parser.add_argument(
         "--plan-only",
         action="store_true",
         help="Validate inputs and print the offline read-only request plan without opening WebSocket.",
@@ -317,6 +327,8 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
             return "--operator-confirm-channels must match --channels when --require-physical-readback is set"
         if confirmed_channels != channels:
             return "--operator-confirm-channels must exactly match --channels"
+        if not args.operator_confirm_session_ready:
+            return "--operator-confirm-session-ready is required when --require-physical-readback is set"
     if args.timeout <= 0:
         return "--timeout must be positive"
     return None
@@ -364,6 +376,8 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "channels": list(channels),
         "operator_channel_confirmation_required": bool(args.require_physical_readback),
         "operator_confirmed_channels": parse_csv_ints_for_summary(args.operator_confirm_channels),
+        "operator_session_confirmation_required": bool(args.require_physical_readback),
+        "operator_confirmed_session_ready": bool(args.operator_confirm_session_ready),
         "value_types": list(value_types),
         "require_physical_readback": bool(args.require_physical_readback),
         "read_only": True,
@@ -410,6 +424,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "fail_closed_conditions": [
             "backend_not_in_wing_mode",
             "operator_channel_confirmation_mismatch",
+            "operator_session_confirmation_missing",
             "physical_readback_missing",
             "readback_identity_mismatch",
             "readback_request_id_mismatch",
@@ -484,6 +499,8 @@ async def run(args: argparse.Namespace) -> int:
         "operator_confirmed_channels": parse_csv_ints_for_summary(
             args.operator_confirm_channels
         ),
+        "operator_session_confirmation_required": bool(args.require_physical_readback),
+        "operator_confirmed_session_ready": bool(args.operator_confirm_session_ready),
         "value_types": list(value_types),
         "require_physical_readback": bool(args.require_physical_readback),
         "expected_plan_required_for_real_run": True,
