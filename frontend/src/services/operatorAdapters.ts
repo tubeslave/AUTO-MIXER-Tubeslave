@@ -45,22 +45,33 @@ const MODE_ALIASES_TO_CANONICAL_BACKEND: Record<string, BackendOperatorMode> = {
   'analysis': 'analyze',
   'analysis mode': 'analyze',
   'analysis_mode': 'analyze',
+  'analysis_mode_mode': 'analyze',
   'analysismode': 'analyze',
   assist: 'assist',
   'assisted': 'assist',
   'assisted mixing': 'assist',
   'assistedmixing': 'assist',
   'assist mode': 'assist',
+  'assisted mode': 'assist',
+  'assisted_mixing': 'assist',
+  'assisted_mixing_mode': 'assist',
   supervised: 'supervised',
   'supervised automix': 'supervised',
   'supervised automix mode': 'supervised',
+  'supervised_automix': 'supervised',
+  'supervised_automix_mode': 'supervised',
   'supervised mode': 'supervised',
+  'supervised_mode': 'supervised',
   auto: 'auto',
   autonomous: 'auto',
   'full autonomous': 'auto',
   'full autonomous mixing': 'auto',
+  'full_autonomous': 'auto',
+  'full_autonomous_mixing': 'auto',
   'full autonomous mixing mode': 'auto',
-  'auto mode': 'auto'
+  'full_autonomous_mixing_mode': 'auto',
+  'auto mode': 'auto',
+  'auto_mode': 'auto'
 };
 
 const modeToBackend: Record<AutomixerMode, BackendOperatorMode> = {
@@ -69,6 +80,15 @@ const modeToBackend: Record<AutomixerMode, BackendOperatorMode> = {
   Supervised: 'supervised',
   Auto: 'auto'
 };
+
+function normalizeModeInput(value: unknown): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
 
 export const mockBackendState: BackendUiState = {
   connectionState: 'mock',
@@ -98,7 +118,7 @@ export function toBackendMode(mode: AutomixerMode): BackendOperatorMode {
 }
 
 export function toUiMode(value: unknown): AutomixerMode {
-  const normalized = String(value || '').trim().toLowerCase();
+  const normalized = normalizeModeInput(value);
   const canonicalMode = MODE_ALIASES_TO_CANONICAL_BACKEND[normalized] as BackendOperatorMode | undefined;
   return modeToUi[canonicalMode ?? 'assist'];
 }

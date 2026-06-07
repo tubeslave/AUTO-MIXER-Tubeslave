@@ -108,8 +108,13 @@ test('toUiMode normalizes known aliases to canonical operator modes', async () =
   const { toUiMode } = await importTypeScript('services/operatorAdapters.ts');
 
   assert.equal(toUiMode('analysis mode'), 'Analyze');
+  assert.equal(toUiMode('analysis-mode'), 'Analyze');
+  assert.equal(toUiMode('analysis_mode'), 'Analyze');
   assert.equal(toUiMode('full autonomous mixing mode'), 'Auto');
+  assert.equal(toUiMode('full-autonomous-mixing-mode'), 'Auto');
   assert.equal(toUiMode('supervised automix'), 'Supervised');
+  assert.equal(toUiMode('supervised automix mode'), 'Supervised');
+  assert.equal(toUiMode('assisted mode'), 'Assist');
   assert.equal(toUiMode('unknown-mode'), 'Assist');
 });
 
