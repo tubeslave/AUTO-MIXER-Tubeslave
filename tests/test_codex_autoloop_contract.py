@@ -98,7 +98,7 @@ def test_codex_autoloop_launch_agent_is_interval_based_and_non_keepalive():
     assert launch_agent["WorkingDirectory"] == "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main"
     assert launch_agent["RunAtLoad"] is False
     assert launch_agent["KeepAlive"] is False
-    assert launch_agent["StartInterval"] == 1200
+    assert launch_agent["StartInterval"] == 21600
     assert (
         launch_agent["EnvironmentVariables"]["CODEX_AUTOLOOP_EXPECTED_PROJECT_ROOT"]
         == "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main"

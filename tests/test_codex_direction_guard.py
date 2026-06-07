@@ -215,5 +215,5 @@ def test_codex_autoloop_readme_documents_direction_guard_activation_time():
     assert "Direction guard activation" in text
     assert "before task selection" in text
     assert "before the final cycle report" in text
-    assert "1200" in text
+    assert "21600" in text
     assert "seconds" in text
