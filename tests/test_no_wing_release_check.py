@@ -36,6 +36,8 @@ from tools.no_wing_release_check import (
     read_surface_physical_readback_artifact_review_queue_path_for_run,
     read_surface_physical_readback_capture_packet_artifact_summary,
     read_surface_physical_readback_capture_packet_path_for_run,
+    read_surface_physical_readback_capture_template_artifact_summary,
+    read_surface_physical_readback_capture_template_path_for_run,
     read_surface_physical_readback_artifact_review_queue_summary,
     read_surface_physical_readback_fixture_acceptance_ledger_summary,
     read_surface_physical_readback_fixture_closure_plan_artifact_summary,
@@ -74,6 +76,7 @@ from tools.no_wing_release_check import (
     validate_read_surface_physical_readback_artifact_review_queue_snapshot,
     validate_read_surface_physical_readback_acceptance_template_artifact_snapshot,
     validate_read_surface_physical_readback_capture_packet_artifact_snapshot,
+    validate_read_surface_physical_readback_capture_template_artifact_snapshot,
     validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot,
     validate_read_surface_physical_readback_fixture_closure_plan_artifact_snapshot,
     validate_read_surface_physical_readback_fixture_closure_plan_snapshot,
@@ -969,6 +972,112 @@ def valid_read_surface_capture_packet_payload() -> dict:
     }
 
 
+def valid_read_surface_capture_template_payload() -> dict:
+    return {
+        "type": "read_surface_physical_readback_artifact_capture_template",
+        "generated_at": "2026-06-07T00:00:00Z",
+        "status": "operator_capture_template_ready",
+        "source_packet_type": "read_surface_physical_readback_capture_packet",
+        "source_packet_status": "operator_capture_required",
+        "source_method_id": "read_surface_physical_readback_capture_plan",
+        "selected_surface_id": "raw_mixer_state_cache",
+        "include_all_targets": False,
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "operator_required": True,
+        "execution_allowed_by_template": False,
+        "accepted_as_physical_fixture_candidate": False,
+        "fixture_closure_allowed_by_template": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "all_remaining_target_count": 2,
+        "capture_template_count": 1,
+        "capture_templates": [
+            {
+                "template_id": "pending-raw-mixer-state-cache-physical-readback",
+                "surface_id": "raw_mixer_state_cache",
+                "remediation_action_id": "remediate_raw_mixer_state_cache",
+                "target_console_surface": "all_cached_addresses",
+                "read_mode": "cached_state",
+                "requires_connection": True,
+                "required_contract_method_id": "raw_mixer_state_physical_readback_contract",
+                "required_artifact_contracts": [
+                    "physical_readback_fixture",
+                    "raw_mixer_state_physical_readback_contract",
+                ],
+                "expected_artifacts": [
+                    "Raw mixer-state physical readback artifact validated by raw_mixer_state_physical_readback_contract.",
+                ],
+                "blockers_to_clear": [
+                    "physical_readback_fixture_missing",
+                    "hardware_parity_unproven",
+                ],
+                "artifact_source_id": "<path-to-operator-captured-json>",
+                "captured_at": "<UTC ISO timestamp, e.g. 2026-06-07T12:00:00Z>",
+                "captured_by": "<operator-name>",
+                "source": "<physical_readback|wing_physical_readback|dlive_physical_readback>",
+                "console_model": "<console model and firmware>",
+                "capture_scope": "<manual capture scope and show-state notes>",
+                "physical_readback_payload": (
+                    "<replace with JSON payload that matches required_contract_method_id>"
+                ),
+                "safety": {
+                    "read_only": True,
+                    "live_write": False,
+                    "mutates_console_state": False,
+                    "queries_console": False,
+                    "executes_tests": False,
+                    "operator_required": True,
+                    "execution_allowed_by_template": False,
+                    "accepted_as_physical_fixture_candidate": False,
+                    "fixture_closure_allowed_by_template": False,
+                    "live_widening_allowed": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                },
+            }
+        ],
+        "required_operator_edits": [
+            "artifact_source_id",
+            "captured_at",
+            "captured_by",
+            "source",
+            "console_model",
+            "capture_scope",
+            "physical_readback_payload",
+        ],
+        "blocked_by": [
+            "operator_must_capture_and_review_physical_readback_artifact",
+            "operator_must_replace_capture_template_placeholders",
+            "operator_must_validate_filled_artifact_with_required_contract",
+            "operator_must_review_artifact_before_fixture_acceptance",
+        ],
+        "operator_sequence": [
+            "Confirm the selected surface and console/show state before capture.",
+            "Replace every placeholder with real operator-captured physical readback data.",
+            "Reject the capture path if it would send a mixer-control message or mutate console state.",
+            "Keep authority, execution, fixture-closure, and autonomous-readiness flags false.",
+            "Validate the filled artifact with the listed required contract before review queue intake.",
+            "Use the review queue and acceptance ledger before any separate fixture-closure decision.",
+        ],
+        "commands": {
+            "focused_validation": [
+                "PYTHONPATH=backend",
+                "python3",
+                "-m",
+                "pytest",
+                "-q",
+                "tests/test_read_surface_physical_readback_capture_template.py",
+                "tests/test_no_wing_release_check.py",
+            ],
+        },
+    }
+
+
 def valid_read_surface_artifact_review_queue_payload() -> dict:
     queue_items = []
     for spec in release_check.INTAKE_SPECS:
@@ -1317,6 +1426,132 @@ def test_no_wing_release_check_rejects_unsafe_read_surface_capture_packet_artifa
         "read_surface_capture_packet_artifact_forbidden_action_missing:do not transmit osc"
         in result.detail["violations"]
     )
+
+
+def test_no_wing_release_check_validates_read_surface_capture_template_artifact(
+    tmp_path,
+):
+    template_path = tmp_path / "read_surface_physical_readback_capture_template.json"
+    template_path.write_text(
+        json.dumps(valid_read_surface_capture_template_payload()),
+        encoding="utf-8",
+    )
+
+    result = validate_read_surface_physical_readback_capture_template_artifact_snapshot(
+        template_path
+    )
+
+    assert result.status == "passed"
+    assert (
+        result.detail["policy"]
+        == "read_surface_physical_readback_capture_template_artifact_is_pending_readonly_operator_gate"
+    )
+    assert result.detail["template_path"] == str(template_path)
+    assert result.detail["template_status"] == "operator_capture_template_ready"
+    assert result.detail["source_packet_status"] == "operator_capture_required"
+    assert result.detail["read_only"] is True
+    assert result.detail["live_write"] is False
+    assert result.detail["mutates_console_state"] is False
+    assert result.detail["queries_console"] is False
+    assert result.detail["executes_tests"] is False
+    assert result.detail["operator_required"] is True
+    assert result.detail["execution_allowed_by_template"] is False
+    assert result.detail["accepted_as_physical_fixture_candidate"] is False
+    assert result.detail["fixture_closure_allowed_by_template"] is False
+    assert result.detail["live_widening_allowed"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["all_remaining_target_count"] == 2
+    assert result.detail["capture_template_count"] == 1
+    assert result.detail["capture_template_surface_ids"] == ["raw_mixer_state_cache"]
+    assert result.detail["capture_template_contract_ids"] == [
+        "raw_mixer_state_physical_readback_contract"
+    ]
+    assert result.detail["required_operator_edits"] == [
+        "artifact_source_id",
+        "captured_at",
+        "captured_by",
+        "source",
+        "console_model",
+        "capture_scope",
+        "physical_readback_payload",
+    ]
+    assert result.detail["operator_sequence_count"] == 6
+    assert result.detail["record_unsafe_flags"] == []
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_missing_read_surface_capture_template_artifact(
+    tmp_path,
+):
+    result = validate_read_surface_physical_readback_capture_template_artifact_snapshot(
+        tmp_path / "missing-capture-template.json"
+    )
+
+    assert result.status == "failed"
+    assert (
+        "read_surface_physical_readback_capture_template_artifact_missing_report"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_unsafe_read_surface_capture_template_artifact(
+    tmp_path,
+):
+    template_path = tmp_path / "unsafe-capture-template.json"
+    payload = valid_read_surface_capture_template_payload()
+    payload["live_authority_granted"] = True
+    payload["accepted_as_physical_fixture_candidate"] = True
+    payload["capture_template_count"] = 2
+    payload["capture_templates"][0]["artifact_source_id"] = "raw-mixer-physical.json"
+    payload["capture_templates"][0]["captured_at"] = "2026-06-07T12:00:00Z"
+    payload["capture_templates"][0]["physical_readback_payload"] = {
+        "type": "raw_mixer_state_physical_readback",
+    }
+    payload["capture_templates"][0]["safety"]["live_authority_granted"] = True
+    payload["capture_templates"][0]["safety"][
+        "accepted_as_physical_fixture_candidate"
+    ] = True
+    template_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_read_surface_physical_readback_capture_template_artifact_snapshot(
+        template_path
+    )
+
+    assert result.status == "failed"
+    assert "capture_template_artifact_live_authority_granted_not_false" in result.detail[
+        "violations"
+    ]
+    assert (
+        "capture_template_artifact_accepted_as_physical_fixture_candidate_not_false"
+        in result.detail["violations"]
+    )
+    assert "capture_template_artifact_record_count_mismatch" in result.detail[
+        "violations"
+    ]
+    assert (
+        "capture_template_artifact_record_0_artifact_source_id_not_pending"
+        in result.detail["violations"]
+    )
+    assert (
+        "capture_template_artifact_record_0_captured_at_not_pending"
+        in result.detail["violations"]
+    )
+    assert (
+        "capture_template_artifact_record_0_payload_not_pending"
+        in result.detail["violations"]
+    )
+    assert "capture_template_artifact_record_0_live_authority_granted_not_false" in result.detail[
+        "violations"
+    ]
+    assert (
+        "capture_template_artifact_record_0_accepted_as_physical_fixture_candidate_not_false"
+        in result.detail["violations"]
+    )
+    assert result.detail["record_unsafe_flags"] == [
+        "record_0_accepted_as_physical_fixture_candidate",
+        "record_0_live_authority_granted",
+    ]
 
 
 def test_no_wing_release_check_validates_artifact_review_queue_artifact(tmp_path):
@@ -3932,6 +4167,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "gain_dry_run_proof" in check_names
     assert "wing_readonly_preflight_plan" in check_names
     assert "read_surface_physical_readback_capture_packet" in check_names
+    assert "read_surface_physical_readback_capture_template" in check_names
     assert "read_surface_physical_readback_artifact_review_queue" in check_names
     assert "read_surface_physical_readback_acceptance_template" in check_names
     assert "read_surface_physical_readback_fixture_closure_plan" in check_names
@@ -3949,6 +4185,9 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         "read_surface_physical_readback_capture_packet"
     )
     assert check_names.index("read_surface_physical_readback_capture_packet") < check_names.index(
+        "read_surface_physical_readback_capture_template"
+    )
+    assert check_names.index("read_surface_physical_readback_capture_template") < check_names.index(
         "read_surface_physical_readback_artifact_review_queue"
     )
     assert check_names.index(
@@ -3984,6 +4223,7 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     fixture_check = next(check for check in checks if check.name == "read_surface_fixture_evidence")
     assert "tests/test_read_surface_fixture_evidence.py" in fixture_check.command
     assert "tests/test_read_surface_physical_readback_capture_packet.py" in fixture_check.command
+    assert "tests/test_read_surface_physical_readback_capture_template.py" in fixture_check.command
     assert "tests/test_read_surface_physical_readback_artifact_review_queue.py" in fixture_check.command
     assert (
         "tests/test_read_surface_physical_readback_fixture_acceptance_template.py"
@@ -4078,6 +4318,20 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "--quiet" in read_capture_packet_check.command
     assert str(read_surface_physical_readback_capture_packet_path_for_run(tmp_path)) in (
         read_capture_packet_check.command
+    )
+    read_capture_template_check = next(
+        check
+        for check in checks
+        if check.name == "read_surface_physical_readback_capture_template"
+    )
+    assert "tools/build_read_surface_physical_readback_capture_template.py" in (
+        read_capture_template_check.command
+    )
+    assert "--format" in read_capture_template_check.command
+    assert "json" in read_capture_template_check.command
+    assert "--quiet" in read_capture_template_check.command
+    assert str(read_surface_physical_readback_capture_template_path_for_run(tmp_path)) in (
+        read_capture_template_check.command
     )
     read_artifact_review_queue_check = next(
         check
@@ -4821,6 +5075,15 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
                 json.dumps(valid_read_surface_capture_packet_payload()),
                 encoding="utf-8",
             )
+        if check.name == "read_surface_physical_readback_capture_template":
+            template_path = read_surface_physical_readback_capture_template_path_for_run(
+                log_dir.parent
+            )
+            template_path.parent.mkdir(parents=True, exist_ok=True)
+            template_path.write_text(
+                json.dumps(valid_read_surface_capture_template_payload()),
+                encoding="utf-8",
+            )
         if check.name == "read_surface_physical_readback_artifact_review_queue":
             queue_path = read_surface_physical_readback_artifact_review_queue_path_for_run(
                 log_dir.parent
@@ -4884,6 +5147,10 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "wing_readonly_preflight_review_decision_ledger_schema" in result_names
     assert "read_surface_physical_readback_capture_packet_artifact_schema" in result_names
     assert (
+        "read_surface_physical_readback_capture_template_artifact_schema"
+        in result_names
+    )
+    assert (
         "read_surface_physical_readback_artifact_review_queue_artifact_schema"
         in result_names
     )
@@ -4945,6 +5212,12 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     )
     assert result_names.index(
         "read_surface_physical_readback_capture_packet_artifact_schema"
+    ) < result_names.index("read_surface_physical_readback_capture_template")
+    assert result_names.index("read_surface_physical_readback_capture_template") < result_names.index(
+        "read_surface_physical_readback_capture_template_artifact_schema"
+    )
+    assert result_names.index(
+        "read_surface_physical_readback_capture_template_artifact_schema"
     ) < result_names.index("read_surface_physical_readback_artifact_review_queue")
     assert result_names.index(
         "read_surface_physical_readback_artifact_review_queue"
@@ -5986,6 +6259,103 @@ def test_no_wing_release_check_summary_embeds_read_surface_capture_packet_artifa
     assert "remaining_capture_target_surface_ids" in markdown_summary
     assert "all_cached_addresses" in markdown_summary
     assert "do not transmit OSC" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_read_surface_capture_template_artifact(
+    tmp_path,
+):
+    result = CheckResult(
+        name="read_surface_physical_readback_capture_template_artifact_schema",
+        status="passed",
+        started_at="2026-06-07T00:00:00Z",
+        finished_at="2026-06-07T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "template_path": "/tmp/read_surface_physical_readback_capture_template.json",
+            "template_type": "read_surface_physical_readback_artifact_capture_template",
+            "template_status": "operator_capture_template_ready",
+            "source_packet_type": "read_surface_physical_readback_capture_packet",
+            "source_packet_status": "operator_capture_required",
+            "source_method_id": "read_surface_physical_readback_capture_plan",
+            "selected_surface_id": "raw_mixer_state_cache",
+            "include_all_targets": False,
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_template": False,
+            "accepted_as_physical_fixture_candidate": False,
+            "fixture_closure_allowed_by_template": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "all_remaining_target_count": 2,
+            "capture_template_count": 1,
+            "capture_template_surface_ids": ["raw_mixer_state_cache"],
+            "capture_template_contract_ids": [
+                "raw_mixer_state_physical_readback_contract",
+            ],
+            "required_operator_edits": [
+                "artifact_source_id",
+                "captured_at",
+                "captured_by",
+                "source",
+                "console_model",
+                "capture_scope",
+                "physical_readback_payload",
+            ],
+            "operator_sequence_count": 6,
+            "blocked_by": [
+                "operator_must_replace_capture_template_placeholders",
+            ],
+            "record_unsafe_flags": [],
+            "focused_validation": [
+                "tests/test_read_surface_physical_readback_capture_template.py",
+                "tests/test_no_wing_release_check.py",
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-07T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert read_surface_physical_readback_capture_template_artifact_summary(
+        [result]
+    ) == summary["read_surface_physical_readback_capture_template_artifact"]
+    artifact = json_summary[
+        "read_surface_physical_readback_capture_template_artifact"
+    ]
+    assert artifact["read_only"] is True
+    assert artifact["live_write"] is False
+    assert artifact["queries_console"] is False
+    assert artifact["executes_tests"] is False
+    assert artifact["operator_required"] is True
+    assert artifact["execution_allowed_by_template"] is False
+    assert artifact["accepted_as_physical_fixture_candidate"] is False
+    assert artifact["fixture_closure_allowed_by_template"] is False
+    assert artifact["live_authority_granted"] is False
+    assert artifact["full_autonomous_ready"] is False
+    assert artifact["template_status"] == "operator_capture_template_ready"
+    assert artifact["selected_surface_id"] == "raw_mixer_state_cache"
+    assert artifact["capture_template_count"] == 1
+    assert artifact["capture_template_surface_ids"] == ["raw_mixer_state_cache"]
+    assert artifact["capture_template_contract_ids"] == [
+        "raw_mixer_state_physical_readback_contract"
+    ]
+    assert "physical_readback_payload" in artifact["required_operator_edits"]
+    assert artifact["record_unsafe_flags"] == []
+    assert artifact["violations"] == []
+    assert (
+        "## Read Surface Physical Readback Capture Template Artifact"
+        in markdown_summary
+    )
+    assert "execution_allowed_by_template: `false`" in markdown_summary
+    assert "capture_template_surface_ids" in markdown_summary
+    assert "physical_readback_payload" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(

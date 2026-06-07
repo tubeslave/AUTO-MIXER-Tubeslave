@@ -355,6 +355,9 @@ WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT = (
 READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PACKET_TOOL = (
     "tools/build_read_surface_physical_readback_capture_packet.py"
 )
+READ_SURFACE_PHYSICAL_READBACK_CAPTURE_TEMPLATE_TOOL = (
+    "tools/build_read_surface_physical_readback_capture_template.py"
+)
 READ_SURFACE_PHYSICAL_READBACK_ARTIFACT_REVIEW_QUEUE_TOOL = (
     "tools/build_read_surface_physical_readback_artifact_review_queue.py"
 )
@@ -693,6 +696,9 @@ def build_checks(
     read_surface_capture_packet_output = (
         read_surface_physical_readback_capture_packet_path_for_run(run_dir)
     )
+    read_surface_capture_template_output = (
+        read_surface_physical_readback_capture_template_path_for_run(run_dir)
+    )
     read_surface_artifact_review_queue_output = (
         read_surface_physical_readback_artifact_review_queue_path_for_run(run_dir)
     )
@@ -727,6 +733,7 @@ def build_checks(
                 "pytest",
                 "tests/test_read_surface_fixture_evidence.py",
                 "tests/test_read_surface_physical_readback_capture_packet.py",
+                "tests/test_read_surface_physical_readback_capture_template.py",
                 "tests/test_read_surface_physical_readback_artifact_review_queue.py",
                 "tests/test_read_surface_physical_readback_fixture_acceptance_template.py",
                 "tests/test_read_surface_physical_readback_fixture_acceptance_ledger.py",
@@ -818,6 +825,19 @@ def build_checks(
                 "json",
                 "--output",
                 str(read_surface_capture_packet_output),
+                "--quiet",
+            ),
+            cwd=str(repo_root),
+        ),
+        CommandCheck(
+            name="read_surface_physical_readback_capture_template",
+            command=(
+                sys.executable,
+                READ_SURFACE_PHYSICAL_READBACK_CAPTURE_TEMPLATE_TOOL,
+                "--format",
+                "json",
+                "--output",
+                str(read_surface_capture_template_output),
                 "--quiet",
             ),
             cwd=str(repo_root),
@@ -979,6 +999,15 @@ def read_surface_physical_readback_capture_packet_path_for_run(run_dir: Path | N
     return (
         (run_dir or DEFAULT_ARTIFACT_ROOT / "pending")
         / "read_surface_physical_readback_capture_packet.json"
+    )
+
+
+def read_surface_physical_readback_capture_template_path_for_run(
+    run_dir: Path | None,
+) -> Path:
+    return (
+        (run_dir or DEFAULT_ARTIFACT_ROOT / "pending")
+        / "read_surface_physical_readback_capture_template.json"
     )
 
 
@@ -2201,6 +2230,285 @@ def validate_read_surface_physical_readback_capture_packet_artifact_snapshot(
     finished = datetime.now(timezone.utc)
     return CheckResult(
         name="read_surface_physical_readback_capture_packet_artifact_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def validate_read_surface_physical_readback_capture_template_artifact_snapshot(
+    template_path: Path,
+) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "read_surface_physical_readback_capture_template_artifact_is_pending_readonly_operator_gate",
+        "template_path": str(template_path),
+    }
+    violations: list[str] = []
+
+    payload, load_error = _json_object_from_path(template_path)
+    template = payload or {}
+    records = (
+        template.get("capture_templates")
+        if isinstance(template.get("capture_templates"), list)
+        else []
+    )
+    required_edits = (
+        template.get("required_operator_edits")
+        if isinstance(template.get("required_operator_edits"), list)
+        else []
+    )
+    blocked_by = (
+        template.get("blocked_by")
+        if isinstance(template.get("blocked_by"), list)
+        else []
+    )
+    operator_sequence = (
+        template.get("operator_sequence")
+        if isinstance(template.get("operator_sequence"), list)
+        else []
+    )
+    commands = (
+        template.get("commands")
+        if isinstance(template.get("commands"), Mapping)
+        else {}
+    )
+
+    if load_error:
+        violations.append(
+            f"read_surface_physical_readback_capture_template_artifact_{load_error}"
+        )
+    if template.get("type") != "read_surface_physical_readback_artifact_capture_template":
+        violations.append("capture_template_artifact_type_mismatch")
+    if template.get("status") not in (
+        "operator_capture_template_ready",
+        "read_surface_physical_readback_complete",
+        "operator_capture_target_missing",
+    ):
+        violations.append("capture_template_artifact_status_unknown")
+    if template.get("source_packet_type") != "read_surface_physical_readback_capture_packet":
+        violations.append("capture_template_artifact_source_packet_type_mismatch")
+    if template.get("source_method_id") != READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PLAN_METHOD_ID:
+        violations.append("capture_template_artifact_source_method_mismatch")
+
+    for key in ("read_only", "operator_required"):
+        if template.get(key) is not True:
+            violations.append(f"capture_template_artifact_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_template",
+        "accepted_as_physical_fixture_candidate",
+        "fixture_closure_allowed_by_template",
+        "live_widening_allowed",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        if template.get(key) is not False:
+            violations.append(f"capture_template_artifact_{key}_not_false")
+
+    all_remaining_target_count = template.get("all_remaining_target_count")
+    if not isinstance(all_remaining_target_count, int):
+        violations.append("capture_template_artifact_remaining_target_count_missing")
+        all_remaining_target_count = 0
+    capture_template_count = template.get("capture_template_count")
+    if not isinstance(capture_template_count, int) or capture_template_count != len(records):
+        violations.append("capture_template_artifact_record_count_mismatch")
+        capture_template_count = len(records)
+    if template.get("status") == "operator_capture_template_ready" and not records:
+        violations.append("capture_template_artifact_ready_status_has_no_records")
+    if (
+        template.get("status") == "read_surface_physical_readback_complete"
+        and records
+    ):
+        violations.append("capture_template_artifact_complete_status_has_records")
+    if template.get("status") == "operator_capture_target_missing" and records:
+        violations.append("capture_template_artifact_missing_status_has_records")
+
+    for required_edit in (
+        "artifact_source_id",
+        "captured_at",
+        "captured_by",
+        "source",
+        "console_model",
+        "capture_scope",
+        "physical_readback_payload",
+    ):
+        if required_edit not in required_edits:
+            violations.append(
+                f"capture_template_artifact_required_edit_{required_edit}_missing"
+            )
+    if len(operator_sequence) < 6:
+        violations.append("capture_template_artifact_operator_sequence_short")
+    focused_validation = commands.get("focused_validation")
+    if not isinstance(focused_validation, list):
+        violations.append("capture_template_artifact_focused_validation_missing")
+        focused_validation = []
+    else:
+        for test_path in (
+            "tests/test_read_surface_physical_readback_capture_template.py",
+            "tests/test_no_wing_release_check.py",
+        ):
+            if test_path not in focused_validation:
+                violations.append(
+                    "capture_template_artifact_focused_validation_missing:"
+                    f"{test_path}"
+                )
+    if template.get("status") == "operator_capture_template_ready" and not blocked_by:
+        violations.append("capture_template_artifact_blocked_by_missing")
+
+    record_unsafe_flags: list[str] = []
+    record_surface_ids: list[str] = []
+    record_contract_ids: list[str] = []
+    for index, record in enumerate(records):
+        if not isinstance(record, Mapping):
+            violations.append(f"capture_template_artifact_record_{index}_not_object")
+            continue
+        for key in (
+            "template_id",
+            "surface_id",
+            "remediation_action_id",
+            "target_console_surface",
+            "read_mode",
+            "required_contract_method_id",
+        ):
+            if not isinstance(record.get(key), str) or not record.get(key):
+                violations.append(
+                    f"capture_template_artifact_record_{index}_{key}_missing"
+                )
+        surface_id = record.get("surface_id")
+        if isinstance(surface_id, str) and surface_id:
+            record_surface_ids.append(surface_id)
+        contract_id = record.get("required_contract_method_id")
+        if isinstance(contract_id, str) and contract_id:
+            record_contract_ids.append(contract_id)
+        required_contracts = (
+            record.get("required_artifact_contracts")
+            if isinstance(record.get("required_artifact_contracts"), list)
+            else []
+        )
+        if "physical_readback_fixture" not in required_contracts:
+            violations.append(
+                f"capture_template_artifact_record_{index}_physical_fixture_contract_missing"
+            )
+        if (
+            isinstance(contract_id, str)
+            and contract_id
+            and contract_id not in required_contracts
+        ):
+            violations.append(
+                f"capture_template_artifact_record_{index}_contract_not_required"
+            )
+        if not isinstance(record.get("expected_artifacts"), list) or not record.get(
+            "expected_artifacts"
+        ):
+            violations.append(
+                f"capture_template_artifact_record_{index}_expected_artifacts_missing"
+            )
+        if not isinstance(record.get("blockers_to_clear"), list) or not record.get(
+            "blockers_to_clear"
+        ):
+            violations.append(
+                f"capture_template_artifact_record_{index}_blockers_missing"
+            )
+        pending_fields = {
+            "artifact_source_id": "<path-to-operator-captured-json>",
+            "captured_by": "<operator-name>",
+            "console_model": "<console model and firmware>",
+            "capture_scope": "<manual capture scope and show-state notes>",
+        }
+        for key, expected_value in pending_fields.items():
+            if record.get(key) != expected_value:
+                violations.append(
+                    f"capture_template_artifact_record_{index}_{key}_not_pending"
+                )
+        captured_at = record.get("captured_at")
+        if not isinstance(captured_at, str) or not captured_at.startswith(
+            "<UTC ISO timestamp"
+        ):
+            violations.append(
+                f"capture_template_artifact_record_{index}_captured_at_not_pending"
+            )
+        source = record.get("source")
+        if not isinstance(source, str) or not source.startswith("<physical_readback"):
+            violations.append(
+                f"capture_template_artifact_record_{index}_source_not_pending"
+            )
+        payload_placeholder = record.get("physical_readback_payload")
+        if not isinstance(payload_placeholder, str) or not payload_placeholder.startswith(
+            "<replace with JSON payload"
+        ):
+            violations.append(
+                f"capture_template_artifact_record_{index}_payload_not_pending"
+            )
+        safety = record.get("safety") if isinstance(record.get("safety"), Mapping) else {}
+        if safety.get("read_only") is not True or safety.get("operator_required") is not True:
+            violations.append(
+                f"capture_template_artifact_record_{index}_safety_true_flags_missing"
+            )
+        for key in (
+            "live_write",
+            "mutates_console_state",
+            "queries_console",
+            "executes_tests",
+            "execution_allowed_by_template",
+            "accepted_as_physical_fixture_candidate",
+            "fixture_closure_allowed_by_template",
+            "live_widening_allowed",
+            "live_authority_granted",
+            "full_autonomous_ready",
+        ):
+            if safety.get(key) is not False:
+                flag = f"record_{index}_{key}"
+                record_unsafe_flags.append(flag)
+                violations.append(
+                    f"capture_template_artifact_{flag}_not_false"
+                )
+
+    detail["template_type"] = template.get("type")
+    detail["template_status"] = template.get("status")
+    detail["source_packet_type"] = template.get("source_packet_type")
+    detail["source_packet_status"] = template.get("source_packet_status")
+    detail["source_method_id"] = template.get("source_method_id")
+    detail["selected_surface_id"] = template.get("selected_surface_id")
+    detail["include_all_targets"] = template.get("include_all_targets")
+    detail["read_only"] = template.get("read_only")
+    detail["live_write"] = template.get("live_write")
+    detail["mutates_console_state"] = template.get("mutates_console_state")
+    detail["queries_console"] = template.get("queries_console")
+    detail["executes_tests"] = template.get("executes_tests")
+    detail["operator_required"] = template.get("operator_required")
+    detail["execution_allowed_by_template"] = template.get(
+        "execution_allowed_by_template"
+    )
+    detail["accepted_as_physical_fixture_candidate"] = template.get(
+        "accepted_as_physical_fixture_candidate"
+    )
+    detail["fixture_closure_allowed_by_template"] = template.get(
+        "fixture_closure_allowed_by_template"
+    )
+    detail["live_widening_allowed"] = template.get("live_widening_allowed")
+    detail["live_authority_granted"] = template.get("live_authority_granted")
+    detail["full_autonomous_ready"] = template.get("full_autonomous_ready")
+    detail["all_remaining_target_count"] = all_remaining_target_count
+    detail["capture_template_count"] = capture_template_count
+    detail["capture_template_surface_ids"] = record_surface_ids
+    detail["capture_template_contract_ids"] = record_contract_ids
+    detail["required_operator_edits"] = (
+        list(required_edits) if isinstance(required_edits, list) else []
+    )
+    detail["operator_sequence_count"] = len(operator_sequence)
+    detail["blocked_by"] = list(blocked_by) if isinstance(blocked_by, list) else []
+    detail["record_unsafe_flags"] = record_unsafe_flags
+    detail["focused_validation"] = list(focused_validation)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="read_surface_physical_readback_capture_template_artifact_schema",
         status="passed" if not violations else "failed",
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -8790,6 +9098,73 @@ def read_surface_physical_readback_capture_packet_artifact_summary(
     return None
 
 
+def read_surface_physical_readback_capture_template_artifact_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if (
+            result.name
+            != "read_surface_physical_readback_capture_template_artifact_schema"
+        ):
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        surface_ids = detail.get("capture_template_surface_ids")
+        contract_ids = detail.get("capture_template_contract_ids")
+        required_edits = detail.get("required_operator_edits")
+        blocked_by = detail.get("blocked_by")
+        unsafe_flags = detail.get("record_unsafe_flags")
+        focused_validation = detail.get("focused_validation")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": detail.get("read_only") is True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": detail.get("operator_required") is True,
+            "execution_allowed_by_template": False,
+            "accepted_as_physical_fixture_candidate": False,
+            "fixture_closure_allowed_by_template": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "template_path": detail.get("template_path"),
+            "template_type": detail.get("template_type"),
+            "template_status": detail.get("template_status"),
+            "source_packet_type": detail.get("source_packet_type"),
+            "source_packet_status": detail.get("source_packet_status"),
+            "source_method_id": detail.get("source_method_id"),
+            "selected_surface_id": detail.get("selected_surface_id"),
+            "include_all_targets": detail.get("include_all_targets") is True,
+            "all_remaining_target_count": int(
+                detail.get("all_remaining_target_count") or 0
+            ),
+            "capture_template_count": int(detail.get("capture_template_count") or 0),
+            "capture_template_surface_ids": (
+                list(surface_ids) if isinstance(surface_ids, list) else []
+            ),
+            "capture_template_contract_ids": (
+                list(contract_ids) if isinstance(contract_ids, list) else []
+            ),
+            "required_operator_edits": (
+                list(required_edits) if isinstance(required_edits, list) else []
+            ),
+            "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "record_unsafe_flags": (
+                list(unsafe_flags) if isinstance(unsafe_flags, list) else []
+            ),
+            "focused_validation": (
+                list(focused_validation)
+                if isinstance(focused_validation, list)
+                else []
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def wing_readonly_preflight_evidence_summary(
     results: Sequence[CheckResult],
 ) -> dict[str, object] | None:
@@ -11461,6 +11836,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     read_capture_packet_artifact = (
         read_surface_physical_readback_capture_packet_artifact_summary(results)
     )
+    read_capture_template_artifact = (
+        read_surface_physical_readback_capture_template_artifact_summary(results)
+    )
     wing_readonly_preflight = wing_readonly_preflight_evidence_summary(results)
     wing_readonly_preflight_plan_artifact = (
         wing_readonly_preflight_plan_artifact_summary(results)
@@ -11534,6 +11912,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     if read_capture_packet_artifact is not None:
         summary["read_surface_physical_readback_capture_packet_artifact"] = (
             read_capture_packet_artifact
+        )
+    if read_capture_template_artifact is not None:
+        summary["read_surface_physical_readback_capture_template_artifact"] = (
+            read_capture_template_artifact
         )
     if wing_readonly_preflight is not None:
         summary["wing_readonly_preflight_evidence"] = wing_readonly_preflight
@@ -11849,6 +12231,51 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 "- focused_validation: "
                 f"`{json.dumps(read_capture_packet_artifact['focused_validation'])}`",
                 f"- violations: `{json.dumps(read_capture_packet_artifact['violations'])}`",
+            ]
+        )
+    if read_capture_template_artifact is not None:
+        lines.extend(
+            [
+                "",
+                "## Read Surface Physical Readback Capture Template Artifact",
+                "",
+                f"- schema_check: `{read_capture_template_artifact['status']}`",
+                f"- read_only: `{str(read_capture_template_artifact['read_only']).lower()}`",
+                f"- live_write: `{str(read_capture_template_artifact['live_write']).lower()}`",
+                f"- mutates_console_state: `{str(read_capture_template_artifact['mutates_console_state']).lower()}`",
+                f"- queries_console: `{str(read_capture_template_artifact['queries_console']).lower()}`",
+                f"- executes_tests: `{str(read_capture_template_artifact['executes_tests']).lower()}`",
+                f"- operator_required: `{str(read_capture_template_artifact['operator_required']).lower()}`",
+                "- execution_allowed_by_template: "
+                f"`{str(read_capture_template_artifact['execution_allowed_by_template']).lower()}`",
+                "- accepted_as_physical_fixture_candidate: "
+                f"`{str(read_capture_template_artifact['accepted_as_physical_fixture_candidate']).lower()}`",
+                "- fixture_closure_allowed_by_template: "
+                f"`{str(read_capture_template_artifact['fixture_closure_allowed_by_template']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(read_capture_template_artifact['live_authority_granted']).lower()}`",
+                f"- full_autonomous_ready: `{str(read_capture_template_artifact['full_autonomous_ready']).lower()}`",
+                f"- template_path: `{read_capture_template_artifact['template_path']}`",
+                f"- template_status: `{read_capture_template_artifact['template_status']}`",
+                f"- source_packet_status: `{read_capture_template_artifact['source_packet_status']}`",
+                f"- selected_surface_id: `{read_capture_template_artifact['selected_surface_id']}`",
+                f"- include_all_targets: `{str(read_capture_template_artifact['include_all_targets']).lower()}`",
+                "- all_remaining_target_count: "
+                f"`{read_capture_template_artifact['all_remaining_target_count']}`",
+                "- capture_template_count: "
+                f"`{read_capture_template_artifact['capture_template_count']}`",
+                "- capture_template_surface_ids: "
+                f"`{json.dumps(read_capture_template_artifact['capture_template_surface_ids'])}`",
+                "- capture_template_contract_ids: "
+                f"`{json.dumps(read_capture_template_artifact['capture_template_contract_ids'])}`",
+                "- required_operator_edits: "
+                f"`{json.dumps(read_capture_template_artifact['required_operator_edits'])}`",
+                f"- blocked_by: `{json.dumps(read_capture_template_artifact['blocked_by'])}`",
+                "- record_unsafe_flags: "
+                f"`{json.dumps(read_capture_template_artifact['record_unsafe_flags'])}`",
+                "- focused_validation: "
+                f"`{json.dumps(read_capture_template_artifact['focused_validation'])}`",
+                f"- violations: `{json.dumps(read_capture_template_artifact['violations'])}`",
             ]
         )
     if wing_readonly_preflight is not None:
@@ -13665,6 +14092,20 @@ def run_release_checks(
             )
             results.append(capture_packet_result)
             if capture_packet_result.status != "passed" and not continue_on_failure:
+                break
+        if (
+            check.name == "read_surface_physical_readback_capture_template"
+            and result.status == "passed"
+        ):
+            capture_template_result = (
+                validate_read_surface_physical_readback_capture_template_artifact_snapshot(
+                    read_surface_physical_readback_capture_template_path_for_run(
+                        run_dir
+                    )
+                )
+            )
+            results.append(capture_template_result)
+            if capture_template_result.status != "passed" and not continue_on_failure:
                 break
         if (
             check.name == "read_surface_physical_readback_artifact_review_queue"
