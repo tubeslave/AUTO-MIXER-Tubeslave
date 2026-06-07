@@ -127,6 +127,7 @@ def test_forbidden_request_types_cover_hard_safety_boundary() -> None:
         "apply_operator_proposal",
         "rollback_last_manual_write",
         "emergency_stop",
+        "connect_mixer",
         "connect_wing",
         "disconnect_wing",
         "disconnect_mixer",

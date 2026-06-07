@@ -555,6 +555,34 @@ def test_file_preflight_artifact_rejects_tampered_event_log_send_types(tmp_path)
     assert "event_log_forbidden_request_type_sent" in evidence["summary"]["violations"]
 
 
+def test_file_preflight_evidence_rejects_tampered_event_log_connect_mixer_send(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events.insert(
+        2,
+        _event(
+            99,
+            "send",
+            {
+                "type": "connect_mixer",
+                "channel": 3,
+                "value_type": "connection",
+                "value": "mixer",
+            },
+        ),
+    )
+    _write_file_artifact(tmp_path / "preflight" / "connect-mixer", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_forbidden_request_type_sent" in evidence["summary"]["violations"]
+    assert "event_log_unexpected_sent_request_types" in evidence["summary"]["violations"]
+    assert "forbidden_request_types_sent_not_empty" in evidence["summary"]["violations"]
+
+
 def test_file_preflight_artifact_rejects_event_payload_mutation_evidence(tmp_path):
     summary = _valid_summary()
     events = _valid_events(summary)

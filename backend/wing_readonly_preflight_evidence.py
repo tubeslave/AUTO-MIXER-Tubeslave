@@ -56,6 +56,7 @@ FORBIDDEN_REQUEST_TYPES = {
     *PROPOSAL_REQUEST_TYPES,
     "rollback_last_manual_write",
     "emergency_stop",
+    "connect_mixer",
     "connect_wing",
     "disconnect_wing",
     "disconnect_mixer",
