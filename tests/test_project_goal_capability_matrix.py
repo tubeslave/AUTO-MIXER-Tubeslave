@@ -4,6 +4,7 @@ from backend.project_goal_capability_matrix import (
     CURRENT_PROVEN_LIVE_WRITE_KINDS,
     GOAL_CAPABILITY_STATUSES,
     build_project_goal_capability_matrix_snapshot,
+    build_project_goal_capability_progress_snapshot,
     get_project_goal_capability,
     iter_project_goal_capabilities,
 )
@@ -731,3 +732,47 @@ def test_snapshot_is_read_only_and_fail_closed_for_live_widening():
     assert "console_scene_preset_control" not in snapshot["summary"]["blocked_live_capability_ids"]
     assert "console_fader_control" in snapshot["summary"]["currently_live_writable_capability_ids"]
     assert snapshot["summary"]["status_counts"]["blocked_live"] >= 1
+
+
+def test_goal_capability_progress_snapshot_aligns_with_matrix_and_highlights_active_blockers():
+    matrix = build_project_goal_capability_matrix_snapshot()
+    progress = build_project_goal_capability_progress_snapshot()
+
+    assert progress["type"] == "project_goal_capability_progress_snapshot"
+    assert progress["status"] == "ok"
+    assert progress["summary"]["row_count"] == len(iter_project_goal_capabilities())
+    assert progress["summary"]["row_count"] == matrix["summary"]["row_count"]
+    assert progress["summary"]["missing_capability_ids"] == matrix["summary"]["missing_capability_ids"]
+    assert progress["summary"]["blocked_live_capability_ids"] == matrix["summary"]["blocked_live_capability_ids"]
+    assert progress["summary"]["currently_live_writable_capability_ids"] == matrix["summary"][
+        "currently_live_writable_capability_ids"
+    ]
+    goal_area_status_counts = {}
+    for row in progress["rows"]:
+        area = row["goal_area"]
+        area_status = goal_area_status_counts.setdefault(
+            area, {status: 0 for status in GOAL_CAPABILITY_STATUSES}
+        )
+        area_status[row["status"]] += 1
+    assert progress["summary"]["goal_area_status_counts"] == goal_area_status_counts
+    assert (
+        isinstance(progress["summary"]["goal_areas_with_blockers"], list)
+        and progress["summary"]["goal_areas_with_blockers"]
+    )
+    assert "runtime_mode" in progress["summary"]["goal_area_counts"]
+    assert "mode_analysis" in progress["summary"]["runtime_mode_ceiling_by_id"]
+    assert progress["summary"]["runtime_mode_ceiling_by_id"] == {
+        row["id"]: row["autonomy_mode_ceiling"] for row in progress["rows"] if row["goal_area"] == "runtime_mode"
+    }
+    assert progress["summary"]["supervised_narrow_live_candidates"]
+    assert progress["summary"]["goal_area_counts"].keys() == {
+        row.goal_area for row in iter_project_goal_capabilities()
+    }
+
+    assert isinstance(progress["next_steps"], list)
+    for step in progress["next_steps"]:
+        assert step["capability_id"] and step["goal_area"] and step["next_step"]
+
+    status_counts = progress["summary"]["status_counts"]
+    for status in GOAL_CAPABILITY_STATUSES:
+        assert status in status_counts

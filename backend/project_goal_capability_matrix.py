@@ -1125,3 +1125,103 @@ def build_project_goal_capability_matrix_snapshot() -> Dict[str, Any]:
         },
         "rows": rows,
     }
+
+
+def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
+    """Build a goal-level progress snapshot for objective-roadmap visibility."""
+
+    rows = tuple(iter_project_goal_capabilities())
+    status_counts = {status: 0 for status in sorted(GOAL_CAPABILITY_STATUSES)}
+    goal_area_counts = {}
+    goal_area_status_counts: Dict[str, Dict[str, int]] = {}
+    blocker_count_by_area = {}
+    runtime_mode_rows = []
+
+    currently_live_writable_ids: list[str] = []
+    blocked_live_ids: list[str] = []
+    proposal_only_ids: list[str] = []
+    missing_ids: list[str] = []
+    supervised_candidates: list[str] = []
+    next_step_outline: list[Dict[str, str]] = []
+
+    for row in rows:
+        status_counts[row.status] += 1
+        goal_area_counts[row.goal_area] = goal_area_counts.get(row.goal_area, 0) + 1
+
+        area_status = goal_area_status_counts.setdefault(
+            row.goal_area, {status: 0 for status in sorted(GOAL_CAPABILITY_STATUSES)}
+        )
+        area_status[row.status] += 1
+
+        if row.currently_live_writable:
+            currently_live_writable_ids.append(row.id)
+        if row.status == "blocked_live":
+            blocked_live_ids.append(row.id)
+        if row.status == "proposal_only":
+            proposal_only_ids.append(row.id)
+        if row.status == "missing":
+            missing_ids.append(row.id)
+        if row.status not in {"canonical", "missing"} and row.blocker:
+            blocker_count_by_area[row.goal_area] = blocker_count_by_area.get(
+                row.goal_area, 0
+            ) + 1
+        if row.autonomy_mode_ceiling == "supervised_narrow" and row.currently_live_writable:
+            supervised_candidates.append(row.id)
+
+        if row.goal_area == "runtime_mode":
+            runtime_mode_rows.append({"id": row.id, "ceiling": row.autonomy_mode_ceiling})
+
+        if row.autonomy_mode_ceiling in {"blocked", "assisted", "offline_only"}:
+            next_step_outline.append(
+                {
+                    "capability_id": row.id,
+                    "goal_area": row.goal_area,
+                    "status": row.status,
+                    "autonomy_mode_ceiling": row.autonomy_mode_ceiling,
+                    "next_step": row.next_step,
+                }
+            )
+
+    runtime_mode_ids = {item["id"]: item["ceiling"] for item in runtime_mode_rows}
+    blocker_pressure_areas = [
+        area
+        for area, count in sorted(blocker_count_by_area.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
+    return {
+        "type": "project_goal_capability_progress_snapshot",
+        "generated_at": _utc_now(),
+        "status": "ok",
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "live_widening_allowed": False,
+            "current_proven_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+        },
+        "summary": {
+            "row_count": len(rows),
+            "status_counts": status_counts,
+            "goal_area_counts": goal_area_counts,
+            "goal_area_status_counts": goal_area_status_counts,
+            "runtime_mode_ceiling_by_id": runtime_mode_ids,
+            "missing_capability_ids": missing_ids,
+            "blocked_live_capability_ids": blocked_live_ids,
+            "proposal_only_capability_ids": proposal_only_ids,
+            "currently_live_writable_capability_ids": currently_live_writable_ids,
+            "supervised_narrow_live_candidates": supervised_candidates,
+            "goal_areas_with_blockers": blocker_pressure_areas,
+            "next_global_step": (
+                "Prioritize blocked areas, expand proof and evidence on supervised "
+                "candidate families, and keep read-only safety-first controls."
+            ),
+        },
+        "next_steps": next_step_outline,
+        "goal_area_progress": {
+            area: {
+                "capability_count": count,
+                "status_counts": goal_area_status_counts[area],
+            }
+            for area, count in goal_area_counts.items()
+        },
+        "rows": [row.to_dict() for row in rows],
+    }
