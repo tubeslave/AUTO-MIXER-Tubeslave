@@ -1145,6 +1145,58 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_fader.assert_called_once_with(1, -6.0)
 
     @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_auto_mode_offline_requires_approval_for_direct_manual_write(
+        self,
+        _mock_bleed: object,
+        _mock_load_config: object,
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        server.connection_mode = "offline"
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server.mixer_client = DummyWingLike()
+
+        result = await server._apply_manual_console_write(
+            websocket=None,
+            channel=1,
+            value=-6.0,
+            value_type="fader",
+            source="unit:auto_unlocked_direct_write_unapproved",
+            approved=False,
+            approval_id=None,
+        )
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "approval_required"
+        assert result["allowed_live_write_kinds"] == ["fader", "gain"]
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_auto_mode_is_blocked_for_wing_supervised_gate_when_wing_deployment_active(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_fader"](
+            websocket,
+            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-auto-wing"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "operator_mode_blocks_live_write"
+        assert payload["approval_id"] == "unit-auto-wing"
+        assert payload["manual_write_supervision"]["deployment_write_boundary_active"] is True
+        assert payload["allowed_live_write_kinds"] == []
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_websocket_fader_blocks_when_cache_pre_read_is_stale(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"

@@ -1083,6 +1083,7 @@ class AutoMixerServer:
                 value_type=write_kind,
                 source=source,
                 approval_id=approval_id,
+                extra={"allowed_live_write_kinds": allowed_live_write_kinds},
             )
 
         try:
