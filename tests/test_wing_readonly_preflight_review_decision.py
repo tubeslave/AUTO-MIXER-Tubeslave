@@ -339,6 +339,24 @@ def test_review_decision_ledger_rejects_non_utc_timestamp():
     assert "review_decision_reviewed_at_invalid" in ledger["records"][0]["violations"]
 
 
+def test_review_decision_ledger_rejects_invalid_candidate_forbidden_request_types():
+    invalid_summary = _valid_summary()
+    invalid_summary["forbidden_request_types_sent"] = ["set_gain"]
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=build_wing_readonly_preflight_evidence(
+            artifact_payloads=(invalid_summary,),
+            artifact_roots=(),
+        ),
+        decision_records=[_accepted_record()],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["invalid_record_count"] == 1
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert "review_decision_candidate_missing" in ledger["records"][0]["violations"]
+
+
 def test_review_decision_ledger_is_transport_free():
     source = Path("backend/wing_readonly_preflight_review_decision.py").read_text(
         encoding="utf-8"
