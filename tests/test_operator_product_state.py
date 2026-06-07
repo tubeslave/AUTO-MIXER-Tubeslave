@@ -7446,6 +7446,13 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
     assert by_type["agent_communications_snapshot"]["communications"]
     assert by_type["processing_pipeline_snapshot"]["methods"] == []
     assert by_type["processing_pipeline_snapshot"]["summary"]["live_apply_policy"] == "supervised_fader_gain_only"
+    assert "project_goal_capability_progress_snapshot" in by_type["processing_pipeline_snapshot"]
+    progress_snapshot = by_type["processing_pipeline_snapshot"][
+        "project_goal_capability_progress_snapshot"
+    ]
+    assert progress_snapshot["type"] == "project_goal_capability_progress_snapshot"
+    assert progress_snapshot["summary"]["row_count"] > 0
+    assert progress_snapshot["goal_area_progress"]
     assert by_type["main_pipeline_preview"]["executor_policy"]["preview_only"] is True
     assert by_type["main_pipeline_preview"]["summary"]["queue_mutation"] is False
 
