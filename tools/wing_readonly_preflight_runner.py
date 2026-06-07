@@ -210,11 +210,15 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
         return "--channels must be comma-separated integers"
     if not channels:
         return "--channels must include at least one channel"
+    if len(set(channels)) != len(channels):
+        return "--channels must not contain duplicates"
     if any(channel < 1 or channel > 48 for channel in channels):
         return "--channels values must be in 1..48"
     value_types = parse_csv_strings(args.value_types)
     if not value_types:
         return "--value-types must include at least one value type"
+    if len(set(value_types)) != len(value_types):
+        return "--value-types must not contain duplicates"
     unsupported = sorted(set(value_types) - {"fader", "gain"})
     if unsupported:
         return f"--value-types unsupported: {','.join(unsupported)}"

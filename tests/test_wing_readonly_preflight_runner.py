@@ -118,6 +118,8 @@ def test_forbidden_request_types_cover_hard_safety_boundary() -> None:
         (["--channels", "0"], "--channels values must be in 1..48"),
         (["--channels", "49"], "--channels values must be in 1..48"),
         (["--channels", ""], "--channels must include at least one channel"),
+        (["--channels", "3,3"], "--channels must not contain duplicates"),
+        (["--value-types", "fader,fader"], "--value-types must not contain duplicates"),
         (["--value-types", "fader,eq"], "--value-types unsupported: eq"),
         (
             ["--channels", "3", "--require-physical-readback"],
