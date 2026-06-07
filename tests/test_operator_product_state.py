@@ -7615,6 +7615,11 @@ async def test_operator_mode_handlers_normalizes_alias_variants(server):
         {"mode": "full autonomous mode", "reason": "alias_mode_change"},
     )
 
+    await server._dispatch["set_operator_mode"](
+        object(),
+        {"mode": "full_autonomous_mixing", "reason": "alias_mode_change"},
+    )
+
     payload = server.send_to_client.await_args.args[1]
     assert payload["type"] == "operator_mode_status"
     assert payload["mode"] == "auto"

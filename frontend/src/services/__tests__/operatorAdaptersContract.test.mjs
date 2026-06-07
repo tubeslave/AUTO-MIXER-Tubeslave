@@ -114,6 +114,7 @@ test('toUiMode normalizes known aliases to canonical operator modes', async () =
   assert.equal(toUiMode('full-autonomous-mixing-mode'), 'Auto');
   assert.equal(toUiMode('full autonomous mode'), 'Auto');
   assert.equal(toUiMode('full_autonomous_mode'), 'Auto');
+  assert.equal(toUiMode('full_autonomous_mixing'), 'Auto');
   assert.equal(toUiMode('supervised automix'), 'Supervised');
   assert.equal(toUiMode('supervised automix mode'), 'Supervised');
   assert.equal(toUiMode('supervised auto mix'), 'Supervised');
@@ -254,6 +255,7 @@ test('mode display labels map objective names to each operational mode', async (
   assert.equal(formatOperatorModeLabel('analysis-mode'), 'Analysis Mode');
   assert.equal(formatOperatorModeLabel('full-autonomous-mode'), 'Full Autonomous Mixing');
   assert.equal(formatOperatorModeLabel('full autonomous mix'), 'Full Autonomous Mixing');
+  assert.equal(formatOperatorModeLabel('full_autonomous_mixing'), 'Full Autonomous Mixing');
   assert.equal(formatOperatorModeLabel('supervised automix mode'), 'Supervised AutoMix');
   assert.equal(formatOperatorModeLabel('full autonomous mixing'), 'Full Autonomous Mixing');
   assert.equal(formatOperatorModeLabel('auto mode'), 'Full Autonomous Mixing');

@@ -56,6 +56,7 @@ const MODE_VALUE_ALIASES: Record<string, AutomixerMode> = {
   'full autonomous': 'Auto',
   'full autonomous mix': 'Auto',
   'full autonomous mixing': 'Auto',
+  'full_autonomous_mixing': 'Auto',
   'full autonomous mode': 'Auto',
   full_autonomous_mix: 'Auto',
   'full autonomous mixing mode': 'Auto',
