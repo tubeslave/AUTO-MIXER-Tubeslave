@@ -277,6 +277,10 @@ function SettingsInspector({
   const liveModuleCount = modules.filter(row => row.canWriteLive).length;
   const reviewOnlyCount = modules.filter(row => !row.canWriteLive).length;
   const quarantinedCount = modules.filter(row => row.status.includes('quarantined') || row.pipelineProfiles.includes('quarantine')).length;
+  const goalCapabilityRows = modules.filter(row => row.domain === 'project_goal_capability');
+  const goalCapabilityRowsWithBlockers = goalCapabilityRows.filter(
+    row => row.status.includes('blocked') || row.pipelineProfiles.includes('status:blocked=1'),
+  ).length;
   const modeRows = modePolicyRows(ui, modules, writeScope);
   const rowsBySection: Record<string, { label: string; value: string; tone?: Tone }[]> = {
     'Backend Policy': [
@@ -296,6 +300,8 @@ function SettingsInspector({
       { label: 'Live executors', value: String(liveModuleCount), tone: liveModuleCount === 1 ? 'green' : 'yellow' },
       { label: 'Review/status only', value: String(reviewOnlyCount), tone: reviewOnlyCount ? 'yellow' : 'green' },
       { label: 'Quarantine', value: String(quarantinedCount), tone: quarantinedCount ? 'red' : 'green' },
+      { label: 'Goal capabilities', value: `${goalCapabilityRows.length} capabilities`, tone: goalCapabilityRows.length ? 'blue' : 'yellow' },
+      { label: 'Goal blockers', value: String(goalCapabilityRowsWithBlockers), tone: goalCapabilityRowsWithBlockers ? 'red' : 'green' },
       { label: 'Allowed writes', value: writeScope, tone: backend.writeScope.length ? 'yellow' : 'red' },
       ...proofEvidenceInspectorRows(modules)
     ],

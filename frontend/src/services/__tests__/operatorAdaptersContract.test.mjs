@@ -3481,6 +3481,15 @@ test('Settings Mode Policy panel summarizes read-only mode gate rows', async () 
   assert.match(source, /rows=\{modeRows\.slice\(0, 2\)\}/);
 });
 
+test('Settings Module Status inspector includes project goal capability summaries', async () => {
+  const source = await fs.readFile(path.join(srcRoot, 'views/SettingsView.tsx'), 'utf8');
+
+  assert.match(source, /row\.domain === 'project_goal_capability'/);
+  assert.match(source, /label: 'Goal capabilities'/);
+  assert.match(source, /label: 'Goal blockers'/);
+  assert.match(source, /writeScope: string;/);
+});
+
 test('directorDecisionRows preserves backend task status instead of forcing applied', async () => {
   const { directorDecisionRows } = await importTypeScript('components/dashboard/directorPanelModel.ts');
 
