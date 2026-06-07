@@ -9195,6 +9195,89 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     )
 
 
+def validate_wing_operator_proposal_runner_physical_readback_policy(
+    runner_path: Path | None = None,
+) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    path = runner_path or REPO_ROOT / "tools/wing_operator_proposal_validation_runner.py"
+    detail: dict[str, object] = {
+        "runner_path": str(path),
+        "policy": "physical_wing_proof_must_require_physical_readback_not_cache",
+    }
+    violations: list[str] = []
+    physical_statuses: list[str] = []
+
+    try:
+        source = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        source = ""
+        violations.append("wing_operator_runner_missing")
+
+    if source:
+        try:
+            tree = ast.parse(source, filename=str(path))
+        except SyntaxError:
+            tree = None
+            violations.append("wing_operator_runner_syntax_error")
+        if tree is not None:
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Assign):
+                    continue
+                if not any(
+                    isinstance(target, ast.Name)
+                    and target.id == "PHYSICAL_READBACK_STATUSES"
+                    for target in node.targets
+                ):
+                    continue
+                try:
+                    value = ast.literal_eval(node.value)
+                except (TypeError, ValueError):
+                    violations.append("physical_readback_statuses_not_literal")
+                    value = set()
+                if isinstance(value, (set, tuple, list)):
+                    physical_statuses = sorted(str(item) for item in value)
+                else:
+                    violations.append("physical_readback_statuses_not_sequence")
+                break
+            else:
+                violations.append("physical_readback_statuses_constant_missing")
+
+        if physical_statuses != ["verified_from_physical_readback"]:
+            violations.append("physical_readback_statuses_include_non_physical_status")
+        if "verified_from_cache" in physical_statuses:
+            violations.append("physical_readback_statuses_allows_cache")
+        required_markers = {
+            "execute_requires_physical_pre_read": (
+                "require_physical_readback=bool(args.execute)"
+            ),
+            "apply_requires_physical_status": (
+                'result.get("readback_status") in PHYSICAL_READBACK_STATUSES'
+            ),
+            "rollback_requires_physical_status": (
+                "rollback_readback_status not in PHYSICAL_READBACK_STATUSES"
+            ),
+            "summary_exposes_required_flag": '"physical_readback_required"',
+            "cache_status_remains_dry_run_only": '"status": "verified_from_cache"',
+        }
+        for violation_id, marker in required_markers.items():
+            if marker not in source:
+                violations.append(violation_id)
+        if "VERIFIED_READBACK_STATUSES" in source:
+            violations.append("legacy_verified_readback_statuses_constant_present")
+
+    detail["physical_readback_statuses"] = physical_statuses
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="wing_operator_proposal_runner_physical_readback_policy",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_supervised_proof_report_autonomy_overlay(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -15157,6 +15240,12 @@ def run_release_checks(
             next_plan_result = validate_supervised_proof_report_next_wing_plan(proof_report_path)
             results.append(next_plan_result)
             if next_plan_result.status != "passed" and not continue_on_failure:
+                break
+            wing_runner_policy_result = (
+                validate_wing_operator_proposal_runner_physical_readback_policy()
+            )
+            results.append(wing_runner_policy_result)
+            if wing_runner_policy_result.status != "passed" and not continue_on_failure:
                 break
             artifact_result = validate_supervised_proof_report_gap_rollup(proof_report_path)
             results.append(artifact_result)

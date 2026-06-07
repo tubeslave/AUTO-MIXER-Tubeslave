@@ -137,6 +137,15 @@ async def test_timeout_after_apply_request_requires_manual_review_not_promotion_
         [
             {"type": "operator_mode_status", "mode": "assist"},
             {"type": "state_update", "state": {"/ch/4/fdr": -12.0}},
+            {
+                "type": "mixer_parameter_value",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "address": "/ch/4/fdr",
+                "channel": 4,
+                "value_type": "fader",
+                "value": -12.0,
+            },
             {"type": "operator_mode_status", "mode": "supervised"},
             {"type": "operator_proposal_created", "status": "created", "proposal": {"id": "apply"}},
         ]
@@ -171,6 +180,7 @@ async def test_timeout_after_apply_request_requires_manual_review_not_promotion_
     assert summary["sent_request_types"] == [
         "get_operator_mode",
         "get_state",
+        "query_mixer_parameter",
         "set_operator_mode",
         "create_operator_proposal",
         "apply_operator_proposal",
@@ -307,6 +317,8 @@ async def test_dry_run_plans_without_creating_or_applying_proposal(
     assert summary["proof_mode"] == "dry_run"
     assert summary["physical_wing"] is False
     assert summary["physical_proof_requires_execute"] is True
+    assert summary["physical_readback_required_for_execute"] is True
+    assert summary["physical_readback_required"] is False
     assert summary["operator_confirmation_required"] is False
     assert summary["operator_confirmation_match"] is False
     assert summary["address"] == "/ch/7/fdr"
@@ -372,6 +384,15 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
         [
             {"type": "operator_mode_status", "mode": "assist"},
             {"type": "state_update", "state": {"/ch/4/fdr": -12.0}},
+            {
+                "type": "mixer_parameter_value",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "address": "/ch/4/fdr",
+                "channel": 4,
+                "value_type": "fader",
+                "value": -12.0,
+            },
             {"type": "operator_mode_status", "mode": "assist"},
             {"type": "operator_proposal_created", "status": "created", "proposal": {"id": "blocked"}},
             {
@@ -392,7 +413,7 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
                     "effective_value": -12.25,
                     "old_value": -12.0,
                     "readback_value": -12.25,
-                    "readback_status": "verified_from_cache",
+                    "readback_status": "verified_from_physical_readback",
                     "rollback_available": True,
                     "rollback_value": -12.0,
                 },
@@ -401,7 +422,7 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
                 "type": "manual_write_rollback_applied",
                 "status": "applied",
                 "readback_value": -12.0,
-                "readback_status": "verified_from_cache",
+                "readback_status": "verified_from_physical_readback",
             },
             {"type": "emergency_stop_applied", "status": "applied"},
             {"type": "operator_proposal_created", "status": "created", "proposal": {"id": "emergency"}},
@@ -440,6 +461,7 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
     assert sent_types == [
         "get_operator_mode",
         "get_state",
+        "query_mixer_parameter",
         "set_operator_mode",
         "create_operator_proposal",
         "apply_operator_proposal",
@@ -458,7 +480,14 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
     apply_requests = [request for request in websocket.sent if request["type"] == "apply_operator_proposal"]
     assert all(request["approved"] is True for request in apply_requests)
     assert all(request["approval_id"].startswith(proposal_id_prefix) for request in apply_requests)
-    rollback_request = websocket.sent[9]
+    pre_read_query = websocket.sent[2]
+    assert pre_read_query == {
+        "type": "query_mixer_parameter",
+        "channel": 4,
+        "value_type": "fader",
+        "address": "/ch/4/fdr",
+    }
+    rollback_request = websocket.sent[10]
     assert rollback_request["type"] == "rollback_last_manual_write"
     assert rollback_request["approved"] is True
 
@@ -470,6 +499,10 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
     assert summary["proof_mode"] == "physical"
     assert summary["physical_wing"] is True
     assert summary["physical_proof_requires_execute"] is True
+    assert summary["physical_readback_required_for_execute"] is True
+    assert summary["physical_readback_required"] is True
+    assert summary["old_value_source"] == "physical_readback"
+    assert summary["old_value_status"] == "verified_from_physical_readback"
     assert summary["operator_confirmation_required"] is True
     assert summary["operator_confirmed_channel"] == 4
     assert summary["operator_confirmed_value_type"] == "fader"
@@ -479,3 +512,120 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
     assert summary["apply_result"]["type"] == "operator_proposal_apply_result"
     assert summary["rollback_result"]["type"] == "manual_write_rollback_applied"
     assert summary["post_emergency_apply_result"]["apply_result"]["reason"] == "emergency_stop_active"
+
+
+@pytest.mark.asyncio
+async def test_execute_path_blocks_when_pre_read_is_not_physical(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist"},
+            {"type": "state_update", "state": {"/ch/4/fdr": -12.0}},
+            {
+                "type": "mixer_parameter_value",
+                "status": "verified_from_cache",
+                "source": "mixer_state_cache",
+                "address": "/ch/4/fdr",
+                "channel": 4,
+                "value_type": "fader",
+                "value": -12.0,
+            },
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    args = parse_args(
+        tmp_path,
+        "--channel",
+        "4",
+        "--value-type",
+        "fader",
+        "--delta-db",
+        "-0.25",
+        "--operator-confirm-channel",
+        "4",
+        "--operator-confirm-value-type",
+        "fader",
+        "--operator-confirm-delta-db",
+        "-0.25",
+        "--execute",
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 3
+    assert [request["type"] for request in websocket.sent] == [
+        "get_operator_mode",
+        "get_state",
+        "query_mixer_parameter",
+    ]
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "current_value_not_verified_from_physical_readback"
+    assert summary["physical_readback_required"] is True
+    assert summary["old_value_read"]["status"] == "verified_from_cache"
+
+
+@pytest.mark.asyncio
+async def test_execute_path_rejects_apply_cache_readback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist"},
+            {"type": "state_update", "state": {}},
+            {
+                "type": "mixer_parameter_value",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "address": "/ch/4/fdr",
+                "channel": 4,
+                "value_type": "fader",
+                "value": -12.0,
+            },
+            {"type": "operator_mode_status", "mode": "supervised"},
+            {"type": "operator_proposal_created", "status": "created", "proposal": {"id": "apply"}},
+            {
+                "type": "operator_proposal_apply_result",
+                "status": "applied",
+                "apply_result": {
+                    "status": "applied",
+                    "channel": 4,
+                    "value_type": "fader",
+                    "effective_value": -12.25,
+                    "old_value": -12.0,
+                    "readback_value": -12.25,
+                    "readback_status": "verified_from_cache",
+                    "rollback_available": True,
+                    "rollback_value": -12.0,
+                },
+            },
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    args = parse_args(
+        tmp_path,
+        "--channel",
+        "4",
+        "--value-type",
+        "fader",
+        "--delta-db",
+        "-0.25",
+        "--operator-confirm-channel",
+        "4",
+        "--operator-confirm-value-type",
+        "fader",
+        "--operator-confirm-delta-db",
+        "-0.25",
+        "--execute",
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 9
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "failed"
+    assert summary["reason"] == "proposal_apply_not_verified"
+    assert summary["apply_result"]["apply_result"]["readback_status"] == "verified_from_cache"

@@ -32,7 +32,7 @@ EXPECTED_ROLLBACK_EVENTS = {
     "manual_write_rollback_error",
 }
 EXPECTED_PARAMETER_EVENTS = {"mixer_parameter_value", "mixer_parameter_read_blocked"}
-VERIFIED_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
+PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
 
 
 def utc_stamp() -> str:
@@ -80,9 +80,10 @@ async def read_current_parameter(
     address: str,
     state: Dict[str, Any],
     timeout: float,
+    require_physical_readback: bool = False,
 ) -> tuple[Optional[float], Dict[str, Any]]:
     cached_value = as_float(state.get(address))
-    if cached_value is not None:
+    if cached_value is not None and not require_physical_readback:
         return cached_value, {
             "status": "verified_from_cache",
             "source": "mixer_state_cache",
@@ -287,7 +288,7 @@ def apply_succeeded(payload: Dict[str, Any]) -> bool:
         payload.get("type") == "operator_proposal_apply_result"
         and payload.get("status") == "applied"
         and result.get("status") == "applied"
-        and result.get("readback_status") in VERIFIED_READBACK_STATUSES
+        and result.get("readback_status") in PHYSICAL_READBACK_STATUSES
         and result.get("proof_status", "verified") == "verified"
         and bool(result.get("rollback_available"))
     )
@@ -406,6 +407,8 @@ async def run(args: argparse.Namespace) -> int:
         "proof_runner": "wing_operator_proposal_validation_runner",
         "proof_mode": "physical" if args.execute else "dry_run",
         "physical_wing": bool(args.execute),
+        "physical_readback_required_for_execute": True,
+        "physical_readback_required": bool(args.execute),
         "url": args.url,
         "channel": args.channel,
         "value_type": args.value_type,
@@ -462,6 +465,7 @@ async def run(args: argparse.Namespace) -> int:
                 address=address,
                 state=state,
                 timeout=args.timeout,
+                require_physical_readback=bool(args.execute),
             )
             if old_value is None:
                 summary.update({
@@ -469,6 +473,18 @@ async def run(args: argparse.Namespace) -> int:
                     "reason": "current_value_unavailable_from_backend_state_and_physical_readback",
                     "operator_mode": mode.get("mode"),
                     "address": address,
+                    "old_value_read": old_value_read,
+                })
+                recorder.write_summary(summary)
+                print(json.dumps(summary, indent=2, sort_keys=True))
+                return 3
+            if args.execute and old_value_read.get("status") not in PHYSICAL_READBACK_STATUSES:
+                summary.update({
+                    "status": "blocked",
+                    "reason": "current_value_not_verified_from_physical_readback",
+                    "operator_mode": mode.get("mode"),
+                    "address": address,
+                    "old_value": old_value,
                     "old_value_read": old_value_read,
                 })
                 recorder.write_summary(summary)
@@ -638,7 +654,10 @@ async def run(args: argparse.Namespace) -> int:
                 return 10
             rollback_readback_status = rollback_result.get("rollback_readback_status") or rollback_result.get("readback_status")
             rollback_proof_status = rollback_result.get("rollback_proof_status") or rollback_result.get("proof_status", "verified")
-            if rollback_readback_status not in VERIFIED_READBACK_STATUSES or rollback_proof_status != "verified":
+            if (
+                rollback_readback_status not in PHYSICAL_READBACK_STATUSES
+                or rollback_proof_status != "verified"
+            ):
                 summary.update({"status": "failed", "reason": "rollback_readback_not_verified"})
                 recorder.write_summary(summary)
                 print(json.dumps(summary, indent=2, sort_keys=True))

@@ -97,8 +97,12 @@ The artifact must show:
 - `status: passed`
 - `proof_runner: wing_operator_proposal_validation_runner`
 - `write_policy: apply_operator_proposal_only`
+- `physical_readback_required: true`
+- pre-read status is `verified_from_physical_readback`
 - apply went through `apply_operator_proposal`
+- apply readback status is `verified_from_physical_readback`
 - rollback went through `rollback_last_manual_write`
+- rollback readback status is `verified_from_physical_readback`
 - emergency stop was applied
 - later apply was blocked with `emergency_stop_active`
 - fader/gain physical readback was recorded after apply and rollback
@@ -113,7 +117,10 @@ The artifact must show:
   channel, value type, and delta;
 - the delta is positive;
 - the value type is not `fader` or `gain`;
+- pre-read comes only from cache during physical `--execute`;
+- apply readback comes only from cache;
 - rollback readback is missing;
+- rollback readback comes only from cache;
 - emergency stop does not block a later apply;
 - timeout happens after `apply_operator_proposal` and physical state is not
   manually inspected;

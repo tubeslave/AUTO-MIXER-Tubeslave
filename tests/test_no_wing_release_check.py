@@ -97,6 +97,7 @@ from tools.no_wing_release_check import (
     validate_user_presets_physical_readback_contract_snapshot,
     validate_supervised_proof_report_autonomy_overlay,
     validate_supervised_proof_report_next_wing_plan,
+    validate_wing_operator_proposal_runner_physical_readback_policy,
     validate_supervised_proof_report_gain_dry_run,
     validate_supervised_proof_report_gap_rollup,
     wing_readonly_preflight_handoff_packet_path_for_run,
@@ -5231,6 +5232,43 @@ def test_no_wing_release_check_rejects_next_wing_steps_without_accepted_review_d
     )
 
 
+def test_no_wing_release_check_validates_wing_runner_physical_readback_policy():
+    result = validate_wing_operator_proposal_runner_physical_readback_policy()
+
+    assert result.status == "passed"
+    assert result.detail["physical_readback_statuses"] == [
+        "verified_from_physical_readback"
+    ]
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_wing_runner_cache_as_physical(tmp_path):
+    runner_path = tmp_path / "wing_operator_proposal_validation_runner.py"
+    runner_path.write_text(
+        """
+PHYSICAL_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
+def run(args):
+    read_current_parameter(require_physical_readback=bool(args.execute))
+    result.get("readback_status") in PHYSICAL_READBACK_STATUSES
+    rollback_readback_status not in PHYSICAL_READBACK_STATUSES
+    return {
+        "physical_readback_required": bool(args.execute),
+        "status": "verified_from_cache",
+    }
+""",
+        encoding="utf-8",
+    )
+
+    result = validate_wing_operator_proposal_runner_physical_readback_policy(runner_path)
+
+    assert result.status == "failed"
+    assert "physical_readback_statuses_allows_cache" in result.detail["violations"]
+    assert (
+        "physical_readback_statuses_include_non_physical_status"
+        in result.detail["violations"]
+    )
+
+
 def test_no_wing_release_check_rejects_autonomy_overlay_that_claims_authority(tmp_path):
     report_path = tmp_path / "supervised_proof_artifact_report.json"
     payload = valid_proof_report_with_gap_rollup()
@@ -5495,6 +5533,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "supervised_proof_report_gain_dry_run_schema" in result_names
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
+    assert "wing_operator_proposal_runner_physical_readback_policy" in result_names
     assert "supervised_proof_report_gap_rollup_schema" in result_names
     assert result_names.index("read_surface_fixture_evidence") < result_names.index(
         "read_surface_fixture_evidence_schema"
@@ -5651,6 +5690,11 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "next_wing_proof_plan_schema"
     )
     assert result_names.index("next_wing_proof_plan_schema") < result_names.index(
+        "wing_operator_proposal_runner_physical_readback_policy"
+    )
+    assert result_names.index(
+        "wing_operator_proposal_runner_physical_readback_policy"
+    ) < result_names.index(
         "supervised_proof_report_gap_rollup_schema"
     )
 
