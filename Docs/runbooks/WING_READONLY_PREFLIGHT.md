@@ -125,8 +125,9 @@ The offline review report must show:
 
 - `manual_review_required_before_readiness_update: true`
 - `manual_review_decision_required: true` only when a clean candidate exists
-- checklist rows for artifact paths, operator channel scope, physical
-  readbacks, read-only event-log sequence, and no live authority
+- checklist rows for artifact paths, operator channel scope, operator session
+  readiness, physical readbacks, read-only event-log sequence, and no live
+  authority
 
 After a clean candidate is reviewed, record the operator decision as a JSON file
 under:
@@ -148,6 +149,7 @@ Minimum accepted-decision shape:
   "checklist_ids": [
     "confirm_artifact_paths",
     "confirm_operator_channel_scope",
+    "confirm_operator_session_ready",
     "confirm_physical_readbacks",
     "confirm_event_log_readonly_sequence",
     "confirm_no_live_authority"

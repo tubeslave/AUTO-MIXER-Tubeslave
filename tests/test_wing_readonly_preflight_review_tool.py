@@ -208,6 +208,7 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert [row["id"] for row in report["manual_review_checklist"]] == [
         "confirm_artifact_paths",
         "confirm_operator_channel_scope",
+        "confirm_operator_session_ready",
         "confirm_physical_readbacks",
         "confirm_event_log_readonly_sequence",
         "confirm_no_live_authority",
@@ -222,6 +223,8 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "events_path": str(summary_path.parent / "events.jsonl"),
             "channels": [3],
             "operator_confirmed_channels": [3],
+            "operator_session_confirmation_required": True,
+            "operator_confirmed_session_ready": True,
             "value_types": ["fader", "gain"],
             "readback_count": 2,
             "physical_readback_count": 2,
@@ -234,7 +237,10 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert f"summary_path: `{summary_path}`" in markdown
     assert f"events_path: `{summary_path.parent / 'events.jsonl'}`" in markdown
     assert "operator_confirmed_channels: `[3]`" in markdown
+    assert "operator_session_confirmation_required: `true`" in markdown
+    assert "operator_confirmed_session_ready: `true`" in markdown
     assert "Manual Review Gate" in markdown
+    assert "confirm_operator_session_ready" in markdown
     assert "confirm_event_log_readonly_sequence" in markdown
     assert "manual_review_decision_required: `true`" in markdown
     assert "request_id_policy: `required_for_every_query_mixer_parameter_response`" in markdown
@@ -327,6 +333,7 @@ def test_review_report_blocks_tampered_event_log(tmp_path: Path):
     assert report["artifact_count"] == 1
     assert report["invalid_candidate_count"] == 1
     assert report["artifact_reviews"][0]["operator_confirmed_channels"] == [3]
+    assert report["artifact_reviews"][0]["operator_confirmed_session_ready"] is True
     assert "event_log_forbidden_request_type_sent" in report["violations"]
     assert review_tool.exit_code_for_report(report) == 3
 

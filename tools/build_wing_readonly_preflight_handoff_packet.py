@@ -47,6 +47,7 @@ FORBIDDEN_LIVE_REQUEST_TYPES = [
 REQUIRED_REVIEW_CHECKLIST_IDS = [
     "confirm_artifact_paths",
     "confirm_operator_channel_scope",
+    "confirm_operator_session_ready",
     "confirm_physical_readbacks",
     "confirm_event_log_readonly_sequence",
     "confirm_no_live_authority",
@@ -248,7 +249,7 @@ def build_handoff_packet(
         },
         "operator_sequence": [
             "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
-            "Confirm backend is connected to the intended WING Rack.",
+            "Confirm backend is connected to the intended WING Rack and ready for read-only inspection.",
             "Confirm the selected channel numbers are safe to inspect.",
             "Run capture_readonly_preflight.",
             "Run review_artifact_and_write_pending_decision_template.",

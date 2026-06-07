@@ -606,6 +606,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     assert result.detail["review_manual_checklist_ids"] == [
         "confirm_artifact_paths",
         "confirm_operator_channel_scope",
+        "confirm_operator_session_ready",
         "confirm_physical_readbacks",
         "confirm_event_log_readonly_sequence",
         "confirm_no_live_authority",
@@ -855,6 +856,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "required_review_checklist_ids": [
             "confirm_artifact_paths",
             "confirm_operator_channel_scope",
+            "confirm_operator_session_ready",
             "confirm_physical_readbacks",
             "confirm_event_log_readonly_sequence",
             "confirm_no_live_authority",
@@ -6897,6 +6899,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "review_manual_checklist_ids": [
                 "confirm_artifact_paths",
                 "confirm_operator_channel_scope",
+                "confirm_operator_session_ready",
                 "confirm_physical_readbacks",
                 "confirm_event_log_readonly_sequence",
                 "confirm_no_live_authority",
@@ -7014,6 +7017,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["review_manual_checklist_ids"] == [
         "confirm_artifact_paths",
         "confirm_operator_channel_scope",
+        "confirm_operator_session_ready",
         "confirm_physical_readbacks",
         "confirm_event_log_readonly_sequence",
         "confirm_no_live_authority",

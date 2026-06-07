@@ -72,6 +72,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
     ]
     assert "confirm_no_live_authority" in packet["required_review_checklist_ids"]
+    assert "confirm_operator_session_ready" in packet["required_review_checklist_ids"]
     assert "apply_operator_proposal" in packet["forbidden_live_request_types"]
     assert "wing_readonly_connection_proof" in packet["blockers_not_closed_by_packet"]
 
@@ -124,6 +125,7 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "capture_readonly_preflight" in markdown
     assert "review_edited_decision_json" in markdown
     assert "pending_review_decision_template.json" in markdown
+    assert "confirm_operator_session_ready" in markdown
     assert "full_autonomous_ready: `false`" in markdown
 
 

@@ -270,6 +270,8 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
     assert evidence["artifacts"][0]["physical_readback_count"] == 2
     assert evidence["artifacts"][0]["channels"] == [3]
     assert evidence["artifacts"][0]["operator_confirmed_channels"] == [3]
+    assert evidence["artifacts"][0]["operator_session_confirmation_required"] is True
+    assert evidence["artifacts"][0]["operator_confirmed_session_ready"] is True
     assert evidence["artifacts"][0]["violations"] == []
 
 

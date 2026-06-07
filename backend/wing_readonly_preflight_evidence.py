@@ -108,6 +108,8 @@ class WingReadonlyPreflightArtifactRecord:
     sent_request_types: Tuple[str, ...]
     channels: Tuple[int, ...]
     operator_confirmed_channels: Tuple[int, ...]
+    operator_session_confirmation_required: bool
+    operator_confirmed_session_ready: bool
     value_types: Tuple[str, ...]
     violations: Tuple[str, ...]
 
@@ -613,6 +615,12 @@ def validate_wing_readonly_preflight_artifact(
             "sent_request_types": list(sent_request_types),
             "channels": list(channels),
             "operator_confirmed_channels": list(confirmed_channels),
+            "operator_session_confirmation_required": (
+                payload.get("operator_session_confirmation_required") is True
+            ),
+            "operator_confirmed_session_ready": (
+                payload.get("operator_confirmed_session_ready") is True
+            ),
             "value_types": list(value_types),
         },
     }
@@ -638,6 +646,12 @@ def _record_from_validation(
         sent_request_types=_string_tuple(evidence.get("sent_request_types")),
         channels=_int_tuple(evidence.get("channels")),
         operator_confirmed_channels=_int_tuple(evidence.get("operator_confirmed_channels")),
+        operator_session_confirmation_required=(
+            evidence.get("operator_session_confirmation_required") is True
+        ),
+        operator_confirmed_session_ready=(
+            evidence.get("operator_confirmed_session_ready") is True
+        ),
         value_types=_string_tuple(evidence.get("value_types")),
         violations=_string_tuple(validation.get("violations")),
     )
@@ -657,6 +671,8 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         sent_request_types=(),
         channels=(),
         operator_confirmed_channels=(),
+        operator_session_confirmation_required=False,
+        operator_confirmed_session_ready=False,
         value_types=(),
         violations=(f"artifact_load_error:{type(exc).__name__}",),
     )

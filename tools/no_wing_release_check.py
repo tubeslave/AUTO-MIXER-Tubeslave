@@ -381,6 +381,7 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_EXIT_CODES = {
 WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = (
     "confirm_artifact_paths",
     "confirm_operator_channel_scope",
+    "confirm_operator_session_ready",
     "confirm_physical_readbacks",
     "confirm_event_log_readonly_sequence",
     "confirm_no_live_authority",

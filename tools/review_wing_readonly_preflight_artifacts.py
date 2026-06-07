@@ -57,6 +57,13 @@ MANUAL_REVIEW_CHECKLIST = (
         "label": "Confirm operator_confirmed_channels exactly match the queried channels.",
     },
     {
+        "id": "confirm_operator_session_ready",
+        "label": (
+            "Confirm operator_confirmed_session_ready is true for the intended "
+            "backend/WING session."
+        ),
+    },
+    {
         "id": "confirm_physical_readbacks",
         "label": "Confirm every readback is verified_from_physical_readback for the declared value types.",
     },
@@ -104,6 +111,12 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                     item.get("operator_confirmed_channels")
                     if isinstance(item.get("operator_confirmed_channels"), list)
                     else []
+                ),
+                "operator_session_confirmation_required": (
+                    item.get("operator_session_confirmation_required") is True
+                ),
+                "operator_confirmed_session_ready": (
+                    item.get("operator_confirmed_session_ready") is True
                 ),
                 "value_types": (
                     item.get("value_types") if isinstance(item.get("value_types"), list) else []
@@ -345,6 +358,10 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"  - channels: `{json.dumps(row.get('channels') or [])}`",
                     "  - operator_confirmed_channels: "
                     f"`{json.dumps(row.get('operator_confirmed_channels') or [])}`",
+                    "  - operator_session_confirmation_required: "
+                    f"`{str(row.get('operator_session_confirmation_required') is True).lower()}`",
+                    "  - operator_confirmed_session_ready: "
+                    f"`{str(row.get('operator_confirmed_session_ready') is True).lower()}`",
                     f"  - value_types: `{json.dumps(row.get('value_types') or [])}`",
                     f"  - readback_count: `{int(row.get('readback_count') or 0)}`",
                     "  - physical_readback_count: "
