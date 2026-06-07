@@ -536,6 +536,49 @@ def test_registry_snapshot_can_hide_full_method_inventory():
     assert "mode_full_autonomous" in snapshot["project_goal_capability_matrix"]["summary"][
         "blocked_live_capability_ids"
     ]
+    assert (
+        snapshot["project_goal_capability_progress_snapshot"]["type"]
+        == "project_goal_capability_progress_snapshot"
+    )
+    assert (
+        snapshot["project_goal_capability_progress_snapshot"]["safety"][
+            "live_widening_allowed"
+        ]
+        is False
+    )
+    assert (
+        snapshot["project_goal_capability_progress_snapshot"]["summary"][
+            "row_count"
+        ]
+        == snapshot["project_goal_capability_matrix"]["summary"]["row_count"]
+    )
+    assert (
+        snapshot["project_goal_capability_progress_snapshot"]["summary"][
+            "missing_capability_ids"
+        ]
+        == snapshot["project_goal_capability_matrix"]["summary"][
+            "missing_capability_ids"
+        ]
+    )
+    assert (
+        snapshot["project_goal_capability_progress_snapshot"]["summary"][
+            "goal_area_counts"
+        ]
+    )
+    assert (
+        sum(
+            snapshot["project_goal_capability_progress_snapshot"]["summary"][
+                "goal_area_counts"
+            ].values()
+        )
+        == snapshot["project_goal_capability_progress_snapshot"]["summary"][
+            "row_count"
+        ]
+    )
+    assert (
+        snapshot["project_goal_capability_progress_snapshot"]["goal_area_progress"]
+        and snapshot["project_goal_capability_progress_snapshot"]["next_steps"]
+    )
     assert snapshot["methods"] == []
     assert {profile["id"] for profile in snapshot["pipeline_profiles"]} == {
         profile.id for profile in iter_pipeline_profiles()

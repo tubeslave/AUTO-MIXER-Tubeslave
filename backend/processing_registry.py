@@ -50,7 +50,10 @@ try:
     )
     from autonomy_mode_transition_gate import build_autonomy_mode_transition_gate
     from autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
-    from project_goal_capability_matrix import build_project_goal_capability_matrix_snapshot
+    from project_goal_capability_matrix import (
+        build_project_goal_capability_matrix_snapshot,
+        build_project_goal_capability_progress_snapshot,
+    )
     from read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
     from read_surface_inventory import build_read_surface_inventory_snapshot
     from read_surface_physical_readback_capture_plan import (
@@ -363,7 +366,10 @@ except ImportError:  # pragma: no cover - package import compatibility
     )
     from backend.autonomy_mode_transition_gate import build_autonomy_mode_transition_gate
     from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
-    from backend.project_goal_capability_matrix import build_project_goal_capability_matrix_snapshot
+    from backend.project_goal_capability_matrix import (
+        build_project_goal_capability_matrix_snapshot,
+        build_project_goal_capability_progress_snapshot,
+    )
     from backend.read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
     from backend.read_surface_inventory import build_read_surface_inventory_snapshot
     from backend.read_surface_physical_readback_capture_plan import (
@@ -6584,6 +6590,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         "pipeline_profiles": profiles,
         "module_status_map": build_module_status_map(),
         "project_goal_capability_matrix": build_project_goal_capability_matrix_snapshot(),
+        "project_goal_capability_progress_snapshot": (
+            build_project_goal_capability_progress_snapshot()
+        ),
         "autonomy_promotion_readiness": autonomy_promotion_readiness,
         "autonomy_mode_transition_gate": autonomy_mode_transition_gate,
         "read_surface_inventory": build_read_surface_inventory_snapshot(),
