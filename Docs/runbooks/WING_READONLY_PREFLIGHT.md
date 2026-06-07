@@ -110,6 +110,8 @@ The summary must show:
 - referenced offline plan fields and `request_sequence` match the captured
   summary, operator-confirmed channels, value types, and readback identities
 - `physical_readback_count == readback_count`
+- every readback has the expected WING address for its channel/value type and a
+  finite numeric `value`
 
 The event log must show only these request types:
 
@@ -243,6 +245,7 @@ Then update:
   `captured_at`;
 - `events.jsonl` payloads include apply/write/rollback evidence or grant live
   authority;
+- any readback omits its expected WING address or finite numeric value;
 - a `query_mixer_parameter` response does not match its request identity;
 - a `query_mixer_parameter` response omits or mismatches the request id;
 - the real run omits the expected offline plan or does not match it;

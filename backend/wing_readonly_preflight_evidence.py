@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -264,6 +265,14 @@ def _iter_nested_mappings(value: Any) -> Iterable[Mapping[str, Any]]:
 
 def _request_id_for(channel: int, value_type: str) -> str:
     return f"wing-readonly-preflight:ch{channel}:{value_type}"
+
+
+def _address_for(channel: int, value_type: str) -> str:
+    if value_type == "fader":
+        return f"/ch/{channel}/fdr"
+    if value_type == "gain":
+        return f"/ch/{channel}/in/set/trim"
+    return ""
 
 
 def _summary_event_path(payload: Mapping[str, Any], summary_path: Path) -> Path | None:
@@ -565,6 +574,19 @@ def _validate_readback_row(index: int, row: Mapping[str, Any], violations: list[
     channel = _safe_int(row.get("channel"))
     if channel < 1 or channel > 48:
         violations.append(f"readback_{index}_invalid_channel")
+    address = str(row.get("address") or "")
+    if not address:
+        violations.append(f"readback_{index}_address_missing")
+    elif value_type in {"fader", "gain"} and 1 <= channel <= 48:
+        if address != _address_for(channel, value_type):
+            violations.append(f"readback_{index}_address_mismatch")
+    value = row.get("value")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+    ):
+        violations.append(f"readback_{index}_value_missing_or_non_numeric")
 
 
 def _target_pairs(channels: Tuple[int, ...], value_types: Tuple[str, ...]) -> Tuple[Tuple[int, str], ...]:

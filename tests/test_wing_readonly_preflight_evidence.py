@@ -394,6 +394,28 @@ def test_preflight_evidence_rejects_readbacks_for_unconfirmed_channel():
     assert expected_violation in evidence["summary"]["violations"]
 
 
+def test_preflight_evidence_rejects_readback_address_mismatch():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["readbacks"][0]["address"] = "/ch/4/fdr"
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "readback_0_address_mismatch" in validation["violations"]
+
+
+def test_preflight_evidence_rejects_missing_or_non_numeric_readback_value():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["readbacks"][0].pop("value")
+    artifact["readbacks"][1]["value"] = "not-a-number"
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "readback_0_value_missing_or_non_numeric" in validation["violations"]
+    assert "readback_1_value_missing_or_non_numeric" in validation["violations"]
+
+
 def test_wing_readonly_preflight_evidence_discovers_summary_json_files(tmp_path):
     artifact_dir = tmp_path / "preflight" / "run"
     artifact_path = _write_file_artifact(artifact_dir)
@@ -684,6 +706,20 @@ def test_file_preflight_artifact_rejects_query_readback_identity_mismatch(tmp_pa
     assert evidence["summary"]["invalid_candidate_count"] == 1
     assert "event_log_readbacks_mismatch" in evidence["summary"]["violations"]
     assert "event_log_query_readback_identity_mismatch:0" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_rejects_summary_readback_wrong_address(tmp_path):
+    summary = _valid_summary()
+    summary["readbacks"][0]["address"] = "/ch/3/in/set/trim"
+    events = _valid_events(summary)
+    _write_file_artifact(tmp_path / "preflight" / "wrong-readback-address", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "readback_0_address_mismatch" in evidence["summary"]["violations"]
 
 
 def test_file_preflight_artifact_rejects_query_readback_request_id_mismatch(tmp_path):
