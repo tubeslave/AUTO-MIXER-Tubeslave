@@ -224,6 +224,9 @@ def build_handoff_packet(
         "queries_console": False,
         "executes_tests": False,
         "operator_required": True,
+        "expected_plan_required_for_real_run": True,
+        "physical_preflight_requires_existing_backend_connection": True,
+        "manual_review_required_before_readiness_update": True,
         "execution_allowed_by_packet": False,
         "readiness_matrix_update_allowed_by_packet": False,
         "readiness_closure_allowed_by_packet": False,
@@ -286,6 +289,12 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"- queries_console: `{str(packet['queries_console']).lower()}`",
         f"- executes_tests: `{str(packet['executes_tests']).lower()}`",
         f"- operator_required: `{str(packet['operator_required']).lower()}`",
+        "- expected_plan_required_for_real_run: "
+        f"`{str(packet['expected_plan_required_for_real_run']).lower()}`",
+        "- physical_preflight_requires_existing_backend_connection: "
+        f"`{str(packet['physical_preflight_requires_existing_backend_connection']).lower()}`",
+        "- manual_review_required_before_readiness_update: "
+        f"`{str(packet['manual_review_required_before_readiness_update']).lower()}`",
         "- execution_allowed_by_packet: "
         f"`{str(packet['execution_allowed_by_packet']).lower()}`",
         "- readiness_matrix_update_allowed_by_packet: "

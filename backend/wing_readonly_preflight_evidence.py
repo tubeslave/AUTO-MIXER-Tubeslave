@@ -100,6 +100,7 @@ class WingReadonlyPreflightArtifactRecord:
     status: str
     accepted_as_readonly_preflight_candidate: bool
     run_id: str | None
+    captured_at: str | None
     summary_path: str | None
     summary_sha256: str | None
     events_path: str | None
@@ -135,6 +136,19 @@ class WingReadonlyPreflightArtifactRecord:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _is_utc_timestamp(value: str) -> bool:
+    if not value:
+        return False
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        return False
+    return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
@@ -519,6 +533,11 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("status_not_passed")
     if payload.get("reason") != "wing_readonly_preflight_passed":
         violations.append("reason_not_passed")
+    captured_at = payload.get("captured_at")
+    if not isinstance(captured_at, str) or not captured_at:
+        violations.append("captured_at_missing")
+    elif not _is_utc_timestamp(captured_at):
+        violations.append("captured_at_invalid")
     if payload.get("connection_mode") != "wing":
         violations.append("connection_mode_not_wing")
     if payload.get("request_id_policy") != REQUEST_ID_POLICY:
@@ -616,6 +635,7 @@ def validate_wing_readonly_preflight_artifact(
         "violations": sorted(dict.fromkeys(violations)),
         "evidence": {
             "run_id": payload.get("run_id"),
+            "captured_at": captured_at if isinstance(captured_at, str) else None,
             "summary_path": payload.get("summary_path"),
             "summary_sha256": (
                 payload.get("summary_sha256")
@@ -660,6 +680,9 @@ def _record_from_validation(
             validation.get("accepted_as_readonly_preflight_candidate") is True
         ),
         run_id=str(evidence.get("run_id")) if evidence.get("run_id") else None,
+        captured_at=(
+            str(evidence.get("captured_at")) if evidence.get("captured_at") else None
+        ),
         summary_path=str(evidence.get("summary_path")) if evidence.get("summary_path") else None,
         summary_sha256=summary_sha256
         or (str(evidence.get("summary_sha256")) if evidence.get("summary_sha256") else None),
@@ -689,6 +712,7 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         status="artifact_load_error",
         accepted_as_readonly_preflight_candidate=False,
         run_id=None,
+        captured_at=None,
         summary_path=None,
         summary_sha256=None,
         events_path=None,
@@ -843,6 +867,9 @@ def build_wing_readonly_preflight_evidence(
             "full_autonomous_ready": False,
             "latest_valid_candidate_source_id": latest_valid.source_id if latest_valid else None,
             "latest_valid_candidate_run_id": latest_valid.run_id if latest_valid else None,
+            "latest_valid_candidate_captured_at": (
+                latest_valid.captured_at if latest_valid else None
+            ),
             "next_global_step": next_global_step,
             "blocked_by": list(blocked_by),
             "violations": list(all_violations),

@@ -14,6 +14,7 @@ def _valid_summary() -> dict:
         "run_id": "20260606T120000Z_wing_readonly_preflight",
         "status": "passed",
         "reason": "wing_readonly_preflight_passed",
+        "captured_at": "2026-06-07T01:00:00Z",
         "proof_artifact_schema": "wing_readonly_preflight.v1",
         "proof_runner": "wing_readonly_preflight_runner",
         "connection_mode": "wing",
@@ -85,6 +86,7 @@ def _accepted_record(**overrides) -> dict:
         "review_id": "review-wing-readonly-1",
         "artifact_source_id": "inline_payload_0",
         "run_id": "20260606T120000Z_wing_readonly_preflight",
+        "artifact_captured_at": "2026-06-07T01:00:00Z",
         "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
         "summary_sha256": "1" * 64,
         "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
@@ -294,6 +296,34 @@ def test_review_decision_ledger_rejects_stale_artifact_hashes():
     violations = set(ledger["records"][0]["violations"])
     assert "review_decision_summary_sha256_mismatch" in violations
     assert "review_decision_events_sha256_mismatch" in violations
+
+
+def test_review_decision_ledger_rejects_pre_capture_review_decision():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[
+            _accepted_record(reviewed_at="2026-06-07T00:59:59Z"),
+        ],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["invalid_record_count"] == 1
+    violations = set(ledger["records"][0]["violations"])
+    assert "review_decision_reviewed_at_before_artifact_captured_at" in violations
+
+
+def test_review_decision_ledger_rejects_stale_artifact_capture_timestamp():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[
+            _accepted_record(artifact_captured_at="2026-06-07T00:59:59Z"),
+        ],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["invalid_record_count"] == 1
+    violations = set(ledger["records"][0]["violations"])
+    assert "review_decision_artifact_captured_at_mismatch" in violations
 
 
 def test_review_decision_ledger_rejects_non_utc_timestamp():

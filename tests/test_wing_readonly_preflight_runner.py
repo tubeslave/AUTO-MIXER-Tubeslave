@@ -254,6 +254,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
     summary = read_summary(tmp_path)
     assert summary["status"] == "passed"
     assert summary["reason"] == "wing_readonly_preflight_passed"
+    assert summary["captured_at"].endswith("Z")
     assert summary["connection_mode"] == "wing"
     assert summary["operator_channel_confirmation_required"] is True
     assert summary["operator_confirmed_channels"] == [3]

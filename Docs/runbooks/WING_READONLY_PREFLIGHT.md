@@ -141,6 +141,7 @@ Minimum accepted-decision shape:
   "review_id": "review-wing-readonly-<run_id>",
   "artifact_source_id": "artifacts/wing_readonly_preflight/<run_id>/summary.json",
   "run_id": "<run_id>",
+  "artifact_captured_at": "2026-06-07T00:00:00Z",
   "summary_path": "artifacts/wing_readonly_preflight/<run_id>/summary.json",
   "summary_sha256": "<sha256 of summary.json>",
   "events_path": "artifacts/wing_readonly_preflight/<run_id>/events.jsonl",
@@ -160,13 +161,15 @@ Minimum accepted-decision shape:
 ```
 
 Use `decision: "rejected"` if the operator does not accept the candidate. The
-`summary_sha256` and `events_sha256` fields must match the current captured
-files; stale decisions for replaced artifacts fail closed. The decision ledger
-still does not grant live authority or close readiness rows by itself. The next
-supervised fader/gain proof plan remains blocked until a clean candidate has
-exactly one accepted decision record. Duplicate decision records for the same
-candidate, including accepted/rejected conflicts, are invalid and must be
-replaced before the next step.
+`artifact_captured_at`, `summary_sha256`, and `events_sha256` fields must match
+the current captured files; stale decisions for replaced artifacts fail closed.
+`reviewed_at` must be the same time as or later than `artifact_captured_at`, so a
+pre-filled or pre-capture operator decision cannot accept a later artifact. The
+decision ledger still does not grant live authority or close readiness rows by
+itself. The next supervised fader/gain proof plan remains blocked until a clean
+candidate has exactly one accepted decision record. Duplicate decision records
+for the same candidate, including accepted/rejected conflicts, are invalid and
+must be replaced before the next step.
 
 ## Review Command
 
@@ -188,7 +191,8 @@ Exit codes:
 The decision template is intentionally not a valid accepted decision yet. The
 operator must edit `decision`, `reviewed_by`, and `reviewed_at`, then save the
 file as a durable review decision. Keep `artifact_source_id`, `run_id`,
-`summary_path`, `events_path`, and `checklist_ids` aligned with the template.
+`artifact_captured_at`, `summary_path`, `events_path`, and `checklist_ids`
+aligned with the template.
 
 After editing the decision JSON, run the focused decision review:
 

@@ -14,6 +14,7 @@ def _valid_summary() -> dict:
         "run_id": "20260606T120000Z_wing_readonly_preflight",
         "status": "passed",
         "reason": "wing_readonly_preflight_passed",
+        "captured_at": "2026-06-07T01:00:00Z",
         "proof_artifact_schema": "wing_readonly_preflight.v1",
         "proof_runner": "wing_readonly_preflight_runner",
         "connection_mode": "wing",
@@ -202,6 +203,7 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
         "review_id",
         "artifact_source_id",
         "run_id",
+        "artifact_captured_at",
         "summary_path",
         "summary_sha256",
         "events_path",
@@ -225,6 +227,7 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "source_id": str(summary_path),
             "status": "valid_readonly_preflight_artifact",
             "run_id": "20260606T120000Z_wing_readonly_preflight",
+            "captured_at": "2026-06-07T01:00:00Z",
             "summary_path": str(summary_path),
             "summary_sha256": _sha256_file(summary_path),
             "events_path": str(summary_path.parent / "events.jsonl"),
@@ -242,6 +245,7 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert review_tool.exit_code_for_report(report) == 0
     markdown = review_tool.render_markdown(report)
     assert "candidate_ready_for_manual_review" in markdown
+    assert "captured_at: `2026-06-07T01:00:00Z`" in markdown
     assert f"summary_path: `{summary_path}`" in markdown
     assert f"summary_sha256: `{_sha256_file(summary_path)}`" in markdown
     assert f"events_path: `{summary_path.parent / 'events.jsonl'}`" in markdown
@@ -276,6 +280,7 @@ def test_review_decision_template_links_clean_candidate_but_requires_operator_ed
     assert template["review_id"] == "review-wing-readonly-20260606T120000Z_wing_readonly_preflight"
     assert template["artifact_source_id"] == str(summary_path)
     assert template["run_id"] == "20260606T120000Z_wing_readonly_preflight"
+    assert template["artifact_captured_at"] == "2026-06-07T01:00:00Z"
     assert template["summary_path"] == str(summary_path)
     assert template["summary_sha256"] == _sha256_file(summary_path)
     assert template["events_path"] == str(summary_path.parent / "events.jsonl")

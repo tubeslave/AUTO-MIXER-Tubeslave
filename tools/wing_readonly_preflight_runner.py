@@ -210,6 +210,10 @@ class EventRecorder:
 
     def write_summary(self, summary: Dict[str, Any]) -> None:
         summary = dict(summary)
+        summary.setdefault(
+            "captured_at",
+            datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        )
         summary.setdefault("events_path", str(self.events_path))
         summary.setdefault("summary_path", str(self.summary_path))
         summary.setdefault("sent_request_types", list(self.sent_request_types))

@@ -390,6 +390,7 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
     "review_id",
     "artifact_source_id",
     "run_id",
+    "artifact_captured_at",
     "summary_path",
     "summary_sha256",
     "events_path",
@@ -3339,7 +3340,13 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     ):
         violations.append("wing_readonly_preflight_handoff_packet_events_glob_mismatch")
 
-    for key in ("read_only", "operator_required"):
+    for key in (
+        "read_only",
+        "operator_required",
+        "expected_plan_required_for_real_run",
+        "physical_preflight_requires_existing_backend_connection",
+        "manual_review_required_before_readiness_update",
+    ):
         if packet.get(key) is not True:
             violations.append(f"wing_readonly_preflight_handoff_packet_{key}_not_true")
     for key in (
@@ -3430,6 +3437,15 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["queries_console"] = packet.get("queries_console")
     detail["executes_tests"] = packet.get("executes_tests")
     detail["operator_required"] = packet.get("operator_required")
+    detail["expected_plan_required_for_real_run"] = packet.get(
+        "expected_plan_required_for_real_run"
+    )
+    detail["physical_preflight_requires_existing_backend_connection"] = packet.get(
+        "physical_preflight_requires_existing_backend_connection"
+    )
+    detail["manual_review_required_before_readiness_update"] = packet.get(
+        "manual_review_required_before_readiness_update"
+    )
     detail["execution_allowed_by_packet"] = packet.get("execution_allowed_by_packet")
     detail["readiness_matrix_update_allowed_by_packet"] = packet.get(
         "readiness_matrix_update_allowed_by_packet"
@@ -10222,6 +10238,16 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "queries_console": False,
             "executes_tests": False,
             "operator_required": detail.get("operator_required") is True,
+            "expected_plan_required_for_real_run": (
+                detail.get("expected_plan_required_for_real_run") is True
+            ),
+            "physical_preflight_requires_existing_backend_connection": (
+                detail.get("physical_preflight_requires_existing_backend_connection")
+                is True
+            ),
+            "manual_review_required_before_readiness_update": (
+                detail.get("manual_review_required_before_readiness_update") is True
+            ),
             "execution_allowed_by_packet": False,
             "readiness_matrix_update_allowed_by_packet": False,
             "readiness_closure_allowed_by_packet": False,
@@ -13371,6 +13397,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['queries_console']).lower()}`",
                 "- executes_tests: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['executes_tests']).lower()}`",
+                "- expected_plan_required_for_real_run: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['expected_plan_required_for_real_run']).lower()}`",
+                "- physical_preflight_requires_existing_backend_connection: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['physical_preflight_requires_existing_backend_connection']).lower()}`",
+                "- manual_review_required_before_readiness_update: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['manual_review_required_before_readiness_update']).lower()}`",
                 "- execution_allowed_by_packet: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['execution_allowed_by_packet']).lower()}`",
                 "- readiness_matrix_update_allowed_by_packet: "

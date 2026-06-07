@@ -15,6 +15,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["queries_console"] is False
     assert packet["executes_tests"] is False
     assert packet["operator_required"] is True
+    assert packet["expected_plan_required_for_real_run"] is True
+    assert packet["physical_preflight_requires_existing_backend_connection"] is True
+    assert packet["manual_review_required_before_readiness_update"] is True
     assert packet["execution_allowed_by_packet"] is False
     assert packet["readiness_matrix_update_allowed_by_packet"] is False
     assert packet["live_authority_granted"] is False
@@ -119,6 +122,9 @@ def test_handoff_markdown_renders_commands_and_boundaries():
 
     assert "WING Read-Only Preflight Handoff Packet" in markdown
     assert "live_write: `false`" in markdown
+    assert "expected_plan_required_for_real_run: `true`" in markdown
+    assert "physical_preflight_requires_existing_backend_connection: `true`" in markdown
+    assert "manual_review_required_before_readiness_update: `true`" in markdown
     assert "preview_readonly_request_plan" in markdown
     assert "--plan-only" in markdown
     assert "--operator-confirm-session-ready" in markdown
@@ -141,6 +147,9 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     assert handoff.main(["--format", "json", "--output", str(json_output), "--quiet"]) == 0
     payload = json.loads(json_output.read_text(encoding="utf-8"))
     assert payload["type"] == "wing_readonly_preflight_handoff_packet"
+    assert payload["expected_plan_required_for_real_run"] is True
+    assert payload["physical_preflight_requires_existing_backend_connection"] is True
+    assert payload["manual_review_required_before_readiness_update"] is True
     assert payload["live_authority_granted"] is False
 
 

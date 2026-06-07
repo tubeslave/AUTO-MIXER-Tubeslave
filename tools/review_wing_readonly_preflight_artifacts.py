@@ -40,6 +40,7 @@ REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
     "review_id",
     "artifact_source_id",
     "run_id",
+    "artifact_captured_at",
     "summary_path",
     "summary_sha256",
     "events_path",
@@ -106,6 +107,7 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                 "source_id": item.get("source_id"),
                 "status": item.get("status"),
                 "run_id": item.get("run_id"),
+                "captured_at": item.get("captured_at"),
                 "summary_path": item.get("summary_path"),
                 "summary_sha256": item.get("summary_sha256"),
                 "events_path": item.get("events_path"),
@@ -172,6 +174,7 @@ def build_review_decision_template(
     candidate = candidates[0]
     source_id = str(candidate.get("source_id") or "")
     run_id = str(candidate.get("run_id") or "")
+    captured_at = str(candidate.get("captured_at") or "")
     summary_path = str(candidate.get("summary_path") or "")
     summary_sha256 = str(candidate.get("summary_sha256") or "")
     events_path = str(candidate.get("events_path") or "")
@@ -179,6 +182,7 @@ def build_review_decision_template(
     if (
         not source_id
         or not run_id
+        or not captured_at
         or not summary_path
         or not summary_sha256
         or not events_path
@@ -191,6 +195,7 @@ def build_review_decision_template(
         "review_id": f"review-wing-readonly-{run_id}",
         "artifact_source_id": source_id,
         "run_id": run_id,
+        "artifact_captured_at": captured_at,
         "summary_path": summary_path,
         "summary_sha256": summary_sha256,
         "events_path": events_path,
@@ -368,6 +373,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"- source: `{row.get('source_id')}`",
                     f"  - status: `{row.get('status')}`",
                     f"  - run_id: `{row.get('run_id')}`",
+                    f"  - captured_at: `{row.get('captured_at')}`",
                     f"  - summary_path: `{row.get('summary_path')}`",
                     f"  - summary_sha256: `{row.get('summary_sha256')}`",
                     f"  - events_path: `{row.get('events_path')}`",

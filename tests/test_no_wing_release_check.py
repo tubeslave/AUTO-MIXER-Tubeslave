@@ -616,6 +616,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "review_id",
         "artifact_source_id",
         "run_id",
+        "artifact_captured_at",
         "summary_path",
         "summary_sha256",
         "events_path",
@@ -748,6 +749,9 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "queries_console": False,
         "executes_tests": False,
         "operator_required": True,
+        "expected_plan_required_for_real_run": True,
+        "physical_preflight_requires_existing_backend_connection": True,
+        "manual_review_required_before_readiness_update": True,
         "execution_allowed_by_packet": False,
         "readiness_matrix_update_allowed_by_packet": False,
         "readiness_closure_allowed_by_packet": False,
@@ -2211,6 +2215,9 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
     payload["live_authority_granted"] = True
     payload["queries_console"] = True
+    payload["expected_plan_required_for_real_run"] = False
+    payload["physical_preflight_requires_existing_backend_connection"] = False
+    payload["manual_review_required_before_readiness_update"] = False
     payload["commands"]["preview_readonly_request_plan"].remove("--plan-only")
     payload["blockers_not_closed_by_packet"].remove("physical_console_readback_proof")
     packet_path.write_text(json.dumps(payload), encoding="utf-8")
@@ -2225,6 +2232,15 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
         "violations"
     ]
     assert "wing_readonly_preflight_handoff_packet_live_authority_granted_not_false" in result.detail[
+        "violations"
+    ]
+    assert "wing_readonly_preflight_handoff_packet_expected_plan_required_for_real_run_not_true" in result.detail[
+        "violations"
+    ]
+    assert "wing_readonly_preflight_handoff_packet_physical_preflight_requires_existing_backend_connection_not_true" in result.detail[
+        "violations"
+    ]
+    assert "wing_readonly_preflight_handoff_packet_manual_review_required_before_readiness_update_not_true" in result.detail[
         "violations"
     ]
     assert "wing_readonly_preflight_handoff_packet_preview_readonly_request_plan_mismatch" in result.detail[
@@ -6911,6 +6927,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "review_id",
                 "artifact_source_id",
                 "run_id",
+                "artifact_captured_at",
                 "summary_path",
                 "summary_sha256",
                 "events_path",
@@ -7031,6 +7048,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         "review_id",
         "artifact_source_id",
         "run_id",
+        "artifact_captured_at",
         "summary_path",
         "summary_sha256",
         "events_path",
@@ -7220,6 +7238,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "queries_console": False,
             "executes_tests": False,
             "operator_required": True,
+            "expected_plan_required_for_real_run": True,
+            "physical_preflight_requires_existing_backend_connection": True,
+            "manual_review_required_before_readiness_update": True,
             "execution_allowed_by_packet": False,
             "readiness_matrix_update_allowed_by_packet": False,
             "readiness_closure_allowed_by_packet": False,
@@ -7258,6 +7279,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["live_write"] is False
     assert artifact["queries_console"] is False
     assert artifact["executes_tests"] is False
+    assert artifact["expected_plan_required_for_real_run"] is True
+    assert artifact["physical_preflight_requires_existing_backend_connection"] is True
+    assert artifact["manual_review_required_before_readiness_update"] is True
     assert artifact["execution_allowed_by_packet"] is False
     assert artifact["readiness_matrix_update_allowed_by_packet"] is False
     assert artifact["readiness_closure_allowed_by_packet"] is False
@@ -7272,6 +7296,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["operator_sequence_count"] == 8
     assert artifact["violations"] == []
     assert "## WING Read-Only Preflight Handoff Packet Artifact" in markdown_summary
+    assert "expected_plan_required_for_real_run: `true`" in markdown_summary
+    assert (
+        "physical_preflight_requires_existing_backend_connection: `true`"
+        in markdown_summary
+    )
+    assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
     assert "plan_artifact_status: `passed`" in markdown_summary
     assert "execution_allowed_by_packet: `false`" in markdown_summary
     assert "preview_command_uses_plan_only: `true`" in markdown_summary

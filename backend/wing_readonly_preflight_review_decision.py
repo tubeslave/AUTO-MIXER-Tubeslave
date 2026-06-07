@@ -130,17 +130,23 @@ def _decision_records(
     return tuple(records)
 
 
-def _is_utc_timestamp(value: str) -> bool:
+def _parse_utc_timestamp(value: str) -> datetime | None:
     if not value:
-        return False
+        return None
     normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
     try:
         parsed = datetime.fromisoformat(normalized)
     except ValueError:
-        return False
+        return None
     if parsed.tzinfo is None:
-        return False
-    return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
+        return None
+    if parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+        return None
+    return parsed
+
+
+def _is_utc_timestamp(value: str) -> bool:
+    return _parse_utc_timestamp(value) is not None
 
 
 def _candidate_items_by_source(evidence: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
@@ -241,6 +247,7 @@ def _validated_record(
     reviewed_by = _string(record.get("reviewed_by"))
     reviewed_at = _string(record.get("reviewed_at"))
     run_id = _string(record.get("run_id"))
+    artifact_captured_at = _string(record.get("artifact_captured_at"))
     summary_path = _string(record.get("summary_path"))
     summary_sha256 = _string(record.get("summary_sha256"))
     events_path = _string(record.get("events_path"))
@@ -260,6 +267,8 @@ def _validated_record(
         violations.append("review_decision_reviewed_at_missing")
     elif not _is_utc_timestamp(reviewed_at):
         violations.append("review_decision_reviewed_at_invalid")
+    if artifact_captured_at and not _is_utc_timestamp(artifact_captured_at):
+        violations.append("review_decision_artifact_captured_at_invalid")
     if not artifact_source_id:
         violations.append("review_decision_artifact_source_missing")
     if checklist_ids != REQUIRED_REVIEW_CHECKLIST_IDS:
@@ -267,6 +276,22 @@ def _validated_record(
     if candidate:
         if run_id != candidate.get("run_id"):
             violations.append("review_decision_run_id_mismatch")
+        candidate_captured_at = _string(candidate.get("captured_at"))
+        if not candidate_captured_at:
+            violations.append("review_decision_candidate_captured_at_missing")
+        elif not artifact_captured_at:
+            violations.append("review_decision_artifact_captured_at_missing")
+        elif artifact_captured_at != candidate_captured_at:
+            violations.append("review_decision_artifact_captured_at_mismatch")
+        else:
+            reviewed_timestamp = _parse_utc_timestamp(reviewed_at)
+            captured_timestamp = _parse_utc_timestamp(candidate_captured_at)
+            if (
+                reviewed_timestamp is not None
+                and captured_timestamp is not None
+                and reviewed_timestamp < captured_timestamp
+            ):
+                violations.append("review_decision_reviewed_at_before_artifact_captured_at")
         if summary_path != candidate.get("summary_path"):
             violations.append("review_decision_summary_path_mismatch")
         candidate_summary_sha256 = _string(candidate.get("summary_sha256"))
@@ -291,6 +316,7 @@ def _validated_record(
         "review_id": record_id,
         "artifact_source_id": artifact_source_id,
         "run_id": run_id,
+        "artifact_captured_at": artifact_captured_at,
         "summary_path": summary_path,
         "summary_sha256": summary_sha256,
         "events_path": events_path,

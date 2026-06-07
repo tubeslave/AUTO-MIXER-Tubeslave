@@ -22,6 +22,7 @@ def _valid_summary() -> dict:
         "run_id": "20260606T120000Z_wing_readonly_preflight",
         "status": "passed",
         "reason": "wing_readonly_preflight_passed",
+        "captured_at": "2026-06-07T01:00:00Z",
         "proof_artifact_schema": "wing_readonly_preflight.v1",
         "proof_runner": "wing_readonly_preflight_runner",
         "connection_mode": "wing",
@@ -251,6 +252,7 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
     assert evidence["summary"]["readiness_closure_allowed_by_evidence"] is False
     assert evidence["summary"]["live_authority_granted"] is False
     assert evidence["summary"]["latest_valid_candidate_run_id"] == "20260606T120000Z_wing_readonly_preflight"
+    assert evidence["summary"]["latest_valid_candidate_captured_at"] == "2026-06-07T01:00:00Z"
     assert evidence["summary"]["blocked_by"] == [
         "operator_must_review_readonly_preflight_candidate_before_readiness_update"
     ]
@@ -265,6 +267,7 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
     }
     assert all(row["closed"] is False for row in evidence["mvp_blocker_matrix"])
     assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is True
+    assert evidence["artifacts"][0]["captured_at"] == "2026-06-07T01:00:00Z"
     assert evidence["artifacts"][0]["summary_path"] == "artifacts/wing_readonly_preflight/run/summary.json"
     assert evidence["artifacts"][0]["events_path"] == "artifacts/wing_readonly_preflight/run/events.jsonl"
     assert evidence["artifacts"][0]["physical_readback_count"] == 2

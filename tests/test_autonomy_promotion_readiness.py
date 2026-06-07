@@ -12,6 +12,7 @@ def _valid_wing_preflight_summary() -> dict:
         "run_id": "20260606T150000Z_wing_readonly_preflight",
         "status": "passed",
         "reason": "wing_readonly_preflight_passed",
+        "captured_at": "2026-06-07T01:00:00Z",
         "proof_artifact_schema": "wing_readonly_preflight.v1",
         "proof_runner": "wing_readonly_preflight_runner",
         "connection_mode": "wing",
@@ -44,20 +45,28 @@ def _valid_wing_preflight_summary() -> dict:
         "physical_readback_count": 2,
         "readbacks": [
             {
+                "type": "mixer_parameter_value",
                 "request_id": "wing-readonly-preflight:ch3:fader",
                 "status": "verified_from_physical_readback",
                 "source": "physical_readback",
                 "channel": 3,
                 "value_type": "fader",
+                "address": "/ch/3/fdr",
+                "value": -12.0,
             },
             {
+                "type": "mixer_parameter_value",
                 "request_id": "wing-readonly-preflight:ch3:gain",
                 "status": "verified_from_physical_readback",
                 "source": "physical_readback",
                 "channel": 3,
                 "value_type": "gain",
+                "address": "/ch/3/in/set/trim",
+                "value": -0.25,
             },
         ],
+        "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
+        "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
     }
 
 
