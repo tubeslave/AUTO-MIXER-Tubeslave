@@ -167,6 +167,67 @@ def _unsafe_flags(record: Mapping[str, Any]) -> Tuple[str, ...]:
     return tuple(flag for flag in UNSAFE_DECISION_FLAGS if record.get(flag) is True)
 
 
+def _duplicate_review_source_ids(
+    records: Iterable[Mapping[str, Any]],
+) -> Tuple[str, ...]:
+    counts: dict[str, int] = {}
+    for record in records:
+        source_id = _string(record.get("artifact_source_id"))
+        if not source_id or record.get("valid") is not True:
+            continue
+        counts[source_id] = counts.get(source_id, 0) + 1
+    return tuple(source_id for source_id, count in counts.items() if count > 1)
+
+
+def _conflicting_review_source_ids(
+    records: Iterable[Mapping[str, Any]],
+) -> Tuple[str, ...]:
+    decisions_by_source: dict[str, set[str]] = {}
+    for record in records:
+        source_id = _string(record.get("artifact_source_id"))
+        decision = _string(record.get("decision"))
+        if not source_id or record.get("valid") is not True:
+            continue
+        decisions_by_source.setdefault(source_id, set()).add(decision)
+    return tuple(
+        source_id
+        for source_id, decisions in decisions_by_source.items()
+        if len(decisions) > 1
+    )
+
+
+def _mark_review_decision_collisions(
+    records: Iterable[Mapping[str, Any]],
+) -> Tuple[Mapping[str, Any], ...]:
+    records_tuple = tuple(records)
+    duplicate_source_ids = set(_duplicate_review_source_ids(records_tuple))
+    conflicting_source_ids = set(_conflicting_review_source_ids(records_tuple))
+    if not duplicate_source_ids and not conflicting_source_ids:
+        return records_tuple
+
+    updated_records: list[Mapping[str, Any]] = []
+    for record in records_tuple:
+        source_id = _string(record.get("artifact_source_id"))
+        if source_id not in duplicate_source_ids:
+            updated_records.append(record)
+            continue
+        updated = dict(record)
+        violations = list(updated.get("violations") or [])
+        if "review_decision_duplicate_artifact_source" not in violations:
+            violations.append("review_decision_duplicate_artifact_source")
+        if (
+            source_id in conflicting_source_ids
+            and "review_decision_conflicting_artifact_source_decisions" not in violations
+        ):
+            violations.append("review_decision_conflicting_artifact_source_decisions")
+        updated["valid"] = False
+        updated["violations"] = violations
+        updated["operator_accepted_readonly_preflight_candidate"] = False
+        updated["operator_rejected_readonly_preflight_candidate"] = False
+        updated_records.append(updated)
+    return tuple(updated_records)
+
+
 def _validated_record(
     record: Mapping[str, Any],
     *,
@@ -246,7 +307,7 @@ def build_wing_readonly_preflight_review_decision_ledger(
 
     evidence = _mapping(preflight_evidence) or build_wing_readonly_preflight_evidence()
     candidates_by_source = _candidate_items_by_source(evidence)
-    records = tuple(
+    records = _mark_review_decision_collisions(
         _validated_record(
             record,
             index=index,
@@ -272,6 +333,26 @@ def build_wing_readonly_preflight_review_decision_ledger(
         if record["operator_rejected_readonly_preflight_candidate"]
     )
     invalid_records = tuple(record for record in records if not record["valid"])
+    duplicate_source_ids = tuple(
+        sorted(
+            {
+                str(record.get("artifact_source_id"))
+                for record in invalid_records
+                if "review_decision_duplicate_artifact_source"
+                in (record.get("violations") or ())
+            }
+        )
+    )
+    conflicting_source_ids = tuple(
+        sorted(
+            {
+                str(record.get("artifact_source_id"))
+                for record in invalid_records
+                if "review_decision_conflicting_artifact_source_decisions"
+                in (record.get("violations") or ())
+            }
+        )
+    )
     reviewed_source_ids = {
         str(record["artifact_source_id"])
         for record in valid_records
@@ -330,6 +411,8 @@ def build_wing_readonly_preflight_review_decision_ledger(
             "accepted_source_ids": [record["artifact_source_id"] for record in accepted_records],
             "rejected_source_ids": [record["artifact_source_id"] for record in rejected_records],
             "invalid_record_ids": [record["review_id"] for record in invalid_records],
+            "duplicate_source_ids": list(duplicate_source_ids),
+            "conflicting_source_ids": list(conflicting_source_ids),
             "unreviewed_candidate_source_ids": list(unreviewed_candidate_source_ids),
             "required_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
             "operator_review_required": True,

@@ -42,6 +42,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_MANUAL_REVIEW_CHECKLIST_20260607.md` | Offline artifact review exposes a required operator checklist before readiness updates. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_20260607.md` | Operator review decisions are file-backed, validated, and still do not grant live authority. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_20260607.md` | Offline artifact review can write a pending operator decision template, and a focused decision-review CLI validates the edited JSON without granting live authority. |
+| `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_DECISION_COLLISION_GATE_20260607.md` | Duplicate or conflicting operator decision records for the same read-only preflight candidate fail closed before supervised proof planning. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_PACKET_20260607.md` | Offline operator packet captures the exact read-only preflight, review, decision-review, and validation sequence without contacting WING. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated handoff packet as a read-only JSON operator gate. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_OFFLINE_PLAN_PREVIEW_20260607.md` | Offline plan-only preview exposes the exact WING read-only preflight request sequence before any backend/WING session opens. |

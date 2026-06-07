@@ -115,6 +115,8 @@ def build_decision_review_report(
         "accepted_source_ids": _string_list(summary.get("accepted_source_ids")),
         "rejected_source_ids": _string_list(summary.get("rejected_source_ids")),
         "invalid_record_ids": _string_list(summary.get("invalid_record_ids")),
+        "duplicate_source_ids": _string_list(summary.get("duplicate_source_ids")),
+        "conflicting_source_ids": _string_list(summary.get("conflicting_source_ids")),
         "unreviewed_candidate_source_ids": _string_list(
             summary.get("unreviewed_candidate_source_ids")
         ),
@@ -184,6 +186,8 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"- accepted_source_ids: `{json.dumps(report['accepted_source_ids'])}`",
         f"- rejected_source_ids: `{json.dumps(report['rejected_source_ids'])}`",
         f"- invalid_record_ids: `{json.dumps(report['invalid_record_ids'])}`",
+        f"- duplicate_source_ids: `{json.dumps(report['duplicate_source_ids'])}`",
+        f"- conflicting_source_ids: `{json.dumps(report['conflicting_source_ids'])}`",
         "- unreviewed_candidate_source_ids: "
         f"`{json.dumps(report['unreviewed_candidate_source_ids'])}`",
         f"- required_checklist_ids: `{json.dumps(report['required_checklist_ids'])}`",

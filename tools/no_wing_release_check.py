@@ -4141,6 +4141,16 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
         if isinstance(summary.get("invalid_record_ids"), list)
         else []
     )
+    detail["duplicate_source_ids"] = (
+        list(summary.get("duplicate_source_ids"))
+        if isinstance(summary.get("duplicate_source_ids"), list)
+        else []
+    )
+    detail["conflicting_source_ids"] = (
+        list(summary.get("conflicting_source_ids"))
+        if isinstance(summary.get("conflicting_source_ids"), list)
+        else []
+    )
     detail["unreviewed_candidate_source_ids"] = (
         list(summary.get("unreviewed_candidate_source_ids"))
         if isinstance(summary.get("unreviewed_candidate_source_ids"), list)

@@ -154,7 +154,9 @@ Minimum accepted-decision shape:
 Use `decision: "rejected"` if the operator does not accept the candidate. The
 decision ledger still does not grant live authority or close readiness rows by
 itself. The next supervised fader/gain proof plan remains blocked until a clean
-candidate has an accepted decision record.
+candidate has exactly one accepted decision record. Duplicate decision records
+for the same candidate, including accepted/rejected conflicts, are invalid and
+must be replaced before the next step.
 
 ## Review Command
 
@@ -232,7 +234,8 @@ Then update:
   `channels`;
 - the review report omits the manual review checklist;
 - the review decision JSON is missing, malformed, not UTC stamped, linked to
-  the wrong artifact/run, or claims live/readiness authority.
+  the wrong artifact/run, duplicated for the same candidate, conflicts with
+  another decision for the same candidate, or claims live/readiness authority.
 
 ## Next Step
 
