@@ -1220,6 +1220,9 @@ def build_main_pipeline_preview(
     autonomy_mode_transition_gate_summary = (
         autonomy_mode_transition_gate.get("summary", {})
     )
+    autonomy_promotion_summary = autonomy_promotion_readiness.get("summary", {})
+    autonomy_promotion_safety = autonomy_promotion_readiness.get("safety", {})
+    autonomy_mode_transition_safety = autonomy_mode_transition_gate.get("safety", {})
 
     analysis_status = str(analysis_report.get("status") or "unknown")
     status = "ok"
@@ -1294,6 +1297,30 @@ def build_main_pipeline_preview(
             ),
             "autonomy_mode_transition_gate_blocked_mode_count": int(
                 len(autonomy_mode_transition_gate_summary.get("blocked_modes", ()) or [])
+            ),
+            "autonomy_promotion_full_autonomous_ready": bool(
+                autonomy_promotion_safety.get("full_autonomous_ready", False)
+            ),
+            "autonomy_mode_transition_full_autonomous_ready": bool(
+                autonomy_mode_transition_safety.get("full_autonomous_ready", False)
+            ),
+            "autonomy_promotion_supervised_live_allowed_target_count": int(
+                len(autonomy_promotion_summary.get("supervised_live_allowed_target_ids", ()))
+            ),
+            "autonomy_promotion_blocked_target_count": int(
+                len(autonomy_promotion_summary.get("blocked_target_ids", ()))
+            ),
+            "autonomy_mode_transition_gate_blocked_modes": list(
+                autonomy_mode_transition_gate_summary.get("blocked_modes", ())
+            ),
+            "autonomy_mode_transition_gate_live_apply_allowed_modes": list(
+                autonomy_mode_transition_gate_summary.get("live_apply_allowed_modes", ())
+            ),
+            "autonomy_mode_transition_gate_supervised_current_live_write_kinds": list(
+                autonomy_mode_transition_gate_summary.get(
+                    "supervised_current_live_write_kinds",
+                    [],
+                )
             ),
             "source_identity_calibration_memory_index_record_count": int(
                 source_identity_memory_index_summary.get("memory_record_count", 0) or 0

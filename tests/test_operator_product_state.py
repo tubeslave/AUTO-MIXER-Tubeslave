@@ -5274,6 +5274,38 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
             main_pipeline_registry["autonomy_mode_transition_gate"]["summary"]["blocked_modes"]
         )
     )
+    assert (
+        payload["summary"]["autonomy_promotion_full_autonomous_ready"]
+        is False
+    )
+    assert (
+        payload["summary"]["autonomy_mode_transition_full_autonomous_ready"]
+        is False
+    )
+    assert (
+        payload["summary"]["autonomy_promotion_supervised_live_allowed_target_count"]
+        == len(
+            main_pipeline_registry["autonomy_promotion_readiness"]["summary"][
+                "supervised_live_allowed_target_ids"
+            ]
+        )
+    )
+    assert (
+        payload["summary"]["autonomy_promotion_blocked_target_count"]
+        == len(main_pipeline_registry["autonomy_promotion_readiness"]["summary"][
+            "blocked_target_ids"
+        ])
+    )
+    assert payload["summary"]["autonomy_mode_transition_gate_blocked_modes"] == sorted(
+        main_pipeline_registry["autonomy_mode_transition_gate"]["summary"][
+            "blocked_modes"
+        ]
+    )
+    assert payload["summary"]["autonomy_mode_transition_gate_live_apply_allowed_modes"] == sorted(
+        main_pipeline_registry["autonomy_mode_transition_gate"]["summary"][
+            "live_apply_allowed_modes"
+        ]
+    )
     assert {
         row["mode"] for row in main_pipeline_registry["autonomy_mode_transition_gate"]["rows"]
     } == {"analyze", "assist", "supervised", "auto"}
