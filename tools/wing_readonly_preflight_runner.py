@@ -236,8 +236,20 @@ async def send_and_wait(
     timeout: float,
 ) -> Dict[str, Any]:
     expected = set(expected_types)
+    request_json = json.dumps(request)
+    try:
+        await ws.send(request_json)
+    except Exception as exc:
+        recorder.record(
+            "send_error",
+            {
+                "request_type": request.get("type"),
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            },
+        )
+        raise
     recorder.record("send", request)
-    await ws.send(json.dumps(request))
     raw = await asyncio.wait_for(ws.recv(), timeout=timeout)
     try:
         payload = json.loads(raw)

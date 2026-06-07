@@ -49,6 +49,11 @@ class TimeoutWebSocket(FakeWebSocket):
         raise asyncio.TimeoutError()
 
 
+class SendFailWebSocket(FakeWebSocket):
+    async def send(self, payload: str) -> None:
+        raise RuntimeError("send failed")
+
+
 def patch_websocket_connect(monkeypatch: pytest.MonkeyPatch, websocket: FakeWebSocket) -> None:
     def fake_connect(url: str) -> FakeWebSocketConnect:
         websocket.url = url
@@ -449,6 +454,55 @@ async def test_readonly_preflight_writes_fail_closed_timeout_artifact(
     assert summary["proposal_request_sent"] is False
     assert summary["sent_request_types"] == ["get_operator_mode"]
     assert [event["event_type"] for event in read_events(summary)] == ["send"]
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_writes_fail_closed_send_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = SendFailWebSocket([])
+    patch_websocket_connect(monkeypatch, websocket)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 1
+    assert [request["type"] for request in websocket.sent] == []
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "read_only_preflight_transport_error"
+    assert summary["fail_closed"] is True
+    assert summary["blockers"] == ["transport_timeout_or_connection_loss"]
+    assert summary["transport_failure"]["type"] == "RuntimeError"
+    assert summary["transport_failure"]["message"] == "send failed"
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
+    assert summary["sent_request_types"] == []
+    assert [event["event_type"] for event in read_events(summary)] == ["send_error"]
 
 
 @pytest.mark.asyncio
