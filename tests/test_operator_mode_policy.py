@@ -59,6 +59,14 @@ def test_goal_language_aliases_handle_robust_separator_variants():
         )
 
 
+def test_goal_language_aliases_fallback_to_assist_for_unknown_inputs():
+    assert normalize_operator_mode(None) == "assist"
+    assert normalize_operator_mode("") == "assist"
+    assert normalize_operator_mode("   ") == "assist"
+    assert normalize_operator_mode("random mode name") == "assist"
+    assert normalize_operator_mode(123) == "assist"
+
+
 def test_analysis_and_assist_modes_never_apply_to_console():
     for mode in ("analysis_mode", "assisted_mixing_mode"):
         status = build_operator_mode_status(mode=mode, connection_mode="wing")

@@ -279,8 +279,23 @@ test('mode display labels map objective names to each operational mode', async (
   assert.equal(formatAIAgentModeLabel('full autonomous mix mode'), 'Auto');
   assert.equal(formatAIAgentModeLabel('full_autonomous_mix'), 'Auto');
   assert.equal(formatAIAgentModeLabel('full_autonomous_mix_mode'), 'Auto');
+  assert.equal(formatAIAgentModeLabel(undefined), 'Suggest');
+  assert.equal(formatAIAgentModeLabel(null), 'Suggest');
+  assert.equal(formatAIAgentModeLabel(0), 'Suggest');
   assert.equal(formatAIAgentModeLabel('unknown-mode'), 'Unknown Mode');
   assert.equal(formatAIAgentModeLabel(''), 'Suggest');
+});
+
+test('mode formatting falls back safely on malformed inputs', async () => {
+  const { formatOperatorModeLabel } = await importTypeScript('utils/prototypeTone.ts');
+  const { toUiMode } = await importTypeScript('services/operatorAdapters.ts');
+
+  assert.equal(toUiMode(undefined), 'Assist');
+  assert.equal(toUiMode(null), 'Assist');
+  assert.equal(toUiMode(0), 'Assist');
+  assert.equal(formatOperatorModeLabel(undefined), 'Assisted Mixing');
+  assert.equal(formatOperatorModeLabel(null), 'Assisted Mixing');
+  assert.equal(formatOperatorModeLabel(0), 'Assisted Mixing');
 });
 
 test('adaptChannels maps cached pan gate and compressor details from read-only inventory', async () => {
