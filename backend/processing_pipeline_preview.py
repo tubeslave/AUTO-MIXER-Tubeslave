@@ -2485,5 +2485,9 @@ def build_main_pipeline_preview(
             "summary": registry_snapshot.get("summary", {}),
             "pipeline_profiles": registry_snapshot.get("pipeline_profiles", []),
             "methods": registry_snapshot.get("methods", []),
+            "project_goal_capability_progress_snapshot": registry_snapshot.get(
+                "project_goal_capability_progress_snapshot",
+                {},
+            ),
         },
     }

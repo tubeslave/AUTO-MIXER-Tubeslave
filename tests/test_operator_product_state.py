@@ -5216,6 +5216,12 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     assert payload["executor_policy"]["live_write"] is False
     assert payload["executor_policy"]["allowed_requested_change_value_types"] == ["fader", "gain"]
     assert payload["summary"]["proposal_count"] == 2
+    goal_progress = payload["registry"][
+        "project_goal_capability_progress_snapshot"
+    ]
+    assert goal_progress["type"] == "project_goal_capability_progress_snapshot"
+    assert goal_progress["summary"]["row_count"] > 0
+    assert goal_progress["summary"]["runtime_mode_ceiling_by_id"]
     assert payload["summary"]["operator_analysis_proposal_count"] == 1
     assert payload["summary"]["agentic_foundation_proposal_count"] == 1
     assert queue["summary"]["pending_count"] == 0
