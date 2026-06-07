@@ -736,6 +736,11 @@ def validate_wing_readonly_preflight_artifact(
     if summary_path is not None:
         _validate_expected_plan_file(payload, summary_path, violations)
         _validate_event_log(payload, summary_path, violations)
+    if any(
+        violation.startswith("event_log_")
+        for violation in violations
+    ):
+        violations.append("event_log_missing_or_invalid")
 
     accepted = not violations
     return {

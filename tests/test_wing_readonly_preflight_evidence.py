@@ -734,6 +734,7 @@ def test_file_preflight_artifact_rejects_send_error_event(tmp_path):
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert evidence["summary"]["invalid_candidate_count"] == 1
     assert "event_log_send_error_present" in evidence["summary"]["violations"]
+    assert "event_log_missing_or_invalid" in evidence["summary"]["violations"]
     assert "event_log_send_recv_sequence_invalid" in evidence["summary"]["violations"]
 
 
