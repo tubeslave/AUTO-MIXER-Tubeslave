@@ -5228,12 +5228,24 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
         == goal_progress["summary"]["row_count"]
     )
     assert (
+        payload["summary"]["project_goal_capability_matrix_row_count"]
+        == goal_progress["summary"]["row_count"]
+    )
+    assert (
+        payload["summary"]["project_goal_capability_progress_row_count"]
+        == goal_progress["summary"]["row_count"]
+    )
+    assert (
         main_pipeline_registry["autonomy_promotion_readiness"]["type"]
         == "autonomy_promotion_readiness"
     )
     assert "autonomous_ready_target_ids" in main_pipeline_registry[
         "autonomy_promotion_readiness"
     ]["summary"]
+    assert (
+        payload["summary"]["autonomy_promotion_target_count"]
+        == len(main_pipeline_registry["autonomy_promotion_readiness"]["rows"])
+    )
     assert (
         main_pipeline_registry[
             "project_goal_capability_matrix"
@@ -5252,6 +5264,16 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     assert main_pipeline_registry["autonomy_mode_transition_gate"]["summary"][
         "supervised_current_live_write_kinds"
     ] == ["fader", "gain"]
+    assert (
+        payload["summary"]["autonomy_mode_transition_gate_mode_count"]
+        == len(main_pipeline_registry["autonomy_mode_transition_gate"]["rows"])
+    )
+    assert (
+        payload["summary"]["autonomy_mode_transition_gate_blocked_mode_count"]
+        == len(
+            main_pipeline_registry["autonomy_mode_transition_gate"]["summary"]["blocked_modes"]
+        )
+    )
     assert {
         row["mode"] for row in main_pipeline_registry["autonomy_mode_transition_gate"]["rows"]
     } == {"analyze", "assist", "supervised", "auto"}

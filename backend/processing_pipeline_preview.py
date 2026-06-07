@@ -1191,6 +1191,35 @@ def build_main_pipeline_preview(
     blockers = build_registry_blockers(pipeline_id=MAIN_PIPELINE_ID)
     proposal_only_contracts = build_proposal_only_method_contracts(pipeline_id=MAIN_PIPELINE_ID)
     registry_snapshot = build_processing_registry_snapshot(include_methods=include_methods)
+    project_goal_capability_matrix = registry_snapshot.get(
+        "project_goal_capability_matrix",
+        {},
+    )
+    project_goal_capability_matrix_summary = (
+        project_goal_capability_matrix.get("summary", {})
+    )
+    project_goal_capability_progress_snapshot = registry_snapshot.get(
+        "project_goal_capability_progress_snapshot",
+        {},
+    )
+    project_goal_capability_progress_snapshot_summary = (
+        project_goal_capability_progress_snapshot.get("summary", {})
+    )
+    autonomy_promotion_readiness = registry_snapshot.get(
+        "autonomy_promotion_readiness",
+        {},
+    )
+    autonomy_promotion_readiness_summary = autonomy_promotion_readiness.get(
+        "summary",
+        {},
+    )
+    autonomy_mode_transition_gate = registry_snapshot.get(
+        "autonomy_mode_transition_gate",
+        {},
+    )
+    autonomy_mode_transition_gate_summary = (
+        autonomy_mode_transition_gate.get("summary", {})
+    )
 
     analysis_status = str(analysis_report.get("status") or "unknown")
     status = "ok"
@@ -1249,6 +1278,22 @@ def build_main_pipeline_preview(
             ),
             "source_identity_calibration_memory_writer_write_result_count": int(
                 source_identity_memory_writer_summary.get("write_result_count", 0) or 0
+            ),
+            "project_goal_capability_matrix_row_count": int(
+                project_goal_capability_matrix_summary.get("row_count", 0) or 0
+            ),
+            "project_goal_capability_progress_row_count": int(
+                project_goal_capability_progress_snapshot_summary.get("row_count", 0)
+                or 0
+            ),
+            "autonomy_promotion_target_count": int(
+                autonomy_promotion_readiness_summary.get("target_count", 0) or 0
+            ),
+            "autonomy_mode_transition_gate_mode_count": int(
+                autonomy_mode_transition_gate_summary.get("mode_count", 0) or 0
+            ),
+            "autonomy_mode_transition_gate_blocked_mode_count": int(
+                len(autonomy_mode_transition_gate_summary.get("blocked_modes", ()) or [])
             ),
             "source_identity_calibration_memory_index_record_count": int(
                 source_identity_memory_index_summary.get("memory_record_count", 0) or 0
