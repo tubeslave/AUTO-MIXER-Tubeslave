@@ -533,6 +533,49 @@ def test_file_preflight_artifact_rejects_tampered_event_log_send_types(tmp_path)
     assert "event_log_forbidden_request_type_sent" in evidence["summary"]["violations"]
 
 
+def test_file_preflight_artifact_rejects_event_payload_mutation_evidence(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events[1]["payload"] = {
+        **events[1]["payload"],
+        "apply_result": {"status": "applied"},
+    }
+    _write_file_artifact(tmp_path / "preflight" / "payload-mutation", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert (
+        "event_log_mutation_evidence_field_present:1:apply_result"
+        in evidence["summary"]["violations"]
+    )
+
+
+def test_file_preflight_artifact_rejects_nested_event_payload_live_authority(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events[3]["payload"] = {
+        **events[3]["payload"],
+        "state": {
+            **events[3]["payload"]["state"],
+            "safety": {"live_authority_granted": True},
+        },
+    }
+    _write_file_artifact(tmp_path / "preflight" / "payload-authority", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert (
+        "event_log_unsafe_authority_field_true:3:live_authority_granted"
+        in evidence["summary"]["violations"]
+    )
+
+
 def test_file_preflight_artifact_rejects_wrong_event_request_order(tmp_path):
     summary = _valid_summary()
     events = _valid_events(summary)

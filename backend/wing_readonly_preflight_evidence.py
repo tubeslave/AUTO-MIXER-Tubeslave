@@ -75,6 +75,28 @@ MUTATION_EVIDENCE_FIELDS = {
     "operator_proposal",
     "write_policy",
 }
+EVENT_PAYLOAD_FORBIDDEN_MUTATION_FIELDS = MUTATION_EVIDENCE_FIELDS | {
+    "write_events",
+    "live_write_events",
+    "console_write_events",
+    "proposal_apply_result",
+}
+EVENT_PAYLOAD_UNSAFE_TRUE_FIELDS = {
+    "write_request_sent",
+    "proposal_request_sent",
+    "live_write",
+    "mutates_console_state",
+    "execution_allowed_by_event",
+    "execution_allowed_by_evidence",
+    "execution_allowed_by_review",
+    "readiness_matrix_update_allowed_by_event",
+    "readiness_matrix_update_allowed_by_evidence",
+    "readiness_closure_allowed_by_event",
+    "readiness_closure_allowed_by_evidence",
+    "live_widening_allowed",
+    "live_authority_granted",
+    "full_autonomous_ready",
+}
 REQUEST_ID_POLICY = "required_for_every_query_mixer_parameter_response"
 EXPECTED_PLAN_SUMMARY_FIELDS = (
     "proof_artifact_schema",
@@ -228,6 +250,16 @@ def _load_jsonl_events(path: Path) -> Tuple[Mapping[str, Any], ...]:
 
 def _event_payload(event: Mapping[str, Any]) -> Mapping[str, Any]:
     return _mapping(event.get("payload"))
+
+
+def _iter_nested_mappings(value: Any) -> Iterable[Mapping[str, Any]]:
+    if isinstance(value, Mapping):
+        yield value
+        for child in value.values():
+            yield from _iter_nested_mappings(child)
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            yield from _iter_nested_mappings(child)
 
 
 def _request_id_for(channel: int, value_type: str) -> str:
@@ -397,6 +429,18 @@ def _validate_event_log(
         for previous, current in zip(parsed_event_timestamps, parsed_event_timestamps[1:])
     ):
         violations.append("event_log_timestamp_sequence_invalid")
+    for event_index, event in enumerate(events):
+        for mapping in _iter_nested_mappings(_event_payload(event)):
+            for field in sorted(EVENT_PAYLOAD_FORBIDDEN_MUTATION_FIELDS):
+                if field in mapping:
+                    violations.append(
+                        f"event_log_mutation_evidence_field_present:{event_index}:{field}"
+                    )
+            for field in sorted(EVENT_PAYLOAD_UNSAFE_TRUE_FIELDS):
+                if mapping.get(field) is True:
+                    violations.append(
+                        f"event_log_unsafe_authority_field_true:{event_index}:{field}"
+                    )
     event_types = tuple(str(event.get("event_type") or "") for event in events)
     if len(event_types) % 2 != 0 or any(
         event_types[index : index + 2] != ("send", "recv")
