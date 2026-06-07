@@ -80,7 +80,27 @@ def _first_artifact_source_id(item: Mapping[str, Any]) -> str:
     return artifact_ids[0] if artifact_ids else ""
 
 
-def _template_record(item: Mapping[str, Any]) -> dict[str, Any]:
+def _candidate_trace(item: Mapping[str, Any], queue: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "source_queue_method_id": str(queue.get("method_id") or ""),
+        "source_queue_status": str(queue.get("status") or ""),
+        "candidate_status": str(item.get("status") or ""),
+        "intake_status": str(item.get("intake_status") or ""),
+        "artifact_source_ids": _string_list(item.get("artifact_source_ids")),
+        "valid_candidate_count": int(item.get("valid_candidate_count") or 0),
+        "invalid_candidate_count": int(item.get("invalid_candidate_count") or 0),
+        "target_consistency": item.get("target_consistency") is True,
+        "candidate_source_id_missing": item.get("candidate_source_id_missing") is True,
+        "accepted_as_physical_fixture_candidate": (
+            item.get("accepted_as_physical_fixture_candidate") is True
+        ),
+        "fixture_closure_allowed_by_queue": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
+
+
+def _template_record(item: Mapping[str, Any], queue: Mapping[str, Any]) -> dict[str, Any]:
     surface_id = str(item.get("surface_id") or "")
     artifact_source_id = _first_artifact_source_id(item)
     return {
@@ -90,6 +110,7 @@ def _template_record(item: Mapping[str, Any]) -> dict[str, Any]:
         "required_contract_method_id": str(
             item.get("required_contract_method_id") or ""
         ),
+        "candidate_trace": _candidate_trace(item, queue),
         "decision": PENDING_DECISION_VALUE,
         "reviewed_by": PENDING_REVIEWED_BY_VALUE,
         "reviewed_at": PENDING_REVIEWED_AT_VALUE,
@@ -121,7 +142,7 @@ def build_acceptance_template(
     summary = _mapping(queue.get("summary"))
     candidates = _candidate_items(queue, surface_id=surface_id)
     template_records = [
-        _template_record(item)
+        _template_record(item, queue)
         for item in candidates
         if _first_artifact_source_id(item)
     ]
@@ -165,6 +186,7 @@ def build_acceptance_template(
         "blocked_by": blocked_by,
         "operator_sequence": [
             "Confirm the artifact is a valid review candidate from the review queue.",
+            "Confirm candidate_trace still matches the review queue candidate.",
             "Set decision to accepted or rejected after manual review.",
             "Set reviewed_by and reviewed_at using a UTC ISO timestamp.",
             "Keep all authority and fixture-closure flags false.",

@@ -19,6 +19,8 @@ request sequence visible and testable before any WebSocket session opens.
 - Emit an offline JSON plan containing channels, value types, operator
   confirmation, intended read-only requests, forbidden request types, expected
   artifacts, and false authority flags.
+- Include the selected MVP blocker, manual review requirement, fail-closed
+  conditions, and post-run review commands in the plan JSON.
 - Add `preview_readonly_request_plan` to the handoff packet.
 - Run the plan preview as a no-WING smoke command.
 - Fail no-WING schema checks if the preview command loses `--plan-only`, lacks

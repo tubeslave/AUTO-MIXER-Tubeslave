@@ -42,11 +42,13 @@ second request builder that could drift from the hardware path.
 1. Add `--plan-only` and `--plan-output` to the preflight runner.
 2. Emit an offline plan with read-only requests, false live-authority flags,
    forbidden request types, and expected hardware artifacts.
-3. Add `preview_readonly_request_plan` to the handoff packet.
-4. Run the preview as a no-WING smoke command.
-5. Fail schema validation if preview channels, confirmation, value types, or
+3. Include the selected MVP blocker, manual review boundary, fail-closed
+   conditions, and post-run review commands in the plan.
+4. Add `preview_readonly_request_plan` to the handoff packet.
+5. Run the preview as a no-WING smoke command.
+6. Fail schema validation if preview channels, confirmation, value types, or
    artifact root drift from capture.
-6. Validate the generated plan artifact after the no-WING smoke command and
+7. Validate the generated plan artifact after the no-WING smoke command and
    expose it in `summary.json`/`summary.md`.
 
 ## Test plan

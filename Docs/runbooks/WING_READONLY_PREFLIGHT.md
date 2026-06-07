@@ -42,7 +42,9 @@ Replace channel `3` with the operator-approved channel:
 Before opening the backend/WING session, preview the exact read-only request
 plan. This validates the channel confirmation and writes only a local JSON plan;
 it does not open WebSocket, contact WING, query the console, or grant live
-authority:
+authority. The plan also records the current MVP blocker, fail-closed
+conditions, and the offline review commands to run after the real artifact is
+captured:
 
 ```bash
 python3 tools/wing_readonly_preflight_runner.py \

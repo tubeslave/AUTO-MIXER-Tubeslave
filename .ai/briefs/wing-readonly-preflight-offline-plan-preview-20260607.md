@@ -19,6 +19,8 @@ read-only capture command.
 - Plan-only mode must not query WING.
 - Plan-only mode must not create physical proof artifacts.
 - Plan-only mode must keep live authority and write capability false.
+- Plan-only mode must name the current MVP blocker and manual review boundary.
+- Plan-only mode must expose fail-closed conditions and post-run review commands.
 - The handoff packet and no-WING summary must expose the preview command.
 
 ## Validation

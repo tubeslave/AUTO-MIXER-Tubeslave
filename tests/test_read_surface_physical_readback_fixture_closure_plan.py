@@ -15,6 +15,7 @@ from backend.read_surface_physical_readback_fixture_closure_plan import (
     build_read_surface_physical_readback_fixture_closure_plan,
 )
 from tests.test_read_surface_physical_readback_fixture_acceptance_ledger import (
+    _acceptance_record,
     _queue_with_valid_candidate,
 )
 from tools import build_read_surface_physical_readback_fixture_closure_plan as closure_tool
@@ -25,15 +26,13 @@ def _accepted_ledger():
     ledger = build_read_surface_physical_readback_fixture_acceptance_ledger(
         review_queue=queue,
         acceptance_records=[
-            {
-                "review_id": "review-raw-1",
-                "surface_id": spec["surface_id"],
-                "artifact_source_id": "raw-mixer-physical.json",
-                "required_contract_method_id": spec["required_contract_method_id"],
-                "decision": "accepted",
-                "reviewed_by": "operator",
-                "reviewed_at": "2026-06-05T21:10:00Z",
-            }
+            _acceptance_record(
+                spec,
+                queue,
+                review_id="review-raw-1",
+                decision="accepted",
+                reviewed_at="2026-06-05T21:10:00Z",
+            )
         ],
     )
     return spec, ledger
@@ -507,15 +506,13 @@ def test_fixture_closure_plan_rejects_rejected_surface_id_summary_drift():
     ledger = build_read_surface_physical_readback_fixture_acceptance_ledger(
         review_queue=queue,
         acceptance_records=[
-            {
-                "review_id": "review-raw-reject",
-                "surface_id": spec["surface_id"],
-                "artifact_source_id": "raw-mixer-physical.json",
-                "required_contract_method_id": spec["required_contract_method_id"],
-                "decision": "rejected",
-                "reviewed_by": "operator",
-                "reviewed_at": "2026-06-05T21:10:00Z",
-            }
+            _acceptance_record(
+                spec,
+                queue,
+                review_id="review-raw-reject",
+                decision="rejected",
+                reviewed_at="2026-06-05T21:10:00Z",
+            )
         ],
     )
     forged_ledger = {
@@ -547,15 +544,13 @@ def test_fixture_closure_plan_does_not_create_candidate_for_rejected_records():
     ledger = build_read_surface_physical_readback_fixture_acceptance_ledger(
         review_queue=queue,
         acceptance_records=[
-            {
-                "review_id": "review-raw-reject",
-                "surface_id": spec["surface_id"],
-                "artifact_source_id": "raw-mixer-physical.json",
-                "required_contract_method_id": spec["required_contract_method_id"],
-                "decision": "rejected",
-                "reviewed_by": "operator",
-                "reviewed_at": "2026-06-05T21:10:00Z",
-            }
+            _acceptance_record(
+                spec,
+                queue,
+                review_id="review-raw-reject",
+                decision="rejected",
+                reviewed_at="2026-06-05T21:10:00Z",
+            )
         ],
     )
 

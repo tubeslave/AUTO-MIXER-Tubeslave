@@ -344,10 +344,14 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert printed["status"] == "ready_for_operator_review"
     assert printed["plan_output"] == str(plan_output)
     assert written["plan_output"] == str(plan_output)
+    assert written["selected_mvp_blocker"] == "WING read-only connection proof"
+    assert written["selected_mvp_blocker_status"] == "tooling_ready_waits_real_wing"
     assert written["contacts_backend"] is False
     assert written["queries_console"] is False
     assert written["execution_allowed_by_plan"] is False
     assert written["live_authority_granted"] is False
+    assert written["operator_required"] is True
+    assert written["manual_review_required_before_readiness_update"] is True
     assert written["read_only"] is True
     assert written["live_write"] is False
     assert written["channels"] == [3]
@@ -361,6 +365,23 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["request_sequence"][2]["address"] == "/ch/3/fdr"
     assert written["request_sequence"][3]["address"] == "/ch/3/in/set/trim"
     assert "set_gain" in written["forbidden_request_types"]
+    assert written["post_run_review_commands"] == [
+        (
+            "python3 tools/review_wing_readonly_preflight_artifacts.py "
+            f"--artifact-root {tmp_path} "
+            "--output Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md "
+            "--decision-template-output "
+            "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json"
+        ),
+        (
+            "python3 tools/review_wing_readonly_preflight_decisions.py "
+            f"--artifact-root {tmp_path} "
+            "--decision-root artifacts/wing_readonly_preflight_review_decisions "
+            "--output Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+        ),
+    ]
+    assert "physical_readback_missing" in written["fail_closed_conditions"]
+    assert "manual_review_decision_missing_or_invalid" in written["fail_closed_conditions"]
     assert not list(tmp_path.glob("*/summary.json"))
 
 
@@ -396,7 +417,10 @@ async def test_plan_only_blocks_invalid_channel_confirmation_before_websocket(
     assert printed["type"] == "wing_readonly_preflight_offline_plan"
     assert printed["status"] == "blocked"
     assert printed["reason"] == "--operator-confirm-channels must exactly match --channels"
+    assert printed["selected_mvp_blocker"] == "WING read-only connection proof"
+    assert printed["operator_required"] is True
     assert printed["contacts_backend"] is False
     assert printed["queries_console"] is False
+    assert printed["manual_review_required_before_readiness_update"] is True
     assert printed["live_authority_granted"] is False
     assert not plan_output.exists()

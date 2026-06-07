@@ -71,6 +71,19 @@ def test_acceptance_template_builds_pending_record_for_valid_candidate():
     assert record["surface_id"] == spec["surface_id"]
     assert record["artifact_source_id"] == "raw-mixer-physical.json"
     assert record["required_contract_method_id"] == spec["required_contract_method_id"]
+    trace = record["candidate_trace"]
+    assert trace["source_queue_method_id"] == queue["method_id"]
+    assert trace["source_queue_status"] == queue["status"]
+    assert trace["candidate_status"] == "operator_review_candidate_available"
+    assert trace["artifact_source_ids"] == ["raw-mixer-physical.json"]
+    assert trace["valid_candidate_count"] == 1
+    assert trace["invalid_candidate_count"] == 0
+    assert trace["target_consistency"] is True
+    assert trace["candidate_source_id_missing"] is False
+    assert trace["accepted_as_physical_fixture_candidate"] is True
+    assert trace["fixture_closure_allowed_by_queue"] is False
+    assert trace["live_authority_granted"] is False
+    assert trace["full_autonomous_ready"] is False
     assert record["decision"] == "<accepted|rejected>"
     assert record["reviewed_by"] == "<operator-name>"
     assert record["reviewed_at"].startswith("<UTC ISO timestamp")
@@ -100,6 +113,7 @@ def test_acceptance_template_uses_real_intake_latest_candidate_source_id():
     record = template["template_records"][0]
     assert record["surface_id"] == spec["surface_id"]
     assert record["artifact_source_id"] == "inline_payload_0"
+    assert record["candidate_trace"]["artifact_source_ids"] == ["inline_payload_0"]
     assert record["live_authority_granted"] is False
     assert record["fixture_closure_allowed_by_acceptance"] is False
 

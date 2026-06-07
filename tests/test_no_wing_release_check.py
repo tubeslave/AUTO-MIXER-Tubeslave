@@ -1288,6 +1288,7 @@ def valid_read_surface_acceptance_template_payload() -> dict:
         "blocked_by": ["operator_must_capture_missing_physical_readback_artifacts"],
         "operator_sequence": [
             "Confirm the artifact is a valid review candidate from the review queue.",
+            "Confirm candidate_trace still matches the review queue candidate.",
             "Set decision to accepted or rejected after manual review.",
             "Set reviewed_by and reviewed_at using a UTC ISO timestamp.",
             "Keep all authority and fixture-closure flags false.",
@@ -1794,13 +1795,14 @@ def test_no_wing_release_check_validates_read_surface_acceptance_template_artifa
     assert result.detail["full_autonomous_ready"] is False
     assert result.detail["review_candidate_count"] == 0
     assert result.detail["template_record_count"] == 0
+    assert result.detail["candidate_trace_count"] == 0
     assert result.detail["required_operator_edits"] == [
         "decision",
         "reviewed_by",
         "reviewed_at",
         "review_notes",
     ]
-    assert result.detail["operator_sequence_count"] == 5
+    assert result.detail["operator_sequence_count"] == 6
     assert result.detail["record_unsafe_flags"] == []
     assert result.detail["violations"] == []
 
@@ -1833,6 +1835,21 @@ def test_no_wing_release_check_rejects_unsafe_read_surface_acceptance_template_a
             "surface_id": "raw_mixer_state",
             "artifact_source_id": "raw-mixer.json",
             "required_contract_method_id": "raw_mixer_state_physical_readback_contract",
+            "candidate_trace": {
+                "source_queue_method_id": "read_surface_physical_readback_artifact_review_queue",
+                "source_queue_status": "operator_review_candidates_available",
+                "candidate_status": "operator_review_candidate_available",
+                "intake_status": "artifact_source_ready",
+                "artifact_source_ids": ["raw-mixer.json"],
+                "valid_candidate_count": 1,
+                "invalid_candidate_count": 0,
+                "target_consistency": True,
+                "candidate_source_id_missing": False,
+                "accepted_as_physical_fixture_candidate": True,
+                "fixture_closure_allowed_by_queue": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
             "decision": "accepted",
             "reviewed_by": "operator",
             "reviewed_at": "2026-06-07T12:00:00Z",
@@ -4046,6 +4063,8 @@ def test_no_wing_release_check_validates_fixture_acceptance_ledger_snapshot():
     assert result.detail["accepted_record_count"] == 0
     assert result.detail["rejected_record_count"] == 0
     assert result.detail["invalid_record_count"] == 0
+    assert result.detail["candidate_trace_missing_count"] == 0
+    assert result.detail["candidate_trace_mismatch_count"] == 0
     assert (
         result.detail["acceptance_template_tool_path"]
         == "tools/build_read_surface_physical_readback_acceptance_template.py"
@@ -6930,13 +6949,14 @@ def test_no_wing_release_check_summary_embeds_read_surface_acceptance_template_a
             "full_autonomous_ready": False,
             "review_candidate_count": 0,
             "template_record_count": 0,
+            "candidate_trace_count": 0,
             "required_operator_edits": [
                 "decision",
                 "reviewed_by",
                 "reviewed_at",
                 "review_notes",
             ],
-            "operator_sequence_count": 5,
+            "operator_sequence_count": 6,
             "blocked_by": ["operator_must_capture_missing_physical_readback_artifacts"],
             "record_unsafe_flags": [],
             "violations": [],
@@ -6964,6 +6984,7 @@ def test_no_wing_release_check_summary_embeds_read_surface_acceptance_template_a
     assert artifact["full_autonomous_ready"] is False
     assert artifact["template_status"] == "operator_candidate_missing"
     assert artifact["template_record_count"] == 0
+    assert artifact["candidate_trace_count"] == 0
     assert artifact["required_operator_edits"] == [
         "decision",
         "reviewed_by",
@@ -6978,6 +6999,7 @@ def test_no_wing_release_check_summary_embeds_read_surface_acceptance_template_a
     )
     assert "execution_allowed_by_template: `false`" in markdown_summary
     assert "fixture_closure_allowed_by_template: `false`" in markdown_summary
+    assert "candidate_trace_count: `0`" in markdown_summary
     assert "operator_must_capture_missing_physical_readback_artifacts" in markdown_summary
 
 
@@ -9200,6 +9222,8 @@ def test_no_wing_release_check_summary_embeds_fixture_acceptance_ledger(tmp_path
             "accepted_record_count": 1,
             "rejected_record_count": 0,
             "invalid_record_count": 0,
+            "candidate_trace_missing_count": 0,
+            "candidate_trace_mismatch_count": 0,
             "unreviewed_candidate_count": 1,
             "accepted_surface_ids": ["raw_mixer_state_cache"],
             "rejected_surface_ids": [],
@@ -9241,6 +9265,8 @@ def test_no_wing_release_check_summary_embeds_fixture_acceptance_ledger(tmp_path
     assert ledger["review_candidate_count"] == 2
     assert ledger["acceptance_record_count"] == 1
     assert ledger["accepted_record_count"] == 1
+    assert ledger["candidate_trace_missing_count"] == 0
+    assert ledger["candidate_trace_mismatch_count"] == 0
     assert ledger["unreviewed_candidate_count"] == 1
     assert ledger["operator_acceptance_required"] is True
     assert ledger["operator_review_required"] is True
@@ -9253,6 +9279,8 @@ def test_no_wing_release_check_summary_embeds_fixture_acceptance_ledger(tmp_path
     assert "live_authority_granted: `false`" in markdown_summary
     assert "full_autonomous_ready: `false`" in markdown_summary
     assert "accepted_record_count: `1`" in markdown_summary
+    assert "candidate_trace_missing_count: `0`" in markdown_summary
+    assert "candidate_trace_mismatch_count: `0`" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_fixture_closure_plan(tmp_path):

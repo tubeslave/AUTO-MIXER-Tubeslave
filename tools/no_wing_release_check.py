@@ -3405,11 +3405,103 @@ def validate_read_surface_physical_readback_acceptance_template_artifact_snapsho
     ):
         violations.append("acceptance_template_artifact_focused_validation_missing")
 
+    candidate_trace_count = 0
     record_unsafe_flags: list[str] = []
     for index, record in enumerate(records):
         if not isinstance(record, Mapping):
             violations.append(f"acceptance_template_artifact_record_{index}_not_object")
             continue
+        candidate_trace = (
+            record.get("candidate_trace")
+            if isinstance(record.get("candidate_trace"), Mapping)
+            else None
+        )
+        if candidate_trace is None:
+            violations.append(
+                f"acceptance_template_artifact_record_{index}_candidate_trace_missing"
+            )
+        else:
+            candidate_trace_count += 1
+            for key in (
+                "source_queue_method_id",
+                "source_queue_status",
+                "candidate_status",
+                "intake_status",
+            ):
+                if not isinstance(candidate_trace.get(key), str) or not candidate_trace.get(
+                    key
+                ):
+                    violations.append(
+                        "acceptance_template_artifact_record_"
+                        f"{index}_candidate_trace_{key}_missing"
+                    )
+            artifact_source_id = record.get("artifact_source_id")
+            trace_artifact_sources = candidate_trace.get("artifact_source_ids")
+            if candidate_trace.get("source_queue_method_id") != template.get(
+                "source_queue_method_id"
+            ):
+                violations.append(
+                    "acceptance_template_artifact_record_"
+                    f"{index}_candidate_trace_source_queue_method_id_mismatch"
+                )
+            if candidate_trace.get("source_queue_status") != template.get(
+                "source_queue_status"
+            ):
+                violations.append(
+                    "acceptance_template_artifact_record_"
+                    f"{index}_candidate_trace_source_queue_status_mismatch"
+                )
+            if not isinstance(trace_artifact_sources, list):
+                violations.append(
+                    "acceptance_template_artifact_record_"
+                    f"{index}_candidate_trace_artifact_sources_missing"
+                )
+            elif artifact_source_id not in trace_artifact_sources:
+                violations.append(
+                    "acceptance_template_artifact_record_"
+                    f"{index}_candidate_trace_artifact_source_missing"
+                )
+            valid_candidate_count = candidate_trace.get("valid_candidate_count")
+            if (
+                not isinstance(valid_candidate_count, int)
+                or isinstance(valid_candidate_count, bool)
+                or valid_candidate_count < 1
+            ):
+                violations.append(
+                    "acceptance_template_artifact_record_"
+                    f"{index}_candidate_trace_valid_candidate_count_missing"
+                )
+            invalid_candidate_count = candidate_trace.get("invalid_candidate_count")
+            if (
+                not isinstance(invalid_candidate_count, int)
+                or isinstance(invalid_candidate_count, bool)
+                or invalid_candidate_count != 0
+            ):
+                violations.append(
+                    "acceptance_template_artifact_record_"
+                    f"{index}_candidate_trace_invalid_candidate_count_not_zero"
+                )
+            for key in ("target_consistency", "accepted_as_physical_fixture_candidate"):
+                if candidate_trace.get(key) is not True:
+                    violations.append(
+                        "acceptance_template_artifact_record_"
+                        f"{index}_candidate_trace_{key}_not_true"
+                    )
+            if candidate_trace.get("candidate_source_id_missing") is not False:
+                violations.append(
+                    "acceptance_template_artifact_record_"
+                    f"{index}_candidate_trace_candidate_source_id_missing_not_false"
+                )
+            for key in (
+                "fixture_closure_allowed_by_queue",
+                "live_authority_granted",
+                "full_autonomous_ready",
+            ):
+                if candidate_trace.get(key) is not False:
+                    violations.append(
+                        "acceptance_template_artifact_record_"
+                        f"{index}_candidate_trace_{key}_not_false"
+                    )
         for key in (
             "review_id",
             "surface_id",
@@ -3478,6 +3570,7 @@ def validate_read_surface_physical_readback_acceptance_template_artifact_snapsho
     detail["full_autonomous_ready"] = template.get("full_autonomous_ready")
     detail["review_candidate_count"] = review_candidate_count
     detail["template_record_count"] = template_record_count
+    detail["candidate_trace_count"] = candidate_trace_count
     detail["required_operator_edits"] = list(required_edits)
     detail["operator_sequence_count"] = len(operator_sequence)
     detail["blocked_by"] = list(blocked_by)
@@ -7948,6 +8041,8 @@ def validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot()
     accepted_record_count = summary.get("accepted_record_count")
     rejected_record_count = summary.get("rejected_record_count")
     invalid_record_count = summary.get("invalid_record_count")
+    candidate_trace_missing_count = summary.get("candidate_trace_missing_count")
+    candidate_trace_mismatch_count = summary.get("candidate_trace_mismatch_count")
     unreviewed_candidate_count = summary.get("unreviewed_candidate_count")
     if not isinstance(review_candidate_count, int):
         violations.append("fixture_acceptance_ledger_review_candidate_count_missing")
@@ -7964,11 +8059,21 @@ def validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot()
     if not isinstance(invalid_record_count, int):
         violations.append("fixture_acceptance_ledger_invalid_count_missing")
         invalid_record_count = 0
+    if not isinstance(candidate_trace_missing_count, int):
+        violations.append("fixture_acceptance_ledger_candidate_trace_missing_count_missing")
+        candidate_trace_missing_count = 0
+    if not isinstance(candidate_trace_mismatch_count, int):
+        violations.append("fixture_acceptance_ledger_candidate_trace_mismatch_count_missing")
+        candidate_trace_mismatch_count = 0
     if not isinstance(unreviewed_candidate_count, int):
         violations.append("fixture_acceptance_ledger_unreviewed_count_missing")
         unreviewed_candidate_count = 0
     if invalid_record_count:
         violations.append("fixture_acceptance_ledger_invalid_record_present")
+    if candidate_trace_missing_count:
+        violations.append("fixture_acceptance_ledger_candidate_trace_missing_present")
+    if candidate_trace_mismatch_count:
+        violations.append("fixture_acceptance_ledger_candidate_trace_mismatch_present")
 
     if summary.get("operator_review_required") is not True:
         violations.append("fixture_acceptance_ledger_operator_review_not_true")
@@ -8008,6 +8113,8 @@ def validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot()
     detail["accepted_record_count"] = accepted_record_count
     detail["rejected_record_count"] = rejected_record_count
     detail["invalid_record_count"] = invalid_record_count
+    detail["candidate_trace_missing_count"] = candidate_trace_missing_count
+    detail["candidate_trace_mismatch_count"] = candidate_trace_mismatch_count
     detail["unreviewed_candidate_count"] = unreviewed_candidate_count
     detail["accepted_surface_ids"] = (
         list(accepted_surface_ids) if isinstance(accepted_surface_ids, list) else []
@@ -11764,6 +11871,7 @@ def read_surface_physical_readback_acceptance_template_artifact_summary(
             "selected_surface_id": detail.get("selected_surface_id"),
             "review_candidate_count": int(detail.get("review_candidate_count") or 0),
             "template_record_count": int(detail.get("template_record_count") or 0),
+            "candidate_trace_count": int(detail.get("candidate_trace_count") or 0),
             "required_operator_edits": (
                 list(required_edits) if isinstance(required_edits, list) else []
             ),
@@ -11810,6 +11918,12 @@ def read_surface_physical_readback_fixture_acceptance_ledger_summary(
             "accepted_record_count": int(detail.get("accepted_record_count") or 0),
             "rejected_record_count": int(detail.get("rejected_record_count") or 0),
             "invalid_record_count": int(detail.get("invalid_record_count") or 0),
+            "candidate_trace_missing_count": int(
+                detail.get("candidate_trace_missing_count") or 0
+            ),
+            "candidate_trace_mismatch_count": int(
+                detail.get("candidate_trace_mismatch_count") or 0
+            ),
             "unreviewed_candidate_count": int(
                 detail.get("unreviewed_candidate_count") or 0
             ),
@@ -14044,6 +14158,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{acceptance_template_artifact['review_candidate_count']}`",
                 "- template_record_count: "
                 f"`{acceptance_template_artifact['template_record_count']}`",
+                "- candidate_trace_count: "
+                f"`{acceptance_template_artifact['candidate_trace_count']}`",
                 "- required_operator_edits: "
                 f"`{json.dumps(acceptance_template_artifact['required_operator_edits'])}`",
                 "- operator_sequence_count: "
@@ -14093,6 +14209,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{fixture_acceptance_ledger['rejected_record_count']}`",
                 "- invalid_record_count: "
                 f"`{fixture_acceptance_ledger['invalid_record_count']}`",
+                "- candidate_trace_missing_count: "
+                f"`{fixture_acceptance_ledger['candidate_trace_missing_count']}`",
+                "- candidate_trace_mismatch_count: "
+                f"`{fixture_acceptance_ledger['candidate_trace_mismatch_count']}`",
                 "- unreviewed_candidate_count: "
                 f"`{fixture_acceptance_ledger['unreviewed_candidate_count']}`",
                 "- operator_acceptance_required: "

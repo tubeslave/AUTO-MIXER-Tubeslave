@@ -11,6 +11,11 @@ The preview is implemented in `tools/wing_readonly_preflight_runner.py` using
 read-request builder as the hardware path, but it does not open WebSocket,
 query WING, or create physical proof artifacts.
 
+The plan JSON also names the current MVP blocker, marks manual review as
+required before any readiness update, lists fail-closed conditions, and includes
+the artifact-review and decision-review commands operators should run after a
+real read-only capture.
+
 `tools/build_wing_readonly_preflight_handoff_packet.py` now includes
 `preview_readonly_request_plan`, and `tools/no_wing_release_check.py` runs the
 preview as an offline smoke command. The release check then reads the generated
@@ -28,6 +33,7 @@ request sequence, and carries no live authority.
 - Real WING read-only evidence is still required before supervised proof steps.
 - The plan artifact is validated as an offline preview only; it is not accepted
   as physical readback evidence.
+- Listed post-run review commands do not execute during plan-only mode.
 
 ## Files Changed
 
@@ -65,6 +71,19 @@ request sequence, and carries no live authority.
 - `/opt/homebrew/bin/git diff --check` passed.
 - `PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q` passed:
   `2952 passed, 1 skipped, 1 warning`.
+- 2026-06-07 continuation validation passed after adding the selected MVP
+  blocker, manual-review boundary, fail-closed conditions, and post-run review
+  commands to the plan JSON:
+  - `PYTHONPATH=backend python3 -m pytest -q tests/test_wing_readonly_preflight_runner.py`
+    passed inside the focused bundle: `39 passed`.
+  - `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick --skip-frontend --artifact-root /tmp/automixer-no-wing-release-check-acceptance-candidate-trace --command-timeout-sec 300`
+    passed, with `wing_readonly_preflight_plan_artifact` reporting
+    `status=passed`, `read_only=true`, `live_write=false`,
+    `contacts_backend=false`, `queries_console=false`,
+    `plan_status=ready_for_operator_review`, and
+    `request_sequence_matches_expected=true`.
+  - `PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q` passed:
+    `2994 passed, 1 skipped, 1 warning`.
 
 ## Remaining Gap
 

@@ -255,13 +255,16 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
     channels = parse_csv_ints(args.channels)
     value_types = parse_csv_strings(args.value_types)
     read_requests = build_read_requests(channels, value_types)
+    artifact_root = str(args.artifact_root)
     return {
         "type": "wing_readonly_preflight_offline_plan",
         "status": "ready_for_operator_review",
         "proof_artifact_schema": "wing_readonly_preflight.v1",
         "proof_runner": "wing_readonly_preflight_runner",
+        "selected_mvp_blocker": "WING read-only connection proof",
+        "selected_mvp_blocker_status": "tooling_ready_waits_real_wing",
         "url": args.url,
-        "artifact_root": args.artifact_root,
+        "artifact_root": artifact_root,
         "channels": list(channels),
         "operator_channel_confirmation_required": bool(args.require_physical_readback),
         "operator_confirmed_channels": parse_csv_ints_for_summary(args.operator_confirm_channels),
@@ -269,6 +272,8 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "require_physical_readback": bool(args.require_physical_readback),
         "read_only": True,
         "live_write": False,
+        "operator_required": True,
+        "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
         "queries_console": False,
         "execution_allowed_by_plan": False,
@@ -285,8 +290,31 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
             *read_requests,
         ],
         "expected_artifacts": [
-            f"{args.artifact_root}/<run_id>/summary.json",
-            f"{args.artifact_root}/<run_id>/events.jsonl",
+            f"{artifact_root}/<run_id>/summary.json",
+            f"{artifact_root}/<run_id>/events.jsonl",
+        ],
+        "post_run_review_commands": [
+            (
+                "python3 tools/review_wing_readonly_preflight_artifacts.py "
+                f"--artifact-root {artifact_root} "
+                "--output Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md "
+                "--decision-template-output "
+                "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json"
+            ),
+            (
+                "python3 tools/review_wing_readonly_preflight_decisions.py "
+                f"--artifact-root {artifact_root} "
+                "--decision-root artifacts/wing_readonly_preflight_review_decisions "
+                "--output Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+            ),
+        ],
+        "fail_closed_conditions": [
+            "backend_not_in_wing_mode",
+            "operator_channel_confirmation_mismatch",
+            "physical_readback_missing",
+            "forbidden_request_type_sent",
+            "event_log_missing_or_invalid",
+            "manual_review_decision_missing_or_invalid",
         ],
         "next_step": "Run without --plan-only only when the intended backend/WING session is ready.",
     }
@@ -302,10 +330,13 @@ async def run(args: argparse.Namespace) -> int:
                 "reason": validation_error,
                 "read_only": True,
                 "live_write": False,
+                "operator_required": True,
+                "selected_mvp_blocker": "WING read-only connection proof",
                 "contacts_backend": False,
                 "queries_console": False,
                 "execution_allowed_by_plan": False,
                 "live_authority_granted": False,
+                "manual_review_required_before_readiness_update": True,
             }
             print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
             return 2

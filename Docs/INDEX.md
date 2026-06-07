@@ -57,6 +57,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_READ_SURFACE_REVIEW_QUEUE_SOURCE_LINK_20260607.md` | Review queues preserve physical-readback artifact source ids before operator acceptance templates are generated. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_PHYSICAL_READBACK_ACCEPTANCE_TEMPLATE_20260607.md` | Offline operator template renders pending acceptance records for valid read-surface physical-readback candidates without closing fixtures or granting live authority. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_ACCEPTANCE_TEMPLATE_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated acceptance-template JSON as a read-only operator gate. |
+| `Docs/reports/AUTOMIXER_READ_SURFACE_ACCEPTANCE_CANDIDATE_TRACE_20260607.md` | Acceptance records preserve and validate the review-queue candidate trace before any fixture-closure decision. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_FIXTURE_CLOSURE_PLAN_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated fixture-closure plan JSON while keeping fixture updates manual-only. |
 | `Docs/reports/AUTOMIXER_WING_SUPERVISED_MVP_RAILS_20260606.md` | MVP contract, blocker table, runbooks, progress updater, and Project Director Agent. |
 | `Docs/reports/MVP_PROGRESS_LATEST.md` | Latest generated supervised WING MVP blocker status and first required action. |

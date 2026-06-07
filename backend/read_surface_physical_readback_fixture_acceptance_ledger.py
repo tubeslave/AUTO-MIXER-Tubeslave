@@ -70,6 +70,12 @@ def _string_list(value: Any) -> Tuple[str, ...]:
     return tuple(str(item) for item in value if isinstance(item, str) and item)
 
 
+def _safe_int(value: Any) -> int:
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        return value
+    return 0
+
+
 def _is_utc_timestamp(value: str) -> bool:
     if not value:
         return False
@@ -115,10 +121,61 @@ def _unsafe_flags(record: Mapping[str, Any]) -> Tuple[str, ...]:
     return tuple(key for key in UNSAFE_ACCEPTANCE_FLAGS if record.get(key) is True)
 
 
+def _candidate_trace_violations(
+    record: Mapping[str, Any],
+    *,
+    candidate: Mapping[str, Any],
+    queue: Mapping[str, Any],
+    artifact_source_id: str,
+) -> Tuple[str, ...]:
+    trace = _mapping(record.get("candidate_trace"))
+    if not trace:
+        return ("acceptance_record_candidate_trace_missing",)
+
+    violations = []
+    expected_artifact_sources = _string_list(candidate.get("artifact_source_ids"))
+    trace_artifact_sources = _string_list(trace.get("artifact_source_ids"))
+    expected_strings = {
+        "source_queue_method_id": _string(queue.get("method_id")),
+        "source_queue_status": _string(queue.get("status")),
+        "candidate_status": _string(candidate.get("status")),
+        "intake_status": _string(candidate.get("intake_status")),
+    }
+    for key, expected in expected_strings.items():
+        if _string(trace.get(key)) != expected:
+            violations.append(f"acceptance_record_candidate_trace_{key}_mismatch")
+
+    if trace_artifact_sources != expected_artifact_sources:
+        violations.append("acceptance_record_candidate_trace_artifact_sources_mismatch")
+    elif artifact_source_id and artifact_source_id not in trace_artifact_sources:
+        violations.append("acceptance_record_candidate_trace_artifact_source_missing")
+
+    for key in ("valid_candidate_count", "invalid_candidate_count"):
+        if _safe_int(trace.get(key)) != _safe_int(candidate.get(key)):
+            violations.append(f"acceptance_record_candidate_trace_{key}_mismatch")
+
+    for key in ("target_consistency", "accepted_as_physical_fixture_candidate"):
+        if trace.get(key) is not True:
+            violations.append(f"acceptance_record_candidate_trace_{key}_not_true")
+    if trace.get("candidate_source_id_missing") is not False:
+        violations.append(
+            "acceptance_record_candidate_trace_candidate_source_id_missing_not_false"
+        )
+    for key in (
+        "fixture_closure_allowed_by_queue",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        if trace.get(key) is not False:
+            violations.append(f"acceptance_record_candidate_trace_{key}_not_false")
+    return tuple(violations)
+
+
 def _validated_record(
     record: Mapping[str, Any],
     *,
     index: int,
+    queue: Mapping[str, Any],
     candidates_by_surface: Mapping[str, Mapping[str, Any]],
 ) -> Dict[str, Any]:
     record_id = _record_id(record, index)
@@ -130,6 +187,7 @@ def _validated_record(
     required_contract_method_id = _string(record.get("required_contract_method_id"))
     candidate = _mapping(candidates_by_surface.get(surface_id))
     candidate_artifact_sources = _string_list(candidate.get("artifact_source_ids"))
+    candidate_trace = _mapping(record.get("candidate_trace"))
     unsafe_flags = _unsafe_flags(record)
     violations = []
 
@@ -151,6 +209,14 @@ def _validated_record(
         violations.append("acceptance_record_candidate_artifact_sources_missing")
     elif candidate_artifact_sources and artifact_source_id not in candidate_artifact_sources:
         violations.append("acceptance_record_artifact_source_mismatch")
+    violations.extend(
+        _candidate_trace_violations(
+            record,
+            candidate=candidate,
+            queue=queue,
+            artifact_source_id=artifact_source_id,
+        )
+    )
     if unsafe_flags:
         violations.append("acceptance_record_unsafe_authority_claim")
 
@@ -160,6 +226,7 @@ def _validated_record(
         "surface_id": surface_id,
         "artifact_source_id": artifact_source_id,
         "required_contract_method_id": required_contract_method_id,
+        "candidate_trace": dict(candidate_trace),
         "decision": decision if decision in ACCEPTANCE_DECISIONS else "invalid",
         "reviewed_by": reviewed_by,
         "reviewed_at": reviewed_at,
@@ -189,6 +256,7 @@ def build_read_surface_physical_readback_fixture_acceptance_ledger(
         _validated_record(
             record,
             index=index,
+            queue=queue,
             candidates_by_surface=candidates_by_surface,
         )
         for index, record in enumerate(_record_list(acceptance_records))
@@ -201,6 +269,20 @@ def build_read_surface_physical_readback_fixture_acceptance_ledger(
         record for record in valid_records if record["operator_rejected_review_candidate"]
     )
     invalid_records = tuple(record for record in records if not record["valid"])
+    candidate_trace_missing_count = sum(
+        1
+        for record in records
+        if "acceptance_record_candidate_trace_missing" in record["violations"]
+    )
+    candidate_trace_mismatch_count = sum(
+        1
+        for record in records
+        if any(
+            violation.startswith("acceptance_record_candidate_trace_")
+            and violation != "acceptance_record_candidate_trace_missing"
+            for violation in record["violations"]
+        )
+    )
     reviewed_surface_ids = {
         str(record["surface_id"])
         for record in valid_records
@@ -252,6 +334,8 @@ def build_read_surface_physical_readback_fixture_acceptance_ledger(
             "accepted_record_count": len(accepted_records),
             "rejected_record_count": len(rejected_records),
             "invalid_record_count": len(invalid_records),
+            "candidate_trace_missing_count": candidate_trace_missing_count,
+            "candidate_trace_mismatch_count": candidate_trace_mismatch_count,
             "unreviewed_candidate_count": len(unreviewed_candidate_surface_ids),
             "accepted_surface_ids": accepted_surface_ids,
             "rejected_surface_ids": rejected_surface_ids,
