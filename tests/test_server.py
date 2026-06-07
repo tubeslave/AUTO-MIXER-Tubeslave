@@ -1310,6 +1310,95 @@ class TestWingDeploymentWriteBoundary:
         )
 
     @pytest.mark.asyncio
+    async def test_operator_proposal_apply_linked_idempotency_key_blocks_duplicate_apply(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        server.mixer_client.state.update({
+            "/ch/1/fdr": -9.0,
+            "/ch/2/fdr": -9.0,
+        })
+        now = time.time()
+        server.mixer_client.state_timestamps.update({
+            "/ch/1/fdr": now,
+            "/ch/2/fdr": now,
+        })
+        server._apply_manual_console_write = AsyncMock(
+            side_effect=[
+                {
+                    "status": "applied",
+                    "success": True,
+                    "channel": 1,
+                    "value_type": "fader",
+                    "effective_value": -9.5,
+                    "old_value": -9.0,
+                    "readback_value": -9.5,
+                    "readback_status": "verified_from_cache",
+                    "rollback_available": True,
+                    "rollback_value": -8.0,
+                },
+                {
+                    "status": "applied",
+                    "success": True,
+                    "channel": 2,
+                    "value_type": "fader",
+                    "effective_value": -9.5,
+                    "old_value": -9.0,
+                    "readback_value": -9.5,
+                    "readback_status": "verified_from_cache",
+                    "rollback_available": True,
+                    "rollback_value": -9.0,
+                },
+            ]
+        )
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "title": "Lead Vocal: linked idempotency lock",
+                "value_type": "fader",
+                "requested_changes": [
+                    {"value_type": "fader", "channel": 1, "value": -9.5},
+                    {"value_type": "fader", "channel": 2, "value": -9.5},
+                ],
+                "reason": "unit",
+            },
+        )
+        create_payload = self._decode_last_message(websocket)
+        proposal_id = create_payload["proposal"]["id"]
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": "unit-auto-linked-idemp",
+            },
+        )
+        first_apply_payload = self._decode_last_message(websocket)
+        assert first_apply_payload["type"] == "operator_proposal_apply_result"
+        assert first_apply_payload["status"] == "applied"
+        assert server._apply_manual_console_write.await_count == 2
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": "unit-auto-linked-idemp",
+            },
+        )
+        second_apply_payload = self._decode_last_message(websocket)
+        assert second_apply_payload["type"] == "operator_proposal_apply_blocked"
+        assert second_apply_payload["status"] == "blocked"
+        assert second_apply_payload["reason"] == "duplicate_idempotency_key"
+        assert server._apply_manual_console_write.await_count == 2
+
+    @pytest.mark.asyncio
     async def test_operator_proposal_apply_is_blocked_for_stale_pre_read_when_wing_boundary_disabled(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "auto"
