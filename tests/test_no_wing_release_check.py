@@ -2060,6 +2060,10 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
     assert result.detail["fail_closed_conditions"] == list(
         release_check.WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS
     )
+    assert (
+        "existing_backend_connection_boundary_missing"
+        in result.detail["fail_closed_conditions"]
+    )
     assert result.detail["post_run_review_commands"] == [
         " ".join(release_check.wing_readonly_preflight_review_command()),
         " ".join(release_check.wing_readonly_preflight_review_decision_command()),
@@ -2120,6 +2124,10 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
     )
     assert (
         "wing_readonly_preflight_plan_fail_closed_condition_transport_timeout_or_connection_loss_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_plan_fail_closed_condition_existing_backend_connection_boundary_missing_missing"
         in result.detail["violations"]
     )
     assert (
