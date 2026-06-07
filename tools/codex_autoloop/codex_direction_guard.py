@@ -243,7 +243,7 @@ def analyze_evidence(raw_items: Iterable[tuple[str, str]]) -> dict:
         "activation_policy": {
             "before_plan": True,
             "before_final_report": True,
-            "wall_clock_schedule": "every Codex autoloop cycle; LaunchAgent interval remains 1200 seconds when installed",
+            "wall_clock_schedule": "every Codex autoloop cycle; LaunchAgent interval remains 21600 seconds when installed",
         },
         "mvp_blocker_table": MVP_BLOCKERS_PATH,
         "status": status,
@@ -341,7 +341,7 @@ def render_markdown(report: dict) -> str:
         "",
         "- Runs before Codex selects a task for the cycle.",
         "- Runs again before the final cycle report.",
-        "- Wall-clock activation follows the existing Codex autoloop interval: every 1200 seconds when the LaunchAgent is installed.",
+        "- Wall-clock activation follows the existing Codex autoloop interval: every 21600 seconds when the LaunchAgent is installed.",
         "",
         "## Summary",
         "",

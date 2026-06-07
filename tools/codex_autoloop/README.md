@@ -1,7 +1,7 @@
 # Codex Autoloop LaunchAgent
 
 This folder prepares a local macOS LaunchAgent that can run safe Codex
-development cycles for Automixer every 20 minutes.
+development cycles for Automixer every 6 hours.
 
 It is not installed automatically. Review the files first, then install only if
 you want the background automation active.
@@ -17,7 +17,7 @@ you want the background automation active.
 
 ## Behavior
 
-- The LaunchAgent starts one Codex cycle every `1200` seconds.
+- The LaunchAgent starts one Codex cycle every `21600` seconds.
 - Codex limit checks are disabled. The wrapper does not inspect quota state and
   does not skip runs based on limits.
 - Current policy supersedes older local reports that described a limit gate:
@@ -41,7 +41,7 @@ you want the background automation active.
   treated as scan noise unless the selected task explicitly targets them. The
   TODO/FIXME scan should use `rg --hidden --glob ...` directly rather than
   `find ... | xargs rg`, because generated app bundle paths can contain spaces.
-- Does not run immediately at login; `launchd` starts it on the 20-minute
+- Does not run immediately at login; `launchd` starts it on the 6-hour
   interval.
 - Uses a lock directory at `.codex_autoloop.lock` to avoid parallel runs.
 - Writes lock owner metadata to `.codex_autoloop.lock/owner.env` after acquiring
@@ -103,7 +103,7 @@ you want the background automation active.
   commit subjects, and repo-local reports, then scores whether the cycle is
   moving toward supervised WING Rack MVP blockers or drifting into
   memory/queue/result-consumer/report-only work. The wall-clock cadence remains
-  the existing LaunchAgent interval of `1200` seconds when installed; no new
+  the existing LaunchAgent interval of `21600` seconds when installed; no new
   background service is installed by the guard.
 - Project Director Agent activation is inside each Codex cycle after the
   direction guard. `tools/codex_autoloop/project_director_agent.py` reads
@@ -157,7 +157,7 @@ tools/codex_autoloop/run_codex_cycle.sh
 
 ## Install LaunchAgent
 
-Only run this when you intentionally want the 20-minute background automation:
+Only run this when you intentionally want the 6-hour background automation:
 
 ```bash
 mkdir -p "$HOME/Library/LaunchAgents" logs/codex_autoloop .paperclip/reports

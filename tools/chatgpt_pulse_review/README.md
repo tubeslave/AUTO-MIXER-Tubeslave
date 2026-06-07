@@ -21,7 +21,7 @@ Safety boundary:
 - The fetcher writes only sanitized Pulse card text and short conversation
   excerpts; it does not write cookies, access tokens, session payloads, account
   identity fields, or signed image URLs.
-- The wrapper uses the same `.codex_autoloop.lock` as the 20-minute Codex loop,
+- The wrapper uses the same `.codex_autoloop.lock` as the Codex autoloop,
   so two Codex automations do not write the repo at the same time.
 
 ## Files
@@ -85,8 +85,8 @@ rm -f "$HOME/Library/LaunchAgents/com.tubeslave.automixer.chatgpt-pulse-review.p
 
 ## Notes
 
-- The daily trigger uses `StartCalendarInterval` at 09:00, not a 20-minute
-  interval.
+- The daily trigger uses `StartCalendarInterval` at 09:00, not the Codex
+  autoloop interval.
 - If the local ChatGPT session expires, the fetcher will fail safely and log the
   reason. Open ChatGPT in Chrome and sign in again.
 - If another Codex automation is already running at 09:00, this job exits

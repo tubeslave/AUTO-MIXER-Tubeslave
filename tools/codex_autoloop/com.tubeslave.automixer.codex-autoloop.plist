@@ -18,7 +18,7 @@
   <false/>
 
   <key>StartInterval</key>
-  <integer>1200</integer>
+  <integer>21600</integer>
 
   <key>KeepAlive</key>
   <false/>
