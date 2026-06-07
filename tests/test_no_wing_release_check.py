@@ -1025,6 +1025,75 @@ def valid_read_surface_capture_template_payload() -> dict:
                 "physical_readback_payload": (
                     "<replace with JSON payload that matches required_contract_method_id>"
                 ),
+                "physical_readback_payload_template": {
+                    "template_status": "operator_must_fill_from_physical_readback",
+                    "required_contract_method_id": "raw_mixer_state_physical_readback_contract",
+                    "artifact_type": "raw_mixer_state_physical_readback",
+                    "schema_id": "raw_mixer_state_physical_readback.v1",
+                    "required_top_level_fields": [
+                        "type",
+                        "schema_id",
+                        "surface_id",
+                        "remediation_action_id",
+                        "captured_at",
+                        "source",
+                        "console_model",
+                        "address_count",
+                        "readback_rows",
+                        "safety",
+                    ],
+                    "required_field_sets": {
+                        "required_row_fields": [
+                            "address",
+                            "value",
+                            "status",
+                            "source",
+                            "captured_at",
+                        ],
+                        "required_false_safety_flags": [
+                            "live_write",
+                            "mutates_console_state",
+                            "live_widening_allowed",
+                            "full_autonomous_ready",
+                        ],
+                    },
+                    "payload": {
+                        "type": "raw_mixer_state_physical_readback",
+                        "schema_id": "raw_mixer_state_physical_readback.v1",
+                        "surface_id": "raw_mixer_state_cache",
+                        "remediation_action_id": "remediate_raw_mixer_state_cache",
+                        "captured_at": (
+                            "<UTC ISO timestamp, e.g. 2026-06-07T12:00:00Z>"
+                        ),
+                        "source": (
+                            "<physical_readback|wing_physical_readback|dlive_physical_readback>"
+                        ),
+                        "console_model": "<console model and firmware>",
+                        "address_count": "<integer address_count>",
+                        "readback_rows": [
+                            {
+                                "address": "<operator-captured address>",
+                                "value": "<operator-captured value>",
+                                "status": "<verified_from_physical_readback>",
+                                "source": (
+                                    "<physical_readback|wing_physical_readback|dlive_physical_readback>"
+                                ),
+                                "captured_at": (
+                                    "<UTC ISO timestamp, e.g. 2026-06-07T12:00:00Z>"
+                                ),
+                            }
+                        ],
+                        "safety": {
+                            "read_only": True,
+                            "live_write": False,
+                            "mutates_console_state": False,
+                            "live_widening_allowed": False,
+                            "full_autonomous_ready": False,
+                            "live_authority_granted": False,
+                            "accepted_as_physical_fixture_candidate": False,
+                        },
+                    },
+                },
                 "safety": {
                     "read_only": True,
                     "live_write": False,
@@ -1049,6 +1118,7 @@ def valid_read_surface_capture_template_payload() -> dict:
             "console_model",
             "capture_scope",
             "physical_readback_payload",
+            "physical_readback_payload_template.payload",
         ],
         "blocked_by": [
             "operator_must_capture_and_review_physical_readback_artifact",
@@ -1467,6 +1537,16 @@ def test_no_wing_release_check_validates_read_surface_capture_template_artifact(
     assert result.detail["capture_template_contract_ids"] == [
         "raw_mixer_state_physical_readback_contract"
     ]
+    assert result.detail["payload_template_contract_ids"] == [
+        "raw_mixer_state_physical_readback_contract"
+    ]
+    assert result.detail["payload_template_artifact_types"] == [
+        "raw_mixer_state_physical_readback"
+    ]
+    assert result.detail["payload_template_schema_ids"] == [
+        "raw_mixer_state_physical_readback.v1"
+    ]
+    assert result.detail["payload_template_field_counts"] == [10]
     assert result.detail["required_operator_edits"] == [
         "artifact_source_id",
         "captured_at",
@@ -1475,6 +1555,7 @@ def test_no_wing_release_check_validates_read_surface_capture_template_artifact(
         "console_model",
         "capture_scope",
         "physical_readback_payload",
+        "physical_readback_payload_template.payload",
     ]
     assert result.detail["operator_sequence_count"] == 6
     assert result.detail["record_unsafe_flags"] == []
@@ -1508,6 +1589,12 @@ def test_no_wing_release_check_rejects_unsafe_read_surface_capture_template_arti
     payload["capture_templates"][0]["physical_readback_payload"] = {
         "type": "raw_mixer_state_physical_readback",
     }
+    payload["capture_templates"][0]["physical_readback_payload_template"]["payload"][
+        "safety"
+    ]["live_authority_granted"] = True
+    payload["capture_templates"][0]["physical_readback_payload_template"]["payload"][
+        "safety"
+    ]["accepted_as_physical_fixture_candidate"] = True
     payload["capture_templates"][0]["safety"]["live_authority_granted"] = True
     payload["capture_templates"][0]["safety"][
         "accepted_as_physical_fixture_candidate"
@@ -1545,13 +1632,23 @@ def test_no_wing_release_check_rejects_unsafe_read_surface_capture_template_arti
         "violations"
     ]
     assert (
+        "capture_template_artifact_record_0_payload_template_live_authority_granted_not_false"
+        in result.detail["violations"]
+    )
+    assert (
+        "capture_template_artifact_record_0_payload_template_accepted_as_physical_fixture_candidate_not_false"
+        in result.detail["violations"]
+    )
+    assert (
         "capture_template_artifact_record_0_accepted_as_physical_fixture_candidate_not_false"
         in result.detail["violations"]
     )
-    assert result.detail["record_unsafe_flags"] == [
+    assert set(result.detail["record_unsafe_flags"]) == {
+        "record_0_payload_template_live_authority_granted",
+        "record_0_payload_template_accepted_as_physical_fixture_candidate",
         "record_0_accepted_as_physical_fixture_candidate",
         "record_0_live_authority_granted",
-    ]
+    }
 
 
 def test_no_wing_release_check_validates_artifact_review_queue_artifact(tmp_path):
@@ -6297,6 +6394,16 @@ def test_no_wing_release_check_summary_embeds_read_surface_capture_template_arti
             "capture_template_contract_ids": [
                 "raw_mixer_state_physical_readback_contract",
             ],
+            "payload_template_contract_ids": [
+                "raw_mixer_state_physical_readback_contract",
+            ],
+            "payload_template_artifact_types": [
+                "raw_mixer_state_physical_readback",
+            ],
+            "payload_template_schema_ids": [
+                "raw_mixer_state_physical_readback.v1",
+            ],
+            "payload_template_field_counts": [10],
             "required_operator_edits": [
                 "artifact_source_id",
                 "captured_at",
@@ -6305,6 +6412,7 @@ def test_no_wing_release_check_summary_embeds_read_surface_capture_template_arti
                 "console_model",
                 "capture_scope",
                 "physical_readback_payload",
+                "physical_readback_payload_template.payload",
             ],
             "operator_sequence_count": 6,
             "blocked_by": [
@@ -6346,7 +6454,21 @@ def test_no_wing_release_check_summary_embeds_read_surface_capture_template_arti
     assert artifact["capture_template_contract_ids"] == [
         "raw_mixer_state_physical_readback_contract"
     ]
+    assert artifact["payload_template_contract_ids"] == [
+        "raw_mixer_state_physical_readback_contract"
+    ]
+    assert artifact["payload_template_artifact_types"] == [
+        "raw_mixer_state_physical_readback"
+    ]
+    assert artifact["payload_template_schema_ids"] == [
+        "raw_mixer_state_physical_readback.v1"
+    ]
+    assert artifact["payload_template_field_counts"] == [10]
     assert "physical_readback_payload" in artifact["required_operator_edits"]
+    assert (
+        "physical_readback_payload_template.payload"
+        in artifact["required_operator_edits"]
+    )
     assert artifact["record_unsafe_flags"] == []
     assert artifact["violations"] == []
     assert (
@@ -6355,6 +6477,8 @@ def test_no_wing_release_check_summary_embeds_read_surface_capture_template_arti
     )
     assert "execution_allowed_by_template: `false`" in markdown_summary
     assert "capture_template_surface_ids" in markdown_summary
+    assert "payload_template_artifact_types" in markdown_summary
+    assert "raw_mixer_state_physical_readback" in markdown_summary
     assert "physical_readback_payload" in markdown_summary
 
 

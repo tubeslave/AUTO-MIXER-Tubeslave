@@ -2364,6 +2364,10 @@ def validate_read_surface_physical_readback_capture_template_artifact_snapshot(
     record_unsafe_flags: list[str] = []
     record_surface_ids: list[str] = []
     record_contract_ids: list[str] = []
+    payload_template_contract_ids: list[str] = []
+    payload_template_artifact_types: list[str] = []
+    payload_template_schema_ids: list[str] = []
+    payload_template_field_counts: list[int] = []
     for index, record in enumerate(records):
         if not isinstance(record, Mapping):
             violations.append(f"capture_template_artifact_record_{index}_not_object")
@@ -2445,6 +2449,147 @@ def validate_read_surface_physical_readback_capture_template_artifact_snapshot(
             violations.append(
                 f"capture_template_artifact_record_{index}_payload_not_pending"
             )
+        payload_template = (
+            record.get("physical_readback_payload_template")
+            if isinstance(record.get("physical_readback_payload_template"), Mapping)
+            else {}
+        )
+        if not payload_template:
+            violations.append(
+                f"capture_template_artifact_record_{index}_payload_template_missing"
+            )
+        else:
+            if (
+                payload_template.get("template_status")
+                != "operator_must_fill_from_physical_readback"
+            ):
+                violations.append(
+                    f"capture_template_artifact_record_{index}_payload_template_status_mismatch"
+                )
+            if payload_template.get("required_contract_method_id") != contract_id:
+                violations.append(
+                    f"capture_template_artifact_record_{index}_payload_template_contract_mismatch"
+                )
+            payload_contract_id = payload_template.get("required_contract_method_id")
+            if isinstance(payload_contract_id, str) and payload_contract_id:
+                payload_template_contract_ids.append(payload_contract_id)
+            artifact_type = payload_template.get("artifact_type")
+            schema_id = payload_template.get("schema_id")
+            if not isinstance(artifact_type, str) or not artifact_type:
+                violations.append(
+                    f"capture_template_artifact_record_{index}_payload_template_type_missing"
+                )
+            else:
+                payload_template_artifact_types.append(artifact_type)
+            if not isinstance(schema_id, str) or not schema_id:
+                violations.append(
+                    f"capture_template_artifact_record_{index}_payload_template_schema_missing"
+                )
+            else:
+                payload_template_schema_ids.append(schema_id)
+            required_top = (
+                payload_template.get("required_top_level_fields")
+                if isinstance(payload_template.get("required_top_level_fields"), list)
+                else []
+            )
+            if not required_top:
+                violations.append(
+                    f"capture_template_artifact_record_{index}_payload_template_required_fields_missing"
+                )
+            for required_field in (
+                "type",
+                "schema_id",
+                "surface_id",
+                "remediation_action_id",
+                "captured_at",
+                "source",
+                "console_model",
+                "safety",
+            ):
+                if required_field not in required_top:
+                    violations.append(
+                        "capture_template_artifact_record_"
+                        f"{index}_payload_template_required_field_missing:{required_field}"
+                    )
+            required_sets = payload_template.get("required_field_sets")
+            if not isinstance(required_sets, Mapping):
+                violations.append(
+                    f"capture_template_artifact_record_{index}_payload_template_field_sets_missing"
+                )
+            payload = (
+                payload_template.get("payload")
+                if isinstance(payload_template.get("payload"), Mapping)
+                else {}
+            )
+            if not payload:
+                violations.append(
+                    f"capture_template_artifact_record_{index}_payload_template_payload_missing"
+                )
+            else:
+                payload_template_field_counts.append(len(payload))
+                for field in required_top:
+                    if isinstance(field, str) and field and field not in payload:
+                        violations.append(
+                            "capture_template_artifact_record_"
+                            f"{index}_payload_template_payload_missing_field:{field}"
+                        )
+                if payload.get("type") != artifact_type:
+                    violations.append(
+                        f"capture_template_artifact_record_{index}_payload_template_payload_type_mismatch"
+                    )
+                if payload.get("schema_id") != schema_id:
+                    violations.append(
+                        f"capture_template_artifact_record_{index}_payload_template_payload_schema_mismatch"
+                    )
+                if payload.get("surface_id") != surface_id:
+                    violations.append(
+                        f"capture_template_artifact_record_{index}_payload_template_payload_surface_mismatch"
+                    )
+                if payload.get("remediation_action_id") != record.get(
+                    "remediation_action_id"
+                ):
+                    violations.append(
+                        f"capture_template_artifact_record_{index}_payload_template_payload_action_mismatch"
+                    )
+                if not isinstance(payload.get("captured_at"), str) or not payload[
+                    "captured_at"
+                ].startswith("<UTC ISO timestamp"):
+                    violations.append(
+                        f"capture_template_artifact_record_{index}_payload_template_captured_at_not_pending"
+                    )
+                if not isinstance(payload.get("source"), str) or not payload[
+                    "source"
+                ].startswith("<physical_readback"):
+                    violations.append(
+                        f"capture_template_artifact_record_{index}_payload_template_source_not_pending"
+                    )
+                if payload.get("console_model") != "<console model and firmware>":
+                    violations.append(
+                        f"capture_template_artifact_record_{index}_payload_template_console_model_not_pending"
+                    )
+                payload_safety = (
+                    payload.get("safety")
+                    if isinstance(payload.get("safety"), Mapping)
+                    else {}
+                )
+                if payload_safety.get("read_only") is not True:
+                    violations.append(
+                        f"capture_template_artifact_record_{index}_payload_template_safety_read_only_not_true"
+                    )
+                for key in (
+                    "live_write",
+                    "mutates_console_state",
+                    "live_widening_allowed",
+                    "live_authority_granted",
+                    "full_autonomous_ready",
+                    "accepted_as_physical_fixture_candidate",
+                ):
+                    if payload_safety.get(key) is not False:
+                        flag = f"record_{index}_payload_template_{key}"
+                        record_unsafe_flags.append(flag)
+                        violations.append(
+                            f"capture_template_artifact_{flag}_not_false"
+                        )
         safety = record.get("safety") if isinstance(record.get("safety"), Mapping) else {}
         if safety.get("read_only") is not True or safety.get("operator_required") is not True:
             violations.append(
@@ -2498,6 +2643,10 @@ def validate_read_surface_physical_readback_capture_template_artifact_snapshot(
     detail["capture_template_count"] = capture_template_count
     detail["capture_template_surface_ids"] = record_surface_ids
     detail["capture_template_contract_ids"] = record_contract_ids
+    detail["payload_template_contract_ids"] = payload_template_contract_ids
+    detail["payload_template_artifact_types"] = payload_template_artifact_types
+    detail["payload_template_schema_ids"] = payload_template_schema_ids
+    detail["payload_template_field_counts"] = payload_template_field_counts
     detail["required_operator_edits"] = (
         list(required_edits) if isinstance(required_edits, list) else []
     )
@@ -9110,6 +9259,10 @@ def read_surface_physical_readback_capture_template_artifact_summary(
         detail = result.detail if isinstance(result.detail, Mapping) else {}
         surface_ids = detail.get("capture_template_surface_ids")
         contract_ids = detail.get("capture_template_contract_ids")
+        payload_contract_ids = detail.get("payload_template_contract_ids")
+        payload_artifact_types = detail.get("payload_template_artifact_types")
+        payload_schema_ids = detail.get("payload_template_schema_ids")
+        payload_field_counts = detail.get("payload_template_field_counts")
         required_edits = detail.get("required_operator_edits")
         blocked_by = detail.get("blocked_by")
         unsafe_flags = detail.get("record_unsafe_flags")
@@ -9146,6 +9299,26 @@ def read_surface_physical_readback_capture_template_artifact_summary(
             ),
             "capture_template_contract_ids": (
                 list(contract_ids) if isinstance(contract_ids, list) else []
+            ),
+            "payload_template_contract_ids": (
+                list(payload_contract_ids)
+                if isinstance(payload_contract_ids, list)
+                else []
+            ),
+            "payload_template_artifact_types": (
+                list(payload_artifact_types)
+                if isinstance(payload_artifact_types, list)
+                else []
+            ),
+            "payload_template_schema_ids": (
+                list(payload_schema_ids)
+                if isinstance(payload_schema_ids, list)
+                else []
+            ),
+            "payload_template_field_counts": (
+                list(payload_field_counts)
+                if isinstance(payload_field_counts, list)
+                else []
             ),
             "required_operator_edits": (
                 list(required_edits) if isinstance(required_edits, list) else []
@@ -12268,6 +12441,14 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(read_capture_template_artifact['capture_template_surface_ids'])}`",
                 "- capture_template_contract_ids: "
                 f"`{json.dumps(read_capture_template_artifact['capture_template_contract_ids'])}`",
+                "- payload_template_contract_ids: "
+                f"`{json.dumps(read_capture_template_artifact['payload_template_contract_ids'])}`",
+                "- payload_template_artifact_types: "
+                f"`{json.dumps(read_capture_template_artifact['payload_template_artifact_types'])}`",
+                "- payload_template_schema_ids: "
+                f"`{json.dumps(read_capture_template_artifact['payload_template_schema_ids'])}`",
+                "- payload_template_field_counts: "
+                f"`{json.dumps(read_capture_template_artifact['payload_template_field_counts'])}`",
                 "- required_operator_edits: "
                 f"`{json.dumps(read_capture_template_artifact['required_operator_edits'])}`",
                 f"- blocked_by: `{json.dumps(read_capture_template_artifact['blocked_by'])}`",

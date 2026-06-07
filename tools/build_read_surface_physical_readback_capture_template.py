@@ -20,6 +20,36 @@ for path in (str(REPO_ROOT), str(BACKEND_ROOT)):
 from tools.build_read_surface_physical_readback_capture_packet import (  # noqa: E402
     build_capture_packet,
 )
+from backend.bus_group_main_dca_physical_readback_contract import (  # noqa: E402
+    build_bus_group_main_dca_physical_readback_contract,
+)
+from backend.channel_basic_controls_physical_readback_contract import (  # noqa: E402
+    build_channel_basic_controls_physical_readback_contract,
+)
+from backend.channel_processing_physical_readback_contract import (  # noqa: E402
+    build_channel_processing_physical_readback_contract,
+)
+from backend.dlive_state_physical_readback_contract import (  # noqa: E402
+    build_dlive_state_physical_readback_contract,
+)
+from backend.fx_slots_inserts_physical_readback_contract import (  # noqa: E402
+    build_fx_slots_inserts_physical_readback_contract,
+)
+from backend.matrix_state_physical_readback_contract import (  # noqa: E402
+    build_matrix_state_physical_readback_contract,
+)
+from backend.raw_mixer_state_physical_readback_contract import (  # noqa: E402
+    build_raw_mixer_state_physical_readback_contract,
+)
+from backend.routing_sends_physical_readback_contract import (  # noqa: E402
+    build_routing_sends_physical_readback_contract,
+)
+from backend.snapshots_scenes_physical_readback_contract import (  # noqa: E402
+    build_snapshots_scenes_physical_readback_contract,
+)
+from backend.user_presets_physical_readback_contract import (  # noqa: E402
+    build_user_presets_physical_readback_contract,
+)
 
 
 DEFAULT_OUTPUT = (
@@ -39,6 +69,7 @@ PENDING_CAPTURE_SCOPE = "<manual capture scope and show-state notes>"
 PENDING_PHYSICAL_READBACK_PAYLOAD = (
     "<replace with JSON payload that matches required_contract_method_id>"
 )
+PAYLOAD_TEMPLATE_STATUS = "operator_must_fill_from_physical_readback"
 FOCUSED_VALIDATION_COMMAND = [
     "PYTHONPATH=backend",
     "python3",
@@ -48,6 +79,49 @@ FOCUSED_VALIDATION_COMMAND = [
     "tests/test_read_surface_physical_readback_capture_template.py",
     "tests/test_no_wing_release_check.py",
 ]
+CONTRACT_BUILDERS = {
+    "raw_mixer_state_physical_readback_contract": build_raw_mixer_state_physical_readback_contract,
+    "channel_basic_controls_physical_readback_contract": build_channel_basic_controls_physical_readback_contract,
+    "channel_processing_physical_readback_contract": build_channel_processing_physical_readback_contract,
+    "bus_group_main_dca_physical_readback_contract": build_bus_group_main_dca_physical_readback_contract,
+    "matrix_state_physical_readback_contract": build_matrix_state_physical_readback_contract,
+    "fx_slots_inserts_physical_readback_contract": build_fx_slots_inserts_physical_readback_contract,
+    "routing_sends_physical_readback_contract": build_routing_sends_physical_readback_contract,
+    "snapshots_scenes_physical_readback_contract": build_snapshots_scenes_physical_readback_contract,
+    "user_presets_physical_readback_contract": build_user_presets_physical_readback_contract,
+    "dlive_state_physical_readback_contract": build_dlive_state_physical_readback_contract,
+}
+COLLECTION_FIELD_TO_REQUIRED_FIELDS = {
+    "readback_rows": "required_row_fields",
+    "channels": "required_channel_fields",
+    "buses": "required_bus_fields",
+    "mains": "required_main_fields",
+    "dcas": "required_dca_fields",
+    "matrices": "required_matrix_fields",
+    "fx_slots": "required_fx_slot_fields",
+    "inserts": "required_insert_fields",
+    "static_dante_routes": "required_static_route_fields",
+    "channel_bus_sends": "required_bus_send_fields",
+    "channel_main_sends": "required_main_send_fields",
+    "channel_matrix_sends": "required_matrix_send_fields",
+    "output_routes": "required_output_route_fields",
+    "snapshots": "required_snapshot_fields",
+    "presets": "required_preset_fields",
+}
+OBJECT_FIELD_TO_REQUIRED_FIELDS = {
+    "active_scene": "required_active_scene_fields",
+    "midi_state": "required_midi_state_fields",
+    "parity": "required_parity_fields",
+    "identity": "required_identity_fields",
+    "controls": "required_control_fields",
+    "hpf": "required_hpf_fields",
+    "eq": "required_eq_fields",
+    "compressor": "required_compressor_fields",
+    "gate": "required_gate_fields",
+    "dynamics": "required_dynamics_fields",
+    "insert": "required_insert_fields",
+    "metering": "required_metering_fields",
+}
 
 
 def utc_now() -> str:
@@ -66,6 +140,153 @@ def _slug(value: str) -> str:
     chars = [char.lower() if char.isalnum() else "-" for char in value]
     slug = "-".join(part for part in "".join(chars).split("-") if part)
     return slug or "pending"
+
+
+def _contract_for_method(method_id: str) -> Mapping[str, Any]:
+    builder = CONTRACT_BUILDERS.get(method_id)
+    if builder is None:
+        return {}
+    contract = builder()
+    return contract if isinstance(contract, Mapping) else {}
+
+
+def _artifact_contract_for_method(method_id: str) -> Mapping[str, Any]:
+    contract = _contract_for_method(method_id)
+    artifact_contract = contract.get("artifact_contract")
+    return artifact_contract if isinstance(artifact_contract, Mapping) else {}
+
+
+def _required_field_sets(artifact_contract: Mapping[str, Any]) -> dict[str, list[str]]:
+    return {
+        str(key): _string_list(value)
+        for key, value in artifact_contract.items()
+        if isinstance(key, str)
+        and key.startswith("required_")
+        and key != "required_top_level_fields"
+    }
+
+
+def _placeholder_for_field(field_name: str) -> str:
+    return f"<operator-captured {field_name}>"
+
+
+def _coverage_template(artifact_contract: Mapping[str, Any]) -> dict[str, str]:
+    for key in (
+        "required_coverage_flags",
+        "required_bus_coverage_flags",
+        "required_main_coverage_flags",
+        "required_dca_coverage_flags",
+        "required_fx_slot_coverage_flags",
+        "required_insert_coverage_flags",
+        "required_static_route_coverage_flags",
+        "required_send_coverage_flags",
+        "required_output_route_coverage_flags",
+    ):
+        flags = _string_list(artifact_contract.get(key))
+        if flags:
+            return {
+                flag: "<true only after physical readback confirms this coverage>"
+                for flag in flags
+            }
+    return {"cache_matches_physical_readback": "<true only after physical readback>"}
+
+
+def _object_template(
+    fields: list[str],
+    artifact_contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for field in fields:
+        nested_key = OBJECT_FIELD_TO_REQUIRED_FIELDS.get(field)
+        if nested_key:
+            payload[field] = _object_template(
+                _string_list(artifact_contract.get(nested_key)),
+                artifact_contract,
+            )
+        elif field == "coverage":
+            payload[field] = _coverage_template(artifact_contract)
+        elif field == "source":
+            payload[field] = PENDING_SOURCE
+        elif field == "captured_at":
+            payload[field] = PENDING_CAPTURED_AT
+        elif field == "status":
+            payload[field] = "<verified_from_physical_readback>"
+        elif field.endswith("_count"):
+            payload[field] = f"<integer {field}>"
+        else:
+            payload[field] = _placeholder_for_field(field)
+    return payload
+
+
+def _top_level_value(
+    field: str,
+    *,
+    target: Mapping[str, Any],
+    artifact_contract: Mapping[str, Any],
+) -> Any:
+    if field == "type":
+        return str(artifact_contract.get("type") or "")
+    if field == "schema_id":
+        return str(artifact_contract.get("schema_id") or "")
+    if field == "surface_id":
+        return str(target.get("surface_id") or "")
+    if field == "remediation_action_id":
+        return str(target.get("remediation_action_id") or "")
+    if field == "captured_at":
+        return PENDING_CAPTURED_AT
+    if field == "source":
+        return PENDING_SOURCE
+    if field == "console_model":
+        return PENDING_CONSOLE_MODEL
+    if field == "safety":
+        safety = {"read_only": True}
+        for flag in _string_list(artifact_contract.get("required_false_safety_flags")):
+            safety[flag] = False
+        safety.setdefault("live_write", False)
+        safety.setdefault("mutates_console_state", False)
+        safety.setdefault("live_widening_allowed", False)
+        safety.setdefault("full_autonomous_ready", False)
+        safety["live_authority_granted"] = False
+        safety["accepted_as_physical_fixture_candidate"] = False
+        return safety
+    collection_key = COLLECTION_FIELD_TO_REQUIRED_FIELDS.get(field)
+    if collection_key:
+        fields = _string_list(artifact_contract.get(collection_key))
+        return [_object_template(fields, artifact_contract)]
+    object_key = OBJECT_FIELD_TO_REQUIRED_FIELDS.get(field)
+    if object_key:
+        return _object_template(
+            _string_list(artifact_contract.get(object_key)),
+            artifact_contract,
+        )
+    if field.endswith("_count"):
+        return f"<integer {field}>"
+    return _placeholder_for_field(field)
+
+
+def _physical_readback_payload_template(target: Mapping[str, Any]) -> dict[str, Any]:
+    contract_method_id = str(target.get("contract_method_id") or "")
+    artifact_contract = _artifact_contract_for_method(contract_method_id)
+    required_top_level_fields = _string_list(
+        artifact_contract.get("required_top_level_fields")
+    )
+    payload = {
+        field: _top_level_value(
+            field,
+            target=target,
+            artifact_contract=artifact_contract,
+        )
+        for field in required_top_level_fields
+    }
+    return {
+        "template_status": PAYLOAD_TEMPLATE_STATUS,
+        "required_contract_method_id": contract_method_id,
+        "artifact_type": str(artifact_contract.get("type") or ""),
+        "schema_id": str(artifact_contract.get("schema_id") or ""),
+        "required_top_level_fields": required_top_level_fields,
+        "required_field_sets": _required_field_sets(artifact_contract),
+        "payload": payload,
+    }
 
 
 def _targets_from_packet(
@@ -111,6 +332,9 @@ def _template_record(target: Mapping[str, Any]) -> dict[str, Any]:
         "console_model": PENDING_CONSOLE_MODEL,
         "capture_scope": PENDING_CAPTURE_SCOPE,
         "physical_readback_payload": PENDING_PHYSICAL_READBACK_PAYLOAD,
+        "physical_readback_payload_template": _physical_readback_payload_template(
+            target
+        ),
         "safety": {
             "read_only": True,
             "live_write": False,
@@ -201,6 +425,7 @@ def build_capture_template(
             "console_model",
             "capture_scope",
             "physical_readback_payload",
+            "physical_readback_payload_template.payload",
         ],
         "blocked_by": blocked_by,
         "operator_sequence": [

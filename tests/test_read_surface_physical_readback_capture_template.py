@@ -91,6 +91,46 @@ def test_capture_template_builds_next_target_without_authority():
     assert record["captured_at"].startswith("<UTC ISO timestamp")
     assert record["source"].startswith("<physical_readback")
     assert record["physical_readback_payload"].startswith("<replace with JSON payload")
+    payload_template = record["physical_readback_payload_template"]
+    assert payload_template["template_status"] == (
+        "operator_must_fill_from_physical_readback"
+    )
+    assert payload_template["required_contract_method_id"] == (
+        "raw_mixer_state_physical_readback_contract"
+    )
+    assert payload_template["artifact_type"] == "raw_mixer_state_physical_readback"
+    assert payload_template["schema_id"] == "raw_mixer_state_physical_readback.v1"
+    assert payload_template["required_field_sets"]["required_false_safety_flags"] == [
+        "live_write",
+        "mutates_console_state",
+        "live_widening_allowed",
+        "full_autonomous_ready",
+    ]
+    assert payload_template["required_top_level_fields"] == [
+        "type",
+        "schema_id",
+        "surface_id",
+        "remediation_action_id",
+        "captured_at",
+        "source",
+        "console_model",
+        "address_count",
+        "readback_rows",
+        "safety",
+    ]
+    payload = payload_template["payload"]
+    assert payload["type"] == "raw_mixer_state_physical_readback"
+    assert payload["schema_id"] == "raw_mixer_state_physical_readback.v1"
+    assert payload["surface_id"] == "raw_mixer_state_cache"
+    assert payload["remediation_action_id"] == "remediate_raw_mixer_state_cache"
+    assert payload["captured_at"].startswith("<UTC ISO timestamp")
+    assert payload["source"].startswith("<physical_readback")
+    assert payload["address_count"] == "<integer address_count>"
+    assert payload["readback_rows"][0]["address"] == "<operator-captured address>"
+    assert payload["readback_rows"][0]["status"] == "<verified_from_physical_readback>"
+    assert payload["safety"]["read_only"] is True
+    assert payload["safety"]["live_write"] is False
+    assert payload["safety"]["accepted_as_physical_fixture_candidate"] is False
     assert record["safety"]["read_only"] is True
     assert record["safety"]["live_write"] is False
     assert record["safety"]["accepted_as_physical_fixture_candidate"] is False
@@ -122,11 +162,38 @@ def test_capture_template_can_select_surface_or_all_targets():
     assert selected["capture_templates"][0]["surface_id"] == (
         "channel_identity_and_basic_controls"
     )
+    selected_payload_template = selected["capture_templates"][0][
+        "physical_readback_payload_template"
+    ]
+    assert selected_payload_template["artifact_type"] == (
+        "channel_basic_controls_physical_readback"
+    )
+    assert selected_payload_template["payload"]["channel_count"] == (
+        "<integer channel_count>"
+    )
+    assert selected_payload_template["payload"]["channels"][0]["identity"] == {
+        "source_name": "<operator-captured source_name>",
+        "source_role": "<operator-captured source_role>",
+        "input_source": "<operator-captured input_source>",
+    }
+    assert selected_payload_template["payload"]["channels"][0]["controls"] == {
+        "fader_db": "<operator-captured fader_db>",
+        "trim_db": "<operator-captured trim_db>",
+        "mute": "<operator-captured mute>",
+        "pan": "<operator-captured pan>",
+    }
     assert all_targets["include_all_targets"] is True
     assert all_targets["capture_template_count"] == 2
     assert [record["surface_id"] for record in all_targets["capture_templates"]] == [
         "raw_mixer_state_cache",
         "channel_identity_and_basic_controls",
+    ]
+    assert [
+        record["physical_readback_payload_template"]["required_contract_method_id"]
+        for record in all_targets["capture_templates"]
+    ] == [
+        "raw_mixer_state_physical_readback_contract",
+        "channel_basic_controls_physical_readback_contract",
     ]
     assert missing["status"] == "operator_capture_target_missing"
     assert missing["capture_templates"] == []
@@ -173,6 +240,7 @@ def test_capture_template_tool_main_writes_json_and_markdown(tmp_path: Path):
     assert "Read Surface Physical Readback Capture Template" in markdown
     assert "live_authority_granted: `false`" in markdown
     assert "physical_readback_payload" in markdown
+    assert "physical_readback_payload_template" in markdown
 
 
 def test_capture_template_tool_is_transport_free():

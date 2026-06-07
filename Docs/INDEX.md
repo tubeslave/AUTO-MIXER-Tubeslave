@@ -52,6 +52,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_READ_SURFACE_CAPTURE_PACKET_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated capture-packet JSON as a read-only operator gate. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_CAPTURE_PACKET_TARGET_MANIFEST_20260607.md` | Capture packets list every remaining physical-readback target while keeping the handoff non-executing. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_PHYSICAL_READBACK_CAPTURE_TEMPLATE_20260607.md` | Offline pending artifact template tells operators which physical-readback fields to fill while remaining invalid as proof and non-live. |
+| `Docs/reports/AUTOMIXER_READ_SURFACE_CAPTURE_TEMPLATE_CONTRACT_SKELETON_20260607.md` | Pending capture templates include contract-derived payload skeletons while remaining invalid as proof and non-live. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_ARTIFACT_REVIEW_QUEUE_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated artifact-review queue JSON before acceptance-template generation. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_PHYSICAL_READBACK_ACCEPTANCE_TEMPLATE_20260607.md` | Offline operator template renders pending acceptance records for valid read-surface physical-readback candidates without closing fixtures or granting live authority. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_ACCEPTANCE_TEMPLATE_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated acceptance-template JSON as a read-only operator gate. |
