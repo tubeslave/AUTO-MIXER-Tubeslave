@@ -209,6 +209,7 @@ Then update:
 - backend is not in WING mode;
 - any readback comes from cache instead of physical readback;
 - any forbidden request type is sent;
+- backend returns an unexpected response type for the request in flight;
 - `events.jsonl` is missing or does not match `summary.json`;
 - `events.jsonl` is not strict `send`/`recv` pairs;
 - a `query_mixer_parameter` response does not match its request identity;

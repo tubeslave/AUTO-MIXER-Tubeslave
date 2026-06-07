@@ -316,6 +316,67 @@ async def test_readonly_preflight_blocks_when_backend_is_not_wing(
 
 
 @pytest.mark.asyncio
+async def test_readonly_preflight_blocks_unexpected_response_type(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            {"type": "heartbeat", "status": "ok"},
+            {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+    )
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 4
+    assert [request["type"] for request in websocket.sent] == [
+        "get_operator_mode",
+        "get_state",
+    ]
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "unexpected_response_type"
+    assert summary["unexpected_response"] == {
+        "request_type": "get_state",
+        "expected_types": ["state_update"],
+        "actual_type": "heartbeat",
+        "payload": {"type": "heartbeat", "status": "ok"},
+    }
+    assert summary["sent_request_types"] == ["get_operator_mode", "get_state"]
+    assert [event["event_type"] for event in read_events(summary)] == [
+        "send",
+        "recv",
+        "send",
+        "recv",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_readonly_preflight_blocks_missing_physical_readback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -639,6 +700,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert "physical_readback_missing" in written["fail_closed_conditions"]
     assert "readback_request_id_mismatch" in written["fail_closed_conditions"]
     assert "expected_plan_missing_or_mismatch" in written["fail_closed_conditions"]
+    assert "unexpected_response_type" in written["fail_closed_conditions"]
     assert "manual_review_decision_missing_or_invalid" in written["fail_closed_conditions"]
     assert not list(tmp_path.glob("*/summary.json"))
 

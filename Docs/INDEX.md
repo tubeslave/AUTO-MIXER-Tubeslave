@@ -50,6 +50,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REQUEST_ID_CORRELATION_GATE_20260607.md` | Read-only preflight runner, backend responses, and evidence intake require request-id correlation for each queried WING readback. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EXPECTED_PLAN_GATE_20260607.md` | Real read-only preflight capture validates against the offline plan before WebSocket and records a plan SHA256 in proof artifacts. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REQUIRE_EXPECTED_PLAN_20260607.md` | Real read-only preflight capture fails closed before WebSocket when `--expected-plan` is omitted. |
+| `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_UNEXPECTED_RESPONSE_GATE_20260607.md` | Real read-only preflight capture fails closed when backend returns an unexpected response type for the request in flight. |
 | `Docs/reports/AUTOMIXER_WING_MVP_DIRECTION_GUARD_SELF_REPORT_FILTER_20260607.md` | Direction guard drift scoring ignores its own policy warnings and generated evidence tables while preserving real drift detection. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_DECISION_GATED_PROOF_PLAN_20260607.md` | Next supervised fader/gain proof steps stay blocked until an accepted read-only preflight review decision exists. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_READINESS_BRIDGE_20260606.md` | Read-only preflight evidence overlay inside autonomy promotion readiness; manual review candidate only. |

@@ -404,6 +404,7 @@ WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS = (
     "readback_request_id_mismatch",
     "expected_plan_missing_or_mismatch",
     "forbidden_request_type_sent",
+    "unexpected_response_type",
     "event_log_missing_or_invalid",
     "manual_review_decision_missing_or_invalid",
 )

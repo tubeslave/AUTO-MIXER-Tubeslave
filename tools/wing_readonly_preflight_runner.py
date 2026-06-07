@@ -14,7 +14,6 @@ import asyncio
 import hashlib
 import json
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
@@ -92,6 +91,23 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "fail_closed_conditions",
     "next_step",
 )
+
+
+class UnexpectedResponseError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        request: Dict[str, Any],
+        expected_types: Iterable[str],
+        payload: Dict[str, Any],
+    ):
+        self.request = request
+        self.expected_types = tuple(sorted(set(expected_types)))
+        self.payload = payload
+        super().__init__(
+            "Unexpected response while waiting for "
+            f"{self.expected_types} after {request.get('type')}: {payload.get('type')}"
+        )
 
 
 def utc_stamp() -> str:
@@ -214,19 +230,19 @@ async def send_and_wait(
     expected = set(expected_types)
     recorder.record("send", request)
     await ws.send(json.dumps(request))
-    deadline = time.monotonic() + timeout
-    while True:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError(f"Timed out waiting for {sorted(expected)} after {request.get('type')}")
-        raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
-        try:
-            payload = json.loads(raw)
-        except json.JSONDecodeError:
-            payload = {"type": "invalid_json", "raw": raw}
-        recorder.record("recv", payload)
-        if payload.get("type") in expected:
-            return payload
+    raw = await asyncio.wait_for(ws.recv(), timeout=timeout)
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        payload = {"type": "invalid_json", "raw": raw}
+    recorder.record("recv", payload)
+    if payload.get("type") not in expected:
+        raise UnexpectedResponseError(
+            request=request,
+            expected_types=expected,
+            payload=payload,
+        )
+    return payload
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -397,6 +413,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
             "readback_request_id_mismatch",
             "expected_plan_missing_or_mismatch",
             "forbidden_request_type_sent",
+            "unexpected_response_type",
             "event_log_missing_or_invalid",
             "manual_review_decision_missing_or_invalid",
         ],
@@ -621,6 +638,22 @@ async def run(args: argparse.Namespace) -> int:
             recorder.write_summary(summary)
             print(json.dumps(summary, indent=2, sort_keys=True))
             return 0 if status == "passed" else 4
+    except UnexpectedResponseError as exc:
+        summary.update(
+            {
+                "status": "blocked",
+                "reason": "unexpected_response_type",
+                "unexpected_response": {
+                    "request_type": exc.request.get("type"),
+                    "expected_types": list(exc.expected_types),
+                    "actual_type": exc.payload.get("type"),
+                    "payload": exc.payload,
+                },
+            }
+        )
+        recorder.write_summary(summary)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 4
     except Exception as exc:
         summary.update(
             {
