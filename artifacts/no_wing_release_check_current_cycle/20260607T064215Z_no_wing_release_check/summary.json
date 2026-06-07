@@ -1,0 +1,43 @@
+{
+  "connection_policy": "no_hardware_no_network_no_live_writes",
+  "failed_checks": [
+    "write_surface_static_scan"
+  ],
+  "generated_at": "2026-06-07T06:42:15Z",
+  "live_write": false,
+  "results": [
+    {
+      "command": null,
+      "cwd": null,
+      "detail": {
+        "host": "127.0.0.1",
+        "listener_detected": false,
+        "policy": "port_must_not_have_unexpected_listener",
+        "port": 8765
+      },
+      "duration_sec": 0.0,
+      "finished_at": "2026-06-07T06:42:15Z",
+      "name": "backend_port_free",
+      "returncode": null,
+      "started_at": "2026-06-07T06:42:15Z",
+      "status": "passed",
+      "stderr_log": null,
+      "stdout_log": null
+    },
+    {
+      "command": "/opt/homebrew/opt/python@3.14/bin/python3.14 -m pytest tests/test_write_surface_inventory_static_scan.py -q --tb=short",
+      "cwd": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+      "detail": null,
+      "duration_sec": 0.601,
+      "finished_at": "2026-06-07T06:42:16Z",
+      "name": "write_surface_static_scan",
+      "returncode": 1,
+      "started_at": "2026-06-07T06:42:15Z",
+      "status": "failed",
+      "stderr_log": "artifacts/no_wing_release_check_current_cycle/20260607T064215Z_no_wing_release_check/logs/write_surface_static_scan.stderr.log",
+      "stdout_log": "artifacts/no_wing_release_check_current_cycle/20260607T064215Z_no_wing_release_check/logs/write_surface_static_scan.stdout.log"
+    }
+  ],
+  "status": "failed",
+  "type": "no_wing_release_check"
+}

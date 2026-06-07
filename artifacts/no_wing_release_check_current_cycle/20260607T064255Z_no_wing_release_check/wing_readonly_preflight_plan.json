@@ -1,0 +1,117 @@
+{
+  "allowed_request_types": [
+    "get_operator_mode",
+    "get_state",
+    "query_mixer_parameter"
+  ],
+  "artifact_root": "artifacts/wing_readonly_preflight",
+  "channels": [
+    3
+  ],
+  "contacts_backend": false,
+  "execution_allowed_by_plan": false,
+  "expected_artifacts": [
+    "artifacts/wing_readonly_preflight/<run_id>/summary.json",
+    "artifacts/wing_readonly_preflight/<run_id>/events.jsonl"
+  ],
+  "expected_plan_required_for_real_run": true,
+  "fail_closed_conditions": [
+    "backend_not_in_wing_mode",
+    "event_log_wing_mode_not_proven",
+    "operator_channel_confirmation_mismatch",
+    "operator_session_confirmation_missing",
+    "physical_readback_missing",
+    "readback_identity_mismatch",
+    "readback_request_id_mismatch",
+    "expected_plan_missing_or_mismatch",
+    "existing_backend_connection_boundary_missing",
+    "forbidden_request_type_sent",
+    "unexpected_response_type",
+    "event_log_missing_or_invalid",
+    "manual_review_decision_missing_or_invalid"
+  ],
+  "forbidden_request_types": [
+    "apply_operator_proposal",
+    "connect_wing",
+    "create_operator_proposal",
+    "disconnect_mixer",
+    "disconnect_wing",
+    "emergency_stop",
+    "load_snap",
+    "mute",
+    "reset",
+    "rollback_last_manual_write",
+    "route_output",
+    "save_snap",
+    "set_channel_trim",
+    "set_compressor",
+    "set_eq",
+    "set_fader",
+    "set_fx_mix",
+    "set_fx_model",
+    "set_fx_on",
+    "set_fx_parameter",
+    "set_gain",
+    "set_input_trim",
+    "set_insert",
+    "set_operator_mode",
+    "set_preamp_gain",
+    "set_preamp_trim",
+    "set_trim",
+    "unmute"
+  ],
+  "live_authority_granted": false,
+  "live_write": false,
+  "manual_review_required_before_readiness_update": true,
+  "next_step": "Run without --plan-only only when the intended backend/WING session is ready.",
+  "operator_channel_confirmation_required": true,
+  "operator_confirmed_channels": [
+    3
+  ],
+  "operator_confirmed_session_ready": true,
+  "operator_required": true,
+  "operator_session_confirmation_required": true,
+  "physical_preflight_requires_existing_backend_connection": true,
+  "plan_output": "artifacts/no_wing_release_check_current_cycle/20260607T064255Z_no_wing_release_check/wing_readonly_preflight_plan.json",
+  "post_run_review_commands": [
+    "python3 tools/review_wing_readonly_preflight_artifacts.py --artifact-root artifacts/wing_readonly_preflight --output Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md --decision-template-output artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json",
+    "python3 tools/review_wing_readonly_preflight_decisions.py --artifact-root artifacts/wing_readonly_preflight --decision-root artifacts/wing_readonly_preflight_review_decisions --output Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+  ],
+  "proof_artifact_schema": "wing_readonly_preflight.v1",
+  "proof_runner": "wing_readonly_preflight_runner",
+  "queries_console": false,
+  "read_only": true,
+  "request_id_policy": "required_for_every_query_mixer_parameter_response",
+  "request_sequence": [
+    {
+      "type": "get_operator_mode"
+    },
+    {
+      "type": "get_state"
+    },
+    {
+      "address": "/ch/3/fdr",
+      "channel": 3,
+      "request_id": "wing-readonly-preflight:ch3:fader",
+      "type": "query_mixer_parameter",
+      "value_type": "fader"
+    },
+    {
+      "address": "/ch/3/in/set/trim",
+      "channel": 3,
+      "request_id": "wing-readonly-preflight:ch3:gain",
+      "type": "query_mixer_parameter",
+      "value_type": "gain"
+    }
+  ],
+  "require_physical_readback": true,
+  "selected_mvp_blocker": "WING read-only connection proof",
+  "selected_mvp_blocker_status": "tooling_ready_waits_real_wing",
+  "status": "ready_for_operator_review",
+  "type": "wing_readonly_preflight_offline_plan",
+  "url": "ws://localhost:8765",
+  "value_types": [
+    "fader",
+    "gain"
+  ]
+}
