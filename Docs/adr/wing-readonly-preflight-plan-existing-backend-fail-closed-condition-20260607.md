@@ -42,10 +42,13 @@ runner command shape was unnecessary and riskier.
 - Update `tools/no_wing_release_check.py` required plan fail-closed conditions.
 - Update `tests/test_no_wing_release_check.py` to prove valid plans include the
   condition and unsafe plans fail when it is missing.
+- Preserve fail-closed evidence consistency by surfacing forbidden event-log
+  sends as summary-level forbidden-request violations.
 
 ## Test plan
 
 - `PYTHONPATH=backend python3 -m pytest -q tests/test_no_wing_release_check.py tests/test_wing_readonly_preflight_runner.py`
+- `PYTHONPATH=backend python3 -m pytest -q tests/test_wing_readonly_preflight_evidence.py`
 - `python3 tools/memory/memory_lint.py`
 
 ## Risks and rollback

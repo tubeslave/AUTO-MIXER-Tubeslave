@@ -554,6 +554,7 @@ def test_file_preflight_artifact_rejects_tampered_event_log_send_types(tmp_path)
     assert "event_log_sent_request_types_mismatch" in evidence["summary"]["violations"]
     assert "event_log_unexpected_sent_request_types" in evidence["summary"]["violations"]
     assert "event_log_forbidden_request_type_sent" in evidence["summary"]["violations"]
+    assert "forbidden_request_types_sent_not_empty" in evidence["summary"]["violations"]
 
 
 def test_file_preflight_evidence_rejects_tampered_event_log_connect_mixer_send(tmp_path):
