@@ -3182,11 +3182,14 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     if not isinstance(fail_closed_conditions, list):
         fail_closed_conditions = []
         violations.append("wing_readonly_preflight_plan_fail_closed_conditions_missing")
+    required_fail_closed = list(WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS)
     for condition in WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS:
         if condition not in fail_closed_conditions:
             violations.append(
                 f"wing_readonly_preflight_plan_fail_closed_condition_{condition}_missing"
             )
+    if fail_closed_conditions != required_fail_closed:
+        violations.append("wing_readonly_preflight_plan_fail_closed_conditions_mismatch")
 
     post_run_review_commands = plan.get("post_run_review_commands")
     expected_post_run_review_commands = [
@@ -3242,6 +3245,9 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         "manual_review_required_before_readiness_update"
     )
     detail["fail_closed_conditions"] = list(fail_closed_conditions)
+    detail["required_fail_closed_conditions"] = list(
+        WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS
+    )
     detail["post_run_review_commands"] = list(post_run_review_commands)
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)

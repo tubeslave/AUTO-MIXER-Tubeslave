@@ -2060,6 +2060,9 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
     assert result.detail["fail_closed_conditions"] == list(
         release_check.WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS
     )
+    assert result.detail["required_fail_closed_conditions"] == list(
+        release_check.WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS
+    )
     assert (
         "existing_backend_connection_boundary_missing"
         in result.detail["fail_closed_conditions"]
@@ -2131,6 +2134,10 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
         in result.detail["violations"]
     )
     assert (
+        "wing_readonly_preflight_plan_fail_closed_conditions_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
         "wing_readonly_preflight_plan_post_run_review_commands_mismatch"
         in result.detail["violations"]
     )
@@ -2140,6 +2147,25 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
     assert "wing_readonly_preflight_plan_unsafe_request_type_present" in result.detail[
         "violations"
     ]
+
+
+def test_no_wing_release_check_rejects_wing_preflight_plan_with_unexpected_fail_closed_condition(
+    tmp_path,
+):
+    plan_path = tmp_path / "extra-fail-closed-plan.json"
+    payload = valid_wing_readonly_preflight_plan_payload(plan_path)
+    payload["fail_closed_conditions"] = list(
+        release_check.WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS
+    ) + ["unexpected_condition"]
+    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_plan_artifact_snapshot(plan_path)
+
+    assert result.status == "failed"
+    assert (
+        "wing_readonly_preflight_plan_fail_closed_conditions_mismatch"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
