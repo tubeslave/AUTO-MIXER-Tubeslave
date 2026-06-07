@@ -851,18 +851,18 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       liveWriteKinds: [],
       pipelineProfiles: [
         `row_count:${Math.trunc(num(projectGoalCapabilitySummary.row_count, 0))}`,
-        `missing_capability_count:${asArray(projectGoalCapabilitySummary.missing_capability_ids).length}`,
-        `blocked_live_count:${asArray(projectGoalCapabilitySummary.blocked_live_capability_ids).length}`,
-        `currently_live_writable_capability_count:${asArray(projectGoalCapabilitySummary.currently_live_writable_capability_ids).length}`,
+        `missing_capability_count:${stringList(projectGoalCapabilitySummary.missing_capability_ids).length}`,
+        `blocked_live_count:${stringList(projectGoalCapabilitySummary.blocked_live_capability_ids).length}`,
+        `currently_live_writable_capability_count:${stringList(projectGoalCapabilitySummary.currently_live_writable_capability_ids).length}`,
         `next_global_step:${str(projectGoalCapabilitySummary.next_global_step, '').slice(0, 96)}`,
       ].filter(Boolean),
-      blockedReason: asArray(projectGoalCapabilitySummary.blocked_live_capability_ids).length > 0
-        ? `Blocked capabilities: ${asArray(projectGoalCapabilitySummary.blocked_live_capability_ids).slice(0, 8).join(', ')}`
+      blockedReason: stringList(projectGoalCapabilitySummary.blocked_live_capability_ids).length > 0
+        ? `Blocked capabilities: ${stringList(projectGoalCapabilitySummary.blocked_live_capability_ids).slice(0, 8).join(', ')}`
         : 'No blocked-live capabilities currently listed by capability-matrix summary.',
       nextStep: str(projectGoalCapabilitySummary.next_global_step, 'Continue roadmap proof and safety work.'),
-      tone: asArray(projectGoalCapabilitySummary.blocked_live_capability_ids).length
+      tone: stringList(projectGoalCapabilitySummary.blocked_live_capability_ids).length
         ? 'red'
-        : asArray(projectGoalCapabilitySummary.missing_capability_ids).length
+        : stringList(projectGoalCapabilitySummary.missing_capability_ids).length
           ? 'yellow'
           : 'blue',
     }]
@@ -884,11 +884,11 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       liveWriteKinds: [],
       pipelineProfiles: [
         `row_count:${Math.trunc(num(progressSummary.row_count, 0))}`,
-        `missing:${asArray(progressSummary.missing_capability_ids).length}`,
-        `blocked_live:${asArray(progressSummary.blocked_live_capability_ids).length}`,
-        `proposal_only:${asArray(progressSummary.proposal_only_capability_ids).length}`,
-        `current_supervised_candidates:${asArray(progressSummary.supervised_narrow_live_candidates).length}`,
-        `goal_areas_with_blockers:${asArray(progressSummary.goal_areas_with_blockers).join(',')}`,
+        `missing:${stringList(progressSummary.missing_capability_ids).length}`,
+        `blocked_live:${stringList(progressSummary.blocked_live_capability_ids).length}`,
+        `proposal_only:${stringList(progressSummary.proposal_only_capability_ids).length}`,
+        `current_supervised_candidates:${stringList(progressSummary.supervised_narrow_live_candidates).length}`,
+        `goal_areas_with_blockers:${stringList(progressSummary.goal_areas_with_blockers).join(',')}`,
         `next_global_step:${str(progressSummary.next_global_step, '').slice(0, 96)}`,
       ].filter(Boolean),
       blockedReason: progressRows.length
@@ -902,9 +902,9 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         const summary = str(progressRow.next_step, 'Next step available in pipeline snapshot.');
         return `${capabilityId} (${area}/${target}): ${summary}`;
       }).filter(Boolean).join(' / ') || str(progressSummary.next_global_step, ''),
-      tone: asArray(progressSummary.blocked_live_capability_ids).length > 0
+      tone: stringList(progressSummary.blocked_live_capability_ids).length > 0
         ? 'red'
-        : asArray(progressSummary.missing_capability_ids).length > 0
+        : stringList(progressSummary.missing_capability_ids).length > 0
           ? 'yellow'
           : 'blue',
     }]

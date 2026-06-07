@@ -3341,6 +3341,117 @@ test('adaptModuleStatusRecords marks stale supervised proof evidence separately 
   assert.match(rows[23].blockedReason, /closure plan is missing/);
 });
 
+test('adaptModuleStatusRecords surfaces project goal capability matrix and progress summary', async () => {
+  const { adaptModuleStatusRecords } = await importTypeScript('services/operatorAdapters.ts');
+
+  const rows = adaptModuleStatusRecords({
+    project_goal_capability_matrix: {
+      status: 'available',
+      rows: [
+        {
+          id: 'cg_vocal_trim',
+          label: 'Safe vocal trim',
+          goal_area: 'input_gain',
+          status: 'limited_available',
+          autonomy_mode_ceiling: 'supervised_live_candidate',
+          currently_live_writable: true,
+          blocker: '',
+          method_ids: ['input_trim', 'noise_gate'],
+          support_paths: ['backend/safegain.py'],
+          current_live_write_kinds: ['gain'],
+          target_console_surfaces: ['channel_strip'],
+          next_step: 'Capture supervised proof for current vocal source.',
+        },
+        {
+          id: 'cg_room_mic_eq',
+          label: 'Room mic equalization',
+          goal_area: 'eq',
+          status: 'blocked',
+          autonomy_mode_ceiling: 'full_autonomous',
+          currently_live_writable: false,
+          blocker: 'No validated eq method available yet.',
+          method_ids: ['eq'],
+          support_paths: ['backend/smart_eq.py', 'backend/eq_router.py'],
+          current_live_write_kinds: ['eq'],
+          target_console_surfaces: ['channel_eq'],
+          next_step: 'Add physical readback-backed method for room mic EQ.',
+        },
+      ],
+      summary: {
+        row_count: 2,
+        missing_capability_ids: ['cg_room_mics'],
+        blocked_live_capability_ids: ['cg_room_mic_eq'],
+        currently_live_writable_capability_ids: ['cg_vocal_trim'],
+        status_counts: {
+          limited_available: 1,
+          blocked: 1,
+        },
+        next_global_step: 'Finish supervised proof work before live rollout.',
+      },
+    },
+    project_goal_capability_progress_snapshot: {
+      status: 'limited_available',
+      next_steps: [
+        {
+          capability_id: 'cg_room_mic_eq',
+          goal_area: 'eq',
+          autonomy_mode_ceiling: 'full_autonomous',
+          next_step: 'Resolve EQ method and proof gap.',
+        },
+      ],
+      summary: {
+        row_count: 1,
+        missing_capability_ids: ['cg_8'],
+        blocked_live_capability_ids: ['cg_room_mic_eq'],
+        proposal_only_capability_ids: ['cg_gate'],
+        supervised_narrow_live_candidates: ['cg_vocal_pan'],
+        goal_areas_with_blockers: ['eq', 'input_gain'],
+        next_global_step: 'Collect proofs in progress order.',
+      },
+    },
+  });
+
+  const capabilityRows = rows.filter((row) => row.domain === 'project_goal_capability' && row.moduleId.startsWith('project_goal_capability:'));
+  const matrixSummary = rows.find((row) => row.moduleId === 'project_goal_capability_summary');
+  const progressSummary = rows.find((row) => row.moduleId === 'project_goal_capability_progress_summary');
+
+  assert.equal(capabilityRows.length, 2);
+  assert.equal(capabilityRows[0].moduleId, 'project_goal_capability:cg_vocal_trim');
+  assert.equal(capabilityRows[0].status, 'limited_available');
+  assert.equal(capabilityRows[0].uiSurface, 'Project goal capability matrix');
+  assert.equal(capabilityRows[0].canWriteLive, true);
+  assert.equal(capabilityRows[0].liveWriteKinds.includes('gain'), true);
+  assert.equal(capabilityRows[0].pipelineProfiles.includes('area:input_gain'), true);
+  assert.equal(capabilityRows[0].pipelineProfiles.includes('blockers:0'), true);
+  assert.equal(capabilityRows[0].pipelineProfiles.includes('target_surfaces:1'), true);
+  assert.equal(capabilityRows[0].pipelineProfiles.includes('methods:2'), true);
+  assert.equal(capabilityRows[0].pipelineProfiles.includes('status:blocked=1'), true);
+
+  const eqRow = rows.find((row) => row.moduleId === 'project_goal_capability:cg_room_mic_eq');
+  assert.equal(eqRow?.status, 'blocked');
+  assert.equal(eqRow?.tone, 'red');
+  assert.equal(eqRow?.canWriteLive, false);
+  assert.equal(eqRow?.pipelineProfiles.includes('blockers:1'), true);
+
+  assert.equal(matrixSummary?.domain, 'project_goal_capability');
+  assert.equal(matrixSummary?.module, 'project_goal_capability_matrix.row_count:2');
+  assert.equal(matrixSummary?.pipelineProfiles.includes('row_count:2'), true);
+  assert.equal(matrixSummary?.pipelineProfiles.includes('blocked_live_count:1'), true);
+  assert.equal(matrixSummary?.pipelineProfiles.includes('missing_capability_count:1'), true);
+  assert.equal(matrixSummary?.tone, 'red');
+  assert.equal(matrixSummary?.status, 'available');
+
+  assert.equal(progressSummary?.domain, 'project_goal_capability');
+  assert.equal(progressSummary?.status, 'limited_available');
+  assert.equal(progressSummary?.module, 'project_goal_progress_snapshot.row_count:1');
+  assert.equal(progressSummary?.pipelineProfiles.includes('blocked_live:1'), true);
+  assert.equal(progressSummary?.pipelineProfiles.includes('proposal_only:1'), true);
+  assert.equal(progressSummary?.pipelineProfiles.includes('current_supervised_candidates:1'), true);
+  assert.equal(progressSummary?.pipelineProfiles.includes('goal_areas_with_blockers:eq,input_gain'), true);
+  assert.equal(progressSummary?.tone, 'red');
+  assert.equal(progressSummary?.nextStep.includes('cg_room_mic_eq (eq/full_autonomous): Resolve EQ method and proof gap.'), true);
+});
+
 test('Settings bottom section grid has one column per read-only section card', async () => {
   const source = await fs.readFile(path.join(srcRoot, 'views/SettingsView.tsx'), 'utf8');
   const sectionTitles = [
