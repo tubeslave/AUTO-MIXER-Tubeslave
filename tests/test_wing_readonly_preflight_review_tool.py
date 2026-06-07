@@ -179,6 +179,10 @@ def _write_artifact(run_dir: Path, *, tamper_events: bool = False) -> Path:
     return summary_path
 
 
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: Path):
     summary_path = _write_artifact(tmp_path / "preflight" / "run")
 
@@ -199,7 +203,9 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
         "artifact_source_id",
         "run_id",
         "summary_path",
+        "summary_sha256",
         "events_path",
+        "events_sha256",
         "decision",
         "reviewed_by",
         "reviewed_at",
@@ -220,7 +226,9 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "status": "valid_readonly_preflight_artifact",
             "run_id": "20260606T120000Z_wing_readonly_preflight",
             "summary_path": str(summary_path),
+            "summary_sha256": _sha256_file(summary_path),
             "events_path": str(summary_path.parent / "events.jsonl"),
+            "events_sha256": _sha256_file(summary_path.parent / "events.jsonl"),
             "channels": [3],
             "operator_confirmed_channels": [3],
             "operator_session_confirmation_required": True,
@@ -235,7 +243,9 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     markdown = review_tool.render_markdown(report)
     assert "candidate_ready_for_manual_review" in markdown
     assert f"summary_path: `{summary_path}`" in markdown
+    assert f"summary_sha256: `{_sha256_file(summary_path)}`" in markdown
     assert f"events_path: `{summary_path.parent / 'events.jsonl'}`" in markdown
+    assert f"events_sha256: `{_sha256_file(summary_path.parent / 'events.jsonl')}`" in markdown
     assert "operator_confirmed_channels: `[3]`" in markdown
     assert "operator_session_confirmation_required: `true`" in markdown
     assert "operator_confirmed_session_ready: `true`" in markdown
@@ -267,7 +277,9 @@ def test_review_decision_template_links_clean_candidate_but_requires_operator_ed
     assert template["artifact_source_id"] == str(summary_path)
     assert template["run_id"] == "20260606T120000Z_wing_readonly_preflight"
     assert template["summary_path"] == str(summary_path)
+    assert template["summary_sha256"] == _sha256_file(summary_path)
     assert template["events_path"] == str(summary_path.parent / "events.jsonl")
+    assert template["events_sha256"] == _sha256_file(summary_path.parent / "events.jsonl")
     assert template["decision"] == "pending_operator_decision"
     assert template["reviewed_by"] == ""
     assert template["reviewed_at"] == ""

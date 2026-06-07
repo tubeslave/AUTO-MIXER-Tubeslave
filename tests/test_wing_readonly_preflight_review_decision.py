@@ -67,7 +67,9 @@ def _valid_summary() -> dict:
             },
         ],
         "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
+        "summary_sha256": "1" * 64,
         "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
+        "events_sha256": "2" * 64,
     }
 
 
@@ -84,7 +86,9 @@ def _accepted_record(**overrides) -> dict:
         "artifact_source_id": "inline_payload_0",
         "run_id": "20260606T120000Z_wing_readonly_preflight",
         "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
+        "summary_sha256": "1" * 64,
         "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
+        "events_sha256": "2" * 64,
         "decision": "accepted",
         "reviewed_by": "operator",
         "reviewed_at": "2026-06-07T01:05:00Z",
@@ -272,6 +276,24 @@ def test_review_decision_ledger_rejects_unsafe_or_unmatched_decision():
     assert "review_decision_checklist_ids_mismatch" in violations
     assert "review_decision_unsafe_authority_claim" in violations
     assert ledger["records"][0]["unsafe_authority_flags"] == ["live_authority_granted"]
+
+
+def test_review_decision_ledger_rejects_stale_artifact_hashes():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[
+            _accepted_record(
+                summary_sha256="3" * 64,
+                events_sha256="4" * 64,
+            )
+        ],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["invalid_record_count"] == 1
+    violations = set(ledger["records"][0]["violations"])
+    assert "review_decision_summary_sha256_mismatch" in violations
+    assert "review_decision_events_sha256_mismatch" in violations
 
 
 def test_review_decision_ledger_rejects_non_utc_timestamp():

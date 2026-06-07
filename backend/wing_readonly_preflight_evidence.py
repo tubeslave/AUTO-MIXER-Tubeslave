@@ -101,7 +101,9 @@ class WingReadonlyPreflightArtifactRecord:
     accepted_as_readonly_preflight_candidate: bool
     run_id: str | None
     summary_path: str | None
+    summary_sha256: str | None
     events_path: str | None
+    events_sha256: str | None
     connection_mode: str | None
     readback_count: int
     physical_readback_count: int
@@ -223,6 +225,13 @@ def _summary_event_path(payload: Mapping[str, Any], summary_path: Path) -> Path 
     if cwd_candidate.exists():
         return cwd_candidate
     return summary_path.parent / event_path
+
+
+def _event_log_sha256(payload: Mapping[str, Any], summary_path: Path) -> str | None:
+    event_path = _summary_event_path(payload, summary_path)
+    if event_path is None or not event_path.exists():
+        return None
+    return _sha256_file(event_path)
 
 
 def _summary_expected_plan_path(
@@ -608,7 +617,17 @@ def validate_wing_readonly_preflight_artifact(
         "evidence": {
             "run_id": payload.get("run_id"),
             "summary_path": payload.get("summary_path"),
+            "summary_sha256": (
+                payload.get("summary_sha256")
+                if isinstance(payload.get("summary_sha256"), str)
+                else None
+            ),
             "events_path": payload.get("events_path"),
+            "events_sha256": (
+                payload.get("events_sha256")
+                if isinstance(payload.get("events_sha256"), str)
+                else None
+            ),
             "connection_mode": payload.get("connection_mode"),
             "readback_count": readback_count,
             "physical_readback_count": physical_readback_count,
@@ -629,6 +648,9 @@ def validate_wing_readonly_preflight_artifact(
 def _record_from_validation(
     source_id: str,
     validation: Mapping[str, Any],
+    *,
+    summary_sha256: str | None = None,
+    events_sha256: str | None = None,
 ) -> WingReadonlyPreflightArtifactRecord:
     evidence = _mapping(validation.get("evidence"))
     return WingReadonlyPreflightArtifactRecord(
@@ -639,7 +661,11 @@ def _record_from_validation(
         ),
         run_id=str(evidence.get("run_id")) if evidence.get("run_id") else None,
         summary_path=str(evidence.get("summary_path")) if evidence.get("summary_path") else None,
+        summary_sha256=summary_sha256
+        or (str(evidence.get("summary_sha256")) if evidence.get("summary_sha256") else None),
         events_path=str(evidence.get("events_path")) if evidence.get("events_path") else None,
+        events_sha256=events_sha256
+        or (str(evidence.get("events_sha256")) if evidence.get("events_sha256") else None),
         connection_mode=str(evidence.get("connection_mode")) if evidence.get("connection_mode") else None,
         readback_count=_safe_int(evidence.get("readback_count")),
         physical_readback_count=_safe_int(evidence.get("physical_readback_count")),
@@ -664,7 +690,9 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         accepted_as_readonly_preflight_candidate=False,
         run_id=None,
         summary_path=None,
+        summary_sha256=None,
         events_path=None,
+        events_sha256=None,
         connection_mode=None,
         readback_count=0,
         physical_readback_count=0,
@@ -692,11 +720,19 @@ def _artifact_records(
     )
     for path in paths:
         try:
+            payload = _load_json_artifact(path)
             validation = validate_wing_readonly_preflight_artifact(
-                _load_json_artifact(path),
+                payload,
                 summary_path=path,
             )
-            records.append(_record_from_validation(str(path), validation))
+            records.append(
+                _record_from_validation(
+                    str(path),
+                    validation,
+                    summary_sha256=_sha256_file(path),
+                    events_sha256=_event_log_sha256(payload, path),
+                )
+            )
         except Exception as exc:  # pragma: no cover - defensive artifact parser
             records.append(_record_from_load_error(str(path), exc))
 

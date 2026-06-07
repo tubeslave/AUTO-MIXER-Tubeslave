@@ -142,7 +142,9 @@ Minimum accepted-decision shape:
   "artifact_source_id": "artifacts/wing_readonly_preflight/<run_id>/summary.json",
   "run_id": "<run_id>",
   "summary_path": "artifacts/wing_readonly_preflight/<run_id>/summary.json",
+  "summary_sha256": "<sha256 of summary.json>",
   "events_path": "artifacts/wing_readonly_preflight/<run_id>/events.jsonl",
+  "events_sha256": "<sha256 of events.jsonl>",
   "decision": "accepted",
   "reviewed_by": "<operator>",
   "reviewed_at": "2026-06-07T00:00:00Z",
@@ -158,11 +160,13 @@ Minimum accepted-decision shape:
 ```
 
 Use `decision: "rejected"` if the operator does not accept the candidate. The
-decision ledger still does not grant live authority or close readiness rows by
-itself. The next supervised fader/gain proof plan remains blocked until a clean
-candidate has exactly one accepted decision record. Duplicate decision records
-for the same candidate, including accepted/rejected conflicts, are invalid and
-must be replaced before the next step.
+`summary_sha256` and `events_sha256` fields must match the current captured
+files; stale decisions for replaced artifacts fail closed. The decision ledger
+still does not grant live authority or close readiness rows by itself. The next
+supervised fader/gain proof plan remains blocked until a clean candidate has
+exactly one accepted decision record. Duplicate decision records for the same
+candidate, including accepted/rejected conflicts, are invalid and must be
+replaced before the next step.
 
 ## Review Command
 

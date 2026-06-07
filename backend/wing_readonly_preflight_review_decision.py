@@ -242,7 +242,9 @@ def _validated_record(
     reviewed_at = _string(record.get("reviewed_at"))
     run_id = _string(record.get("run_id"))
     summary_path = _string(record.get("summary_path"))
+    summary_sha256 = _string(record.get("summary_sha256"))
     events_path = _string(record.get("events_path"))
+    events_sha256 = _string(record.get("events_sha256"))
     checklist_ids = _string_list(record.get("checklist_ids"))
     candidate = _mapping(candidates_by_source.get(artifact_source_id))
     unsafe_flags = _unsafe_flags(record)
@@ -267,8 +269,20 @@ def _validated_record(
             violations.append("review_decision_run_id_mismatch")
         if summary_path != candidate.get("summary_path"):
             violations.append("review_decision_summary_path_mismatch")
+        candidate_summary_sha256 = _string(candidate.get("summary_sha256"))
+        if candidate_summary_sha256:
+            if not summary_sha256:
+                violations.append("review_decision_summary_sha256_missing")
+            elif summary_sha256 != candidate_summary_sha256:
+                violations.append("review_decision_summary_sha256_mismatch")
         if events_path != candidate.get("events_path"):
             violations.append("review_decision_events_path_mismatch")
+        candidate_events_sha256 = _string(candidate.get("events_sha256"))
+        if candidate_events_sha256:
+            if not events_sha256:
+                violations.append("review_decision_events_sha256_missing")
+            elif events_sha256 != candidate_events_sha256:
+                violations.append("review_decision_events_sha256_mismatch")
     if unsafe_flags:
         violations.append("review_decision_unsafe_authority_claim")
 
@@ -278,7 +292,9 @@ def _validated_record(
         "artifact_source_id": artifact_source_id,
         "run_id": run_id,
         "summary_path": summary_path,
+        "summary_sha256": summary_sha256,
         "events_path": events_path,
+        "events_sha256": events_sha256,
         "decision": decision if decision in REVIEW_DECISIONS else "invalid",
         "reviewed_by": reviewed_by,
         "reviewed_at": reviewed_at,

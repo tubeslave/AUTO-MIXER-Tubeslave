@@ -179,13 +179,20 @@ def _write_artifact(run_dir: Path) -> Path:
     return summary_path
 
 
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def _decision_record(summary_path: Path, **overrides) -> dict:
+    events_path = summary_path.parent / "events.jsonl"
     record = {
         "review_id": "review-wing-readonly-1",
         "artifact_source_id": str(summary_path),
         "run_id": "20260606T120000Z_wing_readonly_preflight",
         "summary_path": str(summary_path),
-        "events_path": str(summary_path.parent / "events.jsonl"),
+        "summary_sha256": _sha256_file(summary_path),
+        "events_path": str(events_path),
+        "events_sha256": _sha256_file(events_path),
         "decision": "accepted",
         "reviewed_by": "operator",
         "reviewed_at": "2026-06-07T01:05:00Z",

@@ -41,7 +41,9 @@ REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
     "artifact_source_id",
     "run_id",
     "summary_path",
+    "summary_sha256",
     "events_path",
+    "events_sha256",
     "decision",
     "reviewed_by",
     "reviewed_at",
@@ -105,7 +107,9 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                 "status": item.get("status"),
                 "run_id": item.get("run_id"),
                 "summary_path": item.get("summary_path"),
+                "summary_sha256": item.get("summary_sha256"),
                 "events_path": item.get("events_path"),
+                "events_sha256": item.get("events_sha256"),
                 "channels": item.get("channels") if isinstance(item.get("channels"), list) else [],
                 "operator_confirmed_channels": (
                     item.get("operator_confirmed_channels")
@@ -169,8 +173,17 @@ def build_review_decision_template(
     source_id = str(candidate.get("source_id") or "")
     run_id = str(candidate.get("run_id") or "")
     summary_path = str(candidate.get("summary_path") or "")
+    summary_sha256 = str(candidate.get("summary_sha256") or "")
     events_path = str(candidate.get("events_path") or "")
-    if not source_id or not run_id or not summary_path or not events_path:
+    events_sha256 = str(candidate.get("events_sha256") or "")
+    if (
+        not source_id
+        or not run_id
+        or not summary_path
+        or not summary_sha256
+        or not events_path
+        or not events_sha256
+    ):
         raise ValueError("decision_template_candidate_identity_incomplete")
     template = {
         "template_status": REVIEW_DECISION_TEMPLATE_STATUS,
@@ -179,7 +192,9 @@ def build_review_decision_template(
         "artifact_source_id": source_id,
         "run_id": run_id,
         "summary_path": summary_path,
+        "summary_sha256": summary_sha256,
         "events_path": events_path,
+        "events_sha256": events_sha256,
         "decision": "pending_operator_decision",
         "reviewed_by": "",
         "reviewed_at": "",
@@ -354,7 +369,9 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"  - status: `{row.get('status')}`",
                     f"  - run_id: `{row.get('run_id')}`",
                     f"  - summary_path: `{row.get('summary_path')}`",
+                    f"  - summary_sha256: `{row.get('summary_sha256')}`",
                     f"  - events_path: `{row.get('events_path')}`",
+                    f"  - events_sha256: `{row.get('events_sha256')}`",
                     f"  - channels: `{json.dumps(row.get('channels') or [])}`",
                     "  - operator_confirmed_channels: "
                     f"`{json.dumps(row.get('operator_confirmed_channels') or [])}`",

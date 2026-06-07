@@ -40,6 +40,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_OPERATOR_CONFIRMATION_20260607.md` | Physical readback preflight artifacts must include operator-confirmed channels matching the queried channels. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_SESSION_CONFIRMATION_GATE_20260607.md` | Physical readback preflight artifacts must include explicit operator confirmation that the intended backend/WING session is ready for read-only inspection. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_SESSION_READY_REVIEW_CHECKLIST_20260607.md` | Operator review decisions must explicitly confirm the intended backend/WING session was ready before the read-only preflight candidate can gate supervised proof planning. |
+| `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_DECISION_ARTIFACT_HASH_BINDING_20260607.md` | Operator review decisions pin the exact summary/event-log artifact bytes through SHA256 before they can gate supervised proof planning. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_RELEASE_GATE_20260607.md` | No-WING release summaries expose the preflight capture/review commands and fail closed if either tool is missing. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_MANUAL_REVIEW_CHECKLIST_20260607.md` | Offline artifact review exposes a required operator checklist before readiness updates. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_20260607.md` | Operator review decisions are file-backed, validated, and still do not grant live authority. |
