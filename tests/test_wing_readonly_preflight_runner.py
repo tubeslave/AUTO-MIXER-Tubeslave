@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import json
 from pathlib import Path
@@ -41,6 +42,11 @@ class FakeWebSocketConnect:
 
     async def __aexit__(self, exc_type, exc, tb) -> bool:
         return False
+
+
+class TimeoutWebSocket(FakeWebSocket):
+    async def recv(self) -> str:
+        raise asyncio.TimeoutError()
 
 
 def patch_websocket_connect(monkeypatch: pytest.MonkeyPatch, websocket: FakeWebSocket) -> None:
@@ -396,6 +402,55 @@ async def test_readonly_preflight_blocks_unexpected_response_type(
 
 
 @pytest.mark.asyncio
+async def test_readonly_preflight_writes_fail_closed_timeout_artifact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = TimeoutWebSocket([])
+    patch_websocket_connect(monkeypatch, websocket)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 1
+    assert [request["type"] for request in websocket.sent] == ["get_operator_mode"]
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "read_only_preflight_timeout"
+    assert summary["fail_closed"] is True
+    assert summary["blockers"] == ["transport_timeout_or_connection_loss"]
+    assert summary["timeout_sec"] == 0.2
+    assert summary["transport_failure"]["type"] == "TimeoutError"
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
+    assert summary["sent_request_types"] == ["get_operator_mode"]
+    assert [event["event_type"] for event in read_events(summary)] == ["send"]
+
+
+@pytest.mark.asyncio
 async def test_readonly_preflight_blocks_missing_physical_readback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -731,6 +786,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     ]
     assert "physical_readback_missing" in written["fail_closed_conditions"]
     assert "event_log_wing_mode_not_proven" in written["fail_closed_conditions"]
+    assert "transport_timeout_or_connection_loss" in written["fail_closed_conditions"]
     assert "operator_session_confirmation_missing" in written["fail_closed_conditions"]
     assert "readback_request_id_mismatch" in written["fail_closed_conditions"]
     assert "expected_plan_missing_or_mismatch" in written["fail_closed_conditions"]

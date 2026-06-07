@@ -2119,6 +2119,10 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
         in result.detail["violations"]
     )
     assert (
+        "wing_readonly_preflight_plan_fail_closed_condition_transport_timeout_or_connection_loss_missing"
+        in result.detail["violations"]
+    )
+    assert (
         "wing_readonly_preflight_plan_post_run_review_commands_mismatch"
         in result.detail["violations"]
     )

@@ -241,6 +241,7 @@ Then update:
 - `--operator-confirm-session-ready` is missing for a physical read-only
   preflight;
 - backend returns an unexpected response type for the request in flight;
+- backend transport times out or the WebSocket connection is lost;
 - `events.jsonl` is missing or does not match `summary.json`;
 - `events.jsonl` is not strict `send`/`recv` pairs;
 - `events.jsonl` does not prove WING mode from both `operator_mode_status` and

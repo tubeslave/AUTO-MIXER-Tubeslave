@@ -428,6 +428,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "fail_closed_conditions": [
             "backend_not_in_wing_mode",
             "event_log_wing_mode_not_proven",
+            "transport_timeout_or_connection_loss",
             "operator_channel_confirmation_mismatch",
             "operator_session_confirmation_missing",
             "physical_readback_missing",
@@ -679,11 +680,30 @@ async def run(args: argparse.Namespace) -> int:
         recorder.write_summary(summary)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 4
+    except asyncio.TimeoutError as exc:
+        summary.update(
+            {
+                "status": "blocked",
+                "reason": "read_only_preflight_timeout",
+                "fail_closed": True,
+                "blockers": ["transport_timeout_or_connection_loss"],
+                "timeout_sec": args.timeout,
+                "transport_failure": {
+                    "type": type(exc).__name__,
+                    "message": str(exc),
+                },
+            }
+        )
+        recorder.write_summary(summary)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 1
     except Exception as exc:
         summary.update(
             {
                 "status": "blocked",
                 "reason": "read_only_preflight_transport_error",
+                "fail_closed": True,
+                "blockers": ["transport_timeout_or_connection_loss"],
                 "transport_failure": {"type": type(exc).__name__, "message": str(exc)},
             }
         )
