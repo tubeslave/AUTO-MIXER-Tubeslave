@@ -46,12 +46,18 @@ const MODE_VALUE_ALIASES: Record<string, AutomixerMode> = {
   supervised: 'Supervised',
   'supervised automix': 'Supervised',
   'supervised automix mode': 'Supervised',
+  'supervised auto mix': 'Supervised',
+  supervised_auto_mix: 'Supervised',
+  'supervised_auto_mode': 'Supervised',
+  'supervised auto mode': 'Supervised',
   'supervised mode': 'Supervised',
   auto: 'Auto',
   autonomous: 'Auto',
   'full autonomous': 'Auto',
   'full autonomous mixing': 'Auto',
+  'full autonomous mode': 'Auto',
   'full autonomous mixing mode': 'Auto',
+  full_autonomous_mode: 'Auto',
   'auto mode': 'Auto',
 };
 

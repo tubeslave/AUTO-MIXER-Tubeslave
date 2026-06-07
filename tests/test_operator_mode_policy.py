@@ -30,6 +30,10 @@ def test_goal_language_aliases_normalize_to_stable_backend_modes():
     assert normalize_operator_mode("Supervised AutoMix Mode") == "supervised"
     assert normalize_operator_mode("Full Autonomous Mixing Mode") == "auto"
     assert normalize_operator_mode("autonomous") == "auto"
+    assert normalize_operator_mode("supervised auto mix mode") == "supervised"
+    assert normalize_operator_mode("supervised_auto_mode") == "supervised"
+    assert normalize_operator_mode("full autonomous mode") == "auto"
+    assert normalize_operator_mode("full_autonomous_mode") == "auto"
 
 
 def test_analysis_and_assist_modes_never_apply_to_console():

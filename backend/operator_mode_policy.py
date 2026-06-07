@@ -49,9 +49,11 @@ OPERATOR_MODE_ALIASES = {
     "supervised_automix_mode": MODE_SUPERVISED,
     "supervised_auto_mix": MODE_SUPERVISED,
     "supervised_auto_mix_mode": MODE_SUPERVISED,
+    "supervised_auto_mode": MODE_SUPERVISED,
     MODE_AUTO: MODE_AUTO,
     "autonomous": MODE_AUTO,
     "full_autonomous": MODE_AUTO,
+    "full_autonomous_mode": MODE_AUTO,
     "full_autonomous_mixing": MODE_AUTO,
     "full_autonomous_mixing_mode": MODE_AUTO,
 }
