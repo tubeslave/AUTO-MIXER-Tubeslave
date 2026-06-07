@@ -7,6 +7,7 @@ from backend.project_goal_capability_matrix import (
     get_project_goal_capability,
     iter_project_goal_capabilities,
 )
+from backend.operator_mode_policy import build_operator_mode_status
 
 
 def test_project_goal_matrix_covers_explicit_goal_requirements():
@@ -56,6 +57,34 @@ def test_project_goal_matrix_covers_explicit_goal_requirements():
 
     assert expected <= ids
 
+
+def test_runtime_mode_capability_rows_match_operator_mode_policy():
+    runtime_mode_rows = {
+        "mode_analysis": ("analyze", "analysis", False),
+        "mode_assisted": ("assist", "assisted", False),
+        "mode_supervised_automix": ("supervised", "supervised_narrow", True),
+        "mode_full_autonomous": ("auto", "blocked", False),
+    }
+
+    for row_id, (operator_mode, expected_ceiling, expected_live_apply) in (
+        runtime_mode_rows.items()
+    ):
+        row = get_project_goal_capability(row_id)
+        assert row is not None, row_id
+
+        policy = build_operator_mode_status(
+            mode=operator_mode,
+            connection_mode="offline_fixture",
+            wing_boundary_active=False,
+        )
+
+        assert row.autonomy_mode_ceiling == expected_ceiling
+        assert row.goal_area == "runtime_mode"
+        assert row.project_requirement
+        assert row.current_live_write_kinds == tuple(
+            policy["capabilities"]["allowed_live_write_kinds"]
+        )
+        assert policy["capabilities"]["can_apply_to_console"] is expected_live_apply
 
 def test_project_goal_rows_are_valid_and_reference_registered_methods():
     method_ids = {method.id for method in iter_processing_methods()}
