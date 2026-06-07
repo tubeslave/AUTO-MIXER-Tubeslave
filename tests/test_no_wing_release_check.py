@@ -867,14 +867,9 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "confirm_event_log_readonly_sequence",
             "confirm_no_live_authority",
         ],
-        "forbidden_live_request_types": [
-            "apply_operator_proposal",
-            "rollback_last_manual_write",
-            "emergency_stop",
-            "set_operator_mode",
-            "connect_mixer",
-            "disconnect_mixer",
-        ],
+        "forbidden_live_request_types": list(
+            release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
+        ),
         "blockers_not_closed_by_packet": [
             "wing_readonly_connection_proof",
             "physical_console_readback_proof",
@@ -2120,6 +2115,10 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
         in result.detail["violations"]
     )
     assert (
+        "wing_readonly_preflight_plan_fail_closed_condition_event_log_wing_mode_not_proven_missing"
+        in result.detail["violations"]
+    )
+    assert (
         "wing_readonly_preflight_plan_post_run_review_commands_mismatch"
         in result.detail["violations"]
     )
@@ -2182,6 +2181,12 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         "required_review_checklist_ids"
     ]
     assert "apply_operator_proposal" in result.detail["forbidden_live_request_types"]
+    assert "set_gain" in result.detail["forbidden_live_request_types"]
+    assert "set_eq" in result.detail["forbidden_live_request_types"]
+    assert "route_output" in result.detail["forbidden_live_request_types"]
+    assert result.detail["required_forbidden_live_request_types"] == list(
+        release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
+    )
     assert "physical_console_readback_proof" in result.detail[
         "blockers_not_closed_by_packet"
     ]
@@ -2220,6 +2225,7 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     payload["manual_review_required_before_readiness_update"] = False
     payload["commands"]["preview_readonly_request_plan"].remove("--plan-only")
     payload["blockers_not_closed_by_packet"].remove("physical_console_readback_proof")
+    payload["forbidden_live_request_types"].remove("set_gain")
     packet_path.write_text(json.dumps(payload), encoding="utf-8")
 
     result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
@@ -2251,6 +2257,10 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     ]
     assert (
         "wing_readonly_preflight_handoff_packet_blocker_physical_console_readback_proof_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_forbidden_set_gain_missing"
         in result.detail["violations"]
     )
 

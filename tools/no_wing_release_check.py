@@ -400,8 +400,40 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
     "reviewed_at",
     "checklist_ids",
 )
+WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES = (
+    "create_operator_proposal",
+    "apply_operator_proposal",
+    "rollback_last_manual_write",
+    "emergency_stop",
+    "set_operator_mode",
+    "set_fader",
+    "set_gain",
+    "set_trim",
+    "set_input_trim",
+    "set_channel_trim",
+    "set_preamp_trim",
+    "set_preamp_gain",
+    "set_eq",
+    "set_compressor",
+    "route_output",
+    "load_snap",
+    "save_snap",
+    "reset",
+    "mute",
+    "unmute",
+    "set_insert",
+    "set_fx_model",
+    "set_fx_on",
+    "set_fx_mix",
+    "set_fx_parameter",
+    "connect_wing",
+    "disconnect_wing",
+    "connect_mixer",
+    "disconnect_mixer",
+)
 WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS = (
     "backend_not_in_wing_mode",
+    "event_log_wing_mode_not_proven",
     "operator_channel_confirmation_mismatch",
     "operator_session_confirmation_missing",
     "physical_readback_missing",
@@ -3407,12 +3439,7 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
             violations.append(
                 f"wing_readonly_preflight_handoff_packet_blocker_{required_blocker}_missing"
             )
-    for required_forbidden in (
-        "apply_operator_proposal",
-        "rollback_last_manual_write",
-        "emergency_stop",
-        "set_operator_mode",
-    ):
+    for required_forbidden in WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES:
         if required_forbidden not in forbidden_request_types:
             violations.append(
                 "wing_readonly_preflight_handoff_packet_forbidden_"
@@ -3473,6 +3500,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["required_review_checklist_ids"] = list(required_checklist)
     detail["forbidden_live_request_types"] = list(forbidden_request_types)
+    detail["required_forbidden_live_request_types"] = list(
+        WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
+    )
     detail["blockers_not_closed_by_packet"] = list(blockers)
     detail["operator_sequence_count"] = len(operator_sequence)
     detail["violations"] = violations

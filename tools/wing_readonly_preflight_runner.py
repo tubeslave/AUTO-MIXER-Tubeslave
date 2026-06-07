@@ -427,6 +427,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         ],
         "fail_closed_conditions": [
             "backend_not_in_wing_mode",
+            "event_log_wing_mode_not_proven",
             "operator_channel_confirmation_mismatch",
             "operator_session_confirmation_missing",
             "physical_readback_missing",

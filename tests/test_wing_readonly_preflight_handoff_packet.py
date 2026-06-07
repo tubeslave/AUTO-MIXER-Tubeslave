@@ -76,7 +76,26 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     ]
     assert "confirm_no_live_authority" in packet["required_review_checklist_ids"]
     assert "confirm_operator_session_ready" in packet["required_review_checklist_ids"]
-    assert "apply_operator_proposal" in packet["forbidden_live_request_types"]
+    forbidden_request_types = set(packet["forbidden_live_request_types"])
+    assert "apply_operator_proposal" in forbidden_request_types
+    assert "create_operator_proposal" in forbidden_request_types
+    assert "rollback_last_manual_write" in forbidden_request_types
+    assert "emergency_stop" in forbidden_request_types
+    assert "set_fader" in forbidden_request_types
+    assert "set_gain" in forbidden_request_types
+    assert "set_trim" in forbidden_request_types
+    assert "set_input_trim" in forbidden_request_types
+    assert "set_channel_trim" in forbidden_request_types
+    assert "set_preamp_gain" in forbidden_request_types
+    assert "set_eq" in forbidden_request_types
+    assert "set_compressor" in forbidden_request_types
+    assert "route_output" in forbidden_request_types
+    assert "load_snap" in forbidden_request_types
+    assert "save_snap" in forbidden_request_types
+    assert "reset" in forbidden_request_types
+    assert "mute" in forbidden_request_types
+    assert "unmute" in forbidden_request_types
+    assert "set_fx_parameter" in forbidden_request_types
     assert "wing_readonly_connection_proof" in packet["blockers_not_closed_by_packet"]
 
 
