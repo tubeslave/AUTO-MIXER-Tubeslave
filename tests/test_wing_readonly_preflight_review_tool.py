@@ -352,6 +352,7 @@ def test_review_report_blocks_tampered_event_log(tmp_path: Path):
     assert report["artifact_reviews"][0]["operator_confirmed_channels"] == [3]
     assert report["artifact_reviews"][0]["operator_confirmed_session_ready"] is True
     assert "event_log_forbidden_request_type_sent" in report["violations"]
+    assert "forbidden_request_types_sent_not_empty" in report["violations"]
     assert review_tool.exit_code_for_report(report) == 3
 
 
