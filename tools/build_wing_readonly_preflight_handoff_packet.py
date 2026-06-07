@@ -40,14 +40,9 @@ FOCUSED_VALIDATION_COMMAND = [
 FORBIDDEN_LIVE_REQUEST_TYPES = list(
     no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
 )
-REQUIRED_REVIEW_CHECKLIST_IDS = [
-    "confirm_artifact_paths",
-    "confirm_operator_channel_scope",
-    "confirm_operator_session_ready",
-    "confirm_physical_readbacks",
-    "confirm_event_log_readonly_sequence",
-    "confirm_no_live_authority",
-]
+REQUIRED_REVIEW_CHECKLIST_IDS = list(
+    no_wing_release_check.WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+)
 
 
 def utc_now() -> str:

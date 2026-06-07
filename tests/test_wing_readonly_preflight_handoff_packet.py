@@ -77,6 +77,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     ]
     assert "confirm_no_live_authority" in packet["required_review_checklist_ids"]
     assert "confirm_operator_session_ready" in packet["required_review_checklist_ids"]
+    assert packet["required_review_checklist_ids"] == list(
+        no_wing_release_check.WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+    )
     forbidden_request_types = set(packet["forbidden_live_request_types"])
     assert "apply_operator_proposal" in forbidden_request_types
     assert "create_operator_proposal" in forbidden_request_types
