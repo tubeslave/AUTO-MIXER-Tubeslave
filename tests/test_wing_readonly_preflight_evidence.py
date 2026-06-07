@@ -461,6 +461,7 @@ def test_file_preflight_artifact_requires_matching_event_log(tmp_path):
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert evidence["summary"]["invalid_candidate_count"] == 1
     assert "event_log_missing" in evidence["summary"]["violations"]
+    assert "event_log_missing_or_invalid" in evidence["summary"]["violations"]
 
 
 def test_file_preflight_artifact_requires_existing_expected_plan_file(tmp_path):
