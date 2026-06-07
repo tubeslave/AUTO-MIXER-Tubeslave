@@ -271,11 +271,30 @@ class TestAutoMixerServerConfigNormalization:
             pytest.skip("ai.agent module not available in this test environment")
 
         server = AutoMixerServer()
-        assert server._coerce_agent_mode("analysis").value == AgentMode.SUGGEST.value
-        assert server._coerce_agent_mode("supervised automix mode").value == AgentMode.SUGGEST.value
-        assert server._coerce_agent_mode("full autonomous mixing mode").value == AgentMode.AUTO.value
-        assert server._coerce_agent_mode("manual_mode").value == AgentMode.MANUAL.value
-        assert server._coerce_agent_mode(None).value == AgentMode.AUTO.value
+        checks = [
+            ("analysis", AgentMode.SUGGEST),
+            ("analysis_mode", AgentMode.SUGGEST),
+            ("analysis mode", AgentMode.SUGGEST),
+            ("analysis-mode", AgentMode.SUGGEST),
+            ("assist", AgentMode.SUGGEST),
+            ("assist mode", AgentMode.SUGGEST),
+            ("assisted mode", AgentMode.SUGGEST),
+            ("suggestion", AgentMode.SUGGEST),
+            ("suggest mode", AgentMode.SUGGEST),
+            ("supervised automix mode", AgentMode.SUGGEST),
+            ("supervised_auto_mix", AgentMode.SUGGEST),
+            ("full autonomous mode", AgentMode.AUTO),
+            ("full autonomous mixing mode", AgentMode.AUTO),
+            ("full_autonomous_mode", AgentMode.AUTO),
+            ("auto mode", AgentMode.AUTO),
+            ("manual_mode", AgentMode.MANUAL),
+            ("full manual", AgentMode.MANUAL),
+            ("manual mode", AgentMode.MANUAL),
+            (None, AgentMode.AUTO),
+        ]
+
+        for raw, expected in checks:
+            assert server._coerce_agent_mode(raw).value == expected.value
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
