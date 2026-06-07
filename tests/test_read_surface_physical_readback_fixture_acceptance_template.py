@@ -5,6 +5,9 @@ from backend.read_surface_physical_readback_artifact_review_queue import (
     INTAKE_SPECS,
     build_read_surface_physical_readback_artifact_review_queue,
 )
+from backend.raw_mixer_state_physical_readback_artifact_intake import (
+    build_raw_mixer_state_physical_readback_artifact_intake,
+)
 from backend.read_surface_physical_readback_fixture_acceptance_ledger import (
     build_read_surface_physical_readback_fixture_acceptance_ledger,
 )
@@ -12,6 +15,7 @@ from tests.test_read_surface_physical_readback_artifact_review_queue import (
     _snapshot_for_spec,
     _snapshot_map,
 )
+from tests.test_raw_mixer_state_physical_readback_artifact_intake import _valid_artifact
 from tools import build_read_surface_physical_readback_acceptance_template as template_tool
 
 
@@ -75,6 +79,29 @@ def test_acceptance_template_builds_pending_record_for_valid_candidate():
     assert record["fixture_closure_allowed"] is False
     assert record["live_authority_granted"] is False
     assert record["full_autonomous_ready"] is False
+
+
+def test_acceptance_template_uses_real_intake_latest_candidate_source_id():
+    spec = INTAKE_SPECS[0]
+    intake = build_raw_mixer_state_physical_readback_artifact_intake(
+        artifact_payloads=(_valid_artifact(),),
+        artifact_roots=(),
+    )
+    queue = build_read_surface_physical_readback_artifact_review_queue(
+        intake_snapshots=_snapshot_map(**{spec["method_id"]: intake})
+    )
+    template = template_tool.build_acceptance_template(
+        review_queue=queue,
+        generated_at="2026-06-07T00:00:00Z",
+    )
+
+    assert template["status"] == "operator_acceptance_template_ready"
+    assert template["template_record_count"] == 1
+    record = template["template_records"][0]
+    assert record["surface_id"] == spec["surface_id"]
+    assert record["artifact_source_id"] == "inline_payload_0"
+    assert record["live_authority_granted"] is False
+    assert record["fixture_closure_allowed_by_acceptance"] is False
 
 
 def test_acceptance_template_can_filter_by_surface_id():

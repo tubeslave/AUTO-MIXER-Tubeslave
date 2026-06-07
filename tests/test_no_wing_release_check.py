@@ -1175,6 +1175,7 @@ def valid_read_surface_artifact_review_queue_payload() -> dict:
                 "live_authority_granted": False,
                 "full_autonomous_ready": False,
                 "target_consistency": True,
+                "candidate_source_id_missing": False,
                 "unsafe_authority_flags": [],
                 "artifact_source_ids": [],
                 "blocked_by": [
@@ -1210,6 +1211,7 @@ def valid_read_surface_artifact_review_queue_payload() -> dict:
             "review_candidate_count": 0,
             "missing_artifact_surface_count": len(queue_items),
             "unsafe_authority_claim_count": 0,
+            "candidate_source_id_missing_count": 0,
             "target_inconsistent_surface_count": 0,
             "review_candidate_surface_ids": [],
             "invalid_surface_ids": [],
@@ -1217,6 +1219,7 @@ def valid_read_surface_artifact_review_queue_payload() -> dict:
                 spec["surface_id"] for spec in release_check.INTAKE_SPECS
             ],
             "unsafe_authority_surface_ids": [],
+            "candidate_source_id_missing_surface_ids": [],
             "target_inconsistent_surface_ids": [],
             "operator_review_required": True,
             "physical_fixture_gap_remains": True,
@@ -1685,6 +1688,7 @@ def test_no_wing_release_check_validates_artifact_review_queue_artifact(tmp_path
     assert result.detail["review_candidate_count"] == 0
     assert result.detail["missing_artifact_surface_count"] == len(release_check.INTAKE_SPECS)
     assert result.detail["unsafe_authority_claim_count"] == 0
+    assert result.detail["candidate_source_id_missing_count"] == 0
     assert result.detail["target_inconsistent_surface_count"] == 0
     assert result.detail["operator_review_required"] is True
     assert result.detail["physical_fixture_gap_remains"] is True
@@ -1716,7 +1720,12 @@ def test_no_wing_release_check_rejects_unsafe_artifact_review_queue_artifact(
     payload["summary"]["fixture_closure_allowed_by_queue"] = True
     payload["summary"]["live_authority_granted"] = True
     payload["summary"]["unsafe_authority_claim_count"] = 1
+    payload["summary"]["candidate_source_id_missing_count"] = 1
+    payload["summary"]["candidate_source_id_missing_surface_ids"] = [
+        payload["queue_items"][0]["surface_id"]
+    ]
     payload["queue_items"][0]["unsafe_authority_flags"] = ["live_write"]
+    payload["queue_items"][0]["candidate_source_id_missing"] = True
     payload["queue_items"][0]["fixture_closure_allowed_by_queue"] = True
     payload["queue_items"][0]["live_authority_granted"] = True
     queue_path.write_text(json.dumps(payload), encoding="utf-8")
@@ -1745,6 +1754,9 @@ def test_no_wing_release_check_rejects_unsafe_artifact_review_queue_artifact(
         "violations"
     ]
     assert "artifact_review_queue_artifact_unsafe_authority_claim_present" in result.detail[
+        "violations"
+    ]
+    assert "artifact_review_queue_artifact_candidate_source_id_missing_present" in result.detail[
         "violations"
     ]
 
@@ -3998,6 +4010,7 @@ def test_no_wing_release_check_validates_artifact_review_queue_snapshot():
         "intake_surface_count"
     ]
     assert result.detail["unsafe_authority_claim_count"] == 0
+    assert result.detail["candidate_source_id_missing_count"] == 0
     assert result.detail["target_inconsistent_surface_count"] == 0
     assert result.detail["operator_review_required"] is True
     assert result.detail["physical_fixture_gap_remains"] is True
@@ -9014,11 +9027,13 @@ def test_no_wing_release_check_summary_embeds_artifact_review_queue(tmp_path):
             "review_candidate_count": 1,
             "missing_artifact_surface_count": 9,
             "unsafe_authority_claim_count": 0,
+            "candidate_source_id_missing_count": 0,
             "target_inconsistent_surface_count": 0,
             "review_candidate_surface_ids": ["raw_mixer_state_cache"],
             "invalid_surface_ids": [],
             "missing_artifact_surface_ids": ["user_presets"],
             "unsafe_authority_surface_ids": [],
+            "candidate_source_id_missing_surface_ids": [],
             "target_inconsistent_surface_ids": [],
             "operator_review_required": True,
             "physical_fixture_gap_remains": True,
@@ -9063,6 +9078,7 @@ def test_no_wing_release_check_summary_embeds_artifact_review_queue(tmp_path):
     assert queue["review_candidates_available"] is True
     assert queue["missing_artifact_surface_count"] == 9
     assert queue["unsafe_authority_claim_count"] == 0
+    assert queue["candidate_source_id_missing_count"] == 0
     assert queue["target_inconsistent_surface_count"] == 0
     assert queue["operator_review_required"] is True
     assert queue["physical_fixture_gap_remains"] is True
@@ -9107,6 +9123,7 @@ def test_no_wing_release_check_summary_embeds_artifact_review_queue_artifact(tmp
             "review_candidate_count": 0,
             "missing_artifact_surface_count": len(release_check.INTAKE_SPECS),
             "unsafe_authority_claim_count": 0,
+            "candidate_source_id_missing_count": 0,
             "target_inconsistent_surface_count": 0,
             "review_candidate_surface_ids": [],
             "invalid_surface_ids": [],
@@ -9114,6 +9131,7 @@ def test_no_wing_release_check_summary_embeds_artifact_review_queue_artifact(tmp
                 str(spec["surface_id"]) for spec in release_check.INTAKE_SPECS
             ],
             "unsafe_authority_surface_ids": [],
+            "candidate_source_id_missing_surface_ids": [],
             "target_inconsistent_surface_ids": [],
             "promotion_families_requiring_surface": ["fader", "gain"],
             "queue_item_method_ids": [
@@ -9463,11 +9481,13 @@ def test_no_wing_release_check_summary_embeds_artifact_review_queue_multiple_can
             "review_candidate_count": 2,
             "missing_artifact_surface_count": 8,
             "unsafe_authority_claim_count": 0,
+            "candidate_source_id_missing_count": 0,
             "target_inconsistent_surface_count": 0,
             "review_candidate_surface_ids": ["raw_mixer_state_cache", "dlive_state"],
             "invalid_surface_ids": [],
             "missing_artifact_surface_ids": ["user_presets"],
             "unsafe_authority_surface_ids": [],
+            "candidate_source_id_missing_surface_ids": [],
             "target_inconsistent_surface_ids": [],
             "operator_review_required": True,
             "physical_fixture_gap_remains": True,
@@ -9534,6 +9554,7 @@ def test_no_wing_release_check_artifact_review_queue_summary_normalizes_authorit
             "invalid_candidate_count": 0,
             "review_candidate_count": 1,
             "unsafe_authority_claim_count": 0,
+            "candidate_source_id_missing_count": 0,
             "target_inconsistent_surface_count": 0,
             "fixture_closure_allowed_by_queue": True,
             "live_authority_granted": True,

@@ -198,6 +198,27 @@ def _string_list(value: Any) -> Tuple[str, ...]:
     return tuple(str(item) for item in value if isinstance(item, str) and item)
 
 
+def _artifact_source_ids(
+    summary: Mapping[str, Any],
+    payload: Mapping[str, Any],
+) -> Tuple[str, ...]:
+    sources: list[str] = []
+    sources.extend(_string_list(summary.get("artifact_source_ids")))
+    latest_source = summary.get("latest_valid_candidate_source_id")
+    if isinstance(latest_source, str) and latest_source:
+        sources.append(latest_source)
+    artifacts = payload.get("artifacts") if isinstance(payload.get("artifacts"), list) else []
+    for artifact in artifacts:
+        if not isinstance(artifact, Mapping):
+            continue
+        if artifact.get("accepted_as_physical_fixture_candidate") is not True:
+            continue
+        source_id = artifact.get("source_id")
+        if isinstance(source_id, str) and source_id:
+            sources.append(source_id)
+    return tuple(dict.fromkeys(sources))
+
+
 def _pick_bool(summary: Mapping[str, Any], safety: Mapping[str, Any], key: str) -> bool:
     return summary.get(key) is True or safety.get(key) is True
 
@@ -247,16 +268,26 @@ def _queue_item(spec: Mapping[str, Any], payload: Mapping[str, Any]) -> Dict[str
     source_candidate_claimed = (
         summary.get("accepted_as_physical_fixture_candidate") is True
     )
+    artifact_source_ids = _artifact_source_ids(summary, payload)
+    candidate_source_id_missing = (
+        source_candidate_claimed and valid_candidate_count > 0 and not artifact_source_ids
+    )
     review_candidate = (
         source_candidate_claimed
         and target_consistency
+        and not candidate_source_id_missing
         and valid_candidate_count > 0
         and invalid_candidate_count == 0
         and operator_review_required
         and physical_gap_remains
         and not unsafe_flags
     )
-    if unsafe_flags or invalid_candidate_count or (available and not target_consistency):
+    if (
+        unsafe_flags
+        or invalid_candidate_count
+        or candidate_source_id_missing
+        or (available and not target_consistency)
+    ):
         status = "operator_artifact_replacement_required"
     elif review_candidate:
         status = "operator_review_candidate_available"
@@ -296,8 +327,9 @@ def _queue_item(spec: Mapping[str, Any], payload: Mapping[str, Any]) -> Dict[str
         "live_authority_granted": False,
         "full_autonomous_ready": False,
         "target_consistency": target_consistency,
+        "candidate_source_id_missing": candidate_source_id_missing,
         "unsafe_authority_flags": list(unsafe_flags),
-        "artifact_source_ids": list(_string_list(summary.get("artifact_source_ids"))),
+        "artifact_source_ids": list(artifact_source_ids),
         "blocked_by": list(_string_list(summary.get("blocked_by"))),
         "violations": list(_string_list(summary.get("violations"))),
     }
@@ -322,6 +354,7 @@ def build_read_surface_physical_readback_artifact_review_queue(
         for item in queue_items
         if item["invalid_candidate_count"] > 0
         or item["unsafe_authority_flags"]
+        or item["candidate_source_id_missing"]
         or not item["target_consistency"]
     )
     missing_items = tuple(
@@ -387,6 +420,9 @@ def build_read_surface_physical_readback_artifact_review_queue(
             "unsafe_authority_claim_count": sum(
                 1 for item in queue_items if item["unsafe_authority_flags"]
             ),
+            "candidate_source_id_missing_count": sum(
+                1 for item in queue_items if item["candidate_source_id_missing"]
+            ),
             "target_inconsistent_surface_count": sum(
                 1 for item in queue_items if not item["target_consistency"]
             ),
@@ -397,6 +433,11 @@ def build_read_surface_physical_readback_artifact_review_queue(
             "missing_artifact_surface_ids": [item["surface_id"] for item in missing_items],
             "unsafe_authority_surface_ids": [
                 item["surface_id"] for item in queue_items if item["unsafe_authority_flags"]
+            ],
+            "candidate_source_id_missing_surface_ids": [
+                item["surface_id"]
+                for item in queue_items
+                if item["candidate_source_id_missing"]
             ],
             "target_inconsistent_surface_ids": [
                 item["surface_id"] for item in queue_items if not item["target_consistency"]

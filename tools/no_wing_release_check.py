@@ -3551,6 +3551,7 @@ def validate_read_surface_physical_readback_artifact_review_queue_artifact_snaps
     invalid_candidate_count = summary.get("invalid_candidate_count")
     review_candidate_count = summary.get("review_candidate_count")
     unsafe_authority_claim_count = summary.get("unsafe_authority_claim_count")
+    candidate_source_id_missing_count = summary.get("candidate_source_id_missing_count")
     target_inconsistent_surface_count = summary.get("target_inconsistent_surface_count")
     missing_artifact_surface_count = summary.get("missing_artifact_surface_count")
     expected_intake_count = len(INTAKE_SPECS)
@@ -3577,6 +3578,9 @@ def validate_read_surface_physical_readback_artifact_review_queue_artifact_snaps
     if not isinstance(unsafe_authority_claim_count, int):
         violations.append("artifact_review_queue_artifact_unsafe_count_missing")
         unsafe_authority_claim_count = 0
+    if not isinstance(candidate_source_id_missing_count, int):
+        violations.append("artifact_review_queue_artifact_candidate_source_missing_count_missing")
+        candidate_source_id_missing_count = 0
     if not isinstance(target_inconsistent_surface_count, int):
         violations.append("artifact_review_queue_artifact_target_inconsistent_count_missing")
         target_inconsistent_surface_count = 0
@@ -3589,6 +3593,7 @@ def validate_read_surface_physical_readback_artifact_review_queue_artifact_snaps
     item_invalid_count = 0
     item_review_count = 0
     item_unsafe_count = 0
+    item_candidate_source_missing_count = 0
     item_target_inconsistent_count = 0
     item_missing_count = 0
     item_method_ids: list[str] = []
@@ -3635,6 +3640,14 @@ def validate_read_surface_physical_readback_artifact_review_queue_artifact_snaps
         item_invalid_count += int(item.get("invalid_candidate_count") or 0)
         if item.get("accepted_as_physical_fixture_candidate") is True:
             item_review_count += 1
+            artifact_source_ids = item.get("artifact_source_ids")
+            if not isinstance(artifact_source_ids, list) or not artifact_source_ids:
+                violations.append(
+                    "artifact_review_queue_artifact_item_"
+                    f"{index}_review_candidate_source_ids_missing"
+                )
+        if item.get("candidate_source_id_missing") is True:
+            item_candidate_source_missing_count += 1
         unsafe_flags = item.get("unsafe_authority_flags")
         if isinstance(unsafe_flags, list) and unsafe_flags:
             item_unsafe_count += 1
@@ -3656,6 +3669,10 @@ def validate_read_surface_physical_readback_artifact_review_queue_artifact_snaps
         violations.append("artifact_review_queue_artifact_item_review_count_mismatch")
     if item_unsafe_count != unsafe_authority_claim_count:
         violations.append("artifact_review_queue_artifact_item_unsafe_count_mismatch")
+    if item_candidate_source_missing_count != candidate_source_id_missing_count:
+        violations.append(
+            "artifact_review_queue_artifact_item_candidate_source_missing_count_mismatch"
+        )
     if item_target_inconsistent_count != target_inconsistent_surface_count:
         violations.append(
             "artifact_review_queue_artifact_item_target_inconsistent_count_mismatch"
@@ -3684,6 +3701,8 @@ def validate_read_surface_physical_readback_artifact_review_queue_artifact_snaps
         blocked_by = []
     if unsafe_authority_claim_count:
         violations.append("artifact_review_queue_artifact_unsafe_authority_claim_present")
+    if candidate_source_id_missing_count:
+        violations.append("artifact_review_queue_artifact_candidate_source_id_missing_present")
     if target_inconsistent_surface_count:
         violations.append("artifact_review_queue_artifact_target_inconsistent_surface_present")
     if invalid_candidate_count:
@@ -3710,6 +3729,9 @@ def validate_read_surface_physical_readback_artifact_review_queue_artifact_snaps
     invalid_surface_ids = summary.get("invalid_surface_ids")
     missing_surface_ids = summary.get("missing_artifact_surface_ids")
     unsafe_surface_ids = summary.get("unsafe_authority_surface_ids")
+    candidate_source_missing_surface_ids = summary.get(
+        "candidate_source_id_missing_surface_ids"
+    )
     target_inconsistent_surface_ids = summary.get("target_inconsistent_surface_ids")
     queue_item_method_ids = summary.get("queue_item_method_ids")
     promotion_families = summary.get("promotion_families_requiring_surface")
@@ -3737,6 +3759,7 @@ def validate_read_surface_physical_readback_artifact_review_queue_artifact_snaps
     detail["review_candidate_count"] = review_candidate_count
     detail["missing_artifact_surface_count"] = missing_artifact_surface_count
     detail["unsafe_authority_claim_count"] = unsafe_authority_claim_count
+    detail["candidate_source_id_missing_count"] = candidate_source_id_missing_count
     detail["target_inconsistent_surface_count"] = target_inconsistent_surface_count
     detail["review_candidate_surface_ids"] = (
         list(review_candidate_surface_ids)
@@ -3751,6 +3774,11 @@ def validate_read_surface_physical_readback_artifact_review_queue_artifact_snaps
     )
     detail["unsafe_authority_surface_ids"] = (
         list(unsafe_surface_ids) if isinstance(unsafe_surface_ids, list) else []
+    )
+    detail["candidate_source_id_missing_surface_ids"] = (
+        list(candidate_source_missing_surface_ids)
+        if isinstance(candidate_source_missing_surface_ids, list)
+        else []
     )
     detail["target_inconsistent_surface_ids"] = (
         list(target_inconsistent_surface_ids)
@@ -7740,6 +7768,7 @@ def validate_read_surface_physical_readback_artifact_review_queue_snapshot() -> 
     invalid_candidate_count = summary.get("invalid_candidate_count")
     review_candidate_count = summary.get("review_candidate_count")
     unsafe_claim_count = summary.get("unsafe_authority_claim_count")
+    candidate_source_missing_count = summary.get("candidate_source_id_missing_count")
     target_inconsistent_count = summary.get("target_inconsistent_surface_count")
     missing_surface_count = summary.get("missing_artifact_surface_count")
     if not isinstance(intake_surface_count, int) or intake_surface_count != len(queue_items):
@@ -7763,6 +7792,9 @@ def validate_read_surface_physical_readback_artifact_review_queue_snapshot() -> 
     if not isinstance(unsafe_claim_count, int):
         violations.append("artifact_review_queue_unsafe_claim_count_missing")
         unsafe_claim_count = 0
+    if not isinstance(candidate_source_missing_count, int):
+        violations.append("artifact_review_queue_candidate_source_missing_count_missing")
+        candidate_source_missing_count = 0
     if not isinstance(target_inconsistent_count, int):
         violations.append("artifact_review_queue_target_inconsistent_count_missing")
         target_inconsistent_count = 0
@@ -7773,6 +7805,8 @@ def validate_read_surface_physical_readback_artifact_review_queue_snapshot() -> 
         violations.append("artifact_review_queue_invalid_candidate_present")
     if unsafe_claim_count:
         violations.append("artifact_review_queue_unsafe_authority_claim_present")
+    if candidate_source_missing_count:
+        violations.append("artifact_review_queue_candidate_source_id_missing_present")
     if target_inconsistent_count:
         violations.append("artifact_review_queue_target_inconsistent_surface_present")
 
@@ -7791,6 +7825,9 @@ def validate_read_surface_physical_readback_artifact_review_queue_snapshot() -> 
     invalid_surface_ids = summary.get("invalid_surface_ids")
     missing_surface_ids = summary.get("missing_artifact_surface_ids")
     unsafe_surface_ids = summary.get("unsafe_authority_surface_ids")
+    candidate_source_missing_surface_ids = summary.get(
+        "candidate_source_id_missing_surface_ids"
+    )
     target_inconsistent_surface_ids = summary.get("target_inconsistent_surface_ids")
     blocked_by = summary.get("blocked_by")
     promotion_families = summary.get("promotion_families_requiring_surface")
@@ -7803,6 +7840,7 @@ def validate_read_surface_physical_readback_artifact_review_queue_snapshot() -> 
     detail["review_candidate_count"] = review_candidate_count
     detail["missing_artifact_surface_count"] = missing_surface_count
     detail["unsafe_authority_claim_count"] = unsafe_claim_count
+    detail["candidate_source_id_missing_count"] = candidate_source_missing_count
     detail["target_inconsistent_surface_count"] = target_inconsistent_count
     detail["review_candidate_surface_ids"] = (
         list(review_candidate_surface_ids)
@@ -7817,6 +7855,11 @@ def validate_read_surface_physical_readback_artifact_review_queue_snapshot() -> 
     )
     detail["unsafe_authority_surface_ids"] = (
         list(unsafe_surface_ids) if isinstance(unsafe_surface_ids, list) else []
+    )
+    detail["candidate_source_id_missing_surface_ids"] = (
+        list(candidate_source_missing_surface_ids)
+        if isinstance(candidate_source_missing_surface_ids, list)
+        else []
     )
     detail["target_inconsistent_surface_ids"] = (
         list(target_inconsistent_surface_ids)
@@ -11467,6 +11510,9 @@ def read_surface_physical_readback_artifact_review_queue_summary(
         invalid_surface_ids = detail.get("invalid_surface_ids")
         missing_surface_ids = detail.get("missing_artifact_surface_ids")
         unsafe_surface_ids = detail.get("unsafe_authority_surface_ids")
+        candidate_source_missing_surface_ids = detail.get(
+            "candidate_source_id_missing_surface_ids"
+        )
         target_inconsistent_surface_ids = detail.get("target_inconsistent_surface_ids")
         queue_item_method_ids = detail.get("queue_item_method_ids")
         violations = detail.get("violations")
@@ -11478,12 +11524,16 @@ def read_surface_physical_readback_artifact_review_queue_summary(
         review_candidate_count = int(detail.get("review_candidate_count") or 0)
         invalid_candidate_count = int(detail.get("invalid_candidate_count") or 0)
         unsafe_claim_count = int(detail.get("unsafe_authority_claim_count") or 0)
+        candidate_source_missing_count = int(
+            detail.get("candidate_source_id_missing_count") or 0
+        )
         target_inconsistent_count = int(detail.get("target_inconsistent_surface_count") or 0)
         review_candidates_available = (
             result.status == "passed"
             and review_candidate_count > 0
             and invalid_candidate_count == 0
             and unsafe_claim_count == 0
+            and candidate_source_missing_count == 0
             and target_inconsistent_count == 0
             and not unsafe_claimed
         )
@@ -11512,6 +11562,7 @@ def read_surface_physical_readback_artifact_review_queue_summary(
                 detail.get("missing_artifact_surface_count") or 0
             ),
             "unsafe_authority_claim_count": unsafe_claim_count,
+            "candidate_source_id_missing_count": candidate_source_missing_count,
             "target_inconsistent_surface_count": target_inconsistent_count,
             "review_candidate_surface_ids": (
                 list(review_candidate_surface_ids)
@@ -11526,6 +11577,11 @@ def read_surface_physical_readback_artifact_review_queue_summary(
             ),
             "unsafe_authority_surface_ids": (
                 list(unsafe_surface_ids) if isinstance(unsafe_surface_ids, list) else []
+            ),
+            "candidate_source_id_missing_surface_ids": (
+                list(candidate_source_missing_surface_ids)
+                if isinstance(candidate_source_missing_surface_ids, list)
+                else []
             ),
             "target_inconsistent_surface_ids": (
                 list(target_inconsistent_surface_ids)
@@ -11564,6 +11620,9 @@ def read_surface_physical_readback_artifact_review_queue_artifact_summary(
         invalid_surface_ids = detail.get("invalid_surface_ids")
         missing_surface_ids = detail.get("missing_artifact_surface_ids")
         unsafe_surface_ids = detail.get("unsafe_authority_surface_ids")
+        candidate_source_missing_surface_ids = detail.get(
+            "candidate_source_id_missing_surface_ids"
+        )
         target_inconsistent_surface_ids = detail.get("target_inconsistent_surface_ids")
         queue_item_method_ids = detail.get("queue_item_method_ids")
         focused_validation = detail.get("focused_validation")
@@ -11576,6 +11635,9 @@ def read_surface_physical_readback_artifact_review_queue_artifact_summary(
         review_candidate_count = int(detail.get("review_candidate_count") or 0)
         invalid_candidate_count = int(detail.get("invalid_candidate_count") or 0)
         unsafe_claim_count = int(detail.get("unsafe_authority_claim_count") or 0)
+        candidate_source_missing_count = int(
+            detail.get("candidate_source_id_missing_count") or 0
+        )
         target_inconsistent_count = int(
             detail.get("target_inconsistent_surface_count") or 0
         )
@@ -11584,6 +11646,7 @@ def read_surface_physical_readback_artifact_review_queue_artifact_summary(
             and review_candidate_count > 0
             and invalid_candidate_count == 0
             and unsafe_claim_count == 0
+            and candidate_source_missing_count == 0
             and target_inconsistent_count == 0
             and not unsafe_claimed
         )
@@ -11615,6 +11678,7 @@ def read_surface_physical_readback_artifact_review_queue_artifact_summary(
                 detail.get("missing_artifact_surface_count") or 0
             ),
             "unsafe_authority_claim_count": unsafe_claim_count,
+            "candidate_source_id_missing_count": candidate_source_missing_count,
             "target_inconsistent_surface_count": target_inconsistent_count,
             "review_candidate_surface_ids": (
                 list(review_candidate_surface_ids)
@@ -11630,6 +11694,11 @@ def read_surface_physical_readback_artifact_review_queue_artifact_summary(
             "unsafe_authority_surface_ids": (
                 list(unsafe_surface_ids)
                 if isinstance(unsafe_surface_ids, list)
+                else []
+            ),
+            "candidate_source_id_missing_surface_ids": (
+                list(candidate_source_missing_surface_ids)
+                if isinstance(candidate_source_missing_surface_ids, list)
                 else []
             ),
             "target_inconsistent_surface_ids": (
@@ -13853,6 +13922,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{artifact_review_queue['missing_artifact_surface_count']}`",
                 "- unsafe_authority_claim_count: "
                 f"`{artifact_review_queue['unsafe_authority_claim_count']}`",
+                "- candidate_source_id_missing_count: "
+                f"`{artifact_review_queue['candidate_source_id_missing_count']}`",
                 "- target_inconsistent_surface_count: "
                 f"`{artifact_review_queue['target_inconsistent_surface_count']}`",
                 "- operator_review_required: "
@@ -13869,6 +13940,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(artifact_review_queue['missing_artifact_surface_ids'])}`",
                 "- unsafe_authority_surface_ids: "
                 f"`{json.dumps(artifact_review_queue['unsafe_authority_surface_ids'])}`",
+                "- candidate_source_id_missing_surface_ids: "
+                f"`{json.dumps(artifact_review_queue['candidate_source_id_missing_surface_ids'])}`",
                 "- target_inconsistent_surface_ids: "
                 f"`{json.dumps(artifact_review_queue['target_inconsistent_surface_ids'])}`",
                 "- promotion_families_requiring_surface: "
@@ -13918,6 +13991,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{artifact_review_queue_artifact['missing_artifact_surface_count']}`",
                 "- unsafe_authority_claim_count: "
                 f"`{artifact_review_queue_artifact['unsafe_authority_claim_count']}`",
+                "- candidate_source_id_missing_count: "
+                f"`{artifact_review_queue_artifact['candidate_source_id_missing_count']}`",
                 "- target_inconsistent_surface_count: "
                 f"`{artifact_review_queue_artifact['target_inconsistent_surface_count']}`",
                 "- physical_fixture_gap_remains: "
@@ -13926,6 +14001,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(artifact_review_queue_artifact['review_candidate_surface_ids'])}`",
                 "- missing_artifact_surface_ids: "
                 f"`{json.dumps(artifact_review_queue_artifact['missing_artifact_surface_ids'])}`",
+                "- candidate_source_id_missing_surface_ids: "
+                f"`{json.dumps(artifact_review_queue_artifact['candidate_source_id_missing_surface_ids'])}`",
                 "- queue_item_method_ids: "
                 f"`{json.dumps(artifact_review_queue_artifact['queue_item_method_ids'])}`",
                 f"- blocked_by: `{json.dumps(artifact_review_queue_artifact['blocked_by'])}`",

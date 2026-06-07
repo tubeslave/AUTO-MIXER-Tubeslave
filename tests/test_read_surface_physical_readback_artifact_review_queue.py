@@ -6,12 +6,16 @@ from backend.read_surface_physical_readback_artifact_review_queue import (
     READ_SURFACE_PHYSICAL_READBACK_ARTIFACT_REVIEW_QUEUE_METHOD_ID,
     build_read_surface_physical_readback_artifact_review_queue,
 )
+from backend.raw_mixer_state_physical_readback_artifact_intake import (
+    build_raw_mixer_state_physical_readback_artifact_intake,
+)
 from backend.processing_registry import (
     build_processing_registry_snapshot,
     get_pipeline_profile,
     get_processing_method,
 )
 from backend.project_goal_capability_matrix import get_project_goal_capability
+from tests.test_raw_mixer_state_physical_readback_artifact_intake import _valid_artifact
 from tools import build_read_surface_physical_readback_artifact_review_queue as queue_tool
 
 
@@ -101,6 +105,7 @@ def test_artifact_review_queue_reports_missing_artifacts_without_authority():
     assert queue["summary"]["invalid_candidate_count"] == 0
     assert queue["summary"]["review_candidate_count"] == 0
     assert queue["summary"]["missing_artifact_surface_count"] == len(INTAKE_SPECS)
+    assert queue["summary"]["candidate_source_id_missing_count"] == 0
     assert queue["summary"]["operator_review_required"] is True
     assert queue["summary"]["physical_fixture_gap_remains"] is True
     assert queue["summary"]["fixture_closure_allowed_by_queue"] is False
@@ -179,7 +184,51 @@ def test_artifact_review_queue_surfaces_valid_and_invalid_operator_work():
         item for item in queue["queue_items"] if item["method_id"] == invalid_spec["method_id"]
     )
     assert valid_item["accepted_as_physical_fixture_candidate"] is True
+    assert valid_item["candidate_source_id_missing"] is False
+    assert valid_item["artifact_source_ids"] == [f"{valid_spec['surface_id']}.json"]
     assert invalid_item["accepted_as_physical_fixture_candidate"] is False
+
+
+def test_artifact_review_queue_uses_latest_valid_candidate_source_id_from_real_intake():
+    spec = INTAKE_SPECS[0]
+    intake = build_raw_mixer_state_physical_readback_artifact_intake(
+        artifact_payloads=(_valid_artifact(),),
+        artifact_roots=(),
+    )
+    queue = build_read_surface_physical_readback_artifact_review_queue(
+        intake_snapshots=_snapshot_map(**{spec["method_id"]: intake})
+    )
+
+    assert queue["status"] == "operator_review_candidates_available"
+    assert queue["summary"]["review_candidate_count"] == 1
+    assert queue["summary"]["candidate_source_id_missing_count"] == 0
+    item = next(item for item in queue["queue_items"] if item["method_id"] == spec["method_id"])
+    assert item["accepted_as_physical_fixture_candidate"] is True
+    assert item["candidate_source_id_missing"] is False
+    assert item["artifact_source_ids"] == ["inline_payload_0"]
+
+
+def test_artifact_review_queue_requires_source_id_for_valid_candidate():
+    spec = INTAKE_SPECS[0]
+    snapshot = _snapshot_for_spec(spec, valid=1)
+    snapshot["summary"].pop("artifact_source_ids")
+    snapshot["summary"].pop("latest_valid_candidate_source_id", None)
+    snapshot["artifacts"] = []
+
+    queue = build_read_surface_physical_readback_artifact_review_queue(
+        intake_snapshots=_snapshot_map(**{spec["method_id"]: snapshot})
+    )
+
+    assert queue["status"] == "operator_artifact_replacement_required"
+    assert queue["summary"]["review_candidate_count"] == 0
+    assert queue["summary"]["candidate_source_id_missing_count"] == 1
+    assert queue["summary"]["candidate_source_id_missing_surface_ids"] == [
+        spec["surface_id"]
+    ]
+    item = next(item for item in queue["queue_items"] if item["method_id"] == spec["method_id"])
+    assert item["accepted_as_physical_fixture_candidate"] is False
+    assert item["candidate_source_id_missing"] is True
+    assert item["artifact_source_ids"] == []
 
 
 def test_artifact_review_queue_rejects_unsafe_authority_claims():

@@ -97,6 +97,8 @@ def render_markdown(queue: Mapping[str, Any]) -> str:
         f"- review_candidate_count: `{summary.get('review_candidate_count')}`",
         f"- missing_artifact_surface_count: `{summary.get('missing_artifact_surface_count')}`",
         f"- unsafe_authority_claim_count: `{summary.get('unsafe_authority_claim_count')}`",
+        "- candidate_source_id_missing_count: "
+        f"`{summary.get('candidate_source_id_missing_count')}`",
         f"- target_inconsistent_surface_count: `{summary.get('target_inconsistent_surface_count')}`",
         f"- physical_fixture_gap_remains: `{_bool(summary.get('physical_fixture_gap_remains'))}`",
         f"- blocked_by: `{json.dumps(summary.get('blocked_by') or [])}`",
@@ -112,7 +114,8 @@ def render_markdown(queue: Mapping[str, Any]) -> str:
         lines.append(
             "- "
             f"{row.get('surface_id')} status={row.get('status')} "
-            f"valid={row.get('valid_candidate_count')} invalid={row.get('invalid_candidate_count')}"
+            f"valid={row.get('valid_candidate_count')} invalid={row.get('invalid_candidate_count')} "
+            f"sources={json.dumps(row.get('artifact_source_ids') or [])}"
         )
     focused_validation = commands.get("focused_validation")
     if isinstance(focused_validation, list):
