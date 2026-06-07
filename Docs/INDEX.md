@@ -63,6 +63,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_PROOF_PLAN_ACCEPTED_REVIEW_SOURCE_TRACE_20260607.md` | Next supervised proof plans preserve the accepted read-only preflight review source id that anchors physical proof planning. |
 | `Docs/reports/AUTOMIXER_WING_SUPERVISED_PROOF_OPERATOR_CONFIRMATION_20260607.md` | Physical supervised WING proof commands require matching operator-confirmed channel, value type, and delta before `--execute`. |
 | `Docs/reports/AUTOMIXER_WING_SUPERVISED_PROOF_PHYSICAL_READBACK_ONLY_20260607.md` | Physical supervised WING proof requires physical pre-read, apply readback, and rollback readback instead of cache evidence. |
+| `Docs/reports/AUTOMIXER_SUPERVISED_PROOF_EVALUATOR_PHYSICAL_STATUS_GATE_20260607.md` | Downstream supervised proof evaluation blocks physical-looking artifacts whose pre-read, apply, or rollback status is cache-backed. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_READINESS_BRIDGE_20260606.md` | Read-only preflight evidence overlay inside autonomy promotion readiness; manual review candidate only. |
 | `Docs/reports/AUTOMIXER_SUPERVISED_WING_PROOF_READONLY_PREFLIGHT_GATE_20260606.md` | Next supervised WING proof plan is blocked until clean read-only preflight evidence exists. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PACKET_20260607.md` | Offline operator packet renders the next read-surface physical-readback capture target without querying or mutating a console. |

@@ -74,6 +74,14 @@ def physical_summary(proof_id: str = "physical-fader-proof") -> dict:
     return payload
 
 
+def cache_status_physical_summary(proof_id: str = "cache-status-physical-proof") -> dict:
+    payload = physical_summary(proof_id)
+    payload["apply_result"]["apply_result"]["pre_read_status"] = "verified_from_cache"
+    payload["apply_result"]["apply_result"]["readback_status"] = "verified_from_cache"
+    payload["rollback_result"]["rollback_readback_status"] = "verified_from_cache"
+    return payload
+
+
 def legacy_execute_wing_summary(proof_id: str = "legacy-physical-gain-proof") -> dict:
     payload = dry_run_summary(proof_id)
     payload.pop("physical_wing")
@@ -193,6 +201,28 @@ def test_report_distinguishes_dry_run_physical_ignored_and_invalid_summaries(tmp
     assert report["summary"]["autonomous_ready_proof_ids"] == []
     assert report["ignored_summaries"] == [str(ignored)]
     assert report["invalid_summaries"] == [{"artifact_path": str(invalid), "reason": "json_load_error:JSONDecodeError"}]
+
+
+def test_report_blocks_physical_summary_that_uses_cache_readback_status(tmp_path: Path):
+    artifact = write_summary(tmp_path / "cache_status_physical", cache_status_physical_summary())
+
+    report = report_tool.build_supervised_proof_artifact_report(
+        [artifact],
+        require_physical=True,
+    )
+
+    assert report["status"] == "ok"
+    assert report["summary"]["status_counts"]["supervised_candidate"] == 0
+    assert report["summary"]["status_counts"]["blocked"] == 1
+    assert report["summary"]["promotion_allowed_proof_ids"] == []
+    assert report["summary"]["blocked_proof_ids"] == ["cache-status-physical-proof"]
+    row = report["rows"][0]
+    assert "physical_pre_read_status_required" in row["blockers"]
+    assert "physical_apply_readback_status_required" in row["blockers"]
+    assert "physical_rollback_readback_status_required" in row["blockers"]
+    assert row["evidence"]["pre_read_source"] == "physical_readback"
+    assert row["evidence"]["readback_source"] == "physical_readback"
+    assert row["evidence"]["rollback_readback_source"] == "physical_readback"
 
 
 def test_exit_code_requires_minimum_physical_candidates(tmp_path: Path):

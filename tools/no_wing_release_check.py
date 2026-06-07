@@ -9278,6 +9278,88 @@ def validate_wing_operator_proposal_runner_physical_readback_policy(
     )
 
 
+def validate_supervised_proof_evaluator_physical_readback_policy(
+    evaluator_path: Path | None = None,
+) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    path = evaluator_path or REPO_ROOT / "backend/supervised_proof_artifact_evaluator.py"
+    detail: dict[str, object] = {
+        "evaluator_path": str(path),
+        "policy": "physical_proof_artifacts_must_require_physical_readback_status_not_cache",
+    }
+    violations: list[str] = []
+    physical_statuses: list[str] = []
+
+    try:
+        source = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        source = ""
+        violations.append("supervised_proof_evaluator_missing")
+
+    if source:
+        try:
+            tree = ast.parse(source, filename=str(path))
+        except SyntaxError:
+            tree = None
+            violations.append("supervised_proof_evaluator_syntax_error")
+        if tree is not None:
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Assign):
+                    continue
+                if not any(
+                    isinstance(target, ast.Name)
+                    and target.id == "PHYSICAL_READBACK_STATUSES"
+                    for target in node.targets
+                ):
+                    continue
+                try:
+                    value = ast.literal_eval(node.value)
+                except (TypeError, ValueError):
+                    violations.append("physical_readback_statuses_not_literal")
+                    value = set()
+                if isinstance(value, (set, tuple, list)):
+                    physical_statuses = sorted(str(item) for item in value)
+                else:
+                    violations.append("physical_readback_statuses_not_sequence")
+                break
+            else:
+                violations.append("physical_readback_statuses_constant_missing")
+
+        if physical_statuses != ["verified_from_physical_readback"]:
+            violations.append("physical_readback_statuses_include_non_physical_status")
+        if "verified_from_cache" in physical_statuses:
+            violations.append("physical_readback_statuses_allows_cache")
+        required_markers = {
+            "pre_read_status_requires_physical": (
+                "artifact.pre_read_status not in PHYSICAL_READBACK_STATUSES"
+            ),
+            "apply_status_requires_physical": (
+                "artifact.readback_status not in PHYSICAL_READBACK_STATUSES"
+            ),
+            "rollback_status_requires_physical": (
+                "artifact.rollback_readback_status not in PHYSICAL_READBACK_STATUSES"
+            ),
+            "pre_read_status_blocker": '"physical_pre_read_status_required"',
+            "apply_status_blocker": '"physical_apply_readback_status_required"',
+            "rollback_status_blocker": '"physical_rollback_readback_status_required"',
+        }
+        for violation_id, marker in required_markers.items():
+            if marker not in source:
+                violations.append(violation_id)
+
+    detail["physical_readback_statuses"] = physical_statuses
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="supervised_proof_evaluator_physical_readback_policy",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_supervised_proof_report_autonomy_overlay(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -15246,6 +15328,12 @@ def run_release_checks(
             )
             results.append(wing_runner_policy_result)
             if wing_runner_policy_result.status != "passed" and not continue_on_failure:
+                break
+            evaluator_policy_result = (
+                validate_supervised_proof_evaluator_physical_readback_policy()
+            )
+            results.append(evaluator_policy_result)
+            if evaluator_policy_result.status != "passed" and not continue_on_failure:
                 break
             artifact_result = validate_supervised_proof_report_gap_rollup(proof_report_path)
             results.append(artifact_result)

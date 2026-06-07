@@ -88,6 +88,32 @@ def test_complete_physical_fader_proof_is_supervised_candidate_only():
     assert result.blockers == ()
 
 
+def test_physical_proof_rejects_cache_status_even_with_physical_sources():
+    artifact = complete_artifact(
+        proof_id="forged-cache-physical-proof",
+        value_type="fader",
+        old_value=-12.0,
+        proposed_value=-12.25,
+        delta_db=-0.25,
+        proof_mode="physical",
+        pre_read_status="verified_from_cache",
+        pre_read_source="physical_readback",
+        readback_status="verified_from_cache",
+        readback_source="physical_readback",
+        rollback_value=-12.0,
+        rollback_readback_status="verified_from_cache",
+        rollback_readback_source="physical_readback",
+    )
+
+    result = evaluate_supervised_proof_artifact(artifact, require_physical=True)
+
+    assert result.status == "blocked"
+    assert result.promotion_allowed is False
+    assert "physical_pre_read_status_required" in result.blockers
+    assert "physical_apply_readback_status_required" in result.blockers
+    assert "physical_rollback_readback_status_required" in result.blockers
+
+
 def test_missing_pre_read_blocks_fail_closed():
     artifact = complete_artifact(pre_read_status="readback_unavailable", pre_read_source="")
 

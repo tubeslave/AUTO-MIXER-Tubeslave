@@ -96,6 +96,7 @@ from tools.no_wing_release_check import (
     validate_user_presets_physical_readback_artifact_intake_snapshot,
     validate_user_presets_physical_readback_contract_snapshot,
     validate_supervised_proof_report_autonomy_overlay,
+    validate_supervised_proof_evaluator_physical_readback_policy,
     validate_supervised_proof_report_next_wing_plan,
     validate_wing_operator_proposal_runner_physical_readback_policy,
     validate_supervised_proof_report_gain_dry_run,
@@ -5242,6 +5243,16 @@ def test_no_wing_release_check_validates_wing_runner_physical_readback_policy():
     assert result.detail["violations"] == []
 
 
+def test_no_wing_release_check_validates_supervised_evaluator_physical_readback_policy():
+    result = validate_supervised_proof_evaluator_physical_readback_policy()
+
+    assert result.status == "passed"
+    assert result.detail["physical_readback_statuses"] == [
+        "verified_from_physical_readback"
+    ]
+    assert result.detail["violations"] == []
+
+
 def test_no_wing_release_check_rejects_wing_runner_cache_as_physical(tmp_path):
     runner_path = tmp_path / "wing_operator_proposal_validation_runner.py"
     runner_path.write_text(
@@ -5260,6 +5271,32 @@ def run(args):
     )
 
     result = validate_wing_operator_proposal_runner_physical_readback_policy(runner_path)
+
+    assert result.status == "failed"
+    assert "physical_readback_statuses_allows_cache" in result.detail["violations"]
+    assert (
+        "physical_readback_statuses_include_non_physical_status"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_evaluator_cache_as_physical(tmp_path):
+    evaluator_path = tmp_path / "supervised_proof_artifact_evaluator.py"
+    evaluator_path.write_text(
+        """
+PHYSICAL_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
+def _append_physical_blockers(artifact, blockers):
+    if artifact.pre_read_status not in PHYSICAL_READBACK_STATUSES:
+        blockers.append("physical_pre_read_status_required")
+    if artifact.readback_status not in PHYSICAL_READBACK_STATUSES:
+        blockers.append("physical_apply_readback_status_required")
+    if artifact.rollback_readback_status not in PHYSICAL_READBACK_STATUSES:
+        blockers.append("physical_rollback_readback_status_required")
+""",
+        encoding="utf-8",
+    )
+
+    result = validate_supervised_proof_evaluator_physical_readback_policy(evaluator_path)
 
     assert result.status == "failed"
     assert "physical_readback_statuses_allows_cache" in result.detail["violations"]
@@ -5534,6 +5571,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "autonomy_evidence_overlay_schema" in result_names
     assert "next_wing_proof_plan_schema" in result_names
     assert "wing_operator_proposal_runner_physical_readback_policy" in result_names
+    assert "supervised_proof_evaluator_physical_readback_policy" in result_names
     assert "supervised_proof_report_gap_rollup_schema" in result_names
     assert result_names.index("read_surface_fixture_evidence") < result_names.index(
         "read_surface_fixture_evidence_schema"
@@ -5694,6 +5732,11 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     )
     assert result_names.index(
         "wing_operator_proposal_runner_physical_readback_policy"
+    ) < result_names.index(
+        "supervised_proof_evaluator_physical_readback_policy"
+    )
+    assert result_names.index(
+        "supervised_proof_evaluator_physical_readback_policy"
     ) < result_names.index(
         "supervised_proof_report_gap_rollup_schema"
     )

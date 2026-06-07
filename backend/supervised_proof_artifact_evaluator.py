@@ -23,6 +23,7 @@ VERIFIED_READBACK_STATUSES = {
     "verified_from_simulated_readback",
     "simulated_readback_verified",
 }
+PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
 VERIFIED_PROOF_STATUSES = {"verified", "passed"}
 PHYSICAL_READBACK_SOURCES = {
     "physical_readback",
@@ -237,10 +238,16 @@ def _append_physical_blockers(
         return
     if not physical_mode:
         return
+    if artifact.pre_read_status not in PHYSICAL_READBACK_STATUSES:
+        blockers.append("physical_pre_read_status_required")
     if not _source_is_physical(artifact.pre_read_source):
         blockers.append("physical_pre_read_required")
+    if artifact.readback_status not in PHYSICAL_READBACK_STATUSES:
+        blockers.append("physical_apply_readback_status_required")
     if not _source_is_physical(artifact.readback_source):
         blockers.append("physical_apply_readback_required")
+    if artifact.rollback_readback_status not in PHYSICAL_READBACK_STATUSES:
+        blockers.append("physical_rollback_readback_status_required")
     if not _source_is_physical(artifact.rollback_readback_source):
         blockers.append("physical_rollback_readback_required")
 
