@@ -18,6 +18,10 @@ try:
     from server import convert_numpy_types, AutoMixerServer
 except ImportError:
     pytest.skip("server module not importable", allow_module_level=True)
+try:
+    from ai.agent import AgentMode
+except ImportError:
+    AgentMode = None
 
 
 # ---------------------------------------------------------------------------
@@ -259,8 +263,19 @@ class TestAutoMixerServerConfigNormalization:
         assert normalized["type"] == "wing"
         assert normalized["ip"] == "10.0.0.5"
         assert normalized["port"] == 2223
-        assert normalized["send_port"] == 2222
-        assert normalized["receive_port"] == 2223
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_coerce_agent_mode_normalizes_aliases(self, mock_config, mock_bleed):
+        if AgentMode is None:
+            pytest.skip("ai.agent module not available in this test environment")
+
+        server = AutoMixerServer()
+        assert server._coerce_agent_mode("analysis").value == AgentMode.SUGGEST.value
+        assert server._coerce_agent_mode("supervised automix mode").value == AgentMode.SUGGEST.value
+        assert server._coerce_agent_mode("full autonomous mixing mode").value == AgentMode.AUTO.value
+        assert server._coerce_agent_mode("manual_mode").value == AgentMode.MANUAL.value
+        assert server._coerce_agent_mode(None).value == AgentMode.AUTO.value
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})

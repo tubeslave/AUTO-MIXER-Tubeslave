@@ -2050,11 +2050,47 @@ class AutoMixerServer:
                 mode = "suggest"
         return mode, allow_auto_apply
 
+    def _normalize_agent_mode_request(self, mode: str | None) -> str:
+        """Normalize free-form AI agent mode aliases into a canonical value."""
+        normalized = str(mode or "").strip().lower().replace("-", "_").replace(" ", "_")
+        normalized = "_".join(filter(None, normalized.split("_")))
+        if not normalized:
+            return "auto"
+
+        agent_mode_aliases = {
+            "auto": "auto",
+            "automatic": "auto",
+            "full_autonomous": "auto",
+            "full_autonomous_mixing": "auto",
+            "full_autonomous_mixing_mode": "auto",
+            "autonomous": "auto",
+            "suggest": "suggest",
+            "suggestion": "suggest",
+            "suggest_mode": "suggest",
+            "assist": "suggest",
+            "assisted": "suggest",
+            "analysis": "suggest",
+            "analysis_mode": "suggest",
+            "analysismode": "suggest",
+            "analysis_mode_mode": "suggest",
+            "manual": "manual",
+            "manual_mode": "manual",
+            "manualmode": "manual",
+            "supervised": "suggest",
+            "supervised_automix": "suggest",
+            "supervised_automix_mode": "suggest",
+            "supervised_mode": "suggest",
+            "full_manual": "manual",
+        }
+        return agent_mode_aliases.get(normalized, normalized)
+
     def _coerce_agent_mode(self, mode: str = None, allow_auto_apply: bool = True):
         """Return AgentMode for current run; AUTO is the default test-stage behavior."""
         from ai.agent import AgentMode
 
-        requested = (mode or self.config.get("agent", {}).get("mode", "auto")).lower()
+        requested = self._normalize_agent_mode_request(
+            mode if mode is not None else self.config.get("agent", {}).get("mode", "auto")
+        )
         try:
             agent_mode = AgentMode(requested)
         except ValueError:
