@@ -479,6 +479,7 @@ def _validate_event_log(
         violations.append("event_log_unexpected_sent_request_types")
     if set(event_request_types).intersection(FORBIDDEN_REQUEST_TYPES):
         violations.append("event_log_forbidden_request_type_sent")
+        violations.append("forbidden_request_types_sent_not_empty")
     if (
         len(event_request_types) < 3
         or event_request_types[0] != "get_operator_mode"
