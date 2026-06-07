@@ -113,22 +113,73 @@ def _valid_events(summary: dict) -> list[dict]:
     return events
 
 
+def _expected_plan_request_sequence(summary: dict) -> list[dict]:
+    return [
+        {"type": "get_operator_mode"},
+        {"type": "get_state"},
+        *[
+            {
+                "type": "query_mixer_parameter",
+                "request_id": row["request_id"],
+                "channel": row["channel"],
+                "value_type": row["value_type"],
+                "address": row["address"],
+            }
+            for row in summary["readbacks"]
+        ],
+    ]
+
+
+def _valid_expected_plan(summary: dict) -> dict:
+    return {
+        "type": "wing_readonly_preflight_offline_plan",
+        "status": "ready_for_operator_review",
+        "proof_artifact_schema": summary["proof_artifact_schema"],
+        "proof_runner": summary["proof_runner"],
+        "channels": summary["channels"],
+        "operator_channel_confirmation_required": summary[
+            "operator_channel_confirmation_required"
+        ],
+        "operator_confirmed_channels": summary["operator_confirmed_channels"],
+        "value_types": summary["value_types"],
+        "require_physical_readback": summary["require_physical_readback"],
+        "read_only": summary["read_only"],
+        "live_write": summary["live_write"],
+        "expected_plan_required_for_real_run": summary[
+            "expected_plan_required_for_real_run"
+        ],
+        "physical_preflight_requires_existing_backend_connection": summary[
+            "physical_preflight_requires_existing_backend_connection"
+        ],
+        "manual_review_required_before_readiness_update": True,
+        "contacts_backend": False,
+        "queries_console": False,
+        "execution_allowed_by_plan": False,
+        "live_authority_granted": False,
+        "request_id_policy": summary["request_id_policy"],
+        "request_sequence": _expected_plan_request_sequence(summary),
+    }
+
+
+def _write_expected_plan(summary_path: Path, plan: dict) -> None:
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    plan_path = Path(summary["expected_plan_path"])
+    plan_bytes = json.dumps(plan, sort_keys=True).encode("utf-8")
+    plan_path.write_bytes(plan_bytes)
+    summary["expected_plan_sha256"] = hashlib.sha256(plan_bytes).hexdigest()
+    summary_path.write_text(json.dumps(summary), encoding="utf-8")
+
+
 def _write_file_artifact(artifact_dir: Path, summary: dict | None = None, events: list[dict] | None = None) -> Path:
     artifact_dir.mkdir(parents=True)
     artifact_path = artifact_dir / "summary.json"
     events_path = artifact_dir / "events.jsonl"
     plan_path = artifact_dir / "expected_plan.json"
-    plan_bytes = json.dumps(
-        {
-            "type": "wing_readonly_preflight_offline_plan",
-            "status": "ready_for_operator_review",
-        },
-        sort_keys=True,
-    ).encode("utf-8")
-    plan_path.write_bytes(plan_bytes)
     payload = copy.deepcopy(summary or _valid_summary())
     payload["events_path"] = str(events_path)
     payload["summary_path"] = str(artifact_path)
+    plan_bytes = json.dumps(_valid_expected_plan(payload), sort_keys=True).encode("utf-8")
+    plan_path.write_bytes(plan_bytes)
     payload["expected_plan_path"] = str(plan_path)
     payload["expected_plan_sha256"] = hashlib.sha256(plan_bytes).hexdigest()
     artifact_path.write_text(json.dumps(payload), encoding="utf-8")
@@ -399,6 +450,34 @@ def test_file_preflight_artifact_requires_matching_expected_plan_sha(tmp_path):
     assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert "expected_plan_sha256_mismatch" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_requires_expected_plan_metadata_to_match_summary(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "plan-mismatch")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    plan = _valid_expected_plan(summary)
+    plan["channels"] = [4]
+    _write_expected_plan(artifact_path, plan)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert "expected_plan_channels_mismatch" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_requires_expected_plan_request_sequence_to_match_summary(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "request-sequence-mismatch")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    plan = _valid_expected_plan(summary)
+    plan["request_sequence"][2]["channel"] = 4
+    _write_expected_plan(artifact_path, plan)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert "expected_plan_request_sequence_mismatch" in evidence["summary"]["violations"]
 
 
 def test_file_preflight_artifact_rejects_tampered_event_log_send_types(tmp_path):

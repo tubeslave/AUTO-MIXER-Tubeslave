@@ -103,6 +103,8 @@ The summary must show:
 - `expected_plan_violations: []`
 - `expected_plan_sha256` is non-empty and matches the referenced offline plan
   file during artifact review
+- referenced offline plan fields and `request_sequence` match the captured
+  summary, operator-confirmed channels, value types, and readback identities
 - `physical_readback_count == readback_count`
 
 The event log must show only these request types:
@@ -220,6 +222,8 @@ Then update:
 - the real run omits the expected offline plan or does not match it;
 - the referenced offline plan file is missing or its SHA256 does not match
   `expected_plan_sha256`;
+- the referenced offline plan content does not match the captured summary or
+  read-only request sequence;
 - the summary does not prove the run required an already-connected
   backend/WING session;
 - the run contacts the wrong mixer;

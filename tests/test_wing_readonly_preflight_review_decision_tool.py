@@ -100,22 +100,64 @@ def _valid_events(summary: dict) -> list[dict]:
     return events
 
 
+def _expected_plan_request_sequence(summary: dict) -> list[dict]:
+    return [
+        {"type": "get_operator_mode"},
+        {"type": "get_state"},
+        *[
+            {
+                "type": "query_mixer_parameter",
+                "request_id": row["request_id"],
+                "channel": row["channel"],
+                "value_type": row["value_type"],
+                "address": row["address"],
+            }
+            for row in summary["readbacks"]
+        ],
+    ]
+
+
+def _valid_expected_plan(summary: dict) -> dict:
+    return {
+        "type": "wing_readonly_preflight_offline_plan",
+        "status": "ready_for_operator_review",
+        "proof_artifact_schema": summary["proof_artifact_schema"],
+        "proof_runner": summary["proof_runner"],
+        "channels": summary["channels"],
+        "operator_channel_confirmation_required": summary[
+            "operator_channel_confirmation_required"
+        ],
+        "operator_confirmed_channels": summary["operator_confirmed_channels"],
+        "value_types": summary["value_types"],
+        "require_physical_readback": summary["require_physical_readback"],
+        "read_only": summary["read_only"],
+        "live_write": summary["live_write"],
+        "expected_plan_required_for_real_run": summary[
+            "expected_plan_required_for_real_run"
+        ],
+        "physical_preflight_requires_existing_backend_connection": summary[
+            "physical_preflight_requires_existing_backend_connection"
+        ],
+        "manual_review_required_before_readiness_update": True,
+        "contacts_backend": False,
+        "queries_console": False,
+        "execution_allowed_by_plan": False,
+        "live_authority_granted": False,
+        "request_id_policy": summary["request_id_policy"],
+        "request_sequence": _expected_plan_request_sequence(summary),
+    }
+
+
 def _write_artifact(run_dir: Path) -> Path:
     run_dir.mkdir(parents=True)
     summary = _valid_summary()
     summary_path = run_dir / "summary.json"
     events_path = run_dir / "events.jsonl"
     plan_path = run_dir / "expected_plan.json"
-    plan_bytes = json.dumps(
-        {
-            "type": "wing_readonly_preflight_offline_plan",
-            "status": "ready_for_operator_review",
-        },
-        sort_keys=True,
-    ).encode("utf-8")
-    plan_path.write_bytes(plan_bytes)
     summary["summary_path"] = str(summary_path)
     summary["events_path"] = str(events_path)
+    plan_bytes = json.dumps(_valid_expected_plan(summary), sort_keys=True).encode("utf-8")
+    plan_path.write_bytes(plan_bytes)
     summary["expected_plan_path"] = str(plan_path)
     summary["expected_plan_sha256"] = hashlib.sha256(plan_bytes).hexdigest()
     summary_path.write_text(

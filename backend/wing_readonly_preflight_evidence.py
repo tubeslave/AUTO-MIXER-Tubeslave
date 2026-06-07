@@ -76,6 +76,20 @@ MUTATION_EVIDENCE_FIELDS = {
     "write_policy",
 }
 REQUEST_ID_POLICY = "required_for_every_query_mixer_parameter_response"
+EXPECTED_PLAN_SUMMARY_FIELDS = (
+    "proof_artifact_schema",
+    "proof_runner",
+    "channels",
+    "operator_channel_confirmation_required",
+    "operator_confirmed_channels",
+    "value_types",
+    "require_physical_readback",
+    "read_only",
+    "live_write",
+    "expected_plan_required_for_real_run",
+    "physical_preflight_requires_existing_backend_connection",
+    "request_id_policy",
+)
 
 
 @dataclass(frozen=True)
@@ -231,6 +245,55 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _expected_plan_request_sequence(payload: Mapping[str, Any]) -> list[Dict[str, Any]]:
+    readbacks_raw = payload.get("readbacks")
+    readbacks = (
+        tuple(row for row in readbacks_raw if isinstance(row, Mapping))
+        if isinstance(readbacks_raw, list)
+        else ()
+    )
+    return [
+        {"type": "get_operator_mode"},
+        {"type": "get_state"},
+        *[
+            {
+                "type": "query_mixer_parameter",
+                "request_id": str(row.get("request_id") or ""),
+                "channel": _safe_int(row.get("channel")),
+                "value_type": str(row.get("value_type") or ""),
+                "address": str(row.get("address") or ""),
+            }
+            for row in readbacks
+        ],
+    ]
+
+
+def _validate_expected_plan_payload(
+    summary: Mapping[str, Any],
+    plan: Mapping[str, Any],
+    violations: list[str],
+) -> None:
+    if plan.get("type") != "wing_readonly_preflight_offline_plan":
+        violations.append("expected_plan_type_mismatch")
+    if plan.get("status") != "ready_for_operator_review":
+        violations.append("expected_plan_status_mismatch")
+    for field in EXPECTED_PLAN_SUMMARY_FIELDS:
+        if plan.get(field) != summary.get(field):
+            violations.append(f"expected_plan_{field}_mismatch")
+    if plan.get("request_sequence") != _expected_plan_request_sequence(summary):
+        violations.append("expected_plan_request_sequence_mismatch")
+    for field in (
+        "contacts_backend",
+        "queries_console",
+        "execution_allowed_by_plan",
+        "live_authority_granted",
+    ):
+        if plan.get(field) is not False:
+            violations.append(f"expected_plan_{field}_not_false")
+    if plan.get("manual_review_required_before_readiness_update") is not True:
+        violations.append("expected_plan_manual_review_required_not_true")
+
+
 def _validate_expected_plan_file(
     payload: Mapping[str, Any],
     summary_path: Path,
@@ -251,6 +314,12 @@ def _validate_expected_plan_file(
         return
     if actual_sha != expected_sha:
         violations.append("expected_plan_sha256_mismatch")
+    try:
+        plan_payload = _load_json_artifact(plan_path)
+    except Exception as exc:
+        violations.append(f"expected_plan_file_load_error:{type(exc).__name__}")
+        return
+    _validate_expected_plan_payload(payload, plan_payload, violations)
 
 
 def _validate_event_log(
