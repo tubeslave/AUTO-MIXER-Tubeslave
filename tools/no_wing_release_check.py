@@ -400,6 +400,7 @@ WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS = (
     "backend_not_in_wing_mode",
     "operator_channel_confirmation_mismatch",
     "physical_readback_missing",
+    "readback_identity_mismatch",
     "forbidden_request_type_sent",
     "event_log_missing_or_invalid",
     "manual_review_decision_missing_or_invalid",

@@ -311,6 +311,50 @@ async def test_readonly_preflight_blocks_missing_physical_readback(
 
 
 @pytest.mark.asyncio
+async def test_readonly_preflight_blocks_readback_identity_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
+            {
+                "type": "mixer_parameter_value",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 4,
+                "value_type": "fader",
+                "address": "/ch/4/fdr",
+                "value": -12.0,
+            },
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 4
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "wing_readonly_preflight_blocked"
+    assert summary["physical_readback_count"] == 1
+    assert summary["blockers"] == ["readback_identity_mismatch:ch3:fader"]
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
+
+
+@pytest.mark.asyncio
 async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_artifacts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

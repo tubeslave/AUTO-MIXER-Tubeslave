@@ -108,6 +108,17 @@ def readback_is_physical(payload: Dict[str, Any]) -> bool:
     )
 
 
+def readback_identity_matches(
+    request: Dict[str, Any],
+    payload: Dict[str, Any],
+) -> bool:
+    return (
+        payload.get("channel") == request.get("channel")
+        and payload.get("value_type") == request.get("value_type")
+        and payload.get("address") == request.get("address")
+    )
+
+
 class EventRecorder:
     def __init__(self, run_dir: Path):
         self.run_dir = run_dir
@@ -312,6 +323,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
             "backend_not_in_wing_mode",
             "operator_channel_confirmation_mismatch",
             "physical_readback_missing",
+            "readback_identity_mismatch",
             "forbidden_request_type_sent",
             "event_log_missing_or_invalid",
             "manual_review_decision_missing_or_invalid",
@@ -434,6 +446,11 @@ async def run(args: argparse.Namespace) -> int:
                 if payload.get("type") == "mixer_parameter_read_blocked":
                     blockers.append(f"{payload.get('reason')}:ch{request['channel']}:{request['value_type']}")
                     continue
+                if not readback_identity_matches(request, payload):
+                    blockers.append(
+                        "readback_identity_mismatch:"
+                        f"ch{request['channel']}:{request['value_type']}"
+                    )
                 if args.require_physical_readback and not readback_is_physical(payload):
                     blockers.append(f"physical_readback_missing:ch{request['channel']}:{request['value_type']}")
 
