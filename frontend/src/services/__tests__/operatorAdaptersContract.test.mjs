@@ -251,6 +251,8 @@ test('mode display labels map objective names to each operational mode', async (
   assert.equal(formatOperatorModeLabel('analysis_mode'), 'Analysis Mode');
   assert.equal(formatOperatorModeLabel('supervised auto mix'), 'Supervised AutoMix');
   assert.equal(formatOperatorModeLabel('full autonomous mode'), 'Full Autonomous Mixing');
+  assert.equal(formatOperatorModeLabel('analysis-mode'), 'Analysis Mode');
+  assert.equal(formatOperatorModeLabel('full-autonomous-mode'), 'Full Autonomous Mixing');
   assert.equal(formatOperatorModeLabel('supervised automix mode'), 'Supervised AutoMix');
   assert.equal(formatOperatorModeLabel('full autonomous mixing'), 'Full Autonomous Mixing');
   assert.equal(formatOperatorModeLabel('auto mode'), 'Full Autonomous Mixing');

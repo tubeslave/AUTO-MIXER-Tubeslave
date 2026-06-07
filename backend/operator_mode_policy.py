@@ -7,6 +7,7 @@ suggestions, supervised writes, and locked autonomous control.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any, Dict, List, Tuple
 
 
@@ -40,6 +41,7 @@ OPERATOR_MODE_ALIASES = {
     MODE_ANALYZE: MODE_ANALYZE,
     "analysis": MODE_ANALYZE,
     "analysis_mode": MODE_ANALYZE,
+    "analysis_mode_mode": MODE_ANALYZE,
     MODE_ASSIST: MODE_ASSIST,
     "assisted": MODE_ASSIST,
     "assisted_mixing": MODE_ASSIST,
@@ -124,7 +126,9 @@ MODE_DEFINITIONS: Dict[str, OperatorModeDefinition] = {
 
 
 def normalize_operator_mode(value: Any) -> str:
-    mode = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    normalized = str(value or "").strip().lower()
+    mode = re.sub(r"[-\s]+", "_", normalized)
+    mode = re.sub(r"_+", "_", mode).strip("_")
     return OPERATOR_MODE_ALIASES.get(mode, DEFAULT_OPERATOR_MODE)
 
 

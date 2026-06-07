@@ -97,8 +97,19 @@ export function formatAIAgentModeLabel(modeValue: unknown): string {
 }
 
 export function formatOperatorModeLabel(modeValue: unknown): string {
-  const normalized = String(modeValue || '').trim().toLowerCase();
-  const mode = MODE_VALUE_ALIASES[normalized] || RAW_MODE_MAP[normalized] || 'Assist';
+  const normalized = String(modeValue || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const normalizedWithSpaces = normalized.replace(/_/g, ' ');
+  const mode =
+    MODE_VALUE_ALIASES[normalized] ||
+    MODE_VALUE_ALIASES[normalizedWithSpaces] ||
+    RAW_MODE_MAP[normalized] ||
+    RAW_MODE_MAP[normalizedWithSpaces] ||
+    'Assist';
   return getModeDisplayLabel(mode);
 }
 
