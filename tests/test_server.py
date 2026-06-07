@@ -1245,6 +1245,71 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_operator_proposal_apply_is_allowed_for_auto_mode_when_wing_boundary_disabled(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time()
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        server._apply_manual_console_write = AsyncMock(
+            return_value={
+                "status": "applied",
+                "channel": 1,
+                "value_type": "fader",
+                "effective_value": -9.0,
+                "old_value": -8.0,
+                "readback_value": -9.0,
+                "readback_status": "verified_from_cache",
+                "rollback_available": True,
+                "rollback_value": -8.0,
+            }
+        )
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "title": "Lead Vocal: auto fader",
+                "channel": 1,
+                "value_type": "fader",
+                "value": -9.0,
+                "reason": "unit",
+            },
+        )
+        create_payload = self._decode_last_message(websocket)
+        assert create_payload["type"] == "operator_proposal_created"
+        assert create_payload["status"] == "created"
+        proposal_id = create_payload["proposal"]["id"]
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": "unit-auto-noboundary",
+            },
+        )
+
+        apply_payload = self._decode_last_message(websocket)
+        assert apply_payload["type"] == "operator_proposal_apply_result"
+        assert apply_payload["status"] == "applied"
+        assert apply_payload["apply_result"]["status"] == "applied"
+        assert apply_payload["apply_result"]["channel"] == 1
+        assert apply_payload["apply_result"]["value_type"] == "fader"
+        server._apply_manual_console_write.assert_awaited_once_with(
+            websocket,
+            channel=1,
+            value=-9.0,
+            value_type="fader",
+            source=f"operator_proposal:{proposal_id}",
+            reason="unit",
+            approved=True,
+            approval_id=proposal_id,
+        )
+
+    @pytest.mark.asyncio
     async def test_websocket_fader_blocks_when_cache_pre_read_is_stale(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
