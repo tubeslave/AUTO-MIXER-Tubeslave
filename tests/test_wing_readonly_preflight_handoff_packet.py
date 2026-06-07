@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from tools import build_wing_readonly_preflight_handoff_packet as handoff
+from tools import no_wing_release_check
 
 
 def test_handoff_packet_builds_readonly_operator_sequence():
@@ -96,7 +97,22 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "mute" in forbidden_request_types
     assert "unmute" in forbidden_request_types
     assert "set_fx_parameter" in forbidden_request_types
+    assert len(packet["forbidden_live_request_types"]) == len(forbidden_request_types)
+    assert forbidden_request_types == set(
+        no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
+    )
     assert "wing_readonly_connection_proof" in packet["blockers_not_closed_by_packet"]
+
+
+def test_handoff_packet_forbidden_live_request_types_matches_release_check_contract():
+    packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
+    expected_forbidden = set(
+        no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
+    )
+    packet_forbidden = set(packet["forbidden_live_request_types"])
+
+    assert packet_forbidden == expected_forbidden
+    assert len(packet["forbidden_live_request_types"]) == len(packet_forbidden)
 
 
 def test_handoff_packet_supports_custom_channel_confirmation():
