@@ -5208,6 +5208,7 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
 
     payload = build_main_pipeline_preview(server, total_channels=4)
     queue = build_decision_queue(server)
+    main_pipeline_registry = payload["registry"]
 
     assert payload["type"] == "main_pipeline_preview"
     assert payload["pipeline_id"] == "main_live_assist"
@@ -5222,6 +5223,27 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     assert goal_progress["type"] == "project_goal_capability_progress_snapshot"
     assert goal_progress["summary"]["row_count"] > 0
     assert goal_progress["summary"]["runtime_mode_ceiling_by_id"]
+    assert (
+        main_pipeline_registry[
+            "project_goal_capability_matrix"
+        ]["type"]
+        == "project_goal_capability_matrix"
+    )
+    assert (
+        main_pipeline_registry[
+            "autonomy_mode_transition_gate"
+        ]["summary"]["mode_count"]
+        == 4
+    )
+    assert "auto" in main_pipeline_registry["autonomy_mode_transition_gate"]["summary"][
+        "blocked_modes"
+    ]
+    assert main_pipeline_registry["autonomy_mode_transition_gate"]["summary"][
+        "supervised_current_live_write_kinds"
+    ] == ["fader", "gain"]
+    assert {
+        row["mode"] for row in main_pipeline_registry["autonomy_mode_transition_gate"]["rows"]
+    } == {"analyze", "assist", "supervised", "auto"}
     assert payload["summary"]["operator_analysis_proposal_count"] == 1
     assert payload["summary"]["agentic_foundation_proposal_count"] == 1
     assert queue["summary"]["pending_count"] == 0
@@ -7467,6 +7489,24 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
     assert (
         registry_progress_snapshot["summary"]["row_count"]
         == progress_snapshot["summary"]["row_count"]
+    )
+    assert (
+        main_preview["registry"][
+            "project_goal_capability_matrix"
+        ]["type"]
+        == "project_goal_capability_matrix"
+    )
+    assert (
+        main_preview["registry"][
+            "autonomy_mode_transition_gate"
+        ]["type"]
+        == "autonomy_mode_transition_gate"
+    )
+    assert (
+        by_type["processing_pipeline_snapshot"]["autonomy_mode_transition_gate"][
+            "summary"
+        ]
+        == main_preview["registry"]["autonomy_mode_transition_gate"]["summary"]
     )
     assert by_type["main_pipeline_preview"]["executor_policy"]["preview_only"] is True
     assert by_type["main_pipeline_preview"]["summary"]["queue_mutation"] is False

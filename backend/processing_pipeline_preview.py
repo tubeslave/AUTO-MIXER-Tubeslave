@@ -2485,8 +2485,20 @@ def build_main_pipeline_preview(
             "summary": registry_snapshot.get("summary", {}),
             "pipeline_profiles": registry_snapshot.get("pipeline_profiles", []),
             "methods": registry_snapshot.get("methods", []),
+            "project_goal_capability_matrix": registry_snapshot.get(
+                "project_goal_capability_matrix",
+                {},
+            ),
             "project_goal_capability_progress_snapshot": registry_snapshot.get(
                 "project_goal_capability_progress_snapshot",
+                {},
+            ),
+            "autonomy_promotion_readiness": registry_snapshot.get(
+                "autonomy_promotion_readiness",
+                {},
+            ),
+            "autonomy_mode_transition_gate": registry_snapshot.get(
+                "autonomy_mode_transition_gate",
                 {},
             ),
         },
