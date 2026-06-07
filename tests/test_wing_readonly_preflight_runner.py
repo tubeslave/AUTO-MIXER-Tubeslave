@@ -665,6 +665,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["live_authority_granted"] is False
     assert written["operator_required"] is True
     assert written["expected_plan_required_for_real_run"] is True
+    assert written["physical_preflight_requires_existing_backend_connection"] is True
     assert written["manual_review_required_before_readiness_update"] is True
     assert written["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
     assert written["read_only"] is True

@@ -26,6 +26,7 @@ def _valid_wing_preflight_summary() -> dict:
         "expected_plan_match": True,
         "expected_plan_violations": [],
         "expected_plan_required_for_real_run": True,
+        "physical_preflight_requires_existing_backend_connection": True,
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,

@@ -35,6 +35,7 @@ def _valid_summary() -> dict:
         "expected_plan_match": True,
         "expected_plan_violations": [],
         "expected_plan_required_for_real_run": True,
+        "physical_preflight_requires_existing_backend_connection": True,
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -261,6 +262,19 @@ def test_preflight_evidence_rejects_missing_expected_plan_link():
     assert "expected_plan_violations_not_empty" in validation["violations"]
     assert (
         "expected_plan_required_for_real_run_not_true" in validation["violations"]
+    )
+
+
+def test_preflight_evidence_rejects_missing_existing_backend_connection_boundary():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact.pop("physical_preflight_requires_existing_backend_connection")
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert (
+        "physical_preflight_requires_existing_backend_connection_not_true"
+        in validation["violations"]
     )
 
 

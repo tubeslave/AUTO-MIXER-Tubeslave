@@ -95,6 +95,7 @@ The summary must show:
 - `proposal_request_sent: false`
 - `forbidden_request_types_sent: []`
 - `require_physical_readback: true`
+- `physical_preflight_requires_existing_backend_connection: true`
 - `request_id_policy: required_for_every_query_mixer_parameter_response`
 - `expected_plan_path: artifacts/wing_readonly_preflight_plan/latest_plan.json`
 - `expected_plan_match: true`
@@ -215,6 +216,8 @@ Then update:
 - a `query_mixer_parameter` response does not match its request identity;
 - a `query_mixer_parameter` response omits or mismatches the request id;
 - the real run omits the expected offline plan or does not match it;
+- the summary does not prove the run required an already-connected
+  backend/WING session;
 - the run contacts the wrong mixer;
 - the operator cannot confirm the selected channel;
 - `operator_confirmed_channels` is missing or does not exactly match
