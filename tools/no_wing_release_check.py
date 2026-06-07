@@ -431,6 +431,13 @@ WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES = (
     "connect_mixer",
     "disconnect_mixer",
 )
+WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS = (
+    "wing_readonly_connection_proof",
+    "physical_console_readback_proof",
+    "supervised_fader_write_proof",
+    "supervised_gain_down_trim_proof",
+    "readiness_matrix_update_based_on_real_proof",
+)
 WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS = (
     "backend_not_in_wing_mode",
     "event_log_wing_mode_not_proven",
@@ -3432,11 +3439,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
 
     if required_checklist != list(WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS):
         violations.append("wing_readonly_preflight_handoff_packet_checklist_mismatch")
-    for required_blocker in (
-        "wing_readonly_connection_proof",
-        "physical_console_readback_proof",
-        "readiness_matrix_update_based_on_real_proof",
-    ):
+    required_blockers = list(
+        WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
+    )
+    if blockers != required_blockers:
+        violations.append("wing_readonly_preflight_handoff_packet_blockers_mismatch")
+    for required_blocker in required_blockers:
         if required_blocker not in blockers:
             violations.append(
                 f"wing_readonly_preflight_handoff_packet_blocker_{required_blocker}_missing"
@@ -3506,6 +3514,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
     )
     detail["blockers_not_closed_by_packet"] = list(blockers)
+    detail["required_not_closed_blockers"] = list(
+        WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
+    )
     detail["operator_sequence_count"] = len(operator_sequence)
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)

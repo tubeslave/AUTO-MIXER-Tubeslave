@@ -43,6 +43,9 @@ FORBIDDEN_LIVE_REQUEST_TYPES = list(
 REQUIRED_REVIEW_CHECKLIST_IDS = list(
     no_wing_release_check.WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
 )
+NOT_CLOSED_BLOCKERS = list(
+    no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
+)
 
 
 def utc_now() -> str:
@@ -253,13 +256,7 @@ def build_handoff_packet(
         ],
         "required_review_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
         "forbidden_live_request_types": list(FORBIDDEN_LIVE_REQUEST_TYPES),
-        "blockers_not_closed_by_packet": [
-            "wing_readonly_connection_proof",
-            "physical_console_readback_proof",
-            "supervised_fader_write_proof",
-            "supervised_gain_down_trim_proof",
-            "readiness_matrix_update_based_on_real_proof",
-        ],
+        "blockers_not_closed_by_packet": list(NOT_CLOSED_BLOCKERS),
         "next_manual_artifact_required": "real wing_readonly_preflight.v1 summary.json",
     }
 

@@ -105,6 +105,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
     )
     assert "wing_readonly_connection_proof" in packet["blockers_not_closed_by_packet"]
+    assert packet["blockers_not_closed_by_packet"] == list(
+        no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
+    )
 
 
 def test_handoff_packet_forbidden_live_request_types_matches_release_check_contract():

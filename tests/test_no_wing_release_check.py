@@ -2199,6 +2199,12 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["required_forbidden_live_request_types"] == list(
         release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
     )
+    assert result.detail["blockers_not_closed_by_packet"] == list(
+        release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
+    )
+    assert result.detail["required_not_closed_blockers"] == list(
+        release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
+    )
     assert "physical_console_readback_proof" in result.detail[
         "blockers_not_closed_by_packet"
     ]
