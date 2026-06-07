@@ -138,17 +138,23 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _is_utc_timestamp(value: str) -> bool:
+def _parse_utc_timestamp(value: str) -> datetime | None:
     if not value:
-        return False
+        return None
     normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
     try:
         parsed = datetime.fromisoformat(normalized)
     except ValueError:
-        return False
+        return None
     if parsed.tzinfo is None:
-        return False
-    return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
+        return None
+    if parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+        return None
+    return parsed
+
+
+def _is_utc_timestamp(value: str) -> bool:
+    return _parse_utc_timestamp(value) is not None
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
@@ -372,6 +378,25 @@ def _validate_event_log(
     event_sequences = tuple(_safe_int(event.get("seq")) for event in events)
     if event_sequences != tuple(range(1, len(events) + 1)):
         violations.append("event_log_seq_sequence_invalid")
+    captured_timestamp = _parse_utc_timestamp(str(payload.get("captured_at") or ""))
+    parsed_event_timestamps: list[datetime] = []
+    for index, event in enumerate(events):
+        raw_timestamp = event.get("timestamp")
+        if not isinstance(raw_timestamp, str) or not raw_timestamp:
+            violations.append(f"event_log_timestamp_missing:{index}")
+            continue
+        parsed_timestamp = _parse_utc_timestamp(raw_timestamp)
+        if parsed_timestamp is None:
+            violations.append(f"event_log_timestamp_invalid:{index}")
+            continue
+        parsed_event_timestamps.append(parsed_timestamp)
+        if captured_timestamp is not None and parsed_timestamp > captured_timestamp:
+            violations.append(f"event_log_timestamp_after_captured_at:{index}")
+    if any(
+        previous > current
+        for previous, current in zip(parsed_event_timestamps, parsed_event_timestamps[1:])
+    ):
+        violations.append("event_log_timestamp_sequence_invalid")
     event_types = tuple(str(event.get("event_type") or "") for event in events)
     if len(event_types) % 2 != 0 or any(
         event_types[index : index + 2] != ("send", "recv")

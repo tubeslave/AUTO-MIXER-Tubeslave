@@ -120,6 +120,8 @@ The event log must show only these request types:
 The event log must also be strict `send`/`recv` pairs. The request order must
 be `get_operator_mode`, `get_state`, then `query_mixer_parameter` rows, and each
 query must match its readback by request id, channel, value type, and address.
+Event timestamps must be valid UTC values, monotonic in event order, and not
+later than `summary.json` `captured_at`.
 
 The offline review report must show:
 
@@ -235,6 +237,8 @@ Then update:
 - backend returns an unexpected response type for the request in flight;
 - `events.jsonl` is missing or does not match `summary.json`;
 - `events.jsonl` is not strict `send`/`recv` pairs;
+- `events.jsonl` timestamps are invalid, non-monotonic, or later than
+  `captured_at`;
 - a `query_mixer_parameter` response does not match its request identity;
 - a `query_mixer_parameter` response omits or mismatches the request id;
 - the real run omits the expected offline plan or does not match it;

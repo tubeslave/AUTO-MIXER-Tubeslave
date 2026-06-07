@@ -582,6 +582,48 @@ def test_file_preflight_artifact_rejects_non_contiguous_event_sequence(tmp_path)
     assert "event_log_seq_sequence_invalid" in evidence["summary"]["violations"]
 
 
+def test_file_preflight_artifact_rejects_invalid_event_timestamp(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events[2]["timestamp"] = "2026-06-06 12:00:00"
+    _write_file_artifact(tmp_path / "preflight" / "bad-timestamp", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_timestamp_invalid:2" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_rejects_non_monotonic_event_timestamps(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events[3]["timestamp"] = "2026-06-06T11:59:59.999Z"
+    _write_file_artifact(tmp_path / "preflight" / "backward-timestamp", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_timestamp_sequence_invalid" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_rejects_event_timestamp_after_capture(tmp_path):
+    summary = _valid_summary()
+    events = _valid_events(summary)
+    events[-1]["timestamp"] = "2026-06-07T01:00:00.001Z"
+    _write_file_artifact(tmp_path / "preflight" / "future-event", summary=summary, events=events)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_timestamp_after_captured_at:7" in evidence["summary"]["violations"]
+
+
 def test_file_preflight_artifact_rejects_query_readback_identity_mismatch(tmp_path):
     summary = _valid_summary()
     events = _valid_events(summary)
