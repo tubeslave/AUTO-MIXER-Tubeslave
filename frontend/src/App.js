@@ -19,6 +19,8 @@ import {
   DashboardView,
   TransportBar,
 } from './components/ControlCenterViews';
+import { toUiMode } from './services/operatorAdapters';
+import { getModeDisplayLabel } from './utils/prototypeTone';
 
 // Color map for routing roles
 const ROLE_COLORS = {
@@ -55,6 +57,23 @@ const NAV_ITEMS = [
 
 const CONTROL_CENTER_TABS = new Set(['dashboard', 'agentsConsole', 'channelList', 'connections']);
 
+function formatOperatorModeLabel(modeValue) {
+  const normalized = String(modeValue || '').trim().toLowerCase();
+  if (['analyze', 'analysis', 'analysis mode', 'analysis_mode', 'analysismode'].includes(normalized)) {
+    return getModeDisplayLabel('Analyze');
+  }
+  if (['assist', 'assisted', 'assisted mixing', 'assistedmixing', 'assist mode'].includes(normalized)) {
+    return getModeDisplayLabel('Assist');
+  }
+  if (['supervised', 'supervised automix', 'supervised automix mode', 'supervised mode'].includes(normalized)) {
+    return getModeDisplayLabel('Supervised');
+  }
+  if (['auto', 'autonomous', 'full autonomous', 'full autonomous mixing', 'full autonomous mixing mode', 'auto mode'].includes(normalized)) {
+    return getModeDisplayLabel('Auto');
+  }
+  return getModeDisplayLabel(toUiMode(normalized));
+}
+
 function App() {
   const [serverConnected, setServerConnected] = useState(false);
   const [mixerConnected, setMixerConnected] = useState(false);
@@ -85,10 +104,10 @@ function App() {
   const isControlCenterTab = CONTROL_CENTER_TABS.has(activeTab);
   const operatorMode = operatorModeStatus?.mode || 'assist';
   const operatorModeOptions = operatorModeStatus?.available_modes || [
-    { key: 'analyze', label: 'Analyze' },
-    { key: 'assist', label: 'Assist' },
-    { key: 'supervised', label: 'Supervised' },
-    { key: 'auto', label: 'Auto' },
+    { key: 'analyze' },
+    { key: 'assist' },
+    { key: 'supervised' },
+    { key: 'auto' },
   ];
 
   useEffect(() => {
@@ -493,12 +512,14 @@ function App() {
                 disabled={!serverConnected}
               >
                 {operatorModeOptions.map((mode) => (
-                  <option key={mode.key} value={mode.key}>{mode.label}</option>
+                  <option key={mode.key} value={mode.key}>
+                    {formatOperatorModeLabel(mode.label || mode.key)}
+                  </option>
                 ))}
               </select>
             </label>
             <div className={`mode-badge operator-${operatorMode}`}>
-              {operatorModeStatus?.label || 'Assist'} · {operatorModeStatus?.live_write_policy || 'suggestions_only'}
+              {formatOperatorModeLabel(operatorModeStatus?.mode || operatorMode)} · {operatorModeStatus?.live_write_policy || 'suggestions_only'}
             </div>
           </div>
         </div>

@@ -1,5 +1,7 @@
 import React from 'react';
 import './ControlCenterViews.css';
+import { getModeDisplayLabel } from '../utils/prototypeTone';
+import { toUiMode } from '../services/operatorAdapters';
 
 const mixChannels = [
   { id: 1, name: 'Kick In', role: 'Kick', group: 'DRUMS', level: -12.4, lufs: -14.2, dynamic: 8.1, confidence: 98 },
@@ -99,6 +101,23 @@ function proposalApplyState(item, operatorCanApply) {
   if (!item?.can_apply) return { tone: 'state-yellow', text: 'Только анализ' };
   if (!operatorCanApply) return { tone: 'state-yellow', text: 'Применение заблокировано режимом' };
   return { tone: 'state-green', text: 'Можно применить через supervised' };
+}
+
+function operatorModeDisplayLabel(modeValue) {
+  const normalized = String(modeValue || '').trim().toLowerCase();
+  if (['analyze', 'analysis', 'analysis mode', 'analysis_mode', 'analysismode'].includes(normalized)) {
+    return getModeDisplayLabel('Analyze');
+  }
+  if (['assist', 'assisted', 'assisted mixing', 'assistedmixing', 'assist mode'].includes(normalized)) {
+    return getModeDisplayLabel('Assist');
+  }
+  if (['supervised', 'supervised automix', 'supervised automix mode', 'supervised mode'].includes(normalized)) {
+    return getModeDisplayLabel('Supervised');
+  }
+  if (['auto', 'autonomous', 'full autonomous', 'full autonomous mixing', 'full autonomous mixing mode', 'auto mode'].includes(normalized)) {
+    return getModeDisplayLabel('Auto');
+  }
+  return getModeDisplayLabel(toUiMode(normalized));
 }
 
 function ProposalChangeList({ item }) {
@@ -232,7 +251,7 @@ function DirectorPanel({ decisionQueue, operatorModeStatus, proposalActions }) {
   const queueAvailable = decisionQueue?.proposal_queue_available !== false;
   const agentRuntimeAvailable = decisionQueue?.agent_runtime_available === true;
   const canApply = operatorModeStatus?.capabilities?.can_apply_to_console === true;
-  const modeLabel = operatorModeStatus?.label || 'Assist';
+  const modeLabel = operatorModeDisplayLabel(operatorModeStatus?.mode || operatorModeStatus?.label);
   const currentGoal = queueAvailable
     ? 'Обеспечить читаемость вокала и сбалансированный микс в рамках текущей политики режима.'
     : 'Очередь предложений недоступна; экран показывает read-only состояние backend без фиктивных применений.';
@@ -406,7 +425,7 @@ export function AgentsConsoleView({ decisionQueue, operatorModeStatus, proposalA
     <div className="console-page">
       <div className="console-main">
         <div className="page-heading">
-          <div><h2>Консоль агентов</h2><p>Mode: {operatorModeStatus?.label || 'Assist'} · {rosterRows.length ? 'backend roster' : agentAvailable ? 'runtime connected' : 'runtime unavailable'} · Analysis: {operatorAnalysisReport?.status || 'idle'}</p></div>
+          <div><h2>Консоль агентов</h2><p>Mode: {operatorModeDisplayLabel(operatorModeStatus?.mode || operatorModeStatus?.label)} · {rosterRows.length ? 'backend roster' : agentAvailable ? 'runtime connected' : 'runtime unavailable'} · Analysis: {operatorAnalysisReport?.status || 'idle'}</p></div>
           <div className="page-actions">
             <button className="ghost-action" onClick={() => proposalActions?.onImportSafeGain?.()}>SafeGain</button>
             <button className="ghost-action" onClick={() => proposalActions?.onImportSoundcheck?.()}>Soundcheck</button>
