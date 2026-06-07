@@ -32,10 +32,15 @@ from tools.no_wing_release_check import (
     raw_mixer_readback_contract_summary,
     read_surface_physical_readback_acceptance_template_path_for_run,
     read_surface_physical_readback_acceptance_template_artifact_summary,
+    read_surface_physical_readback_artifact_review_queue_artifact_summary,
+    read_surface_physical_readback_artifact_review_queue_path_for_run,
+    read_surface_physical_readback_capture_packet_artifact_summary,
     read_surface_physical_readback_capture_packet_path_for_run,
     read_surface_physical_readback_artifact_review_queue_summary,
     read_surface_physical_readback_fixture_acceptance_ledger_summary,
+    read_surface_physical_readback_fixture_closure_plan_artifact_summary,
     read_surface_physical_readback_fixture_closure_plan_summary,
+    read_surface_physical_readback_fixture_closure_plan_path_for_run,
     read_surface_physical_readback_capture_plan_summary,
     wing_readonly_preflight_evidence_summary,
     wing_readonly_preflight_handoff_packet_artifact_summary,
@@ -65,9 +70,12 @@ from tools.no_wing_release_check import (
     validate_fx_slots_inserts_physical_readback_contract_snapshot,
     validate_matrix_state_physical_readback_artifact_intake_snapshot,
     validate_matrix_state_physical_readback_contract_snapshot,
+    validate_read_surface_physical_readback_artifact_review_queue_artifact_snapshot,
     validate_read_surface_physical_readback_artifact_review_queue_snapshot,
     validate_read_surface_physical_readback_acceptance_template_artifact_snapshot,
+    validate_read_surface_physical_readback_capture_packet_artifact_snapshot,
     validate_read_surface_physical_readback_fixture_acceptance_ledger_snapshot,
+    validate_read_surface_physical_readback_fixture_closure_plan_artifact_snapshot,
     validate_read_surface_physical_readback_fixture_closure_plan_snapshot,
     validate_wing_readonly_preflight_evidence_snapshot,
     validate_wing_readonly_preflight_handoff_packet_artifact_snapshot,
@@ -833,6 +841,187 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
     }
 
 
+def valid_read_surface_capture_packet_payload() -> dict:
+    return {
+        "type": "read_surface_physical_readback_capture_packet",
+        "generated_at": "2026-06-07T00:00:00Z",
+        "status": "operator_capture_required",
+        "source_plan_status": "operator_capture_required",
+        "source_method_id": "read_surface_physical_readback_capture_plan",
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "operator_required": True,
+        "execution_allowed_by_packet": False,
+        "live_widening_allowed": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "physical_fixture_missing_surface_ids": [
+            "raw_mixer_state_cache",
+            "channel_identity_and_basic_controls",
+        ],
+        "physical_gap_surface_count": 2,
+        "next_physical_readback_surface_id": "raw_mixer_state_cache",
+        "next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
+        "target_action_consistency": True,
+        "capture_step_count": 1,
+        "required_artifact_contracts": [
+            "physical_readback_fixture",
+            "raw_mixer_state_physical_readback_contract",
+        ],
+        "blocked_by": [
+            "physical_readback_fixtures_incomplete",
+            "operator_must_capture_and_review_physical_readback_artifact",
+        ],
+        "step": {
+            "surface_id": "raw_mixer_state_cache",
+            "remediation_action_id": "remediate_raw_mixer_state_cache",
+            "target_console_surface": "all_cached_addresses",
+            "read_mode": "cached_state",
+            "contract_method_id": "raw_mixer_state_physical_readback_contract",
+            "expected_artifacts": [
+                "Read DTO for all_cached_addresses with explicit coverage flags.",
+                "Raw mixer-state physical readback artifact validated by raw_mixer_state_physical_readback_contract.",
+            ],
+            "blockers_to_clear": [
+                "physical_readback_fixture_missing",
+                "hardware_parity_unproven",
+            ],
+            "forbidden_actions": [
+                "do not apply fader, gain, trim, pan, mute, EQ, dynamics, gate, routing, DCA, matrix, FX, scene, or preset changes",
+                "do not transmit OSC, MIDI, TCP, or websocket mixer-control messages",
+                "do not change safety rows, operator mode, promotion readiness, or live-write policy from this plan",
+            ],
+        },
+        "operator_sequence": [
+            "Confirm the intended console, show state, and read-only capture scope.",
+            "Use operator-approved read-only tooling outside this packet to capture the physical readback artifact.",
+            "Reject the artifact if the capture path would transmit a mixer-control command.",
+            "Validate the artifact against the required physical readback contract.",
+            "Review the artifact manually before changing fixture baselines or autonomy readiness.",
+        ],
+        "commands": {
+            "focused_validation": [
+                "PYTHONPATH=backend",
+                "python3",
+                "-m",
+                "pytest",
+                "-q",
+                "tests/test_read_surface_physical_readback_capture_plan.py",
+                "tests/test_no_wing_release_check.py",
+            ],
+        },
+    }
+
+
+def valid_read_surface_artifact_review_queue_payload() -> dict:
+    queue_items = []
+    for spec in release_check.INTAKE_SPECS:
+        queue_items.append(
+            {
+                "method_id": spec["method_id"],
+                "available": True,
+                "schema_id": "physical_readback.v1",
+                "intake_status": "operator_artifact_missing",
+                "surface_id": spec["surface_id"],
+                "remediation_action_id": spec["remediation_action_id"],
+                "required_contract_method_id": spec["required_contract_method_id"],
+                "status": "operator_artifact_missing",
+                "artifact_count": 0,
+                "valid_candidate_count": 0,
+                "invalid_candidate_count": 0,
+                "accepted_as_physical_fixture_candidate": False,
+                "source_accepted_as_physical_fixture_candidate_claimed": False,
+                "operator_review_required": True,
+                "source_operator_review_required_claimed": True,
+                "physical_fixture_gap_remains": True,
+                "source_physical_fixture_gap_remains_claimed": True,
+                "fixture_closure_allowed_by_queue": False,
+                "fixture_closure_allowed_by_intake": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+                "target_consistency": True,
+                "unsafe_authority_flags": [],
+                "artifact_source_ids": [],
+                "blocked_by": [
+                    "operator_must_capture_physical_readback_artifact",
+                ],
+                "violations": [],
+            }
+        )
+    return {
+        "type": "read_surface_physical_readback_artifact_review_queue",
+        "generated_at": "2026-06-07T00:00:00Z",
+        "method_id": "read_surface_physical_readback_artifact_review_queue",
+        "status": "operator_artifact_capture_required",
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_queue": False,
+            "fixture_closure_allowed_by_queue": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "summary": {
+            "intake_surface_count": len(queue_items),
+            "available_intake_count": len(queue_items),
+            "artifact_count": 0,
+            "valid_candidate_count": 0,
+            "invalid_candidate_count": 0,
+            "review_candidate_count": 0,
+            "missing_artifact_surface_count": len(queue_items),
+            "unsafe_authority_claim_count": 0,
+            "target_inconsistent_surface_count": 0,
+            "review_candidate_surface_ids": [],
+            "invalid_surface_ids": [],
+            "missing_artifact_surface_ids": [
+                spec["surface_id"] for spec in release_check.INTAKE_SPECS
+            ],
+            "unsafe_authority_surface_ids": [],
+            "target_inconsistent_surface_ids": [],
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "execution_allowed_by_queue": False,
+            "fixture_closure_allowed_by_queue": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "promotion_families_requiring_surface": [],
+            "blocked_by": ["operator_must_capture_missing_physical_readback_artifacts"],
+            "next_global_step": "Operator captures missing physical readback artifacts.",
+            "queue_item_method_ids": [
+                spec["method_id"] for spec in release_check.INTAKE_SPECS
+            ],
+        },
+        "queue_items": queue_items,
+        "operator_sequence": [
+            "Confirm every listed candidate came from a physical readback artifact intake.",
+            "Reject the queue if any candidate reports live, mutation, query, or closure authority.",
+            "Review valid candidates manually before preparing acceptance records.",
+            "Capture or replace any missing or invalid physical readback artifacts.",
+            "Run the focused validation command before using the acceptance template.",
+        ],
+        "commands": {
+            "focused_validation": [
+                "PYTHONPATH=backend",
+                "python3",
+                "-m",
+                "pytest",
+                "-q",
+                "tests/test_read_surface_physical_readback_artifact_review_queue.py",
+                "tests/test_no_wing_release_check.py",
+            ],
+        },
+    }
+
+
 def valid_read_surface_acceptance_template_payload() -> dict:
     return {
         "type": "read_surface_physical_readback_fixture_acceptance_template",
@@ -881,6 +1070,279 @@ def valid_read_surface_acceptance_template_payload() -> dict:
             ],
         },
     }
+
+
+def valid_read_surface_fixture_closure_plan_artifact_payload() -> dict:
+    return {
+        "type": "read_surface_physical_readback_fixture_closure_plan",
+        "generated_at": "2026-06-07T00:00:00Z",
+        "method_id": "read_surface_physical_readback_fixture_closure_plan",
+        "source_method_id": "read_surface_physical_readback_fixture_acceptance_ledger",
+        "status": "fixture_closure_not_ready",
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_plan": False,
+            "fixture_update_allowed_by_plan": False,
+            "fixture_closure_allowed_by_plan": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "summary": {
+            "ledger_status": "operator_acceptance_required",
+            "review_candidate_count": 0,
+            "acceptance_record_count": 0,
+            "accepted_record_count": 0,
+            "rejected_record_count": 0,
+            "invalid_record_count": 0,
+            "unreviewed_candidate_count": 0,
+            "closure_candidate_count": 0,
+            "closure_candidate_surface_ids": [],
+            "rejected_surface_ids": [],
+            "invalid_record_ids": [],
+            "unreviewed_candidate_surface_ids": [],
+            "manual_fixture_closure_candidate_available": False,
+            "manual_fixture_closure_required": True,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "fixture_update_allowed_by_plan": False,
+            "fixture_closure_allowed_by_plan": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "blocked_by": [
+                "accepted_physical_readback_candidate_required_before_fixture_closure"
+            ],
+            "next_global_step": "Operator needs accepted physical readback candidates first.",
+        },
+        "closure_candidates": [],
+        "operator_sequence": [
+            "Confirm every physical readback candidate was reviewed by an operator.",
+            "Reject this plan if any acceptance record is invalid, ambiguous, or unreviewed.",
+            "Keep fixture_update_allowed_by_plan and fixture_closure_allowed_by_plan false.",
+            "Perform any fixture baseline update as a separate manual repository change.",
+            "Run the focused validation command before considering a separate closure decision.",
+        ],
+        "commands": {
+            "focused_validation": [
+                "PYTHONPATH=backend",
+                "python3",
+                "-m",
+                "pytest",
+                "-q",
+                "tests/test_read_surface_physical_readback_fixture_closure_plan.py",
+                "tests/test_no_wing_release_check.py",
+            ],
+        },
+    }
+
+
+def test_no_wing_release_check_validates_read_surface_capture_packet_artifact(
+    tmp_path,
+):
+    packet_path = tmp_path / "read_surface_physical_readback_capture_packet.json"
+    packet_path.write_text(
+        json.dumps(valid_read_surface_capture_packet_payload()),
+        encoding="utf-8",
+    )
+
+    result = validate_read_surface_physical_readback_capture_packet_artifact_snapshot(
+        packet_path
+    )
+
+    assert result.status == "passed"
+    assert (
+        result.detail["policy"]
+        == "read_surface_physical_readback_capture_packet_artifact_is_readonly_operator_gate"
+    )
+    assert result.detail["packet_path"] == str(packet_path)
+    assert result.detail["packet_status"] == "operator_capture_required"
+    assert result.detail["source_plan_status"] == "operator_capture_required"
+    assert result.detail["read_only"] is True
+    assert result.detail["live_write"] is False
+    assert result.detail["mutates_console_state"] is False
+    assert result.detail["queries_console"] is False
+    assert result.detail["executes_tests"] is False
+    assert result.detail["operator_required"] is True
+    assert result.detail["execution_allowed_by_packet"] is False
+    assert result.detail["live_widening_allowed"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["physical_gap_surface_count"] == 2
+    assert result.detail["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert (
+        result.detail["next_physical_readback_action_id"]
+        == "remediate_raw_mixer_state_cache"
+    )
+    assert result.detail["target_action_consistency"] is True
+    assert result.detail["capture_step_count"] == 1
+    assert "physical_readback_fixture" in result.detail["required_artifact_contracts"]
+    assert result.detail["step_surface_id"] == "raw_mixer_state_cache"
+    assert result.detail["step_target_console_surface"] == "all_cached_addresses"
+    assert result.detail["step_read_mode"] == "cached_state"
+    assert (
+        result.detail["step_contract_method_id"]
+        == "raw_mixer_state_physical_readback_contract"
+    )
+    assert result.detail["step_expected_artifact_count"] == 2
+    assert result.detail["step_blocker_count"] == 2
+    assert result.detail["operator_sequence_count"] == 5
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_missing_read_surface_capture_packet_artifact(
+    tmp_path,
+):
+    result = validate_read_surface_physical_readback_capture_packet_artifact_snapshot(
+        tmp_path / "missing-capture-packet.json"
+    )
+
+    assert result.status == "failed"
+    assert (
+        "read_surface_physical_readback_capture_packet_artifact_missing_report"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_unsafe_read_surface_capture_packet_artifact(
+    tmp_path,
+):
+    packet_path = tmp_path / "unsafe-capture-packet.json"
+    payload = valid_read_surface_capture_packet_payload()
+    payload["queries_console"] = True
+    payload["execution_allowed_by_packet"] = True
+    payload["live_authority_granted"] = True
+    payload["physical_gap_surface_count"] = 3
+    payload["step"]["forbidden_actions"] = [
+        "do not apply fader, gain, trim, pan, mute, EQ, dynamics, gate, routing, DCA, matrix, FX, scene, or preset changes",
+    ]
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_read_surface_physical_readback_capture_packet_artifact_snapshot(
+        packet_path
+    )
+
+    assert result.status == "failed"
+    assert "read_surface_capture_packet_artifact_queries_console_not_false" in result.detail[
+        "violations"
+    ]
+    assert (
+        "read_surface_capture_packet_artifact_execution_allowed_by_packet_not_false"
+        in result.detail["violations"]
+    )
+    assert (
+        "read_surface_capture_packet_artifact_live_authority_granted_not_false"
+        in result.detail["violations"]
+    )
+    assert "read_surface_capture_packet_artifact_gap_count_mismatch" in result.detail[
+        "violations"
+    ]
+    assert (
+        "read_surface_capture_packet_artifact_forbidden_action_missing:do not transmit osc"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_validates_artifact_review_queue_artifact(tmp_path):
+    queue_path = tmp_path / "read_surface_physical_readback_artifact_review_queue.json"
+    queue_path.write_text(
+        json.dumps(valid_read_surface_artifact_review_queue_payload()),
+        encoding="utf-8",
+    )
+
+    result = validate_read_surface_physical_readback_artifact_review_queue_artifact_snapshot(
+        queue_path
+    )
+
+    assert result.status == "passed"
+    assert (
+        result.detail["policy"]
+        == "physical_readback_artifact_review_queue_artifact_is_read_only_operator_gate"
+    )
+    assert result.detail["queue_path"] == str(queue_path)
+    assert result.detail["queue_status"] == "operator_artifact_capture_required"
+    assert result.detail["read_only"] is True
+    assert result.detail["live_write"] is False
+    assert result.detail["mutates_console_state"] is False
+    assert result.detail["queries_console"] is False
+    assert result.detail["executes_tests"] is False
+    assert result.detail["operator_required"] is True
+    assert result.detail["execution_allowed_by_queue"] is False
+    assert result.detail["fixture_closure_allowed_by_queue"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["intake_surface_count"] == len(release_check.INTAKE_SPECS)
+    assert result.detail["available_intake_count"] == len(release_check.INTAKE_SPECS)
+    assert result.detail["artifact_count"] == 0
+    assert result.detail["review_candidate_count"] == 0
+    assert result.detail["missing_artifact_surface_count"] == len(release_check.INTAKE_SPECS)
+    assert result.detail["unsafe_authority_claim_count"] == 0
+    assert result.detail["target_inconsistent_surface_count"] == 0
+    assert result.detail["operator_review_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["operator_sequence_count"] == 5
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_missing_artifact_review_queue_artifact(
+    tmp_path,
+):
+    result = validate_read_surface_physical_readback_artifact_review_queue_artifact_snapshot(
+        tmp_path / "missing-artifact-review-queue.json"
+    )
+
+    assert result.status == "failed"
+    assert (
+        "read_surface_physical_readback_artifact_review_queue_artifact_missing_report"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_unsafe_artifact_review_queue_artifact(
+    tmp_path,
+):
+    queue_path = tmp_path / "unsafe-artifact-review-queue.json"
+    payload = valid_read_surface_artifact_review_queue_payload()
+    payload["safety"]["fixture_closure_allowed_by_queue"] = True
+    payload["safety"]["live_authority_granted"] = True
+    payload["summary"]["fixture_closure_allowed_by_queue"] = True
+    payload["summary"]["live_authority_granted"] = True
+    payload["summary"]["unsafe_authority_claim_count"] = 1
+    payload["queue_items"][0]["unsafe_authority_flags"] = ["live_write"]
+    payload["queue_items"][0]["fixture_closure_allowed_by_queue"] = True
+    payload["queue_items"][0]["live_authority_granted"] = True
+    queue_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_read_surface_physical_readback_artifact_review_queue_artifact_snapshot(
+        queue_path
+    )
+
+    assert result.status == "failed"
+    assert "artifact_review_queue_artifact_fixture_closure_allowed_by_queue_not_false" in result.detail[
+        "violations"
+    ]
+    assert "artifact_review_queue_artifact_live_authority_granted_not_false" in result.detail[
+        "violations"
+    ]
+    assert "artifact_review_queue_artifact_summary_fixture_closure_allowed_by_queue_not_false" in result.detail[
+        "violations"
+    ]
+    assert "artifact_review_queue_artifact_summary_live_authority_granted_not_false" in result.detail[
+        "violations"
+    ]
+    assert "artifact_review_queue_artifact_item_0_fixture_closure_allowed_by_queue_not_false" in result.detail[
+        "violations"
+    ]
+    assert "artifact_review_queue_artifact_item_0_live_authority_granted_not_false" in result.detail[
+        "violations"
+    ]
+    assert "artifact_review_queue_artifact_unsafe_authority_claim_present" in result.detail[
+        "violations"
+    ]
 
 
 def test_no_wing_release_check_validates_read_surface_acceptance_template_artifact(
@@ -995,6 +1457,94 @@ def test_no_wing_release_check_rejects_unsafe_read_surface_acceptance_template_a
     )
     assert result.detail["record_unsafe_flags"] == [
         "record_0_fixture_closure_allowed_by_acceptance"
+    ]
+
+
+def test_no_wing_release_check_validates_fixture_closure_plan_artifact(tmp_path):
+    plan_path = tmp_path / "read_surface_physical_readback_fixture_closure_plan.json"
+    plan_path.write_text(
+        json.dumps(valid_read_surface_fixture_closure_plan_artifact_payload()),
+        encoding="utf-8",
+    )
+
+    result = validate_read_surface_physical_readback_fixture_closure_plan_artifact_snapshot(
+        plan_path
+    )
+
+    assert result.status == "passed"
+    assert (
+        result.detail["policy"]
+        == "physical_readback_fixture_closure_plan_artifact_is_manual_read_only_gate"
+    )
+    assert result.detail["plan_path"] == str(plan_path)
+    assert result.detail["plan_status"] == "fixture_closure_not_ready"
+    assert result.detail["read_only"] is True
+    assert result.detail["live_write"] is False
+    assert result.detail["mutates_console_state"] is False
+    assert result.detail["queries_console"] is False
+    assert result.detail["executes_tests"] is False
+    assert result.detail["operator_required"] is True
+    assert result.detail["execution_allowed_by_plan"] is False
+    assert result.detail["fixture_update_allowed_by_plan"] is False
+    assert result.detail["fixture_closure_allowed_by_plan"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["closure_candidate_count"] == 0
+    assert result.detail["manual_fixture_closure_required"] is True
+    assert result.detail["operator_review_required"] is True
+    assert result.detail["physical_fixture_gap_remains"] is True
+    assert result.detail["operator_sequence_count"] == 5
+    assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_missing_fixture_closure_plan_artifact(
+    tmp_path,
+):
+    result = validate_read_surface_physical_readback_fixture_closure_plan_artifact_snapshot(
+        tmp_path / "missing-fixture-closure-plan.json"
+    )
+
+    assert result.status == "failed"
+    assert (
+        "read_surface_physical_readback_fixture_closure_plan_artifact_missing_report"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_unsafe_fixture_closure_plan_artifact(
+    tmp_path,
+):
+    plan_path = tmp_path / "unsafe-fixture-closure-plan.json"
+    payload = valid_read_surface_fixture_closure_plan_artifact_payload()
+    payload["safety"]["fixture_closure_allowed_by_plan"] = True
+    payload["safety"]["live_authority_granted"] = True
+    payload["summary"]["fixture_closure_allowed_by_plan"] = True
+    payload["summary"]["live_authority_granted"] = True
+    payload["summary"]["closure_candidate_count"] = 1
+    payload["closure_candidates"] = []
+    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_read_surface_physical_readback_fixture_closure_plan_artifact_snapshot(
+        plan_path
+    )
+
+    assert result.status == "failed"
+    assert "fixture_closure_plan_artifact_fixture_closure_allowed_by_plan_not_false" in result.detail[
+        "violations"
+    ]
+    assert "fixture_closure_plan_artifact_live_authority_granted_not_false" in result.detail[
+        "violations"
+    ]
+    assert (
+        "fixture_closure_plan_artifact_summary_fixture_closure_allowed_by_plan_not_false"
+        in result.detail["violations"]
+    )
+    assert (
+        "fixture_closure_plan_artifact_summary_live_authority_granted_not_false"
+        in result.detail["violations"]
+    )
+    assert "fixture_closure_plan_artifact_candidate_count_mismatch" in result.detail[
+        "violations"
     ]
 
 
@@ -3310,7 +3860,9 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "gain_dry_run_proof" in check_names
     assert "wing_readonly_preflight_plan" in check_names
     assert "read_surface_physical_readback_capture_packet" in check_names
+    assert "read_surface_physical_readback_artifact_review_queue" in check_names
     assert "read_surface_physical_readback_acceptance_template" in check_names
+    assert "read_surface_physical_readback_fixture_closure_plan" in check_names
     assert "wing_readonly_preflight_handoff_packet" in check_names
     assert "supervised_proof_artifact_report" in check_names
     assert check_names.index("write_surface_static_scan") < check_names.index("backend_pytest")
@@ -3325,10 +3877,20 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         "read_surface_physical_readback_capture_packet"
     )
     assert check_names.index("read_surface_physical_readback_capture_packet") < check_names.index(
+        "read_surface_physical_readback_artifact_review_queue"
+    )
+    assert check_names.index(
+        "read_surface_physical_readback_artifact_review_queue"
+    ) < check_names.index(
         "read_surface_physical_readback_acceptance_template"
     )
     assert check_names.index(
         "read_surface_physical_readback_acceptance_template"
+    ) < check_names.index(
+        "read_surface_physical_readback_fixture_closure_plan"
+    )
+    assert check_names.index(
+        "read_surface_physical_readback_fixture_closure_plan"
     ) < check_names.index(
         "wing_readonly_preflight_handoff_packet"
     )
@@ -3350,8 +3912,17 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     fixture_check = next(check for check in checks if check.name == "read_surface_fixture_evidence")
     assert "tests/test_read_surface_fixture_evidence.py" in fixture_check.command
     assert "tests/test_read_surface_physical_readback_capture_packet.py" in fixture_check.command
+    assert "tests/test_read_surface_physical_readback_artifact_review_queue.py" in fixture_check.command
     assert (
         "tests/test_read_surface_physical_readback_fixture_acceptance_template.py"
+        in fixture_check.command
+    )
+    assert (
+        "tests/test_read_surface_physical_readback_fixture_acceptance_ledger.py"
+        in fixture_check.command
+    )
+    assert (
+        "tests/test_read_surface_physical_readback_fixture_closure_plan.py"
         in fixture_check.command
     )
     assert "tests/test_raw_mixer_state_physical_readback_contract.py" in fixture_check.command
@@ -3430,9 +4001,25 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "tools/build_read_surface_physical_readback_capture_packet.py" in (
         read_capture_packet_check.command
     )
+    assert "--format" in read_capture_packet_check.command
+    assert "json" in read_capture_packet_check.command
     assert "--quiet" in read_capture_packet_check.command
     assert str(read_surface_physical_readback_capture_packet_path_for_run(tmp_path)) in (
         read_capture_packet_check.command
+    )
+    read_artifact_review_queue_check = next(
+        check
+        for check in checks
+        if check.name == "read_surface_physical_readback_artifact_review_queue"
+    )
+    assert "tools/build_read_surface_physical_readback_artifact_review_queue.py" in (
+        read_artifact_review_queue_check.command
+    )
+    assert "--format" in read_artifact_review_queue_check.command
+    assert "json" in read_artifact_review_queue_check.command
+    assert "--quiet" in read_artifact_review_queue_check.command
+    assert str(read_surface_physical_readback_artifact_review_queue_path_for_run(tmp_path)) in (
+        read_artifact_review_queue_check.command
     )
     wing_plan_check = next(
         check for check in checks if check.name == "wing_readonly_preflight_plan"
@@ -3456,6 +4043,20 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "--quiet" in read_acceptance_template_check.command
     assert str(read_surface_physical_readback_acceptance_template_path_for_run(tmp_path)) in (
         read_acceptance_template_check.command
+    )
+    read_fixture_closure_plan_check = next(
+        check
+        for check in checks
+        if check.name == "read_surface_physical_readback_fixture_closure_plan"
+    )
+    assert "tools/build_read_surface_physical_readback_fixture_closure_plan.py" in (
+        read_fixture_closure_plan_check.command
+    )
+    assert "--format" in read_fixture_closure_plan_check.command
+    assert "json" in read_fixture_closure_plan_check.command
+    assert "--quiet" in read_fixture_closure_plan_check.command
+    assert str(read_surface_physical_readback_fixture_closure_plan_path_for_run(tmp_path)) in (
+        read_fixture_closure_plan_check.command
     )
     gain_check = next(check for check in checks if check.name == "gain_dry_run_proof")
     assert "tools/gain_proof_dry_run_runner.py" in gain_check.command
@@ -4139,6 +4740,24 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
                 ),
                 encoding="utf-8",
             )
+        if check.name == "read_surface_physical_readback_capture_packet":
+            packet_path = read_surface_physical_readback_capture_packet_path_for_run(
+                log_dir.parent
+            )
+            packet_path.parent.mkdir(parents=True, exist_ok=True)
+            packet_path.write_text(
+                json.dumps(valid_read_surface_capture_packet_payload()),
+                encoding="utf-8",
+            )
+        if check.name == "read_surface_physical_readback_artifact_review_queue":
+            queue_path = read_surface_physical_readback_artifact_review_queue_path_for_run(
+                log_dir.parent
+            )
+            queue_path.parent.mkdir(parents=True, exist_ok=True)
+            queue_path.write_text(
+                json.dumps(valid_read_surface_artifact_review_queue_payload()),
+                encoding="utf-8",
+            )
         if check.name == "read_surface_physical_readback_acceptance_template":
             template_path = read_surface_physical_readback_acceptance_template_path_for_run(
                 log_dir.parent
@@ -4146,6 +4765,15 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
             template_path.parent.mkdir(parents=True, exist_ok=True)
             template_path.write_text(
                 json.dumps(valid_read_surface_acceptance_template_payload()),
+                encoding="utf-8",
+            )
+        if check.name == "read_surface_physical_readback_fixture_closure_plan":
+            plan_path = read_surface_physical_readback_fixture_closure_plan_path_for_run(
+                log_dir.parent
+            )
+            plan_path.parent.mkdir(parents=True, exist_ok=True)
+            plan_path.write_text(
+                json.dumps(valid_read_surface_fixture_closure_plan_artifact_payload()),
                 encoding="utf-8",
             )
         if check.name == "supervised_proof_artifact_report":
@@ -4182,10 +4810,16 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     assert "wing_readonly_preflight_plan_artifact_schema" in result_names
     assert "wing_readonly_preflight_handoff_packet_artifact_schema" in result_names
     assert "wing_readonly_preflight_review_decision_ledger_schema" in result_names
+    assert "read_surface_physical_readback_capture_packet_artifact_schema" in result_names
+    assert (
+        "read_surface_physical_readback_artifact_review_queue_artifact_schema"
+        in result_names
+    )
     assert (
         "read_surface_physical_readback_acceptance_template_artifact_schema"
         in result_names
     )
+    assert "read_surface_physical_readback_fixture_closure_plan_artifact_schema" in result_names
     assert "raw_mixer_state_physical_readback_contract_schema" in result_names
     assert "raw_mixer_state_physical_readback_artifact_intake_schema" in result_names
     assert "channel_basic_controls_physical_readback_contract_schema" in result_names
@@ -4235,6 +4869,19 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
         "wing_readonly_preflight_plan_artifact_schema"
     ) < result_names.index("read_surface_physical_readback_capture_packet")
     assert result_names.index("read_surface_physical_readback_capture_packet") < result_names.index(
+        "read_surface_physical_readback_capture_packet_artifact_schema"
+    )
+    assert result_names.index(
+        "read_surface_physical_readback_capture_packet_artifact_schema"
+    ) < result_names.index("read_surface_physical_readback_artifact_review_queue")
+    assert result_names.index(
+        "read_surface_physical_readback_artifact_review_queue"
+    ) < result_names.index(
+        "read_surface_physical_readback_artifact_review_queue_artifact_schema"
+    )
+    assert result_names.index(
+        "read_surface_physical_readback_artifact_review_queue_artifact_schema"
+    ) < result_names.index(
         "read_surface_physical_readback_acceptance_template"
     )
     assert result_names.index(
@@ -4244,6 +4891,14 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     )
     assert result_names.index(
         "read_surface_physical_readback_acceptance_template_artifact_schema"
+    ) < result_names.index("read_surface_physical_readback_fixture_closure_plan")
+    assert result_names.index(
+        "read_surface_physical_readback_fixture_closure_plan"
+    ) < result_names.index(
+        "read_surface_physical_readback_fixture_closure_plan_artifact_schema"
+    )
+    assert result_names.index(
+        "read_surface_physical_readback_fixture_closure_plan_artifact_schema"
     ) < result_names.index("wing_readonly_preflight_handoff_packet")
     assert result_names.index("wing_readonly_preflight_handoff_packet") < result_names.index(
         "wing_readonly_preflight_handoff_packet_artifact_schema"
@@ -5152,6 +5807,96 @@ def test_no_wing_release_check_summary_embeds_read_surface_capture_plan(tmp_path
     assert "execution_allowed_by_plan: `false`" in markdown_summary
     assert "live_authority_granted: `false`" in markdown_summary
     assert "step_remediation_action_id" in markdown_summary
+
+
+def test_no_wing_release_check_summary_embeds_read_surface_capture_packet_artifact(
+    tmp_path,
+):
+    result = CheckResult(
+        name="read_surface_physical_readback_capture_packet_artifact_schema",
+        status="passed",
+        started_at="2026-06-07T00:00:00Z",
+        finished_at="2026-06-07T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "packet_path": "/tmp/read_surface_physical_readback_capture_packet.json",
+            "packet_type": "read_surface_physical_readback_capture_packet",
+            "packet_status": "operator_capture_required",
+            "source_plan_status": "operator_capture_required",
+            "source_method_id": "read_surface_physical_readback_capture_plan",
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_packet": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "physical_fixture_missing_surface_ids": ["raw_mixer_state_cache"],
+            "physical_gap_surface_count": 1,
+            "next_physical_readback_surface_id": "raw_mixer_state_cache",
+            "next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
+            "target_action_consistency": True,
+            "capture_step_count": 1,
+            "required_artifact_contracts": [
+                "physical_readback_fixture",
+                "raw_mixer_state_physical_readback_contract",
+            ],
+            "blocked_by": [
+                "operator_must_capture_and_review_physical_readback_artifact",
+            ],
+            "step_surface_id": "raw_mixer_state_cache",
+            "step_remediation_action_id": "remediate_raw_mixer_state_cache",
+            "step_target_console_surface": "all_cached_addresses",
+            "step_read_mode": "cached_state",
+            "step_contract_method_id": "raw_mixer_state_physical_readback_contract",
+            "step_expected_artifact_count": 2,
+            "step_blocker_count": 2,
+            "step_forbidden_actions": [
+                "do not transmit OSC, MIDI, TCP, or websocket mixer-control messages",
+            ],
+            "operator_sequence_count": 5,
+            "focused_validation": [
+                "tests/test_read_surface_physical_readback_capture_plan.py",
+                "tests/test_no_wing_release_check.py",
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-07T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert read_surface_physical_readback_capture_packet_artifact_summary(
+        [result]
+    ) == summary["read_surface_physical_readback_capture_packet_artifact"]
+    artifact = json_summary[
+        "read_surface_physical_readback_capture_packet_artifact"
+    ]
+    assert artifact["read_only"] is True
+    assert artifact["live_write"] is False
+    assert artifact["queries_console"] is False
+    assert artifact["executes_tests"] is False
+    assert artifact["operator_required"] is True
+    assert artifact["execution_allowed_by_packet"] is False
+    assert artifact["live_authority_granted"] is False
+    assert artifact["full_autonomous_ready"] is False
+    assert artifact["packet_status"] == "operator_capture_required"
+    assert artifact["next_physical_readback_surface_id"] == "raw_mixer_state_cache"
+    assert artifact["target_action_consistency"] is True
+    assert "physical_readback_fixture" in artifact["required_artifact_contracts"]
+    assert "tests/test_no_wing_release_check.py" in artifact["focused_validation"]
+    assert artifact["violations"] == []
+    assert (
+        "## Read Surface Physical Readback Capture Packet Artifact"
+        in markdown_summary
+    )
+    assert "execution_allowed_by_packet: `false`" in markdown_summary
+    assert "all_cached_addresses" in markdown_summary
+    assert "do not transmit OSC" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
@@ -7748,6 +8493,97 @@ def test_no_wing_release_check_summary_embeds_artifact_review_queue(tmp_path):
     assert "full_autonomous_ready: `false`" in markdown_summary
 
 
+def test_no_wing_release_check_summary_embeds_artifact_review_queue_artifact(tmp_path):
+    result = CheckResult(
+        name="read_surface_physical_readback_artifact_review_queue_artifact_schema",
+        status="passed",
+        started_at="2026-06-07T00:00:00Z",
+        finished_at="2026-06-07T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "queue_path": "/tmp/read_surface_physical_readback_artifact_review_queue.json",
+            "queue_type": "read_surface_physical_readback_artifact_review_queue",
+            "queue_status": "operator_artifact_capture_required",
+            "method_id": "read_surface_physical_readback_artifact_review_queue",
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_queue": False,
+            "fixture_closure_allowed_by_queue": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "intake_surface_count": len(release_check.INTAKE_SPECS),
+            "available_intake_count": len(release_check.INTAKE_SPECS),
+            "artifact_count": 0,
+            "valid_candidate_count": 0,
+            "invalid_candidate_count": 0,
+            "review_candidate_count": 0,
+            "missing_artifact_surface_count": len(release_check.INTAKE_SPECS),
+            "unsafe_authority_claim_count": 0,
+            "target_inconsistent_surface_count": 0,
+            "review_candidate_surface_ids": [],
+            "invalid_surface_ids": [],
+            "missing_artifact_surface_ids": [
+                str(spec["surface_id"]) for spec in release_check.INTAKE_SPECS
+            ],
+            "unsafe_authority_surface_ids": [],
+            "target_inconsistent_surface_ids": [],
+            "promotion_families_requiring_surface": ["fader", "gain"],
+            "queue_item_method_ids": [
+                str(spec["method_id"]) for spec in release_check.INTAKE_SPECS
+            ],
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "blocked_by": [
+                "operator_must_capture_missing_physical_readback_artifacts"
+            ],
+            "operator_sequence_count": 5,
+            "focused_validation": [
+                "tests/test_read_surface_physical_readback_artifact_review_queue.py",
+                "tests/test_no_wing_release_check.py",
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-07T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert read_surface_physical_readback_artifact_review_queue_artifact_summary(
+        [result]
+    ) == summary["read_surface_physical_readback_artifact_review_queue_artifact"]
+    artifact = json_summary[
+        "read_surface_physical_readback_artifact_review_queue_artifact"
+    ]
+    assert artifact["read_only"] is True
+    assert artifact["live_write"] is False
+    assert artifact["queries_console"] is False
+    assert artifact["executes_tests"] is False
+    assert artifact["operator_required"] is True
+    assert artifact["execution_allowed_by_queue"] is False
+    assert artifact["fixture_closure_allowed_by_queue"] is False
+    assert artifact["live_authority_granted"] is False
+    assert artifact["full_autonomous_ready"] is False
+    assert artifact["queue_status"] == "operator_artifact_capture_required"
+    assert artifact["review_candidate_count"] == 0
+    assert artifact["review_candidates_available"] is False
+    assert artifact["missing_artifact_surface_count"] == len(release_check.INTAKE_SPECS)
+    assert artifact["physical_fixture_gap_remains"] is True
+    assert artifact["violations"] == []
+    assert (
+        "## Read Surface Physical Readback Artifact Review Queue Artifact"
+        in markdown_summary
+    )
+    assert "fixture_closure_allowed_by_queue: `false`" in markdown_summary
+    assert "live_authority_granted: `false`" in markdown_summary
+    assert "operator_must_capture_missing_physical_readback_artifacts" in markdown_summary
+
+
 def test_no_wing_release_check_summary_embeds_fixture_acceptance_ledger(tmp_path):
     result = CheckResult(
         name="read_surface_physical_readback_fixture_acceptance_ledger_schema",
@@ -7891,6 +8727,96 @@ def test_no_wing_release_check_summary_embeds_fixture_closure_plan(tmp_path):
     assert "closure_candidate_count: `1`" in markdown_summary
 
 
+def test_no_wing_release_check_summary_embeds_fixture_closure_plan_artifact(tmp_path):
+    result = CheckResult(
+        name="read_surface_physical_readback_fixture_closure_plan_artifact_schema",
+        status="passed",
+        started_at="2026-06-07T00:00:00Z",
+        finished_at="2026-06-07T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "plan_path": "/tmp/read_surface_physical_readback_fixture_closure_plan.json",
+            "plan_type": "read_surface_physical_readback_fixture_closure_plan",
+            "plan_status": "fixture_closure_not_ready",
+            "method_id": "read_surface_physical_readback_fixture_closure_plan",
+            "source_method_id": "read_surface_physical_readback_fixture_acceptance_ledger",
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_plan": False,
+            "fixture_update_allowed_by_plan": False,
+            "fixture_closure_allowed_by_plan": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "ledger_status": "operator_acceptance_required",
+            "review_candidate_count": 0,
+            "acceptance_record_count": 0,
+            "accepted_record_count": 0,
+            "rejected_record_count": 0,
+            "invalid_record_count": 0,
+            "unreviewed_candidate_count": 0,
+            "closure_candidate_count": 0,
+            "closure_candidate_surface_ids": [],
+            "rejected_surface_ids": [],
+            "invalid_record_ids": [],
+            "unreviewed_candidate_surface_ids": [],
+            "manual_fixture_closure_candidate_available": False,
+            "manual_fixture_closure_required": True,
+            "operator_review_required": True,
+            "physical_fixture_gap_remains": True,
+            "blocked_by": [
+                "accepted_physical_readback_candidate_required_before_fixture_closure"
+            ],
+            "next_global_step": "Operator needs accepted physical readback candidates first.",
+            "operator_sequence_count": 5,
+            "focused_validation": [
+                "tests/test_read_surface_physical_readback_fixture_closure_plan.py",
+                "tests/test_no_wing_release_check.py",
+            ],
+            "violations": [],
+        },
+    )
+
+    summary = write_summary(tmp_path, [result], generated_at="2026-06-07T00:00:00Z")
+    json_summary = json.loads((tmp_path / "summary.json").read_text())
+    markdown_summary = (tmp_path / "summary.md").read_text()
+
+    assert read_surface_physical_readback_fixture_closure_plan_artifact_summary(
+        [result]
+    ) == summary["read_surface_physical_readback_fixture_closure_plan_artifact"]
+    artifact = json_summary[
+        "read_surface_physical_readback_fixture_closure_plan_artifact"
+    ]
+    assert artifact["read_only"] is True
+    assert artifact["live_write"] is False
+    assert artifact["queries_console"] is False
+    assert artifact["executes_tests"] is False
+    assert artifact["operator_required"] is True
+    assert artifact["execution_allowed_by_plan"] is False
+    assert artifact["fixture_update_allowed_by_plan"] is False
+    assert artifact["fixture_closure_allowed_by_plan"] is False
+    assert artifact["live_authority_granted"] is False
+    assert artifact["full_autonomous_ready"] is False
+    assert artifact["plan_status"] == "fixture_closure_not_ready"
+    assert artifact["closure_candidate_count"] == 0
+    assert artifact["physical_fixture_gap_remains"] is True
+    assert artifact["violations"] == []
+    assert (
+        "## Read Surface Physical Readback Fixture Closure Plan Artifact"
+        in markdown_summary
+    )
+    assert "fixture_update_allowed_by_plan: `false`" in markdown_summary
+    assert "fixture_closure_allowed_by_plan: `false`" in markdown_summary
+    assert (
+        "accepted_physical_readback_candidate_required_before_fixture_closure"
+        in markdown_summary
+    )
+
+
 def test_no_wing_release_check_dlive_state_intake_summary_normalizes_authority_claims():
     result = CheckResult(
         name="dlive_state_physical_readback_artifact_intake_schema",
@@ -7937,7 +8863,7 @@ def test_no_wing_release_check_dlive_state_intake_summary_normalizes_authority_c
     assert summary["violations"] == ["claimed_dlive_authority"]
 
 
-def test_no_wing_release_check_summary_embeds_artifact_review_queue(tmp_path):
+def test_no_wing_release_check_summary_embeds_artifact_review_queue_multiple_candidates(tmp_path):
     result = CheckResult(
         name="read_surface_physical_readback_artifact_review_queue_schema",
         status="passed",

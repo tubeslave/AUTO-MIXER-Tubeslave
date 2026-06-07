@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from backend.processing_registry import (
@@ -16,6 +17,7 @@ from backend.read_surface_physical_readback_fixture_closure_plan import (
 from tests.test_read_surface_physical_readback_fixture_acceptance_ledger import (
     _queue_with_valid_candidate,
 )
+from tools import build_read_surface_physical_readback_fixture_closure_plan as closure_tool
 
 
 def _accepted_ledger():
@@ -68,6 +70,45 @@ def test_fixture_closure_plan_requires_accepted_candidates():
     assert "accepted_physical_readback_candidate_required_before_fixture_closure" in plan[
         "summary"
     ]["blocked_by"]
+
+
+def test_fixture_closure_plan_tool_main_writes_markdown_and_json(tmp_path: Path):
+    markdown_output = tmp_path / "fixture-closure-plan.md"
+    json_output = tmp_path / "fixture-closure-plan.json"
+
+    assert closure_tool.main(["--output", str(markdown_output), "--quiet"]) == 0
+    assert "Read Surface Physical Readback Fixture Closure Plan" in markdown_output.read_text(
+        encoding="utf-8"
+    )
+
+    assert closure_tool.main(["--format", "json", "--output", str(json_output), "--quiet"]) == 0
+    payload = json.loads(json_output.read_text(encoding="utf-8"))
+    assert payload["type"] == "read_surface_physical_readback_fixture_closure_plan"
+    assert payload["safety"]["fixture_closure_allowed_by_plan"] is False
+    assert payload["safety"]["live_authority_granted"] is False
+    assert "operator_sequence" in payload
+    assert "focused_validation" in payload["commands"]
+
+
+def test_fixture_closure_plan_tool_is_transport_free():
+    source = Path(
+        "tools/build_read_surface_physical_readback_fixture_closure_plan.py"
+    ).read_text(encoding="utf-8")
+
+    forbidden = [
+        "WingClient",
+        "DLiveClient",
+        "EnhancedOSCClient",
+        "import socket",
+        "websockets",
+        ".send(",
+        "mixer_client",
+        "set_fader",
+        "set_gain",
+        "apply_operator_proposal",
+    ]
+    for token in forbidden:
+        assert token not in source
 
 
 def test_fixture_closure_plan_surfaces_manual_candidate_without_closing_gap():

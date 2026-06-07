@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from backend.read_surface_physical_readback_artifact_review_queue import (
@@ -11,6 +12,7 @@ from backend.processing_registry import (
     get_processing_method,
 )
 from backend.project_goal_capability_matrix import get_project_goal_capability
+from tools import build_read_surface_physical_readback_artifact_review_queue as queue_tool
 
 
 def _snapshot_for_spec(spec: dict, *, valid: int = 0, invalid: int = 0, live_write: bool = False) -> dict:
@@ -110,6 +112,45 @@ def test_artifact_review_queue_reports_missing_artifacts_without_authority():
     assert len(queue["queue_items"]) == len(INTAKE_SPECS)
     assert all(item["fixture_closure_allowed_by_queue"] is False for item in queue["queue_items"])
     assert all(item["live_authority_granted"] is False for item in queue["queue_items"])
+
+
+def test_artifact_review_queue_tool_main_writes_markdown_and_json(tmp_path: Path):
+    markdown_output = tmp_path / "artifact-review-queue.md"
+    json_output = tmp_path / "artifact-review-queue.json"
+
+    assert queue_tool.main(["--output", str(markdown_output), "--quiet"]) == 0
+    assert "Read Surface Physical Readback Artifact Review Queue" in markdown_output.read_text(
+        encoding="utf-8"
+    )
+
+    assert queue_tool.main(["--format", "json", "--output", str(json_output), "--quiet"]) == 0
+    payload = json.loads(json_output.read_text(encoding="utf-8"))
+    assert payload["type"] == "read_surface_physical_readback_artifact_review_queue"
+    assert payload["safety"]["fixture_closure_allowed_by_queue"] is False
+    assert payload["safety"]["live_authority_granted"] is False
+    assert "operator_sequence" in payload
+    assert "focused_validation" in payload["commands"]
+
+
+def test_artifact_review_queue_tool_is_transport_free():
+    source = Path(
+        "tools/build_read_surface_physical_readback_artifact_review_queue.py"
+    ).read_text(encoding="utf-8")
+
+    forbidden = [
+        "WingClient",
+        "DLiveClient",
+        "EnhancedOSCClient",
+        "import socket",
+        "websockets",
+        ".send(",
+        "mixer_client",
+        "set_fader",
+        "set_gain",
+        "apply_operator_proposal",
+    ]
+    for token in forbidden:
+        assert token not in source
 
 
 def test_artifact_review_queue_surfaces_valid_and_invalid_operator_work():

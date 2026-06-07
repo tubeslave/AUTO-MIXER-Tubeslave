@@ -299,6 +299,7 @@ from backend.read_surface_physical_readback_capture_plan import (  # noqa: E402
     build_read_surface_physical_readback_capture_plan,
 )
 from backend.read_surface_physical_readback_artifact_review_queue import (  # noqa: E402
+    INTAKE_SPECS,
     READ_SURFACE_PHYSICAL_READBACK_ARTIFACT_REVIEW_QUEUE_METHOD_ID,
     READ_SURFACE_PHYSICAL_READBACK_ARTIFACT_REVIEW_QUEUE_STATUSES,
     build_read_surface_physical_readback_artifact_review_queue,
@@ -354,8 +355,14 @@ WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT = (
 READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PACKET_TOOL = (
     "tools/build_read_surface_physical_readback_capture_packet.py"
 )
+READ_SURFACE_PHYSICAL_READBACK_ARTIFACT_REVIEW_QUEUE_TOOL = (
+    "tools/build_read_surface_physical_readback_artifact_review_queue.py"
+)
 READ_SURFACE_PHYSICAL_READBACK_ACCEPTANCE_TEMPLATE_TOOL = (
     "tools/build_read_surface_physical_readback_acceptance_template.py"
+)
+READ_SURFACE_PHYSICAL_READBACK_FIXTURE_CLOSURE_PLAN_TOOL = (
+    "tools/build_read_surface_physical_readback_fixture_closure_plan.py"
 )
 WING_READONLY_PREFLIGHT_REVIEW_EXIT_CODES = {
     "candidate_ready": 0,
@@ -686,8 +693,14 @@ def build_checks(
     read_surface_capture_packet_output = (
         read_surface_physical_readback_capture_packet_path_for_run(run_dir)
     )
+    read_surface_artifact_review_queue_output = (
+        read_surface_physical_readback_artifact_review_queue_path_for_run(run_dir)
+    )
     read_surface_acceptance_template_output = (
         read_surface_physical_readback_acceptance_template_path_for_run(run_dir)
+    )
+    read_surface_fixture_closure_plan_output = (
+        read_surface_physical_readback_fixture_closure_plan_path_for_run(run_dir)
     )
     handoff_packet_output = wing_readonly_preflight_handoff_packet_path_for_run(run_dir)
     gain_proof_root = gain_proof_artifact_root_for_run(run_dir)
@@ -714,7 +727,10 @@ def build_checks(
                 "pytest",
                 "tests/test_read_surface_fixture_evidence.py",
                 "tests/test_read_surface_physical_readback_capture_packet.py",
+                "tests/test_read_surface_physical_readback_artifact_review_queue.py",
                 "tests/test_read_surface_physical_readback_fixture_acceptance_template.py",
+                "tests/test_read_surface_physical_readback_fixture_acceptance_ledger.py",
+                "tests/test_read_surface_physical_readback_fixture_closure_plan.py",
                 "tests/test_raw_mixer_state_physical_readback_contract.py",
                 "tests/test_raw_mixer_state_physical_readback_artifact_intake.py",
                 "tests/test_channel_basic_controls_physical_readback_contract.py",
@@ -798,8 +814,23 @@ def build_checks(
             command=(
                 sys.executable,
                 READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PACKET_TOOL,
+                "--format",
+                "json",
                 "--output",
                 str(read_surface_capture_packet_output),
+                "--quiet",
+            ),
+            cwd=str(repo_root),
+        ),
+        CommandCheck(
+            name="read_surface_physical_readback_artifact_review_queue",
+            command=(
+                sys.executable,
+                READ_SURFACE_PHYSICAL_READBACK_ARTIFACT_REVIEW_QUEUE_TOOL,
+                "--format",
+                "json",
+                "--output",
+                str(read_surface_artifact_review_queue_output),
                 "--quiet",
             ),
             cwd=str(repo_root),
@@ -811,6 +842,19 @@ def build_checks(
                 READ_SURFACE_PHYSICAL_READBACK_ACCEPTANCE_TEMPLATE_TOOL,
                 "--output",
                 str(read_surface_acceptance_template_output),
+                "--quiet",
+            ),
+            cwd=str(repo_root),
+        ),
+        CommandCheck(
+            name="read_surface_physical_readback_fixture_closure_plan",
+            command=(
+                sys.executable,
+                READ_SURFACE_PHYSICAL_READBACK_FIXTURE_CLOSURE_PLAN_TOOL,
+                "--format",
+                "json",
+                "--output",
+                str(read_surface_fixture_closure_plan_output),
                 "--quiet",
             ),
             cwd=str(repo_root),
@@ -932,7 +976,19 @@ def wing_readonly_preflight_plan_path_for_run(run_dir: Path | None) -> Path:
 
 
 def read_surface_physical_readback_capture_packet_path_for_run(run_dir: Path | None) -> Path:
-    return (run_dir or DEFAULT_ARTIFACT_ROOT / "pending") / "read_surface_physical_readback_capture_packet.md"
+    return (
+        (run_dir or DEFAULT_ARTIFACT_ROOT / "pending")
+        / "read_surface_physical_readback_capture_packet.json"
+    )
+
+
+def read_surface_physical_readback_artifact_review_queue_path_for_run(
+    run_dir: Path | None,
+) -> Path:
+    return (
+        (run_dir or DEFAULT_ARTIFACT_ROOT / "pending")
+        / "read_surface_physical_readback_artifact_review_queue.json"
+    )
 
 
 def read_surface_physical_readback_acceptance_template_path_for_run(
@@ -941,6 +997,15 @@ def read_surface_physical_readback_acceptance_template_path_for_run(
     return (
         (run_dir or DEFAULT_ARTIFACT_ROOT / "pending")
         / "read_surface_physical_readback_acceptance_template.json"
+    )
+
+
+def read_surface_physical_readback_fixture_closure_plan_path_for_run(
+    run_dir: Path | None,
+) -> Path:
+    return (
+        (run_dir or DEFAULT_ARTIFACT_ROOT / "pending")
+        / "read_surface_physical_readback_fixture_closure_plan.json"
     )
 
 
@@ -1809,6 +1874,236 @@ def validate_read_surface_physical_readback_capture_plan_snapshot() -> CheckResu
     )
 
 
+def validate_read_surface_physical_readback_capture_packet_artifact_snapshot(
+    packet_path: Path,
+) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "read_surface_physical_readback_capture_packet_artifact_is_readonly_operator_gate",
+        "packet_path": str(packet_path),
+    }
+    violations: list[str] = []
+
+    payload, load_error = _json_object_from_path(packet_path)
+    packet = payload or {}
+    step = packet.get("step") if isinstance(packet.get("step"), Mapping) else {}
+    commands = packet.get("commands") if isinstance(packet.get("commands"), Mapping) else {}
+    physical_ids = (
+        packet.get("physical_fixture_missing_surface_ids")
+        if isinstance(packet.get("physical_fixture_missing_surface_ids"), list)
+        else []
+    )
+    required_contracts = (
+        packet.get("required_artifact_contracts")
+        if isinstance(packet.get("required_artifact_contracts"), list)
+        else []
+    )
+    blocked_by = (
+        packet.get("blocked_by") if isinstance(packet.get("blocked_by"), list) else []
+    )
+    operator_sequence = (
+        packet.get("operator_sequence")
+        if isinstance(packet.get("operator_sequence"), list)
+        else []
+    )
+    expected_artifacts = (
+        step.get("expected_artifacts")
+        if isinstance(step.get("expected_artifacts"), list)
+        else []
+    )
+    blockers_to_clear = (
+        step.get("blockers_to_clear")
+        if isinstance(step.get("blockers_to_clear"), list)
+        else []
+    )
+    forbidden_actions = (
+        step.get("forbidden_actions")
+        if isinstance(step.get("forbidden_actions"), list)
+        else []
+    )
+
+    if load_error:
+        violations.append(
+            f"read_surface_physical_readback_capture_packet_artifact_{load_error}"
+        )
+    if packet.get("type") != "read_surface_physical_readback_capture_packet":
+        violations.append("read_surface_capture_packet_artifact_type_mismatch")
+    if packet.get("source_method_id") != READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PLAN_METHOD_ID:
+        violations.append("read_surface_capture_packet_artifact_source_method_mismatch")
+    if packet.get("status") not in (
+        "operator_capture_required",
+        "read_surface_physical_readback_complete",
+    ):
+        violations.append("read_surface_capture_packet_artifact_status_unknown")
+    if packet.get("source_plan_status") != packet.get("status"):
+        violations.append("read_surface_capture_packet_artifact_source_status_mismatch")
+
+    for key in ("read_only", "operator_required"):
+        if packet.get(key) is not True:
+            violations.append(f"read_surface_capture_packet_artifact_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_packet",
+        "live_widening_allowed",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        if packet.get(key) is not False:
+            violations.append(f"read_surface_capture_packet_artifact_{key}_not_false")
+
+    if not all(isinstance(item, str) and item for item in physical_ids):
+        violations.append("read_surface_capture_packet_artifact_physical_ids_invalid")
+    physical_gap_surface_count = packet.get("physical_gap_surface_count")
+    if (
+        not isinstance(physical_gap_surface_count, int)
+        or physical_gap_surface_count != len(physical_ids)
+    ):
+        violations.append("read_surface_capture_packet_artifact_gap_count_mismatch")
+        physical_gap_surface_count = len(physical_ids)
+    capture_step_count = packet.get("capture_step_count")
+    if not isinstance(capture_step_count, int):
+        violations.append("read_surface_capture_packet_artifact_step_count_missing")
+        capture_step_count = 0
+
+    next_surface_id = packet.get("next_physical_readback_surface_id")
+    next_action_id = packet.get("next_physical_readback_action_id")
+    capture_required = packet.get("status") == "operator_capture_required"
+    if capture_required:
+        if not isinstance(next_surface_id, str) or not next_surface_id:
+            violations.append("read_surface_capture_packet_artifact_next_surface_missing")
+        if not isinstance(next_action_id, str) or not next_action_id:
+            violations.append("read_surface_capture_packet_artifact_next_action_missing")
+        elif next_action_id != f"remediate_{next_surface_id}":
+            violations.append("read_surface_capture_packet_artifact_next_action_mismatch")
+        if packet.get("target_action_consistency") is not True:
+            violations.append(
+                "read_surface_capture_packet_artifact_target_action_consistency_not_true"
+            )
+        if capture_step_count < 1:
+            violations.append("read_surface_capture_packet_artifact_step_count_too_low")
+        if not required_contracts:
+            violations.append("read_surface_capture_packet_artifact_contracts_missing")
+        elif "physical_readback_fixture" not in required_contracts:
+            violations.append(
+                "read_surface_capture_packet_artifact_physical_fixture_contract_missing"
+            )
+        if not blocked_by:
+            violations.append("read_surface_capture_packet_artifact_blocked_by_missing")
+        if not step:
+            violations.append("read_surface_capture_packet_artifact_step_missing")
+        else:
+            if step.get("surface_id") != next_surface_id:
+                violations.append("read_surface_capture_packet_artifact_step_surface_mismatch")
+            if step.get("remediation_action_id") != next_action_id:
+                violations.append("read_surface_capture_packet_artifact_step_action_mismatch")
+            for key in ("target_console_surface", "read_mode", "contract_method_id"):
+                if not isinstance(step.get(key), str) or not step.get(key):
+                    violations.append(
+                        f"read_surface_capture_packet_artifact_step_{key}_missing"
+                    )
+            if not expected_artifacts:
+                violations.append(
+                    "read_surface_capture_packet_artifact_step_expected_artifacts_missing"
+                )
+            if not blockers_to_clear:
+                violations.append(
+                    "read_surface_capture_packet_artifact_step_blockers_missing"
+                )
+            if not forbidden_actions:
+                violations.append(
+                    "read_surface_capture_packet_artifact_step_forbidden_actions_missing"
+                )
+    else:
+        if next_surface_id is not None or next_action_id is not None:
+            violations.append("read_surface_capture_packet_artifact_complete_target_present")
+        if capture_step_count != 0:
+            violations.append("read_surface_capture_packet_artifact_complete_step_count_nonzero")
+        if step:
+            violations.append("read_surface_capture_packet_artifact_complete_step_present")
+        if packet.get("target_action_consistency") is not False:
+            violations.append(
+                "read_surface_capture_packet_artifact_complete_target_consistency_not_false"
+            )
+
+    if len(operator_sequence) < 5:
+        violations.append("read_surface_capture_packet_artifact_operator_sequence_short")
+    focused_validation = commands.get("focused_validation")
+    if not isinstance(focused_validation, list):
+        violations.append("read_surface_capture_packet_artifact_focused_validation_missing")
+        focused_validation = []
+    else:
+        for test_path in (
+            "tests/test_read_surface_physical_readback_capture_plan.py",
+            "tests/test_no_wing_release_check.py",
+        ):
+            if test_path not in focused_validation:
+                violations.append(
+                    "read_surface_capture_packet_artifact_focused_validation_missing:"
+                    f"{test_path}"
+                )
+    forbidden_text = "\n".join(str(item).lower() for item in forbidden_actions)
+    for phrase in (
+        "do not apply",
+        "do not transmit osc",
+        "do not change safety rows",
+    ):
+        if capture_required and phrase not in forbidden_text:
+            violations.append(
+                "read_surface_capture_packet_artifact_forbidden_action_missing:"
+                f"{phrase}"
+            )
+
+    detail["packet_type"] = packet.get("type")
+    detail["packet_status"] = packet.get("status")
+    detail["source_plan_status"] = packet.get("source_plan_status")
+    detail["source_method_id"] = packet.get("source_method_id")
+    detail["read_only"] = packet.get("read_only")
+    detail["live_write"] = packet.get("live_write")
+    detail["mutates_console_state"] = packet.get("mutates_console_state")
+    detail["queries_console"] = packet.get("queries_console")
+    detail["executes_tests"] = packet.get("executes_tests")
+    detail["operator_required"] = packet.get("operator_required")
+    detail["execution_allowed_by_packet"] = packet.get("execution_allowed_by_packet")
+    detail["live_widening_allowed"] = packet.get("live_widening_allowed")
+    detail["live_authority_granted"] = packet.get("live_authority_granted")
+    detail["full_autonomous_ready"] = packet.get("full_autonomous_ready")
+    detail["physical_fixture_missing_surface_ids"] = list(physical_ids)
+    detail["physical_gap_surface_count"] = physical_gap_surface_count
+    detail["next_physical_readback_surface_id"] = next_surface_id
+    detail["next_physical_readback_action_id"] = next_action_id
+    detail["target_action_consistency"] = packet.get("target_action_consistency")
+    detail["capture_step_count"] = capture_step_count
+    detail["required_artifact_contracts"] = list(required_contracts)
+    detail["blocked_by"] = list(blocked_by)
+    detail["step_surface_id"] = step.get("surface_id") if step else None
+    detail["step_remediation_action_id"] = (
+        step.get("remediation_action_id") if step else None
+    )
+    detail["step_target_console_surface"] = (
+        step.get("target_console_surface") if step else None
+    )
+    detail["step_read_mode"] = step.get("read_mode") if step else None
+    detail["step_contract_method_id"] = step.get("contract_method_id") if step else None
+    detail["step_expected_artifact_count"] = len(expected_artifacts)
+    detail["step_blocker_count"] = len(blockers_to_clear)
+    detail["step_forbidden_actions"] = list(forbidden_actions)
+    detail["operator_sequence_count"] = len(operator_sequence)
+    detail["focused_validation"] = list(focused_validation)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="read_surface_physical_readback_capture_packet_artifact_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     started = datetime.now(timezone.utc)
     detail: dict[str, object] = {
@@ -2629,6 +2924,293 @@ def validate_read_surface_physical_readback_acceptance_template_artifact_snapsho
     finished = datetime.now(timezone.utc)
     return CheckResult(
         name="read_surface_physical_readback_acceptance_template_artifact_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
+def validate_read_surface_physical_readback_artifact_review_queue_artifact_snapshot(
+    queue_path: Path,
+) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "physical_readback_artifact_review_queue_artifact_is_read_only_operator_gate",
+        "queue_path": str(queue_path),
+    }
+    violations: list[str] = []
+
+    payload, load_error = _json_object_from_path(queue_path)
+    queue = payload or {}
+    safety = queue.get("safety") if isinstance(queue.get("safety"), Mapping) else {}
+    summary = queue.get("summary") if isinstance(queue.get("summary"), Mapping) else {}
+    items = queue.get("queue_items") if isinstance(queue.get("queue_items"), list) else []
+    operator_sequence = (
+        queue.get("operator_sequence")
+        if isinstance(queue.get("operator_sequence"), list)
+        else []
+    )
+    commands = queue.get("commands") if isinstance(queue.get("commands"), Mapping) else {}
+
+    if load_error:
+        violations.append(
+            f"read_surface_physical_readback_artifact_review_queue_artifact_{load_error}"
+        )
+    if queue.get("type") != "read_surface_physical_readback_artifact_review_queue":
+        violations.append("artifact_review_queue_artifact_type_mismatch")
+    if queue.get("method_id") != READ_SURFACE_PHYSICAL_READBACK_ARTIFACT_REVIEW_QUEUE_METHOD_ID:
+        violations.append("artifact_review_queue_artifact_method_id_mismatch")
+    if queue.get("status") not in READ_SURFACE_PHYSICAL_READBACK_ARTIFACT_REVIEW_QUEUE_STATUSES:
+        violations.append("artifact_review_queue_artifact_status_unknown")
+
+    for key in ("read_only", "operator_required"):
+        if safety.get(key) is not True:
+            violations.append(f"artifact_review_queue_artifact_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_queue",
+        "fixture_closure_allowed_by_queue",
+        "live_widening_allowed",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"artifact_review_queue_artifact_{key}_not_false")
+
+    intake_surface_count = summary.get("intake_surface_count")
+    available_intake_count = summary.get("available_intake_count")
+    artifact_count = summary.get("artifact_count")
+    valid_candidate_count = summary.get("valid_candidate_count")
+    invalid_candidate_count = summary.get("invalid_candidate_count")
+    review_candidate_count = summary.get("review_candidate_count")
+    unsafe_authority_claim_count = summary.get("unsafe_authority_claim_count")
+    target_inconsistent_surface_count = summary.get("target_inconsistent_surface_count")
+    missing_artifact_surface_count = summary.get("missing_artifact_surface_count")
+    expected_intake_count = len(INTAKE_SPECS)
+    if not isinstance(intake_surface_count, int) or intake_surface_count != len(items):
+        violations.append("artifact_review_queue_artifact_intake_count_mismatch")
+        intake_surface_count = len(items)
+    if intake_surface_count != expected_intake_count:
+        violations.append("artifact_review_queue_artifact_expected_intake_count_mismatch")
+    if not isinstance(available_intake_count, int):
+        violations.append("artifact_review_queue_artifact_available_count_missing")
+        available_intake_count = 0
+    if not isinstance(artifact_count, int):
+        violations.append("artifact_review_queue_artifact_artifact_count_missing")
+        artifact_count = 0
+    if not isinstance(valid_candidate_count, int):
+        violations.append("artifact_review_queue_artifact_valid_count_missing")
+        valid_candidate_count = 0
+    if not isinstance(invalid_candidate_count, int):
+        violations.append("artifact_review_queue_artifact_invalid_count_missing")
+        invalid_candidate_count = 0
+    if not isinstance(review_candidate_count, int):
+        violations.append("artifact_review_queue_artifact_review_count_missing")
+        review_candidate_count = 0
+    if not isinstance(unsafe_authority_claim_count, int):
+        violations.append("artifact_review_queue_artifact_unsafe_count_missing")
+        unsafe_authority_claim_count = 0
+    if not isinstance(target_inconsistent_surface_count, int):
+        violations.append("artifact_review_queue_artifact_target_inconsistent_count_missing")
+        target_inconsistent_surface_count = 0
+    if not isinstance(missing_artifact_surface_count, int):
+        violations.append("artifact_review_queue_artifact_missing_count_missing")
+        missing_artifact_surface_count = 0
+
+    item_artifact_count = 0
+    item_valid_count = 0
+    item_invalid_count = 0
+    item_review_count = 0
+    item_unsafe_count = 0
+    item_target_inconsistent_count = 0
+    item_missing_count = 0
+    item_method_ids: list[str] = []
+    item_unsafe_flags: list[str] = []
+    for index, item in enumerate(items):
+        if not isinstance(item, Mapping):
+            violations.append(f"artifact_review_queue_artifact_item_{index}_not_object")
+            continue
+        method_id = item.get("method_id")
+        if not isinstance(method_id, str) or not method_id:
+            violations.append(f"artifact_review_queue_artifact_item_{index}_method_id_missing")
+        else:
+            item_method_ids.append(method_id)
+        for key in (
+            "surface_id",
+            "remediation_action_id",
+            "required_contract_method_id",
+            "status",
+        ):
+            if not isinstance(item.get(key), str) or not item.get(key):
+                violations.append(
+                    f"artifact_review_queue_artifact_item_{index}_{key}_missing"
+                )
+        for key in (
+            "fixture_closure_allowed_by_queue",
+            "fixture_closure_allowed_by_intake",
+            "live_authority_granted",
+            "full_autonomous_ready",
+        ):
+            if item.get(key) is not False:
+                violations.append(
+                    f"artifact_review_queue_artifact_item_{index}_{key}_not_false"
+                )
+        if item.get("operator_review_required") is not True:
+            violations.append(
+                f"artifact_review_queue_artifact_item_{index}_operator_review_not_true"
+            )
+        if item.get("physical_fixture_gap_remains") is not True:
+            violations.append(
+                f"artifact_review_queue_artifact_item_{index}_physical_gap_not_true"
+            )
+        item_artifact_count += int(item.get("artifact_count") or 0)
+        item_valid_count += int(item.get("valid_candidate_count") or 0)
+        item_invalid_count += int(item.get("invalid_candidate_count") or 0)
+        if item.get("accepted_as_physical_fixture_candidate") is True:
+            item_review_count += 1
+        unsafe_flags = item.get("unsafe_authority_flags")
+        if isinstance(unsafe_flags, list) and unsafe_flags:
+            item_unsafe_count += 1
+            item_unsafe_flags.extend(str(flag) for flag in unsafe_flags)
+        if item.get("target_consistency") is not True:
+            item_target_inconsistent_count += 1
+        if item.get("status") == "operator_artifact_missing":
+            item_missing_count += 1
+
+    if item_method_ids != [str(spec["method_id"]) for spec in INTAKE_SPECS]:
+        violations.append("artifact_review_queue_artifact_method_sequence_mismatch")
+    if item_artifact_count != artifact_count:
+        violations.append("artifact_review_queue_artifact_item_artifact_count_mismatch")
+    if item_valid_count != valid_candidate_count:
+        violations.append("artifact_review_queue_artifact_item_valid_count_mismatch")
+    if item_invalid_count != invalid_candidate_count:
+        violations.append("artifact_review_queue_artifact_item_invalid_count_mismatch")
+    if item_review_count != review_candidate_count:
+        violations.append("artifact_review_queue_artifact_item_review_count_mismatch")
+    if item_unsafe_count != unsafe_authority_claim_count:
+        violations.append("artifact_review_queue_artifact_item_unsafe_count_mismatch")
+    if item_target_inconsistent_count != target_inconsistent_surface_count:
+        violations.append(
+            "artifact_review_queue_artifact_item_target_inconsistent_count_mismatch"
+        )
+    if item_missing_count != missing_artifact_surface_count:
+        violations.append("artifact_review_queue_artifact_item_missing_count_mismatch")
+
+    for key in (
+        "operator_review_required",
+        "physical_fixture_gap_remains",
+    ):
+        if summary.get(key) is not True:
+            violations.append(f"artifact_review_queue_artifact_{key}_not_true")
+    for key in (
+        "execution_allowed_by_queue",
+        "fixture_closure_allowed_by_queue",
+        "live_widening_allowed",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        if summary.get(key) is not False:
+            violations.append(f"artifact_review_queue_artifact_summary_{key}_not_false")
+    blocked_by = summary.get("blocked_by")
+    if not isinstance(blocked_by, list) or not blocked_by:
+        violations.append("artifact_review_queue_artifact_blocked_by_missing")
+        blocked_by = []
+    if unsafe_authority_claim_count:
+        violations.append("artifact_review_queue_artifact_unsafe_authority_claim_present")
+    if target_inconsistent_surface_count:
+        violations.append("artifact_review_queue_artifact_target_inconsistent_surface_present")
+    if invalid_candidate_count:
+        violations.append("artifact_review_queue_artifact_invalid_candidate_present")
+
+    if len(operator_sequence) < 5:
+        violations.append("artifact_review_queue_artifact_operator_sequence_short")
+    focused_validation = commands.get("focused_validation")
+    if not isinstance(focused_validation, list):
+        violations.append("artifact_review_queue_artifact_focused_validation_missing")
+        focused_validation = []
+    else:
+        for test_path in (
+            "tests/test_read_surface_physical_readback_artifact_review_queue.py",
+            "tests/test_no_wing_release_check.py",
+        ):
+            if test_path not in focused_validation:
+                violations.append(
+                    "artifact_review_queue_artifact_focused_validation_missing:"
+                    f"{test_path}"
+                )
+
+    review_candidate_surface_ids = summary.get("review_candidate_surface_ids")
+    invalid_surface_ids = summary.get("invalid_surface_ids")
+    missing_surface_ids = summary.get("missing_artifact_surface_ids")
+    unsafe_surface_ids = summary.get("unsafe_authority_surface_ids")
+    target_inconsistent_surface_ids = summary.get("target_inconsistent_surface_ids")
+    queue_item_method_ids = summary.get("queue_item_method_ids")
+    promotion_families = summary.get("promotion_families_requiring_surface")
+    detail["queue_type"] = queue.get("type")
+    detail["queue_status"] = queue.get("status")
+    detail["method_id"] = queue.get("method_id")
+    detail["read_only"] = safety.get("read_only")
+    detail["live_write"] = safety.get("live_write")
+    detail["mutates_console_state"] = safety.get("mutates_console_state")
+    detail["queries_console"] = safety.get("queries_console")
+    detail["executes_tests"] = safety.get("executes_tests")
+    detail["operator_required"] = safety.get("operator_required")
+    detail["execution_allowed_by_queue"] = safety.get("execution_allowed_by_queue")
+    detail["fixture_closure_allowed_by_queue"] = safety.get(
+        "fixture_closure_allowed_by_queue"
+    )
+    detail["live_widening_allowed"] = safety.get("live_widening_allowed")
+    detail["live_authority_granted"] = safety.get("live_authority_granted")
+    detail["full_autonomous_ready"] = safety.get("full_autonomous_ready")
+    detail["intake_surface_count"] = intake_surface_count
+    detail["available_intake_count"] = available_intake_count
+    detail["artifact_count"] = artifact_count
+    detail["valid_candidate_count"] = valid_candidate_count
+    detail["invalid_candidate_count"] = invalid_candidate_count
+    detail["review_candidate_count"] = review_candidate_count
+    detail["missing_artifact_surface_count"] = missing_artifact_surface_count
+    detail["unsafe_authority_claim_count"] = unsafe_authority_claim_count
+    detail["target_inconsistent_surface_count"] = target_inconsistent_surface_count
+    detail["review_candidate_surface_ids"] = (
+        list(review_candidate_surface_ids)
+        if isinstance(review_candidate_surface_ids, list)
+        else []
+    )
+    detail["invalid_surface_ids"] = (
+        list(invalid_surface_ids) if isinstance(invalid_surface_ids, list) else []
+    )
+    detail["missing_artifact_surface_ids"] = (
+        list(missing_surface_ids) if isinstance(missing_surface_ids, list) else []
+    )
+    detail["unsafe_authority_surface_ids"] = (
+        list(unsafe_surface_ids) if isinstance(unsafe_surface_ids, list) else []
+    )
+    detail["target_inconsistent_surface_ids"] = (
+        list(target_inconsistent_surface_ids)
+        if isinstance(target_inconsistent_surface_ids, list)
+        else []
+    )
+    detail["queue_item_method_ids"] = (
+        list(queue_item_method_ids) if isinstance(queue_item_method_ids, list) else []
+    )
+    detail["promotion_families_requiring_surface"] = (
+        list(promotion_families) if isinstance(promotion_families, list) else []
+    )
+    detail["operator_review_required"] = summary.get("operator_review_required")
+    detail["physical_fixture_gap_remains"] = summary.get("physical_fixture_gap_remains")
+    detail["blocked_by"] = list(blocked_by)
+    detail["item_unsafe_flags"] = item_unsafe_flags
+    detail["operator_sequence_count"] = len(operator_sequence)
+    detail["focused_validation"] = list(focused_validation)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="read_surface_physical_readback_artifact_review_queue_artifact_schema",
         status="passed" if not violations else "failed",
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -7007,6 +7589,240 @@ def validate_read_surface_physical_readback_fixture_closure_plan_snapshot() -> C
     )
 
 
+def validate_read_surface_physical_readback_fixture_closure_plan_artifact_snapshot(
+    plan_path: Path,
+) -> CheckResult:
+    started = datetime.now(timezone.utc)
+    detail: dict[str, object] = {
+        "policy": "physical_readback_fixture_closure_plan_artifact_is_manual_read_only_gate",
+        "plan_path": str(plan_path),
+    }
+    violations: list[str] = []
+
+    payload, load_error = _json_object_from_path(plan_path)
+    plan = payload or {}
+    safety = plan.get("safety") if isinstance(plan.get("safety"), Mapping) else {}
+    summary = plan.get("summary") if isinstance(plan.get("summary"), Mapping) else {}
+    candidates = (
+        plan.get("closure_candidates")
+        if isinstance(plan.get("closure_candidates"), list)
+        else []
+    )
+    operator_sequence = (
+        plan.get("operator_sequence")
+        if isinstance(plan.get("operator_sequence"), list)
+        else []
+    )
+    commands = plan.get("commands") if isinstance(plan.get("commands"), Mapping) else {}
+
+    if load_error:
+        violations.append(
+            f"read_surface_physical_readback_fixture_closure_plan_artifact_{load_error}"
+        )
+    if plan.get("type") != "read_surface_physical_readback_fixture_closure_plan":
+        violations.append("fixture_closure_plan_artifact_type_mismatch")
+    if plan.get("method_id") != READ_SURFACE_PHYSICAL_READBACK_FIXTURE_CLOSURE_PLAN_METHOD_ID:
+        violations.append("fixture_closure_plan_artifact_method_id_mismatch")
+    if (
+        plan.get("source_method_id")
+        != READ_SURFACE_PHYSICAL_READBACK_FIXTURE_ACCEPTANCE_LEDGER_METHOD_ID
+    ):
+        violations.append("fixture_closure_plan_artifact_source_method_mismatch")
+    if plan.get("status") not in READ_SURFACE_PHYSICAL_READBACK_FIXTURE_CLOSURE_PLAN_STATUSES:
+        violations.append("fixture_closure_plan_artifact_status_unknown")
+
+    for key in ("read_only", "operator_required"):
+        if safety.get(key) is not True:
+            violations.append(f"fixture_closure_plan_artifact_{key}_not_true")
+    for key in (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_plan",
+        "fixture_update_allowed_by_plan",
+        "fixture_closure_allowed_by_plan",
+        "live_widening_allowed",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        if safety.get(key) is not False:
+            violations.append(f"fixture_closure_plan_artifact_{key}_not_false")
+
+    closure_candidate_count = summary.get("closure_candidate_count")
+    accepted_record_count = summary.get("accepted_record_count")
+    invalid_record_count = summary.get("invalid_record_count")
+    unreviewed_candidate_count = summary.get("unreviewed_candidate_count")
+    if not isinstance(closure_candidate_count, int) or closure_candidate_count != len(candidates):
+        violations.append("fixture_closure_plan_artifact_candidate_count_mismatch")
+        closure_candidate_count = len(candidates)
+    if not isinstance(accepted_record_count, int):
+        violations.append("fixture_closure_plan_artifact_accepted_count_missing")
+        accepted_record_count = 0
+    if not isinstance(invalid_record_count, int):
+        violations.append("fixture_closure_plan_artifact_invalid_count_missing")
+        invalid_record_count = 0
+    if not isinstance(unreviewed_candidate_count, int):
+        violations.append("fixture_closure_plan_artifact_unreviewed_count_missing")
+        unreviewed_candidate_count = 0
+    if invalid_record_count:
+        violations.append("fixture_closure_plan_artifact_invalid_record_present")
+
+    for key in ("manual_fixture_closure_required", "operator_review_required", "physical_fixture_gap_remains"):
+        if summary.get(key) is not True:
+            violations.append(f"fixture_closure_plan_artifact_{key}_not_true")
+    for key in (
+        "fixture_update_allowed_by_plan",
+        "fixture_closure_allowed_by_plan",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    ):
+        if summary.get(key) is not False:
+            violations.append(f"fixture_closure_plan_artifact_summary_{key}_not_false")
+    blocked_by = summary.get("blocked_by")
+    if not isinstance(blocked_by, list) or not blocked_by:
+        violations.append("fixture_closure_plan_artifact_blocked_by_missing")
+        blocked_by = []
+    if not isinstance(summary.get("next_global_step"), str) or not summary.get(
+        "next_global_step"
+    ):
+        violations.append("fixture_closure_plan_artifact_next_global_step_missing")
+
+    if summary.get("manual_fixture_closure_candidate_available") is not bool(candidates):
+        violations.append("fixture_closure_plan_artifact_manual_candidate_flag_mismatch")
+    if plan.get("status") == "manual_fixture_closure_candidate_available" and not candidates:
+        violations.append("fixture_closure_plan_artifact_candidate_status_without_candidates")
+    if plan.get("status") != "manual_fixture_closure_candidate_available" and candidates:
+        violations.append("fixture_closure_plan_artifact_candidates_without_candidate_status")
+
+    closure_candidate_surface_ids = (
+        summary.get("closure_candidate_surface_ids")
+        if isinstance(summary.get("closure_candidate_surface_ids"), list)
+        else []
+    )
+    if len(closure_candidate_surface_ids) != len(candidates):
+        violations.append("fixture_closure_plan_artifact_candidate_surface_count_mismatch")
+    for index, candidate in enumerate(candidates):
+        if not isinstance(candidate, Mapping):
+            violations.append(f"fixture_closure_plan_artifact_candidate_{index}_not_object")
+            continue
+        for field in (
+            "review_id",
+            "surface_id",
+            "artifact_source_id",
+            "required_contract_method_id",
+            "reviewed_by",
+            "reviewed_at",
+        ):
+            if not isinstance(candidate.get(field), str) or not candidate.get(field):
+                violations.append(
+                    f"fixture_closure_plan_artifact_candidate_{index}_{field}_missing"
+                )
+        if candidate.get("manual_fixture_closure_required") is not True:
+            violations.append(
+                f"fixture_closure_plan_artifact_candidate_{index}_manual_required_not_true"
+            )
+        for key in (
+            "fixture_update_allowed_by_plan",
+            "fixture_closure_allowed_by_plan",
+            "live_authority_granted",
+            "full_autonomous_ready",
+        ):
+            if candidate.get(key) is not False:
+                violations.append(
+                    f"fixture_closure_plan_artifact_candidate_{index}_{key}_not_false"
+                )
+
+    if len(operator_sequence) < 5:
+        violations.append("fixture_closure_plan_artifact_operator_sequence_short")
+    focused_validation = commands.get("focused_validation")
+    if not isinstance(focused_validation, list):
+        violations.append("fixture_closure_plan_artifact_focused_validation_missing")
+        focused_validation = []
+    else:
+        for test_path in (
+            "tests/test_read_surface_physical_readback_fixture_closure_plan.py",
+            "tests/test_no_wing_release_check.py",
+        ):
+            if test_path not in focused_validation:
+                violations.append(
+                    "fixture_closure_plan_artifact_focused_validation_missing:"
+                    f"{test_path}"
+                )
+
+    rejected_surface_ids = summary.get("rejected_surface_ids")
+    invalid_record_ids = summary.get("invalid_record_ids")
+    unreviewed_surface_ids = summary.get("unreviewed_candidate_surface_ids")
+    detail["plan_type"] = plan.get("type")
+    detail["plan_status"] = plan.get("status")
+    detail["method_id"] = plan.get("method_id")
+    detail["source_method_id"] = plan.get("source_method_id")
+    detail["read_only"] = safety.get("read_only")
+    detail["live_write"] = safety.get("live_write")
+    detail["mutates_console_state"] = safety.get("mutates_console_state")
+    detail["queries_console"] = safety.get("queries_console")
+    detail["executes_tests"] = safety.get("executes_tests")
+    detail["operator_required"] = safety.get("operator_required")
+    detail["execution_allowed_by_plan"] = safety.get("execution_allowed_by_plan")
+    detail["fixture_update_allowed_by_plan"] = safety.get(
+        "fixture_update_allowed_by_plan"
+    )
+    detail["fixture_closure_allowed_by_plan"] = safety.get(
+        "fixture_closure_allowed_by_plan"
+    )
+    detail["live_widening_allowed"] = safety.get("live_widening_allowed")
+    detail["live_authority_granted"] = safety.get("live_authority_granted")
+    detail["full_autonomous_ready"] = safety.get("full_autonomous_ready")
+    detail["ledger_status"] = summary.get("ledger_status")
+    detail["review_candidate_count"] = int(summary.get("review_candidate_count") or 0)
+    detail["acceptance_record_count"] = int(summary.get("acceptance_record_count") or 0)
+    detail["accepted_record_count"] = accepted_record_count
+    detail["rejected_record_count"] = int(summary.get("rejected_record_count") or 0)
+    detail["invalid_record_count"] = invalid_record_count
+    detail["unreviewed_candidate_count"] = unreviewed_candidate_count
+    detail["closure_candidate_count"] = closure_candidate_count
+    detail["closure_candidate_surface_ids"] = list(closure_candidate_surface_ids)
+    detail["rejected_surface_ids"] = (
+        list(rejected_surface_ids) if isinstance(rejected_surface_ids, list) else []
+    )
+    detail["invalid_record_ids"] = (
+        list(invalid_record_ids) if isinstance(invalid_record_ids, list) else []
+    )
+    detail["unreviewed_candidate_surface_ids"] = (
+        list(unreviewed_surface_ids) if isinstance(unreviewed_surface_ids, list) else []
+    )
+    detail["manual_fixture_closure_candidate_available"] = summary.get(
+        "manual_fixture_closure_candidate_available"
+    )
+    detail["manual_fixture_closure_required"] = summary.get(
+        "manual_fixture_closure_required"
+    )
+    detail["operator_review_required"] = summary.get("operator_review_required")
+    detail["physical_fixture_gap_remains"] = summary.get("physical_fixture_gap_remains")
+    detail["summary_fixture_update_allowed_by_plan"] = summary.get(
+        "fixture_update_allowed_by_plan"
+    )
+    detail["summary_fixture_closure_allowed_by_plan"] = summary.get(
+        "fixture_closure_allowed_by_plan"
+    )
+    detail["summary_live_authority_granted"] = summary.get("live_authority_granted")
+    detail["summary_full_autonomous_ready"] = summary.get("full_autonomous_ready")
+    detail["blocked_by"] = list(blocked_by)
+    detail["next_global_step"] = summary.get("next_global_step")
+    detail["operator_sequence_count"] = len(operator_sequence)
+    detail["focused_validation"] = list(focused_validation)
+    detail["violations"] = violations
+    finished = datetime.now(timezone.utc)
+    return CheckResult(
+        name="read_surface_physical_readback_fixture_closure_plan_artifact_schema",
+        status="passed" if not violations else "failed",
+        started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        duration_sec=round((finished - started).total_seconds(), 3),
+        detail=detail,
+    )
+
+
 def validate_supervised_proof_report_gain_dry_run(report_path: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     payload, load_error = _json_object_from_path(report_path)
@@ -7765,6 +8581,79 @@ def read_surface_physical_readback_capture_plan_summary(
             "step_remediation_action_id": detail.get("step_remediation_action_id"),
             "step_forbidden_actions": (
                 list(forbidden_actions) if isinstance(forbidden_actions, list) else []
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
+def read_surface_physical_readback_capture_packet_artifact_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if result.name != "read_surface_physical_readback_capture_packet_artifact_schema":
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        physical_missing = detail.get("physical_fixture_missing_surface_ids")
+        required_contracts = detail.get("required_artifact_contracts")
+        blocked_by = detail.get("blocked_by")
+        forbidden_actions = detail.get("step_forbidden_actions")
+        focused_validation = detail.get("focused_validation")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": detail.get("read_only") is True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": detail.get("operator_required") is True,
+            "execution_allowed_by_packet": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "packet_path": detail.get("packet_path"),
+            "packet_type": detail.get("packet_type"),
+            "packet_status": detail.get("packet_status"),
+            "source_plan_status": detail.get("source_plan_status"),
+            "source_method_id": detail.get("source_method_id"),
+            "physical_gap_surface_count": int(
+                detail.get("physical_gap_surface_count") or 0
+            ),
+            "physical_fixture_missing_surface_ids": (
+                list(physical_missing) if isinstance(physical_missing, list) else []
+            ),
+            "next_physical_readback_surface_id": detail.get(
+                "next_physical_readback_surface_id"
+            ),
+            "next_physical_readback_action_id": detail.get(
+                "next_physical_readback_action_id"
+            ),
+            "target_action_consistency": (
+                detail.get("target_action_consistency") is True
+            ),
+            "capture_step_count": int(detail.get("capture_step_count") or 0),
+            "required_artifact_contracts": (
+                list(required_contracts) if isinstance(required_contracts, list) else []
+            ),
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "step_surface_id": detail.get("step_surface_id"),
+            "step_remediation_action_id": detail.get("step_remediation_action_id"),
+            "step_target_console_surface": detail.get("step_target_console_surface"),
+            "step_read_mode": detail.get("step_read_mode"),
+            "step_contract_method_id": detail.get("step_contract_method_id"),
+            "step_expected_artifact_count": int(
+                detail.get("step_expected_artifact_count") or 0
+            ),
+            "step_blocker_count": int(detail.get("step_blocker_count") or 0),
+            "step_forbidden_actions": (
+                list(forbidden_actions) if isinstance(forbidden_actions, list) else []
+            ),
+            "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
+            "focused_validation": (
+                list(focused_validation)
+                if isinstance(focused_validation, list)
+                else []
             ),
             "violations": list(violations) if isinstance(violations, list) else [],
         }
@@ -9981,6 +10870,119 @@ def read_surface_physical_readback_artifact_review_queue_summary(
     return None
 
 
+def read_surface_physical_readback_artifact_review_queue_artifact_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if (
+            result.name
+            != "read_surface_physical_readback_artifact_review_queue_artifact_schema"
+        ):
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        blocked_by = detail.get("blocked_by")
+        promotion_families = detail.get("promotion_families_requiring_surface")
+        review_candidate_surface_ids = detail.get("review_candidate_surface_ids")
+        invalid_surface_ids = detail.get("invalid_surface_ids")
+        missing_surface_ids = detail.get("missing_artifact_surface_ids")
+        unsafe_surface_ids = detail.get("unsafe_authority_surface_ids")
+        target_inconsistent_surface_ids = detail.get("target_inconsistent_surface_ids")
+        queue_item_method_ids = detail.get("queue_item_method_ids")
+        focused_validation = detail.get("focused_validation")
+        violations = detail.get("violations")
+        unsafe_claimed = (
+            detail.get("fixture_closure_allowed_by_queue") is True
+            or detail.get("live_authority_granted") is True
+            or detail.get("full_autonomous_ready") is True
+        )
+        review_candidate_count = int(detail.get("review_candidate_count") or 0)
+        invalid_candidate_count = int(detail.get("invalid_candidate_count") or 0)
+        unsafe_claim_count = int(detail.get("unsafe_authority_claim_count") or 0)
+        target_inconsistent_count = int(
+            detail.get("target_inconsistent_surface_count") or 0
+        )
+        review_candidates_available = (
+            result.status == "passed"
+            and review_candidate_count > 0
+            and invalid_candidate_count == 0
+            and unsafe_claim_count == 0
+            and target_inconsistent_count == 0
+            and not unsafe_claimed
+        )
+        return {
+            "status": result.status,
+            "read_only": detail.get("read_only") is True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": detail.get("operator_required") is True,
+            "execution_allowed_by_queue": False,
+            "fixture_closure_allowed_by_queue": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "queue_path": detail.get("queue_path"),
+            "queue_type": detail.get("queue_type"),
+            "queue_status": detail.get("queue_status"),
+            "method_id": detail.get("method_id"),
+            "intake_surface_count": int(detail.get("intake_surface_count") or 0),
+            "available_intake_count": int(detail.get("available_intake_count") or 0),
+            "artifact_count": int(detail.get("artifact_count") or 0),
+            "valid_candidate_count": int(detail.get("valid_candidate_count") or 0),
+            "invalid_candidate_count": invalid_candidate_count,
+            "review_candidate_count": review_candidate_count,
+            "review_candidates_available": review_candidates_available,
+            "missing_artifact_surface_count": int(
+                detail.get("missing_artifact_surface_count") or 0
+            ),
+            "unsafe_authority_claim_count": unsafe_claim_count,
+            "target_inconsistent_surface_count": target_inconsistent_count,
+            "review_candidate_surface_ids": (
+                list(review_candidate_surface_ids)
+                if isinstance(review_candidate_surface_ids, list)
+                else []
+            ),
+            "invalid_surface_ids": (
+                list(invalid_surface_ids) if isinstance(invalid_surface_ids, list) else []
+            ),
+            "missing_artifact_surface_ids": (
+                list(missing_surface_ids) if isinstance(missing_surface_ids, list) else []
+            ),
+            "unsafe_authority_surface_ids": (
+                list(unsafe_surface_ids)
+                if isinstance(unsafe_surface_ids, list)
+                else []
+            ),
+            "target_inconsistent_surface_ids": (
+                list(target_inconsistent_surface_ids)
+                if isinstance(target_inconsistent_surface_ids, list)
+                else []
+            ),
+            "promotion_families_requiring_surface": (
+                list(promotion_families) if isinstance(promotion_families, list) else []
+            ),
+            "queue_item_method_ids": (
+                list(queue_item_method_ids)
+                if isinstance(queue_item_method_ids, list)
+                else []
+            ),
+            "operator_review_required": detail.get("operator_review_required") is True,
+            "physical_fixture_gap_remains": (
+                detail.get("physical_fixture_gap_remains") is True
+            ),
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
+            "focused_validation": (
+                list(focused_validation)
+                if isinstance(focused_validation, list)
+                else []
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def read_surface_physical_readback_acceptance_template_artifact_summary(
     results: Sequence[CheckResult],
 ) -> dict[str, object] | None:
@@ -10161,6 +11163,93 @@ def read_surface_physical_readback_fixture_closure_plan_summary(
     return None
 
 
+def read_surface_physical_readback_fixture_closure_plan_artifact_summary(
+    results: Sequence[CheckResult],
+) -> dict[str, object] | None:
+    for result in results:
+        if (
+            result.name
+            != "read_surface_physical_readback_fixture_closure_plan_artifact_schema"
+        ):
+            continue
+        detail = result.detail if isinstance(result.detail, Mapping) else {}
+        blocked_by = detail.get("blocked_by")
+        closure_candidate_surface_ids = detail.get("closure_candidate_surface_ids")
+        rejected_surface_ids = detail.get("rejected_surface_ids")
+        invalid_record_ids = detail.get("invalid_record_ids")
+        unreviewed_surface_ids = detail.get("unreviewed_candidate_surface_ids")
+        focused_validation = detail.get("focused_validation")
+        violations = detail.get("violations")
+        return {
+            "status": result.status,
+            "read_only": detail.get("read_only") is True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": detail.get("operator_required") is True,
+            "execution_allowed_by_plan": False,
+            "fixture_update_allowed_by_plan": False,
+            "fixture_closure_allowed_by_plan": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "plan_path": detail.get("plan_path"),
+            "plan_type": detail.get("plan_type"),
+            "plan_status": detail.get("plan_status"),
+            "method_id": detail.get("method_id"),
+            "source_method_id": detail.get("source_method_id"),
+            "ledger_status": detail.get("ledger_status"),
+            "review_candidate_count": int(detail.get("review_candidate_count") or 0),
+            "acceptance_record_count": int(detail.get("acceptance_record_count") or 0),
+            "accepted_record_count": int(detail.get("accepted_record_count") or 0),
+            "rejected_record_count": int(detail.get("rejected_record_count") or 0),
+            "invalid_record_count": int(detail.get("invalid_record_count") or 0),
+            "unreviewed_candidate_count": int(
+                detail.get("unreviewed_candidate_count") or 0
+            ),
+            "closure_candidate_count": int(detail.get("closure_candidate_count") or 0),
+            "closure_candidate_surface_ids": (
+                list(closure_candidate_surface_ids)
+                if isinstance(closure_candidate_surface_ids, list)
+                else []
+            ),
+            "rejected_surface_ids": (
+                list(rejected_surface_ids)
+                if isinstance(rejected_surface_ids, list)
+                else []
+            ),
+            "invalid_record_ids": (
+                list(invalid_record_ids) if isinstance(invalid_record_ids, list) else []
+            ),
+            "unreviewed_candidate_surface_ids": (
+                list(unreviewed_surface_ids)
+                if isinstance(unreviewed_surface_ids, list)
+                else []
+            ),
+            "manual_fixture_closure_candidate_available": (
+                detail.get("manual_fixture_closure_candidate_available") is True
+            ),
+            "manual_fixture_closure_required": (
+                detail.get("manual_fixture_closure_required") is True
+            ),
+            "operator_review_required": detail.get("operator_review_required") is True,
+            "physical_fixture_gap_remains": (
+                detail.get("physical_fixture_gap_remains") is True
+            ),
+            "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
+            "next_global_step": detail.get("next_global_step"),
+            "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
+            "focused_validation": (
+                list(focused_validation)
+                if isinstance(focused_validation, list)
+                else []
+            ),
+            "violations": list(violations) if isinstance(violations, list) else [],
+        }
+    return None
+
+
 def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, object] | None:
     for result in results:
         if result.name != "next_wing_proof_plan_schema":
@@ -10239,6 +11328,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     read_fixture = read_surface_fixture_evidence_summary(results)
     read_remediation = read_surface_remediation_plan_summary(results)
     read_capture_plan = read_surface_physical_readback_capture_plan_summary(results)
+    read_capture_packet_artifact = (
+        read_surface_physical_readback_capture_packet_artifact_summary(results)
+    )
     wing_readonly_preflight = wing_readonly_preflight_evidence_summary(results)
     wing_readonly_preflight_plan_artifact = (
         wing_readonly_preflight_plan_artifact_summary(results)
@@ -10272,6 +11364,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     artifact_review_queue = read_surface_physical_readback_artifact_review_queue_summary(
         results
     )
+    artifact_review_queue_artifact = (
+        read_surface_physical_readback_artifact_review_queue_artifact_summary(results)
+    )
     acceptance_template_artifact = (
         read_surface_physical_readback_acceptance_template_artifact_summary(results)
     )
@@ -10280,6 +11375,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     )
     fixture_closure_plan = read_surface_physical_readback_fixture_closure_plan_summary(
         results
+    )
+    fixture_closure_plan_artifact = (
+        read_surface_physical_readback_fixture_closure_plan_artifact_summary(results)
     )
     next_plan = next_wing_proof_plan_summary(results)
     summary = {
@@ -10303,6 +11401,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["read_surface_remediation_plan"] = read_remediation
     if read_capture_plan is not None:
         summary["read_surface_physical_readback_capture_plan"] = read_capture_plan
+    if read_capture_packet_artifact is not None:
+        summary["read_surface_physical_readback_capture_packet_artifact"] = (
+            read_capture_packet_artifact
+        )
     if wing_readonly_preflight is not None:
         summary["wing_readonly_preflight_evidence"] = wing_readonly_preflight
     if wing_readonly_preflight_plan_artifact is not None:
@@ -10369,6 +11471,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["read_surface_physical_readback_artifact_review_queue"] = (
             artifact_review_queue
         )
+    if artifact_review_queue_artifact is not None:
+        summary["read_surface_physical_readback_artifact_review_queue_artifact"] = (
+            artifact_review_queue_artifact
+        )
     if acceptance_template_artifact is not None:
         summary["read_surface_physical_readback_acceptance_template_artifact"] = (
             acceptance_template_artifact
@@ -10380,6 +11486,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     if fixture_closure_plan is not None:
         summary["read_surface_physical_readback_fixture_closure_plan"] = (
             fixture_closure_plan
+        )
+    if fixture_closure_plan_artifact is not None:
+        summary["read_surface_physical_readback_fixture_closure_plan_artifact"] = (
+            fixture_closure_plan_artifact
         )
     if next_plan is not None:
         summary["next_wing_proof_plan"] = next_plan
@@ -10553,6 +11663,52 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- step_surface_id: `{read_capture_plan['step_surface_id']}`",
                 f"- step_remediation_action_id: `{read_capture_plan['step_remediation_action_id']}`",
                 f"- violations: `{json.dumps(read_capture_plan['violations'])}`",
+            ]
+        )
+    if read_capture_packet_artifact is not None:
+        lines.extend(
+            [
+                "",
+                "## Read Surface Physical Readback Capture Packet Artifact",
+                "",
+                f"- schema_check: `{read_capture_packet_artifact['status']}`",
+                f"- read_only: `{str(read_capture_packet_artifact['read_only']).lower()}`",
+                f"- live_write: `{str(read_capture_packet_artifact['live_write']).lower()}`",
+                f"- mutates_console_state: `{str(read_capture_packet_artifact['mutates_console_state']).lower()}`",
+                f"- queries_console: `{str(read_capture_packet_artifact['queries_console']).lower()}`",
+                f"- executes_tests: `{str(read_capture_packet_artifact['executes_tests']).lower()}`",
+                f"- operator_required: `{str(read_capture_packet_artifact['operator_required']).lower()}`",
+                "- execution_allowed_by_packet: "
+                f"`{str(read_capture_packet_artifact['execution_allowed_by_packet']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(read_capture_packet_artifact['live_authority_granted']).lower()}`",
+                f"- full_autonomous_ready: `{str(read_capture_packet_artifact['full_autonomous_ready']).lower()}`",
+                f"- packet_path: `{read_capture_packet_artifact['packet_path']}`",
+                f"- packet_status: `{read_capture_packet_artifact['packet_status']}`",
+                f"- source_plan_status: `{read_capture_packet_artifact['source_plan_status']}`",
+                f"- capture_step_count: `{read_capture_packet_artifact['capture_step_count']}`",
+                f"- physical_gap_surface_count: `{read_capture_packet_artifact['physical_gap_surface_count']}`",
+                "- physical_fixture_missing_surface_ids: "
+                f"`{json.dumps(read_capture_packet_artifact['physical_fixture_missing_surface_ids'])}`",
+                "- next_physical_readback_surface_id: "
+                f"`{read_capture_packet_artifact['next_physical_readback_surface_id']}`",
+                "- next_physical_readback_action_id: "
+                f"`{read_capture_packet_artifact['next_physical_readback_action_id']}`",
+                f"- target_action_consistency: `{str(read_capture_packet_artifact['target_action_consistency']).lower()}`",
+                "- required_artifact_contracts: "
+                f"`{json.dumps(read_capture_packet_artifact['required_artifact_contracts'])}`",
+                f"- blocked_by: `{json.dumps(read_capture_packet_artifact['blocked_by'])}`",
+                f"- step_surface_id: `{read_capture_packet_artifact['step_surface_id']}`",
+                "- step_target_console_surface: "
+                f"`{read_capture_packet_artifact['step_target_console_surface']}`",
+                f"- step_read_mode: `{read_capture_packet_artifact['step_read_mode']}`",
+                "- step_contract_method_id: "
+                f"`{read_capture_packet_artifact['step_contract_method_id']}`",
+                "- step_forbidden_actions: "
+                f"`{json.dumps(read_capture_packet_artifact['step_forbidden_actions'])}`",
+                "- focused_validation: "
+                f"`{json.dumps(read_capture_packet_artifact['focused_validation'])}`",
+                f"- violations: `{json.dumps(read_capture_packet_artifact['violations'])}`",
             ]
         )
     if wing_readonly_preflight is not None:
@@ -11975,6 +13131,61 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(artifact_review_queue['violations'])}`",
             ]
         )
+    if artifact_review_queue_artifact is not None:
+        lines.extend(
+            [
+                "",
+                "## Read Surface Physical Readback Artifact Review Queue Artifact",
+                "",
+                f"- schema_check: `{artifact_review_queue_artifact['status']}`",
+                f"- read_only: `{str(artifact_review_queue_artifact['read_only']).lower()}`",
+                f"- live_write: `{str(artifact_review_queue_artifact['live_write']).lower()}`",
+                "- mutates_console_state: "
+                f"`{str(artifact_review_queue_artifact['mutates_console_state']).lower()}`",
+                "- queries_console: "
+                f"`{str(artifact_review_queue_artifact['queries_console']).lower()}`",
+                "- executes_tests: "
+                f"`{str(artifact_review_queue_artifact['executes_tests']).lower()}`",
+                "- operator_required: "
+                f"`{str(artifact_review_queue_artifact['operator_required']).lower()}`",
+                "- execution_allowed_by_queue: "
+                f"`{str(artifact_review_queue_artifact['execution_allowed_by_queue']).lower()}`",
+                "- fixture_closure_allowed_by_queue: "
+                f"`{str(artifact_review_queue_artifact['fixture_closure_allowed_by_queue']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(artifact_review_queue_artifact['live_authority_granted']).lower()}`",
+                "- full_autonomous_ready: "
+                f"`{str(artifact_review_queue_artifact['full_autonomous_ready']).lower()}`",
+                f"- queue_path: `{artifact_review_queue_artifact['queue_path']}`",
+                f"- queue_status: `{artifact_review_queue_artifact['queue_status']}`",
+                f"- intake_surface_count: `{artifact_review_queue_artifact['intake_surface_count']}`",
+                f"- available_intake_count: `{artifact_review_queue_artifact['available_intake_count']}`",
+                f"- artifact_count: `{artifact_review_queue_artifact['artifact_count']}`",
+                f"- valid_candidate_count: `{artifact_review_queue_artifact['valid_candidate_count']}`",
+                f"- invalid_candidate_count: `{artifact_review_queue_artifact['invalid_candidate_count']}`",
+                f"- review_candidate_count: `{artifact_review_queue_artifact['review_candidate_count']}`",
+                "- review_candidates_available: "
+                f"`{str(artifact_review_queue_artifact['review_candidates_available']).lower()}`",
+                "- missing_artifact_surface_count: "
+                f"`{artifact_review_queue_artifact['missing_artifact_surface_count']}`",
+                "- unsafe_authority_claim_count: "
+                f"`{artifact_review_queue_artifact['unsafe_authority_claim_count']}`",
+                "- target_inconsistent_surface_count: "
+                f"`{artifact_review_queue_artifact['target_inconsistent_surface_count']}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(artifact_review_queue_artifact['physical_fixture_gap_remains']).lower()}`",
+                "- review_candidate_surface_ids: "
+                f"`{json.dumps(artifact_review_queue_artifact['review_candidate_surface_ids'])}`",
+                "- missing_artifact_surface_ids: "
+                f"`{json.dumps(artifact_review_queue_artifact['missing_artifact_surface_ids'])}`",
+                "- queue_item_method_ids: "
+                f"`{json.dumps(artifact_review_queue_artifact['queue_item_method_ids'])}`",
+                f"- blocked_by: `{json.dumps(artifact_review_queue_artifact['blocked_by'])}`",
+                "- focused_validation: "
+                f"`{json.dumps(artifact_review_queue_artifact['focused_validation'])}`",
+                f"- violations: `{json.dumps(artifact_review_queue_artifact['violations'])}`",
+            ]
+        )
     if acceptance_template_artifact is not None:
         lines.extend(
             [
@@ -12142,6 +13353,59 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- violations: `{json.dumps(fixture_closure_plan['violations'])}`",
             ]
         )
+    if fixture_closure_plan_artifact is not None:
+        lines.extend(
+            [
+                "",
+                "## Read Surface Physical Readback Fixture Closure Plan Artifact",
+                "",
+                f"- schema_check: `{fixture_closure_plan_artifact['status']}`",
+                f"- read_only: `{str(fixture_closure_plan_artifact['read_only']).lower()}`",
+                f"- live_write: `{str(fixture_closure_plan_artifact['live_write']).lower()}`",
+                "- mutates_console_state: "
+                f"`{str(fixture_closure_plan_artifact['mutates_console_state']).lower()}`",
+                "- queries_console: "
+                f"`{str(fixture_closure_plan_artifact['queries_console']).lower()}`",
+                "- executes_tests: "
+                f"`{str(fixture_closure_plan_artifact['executes_tests']).lower()}`",
+                "- operator_required: "
+                f"`{str(fixture_closure_plan_artifact['operator_required']).lower()}`",
+                "- execution_allowed_by_plan: "
+                f"`{str(fixture_closure_plan_artifact['execution_allowed_by_plan']).lower()}`",
+                "- fixture_update_allowed_by_plan: "
+                f"`{str(fixture_closure_plan_artifact['fixture_update_allowed_by_plan']).lower()}`",
+                "- fixture_closure_allowed_by_plan: "
+                f"`{str(fixture_closure_plan_artifact['fixture_closure_allowed_by_plan']).lower()}`",
+                "- live_authority_granted: "
+                f"`{str(fixture_closure_plan_artifact['live_authority_granted']).lower()}`",
+                "- full_autonomous_ready: "
+                f"`{str(fixture_closure_plan_artifact['full_autonomous_ready']).lower()}`",
+                f"- plan_path: `{fixture_closure_plan_artifact['plan_path']}`",
+                f"- plan_status: `{fixture_closure_plan_artifact['plan_status']}`",
+                f"- ledger_status: `{fixture_closure_plan_artifact['ledger_status']}`",
+                "- acceptance_record_count: "
+                f"`{fixture_closure_plan_artifact['acceptance_record_count']}`",
+                "- accepted_record_count: "
+                f"`{fixture_closure_plan_artifact['accepted_record_count']}`",
+                "- invalid_record_count: "
+                f"`{fixture_closure_plan_artifact['invalid_record_count']}`",
+                "- unreviewed_candidate_count: "
+                f"`{fixture_closure_plan_artifact['unreviewed_candidate_count']}`",
+                "- closure_candidate_count: "
+                f"`{fixture_closure_plan_artifact['closure_candidate_count']}`",
+                "- manual_fixture_closure_candidate_available: "
+                f"`{str(fixture_closure_plan_artifact['manual_fixture_closure_candidate_available']).lower()}`",
+                "- physical_fixture_gap_remains: "
+                f"`{str(fixture_closure_plan_artifact['physical_fixture_gap_remains']).lower()}`",
+                "- closure_candidate_surface_ids: "
+                f"`{json.dumps(fixture_closure_plan_artifact['closure_candidate_surface_ids'])}`",
+                f"- blocked_by: `{json.dumps(fixture_closure_plan_artifact['blocked_by'])}`",
+                f"- next_global_step: `{fixture_closure_plan_artifact['next_global_step']}`",
+                "- focused_validation: "
+                f"`{json.dumps(fixture_closure_plan_artifact['focused_validation'])}`",
+                f"- violations: `{json.dumps(fixture_closure_plan_artifact['violations'])}`",
+            ]
+        )
     if next_plan is not None:
         lines.extend(
             [
@@ -12251,6 +13515,35 @@ def run_release_checks(
             if handoff_artifact_result.status != "passed" and not continue_on_failure:
                 break
         if (
+            check.name == "read_surface_physical_readback_capture_packet"
+            and result.status == "passed"
+        ):
+            capture_packet_result = (
+                validate_read_surface_physical_readback_capture_packet_artifact_snapshot(
+                    read_surface_physical_readback_capture_packet_path_for_run(run_dir)
+                )
+            )
+            results.append(capture_packet_result)
+            if capture_packet_result.status != "passed" and not continue_on_failure:
+                break
+        if (
+            check.name == "read_surface_physical_readback_artifact_review_queue"
+            and result.status == "passed"
+        ):
+            review_queue_artifact_result = (
+                validate_read_surface_physical_readback_artifact_review_queue_artifact_snapshot(
+                    read_surface_physical_readback_artifact_review_queue_path_for_run(
+                        run_dir
+                    )
+                )
+            )
+            results.append(review_queue_artifact_result)
+            if (
+                review_queue_artifact_result.status != "passed"
+                and not continue_on_failure
+            ):
+                break
+        if (
             check.name == "read_surface_physical_readback_acceptance_template"
             and result.status == "passed"
         ):
@@ -12263,6 +13556,23 @@ def run_release_checks(
             )
             results.append(acceptance_template_result)
             if acceptance_template_result.status != "passed" and not continue_on_failure:
+                break
+        if (
+            check.name == "read_surface_physical_readback_fixture_closure_plan"
+            and result.status == "passed"
+        ):
+            fixture_closure_artifact_result = (
+                validate_read_surface_physical_readback_fixture_closure_plan_artifact_snapshot(
+                    read_surface_physical_readback_fixture_closure_plan_path_for_run(
+                        run_dir
+                    )
+                )
+            )
+            results.append(fixture_closure_artifact_result)
+            if (
+                fixture_closure_artifact_result.status != "passed"
+                and not continue_on_failure
+            ):
                 break
         if check.name == "read_surface_fixture_evidence" and result.status == "passed":
             read_fixture_result = validate_read_surface_fixture_evidence_snapshot()
