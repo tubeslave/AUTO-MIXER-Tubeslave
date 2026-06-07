@@ -56,8 +56,11 @@ OPERATOR_MODE_ALIASES = {
     "autonomous": MODE_AUTO,
     "full_autonomous": MODE_AUTO,
     "full_autonomous_mix": MODE_AUTO,
+    "full_autonomous_mix_mode": MODE_AUTO,
     "full_autonomous_mode": MODE_AUTO,
     "full_autonomous_mixing": MODE_AUTO,
+    "full autonomous mix": MODE_AUTO,
+    "full autonomous mix mode": MODE_AUTO,
     "full_autonomous_mixing_mode": MODE_AUTO,
 }
 
