@@ -1035,7 +1035,12 @@ class AutoMixerServer:
                 extra={"allowed_live_write_kinds": ["fader", "gain"]},
             )
 
-        if self.operator_mode != "supervised":
+        operator_mode = self.get_operator_mode_status()
+        operator_capabilities = operator_mode.get("capabilities", {})
+        allowed_live_write_kinds = list(
+            operator_capabilities.get("allowed_live_write_kinds") or []
+        )
+        if not operator_capabilities.get("can_apply_to_console"):
             return self._manual_write_blocked_result(
                 reason="operator_mode_blocks_live_write",
                 channel=channel,
@@ -1043,6 +1048,7 @@ class AutoMixerServer:
                 value_type=write_kind,
                 source=source,
                 approval_id=approval_id,
+                extra={"allowed_live_write_kinds": allowed_live_write_kinds},
             )
 
         if self.connection_mode == "wing" and self._wing_observation_only:
