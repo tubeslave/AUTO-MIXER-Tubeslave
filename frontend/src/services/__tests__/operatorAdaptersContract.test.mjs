@@ -269,6 +269,10 @@ test('mode display labels map objective names to each operational mode', async (
   assert.equal(formatAIAgentModeLabel('suggest'), 'Suggest');
   assert.equal(formatAIAgentModeLabel('manual_mode'), 'Manual');
   assert.equal(formatAIAgentModeLabel('full autonomous'), 'Auto');
+  assert.equal(formatAIAgentModeLabel('full autonomous mix'), 'Auto');
+  assert.equal(formatAIAgentModeLabel('full autonomous mix mode'), 'Auto');
+  assert.equal(formatAIAgentModeLabel('full_autonomous_mix'), 'Auto');
+  assert.equal(formatAIAgentModeLabel('full_autonomous_mix_mode'), 'Auto');
   assert.equal(formatAIAgentModeLabel('unknown-mode'), 'Unknown Mode');
   assert.equal(formatAIAgentModeLabel(''), 'Suggest');
 });
