@@ -452,6 +452,8 @@ def _validate_event_log(
                         f"event_log_unsafe_authority_field_true:{event_index}:{field}"
                     )
     event_types = tuple(str(event.get("event_type") or "") for event in events)
+    if "send_error" in event_types:
+        violations.append("event_log_send_error_present")
     if len(event_types) % 2 != 0 or any(
         event_types[index : index + 2] != ("send", "recv")
         for index in range(0, len(event_types), 2)

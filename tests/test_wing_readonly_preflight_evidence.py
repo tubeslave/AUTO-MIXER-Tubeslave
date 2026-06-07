@@ -710,6 +710,33 @@ def test_file_preflight_artifact_rejects_grouped_send_recv_events(tmp_path):
     assert "event_log_response_type_mismatch:0" in evidence["summary"]["violations"]
 
 
+def test_file_preflight_artifact_rejects_send_error_event(tmp_path):
+    summary = _valid_summary()
+    _write_file_artifact(
+        tmp_path / "preflight" / "send-error",
+        summary=summary,
+        events=[
+            _event(
+                1,
+                "send_error",
+                {
+                    "request_type": "get_operator_mode",
+                    "error_type": "RuntimeError",
+                    "error": "send failed",
+                },
+            ),
+        ],
+    )
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert "event_log_send_error_present" in evidence["summary"]["violations"]
+    assert "event_log_send_recv_sequence_invalid" in evidence["summary"]["violations"]
+
+
 def test_file_preflight_artifact_rejects_non_contiguous_event_sequence(tmp_path):
     summary = _valid_summary()
     events = _valid_events(summary)
