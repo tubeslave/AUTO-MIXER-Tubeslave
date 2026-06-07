@@ -38,6 +38,8 @@ Forbidden live writes:
 
 - `Docs/runbooks/WING_READONLY_PREFLIGHT.md` has produced a clean real artifact.
 - The read-only artifact was manually reviewed.
+- The review decision ledger has exactly one accepted decision for the clean
+  preflight candidate and no duplicate or conflicting decision records.
 - `.ai/project-layer/wing_mvp_blockers.md` shows read-only preflight as reviewed
   or ready for supervised proof.
 - The operator explicitly approves the exact channel, value type, and delta.
@@ -94,6 +96,8 @@ The artifact must show:
 ## Fail Closed If
 
 - read-only preflight was not reviewed first;
+- duplicate or conflicting read-only preflight review decision JSON files are
+  still present;
 - operator approval is not explicit;
 - the delta is positive;
 - the value type is not `fader` or `gain`;

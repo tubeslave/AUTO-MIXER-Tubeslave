@@ -4,7 +4,8 @@
 
 This slice makes the WING read-only preflight review-decision ledger fail closed
 when multiple valid decision records target the same clean preflight candidate.
-Accepted/rejected conflicts no longer leave an accepted readiness candidate.
+Duplicate accepted decisions and accepted/rejected conflicts no longer leave an
+accepted readiness candidate.
 
 The check is offline only. It does not inspect hardware and does not authorize
 readiness or live writes.
@@ -36,7 +37,7 @@ readiness or live writes.
 Pre-commit validation run:
 
 - `python3 -m py_compile backend/wing_readonly_preflight_review_decision.py tools/review_wing_readonly_preflight_decisions.py tools/no_wing_release_check.py` - PASS
-- `PYTHONPATH=backend python3 -m pytest -q tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py` - `16 passed`
+- `PYTHONPATH=backend python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py -q --tb=short` - `18 passed`
 - `PYTHONPATH=backend python3 -m pytest -q tests/test_wing_readonly_preflight_evidence.py tests/test_wing_readonly_preflight_review_tool.py tests/test_autonomy_promotion_readiness.py` - `41 passed`
 - `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick --skip-frontend --artifact-root /tmp/automixer_no_wing_review_decision_collision_gate_20260607` - PASS, top-level `status: passed`
 - `PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q` - `3012 passed, 1 skipped, 1 warning`

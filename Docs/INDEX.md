@@ -59,6 +59,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_UNEXPECTED_RESPONSE_GATE_20260607.md` | Real read-only preflight capture fails closed when backend returns an unexpected response type for the request in flight. |
 | `Docs/reports/AUTOMIXER_WING_MVP_DIRECTION_GUARD_SELF_REPORT_FILTER_20260607.md` | Direction guard drift scoring ignores its own policy warnings and generated evidence tables while preserving real drift detection. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_DECISION_GATED_PROOF_PLAN_20260607.md` | Next supervised fader/gain proof steps stay blocked until an accepted read-only preflight review decision exists. |
+| `Docs/reports/AUTOMIXER_WING_PROOF_PLAN_REVIEW_DECISION_COLLISION_TRACE_20260607.md` | Next supervised proof plans expose duplicate/conflicting read-only preflight decision records that must be replaced before proof execution. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_READINESS_BRIDGE_20260606.md` | Read-only preflight evidence overlay inside autonomy promotion readiness; manual review candidate only. |
 | `Docs/reports/AUTOMIXER_SUPERVISED_WING_PROOF_READONLY_PREFLIGHT_GATE_20260606.md` | Next supervised WING proof plan is blocked until clean read-only preflight evidence exists. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PACKET_20260607.md` | Offline operator packet renders the next read-surface physical-readback capture target without querying or mutating a console. |

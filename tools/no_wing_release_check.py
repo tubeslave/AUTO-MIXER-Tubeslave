@@ -8765,6 +8765,9 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     readonly_preflight_review_decision_blocked_by: list[str] = []
     readonly_preflight_review_decision_accepted_record_count = 0
     readonly_preflight_review_decision_invalid_record_count = 0
+    readonly_preflight_review_decision_invalid_record_ids: list[str] = []
+    readonly_preflight_review_decision_duplicate_source_ids: list[str] = []
+    readonly_preflight_review_decision_conflicting_source_ids: list[str] = []
     readonly_preflight_review_decision_unreviewed_candidate_count = 0
     step_count = 0
     plan_status: object = None
@@ -8885,6 +8888,33 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
         readonly_preflight_review_decision_invalid_record_count = int(
             summary.get("readonly_preflight_review_decision_invalid_record_count") or 0
         )
+        readonly_preflight_review_decision_invalid_record_ids = (
+            [
+                str(item)
+                for item in summary.get("readonly_preflight_review_decision_invalid_record_ids", [])
+                if item
+            ]
+            if isinstance(summary.get("readonly_preflight_review_decision_invalid_record_ids"), list)
+            else []
+        )
+        readonly_preflight_review_decision_duplicate_source_ids = (
+            [
+                str(item)
+                for item in summary.get("readonly_preflight_review_decision_duplicate_source_ids", [])
+                if item
+            ]
+            if isinstance(summary.get("readonly_preflight_review_decision_duplicate_source_ids"), list)
+            else []
+        )
+        readonly_preflight_review_decision_conflicting_source_ids = (
+            [
+                str(item)
+                for item in summary.get("readonly_preflight_review_decision_conflicting_source_ids", [])
+                if item
+            ]
+            if isinstance(summary.get("readonly_preflight_review_decision_conflicting_source_ids"), list)
+            else []
+        )
         readonly_preflight_review_decision_unreviewed_candidate_count = int(
             summary.get("readonly_preflight_review_decision_unreviewed_candidate_count") or 0
         )
@@ -8930,6 +8960,18 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 review_summary.get("invalid_record_count") or 0
             ):
                 violations.append("next_wing_proof_plan_review_decision_invalid_count_mismatch")
+            if readonly_preflight_review_decision_invalid_record_ids != _string_list(
+                review_summary.get("invalid_record_ids")
+            ):
+                violations.append("next_wing_proof_plan_review_decision_invalid_ids_mismatch")
+            if readonly_preflight_review_decision_duplicate_source_ids != _string_list(
+                review_summary.get("duplicate_source_ids")
+            ):
+                violations.append("next_wing_proof_plan_review_decision_duplicate_sources_mismatch")
+            if readonly_preflight_review_decision_conflicting_source_ids != _string_list(
+                review_summary.get("conflicting_source_ids")
+            ):
+                violations.append("next_wing_proof_plan_review_decision_conflicting_sources_mismatch")
             if readonly_preflight_review_decision_unreviewed_candidate_count != int(
                 review_summary.get("unreviewed_candidate_count") or 0
             ):
@@ -9038,6 +9080,15 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     )
     detail["readonly_preflight_review_decision_invalid_record_count"] = (
         readonly_preflight_review_decision_invalid_record_count
+    )
+    detail["readonly_preflight_review_decision_invalid_record_ids"] = (
+        readonly_preflight_review_decision_invalid_record_ids
+    )
+    detail["readonly_preflight_review_decision_duplicate_source_ids"] = (
+        readonly_preflight_review_decision_duplicate_source_ids
+    )
+    detail["readonly_preflight_review_decision_conflicting_source_ids"] = (
+        readonly_preflight_review_decision_conflicting_source_ids
     )
     detail["readonly_preflight_review_decision_unreviewed_candidate_count"] = (
         readonly_preflight_review_decision_unreviewed_candidate_count
@@ -9927,6 +9978,8 @@ def wing_readonly_preflight_review_decision_summary(
         accepted_source_ids = detail.get("accepted_source_ids")
         rejected_source_ids = detail.get("rejected_source_ids")
         invalid_record_ids = detail.get("invalid_record_ids")
+        duplicate_source_ids = detail.get("duplicate_source_ids")
+        conflicting_source_ids = detail.get("conflicting_source_ids")
         unreviewed_candidate_source_ids = detail.get("unreviewed_candidate_source_ids")
         decision_search_roots = detail.get("decision_search_roots")
         review_command = detail.get("review_command")
@@ -9983,6 +10036,16 @@ def wing_readonly_preflight_review_decision_summary(
             "invalid_record_ids": (
                 list(invalid_record_ids)
                 if isinstance(invalid_record_ids, list)
+                else []
+            ),
+            "duplicate_source_ids": (
+                list(duplicate_source_ids)
+                if isinstance(duplicate_source_ids, list)
+                else []
+            ),
+            "conflicting_source_ids": (
+                list(conflicting_source_ids)
+                if isinstance(conflicting_source_ids, list)
                 else []
             ),
             "unreviewed_candidate_source_ids": (
@@ -12335,6 +12398,30 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
             "readonly_preflight_review_decision_invalid_record_count": int(
                 detail.get("readonly_preflight_review_decision_invalid_record_count") or 0
             ),
+            "readonly_preflight_review_decision_invalid_record_ids": (
+                list(detail.get("readonly_preflight_review_decision_invalid_record_ids"))
+                if isinstance(
+                    detail.get("readonly_preflight_review_decision_invalid_record_ids"),
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_duplicate_source_ids": (
+                list(detail.get("readonly_preflight_review_decision_duplicate_source_ids"))
+                if isinstance(
+                    detail.get("readonly_preflight_review_decision_duplicate_source_ids"),
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_conflicting_source_ids": (
+                list(detail.get("readonly_preflight_review_decision_conflicting_source_ids"))
+                if isinstance(
+                    detail.get("readonly_preflight_review_decision_conflicting_source_ids"),
+                    list,
+                )
+                else []
+            ),
             "readonly_preflight_review_decision_unreviewed_candidate_count": int(
                 detail.get("readonly_preflight_review_decision_unreviewed_candidate_count") or 0
             ),
@@ -13042,6 +13129,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_review_decision['rejected_source_ids'])}`",
                 "- invalid_record_ids: "
                 f"`{json.dumps(wing_readonly_preflight_review_decision['invalid_record_ids'])}`",
+                "- duplicate_source_ids: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['duplicate_source_ids'])}`",
+                "- conflicting_source_ids: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['conflicting_source_ids'])}`",
                 "- unreviewed_candidate_source_ids: "
                 f"`{json.dumps(wing_readonly_preflight_review_decision['unreviewed_candidate_source_ids'])}`",
                 f"- blocked_by: `{json.dumps(wing_readonly_preflight_review_decision['blocked_by'])}`",
@@ -14575,6 +14666,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{next_plan['readonly_preflight_review_decision_accepted_record_count']}`",
                 "- readonly_preflight_review_decision_invalid_record_count: "
                 f"`{next_plan['readonly_preflight_review_decision_invalid_record_count']}`",
+                "- readonly_preflight_review_decision_invalid_record_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_invalid_record_ids'])}`",
+                "- readonly_preflight_review_decision_duplicate_source_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_duplicate_source_ids'])}`",
+                "- readonly_preflight_review_decision_conflicting_source_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_conflicting_source_ids'])}`",
                 "- readonly_preflight_review_decision_unreviewed_candidate_count: "
                 f"`{next_plan['readonly_preflight_review_decision_unreviewed_candidate_count']}`",
                 f"- global_blockers: `{json.dumps(next_plan['global_blockers'])}`",

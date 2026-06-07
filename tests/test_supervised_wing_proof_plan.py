@@ -102,6 +102,37 @@ def preflight_candidate_without_review_decision_snapshot() -> dict:
     return readiness
 
 
+def preflight_candidate_with_conflicting_review_decisions_snapshot() -> dict:
+    readiness = preflight_ready_snapshot()
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = {
+        "type": "wing_readonly_preflight_review_decision_ledger",
+        "status": "operator_review_decision_replacement_required",
+        "summary": {
+            "ledger_status": "operator_review_decision_replacement_required",
+            "accepted_record_count": 0,
+            "rejected_record_count": 0,
+            "invalid_record_count": 2,
+            "invalid_record_ids": ["review-accept", "review-reject"],
+            "duplicate_source_ids": [
+                "artifacts/wing_readonly_preflight/run/summary.json"
+            ],
+            "conflicting_source_ids": [
+                "artifacts/wing_readonly_preflight/run/summary.json"
+            ],
+            "unreviewed_candidate_count": 0,
+            "manual_readiness_update_candidate_available": False,
+            "readiness_matrix_update_allowed_by_decision": False,
+            "readiness_closure_allowed_by_decision": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "blocked_by": [
+                "operator_must_replace_invalid_readonly_preflight_review_decisions"
+            ],
+        },
+    }
+    return readiness
+
+
 def test_supervised_wing_proof_plan_module_is_transport_free():
     source = Path("backend/supervised_wing_proof_plan.py").read_text(encoding="utf-8")
 
@@ -208,6 +239,46 @@ def test_plan_blocks_physical_proof_steps_until_review_decision_is_accepted():
     )
     assert (
         "operator_must_record_readonly_preflight_review_decision"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["readonly_preflight_steps"] == []
+    assert plan["steps"] == []
+
+
+def test_plan_blocks_physical_proof_steps_for_conflicting_review_decisions():
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(
+            evidence_row("gain", blockers=["physical_candidate_missing"]),
+            evidence_row("fader", blockers=["physical_candidate_missing"]),
+        ),
+        autonomy_readiness_snapshot=preflight_candidate_with_conflicting_review_decisions_snapshot(),
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_candidate_available"] is True
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
+    assert (
+        plan["summary"]["readonly_preflight_review_decision_status"]
+        == "operator_review_decision_replacement_required"
+    )
+    assert plan["summary"]["readonly_preflight_review_decision_invalid_record_count"] == 2
+    assert plan["summary"]["readonly_preflight_review_decision_invalid_record_ids"] == [
+        "review-accept",
+        "review-reject",
+    ]
+    assert plan["summary"]["readonly_preflight_review_decision_duplicate_source_ids"] == [
+        "artifacts/wing_readonly_preflight/run/summary.json"
+    ]
+    assert plan["summary"]["readonly_preflight_review_decision_conflicting_source_ids"] == [
+        "artifacts/wing_readonly_preflight/run/summary.json"
+    ]
+    assert (
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert (
+        "operator_must_replace_invalid_readonly_preflight_review_decisions"
         in plan["summary"]["global_blockers"]
     )
     assert plan["readonly_preflight_steps"] == []

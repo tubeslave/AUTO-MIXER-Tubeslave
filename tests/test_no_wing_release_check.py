@@ -9788,6 +9788,9 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
             ],
             "readonly_preflight_review_decision_accepted_record_count": 1,
             "readonly_preflight_review_decision_invalid_record_count": 0,
+            "readonly_preflight_review_decision_invalid_record_ids": [],
+            "readonly_preflight_review_decision_duplicate_source_ids": [],
+            "readonly_preflight_review_decision_conflicting_source_ids": [],
             "readonly_preflight_review_decision_unreviewed_candidate_count": 0,
             "global_blockers": ["operator_must_approve_and_execute_manually"],
             "violations": [],
@@ -9828,11 +9831,30 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         ]
         == "operator_review_decision_records_available"
     )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_review_decision_invalid_record_ids"
+        ]
+        == []
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_review_decision_duplicate_source_ids"
+        ]
+        == []
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_review_decision_conflicting_source_ids"
+        ]
+        == []
+    )
     assert "## Next WING Proof Plan" in markdown_summary
     assert 'planned_value_types: `["gain"]`' in markdown_summary
     assert "readonly_preflight_candidate_available: `true`" in markdown_summary
     assert "readonly_preflight_step_count: `0`" in markdown_summary
     assert "readonly_preflight_review_decision_accepted: `true`" in markdown_summary
+    assert "readonly_preflight_review_decision_duplicate_source_ids: `[]`" in markdown_summary
 
 
 def test_no_wing_release_check_records_command_timeout(tmp_path):
