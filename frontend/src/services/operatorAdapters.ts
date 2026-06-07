@@ -40,6 +40,29 @@ const modeToUi: Record<BackendOperatorMode, AutomixerMode> = {
   auto: 'Auto'
 };
 
+const MODE_ALIASES_TO_CANONICAL_BACKEND: Record<string, BackendOperatorMode> = {
+  analyze: 'analyze',
+  'analysis': 'analyze',
+  'analysis mode': 'analyze',
+  'analysis_mode': 'analyze',
+  'analysismode': 'analyze',
+  assist: 'assist',
+  'assisted': 'assist',
+  'assisted mixing': 'assist',
+  'assistedmixing': 'assist',
+  'assist mode': 'assist',
+  supervised: 'supervised',
+  'supervised automix': 'supervised',
+  'supervised automix mode': 'supervised',
+  'supervised mode': 'supervised',
+  auto: 'auto',
+  autonomous: 'auto',
+  'full autonomous': 'auto',
+  'full autonomous mixing': 'auto',
+  'full autonomous mixing mode': 'auto',
+  'auto mode': 'auto'
+};
+
 const modeToBackend: Record<AutomixerMode, BackendOperatorMode> = {
   Analyze: 'analyze',
   Assist: 'assist',
@@ -75,8 +98,9 @@ export function toBackendMode(mode: AutomixerMode): BackendOperatorMode {
 }
 
 export function toUiMode(value: unknown): AutomixerMode {
-  const normalized = String(value || '').trim().toLowerCase() as BackendOperatorMode;
-  return modeToUi[normalized] ?? 'Assist';
+  const normalized = String(value || '').trim().toLowerCase();
+  const canonicalMode = MODE_ALIASES_TO_CANONICAL_BACKEND[normalized] as BackendOperatorMode | undefined;
+  return modeToUi[canonicalMode ?? 'assist'];
 }
 
 function asRecord(value: unknown): UnknownRecord {

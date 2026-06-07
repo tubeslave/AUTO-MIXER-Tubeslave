@@ -104,6 +104,15 @@ test('adaptTasks preserves SafeGain ensemble evidence for read-only cockpit disp
   assert.equal(task.safetyEvidence[5].tone, 'green');
 });
 
+test('toUiMode normalizes known aliases to canonical operator modes', async () => {
+  const { toUiMode } = await importTypeScript('services/operatorAdapters.ts');
+
+  assert.equal(toUiMode('analysis mode'), 'Analyze');
+  assert.equal(toUiMode('full autonomous mixing mode'), 'Auto');
+  assert.equal(toUiMode('supervised automix'), 'Supervised');
+  assert.equal(toUiMode('unknown-mode'), 'Assist');
+});
+
 test('safetyEvidenceForTask keeps ensemble rows visible before generic evidence', async () => {
   const { ensembleEvidenceForTask, safetyEvidenceForTask } = await importTypeScript('mock/automixerData.ts');
 
