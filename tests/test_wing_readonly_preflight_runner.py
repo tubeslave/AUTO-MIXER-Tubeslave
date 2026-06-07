@@ -392,6 +392,8 @@ async def test_readonly_preflight_blocks_unexpected_response_type(
     summary = read_summary(tmp_path)
     assert summary["status"] == "blocked"
     assert summary["reason"] == "unexpected_response_type"
+    assert summary["fail_closed"] is True
+    assert summary["blockers"] == ["unexpected_response_type"]
     assert summary["unexpected_response"] == {
         "request_type": "get_state",
         "expected_types": ["state_update"],

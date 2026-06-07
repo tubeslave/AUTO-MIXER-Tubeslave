@@ -682,6 +682,8 @@ async def run(args: argparse.Namespace) -> int:
             {
                 "status": "blocked",
                 "reason": "unexpected_response_type",
+                "fail_closed": True,
+                "blockers": ["unexpected_response_type"],
                 "unexpected_response": {
                     "request_type": exc.request.get("type"),
                     "expected_types": list(exc.expected_types),
