@@ -44,7 +44,8 @@ plan. This validates the channel confirmation and writes only a local JSON plan;
 it does not open WebSocket, contact WING, query the console, or grant live
 authority. The plan also records the current MVP blocker, fail-closed
 conditions, and the offline review commands to run after the real artifact is
-captured:
+captured. It must also show `expected_plan_required_for_real_run: true` and
+`physical_preflight_requires_existing_backend_connection: true`:
 
 ```bash
 python3 tools/wing_readonly_preflight_runner.py \

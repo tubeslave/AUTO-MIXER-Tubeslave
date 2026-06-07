@@ -414,6 +414,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
             "readback_identity_mismatch",
             "readback_request_id_mismatch",
             "expected_plan_missing_or_mismatch",
+            "existing_backend_connection_boundary_missing",
             "forbidden_request_type_sent",
             "unexpected_response_type",
             "event_log_missing_or_invalid",

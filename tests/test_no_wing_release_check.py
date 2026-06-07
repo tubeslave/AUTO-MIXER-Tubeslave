@@ -663,6 +663,8 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "read_only": True,
         "live_write": False,
         "operator_required": True,
+        "expected_plan_required_for_real_run": True,
+        "physical_preflight_requires_existing_backend_connection": True,
         "manual_review_required_before_readiness_update": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "contacts_backend": False,
@@ -2031,6 +2033,11 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
     assert result.detail["contacts_backend"] is False
     assert result.detail["queries_console"] is False
     assert result.detail["operator_required"] is True
+    assert result.detail["expected_plan_required_for_real_run"] is True
+    assert (
+        result.detail["physical_preflight_requires_existing_backend_connection"]
+        is True
+    )
     assert result.detail["manual_review_required_before_readiness_update"] is True
     assert result.detail["execution_allowed_by_plan"] is False
     assert result.detail["live_authority_granted"] is False
@@ -2063,6 +2070,8 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
     payload = valid_wing_readonly_preflight_plan_payload(plan_path)
     payload["contacts_backend"] = True
     payload["live_authority_granted"] = True
+    payload["expected_plan_required_for_real_run"] = False
+    payload["physical_preflight_requires_existing_backend_connection"] = False
     payload["manual_review_required_before_readiness_update"] = False
     payload["fail_closed_conditions"] = ["backend_not_in_wing_mode"]
     payload["post_run_review_commands"] = []
@@ -2078,6 +2087,13 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
     assert "wing_readonly_preflight_plan_live_authority_granted_not_false" in result.detail[
         "violations"
     ]
+    assert "wing_readonly_preflight_plan_expected_plan_required_not_true" in result.detail[
+        "violations"
+    ]
+    assert (
+        "wing_readonly_preflight_plan_existing_backend_connection_boundary_not_true"
+        in result.detail["violations"]
+    )
     assert "wing_readonly_preflight_plan_manual_review_boundary_not_true" in result.detail[
         "violations"
     ]
@@ -6908,6 +6924,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "contacts_backend": False,
             "queries_console": False,
             "operator_required": True,
+            "expected_plan_required_for_real_run": True,
+            "physical_preflight_requires_existing_backend_connection": True,
             "manual_review_required_before_readiness_update": True,
             "execution_allowed_by_plan": False,
             "live_authority_granted": False,
@@ -6940,6 +6958,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["contacts_backend"] is False
     assert artifact["queries_console"] is False
     assert artifact["operator_required"] is True
+    assert artifact["expected_plan_required_for_real_run"] is True
+    assert artifact["physical_preflight_requires_existing_backend_connection"] is True
     assert artifact["manual_review_required_before_readiness_update"] is True
     assert artifact["execution_allowed_by_plan"] is False
     assert artifact["live_authority_granted"] is False
@@ -6965,6 +6985,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["violations"] == []
     assert "## WING Read-Only Preflight Plan Artifact" in markdown_summary
     assert "contacts_backend: `false`" in markdown_summary
+    assert "expected_plan_required_for_real_run: `true`" in markdown_summary
+    assert (
+        "physical_preflight_requires_existing_backend_connection: `true`"
+        in markdown_summary
+    )
     assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
     assert "WING read-only connection proof" in markdown_summary
     assert "physical_readback_missing" in markdown_summary

@@ -51,6 +51,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EXPECTED_PLAN_GATE_20260607.md` | Real read-only preflight capture validates against the offline plan before WebSocket and records a plan SHA256 in proof artifacts. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EXPECTED_PLAN_REQUIRED_EVIDENCE_GATE_20260607.md` | Evidence intake requires proof that real read-only preflight runs required an offline expected plan. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EXISTING_BACKEND_CONNECTION_EVIDENCE_GATE_20260607.md` | Evidence intake requires proof that real read-only preflight used an already-connected backend/WING session, not direct connect/disconnect authority. |
+| `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_PLAN_POLICY_FLAGS_RELEASE_GATE_20260607.md` | No-WING release checks require the offline preflight plan to carry expected-plan and existing-backend policy flags. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REQUIRE_EXPECTED_PLAN_20260607.md` | Real read-only preflight capture fails closed before WebSocket when `--expected-plan` is omitted. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_UNEXPECTED_RESPONSE_GATE_20260607.md` | Real read-only preflight capture fails closed when backend returns an unexpected response type for the request in flight. |
 | `Docs/reports/AUTOMIXER_WING_MVP_DIRECTION_GUARD_SELF_REPORT_FILTER_20260607.md` | Direction guard drift scoring ignores its own policy warnings and generated evidence tables while preserving real drift detection. |

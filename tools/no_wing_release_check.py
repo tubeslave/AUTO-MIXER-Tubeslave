@@ -3038,6 +3038,14 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append("wing_readonly_preflight_plan_selected_mvp_blocker_status_mismatch")
     if plan.get("operator_required") is not True:
         violations.append("wing_readonly_preflight_plan_operator_required_not_true")
+    if plan.get("expected_plan_required_for_real_run") is not True:
+        violations.append(
+            "wing_readonly_preflight_plan_expected_plan_required_not_true"
+        )
+    if plan.get("physical_preflight_requires_existing_backend_connection") is not True:
+        violations.append(
+            "wing_readonly_preflight_plan_existing_backend_connection_boundary_not_true"
+        )
     if plan.get("manual_review_required_before_readiness_update") is not True:
         violations.append(
             "wing_readonly_preflight_plan_manual_review_boundary_not_true"
@@ -3155,6 +3163,12 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["selected_mvp_blocker"] = plan.get("selected_mvp_blocker")
     detail["selected_mvp_blocker_status"] = plan.get("selected_mvp_blocker_status")
     detail["operator_required"] = plan.get("operator_required")
+    detail["expected_plan_required_for_real_run"] = plan.get(
+        "expected_plan_required_for_real_run"
+    )
+    detail["physical_preflight_requires_existing_backend_connection"] = plan.get(
+        "physical_preflight_requires_existing_backend_connection"
+    )
     detail["manual_review_required_before_readiness_update"] = plan.get(
         "manual_review_required_before_readiness_update"
     )
@@ -9761,6 +9775,13 @@ def wing_readonly_preflight_plan_artifact_summary(
             "contacts_backend": False,
             "queries_console": False,
             "operator_required": detail.get("operator_required") is True,
+            "expected_plan_required_for_real_run": (
+                detail.get("expected_plan_required_for_real_run") is True
+            ),
+            "physical_preflight_requires_existing_backend_connection": (
+                detail.get("physical_preflight_requires_existing_backend_connection")
+                is True
+            ),
             "manual_review_required_before_readiness_update": (
                 detail.get("manual_review_required_before_readiness_update") is True
             ),
@@ -12873,6 +12894,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- queries_console: `{str(wing_readonly_preflight_plan_artifact['queries_console']).lower()}`",
                 "- operator_required: "
                 f"`{str(wing_readonly_preflight_plan_artifact['operator_required']).lower()}`",
+                "- expected_plan_required_for_real_run: "
+                f"`{str(wing_readonly_preflight_plan_artifact['expected_plan_required_for_real_run']).lower()}`",
+                "- physical_preflight_requires_existing_backend_connection: "
+                f"`{str(wing_readonly_preflight_plan_artifact['physical_preflight_requires_existing_backend_connection']).lower()}`",
                 "- manual_review_required_before_readiness_update: "
                 f"`{str(wing_readonly_preflight_plan_artifact['manual_review_required_before_readiness_update']).lower()}`",
                 "- execution_allowed_by_plan: "
