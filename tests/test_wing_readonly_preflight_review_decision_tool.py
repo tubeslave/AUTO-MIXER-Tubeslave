@@ -307,6 +307,39 @@ def test_decision_review_report_blocks_conflicting_duplicate_decisions(tmp_path:
     assert f'conflicting_source_ids: `["{summary_path}"]`' in markdown
 
 
+def test_decision_review_report_blocks_duplicate_accepted_decisions(tmp_path: Path):
+    summary_path = _write_artifact(tmp_path / "preflight" / "run")
+    accepted_a_path = _write_decision(
+        tmp_path / "decisions" / "accepted-a.json",
+        _decision_record(summary_path, review_id="review-accept-a"),
+    )
+    accepted_b_path = _write_decision(
+        tmp_path / "decisions" / "accepted-b.json",
+        _decision_record(
+            summary_path,
+            review_id="review-accept-b",
+            reviewed_at="2026-06-07T01:10:00Z",
+        ),
+    )
+
+    report = decision_tool.build_decision_review_report(
+        artifact_roots=(tmp_path / "preflight",),
+        decision_paths=(accepted_a_path, accepted_b_path),
+    )
+
+    assert report["status"] == "blocked"
+    assert report["accepted_record_count"] == 0
+    assert report["rejected_record_count"] == 0
+    assert report["invalid_record_count"] == 2
+    assert report["manual_readiness_update_candidate_available"] is False
+    assert report["duplicate_source_ids"] == [str(summary_path)]
+    assert report["conflicting_source_ids"] == []
+    assert decision_tool.exit_code_for_report(report) == 3
+    markdown = decision_tool.render_markdown(report)
+    assert f'duplicate_source_ids: `["{summary_path}"]`' in markdown
+    assert "conflicting_source_ids: `[]`" in markdown
+
+
 def test_decision_review_report_requires_preflight_candidate_first(tmp_path: Path):
     report = decision_tool.build_decision_review_report(
         artifact_roots=(tmp_path / "missing",),

@@ -216,6 +216,40 @@ def test_review_decision_ledger_rejects_duplicate_conflicting_candidate_decision
         assert record["operator_rejected_readonly_preflight_candidate"] is False
 
 
+def test_review_decision_ledger_rejects_duplicate_accepted_candidate_decisions():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[
+            _accepted_record(review_id="review-accept-a"),
+            _accepted_record(
+                review_id="review-accept-b",
+                reviewed_at="2026-06-07T01:10:00Z",
+            ),
+        ],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert ledger["summary"]["rejected_record_count"] == 0
+    assert ledger["summary"]["invalid_record_count"] == 2
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert ledger["summary"]["duplicate_source_ids"] == ["inline_payload_0"]
+    assert ledger["summary"]["conflicting_source_ids"] == []
+    assert ledger["summary"]["invalid_record_ids"] == [
+        "review-accept-a",
+        "review-accept-b",
+    ]
+    for record in ledger["records"]:
+        assert record["valid"] is False
+        assert "review_decision_duplicate_artifact_source" in record["violations"]
+        assert (
+            "review_decision_conflicting_artifact_source_decisions"
+            not in record["violations"]
+        )
+        assert record["operator_accepted_readonly_preflight_candidate"] is False
+        assert record["operator_rejected_readonly_preflight_candidate"] is False
+
+
 def test_review_decision_ledger_rejects_unsafe_or_unmatched_decision():
     ledger = build_wing_readonly_preflight_review_decision_ledger(
         preflight_evidence=_evidence_with_candidate(),
