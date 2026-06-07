@@ -98,7 +98,22 @@ async def test_connection_failure_before_apply_records_fail_closed_without_live_
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     patch_websocket_connect_failure(monkeypatch, OSError("backend unavailable"))
-    args = parse_args(tmp_path, "--channel", "7", "--value-type", "fader", "--delta-db", "-0.25", "--execute")
+    args = parse_args(
+        tmp_path,
+        "--channel",
+        "7",
+        "--value-type",
+        "fader",
+        "--delta-db",
+        "-0.25",
+        "--operator-confirm-channel",
+        "7",
+        "--operator-confirm-value-type",
+        "fader",
+        "--operator-confirm-delta-db",
+        "-0.25",
+        "--execute",
+    )
 
     exit_code = await runner.run(args)
 
@@ -127,7 +142,22 @@ async def test_timeout_after_apply_request_requires_manual_review_not_promotion_
         ]
     )
     patch_websocket_connect(monkeypatch, websocket)
-    args = parse_args(tmp_path, "--channel", "4", "--value-type", "fader", "--delta-db", "-0.25", "--execute")
+    args = parse_args(
+        tmp_path,
+        "--channel",
+        "4",
+        "--value-type",
+        "fader",
+        "--delta-db",
+        "-0.25",
+        "--operator-confirm-channel",
+        "4",
+        "--operator-confirm-value-type",
+        "fader",
+        "--operator-confirm-delta-db",
+        "-0.25",
+        "--execute",
+    )
 
     exit_code = await runner.run(args)
 
@@ -160,12 +190,87 @@ async def test_timeout_after_apply_request_requires_manual_review_not_promotion_
             "--prove-emergency-stop requires --execute",
         ),
         (
-            ["--channel", "1", "--value-type", "fader", "--delta-db", "-0.1", "--prove-blocked-apply"],
+            [
+                "--channel",
+                "1",
+                "--value-type",
+                "fader",
+                "--delta-db",
+                "-0.1",
+                "--prove-blocked-apply",
+            ],
             "--prove-blocked-apply requires --execute",
         ),
         (
-            ["--channel", "1", "--value-type", "fader", "--delta-db", "-0.1", "--rollback-delay-sec", "6"],
+            [
+                "--channel",
+                "1",
+                "--value-type",
+                "fader",
+                "--delta-db",
+                "-0.1",
+                "--rollback-delay-sec",
+                "6",
+            ],
             "--rollback-delay-sec must be between 0 and 5 seconds",
+        ),
+        (
+            ["--channel", "1", "--value-type", "fader", "--delta-db", "-0.1", "--execute"],
+            "--operator-confirm-channel is required with --execute",
+        ),
+        (
+            [
+                "--channel",
+                "1",
+                "--value-type",
+                "fader",
+                "--delta-db",
+                "-0.1",
+                "--operator-confirm-channel",
+                "2",
+                "--operator-confirm-value-type",
+                "fader",
+                "--operator-confirm-delta-db",
+                "-0.1",
+                "--execute",
+            ],
+            "--operator-confirm-channel must match --channel",
+        ),
+        (
+            [
+                "--channel",
+                "1",
+                "--value-type",
+                "fader",
+                "--delta-db",
+                "-0.1",
+                "--operator-confirm-channel",
+                "1",
+                "--operator-confirm-value-type",
+                "gain",
+                "--operator-confirm-delta-db",
+                "-0.1",
+                "--execute",
+            ],
+            "--operator-confirm-value-type must match --value-type",
+        ),
+        (
+            [
+                "--channel",
+                "1",
+                "--value-type",
+                "fader",
+                "--delta-db",
+                "-0.1",
+                "--operator-confirm-channel",
+                "1",
+                "--operator-confirm-value-type",
+                "fader",
+                "--operator-confirm-delta-db",
+                "-0.2",
+                "--execute",
+            ],
+            "--operator-confirm-delta-db must match --delta-db",
         ),
     ],
 )
@@ -202,6 +307,8 @@ async def test_dry_run_plans_without_creating_or_applying_proposal(
     assert summary["proof_mode"] == "dry_run"
     assert summary["physical_wing"] is False
     assert summary["physical_proof_requires_execute"] is True
+    assert summary["operator_confirmation_required"] is False
+    assert summary["operator_confirmation_match"] is False
     assert summary["address"] == "/ch/7/fdr"
     assert summary["old_value"] == -10.0
     assert summary["target_value"] == -10.25
@@ -315,6 +422,12 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
         "fader",
         "--delta-db",
         "-0.25",
+        "--operator-confirm-channel",
+        "4",
+        "--operator-confirm-value-type",
+        "fader",
+        "--operator-confirm-delta-db",
+        "-0.25",
         "--execute",
         "--prove-blocked-apply",
         "--prove-emergency-stop",
@@ -357,6 +470,11 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
     assert summary["proof_mode"] == "physical"
     assert summary["physical_wing"] is True
     assert summary["physical_proof_requires_execute"] is True
+    assert summary["operator_confirmation_required"] is True
+    assert summary["operator_confirmed_channel"] == 4
+    assert summary["operator_confirmed_value_type"] == "fader"
+    assert summary["operator_confirmed_delta_db"] == -0.25
+    assert summary["operator_confirmation_match"] is True
     assert summary["write_policy"] == "apply_operator_proposal_only"
     assert summary["apply_result"]["type"] == "operator_proposal_apply_result"
     assert summary["rollback_result"]["type"] == "manual_write_rollback_applied"

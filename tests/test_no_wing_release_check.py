@@ -4871,7 +4871,27 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     "live_execution_required": True,
                     "execution_allowed_by_plan": False,
                     "operator_approval_required": True,
-                    "command": ["python", "tools/wing_operator_proposal_validation_runner.py"],
+                    "command": [
+                        "python3",
+                        "tools/wing_operator_proposal_validation_runner.py",
+                        "--url",
+                        "ws://localhost:8765",
+                        "--channel",
+                        "3",
+                        "--value-type",
+                        "gain",
+                        "--delta-db",
+                        "-0.25",
+                        "--operator-confirm-channel",
+                        "3",
+                        "--operator-confirm-value-type",
+                        "gain",
+                        "--operator-confirm-delta-db",
+                        "-0.25",
+                        "--execute",
+                        "--prove-blocked-apply",
+                        "--prove-emergency-stop",
+                    ],
                     "rationale": "physical proof required",
                     "prerequisites": ["operator approval"],
                     "abort_conditions": ["operator concern"],
@@ -4979,6 +4999,27 @@ def test_no_wing_release_check_rejects_next_wing_plan_with_stale_review_source_i
     assert result.status == "failed"
     assert (
         "next_wing_proof_plan_review_decision_accepted_sources_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_next_wing_plan_stale_operator_confirmation(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    command = payload["next_wing_proof_plan"]["steps"][0]["command"]
+    command[command.index("--operator-confirm-channel") + 1] = "4"
+    command[command.index("--operator-confirm-delta-db") + 1] = "-0.50"
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "failed"
+    assert (
+        "next_wing_proof_plan_step_0_operator_confirm_channel_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "next_wing_proof_plan_step_0_operator_confirm_delta_mismatch"
         in result.detail["violations"]
     )
 

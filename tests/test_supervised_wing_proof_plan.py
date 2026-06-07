@@ -208,6 +208,18 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert gain_step["delta_db"] == -0.25
     assert gain_step["command"][0] == "python3"
     assert "--execute" in gain_step["command"]
+    assert "--operator-confirm-channel" in gain_step["command"]
+    assert gain_step["command"][gain_step["command"].index("--operator-confirm-channel") + 1] == "3"
+    assert "--operator-confirm-value-type" in gain_step["command"]
+    assert (
+        gain_step["command"][gain_step["command"].index("--operator-confirm-value-type") + 1]
+        == "gain"
+    )
+    assert "--operator-confirm-delta-db" in gain_step["command"]
+    assert (
+        gain_step["command"][gain_step["command"].index("--operator-confirm-delta-db") + 1]
+        == "-0.25"
+    )
     assert "--prove-blocked-apply" in gain_step["command"]
     assert "--prove-emergency-stop" in gain_step["command"]
     assert "ws://proof-backend" in gain_step["command"]

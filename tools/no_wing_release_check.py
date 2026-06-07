@@ -9068,6 +9068,12 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             if not isinstance(step, Mapping):
                 violations.append(f"next_wing_proof_plan_step_{index}_not_object")
                 continue
+            try:
+                channel = int(step.get("channel"))
+            except (TypeError, ValueError):
+                channel = None
+                violations.append(f"next_wing_proof_plan_step_{index}_channel_invalid")
+            value_type = str(step.get("value_type") or "")
             if step.get("execution_allowed_by_plan") is not False:
                 violations.append(f"next_wing_proof_plan_step_{index}_execution_allowed")
             if step.get("operator_approval_required") is not True:
@@ -9081,6 +9087,55 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 continue
             if delta_db >= 0 or abs(delta_db) > 0.5:
                 violations.append(f"next_wing_proof_plan_step_{index}_delta_not_safe_negative_proof")
+            command = (
+                [str(item) for item in step.get("command", []) if item]
+                if isinstance(step.get("command"), list)
+                else []
+            )
+            if "tools/wing_operator_proposal_validation_runner.py" not in command:
+                violations.append(f"next_wing_proof_plan_step_{index}_runner_missing")
+
+            def command_value(flag: str) -> str | None:
+                try:
+                    return command[command.index(flag) + 1]
+                except (ValueError, IndexError):
+                    return None
+
+            confirmed_channel = command_value("--operator-confirm-channel")
+            confirmed_value_type = command_value("--operator-confirm-value-type")
+            confirmed_delta = command_value("--operator-confirm-delta-db")
+            if confirmed_channel is None:
+                violations.append(
+                    f"next_wing_proof_plan_step_{index}_operator_confirm_channel_missing"
+                )
+            elif channel is not None and confirmed_channel != str(channel):
+                violations.append(
+                    f"next_wing_proof_plan_step_{index}_operator_confirm_channel_mismatch"
+                )
+            if confirmed_value_type is None:
+                violations.append(
+                    f"next_wing_proof_plan_step_{index}_operator_confirm_value_type_missing"
+                )
+            elif confirmed_value_type != value_type:
+                violations.append(
+                    f"next_wing_proof_plan_step_{index}_operator_confirm_value_type_mismatch"
+                )
+            if confirmed_delta is None:
+                violations.append(
+                    f"next_wing_proof_plan_step_{index}_operator_confirm_delta_missing"
+                )
+            else:
+                try:
+                    confirmed_delta_db = float(confirmed_delta)
+                except ValueError:
+                    violations.append(
+                        f"next_wing_proof_plan_step_{index}_operator_confirm_delta_invalid"
+                    )
+                else:
+                    if round(confirmed_delta_db, 3) != round(delta_db, 3):
+                        violations.append(
+                            f"next_wing_proof_plan_step_{index}_operator_confirm_delta_mismatch"
+                        )
 
     detail["plan_status"] = plan_status
     detail["step_count"] = step_count

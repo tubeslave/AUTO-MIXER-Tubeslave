@@ -182,6 +182,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--channel", type=int, required=True, help="Wing input channel, 1..48")
     parser.add_argument("--value-type", choices=["fader", "gain"], required=True, help="Parameter to test")
     parser.add_argument("--delta-db", type=float, required=True, help="Small negative dB delta to apply before rollback")
+    parser.add_argument(
+        "--operator-confirm-channel",
+        type=int,
+        help="Operator-confirmed channel; required for --execute and must match --channel",
+    )
+    parser.add_argument(
+        "--operator-confirm-value-type",
+        choices=["fader", "gain"],
+        help="Operator-confirmed value type; required for --execute and must match --value-type",
+    )
+    parser.add_argument(
+        "--operator-confirm-delta-db",
+        type=float,
+        help="Operator-confirmed negative delta; required for --execute and must match --delta-db",
+    )
     parser.add_argument("--execute", action="store_true", help="Actually apply proposal and rollback")
     parser.add_argument(
         "--prove-blocked-apply",
@@ -206,6 +221,19 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
         return "--channel must be in 1..48"
     if args.delta_db >= 0.0 or abs(args.delta_db) > 0.5:
         return "--delta-db must be negative and no larger than 0.5 dB"
+    if args.execute:
+        if args.operator_confirm_channel is None:
+            return "--operator-confirm-channel is required with --execute"
+        if args.operator_confirm_value_type is None:
+            return "--operator-confirm-value-type is required with --execute"
+        if args.operator_confirm_delta_db is None:
+            return "--operator-confirm-delta-db is required with --execute"
+        if args.operator_confirm_channel != args.channel:
+            return "--operator-confirm-channel must match --channel"
+        if args.operator_confirm_value_type != args.value_type:
+            return "--operator-confirm-value-type must match --value-type"
+        if round(float(args.operator_confirm_delta_db), 3) != round(float(args.delta_db), 3):
+            return "--operator-confirm-delta-db must match --delta-db"
     if args.prove_emergency_stop and not args.execute:
         return "--prove-emergency-stop requires --execute"
     if args.prove_blocked_apply and not args.execute:
@@ -382,6 +410,17 @@ async def run(args: argparse.Namespace) -> int:
         "channel": args.channel,
         "value_type": args.value_type,
         "delta_db": args.delta_db,
+        "operator_confirmation_required": bool(args.execute),
+        "operator_confirmed_channel": args.operator_confirm_channel,
+        "operator_confirmed_value_type": args.operator_confirm_value_type,
+        "operator_confirmed_delta_db": args.operator_confirm_delta_db,
+        "operator_confirmation_match": (
+            bool(args.execute)
+            and args.operator_confirm_channel == args.channel
+            and args.operator_confirm_value_type == args.value_type
+            and args.operator_confirm_delta_db is not None
+            and round(float(args.operator_confirm_delta_db), 3) == round(float(args.delta_db), 3)
+        ),
         "rollback_delay_sec": args.rollback_delay_sec,
         "prove_blocked_apply": bool(args.prove_blocked_apply),
         "prove_emergency_stop": bool(args.prove_emergency_stop),

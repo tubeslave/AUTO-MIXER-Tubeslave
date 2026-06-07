@@ -45,6 +45,8 @@ Forbidden live writes:
 - `.ai/project-layer/wing_mvp_blockers.md` shows read-only preflight as reviewed
   or ready for supervised proof.
 - The operator explicitly approves the exact channel, value type, and delta.
+- The command repeats that approval with matching `--operator-confirm-channel`,
+  `--operator-confirm-value-type`, and `--operator-confirm-delta-db` flags.
 - The selected delta is small and negative.
 - The operator is present and can stop the test.
 
@@ -58,6 +60,9 @@ python3 tools/wing_operator_proposal_validation_runner.py \
   --channel 3 \
   --value-type fader \
   --delta-db -0.25 \
+  --operator-confirm-channel 3 \
+  --operator-confirm-value-type fader \
+  --operator-confirm-delta-db -0.25 \
   --execute \
   --prove-blocked-apply \
   --prove-emergency-stop \
@@ -75,6 +80,9 @@ python3 tools/wing_operator_proposal_validation_runner.py \
   --channel 3 \
   --value-type gain \
   --delta-db -0.25 \
+  --operator-confirm-channel 3 \
+  --operator-confirm-value-type gain \
+  --operator-confirm-delta-db -0.25 \
   --execute \
   --prove-blocked-apply \
   --prove-emergency-stop \
@@ -101,6 +109,8 @@ The artifact must show:
 - duplicate or conflicting read-only preflight review decision JSON files are
   still present;
 - operator approval is not explicit;
+- operator confirmation flags are missing or do not match the requested
+  channel, value type, and delta;
 - the delta is positive;
 - the value type is not `fader` or `gain`;
 - rollback readback is missing;
