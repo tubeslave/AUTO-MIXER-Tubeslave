@@ -44,6 +44,21 @@ def test_goal_language_aliases_normalize_to_stable_backend_modes():
     assert normalize_operator_mode("full_autonomous_mode") == "auto"
 
 
+def test_goal_language_aliases_handle_robust_separator_variants():
+    for value in (
+        "full-autonomous-mix",
+        "full -- autonomous -- mix",
+        "full   autonomous    mix",
+        "full_autonomous_mode--",
+        "analysis----mode",
+        "supervised-auto_mix",
+        "supervised   automix  mode",
+    ):
+        assert normalize_operator_mode(value) == "auto" if "full" in value else (
+            "supervised" if "super" in value else "analyze"
+        )
+
+
 def test_analysis_and_assist_modes_never_apply_to_console():
     for mode in ("analysis_mode", "assisted_mixing_mode"):
         status = build_operator_mode_status(mode=mode, connection_mode="wing")
