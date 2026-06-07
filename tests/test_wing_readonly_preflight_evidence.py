@@ -34,6 +34,7 @@ def _valid_summary() -> dict:
         "expected_plan_sha256": "0" * 64,
         "expected_plan_match": True,
         "expected_plan_violations": [],
+        "expected_plan_required_for_real_run": True,
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -249,6 +250,7 @@ def test_preflight_evidence_rejects_missing_expected_plan_link():
     artifact.pop("expected_plan_sha256")
     artifact.pop("expected_plan_match")
     artifact.pop("expected_plan_violations")
+    artifact.pop("expected_plan_required_for_real_run")
 
     validation = validate_wing_readonly_preflight_artifact(artifact)
 
@@ -257,6 +259,9 @@ def test_preflight_evidence_rejects_missing_expected_plan_link():
     assert "expected_plan_sha256_missing" in validation["violations"]
     assert "expected_plan_match_not_true" in validation["violations"]
     assert "expected_plan_violations_not_empty" in validation["violations"]
+    assert (
+        "expected_plan_required_for_real_run_not_true" in validation["violations"]
+    )
 
 
 def test_preflight_evidence_rejects_operator_channel_confirmation_mismatch():

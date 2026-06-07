@@ -23,6 +23,7 @@ def _valid_summary() -> dict:
         "expected_plan_sha256": "0" * 64,
         "expected_plan_match": True,
         "expected_plan_violations": [],
+        "expected_plan_required_for_real_run": True,
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,

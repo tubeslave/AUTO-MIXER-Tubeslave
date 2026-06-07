@@ -402,6 +402,8 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("expected_plan_match_not_true")
     if payload.get("expected_plan_violations") not in ([], ()):
         violations.append("expected_plan_violations_not_empty")
+    if payload.get("expected_plan_required_for_real_run") is not True:
+        violations.append("expected_plan_required_for_real_run_not_true")
     if payload.get("require_physical_readback") is not True:
         violations.append("require_physical_readback_not_true")
     channels = _int_tuple(payload.get("channels"))
