@@ -237,7 +237,7 @@ test('adaptChannels treats control_state mute as read-only channel status', asyn
 });
 
 test('mode display labels map objective names to each operational mode', async () => {
-  const { getModeDisplayLabel, modeDisplayLabel, formatOperatorModeLabel } = await importTypeScript('utils/prototypeTone.ts');
+  const { getModeDisplayLabel, modeDisplayLabel, formatOperatorModeLabel, formatAIAgentModeLabel } = await importTypeScript('utils/prototypeTone.ts');
 
   assert.equal(getModeDisplayLabel('Analyze'), 'Analysis Mode');
   assert.equal(getModeDisplayLabel('Assist'), 'Assisted Mixing');
@@ -249,6 +249,11 @@ test('mode display labels map objective names to each operational mode', async (
   assert.equal(formatOperatorModeLabel('full autonomous mixing'), 'Full Autonomous Mixing');
   assert.equal(formatOperatorModeLabel('auto mode'), 'Full Autonomous Mixing');
   assert.equal(formatOperatorModeLabel('unknown'), 'Assisted Mixing');
+  assert.equal(formatAIAgentModeLabel('suggest'), 'Suggest');
+  assert.equal(formatAIAgentModeLabel('manual_mode'), 'Manual');
+  assert.equal(formatAIAgentModeLabel('full autonomous'), 'Auto');
+  assert.equal(formatAIAgentModeLabel('unknown-mode'), 'Unknown Mode');
+  assert.equal(formatAIAgentModeLabel(''), 'Suggest');
 });
 
 test('adaptChannels maps cached pan gate and compressor details from read-only inventory', async () => {

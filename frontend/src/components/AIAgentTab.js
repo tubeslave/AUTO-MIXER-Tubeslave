@@ -1,43 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import websocketService from '../services/websocket';
+import { formatAIAgentModeLabel } from '../utils/prototypeTone';
 import './AIAgentTab.css';
-
-const AI_AGENT_MODE_LABELS = {
-  suggest: 'Suggest',
-  suggestion: 'Suggest',
-  'suggest mode': 'Suggest',
-  suggest_mode: 'Suggest',
-  manual: 'Manual',
-  'manual mode': 'Manual',
-  manual_mode: 'Manual',
-  auto: 'Auto',
-  autonomous: 'Auto',
-  'full autonomous': 'Auto',
-  'full autonomous mode': 'Auto',
-  full_autonomous_mode: 'Auto'
-};
-
-function normalizeModeToken(mode) {
-  return String(mode || '')
-    .trim()
-    .toLowerCase()
-    .replace(/-/g, '_')
-    .replace(/\s+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
-}
-
-function formatAIAgentMode(mode) {
-  const normalized = normalizeModeToken(mode);
-  if (AI_AGENT_MODE_LABELS[normalized]) return AI_AGENT_MODE_LABELS[normalized];
-
-  if (!normalized) return 'Suggest';
-
-  return normalized
-    .split('_')
-    .map(chunk => chunk.charAt(0).toUpperCase() + chunk.slice(1))
-    .join(' ');
-}
 
 function formatParams(params = {}) {
   const entries = Object.entries(params).slice(0, 4);
@@ -93,7 +57,7 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
     const handleMeters = (data) => setMeters(data.channels || {});
     const handleMode = (data) => {
       if (data.mode) setMode(data.mode);
-      setMessage(`Mode: ${formatAIAgentMode(data.mode || mode)}`);
+      setMessage(`Mode: ${formatAIAgentModeLabel(data.mode || mode)}`);
     };
     const refreshHistory = () => websocketService.getActionHistory(20);
 
@@ -216,7 +180,7 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
           <button className="btn-sm" onClick={refresh}>Refresh State</button>
         </div>
         <div className="module-status">
-          Mode: {formatAIAgentMode(status.mode || mode)} | Channels tracked: {status.channels_tracked || 0} | Pending: {status.pending_actions || pending.length}
+          Mode: {formatAIAgentModeLabel(status.mode || mode)} | Channels tracked: {status.channels_tracked || 0} | Pending: {status.pending_actions || pending.length}
         </div>
         <div className="module-status">
           Auto Apply: {autoModeLabel}. {autoModeNote}

@@ -55,6 +55,23 @@ const MODE_VALUE_ALIASES: Record<string, AutomixerMode> = {
   'auto mode': 'Auto',
 };
 
+const AI_AGENT_MODE_VALUE_ALIASES: Record<string, string> = {
+  suggest: 'Suggest',
+  suggestion: 'Suggest',
+  'suggest mode': 'Suggest',
+  suggest_mode: 'Suggest',
+  manual: 'Manual',
+  'manual mode': 'Manual',
+  manual_mode: 'Manual',
+  auto: 'Auto',
+  autonomous: 'Auto',
+  full_autonomous: 'Auto',
+  'full_autonomous_mode': 'Auto',
+  'full_autonomous_mixing': 'Auto',
+  'full_autonomous_mixing_mode': 'Auto',
+  auto_mode: 'Auto',
+};
+
 const RAW_MODE_MAP: Record<string, AutomixerMode> = {
   analyze: 'Analyze',
   assist: 'Assist',
@@ -62,10 +79,28 @@ const RAW_MODE_MAP: Record<string, AutomixerMode> = {
   auto: 'Auto',
 };
 
+export function formatAIAgentModeLabel(modeValue: unknown): string {
+  const normalized = String(modeValue || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  return AI_AGENT_MODE_VALUE_ALIASES[normalized] || (normalized ? toTitleCase(normalized) : 'Suggest');
+}
+
 export function formatOperatorModeLabel(modeValue: unknown): string {
   const normalized = String(modeValue || '').trim().toLowerCase();
   const mode = MODE_VALUE_ALIASES[normalized] || RAW_MODE_MAP[normalized] || 'Assist';
   return getModeDisplayLabel(mode);
+}
+
+function toTitleCase(value: string): string {
+  return value
+    .split('_')
+    .map(chunk => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+    .join(' ');
 }
 
 export function textClassForTone(tone?: Tone): string {
