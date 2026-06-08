@@ -1343,6 +1343,35 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_auto_mode_offline_blocks_mute_kind_even_when_approved(
+        self,
+        _mock_bleed: object,
+        _mock_load_config: object,
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        server.connection_mode = "offline"
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server.mixer_client = DummyWingLike()
+
+        result = await server._apply_manual_console_write(
+            websocket=None,
+            channel=1,
+            value=True,
+            value_type="mute",
+            source="unit:auto_unlocked_direct_mute",
+            approved=True,
+            approval_id="unit-auto-unlocked-mute",
+        )
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "live_write_kind_not_allowed_in_mode"
+        assert result["allowed_live_write_kinds"] == ["fader", "gain"]
+        server.mixer_client.set_channel_mute.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_auto_mode_is_blocked_for_wing_supervised_gate_when_wing_deployment_active(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "auto"

@@ -1088,9 +1088,24 @@ class AutoMixerServer:
         allowed_live_write_kinds = list(
             operator_capabilities.get("allowed_live_write_kinds") or []
         )
+        if (
+            operator_mode.get("mode") == "supervised"
+            and "mute" not in allowed_live_write_kinds
+        ):
+            allowed_live_write_kinds.append("mute")
         if not operator_capabilities.get("can_apply_to_console"):
             return self._manual_write_blocked_result(
                 reason="operator_mode_blocks_live_write",
+                channel=channel,
+                value=value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+                extra={"allowed_live_write_kinds": allowed_live_write_kinds},
+            )
+        if write_kind not in allowed_live_write_kinds:
+            return self._manual_write_blocked_result(
+                reason="live_write_kind_not_allowed_in_mode",
                 channel=channel,
                 value=value,
                 value_type=write_kind,
