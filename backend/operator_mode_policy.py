@@ -19,6 +19,37 @@ MODE_AUTO = "auto"
 DEFAULT_OPERATOR_MODE = MODE_ASSIST
 VALID_OPERATOR_MODES = (MODE_ANALYZE, MODE_ASSIST, MODE_SUPERVISED, MODE_AUTO)
 CURRENT_PROVEN_LIVE_WRITE_KINDS = ("fader", "gain")
+SUPPORTED_MANUAL_LIVE_WRITE_KINDS = ("fader", "gain", "mute")
+MANUAL_LIVE_WRITE_KIND_ALIASES = {
+    "trim": "gain",
+    "input_gain": "gain",
+    "preamp_gain": "gain",
+}
+
+
+def normalize_manual_live_write_kinds(raw_kinds: Any) -> list[str]:
+    if not raw_kinds:
+        return []
+    if not isinstance(raw_kinds, (list, tuple)):
+        return []
+
+    supported = set(SUPPORTED_MANUAL_LIVE_WRITE_KINDS)
+    seen = set()
+    approved: list[str] = []
+    for item in raw_kinds:
+        if item is None:
+            continue
+        normalized = str(item).strip().lower()
+        normalized = MANUAL_LIVE_WRITE_KIND_ALIASES.get(normalized, normalized)
+        if normalized not in supported:
+            continue
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        approved.append(normalized)
+    return approved
+
+
 FULL_AUTONOMOUS_TARGET_SURFACES = (
     "preamp",
     "trim",

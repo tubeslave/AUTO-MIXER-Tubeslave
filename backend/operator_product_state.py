@@ -29,6 +29,10 @@ except ImportError:  # pragma: no cover - package import compatibility
         build_processing_registry_snapshot,
     )
 try:
+    from operator_mode_policy import normalize_manual_live_write_kinds
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import normalize_manual_live_write_kinds
+try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan,
     )
@@ -69,7 +73,6 @@ DEFAULT_SNAPSHOT_COUNT = 200
 DEFAULT_USER_PRESET_COUNT = 200
 DEFAULT_CACHE_STALE_AFTER_SEC = 30.0
 MIN_ACTIVE_DB = -90.0
-SUPPORTED_MANUAL_LIVE_WRITE_KINDS = ("fader", "gain", "mute")
 DEFAULT_TELEMETRY_STORAGE_DIR = "data/telemetry/sessions"
 DEFAULT_SUPERVISED_PROOF_REPORT_STALE_AFTER_SEC = 24 * 60 * 60
 DEFAULT_SUPERVISED_PROOF_REPORT_DIRS = (
@@ -189,35 +192,6 @@ def _safe_call(fn: Callable[..., Any], *args: Any, default: Any = None, **kwargs
         return fn(*args, **kwargs)
     except Exception as exc:  # pragma: no cover - defensive runtime guard
         return {"error": str(exc)} if default is None else default
-
-
-def _normalize_manual_live_write_kinds(raw_kinds: Any) -> List[str]:
-    """Normalize and filter supported manual live write kinds for UI/runtime safety surfaces."""
-
-    normalized_map = {
-        "trim": "gain",
-        "input_gain": "gain",
-        "preamp_gain": "gain",
-    }
-    if not raw_kinds:
-        return []
-    if not isinstance(raw_kinds, (list, tuple)):
-        return []
-
-    seen = set()
-    approved: List[str] = []
-    for item in raw_kinds:
-        if item is None:
-            continue
-        normalized = str(item).strip().lower()
-        normalized = normalized_map.get(normalized, normalized)
-        if normalized not in SUPPORTED_MANUAL_LIVE_WRITE_KINDS:
-            continue
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        approved.append(normalized)
-    return approved
 
 
 def _round(value: Any, digits: int = 1) -> Optional[float]:
@@ -7034,7 +7008,7 @@ def build_safety_monitor(server: Any) -> Dict[str, Any]:
             allowed.append("mute")
         approved_live_write_kinds = allowed
     else:
-        approved_live_write_kinds = _normalize_manual_live_write_kinds(
+        approved_live_write_kinds = normalize_manual_live_write_kinds(
             approved_live_write_kinds
         )
     traces = build_decision_traces(server, limit=12)

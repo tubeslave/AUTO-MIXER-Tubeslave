@@ -11,6 +11,10 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from operator_mode_policy import (
+    normalize_manual_live_write_kinds,
+)
+
 try:
     from bus_group_main_dca_physical_readback_contract import (
         build_bus_group_main_dca_physical_readback_contract,
@@ -680,7 +684,6 @@ PROCESSING_DOMAINS = {
 }
 
 LIVE_ALLOWED_WRITE_KINDS = ("fader", "gain")
-SUPPORTED_MANUAL_LIVE_WRITE_KINDS = LIVE_ALLOWED_WRITE_KINDS + ("mute",)
 
 
 @dataclass(frozen=True)
@@ -6922,23 +6925,9 @@ def build_pipeline_runtime_summary(operator_mode: Dict[str, Any], manual_write_s
             allowed.append("mute")
         approved_live_write_kinds = allowed
     else:
-        supported_manual_live_write_kinds = set(SUPPORTED_MANUAL_LIVE_WRITE_KINDS)
-        normalized_mapping = {
-            "preamp_gain": "gain",
-            "trim": "gain",
-            "input_gain": "gain",
-        }
-        seen = set()
-        approved = []
-        for item in list(approved_live_write_kinds):
-            normalized = str(item or "").strip().lower()
-            normalized = normalized_mapping.get(normalized, normalized)
-            if normalized not in supported_manual_live_write_kinds:
-                continue
-            if normalized not in seen:
-                seen.add(normalized)
-                approved.append(normalized)
-        approved_live_write_kinds = approved
+        approved_live_write_kinds = normalize_manual_live_write_kinds(
+            approved_live_write_kinds
+        )
     main = get_pipeline_profile("main_live_assist")
     return {
         "main_pipeline_id": "main_live_assist",

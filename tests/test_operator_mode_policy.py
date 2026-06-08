@@ -2,6 +2,7 @@ from backend.operator_mode_policy import (
     FULL_AUTONOMOUS_TARGET_SURFACES,
     build_operator_mode_status,
     get_operator_mode_options,
+    normalize_manual_live_write_kinds,
     normalize_operator_mode,
 )
 
@@ -147,3 +148,9 @@ def test_unlocked_non_wing_auto_still_exposes_only_current_proven_write_scope():
         "fader",
     ]
     assert "autonomous_scope_limited_to_current_proven_write_kinds" in status["warnings"]
+
+
+def test_normalize_manual_live_write_kinds_filters_unsupported_and_aliases_values():
+    assert normalize_manual_live_write_kinds(
+        ["fader", "gain", "eq", "trim", "input_gain", "preamp_gain", "fader", "mute"]
+    ) == ["fader", "gain", "mute"]
