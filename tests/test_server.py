@@ -1115,6 +1115,26 @@ class TestWingDeploymentWriteBoundary:
 
         assert minimal_server.last_fader_values[8] == -12.0
 
+    def test_handle_external_fader_update_ignores_out_of_range_channel(self, minimal_server):
+        controller = MagicMock()
+        controller.realtime_enabled = True
+        minimal_server.auto_fader_controller = controller
+
+        minimal_server._handle_external_fader_update("/ch/99/fdr", (-10.0,))
+
+        assert 99 not in minimal_server.last_fader_values
+        controller.handle_external_fader_change.assert_not_called()
+
+    def test_handle_external_fader_update_ignores_zero_channel(self, minimal_server):
+        controller = MagicMock()
+        controller.realtime_enabled = True
+        minimal_server.auto_fader_controller = controller
+
+        minimal_server._handle_external_fader_update("/ch/0/fdr", (-10.0,))
+
+        assert 0 not in minimal_server.last_fader_values
+        controller.handle_external_fader_change.assert_not_called()
+
     def test_handle_external_fader_update_with_disabled_realtime_controller_skips_controller_callback(self, minimal_server):
         controller = MagicMock()
         controller.realtime_enabled = False

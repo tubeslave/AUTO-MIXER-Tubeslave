@@ -1956,6 +1956,9 @@ class AutoMixerServer:
         channel, value_type = parsed
         if value_type != "fader" or not args:
             return
+        if not 1 <= channel <= 48:
+            logger.debug("Ignoring external fader update for out-of-range channel %s: %s", channel, address)
+            return
         try:
             fader_value = float(args[0])
         except (TypeError, ValueError, IndexError, AttributeError):
