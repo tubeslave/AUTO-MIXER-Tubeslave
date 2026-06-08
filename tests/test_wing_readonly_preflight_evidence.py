@@ -5,6 +5,11 @@ from pathlib import Path
 
 from backend.wing_readonly_preflight_evidence import (
     DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS,
+    EXPECTED_PLAN_ALLOWED_REQUEST_TYPES,
+    EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS,
+    EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES,
+    EXPECTED_SELECTED_MVP_BLOCKER,
+    EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
     WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID,
     build_wing_readonly_preflight_evidence,
     validate_wing_readonly_preflight_artifact,
@@ -139,6 +144,9 @@ def _valid_expected_plan(summary: dict) -> dict:
         "status": "ready_for_operator_review",
         "proof_artifact_schema": summary["proof_artifact_schema"],
         "proof_runner": summary["proof_runner"],
+        "selected_mvp_blocker": EXPECTED_SELECTED_MVP_BLOCKER,
+        "selected_mvp_blocker_status": EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
+        "plan_output": summary["expected_plan_path"],
         "channels": summary["channels"],
         "operator_channel_confirmation_required": summary[
             "operator_channel_confirmation_required"
@@ -160,13 +168,17 @@ def _valid_expected_plan(summary: dict) -> dict:
         "physical_preflight_requires_existing_backend_connection": summary[
             "physical_preflight_requires_existing_backend_connection"
         ],
+        "operator_required": True,
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
         "queries_console": False,
         "execution_allowed_by_plan": False,
         "live_authority_granted": False,
+        "allowed_request_types": list(EXPECTED_PLAN_ALLOWED_REQUEST_TYPES),
+        "forbidden_request_types": list(EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES),
         "request_id_policy": summary["request_id_policy"],
         "request_sequence": _expected_plan_request_sequence(summary),
+        "fail_closed_conditions": list(EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS),
     }
 
 
@@ -187,9 +199,9 @@ def _write_file_artifact(artifact_dir: Path, summary: dict | None = None, events
     payload = copy.deepcopy(summary or _valid_summary())
     payload["events_path"] = str(events_path)
     payload["summary_path"] = str(artifact_path)
+    payload["expected_plan_path"] = str(plan_path)
     plan_bytes = json.dumps(_valid_expected_plan(payload), sort_keys=True).encode("utf-8")
     plan_path.write_bytes(plan_bytes)
-    payload["expected_plan_path"] = str(plan_path)
     payload["expected_plan_sha256"] = hashlib.sha256(plan_bytes).hexdigest()
     artifact_path.write_text(json.dumps(payload), encoding="utf-8")
     event_rows = events if events is not None else _valid_events(payload)
@@ -512,6 +524,44 @@ def test_file_preflight_artifact_requires_expected_plan_metadata_to_match_summar
     assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert "expected_plan_channels_mismatch" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_requires_expected_plan_policy_metadata(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "plan-policy-mismatch")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    plan = _valid_expected_plan(summary)
+    plan["selected_mvp_blocker"] = "Operator proposal queue import"
+    plan["selected_mvp_blocker_status"] = "closed"
+    plan["operator_required"] = False
+    plan["plan_output"] = "artifacts/other_plan.json"
+    plan["allowed_request_types"] = ["get_operator_mode", "set_gain"]
+    plan["forbidden_request_types"] = ["set_fader"]
+    plan["fail_closed_conditions"] = ["backend_not_in_wing_mode"]
+    _write_expected_plan(artifact_path, plan)
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_roots=(tmp_path / "preflight",)
+    )
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    violations = evidence["summary"]["violations"]
+    assert "expected_plan_selected_mvp_blocker_mismatch" in violations
+    assert "expected_plan_selected_mvp_blocker_status_mismatch" in violations
+    assert "expected_plan_operator_required_not_true" in violations
+    assert "expected_plan_plan_output_mismatch" in violations
+    assert "expected_plan_allowed_request_types_mismatch" in violations
+    assert "expected_plan_forbidden_request_types_mismatch" in violations
+    assert "expected_plan_forbidden_request_type_missing:set_gain" in violations
+    assert "expected_plan_fail_closed_conditions_mismatch" in violations
+    assert (
+        "expected_plan_fail_closed_condition_missing:physical_readback_missing"
+        in violations
+    )
+    assert (
+        "expected_plan_fail_closed_condition_missing:manual_review_decision_missing_or_invalid"
+        in violations
+    )
 
 
 def test_file_preflight_artifact_requires_expected_plan_request_sequence_to_match_summary(tmp_path):

@@ -1,8 +1,12 @@
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 from tools import build_wing_readonly_preflight_handoff_packet as handoff
 from tools import no_wing_release_check
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_handoff_packet_builds_readonly_operator_sequence():
@@ -191,6 +195,36 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     assert payload["expected_plan_required_for_real_run"] is True
     assert payload["physical_preflight_requires_existing_backend_connection"] is True
     assert payload["manual_review_required_before_readiness_update"] is True
+    assert payload["live_authority_granted"] is False
+
+
+def test_handoff_tool_runs_as_repo_local_script_path(tmp_path: Path):
+    output = tmp_path / "handoff.json"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "tools/build_wing_readonly_preflight_handoff_packet.py",
+            "--channels",
+            "3",
+            "--format",
+            "json",
+            "--output",
+            str(output),
+            "--quiet",
+        ],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["type"] == "wing_readonly_preflight_handoff_packet"
+    assert payload["commands"]["preview_readonly_request_plan"][1] == (
+        "tools/wing_readonly_preflight_runner.py"
+    )
     assert payload["live_authority_granted"] is False
 
 

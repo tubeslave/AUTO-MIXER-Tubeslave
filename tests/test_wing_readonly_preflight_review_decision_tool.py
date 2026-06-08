@@ -2,6 +2,13 @@ import hashlib
 import json
 from pathlib import Path
 
+from backend.wing_readonly_preflight_evidence import (
+    EXPECTED_PLAN_ALLOWED_REQUEST_TYPES,
+    EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS,
+    EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES,
+    EXPECTED_SELECTED_MVP_BLOCKER,
+    EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
+)
 from backend.wing_readonly_preflight_review_decision import REQUIRED_REVIEW_CHECKLIST_IDS
 from tools import review_wing_readonly_preflight_decisions as decision_tool
 
@@ -126,6 +133,9 @@ def _valid_expected_plan(summary: dict) -> dict:
         "status": "ready_for_operator_review",
         "proof_artifact_schema": summary["proof_artifact_schema"],
         "proof_runner": summary["proof_runner"],
+        "selected_mvp_blocker": EXPECTED_SELECTED_MVP_BLOCKER,
+        "selected_mvp_blocker_status": EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
+        "plan_output": summary["expected_plan_path"],
         "channels": summary["channels"],
         "operator_channel_confirmation_required": summary[
             "operator_channel_confirmation_required"
@@ -147,13 +157,17 @@ def _valid_expected_plan(summary: dict) -> dict:
         "physical_preflight_requires_existing_backend_connection": summary[
             "physical_preflight_requires_existing_backend_connection"
         ],
+        "operator_required": True,
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
         "queries_console": False,
         "execution_allowed_by_plan": False,
         "live_authority_granted": False,
+        "allowed_request_types": list(EXPECTED_PLAN_ALLOWED_REQUEST_TYPES),
+        "forbidden_request_types": list(EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES),
         "request_id_policy": summary["request_id_policy"],
         "request_sequence": _expected_plan_request_sequence(summary),
+        "fail_closed_conditions": list(EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS),
     }
 
 
@@ -165,9 +179,9 @@ def _write_artifact(run_dir: Path) -> Path:
     plan_path = run_dir / "expected_plan.json"
     summary["summary_path"] = str(summary_path)
     summary["events_path"] = str(events_path)
+    summary["expected_plan_path"] = str(plan_path)
     plan_bytes = json.dumps(_valid_expected_plan(summary), sort_keys=True).encode("utf-8")
     plan_path.write_bytes(plan_bytes)
-    summary["expected_plan_path"] = str(plan_path)
     summary["expected_plan_sha256"] = hashlib.sha256(plan_bytes).hexdigest()
     summary_path.write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n",

@@ -100,6 +100,30 @@ EVENT_PAYLOAD_UNSAFE_TRUE_FIELDS = {
     "full_autonomous_ready",
 }
 REQUEST_ID_POLICY = "required_for_every_query_mixer_parameter_response"
+EXPECTED_SELECTED_MVP_BLOCKER = "WING read-only connection proof"
+EXPECTED_SELECTED_MVP_BLOCKER_STATUS = "tooling_ready_waits_real_wing"
+EXPECTED_PLAN_ALLOWED_REQUEST_TYPES = (
+    "get_operator_mode",
+    "get_state",
+    "query_mixer_parameter",
+)
+EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES = tuple(sorted(FORBIDDEN_REQUEST_TYPES))
+EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS = (
+    "backend_not_in_wing_mode",
+    "event_log_wing_mode_not_proven",
+    "transport_timeout_or_connection_loss",
+    "operator_channel_confirmation_mismatch",
+    "operator_session_confirmation_missing",
+    "physical_readback_missing",
+    "readback_identity_mismatch",
+    "readback_request_id_mismatch",
+    "expected_plan_missing_or_mismatch",
+    "existing_backend_connection_boundary_missing",
+    "forbidden_request_type_sent",
+    "unexpected_response_type",
+    "event_log_missing_or_invalid",
+    "manual_review_decision_missing_or_invalid",
+)
 EXPECTED_PLAN_SUMMARY_FIELDS = (
     "proof_artifact_schema",
     "proof_runner",
@@ -352,6 +376,14 @@ def _validate_expected_plan_payload(
         violations.append("expected_plan_type_mismatch")
     if plan.get("status") != "ready_for_operator_review":
         violations.append("expected_plan_status_mismatch")
+    if plan.get("selected_mvp_blocker") != EXPECTED_SELECTED_MVP_BLOCKER:
+        violations.append("expected_plan_selected_mvp_blocker_mismatch")
+    if plan.get("selected_mvp_blocker_status") != EXPECTED_SELECTED_MVP_BLOCKER_STATUS:
+        violations.append("expected_plan_selected_mvp_blocker_status_mismatch")
+    if plan.get("operator_required") is not True:
+        violations.append("expected_plan_operator_required_not_true")
+    if plan.get("plan_output") != summary.get("expected_plan_path"):
+        violations.append("expected_plan_plan_output_mismatch")
     for field in EXPECTED_PLAN_SUMMARY_FIELDS:
         if plan.get(field) != summary.get(field):
             violations.append(f"expected_plan_{field}_mismatch")
@@ -367,6 +399,26 @@ def _validate_expected_plan_payload(
             violations.append(f"expected_plan_{field}_not_false")
     if plan.get("manual_review_required_before_readiness_update") is not True:
         violations.append("expected_plan_manual_review_required_not_true")
+    if plan.get("allowed_request_types") != list(EXPECTED_PLAN_ALLOWED_REQUEST_TYPES):
+        violations.append("expected_plan_allowed_request_types_mismatch")
+
+    forbidden_request_types = plan.get("forbidden_request_types")
+    if forbidden_request_types != list(EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES):
+        violations.append("expected_plan_forbidden_request_types_mismatch")
+    if not isinstance(forbidden_request_types, list):
+        forbidden_request_types = []
+    for request_type in EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES:
+        if request_type not in forbidden_request_types:
+            violations.append(f"expected_plan_forbidden_request_type_missing:{request_type}")
+
+    fail_closed_conditions = plan.get("fail_closed_conditions")
+    if fail_closed_conditions != list(EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS):
+        violations.append("expected_plan_fail_closed_conditions_mismatch")
+    if not isinstance(fail_closed_conditions, list):
+        fail_closed_conditions = []
+    for condition in EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS:
+        if condition not in fail_closed_conditions:
+            violations.append(f"expected_plan_fail_closed_condition_missing:{condition}")
 
 
 def _validate_expected_plan_file(

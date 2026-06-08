@@ -25,6 +25,11 @@ It does not approve live writes.
 - No live performance is in progress unless the operator explicitly allows
   read-only inspection.
 - Do not run supervised proof yet.
+- Do not mix latency, OSC RTT, audio E2E, tone-trigger, DSP-host, or plugin-host
+  benchmarks into this read-only proof. Those measurements may be captured
+  later as separate lab-only artifacts, but this preflight may send only the
+  read-only request types listed below and must not trigger audio or console
+  mutation behavior.
 
 ## Command
 
