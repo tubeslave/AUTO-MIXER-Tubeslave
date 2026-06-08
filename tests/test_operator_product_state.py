@@ -10872,6 +10872,30 @@ def test_build_safety_monitor_falls_back_to_auto_live_kinds_when_manual_status_m
     assert monitor["live_write_policy"]["approved_live_write_kinds"] == ["fader", "gain"]
 
 
+def test_build_safety_monitor_prefers_manual_approved_live_write_kinds_and_filters_unsupported_values(server):
+    server.operator_mode = "supervised"
+    server.get_manual_write_supervision_status = lambda: {
+        "approved_live_write_kinds": [
+            "fader",
+            "gain",
+            "eq",
+            "trim",
+            "fader",
+            "input_gain",
+            "preamp_gain",
+            "mute",
+        ]
+    }
+
+    monitor = build_safety_monitor(server)
+
+    assert monitor["live_write_policy"]["approved_live_write_kinds"] == [
+        "fader",
+        "gain",
+        "mute",
+    ]
+
+
 def test_operator_analysis_reports_without_creating_in_analyze_mode(server):
     server.operator_mode = "analyze"
     server.mixer_client = CachedMixer()
