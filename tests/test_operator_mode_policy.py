@@ -75,7 +75,9 @@ def test_analysis_and_assist_modes_never_apply_to_console():
         assert status["capabilities"]["can_apply_to_console"] is False
         assert status["capabilities"]["can_autonomous_apply"] is False
         assert status["capabilities"]["allowed_live_write_kinds"] == []
+        assert status["capabilities"]["allowed_live_write_surfaces"] == []
         assert status["project_mode"]["current_live_write_kinds"] == []
+        assert status["project_mode"]["effective_live_write_surfaces"] == []
 
 
 def test_supervised_mode_maps_to_target_architecture_but_current_scope_stays_proven():
@@ -89,6 +91,16 @@ def test_supervised_mode_maps_to_target_architecture_but_current_scope_stays_pro
     assert status["capabilities"]["requires_approval"] is True
     assert status["capabilities"]["can_autonomous_apply"] is False
     assert status["capabilities"]["allowed_live_write_kinds"] == ["fader", "gain"]
+    assert status["capabilities"]["allowed_live_write_surfaces"] == [
+        "preamp",
+        "trim",
+        "fader",
+    ]
+    assert status["project_mode"]["effective_live_write_surfaces"] == [
+        "preamp",
+        "trim",
+        "fader",
+    ]
 
 
 def test_full_autonomous_mode_is_locked_on_wing_even_if_runtime_unlock_is_set():
@@ -120,8 +132,18 @@ def test_unlocked_non_wing_auto_still_exposes_only_current_proven_write_scope():
     assert status["capabilities"]["can_autonomous_apply"] is True
     assert status["capabilities"]["requires_approval"] is False
     assert status["capabilities"]["allowed_live_write_kinds"] == ["fader", "gain"]
+    assert status["capabilities"]["allowed_live_write_surfaces"] == [
+        "preamp",
+        "trim",
+        "fader",
+    ]
     assert status["project_mode"]["target_live_write_surfaces"] == list(
         FULL_AUTONOMOUS_TARGET_SURFACES
     )
     assert status["project_mode"]["current_live_write_kinds"] == ["fader", "gain"]
+    assert status["project_mode"]["effective_live_write_surfaces"] == [
+        "preamp",
+        "trim",
+        "fader",
+    ]
     assert "autonomous_scope_limited_to_current_proven_write_kinds" in status["warnings"]

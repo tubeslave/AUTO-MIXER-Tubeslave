@@ -36,6 +36,10 @@ FULL_AUTONOMOUS_TARGET_SURFACES = (
     "scenes",
     "presets",
 )
+PROVEN_LIVE_WRITE_SURFACE_BY_KIND = {
+    "fader": ("fader",),
+    "gain": ("preamp", "trim"),
+}
 
 OPERATOR_MODE_ALIASES = {
     MODE_ANALYZE: MODE_ANALYZE,
@@ -151,6 +155,21 @@ def get_operator_mode_options() -> List[Dict[str, str]]:
     ]
 
 
+def _derive_effective_live_write_surfaces(live_write_kinds: List[str]) -> List[str]:
+    seen = set()
+    surfaces: List[str] = []
+    for kind in live_write_kinds:
+        for surface in PROVEN_LIVE_WRITE_SURFACE_BY_KIND.get(kind, ()):
+            if surface not in seen:
+                seen.add(surface)
+                surfaces.append(surface)
+    ordered: List[str] = []
+    for surface in FULL_AUTONOMOUS_TARGET_SURFACES:
+        if surface in seen and surface not in ordered:
+            ordered.append(surface)
+    return ordered
+
+
 def build_operator_mode_status(
     *,
     mode: str,
@@ -203,6 +222,9 @@ def build_operator_mode_status(
         can_autonomous_apply = False
         requires_approval = False
         current_live_write_kinds = []
+    effective_live_write_surfaces = _derive_effective_live_write_surfaces(
+        current_live_write_kinds
+    )
 
     return {
         "mode": normalized,
@@ -218,6 +240,7 @@ def build_operator_mode_status(
             "proposal_policy": definition.proposal_policy,
             "target_live_write_surfaces": list(definition.target_live_write_surfaces),
             "current_live_write_kinds": current_live_write_kinds,
+            "effective_live_write_surfaces": effective_live_write_surfaces,
         },
         "connection_mode": connection_mode,
         "wing_deployment": wing_deployment,
@@ -230,6 +253,9 @@ def build_operator_mode_status(
             "requires_approval": requires_approval,
             "can_autonomous_apply": can_autonomous_apply,
             "allowed_live_write_kinds": current_live_write_kinds if can_apply_to_console else [],
+            "allowed_live_write_surfaces": effective_live_write_surfaces
+            if can_apply_to_console
+            else [],
         },
         "blocked_reasons": blocked_reasons,
         "warnings": warnings,
