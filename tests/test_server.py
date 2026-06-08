@@ -1067,6 +1067,9 @@ class TestWingDeploymentWriteBoundary:
         assert minimal_server._parse_manual_write_address("/ch/12/eq") is None
         assert minimal_server._parse_manual_write_address("/bus/1/fdr") is None
         assert minimal_server._parse_manual_write_address("/ch/not-an-int/fdr") is None
+        assert minimal_server._parse_manual_write_address("") is None
+        assert minimal_server._parse_manual_write_address(None) is None
+        assert minimal_server._parse_manual_write_address("/ch/12/fdr/") is None
 
     def test_handle_external_fader_update_tracks_fader_and_notifies_realtime_controller(self, minimal_server):
         controller = MagicMock()
@@ -1126,6 +1129,16 @@ class TestWingDeploymentWriteBoundary:
         minimal_server._handle_external_fader_update("/ch/8/fdr", ())
 
         assert minimal_server.last_fader_values == {}
+
+    def test_handle_external_fader_update_uses_first_arg_if_multiple_provided(self, minimal_server):
+        controller = MagicMock()
+        controller.realtime_enabled = True
+        minimal_server.auto_fader_controller = controller
+
+        minimal_server._handle_external_fader_update("/ch/9/fdr", (1.0, 2.0, 3.0))
+
+        assert minimal_server.last_fader_values[9] == 1.0
+        controller.handle_external_fader_change.assert_called_once_with(9, 1.0)
 
     @pytest.mark.asyncio
     async def test_reset_trim_is_quarantined_for_wing(self, dummy_wing_server):
