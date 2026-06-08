@@ -1065,6 +1065,11 @@ class TestWingDeploymentWriteBoundary:
         assert minimal_server._parse_manual_write_address("  /ch/12/mute  ") == (12, "mute")
         assert minimal_server._parse_manual_write_address(b"/ch/13/fdr") == (13, "fader")
         assert minimal_server._parse_manual_write_address(Path("/ch/15/fdr")) == (15, "fader")
+        class CustomPathLike(os.PathLike):
+            def __fspath__(self):
+                return "/ch/16/fdr"
+
+        assert minimal_server._parse_manual_write_address(CustomPathLike()) == (16, "fader")
 
         assert minimal_server._parse_manual_write_address(
             bytearray(b"/ch/14/in/set/trim")

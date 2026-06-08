@@ -798,8 +798,8 @@ class AutoMixerServer:
 
     @staticmethod
     def _parse_manual_write_address(address: Any) -> Optional[tuple[int, str]]:
-        if isinstance(address, Path):
-            address = str(address)
+        if isinstance(address, os.PathLike):
+            address = address.__fspath__()
         if isinstance(address, (bytes, bytearray)):
             try:
                 address = address.decode("utf-8")
