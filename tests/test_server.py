@@ -1239,6 +1239,26 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_mute.assert_called_once_with(3, True)
 
     @pytest.mark.asyncio
+    async def test_websocket_mute_channel_alias_requires_supervised_approval_for_wing(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["mute_channel"](
+            websocket,
+            {"channel": 7, "muted": True},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "approval_required"
+        assert payload["value_type"] == "mute"
+        server.mixer_client.set_channel_mute.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_websocket_unmute_channel_alias_defaults_to_false_and_routes_to_manual_gate(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
