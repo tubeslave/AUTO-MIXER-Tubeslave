@@ -721,6 +721,9 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
   const autonomyModeTransitionGateSupervisedCurrentLiveWriteKinds = stringList(
     readinessSummary.autonomy_mode_transition_gate_supervised_current_live_write_kinds,
   );
+  const autonomyModeTransitionGateSupervisedCurrentLiveWriteSurfaces = stringList(
+    readinessSummary.autonomy_mode_transition_gate_supervised_current_live_write_surfaces,
+  );
   const hasAutonomyReadinessSummarySignals = (
     autonomyPromotionFullAutonomousReady
     || autonomyModeTransitionFullAutonomousReady
@@ -731,6 +734,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     || autonomyModeTransitionGateBlockedModes.length > 0
     || autonomyModeTransitionGateLiveApplyAllowedModes.length > 0
     || autonomyModeTransitionGateSupervisedCurrentLiveWriteKinds.length > 0
+    || autonomyModeTransitionGateSupervisedCurrentLiveWriteSurfaces.length > 0
   );
   const modeGateRows = asArray(modeGate.rows).map(row => {
     const mode = str(row.mode, 'unknown_mode');
@@ -835,6 +839,9 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         ...autonomyModeTransitionGateBlockedModes.map(mode => `mode_transition_gate_blocked_mode:${mode}`),
         ...autonomyModeTransitionGateLiveApplyAllowedModes.map(mode => `mode_transition_gate_live_apply_mode:${mode}`),
         ...autonomyModeTransitionGateSupervisedCurrentLiveWriteKinds.map(kind => `supervised_current_live_write_kind:${kind}`),
+        ...autonomyModeTransitionGateSupervisedCurrentLiveWriteSurfaces.map(
+          surface => `supervised_current_live_write_surface:${surface}`,
+        ),
       ],
       blockedReason: autonomyPromotionFullAutonomousReady && autonomyModeTransitionFullAutonomousReady
         ? 'No outstanding autonomy readiness blockers.'

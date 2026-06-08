@@ -469,6 +469,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
         autonomy_mode_transition_gate_blocked_modes: ['analyze'],
         autonomy_mode_transition_gate_live_apply_allowed_modes: ['supervised'],
         autonomy_mode_transition_gate_supervised_current_live_write_kinds: ['fader'],
+        autonomy_mode_transition_gate_supervised_current_live_write_surfaces: ['preamp', 'trim', 'fader'],
         promotion_gap_summary: {
           read_only: true,
           live_write: false,
@@ -1644,6 +1645,9 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'mode_transition_gate_blocked_mode:analyze',
     'mode_transition_gate_live_apply_mode:supervised',
     'supervised_current_live_write_kind:fader',
+    'supervised_current_live_write_surface:preamp',
+    'supervised_current_live_write_surface:trim',
+    'supervised_current_live_write_surface:fader',
   ]);
   assert.equal(
     autonomySummary.blockedReason,
