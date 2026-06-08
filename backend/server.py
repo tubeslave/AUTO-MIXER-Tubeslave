@@ -797,6 +797,24 @@ class AutoMixerServer:
         return config["address"].format(channel=channel)
 
     @staticmethod
+    def _parse_manual_write_address(address: str) -> Optional[tuple[int, str]]:
+        normalized = str(address or "").strip()
+        if not normalized:
+            return None
+        for value_type, config in MANUAL_WRITE_KIND_CONFIG.items():
+            template = config.get("address", "")
+            if "{channel}" not in template:
+                continue
+            pattern = re.escape(template).replace(r"\{channel\}", r"(?P<channel>\d+)")
+            match = re.fullmatch(pattern, normalized)
+            if match is not None:
+                try:
+                    return int(match.group("channel")), value_type
+                except (TypeError, ValueError):
+                    return None
+        return None
+
+    @staticmethod
     def _coerce_optional_bool(value: Any) -> Optional[bool]:
         if value is None:
             return None

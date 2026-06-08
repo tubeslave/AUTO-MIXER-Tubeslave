@@ -29,17 +29,12 @@ def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int]
         return channel_int, value_type, expected_address, None
 
     if address:
-        parts = address.split("/")
-        if len(parts) == 4 and parts[1] == "ch" and parts[3] == "fdr":
-            parsed_type = "fader"
-        elif len(parts) == 6 and parts[1] == "ch" and parts[3:] == ["in", "set", "trim"]:
-            parsed_type = "gain"
-        elif len(parts) == 4 and parts[1] == "ch" and parts[3] == "mute":
-            parsed_type = "mute"
-        else:
+        parsed = server._parse_manual_write_address(address)
+        if parsed is None:
             return None, None, None, "unsupported_address"
+        channel_int, parsed_type = parsed
         try:
-            channel_int = int(parts[2])
+            channel_int = int(channel_int)
         except (TypeError, ValueError):
             return None, None, None, "invalid_channel"
         if channel_int < 1 or channel_int > 48:

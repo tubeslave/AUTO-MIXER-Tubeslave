@@ -2,6 +2,7 @@
 
 import os
 import sys
+from typing import Optional
 
 import pytest
 
@@ -16,6 +17,32 @@ except ImportError:  # pragma: no cover - package import compatibility
 
 
 class FakeServer:
+    def _parse_manual_write_address(self, address: object) -> Optional[tuple[int, str]]:
+        normalized = str(address or "").strip()
+        if not normalized:
+            return None
+        if normalized.startswith("/ch/") and normalized.endswith("/fdr"):
+            try:
+                return int(normalized.split("/")[2]), "fader"
+            except (IndexError, TypeError, ValueError):
+                return None
+        if normalized.startswith("/ch/") and normalized.endswith("/mute"):
+            try:
+                return int(normalized.split("/")[2]), "mute"
+            except (IndexError, TypeError, ValueError):
+                return None
+        parts = normalized.split("/")
+        if (
+            len(parts) == 6
+            and parts[1] == "ch"
+            and parts[3:] == ["in", "set", "trim"]
+        ):
+            try:
+                return int(parts[2]), "gain"
+            except (TypeError, ValueError, IndexError):
+                return None
+        return None
+
     def _normalize_manual_write_kind(self, raw_value: object) -> str:
         if raw_value is None:
             return ""
