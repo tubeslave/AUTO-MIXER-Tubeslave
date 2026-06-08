@@ -3,6 +3,7 @@ from backend.processing_registry import (
     PROCESSING_DOMAINS,
     PROCESSING_STATUSES,
     build_processing_registry_snapshot,
+    build_pipeline_runtime_summary,
     get_pipeline_profile,
     get_processing_method,
     iter_pipeline_profiles,
@@ -181,6 +182,35 @@ def test_main_live_pipeline_executor_is_only_supervised_fader_gain():
     assert context_gate.status == "proposal_only"
     assert "source_identity_downstream_trust" in context_gate.notes
     assert "context_aware_gate_agent" in main.proposal_method_ids
+
+
+def test_pipeline_runtime_summary_prefers_manual_approved_live_write_kinds():
+    operator_mode = {
+        "mode": "supervised",
+        "capabilities": {
+            "allowed_live_write_kinds": ["fader", "gain"],
+            "can_apply_to_console": True,
+        },
+    }
+    manual_write_supervision = {"approved_live_write_kinds": ["fader", "gain", "eq"]}
+
+    runtime = build_pipeline_runtime_summary(
+        operator_mode,
+        manual_write_supervision,
+    )
+
+    assert runtime["allowed_live_write_kinds"] == ["fader", "gain", "eq"]
+
+
+def test_pipeline_runtime_summary_falls_back_to_supervised_mode_live_write_kinds():
+    operator_mode = {
+        "mode": "supervised",
+        "capabilities": {"allowed_live_write_kinds": ["fader", "gain"], "can_apply_to_console": True},
+    }
+
+    runtime = build_pipeline_runtime_summary(operator_mode, {})
+
+    assert runtime["allowed_live_write_kinds"] == ["fader", "gain", "mute"]
 
 
 def test_supervised_proof_artifact_evaluator_is_shadow_only_not_executor():

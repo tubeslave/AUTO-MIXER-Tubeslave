@@ -1234,6 +1234,7 @@ def build_main_pipeline_preview(
         status = "clear"
         reason = "no_pipeline_preview_proposals"
 
+    runtime = build_pipeline_runtime_summary(operator_mode, manual_write_supervision)
     return {
         "type": "main_pipeline_preview",
         "generated_at": _utc_now(),
@@ -1242,7 +1243,7 @@ def build_main_pipeline_preview(
         "pipeline_id": MAIN_PIPELINE_ID,
         "pipeline_status": profile.status if profile else "missing",
         "operator_mode": operator_mode,
-        "runtime": build_pipeline_runtime_summary(operator_mode, manual_write_supervision),
+        "runtime": runtime,
         "executor_policy": {
             "preview_only": True,
             "queue_mutation": False,
@@ -1250,7 +1251,9 @@ def build_main_pipeline_preview(
             "live_apply_policy": "supervised_fader_gain_only",
             "apply_path": "apply_operator_proposal -> supervised_manual_gate",
             "executor_method_ids": list(profile.executor_method_ids if profile else ()),
-            "allowed_requested_change_value_types": list(LIVE_ALLOWED_WRITE_KINDS),
+            "allowed_requested_change_value_types": list(
+                runtime.get("allowed_live_write_kinds", LIVE_ALLOWED_WRITE_KINDS)
+            ),
             "requires_supervision": True,
         },
         "summary": {

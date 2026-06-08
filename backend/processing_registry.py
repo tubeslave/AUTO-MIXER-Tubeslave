@@ -6908,12 +6908,26 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
 
 
 def build_pipeline_runtime_summary(operator_mode: Dict[str, Any], manual_write_supervision: Dict[str, Any]) -> Dict[str, Any]:
+    manual = manual_write_supervision if isinstance(manual_write_supervision, dict) else {}
+    approved_live_write_kinds = manual.get("approved_live_write_kinds")
+    if not approved_live_write_kinds:
+        allowed = list(
+            operator_mode.get("capabilities", {}).get("allowed_live_write_kinds") or []
+        )
+        if (
+            operator_mode.get("mode") == "supervised"
+            and "mute" not in allowed
+        ):
+            allowed.append("mute")
+        if not allowed:
+            allowed = list(LIVE_ALLOWED_WRITE_KINDS)
+        approved_live_write_kinds = allowed
     main = get_pipeline_profile("main_live_assist")
     return {
         "main_pipeline_id": "main_live_assist",
         "main_pipeline_status": main.status if main else "missing",
         "live_apply_policy": "supervised_fader_gain_only",
-        "allowed_live_write_kinds": list(LIVE_ALLOWED_WRITE_KINDS),
+        "allowed_live_write_kinds": list(approved_live_write_kinds),
         "operator_mode": operator_mode.get("mode"),
         "can_apply_to_console": bool(operator_mode.get("capabilities", {}).get("can_apply_to_console")),
         "manual_write_supervision": manual_write_supervision,
