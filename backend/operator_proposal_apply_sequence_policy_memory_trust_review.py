@@ -23,6 +23,12 @@ except ImportError:  # pragma: no cover - package import compatibility
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_INDEX_STATUSES,
         build_operator_proposal_apply_sequence_policy_memory_index,
     )
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
 
 OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_REVIEW_METHOD_ID = (
@@ -73,7 +79,6 @@ REQUIRED_FRESHNESS_FALSE_FLAGS = (
     "queue_mutation",
     "policy_mutation",
 )
-ALLOWED_VALUE_TYPES = {"fader", "gain"}
 VERIFIED_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
 
 

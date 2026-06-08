@@ -24,6 +24,12 @@ except ImportError:  # pragma: no cover - package import compatibility
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_PREFLIGHT_RESULT_CONSUMER_STATUSES,
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_result_consumer,
     )
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
 
 OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_SEQUENCE_PLAN_RESULT_CONSUMER_METHOD_ID = (
@@ -207,7 +213,7 @@ def _sequence_plan_envelope_violations(plan: Mapping[str, Any]) -> Tuple[str, ..
     if safety.get("live_apply_entrypoint") != "apply_operator_proposal":
         violations.append("sequence_policy_sequence_plan_result_consumer_plan_entrypoint_mismatch")
     allowed_kinds = _string_list(safety.get("allowed_live_write_kinds"))
-    if tuple(sorted(allowed_kinds)) != ("fader", "gain"):
+    if tuple(sorted(allowed_kinds)) != tuple(sorted(CURRENT_PROVEN_LIVE_WRITE_KINDS)):
         violations.append("sequence_policy_sequence_plan_result_consumer_plan_allowed_kinds_mismatch")
     for flag in REQUIRED_SEQUENCE_PLAN_FALSE_FLAGS:
         if safety.get(flag) is not False:
@@ -306,7 +312,7 @@ def _sequence_step_violations(
         if change.get("change_index") != change_index:
             violations.append(f"{proposal_id}:change_index_mismatch")
         value_type = _string(change.get("value_type"))
-        if value_type not in {"fader", "gain"}:
+        if value_type not in ALLOWED_VALUE_TYPES:
             violations.append(f"{proposal_id}:change_value_type_not_dry_run_safe")
         effective_value = change.get("effective_value")
         if not isinstance(effective_value, (int, float)) or isinstance(effective_value, bool):

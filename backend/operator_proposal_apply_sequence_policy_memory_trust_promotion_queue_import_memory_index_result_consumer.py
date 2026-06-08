@@ -29,6 +29,12 @@ except ImportError:  # pragma: no cover - package import compatibility
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_MEMORY_WRITER_APPLY_RESULT_CONSUMER_METHOD_ID,
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_MEMORY_WRITER_APPLY_RESULT_CONSUMER_STATUSES,
     )
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
 
 OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_MEMORY_INDEX_RESULT_CONSUMER_METHOD_ID = (
@@ -50,7 +56,6 @@ REQUIRED_MEMORY_INDEX_TYPE = "operator_proposal_apply_sequence_policy_memory_ind
 REQUIRED_MEMORY_INDEX_AVAILABLE_STATUS = "append_only_sequence_memory_index_available"
 REQUIRED_TARGET_MEMORY_PATH = ".ai/memory/project.md"
 REQUIRED_LEARNING_SCOPE = "supervised_fader_gain_sequence_execution"
-ALLOWED_VALUE_TYPES = {"fader", "gain"}
 VERIFIED_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
 REQUIRED_CONSUMER_FALSE_FLAGS = (
     "memory_index_handler_invoked",

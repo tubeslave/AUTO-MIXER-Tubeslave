@@ -21,6 +21,12 @@ except ImportError:  # pragma: no cover - package import compatibility
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_MEMORY_DRAFT_RESULT_CONSUMER_METHOD_ID,
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_MEMORY_DRAFT_RESULT_CONSUMER_STATUSES,
     )
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
 
 OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_MEMORY_WRITER_DRY_RUN_RESULT_CONSUMER_METHOD_ID = (
@@ -291,7 +297,7 @@ def _writer_envelope_violations(writer: Mapping[str, Any]) -> Tuple[str, ...]:
     if safety.get("does_not_call_manual_console_write") is not True:
         violations.append("sequence_policy_memory_writer_dry_run_consumer_writer_safety_manual_write_denial_missing")
     allowed_kinds = _string_list(safety.get("allowed_live_write_kinds"))
-    if tuple(sorted(allowed_kinds)) != ("fader", "gain"):
+    if tuple(sorted(allowed_kinds)) != tuple(sorted(CURRENT_PROVEN_LIVE_WRITE_KINDS)):
         violations.append("sequence_policy_memory_writer_dry_run_consumer_writer_safety_allowed_kinds_mismatch")
     for flag in REQUIRED_WRITER_FALSE_FLAGS:
         if safety.get(flag) is not False:

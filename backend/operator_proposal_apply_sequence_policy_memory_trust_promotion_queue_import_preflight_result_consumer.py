@@ -24,6 +24,12 @@ except ImportError:  # pragma: no cover - package import compatibility
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_PREFLIGHT_PLAN_STATUSES,
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan,
     )
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
 
 OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_PREFLIGHT_RESULT_CONSUMER_METHOD_ID = (
@@ -299,7 +305,7 @@ def _preflight_result_violations(
     if idempotency.get("duplicate") is not False:
         violations.append(f"{proposal_id}:idempotency_duplicate_not_false")
     allowed_kinds = _string_list(safety.get("allowed_live_write_kinds"))
-    if any(kind not in {"fader", "gain"} for kind in allowed_kinds):
+    if any(kind not in ALLOWED_VALUE_TYPES for kind in allowed_kinds):
         violations.append(f"{proposal_id}:allowed_live_write_kind_not_sequence_safe")
     return tuple(violations)
 

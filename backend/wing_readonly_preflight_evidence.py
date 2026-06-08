@@ -14,6 +14,10 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Tuple
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
 
 
 WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID = "wing_readonly_preflight_evidence"
@@ -26,6 +30,7 @@ EVIDENCE_STATUSES = {
     "readonly_preflight_artifact_replacement_required",
 }
 ALLOWED_SENT_REQUEST_TYPES = {"get_operator_mode", "get_state", "query_mixer_parameter"}
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 EXPECTED_READBACK_EVENT_TYPES = {"mixer_parameter_value", "mixer_parameter_read_blocked"}
 LIVE_WRITE_REQUEST_TYPES = {
     "set_fader",
@@ -644,7 +649,7 @@ def _validate_readback_row(index: int, row: Mapping[str, Any], violations: list[
     if not str(row.get("request_id") or ""):
         violations.append(f"readback_{index}_request_id_missing")
     value_type = str(row.get("value_type") or "")
-    if value_type not in {"fader", "gain"}:
+    if value_type not in ALLOWED_VALUE_TYPES:
         violations.append(f"readback_{index}_unsupported_value_type")
     channel = _safe_int(row.get("channel"))
     if channel < 1 or channel > 48:
@@ -652,7 +657,7 @@ def _validate_readback_row(index: int, row: Mapping[str, Any], violations: list[
     address = str(row.get("address") or "")
     if not address:
         violations.append(f"readback_{index}_address_missing")
-    elif value_type in {"fader", "gain"} and 1 <= channel <= 48:
+    elif value_type in ALLOWED_VALUE_TYPES and 1 <= channel <= 48:
         if address != _address_for(channel, value_type):
             violations.append(f"readback_{index}_address_mismatch")
     value = row.get("value")

@@ -33,6 +33,12 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.operator_mode_policy import normalize_manual_live_write_kinds
 try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan,
     )
@@ -6602,7 +6608,7 @@ def _empty_autonomy_evidence_overlay(*, generated_at: str, report_path: Optional
 
 def _normalized_autonomy_overlay_row(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     value_type = str(row.get("value_type") or "")
-    if value_type not in {"fader", "gain"}:
+    if value_type not in ALLOWED_VALUE_TYPES:
         return None
     target_id = str(
         row.get("target_id")
@@ -6656,7 +6662,7 @@ def _normalize_autonomy_evidence_overlay(
         if normalized is not None
     ]
     present_value_types = {row["value_type"] for row in rows}
-    if present_value_types != {"fader", "gain"}:
+    if present_value_types != ALLOWED_VALUE_TYPES:
         fallback = _empty_autonomy_evidence_overlay(generated_at=generated_at, report_path=report_path)
         for row in fallback["rows"]:
             if row["value_type"] not in present_value_types:

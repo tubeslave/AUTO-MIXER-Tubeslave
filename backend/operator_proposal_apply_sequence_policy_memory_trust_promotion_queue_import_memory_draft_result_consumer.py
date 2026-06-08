@@ -13,6 +13,13 @@ from math import isfinite
 from typing import Any, Dict, Mapping, Tuple
 
 try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+
+try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_audit_policy_gate_result_consumer import (
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_AUDIT_POLICY_GATE_RESULT_CONSUMER_METHOD_ID,
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_AUDIT_POLICY_GATE_RESULT_CONSUMER_STATUSES,
@@ -246,7 +253,7 @@ def _memory_draft_envelope_violations(memory_draft: Mapping[str, Any]) -> Tuple[
     if safety.get("does_not_call_manual_console_write") is not True:
         violations.append("sequence_policy_memory_draft_result_consumer_draft_safety_manual_write_denial_missing")
     allowed_kinds = _string_list(safety.get("allowed_live_write_kinds"))
-    if tuple(sorted(allowed_kinds)) != ("fader", "gain"):
+    if tuple(sorted(allowed_kinds)) != tuple(sorted(CURRENT_PROVEN_LIVE_WRITE_KINDS)):
         violations.append("sequence_policy_memory_draft_result_consumer_draft_safety_allowed_kinds_mismatch")
     for flag in REQUIRED_MEMORY_DRAFT_FALSE_FLAGS:
         if safety.get(flag) is not False:
@@ -321,7 +328,7 @@ def _memory_draft_record_violations(
         violations.append(f"{proposal_id}:draft_text_missing")
     evidence = _mapping(record.get("evidence"))
     value_type = _string(evidence.get("value_type"))
-    if value_type not in {"fader", "gain"}:
+    if value_type not in ALLOWED_VALUE_TYPES:
         violations.append(f"{proposal_id}:evidence_value_type_not_memory_safe")
     effective_value = evidence.get("effective_value")
     if (

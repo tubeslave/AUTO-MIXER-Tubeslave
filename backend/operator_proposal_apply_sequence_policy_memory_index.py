@@ -12,6 +12,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 import re
 from typing import Any, Dict, List, Tuple
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
 
 OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_INDEX_METHOD_ID = (
@@ -24,7 +30,6 @@ OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_INDEX_STATUSES = {
 }
 ALLOWED_TARGET_MEMORY_PATH = ".ai/memory/project.md"
 RUNTIME_AUTHORITY_LINE = "- Runtime authority: no live, queue, model, or policy mutation"
-ALLOWED_VALUE_TYPES = {"fader", "gain"}
 VERIFIED_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
 
 _HEADING_RE = re.compile(r"^### Supervised sequence policy memory\s*$")

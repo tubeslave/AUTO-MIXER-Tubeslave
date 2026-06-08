@@ -13,6 +13,13 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Mapping, Tuple
 
 try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+
+try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_gate_result_consumer import (
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_EXECUTION_GATE_RESULT_CONSUMER_METHOD_ID,
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_EXECUTION_GATE_RESULT_CONSUMER_STATUSES,
@@ -243,7 +250,7 @@ def _execution_envelope_violations(execution: Mapping[str, Any]) -> Tuple[str, .
     if safety.get("live_apply_entrypoint") != "apply_operator_proposal":
         violations.append("sequence_policy_execution_result_consumer_execution_safety_entrypoint_mismatch")
     allowed_kinds = _string_list(safety.get("allowed_live_write_kinds"))
-    if tuple(sorted(allowed_kinds)) != ("fader", "gain"):
+    if tuple(sorted(allowed_kinds)) != tuple(sorted(CURRENT_PROVEN_LIVE_WRITE_KINDS)):
         violations.append("sequence_policy_execution_result_consumer_execution_safety_allowed_kinds_mismatch")
     for flag in REQUIRED_EXECUTION_SAFETY_TRUE_FLAGS:
         if safety.get(flag) is not True:
@@ -330,7 +337,7 @@ def _execution_row_violations(
     if apply_result.get("status") != "applied":
         violations.append(f"{proposal_id}:apply_result_not_applied")
     value_type = _string(apply_result.get("value_type"))
-    if value_type not in {"fader", "gain"}:
+    if value_type not in ALLOWED_VALUE_TYPES:
         violations.append(f"{proposal_id}:apply_result_value_type_not_audit_safe")
     effective_value = apply_result.get("effective_value")
     if not isinstance(effective_value, (int, float)) or isinstance(effective_value, bool):

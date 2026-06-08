@@ -14,6 +14,13 @@ from math import isfinite
 from typing import Any, Dict, Mapping, Tuple
 
 try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+
+try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer import (
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_EXECUTION_AUDIT_RESULT_CONSUMER_METHOD_ID,
         OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_EXECUTION_AUDIT_RESULT_CONSUMER_STATUSES,
@@ -227,7 +234,7 @@ def _policy_gate_envelope_violations(policy_gate: Mapping[str, Any]) -> Tuple[st
     if safety.get("does_not_call_manual_console_write") is not True:
         violations.append("sequence_policy_audit_policy_gate_result_consumer_policy_gate_safety_manual_write_denial_missing")
     allowed_kinds = _string_list(safety.get("allowed_live_write_kinds"))
-    if tuple(sorted(allowed_kinds)) != ("fader", "gain"):
+    if tuple(sorted(allowed_kinds)) != tuple(sorted(CURRENT_PROVEN_LIVE_WRITE_KINDS)):
         violations.append("sequence_policy_audit_policy_gate_result_consumer_policy_gate_safety_allowed_kinds_mismatch")
     for flag in REQUIRED_POLICY_GATE_FALSE_FLAGS:
         if safety.get(flag) is not False:
@@ -289,7 +296,7 @@ def _policy_evidence_violations(
         if row.get(flag) is not False:
             violations.append(f"{proposal_id}:{flag}_not_false")
     value_type = _string(row.get("value_type"))
-    if value_type not in {"fader", "gain"}:
+    if value_type not in ALLOWED_VALUE_TYPES:
         violations.append(f"{proposal_id}:value_type_not_memory_safe")
     effective_value = row.get("effective_value")
     if (
