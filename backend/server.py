@@ -1,5 +1,6 @@
 import asyncio
 import atexit
+import math
 import json
 import logging
 import os
@@ -1963,12 +1964,23 @@ class AutoMixerServer:
             fader_value = float(args[0])
         except (TypeError, ValueError, IndexError, AttributeError):
             return
+        if not math.isfinite(fader_value):
+            logger.debug("Ignoring external fader update with non-finite value for channel %s: %s", channel, fader_value)
+            return
 
-        self.last_fader_values[channel] = fader_value
+        safe_fader_value = self._clamp_manual_write_value(fader_value, "fader")
+        if safe_fader_value != fader_value:
+            logger.debug(
+                "Clamped external fader update value for channel %s: %s -> %s",
+                channel,
+                fader_value,
+                safe_fader_value,
+            )
+        self.last_fader_values[channel] = safe_fader_value
         controller = self.auto_fader_controller
         if controller and controller.realtime_enabled:
             try:
-                controller.handle_external_fader_change(channel, fader_value)
+                controller.handle_external_fader_change(channel, safe_fader_value)
             except Exception as exc:
                 logger.warning(
                     "Auto Fader external change handler failed for channel %s: %s",

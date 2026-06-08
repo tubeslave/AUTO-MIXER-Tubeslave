@@ -1184,6 +1184,32 @@ class TestWingDeploymentWriteBoundary:
         assert minimal_server.last_fader_values[9] == 1.0
         controller.handle_external_fader_change.assert_called_once_with(9, 1.0)
 
+    def test_handle_external_fader_update_ignores_non_finite_value(self, minimal_server):
+        controller = MagicMock()
+        controller.realtime_enabled = True
+        minimal_server.auto_fader_controller = controller
+
+        minimal_server._handle_external_fader_update("/ch/10/fdr", (float("nan"),))
+        minimal_server._handle_external_fader_update("/ch/10/fdr", (float("inf"),))
+
+        assert 10 not in minimal_server.last_fader_values
+        controller.handle_external_fader_change.assert_not_called()
+
+    def test_handle_external_fader_update_clamps_extreme_fader_value(self, minimal_server):
+        controller = MagicMock()
+        controller.realtime_enabled = True
+        minimal_server.auto_fader_controller = controller
+
+        minimal_server._handle_external_fader_update("/ch/10/fdr", (1000.0,))
+
+        assert minimal_server.last_fader_values[10] == 10.0
+        controller.handle_external_fader_change.assert_called_once_with(10, 10.0)
+
+        minimal_server._handle_external_fader_update("/ch/11/fdr", (-200.0,))
+
+        assert minimal_server.last_fader_values[11] == -144.0
+        controller.handle_external_fader_change.assert_called_with(11, -144.0)
+
     @pytest.mark.asyncio
     async def test_reset_trim_is_quarantined_for_wing(self, dummy_wing_server):
         server = dummy_wing_server
