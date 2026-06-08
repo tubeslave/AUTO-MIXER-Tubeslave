@@ -3,6 +3,7 @@
 import time
 from pathlib import Path
 
+from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
 from operator_product_state import (
     build_agent_communications_snapshot,
     build_bus_main_dca_snapshot,
@@ -211,6 +212,7 @@ VERIFIED_MANUAL_READBACK_STATUSES = {"verified_from_cache", "verified_from_physi
 APPLY_DELTA_LIMITS_DB = {"fader": 1.0, "gain": 0.5}
 CUMULATIVE_DELTA_LIMITS_DB = {"fader": 3.0, "gain": 1.5}
 CUMULATIVE_DELTA_WINDOW_SEC = 300.0
+PROVEN_LIVE_WRITE_KIND_SET = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
 
 def manual_write_result_verified(result):
@@ -379,7 +381,7 @@ def register_handlers(server):
             "proposed_value": proposed_value,
             "delta": delta,
             "safety_limits": {
-                "allowed_live_write_kinds": ["fader", "gain"],
+                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
                 "max_delta_db": APPLY_DELTA_LIMITS_DB.get(value_type),
                 "upward_auto_generated_moves_allowed": False,
             },
@@ -1884,7 +1886,7 @@ def register_handlers(server):
                     proposed_value=requested_change.get("value"),
                     delta=requested_change.get("delta_db"),
                     safety_limits={
-                        "allowed_live_write_kinds": ["fader", "gain"],
+                        "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
                         "proposal_only_if_unsupported": True,
                     },
                     proof_status="pending",
@@ -2627,9 +2629,9 @@ def register_handlers(server):
         safety = result.get("safety") if isinstance(result.get("safety"), dict) else {}
         allowed = set(safety.get("allowed_live_write_kinds") or [])
         if not allowed:
-            allowed = {"fader", "gain"}
+            allowed = PROVEN_LIVE_WRITE_KIND_SET
         value_type = str(change.get("value_type") or "").strip().lower()
-        if value_type not in {"fader", "gain"} or value_type not in allowed:
+        if value_type not in PROVEN_LIVE_WRITE_KIND_SET or value_type not in allowed:
             return None, "preflight_change_value_type_not_plan_eligible"
         channel = change.get("channel")
         if channel is None:
@@ -2725,7 +2727,7 @@ def register_handlers(server):
                 "queries_console": False,
                 "live_widening_allowed": False,
                 "live_apply_entrypoint": "apply_operator_proposal",
-                "allowed_live_write_kinds": ["fader", "gain"],
+                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
             },
             "planned_apply_sequence": planned_steps,
             "blocked_results": blocked_results,
@@ -2891,7 +2893,7 @@ def register_handlers(server):
         if not isinstance(change, dict):
             return None, "invalid_planned_change"
         value_type = str(change.get("value_type") or "").strip().lower()
-        if value_type not in {"fader", "gain"}:
+        if value_type not in PROVEN_LIVE_WRITE_KIND_SET:
             return None, "planned_change_value_type_not_dry_run_eligible"
         channel = change.get("channel")
         if channel is None:
@@ -2964,7 +2966,7 @@ def register_handlers(server):
                 "queries_console": False,
                 "live_widening_allowed": False,
                 "live_apply_entrypoint": "apply_operator_proposal",
-                "allowed_live_write_kinds": ["fader", "gain"],
+                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
             },
             "dry_run_results": results,
         }
@@ -3033,7 +3035,7 @@ def register_handlers(server):
                 "queries_console": False,
                 "live_widening_allowed": False,
                 "live_apply_entrypoint": "apply_operator_proposal",
-                "allowed_live_write_kinds": ["fader", "gain"],
+                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
             },
             "ready_for_executor": candidates,
             "blocked_results": blocked,
@@ -4110,7 +4112,7 @@ def register_handlers(server):
                 "requires_gate_ready": True,
                 "uses_existing_apply_operator_proposal": True,
                 "live_apply_entrypoint": "apply_operator_proposal",
-                "allowed_live_write_kinds": ["fader", "gain"],
+                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
                 "live_write": live_write,
                 "direct_live_write": False,
                 "apply_attempted": delegated_apply_attempted,
@@ -4364,7 +4366,7 @@ def register_handlers(server):
                 )
             )
         allowed = set(safety.get("allowed_live_write_kinds") or [])
-        if not allowed or allowed - {"fader", "gain"}:
+        if not allowed or allowed - PROVEN_LIVE_WRITE_KIND_SET:
             blockers.append(
                 sequence_execution_audit_blocker(
                     "safety_allowed_live_write_kinds_widened"
@@ -4447,7 +4449,7 @@ def register_handlers(server):
                 )
             )
         value_type = str(apply_result.get("value_type") or "").strip().lower()
-        if value_type not in {"fader", "gain"}:
+        if value_type not in PROVEN_LIVE_WRITE_KIND_SET:
             blockers.append(
                 sequence_execution_audit_blocker(
                     "execution_row_value_type_not_live_allowed",
@@ -4539,7 +4541,7 @@ def register_handlers(server):
                 "does_not_call_apply_operator_proposal": True,
                 "does_not_call_manual_console_write": True,
                 "live_apply_entrypoint_required": "apply_operator_proposal",
-                "allowed_live_write_kinds": ["fader", "gain"],
+                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
                 "execution_allowed_by_audit": False,
                 "live_write": False,
                 "apply_attempted": False,
@@ -4673,7 +4675,7 @@ def register_handlers(server):
             if safety.get(field) not in (False, None):
                 blockers.append(audit_policy_gate_blocker(f"safety_{field}_true"))
         allowed = set(safety.get("allowed_live_write_kinds") or [])
-        if not allowed or allowed - {"fader", "gain"}:
+        if not allowed or allowed - PROVEN_LIVE_WRITE_KIND_SET:
             blockers.append(
                 audit_policy_gate_blocker("safety_allowed_live_write_kinds_widened")
             )
@@ -4694,7 +4696,7 @@ def register_handlers(server):
                 )
             )
         value_type = str(row.get("value_type") or "").strip().lower()
-        if value_type not in {"fader", "gain"}:
+        if value_type not in PROVEN_LIVE_WRITE_KIND_SET:
             blockers.append(
                 audit_policy_gate_blocker(
                     "audit_row_value_type_not_policy_allowed",
@@ -4814,7 +4816,7 @@ def register_handlers(server):
                 "audit_payload_required": True,
                 "does_not_call_apply_operator_proposal": True,
                 "does_not_call_manual_console_write": True,
-                "allowed_live_write_kinds": ["fader", "gain"],
+                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
                 "execution_allowed_by_policy_gate": False,
                 "execution_allowed_by_audit": False,
                 "live_write": False,
@@ -4952,7 +4954,7 @@ def register_handlers(server):
             if safety.get(field) not in (False, None):
                 blockers.append(policy_memory_draft_blocker(f"safety_{field}_true"))
         allowed = set(safety.get("allowed_live_write_kinds") or [])
-        if not allowed or allowed - {"fader", "gain"}:
+        if not allowed or allowed - PROVEN_LIVE_WRITE_KIND_SET:
             blockers.append(
                 policy_memory_draft_blocker("safety_allowed_live_write_kinds_widened")
             )
@@ -4995,7 +4997,7 @@ def register_handlers(server):
                     )
                 )
         value_type = str(row.get("value_type") or "").strip().lower()
-        if value_type not in {"fader", "gain"}:
+        if value_type not in PROVEN_LIVE_WRITE_KIND_SET:
             blockers.append(
                 policy_memory_draft_blocker(
                     "policy_evidence_value_type_not_memory_allowed",
@@ -5141,7 +5143,7 @@ def register_handlers(server):
                 "policy_gate_payload_required": True,
                 "does_not_call_apply_operator_proposal": True,
                 "does_not_call_manual_console_write": True,
-                "allowed_live_write_kinds": ["fader", "gain"],
+                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
                 "append_only_memory_write_allowed_by_draft": False,
                 "requires_separate_memory_writer": True,
                 "execution_allowed_by_draft": False,
@@ -5288,7 +5290,7 @@ def register_handlers(server):
             if safety.get(field) not in (False, None):
                 blockers.append(policy_memory_writer_blocker(f"safety_{field}_true"))
         allowed = set(safety.get("allowed_live_write_kinds") or [])
-        if not allowed or allowed - {"fader", "gain"}:
+        if not allowed or allowed - PROVEN_LIVE_WRITE_KIND_SET:
             blockers.append(
                 policy_memory_writer_blocker("safety_allowed_live_write_kinds_widened")
             )
@@ -5353,7 +5355,7 @@ def register_handlers(server):
                 )
         evidence = record.get("evidence") if isinstance(record.get("evidence"), dict) else {}
         value_type = str(evidence.get("value_type") or "").strip().lower()
-        if value_type not in {"fader", "gain"}:
+        if value_type not in PROVEN_LIVE_WRITE_KIND_SET:
             blockers.append(
                 policy_memory_writer_blocker(
                     "memory_draft_record_value_type_not_allowed",
@@ -5504,7 +5506,7 @@ def register_handlers(server):
                 "target_memory_path": ".ai/memory/project.md",
                 "does_not_call_apply_operator_proposal": True,
                 "does_not_call_manual_console_write": True,
-                "allowed_live_write_kinds": ["fader", "gain"],
+                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
                 "live_write": False,
                 "apply_attempted": False,
                 "queue_mutation": False,
