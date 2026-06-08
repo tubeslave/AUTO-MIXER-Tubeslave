@@ -1598,6 +1598,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.deepEqual(analysisMode.liveWriteKinds, []);
   assert.equal(analysisMode.tone, 'green');
   assert.match(analysisMode.blockedReason, /mode_has_no_live_apply_authority/);
+  assert.match(analysisMode.nextStep, /No live-write authority for this mode/);
 
   const supervisedMode = rows.find(row => row.moduleId === 'mode_gate:supervised');
   assert.equal(supervisedMode.label, 'Supervised AutoMix Mode');
@@ -1619,6 +1620,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.deepEqual(autoMode.liveWriteKinds, []);
   assert.equal(autoMode.tone, 'red');
   assert.match(autoMode.blockedReason, /full_autonomous_mode_remains_blocked/);
+  assert.match(autoMode.nextStep, /No live-write authority for this mode/);
   assert.match(autoMode.nextStep, /Full Auto gaps: read_surface:14, write_surface:19/);
 
   const scenePresetReadiness = rows.find(row => row.moduleId === 'promotion_readiness:scene_preset_supervised_promotion');

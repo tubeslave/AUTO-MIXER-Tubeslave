@@ -758,6 +758,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const nextStep = [
       nextActions.join(' / '),
       writeKinds.length ? `Current policy live-write kinds: ${writeKinds.join(', ')}` : '',
+      !Boolean(row.live_apply_allowed) ? 'No live-write authority for this mode' : '',
       gapText ? `Full Auto gaps: ${gapText}` : '',
     ].filter(Boolean).join(' / ') || 'Mode gate is read-only.';
     return {
