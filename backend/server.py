@@ -109,6 +109,29 @@ _load_repo_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+MANUAL_WRITE_KIND_CONFIG = {
+    "fader": {
+        "address": "/ch/{channel}/fdr",
+        "method": "set_channel_fader",
+        "readback_tolerance": 0.05,
+        "clamp": lambda value: max(-144.0, min(10.0, float(value))),
+    },
+    "gain": {
+        "address": "/ch/{channel}/in/set/trim",
+        "method": "set_channel_gain",
+        "readback_tolerance": 0.06,
+        "clamp": lambda value: max(-18.0, min(18.0, float(value))),
+    },
+    "mute": {
+        "address": "/ch/{channel}/mute",
+        "method": "set_channel_mute",
+        "readback_tolerance": 0.0,
+        "clamp": lambda value: 1.0 if bool(value) else 0.0,
+    },
+}
+
+SUPPORTED_MANUAL_WRITE_KINDS_SET = frozenset(SUPPORTED_MANUAL_LIVE_WRITE_KINDS)
+
 
 def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -273,7 +296,6 @@ class AutoMixerServer:
         )
         self._manual_write_last_write_ts: Dict[tuple[int, str], float] = {}
         self._last_manual_write_result: Optional[Dict[str, Any]] = None
-        self._manual_write_readback_tolerance = {"fader": 0.05, "gain": 0.06, "mute": 0.0}
         manual_write_artifacts_dir = Path(
             os.getenv(
                 "AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR",
@@ -769,13 +791,10 @@ class AutoMixerServer:
 
     @staticmethod
     def _manual_write_address(channel: int, value_type: str) -> str:
-        if value_type == "fader":
-            return f"/ch/{channel}/fdr"
-        if value_type == "gain":
-            return f"/ch/{channel}/in/set/trim"
-        if value_type == "mute":
-            return f"/ch/{channel}/mute"
-        return ""
+        config = MANUAL_WRITE_KIND_CONFIG.get(value_type)
+        if not config:
+            return ""
+        return config["address"].format(channel=channel)
 
     @staticmethod
     def _coerce_optional_bool(value: Any) -> Optional[bool]:
@@ -897,13 +916,10 @@ class AutoMixerServer:
 
     @staticmethod
     def _clamp_manual_write_value(value: float, value_type: str) -> float:
-        if value_type == "fader":
-            return max(-144.0, min(10.0, float(value)))
-        if value_type == "gain":
-            return max(-18.0, min(18.0, float(value)))
-        if value_type == "mute":
-            return 1.0 if bool(value) else 0.0
-        return float(value)
+        clamp = MANUAL_WRITE_KIND_CONFIG.get(value_type, {}).get("clamp")
+        if clamp is None:
+            return float(value)
+        return clamp(value)
 
     @staticmethod
     def _coerce_optional_float(value: Any) -> Optional[float]:
@@ -961,8 +977,8 @@ class AutoMixerServer:
         if readback_source == "mixer_state_cache":
             if not isinstance(readback_cache_freshness, dict) or readback_cache_freshness.get("status") != "fresh":
                 return "readback_cache_not_fresh"
-
-        tolerance = self._manual_write_readback_tolerance.get(value_type, 0.05)
+        config = MANUAL_WRITE_KIND_CONFIG.get(value_type, {})
+        tolerance = config.get("readback_tolerance", 0.05)
         if abs(readback_float - effective_value) <= tolerance:
             if readback_source == "physical_readback":
                 return "verified_from_physical_readback"
@@ -1219,11 +1235,7 @@ class AutoMixerServer:
                 approval_id=approval_id,
             )
 
-        method_name = {
-            "fader": "set_channel_fader",
-            "gain": "set_channel_gain",
-            "mute": "set_channel_mute",
-        }.get(write_kind, "")
+        method_name = MANUAL_WRITE_KIND_CONFIG.get(write_kind, {}).get("method", "")
         write_method = getattr(self.mixer_client, method_name, None)
         if not callable(write_method):
             return self._manual_write_blocked_result(
