@@ -6992,6 +6992,17 @@ def build_safety_monitor(server: Any) -> Dict[str, Any]:
         if hasattr(server, "get_manual_write_supervision_status")
         else {}
     )
+    approved_live_write_kinds = manual.get("approved_live_write_kinds")
+    if not approved_live_write_kinds:
+        allowed = list(
+            operator_mode.get("capabilities", {}).get("allowed_live_write_kinds") or []
+        )
+        if (
+            operator_mode.get("mode") == "supervised"
+            and "mute" not in allowed
+        ):
+            allowed.append("mute")
+        approved_live_write_kinds = allowed
     traces = build_decision_traces(server, limit=12)
     last_trace = traces["traces"][-1] if traces["traces"] else None
     quarantined_surfaces = [
@@ -7018,7 +7029,7 @@ def build_safety_monitor(server: Any) -> Dict[str, Any]:
         "live_write_policy": {
             "apply_path": operator_mode.get("apply_path"),
             "policy": operator_mode.get("live_write_policy"),
-            "approved_live_write_kinds": manual.get("approved_live_write_kinds", ["fader", "gain"]),
+            "approved_live_write_kinds": approved_live_write_kinds,
             "requires_approval": operator_mode.get("capabilities", {}).get("requires_approval", True),
             "direct_writes_allowed": False,
             "autonomous_apply_allowed": False,
