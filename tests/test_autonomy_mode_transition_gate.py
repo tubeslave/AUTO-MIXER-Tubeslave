@@ -110,6 +110,7 @@ def test_gate_reports_supervised_as_limited_and_blocks_expansion_from_proof_over
     assert supervised["runtime_entry_allowed"] is True
     assert supervised["live_apply_allowed"] is True
     assert supervised["current_live_write_kinds"] == ["fader", "gain"]
+    assert supervised["current_live_write_surfaces"] == ["preamp", "trim", "fader"]
     assert supervised["mode_expansion_allowed"] is False
     assert "fader_supervised_promotion" in supervised["promotion_target_ids"]
     assert "manual_safety_review_candidate" in supervised["evidence_statuses"]
@@ -119,6 +120,11 @@ def test_gate_reports_supervised_as_limited_and_blocks_expansion_from_proof_over
     assert "readiness_gap_read_surface" not in supervised["blockers"]
     assert "supervised" in gate["summary"]["live_apply_allowed_modes"]
     assert gate["summary"]["supervised_current_live_write_kinds"] == ["fader", "gain"]
+    assert gate["summary"]["supervised_current_live_write_surfaces"] == [
+        "preamp",
+        "trim",
+        "fader",
+    ]
     assert "fader_supervised_promotion" in gate["summary"]["supervised_promotion_target_ids"]
     assert gate["summary"]["blocked_modes"] == ["auto"]
 

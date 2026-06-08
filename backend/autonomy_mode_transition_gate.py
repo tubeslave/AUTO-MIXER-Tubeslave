@@ -54,6 +54,7 @@ class AutonomyModeGateRow:
     autonomous_apply_allowed: bool
     mode_expansion_allowed: bool
     current_live_write_kinds: Tuple[str, ...]
+    current_live_write_surfaces: Tuple[str, ...]
     promotion_target_ids: Tuple[str, ...]
     evidence_statuses: Tuple[str, ...]
     readiness_gap_bucket_counts: Dict[str, int]
@@ -73,6 +74,7 @@ class AutonomyModeGateRow:
         payload = asdict(self)
         for key in (
             "current_live_write_kinds",
+            "current_live_write_surfaces",
             "promotion_target_ids",
             "evidence_statuses",
             "readiness_gap_target_ids_by_bucket",
@@ -266,6 +268,9 @@ def _row_for_mode(
         blockers.append("wing_deployment_requires_manual_safety_review")
 
     current_live_write_kinds = tuple(str(item) for item in capabilities.get("allowed_live_write_kinds", ()) if item)
+    current_live_write_surfaces = tuple(
+        str(item) for item in (project_mode.get("effective_live_write_surfaces") or ()) if item
+    )
     live_apply_allowed = bool(runtime_entry_allowed and mode == MODE_SUPERVISED and current_live_write_kinds)
 
     return AutonomyModeGateRow(
@@ -278,6 +283,7 @@ def _row_for_mode(
         autonomous_apply_allowed=False,
         mode_expansion_allowed=mode_expansion_allowed,
         current_live_write_kinds=current_live_write_kinds if live_apply_allowed else (),
+        current_live_write_surfaces=current_live_write_surfaces if live_apply_allowed else (),
         promotion_target_ids=target_ids,
         evidence_statuses=_unique(evidence_statuses),
         readiness_gap_bucket_counts=gap_bucket_counts,
@@ -342,6 +348,9 @@ def build_autonomy_mode_transition_gate(
                 auto_row.readiness_gap_target_ids_by_bucket
             ),
             "supervised_current_live_write_kinds": list(supervised_row.current_live_write_kinds),
+            "supervised_current_live_write_surfaces": list(
+                supervised_row.current_live_write_surfaces
+            ),
             "supervised_promotion_target_ids": list(supervised_row.promotion_target_ids),
             "global_blockers": [
                 "mode_gate_does_not_change_runtime_mode",
