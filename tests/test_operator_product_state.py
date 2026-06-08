@@ -5204,6 +5204,9 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     server.mixer_client.set_gain = MagicMock()
     server.mixer_client.set_eq = MagicMock()
     server.mixer_client.set_compressor = MagicMock()
+    server.operator_mode = "auto"
+    server._auto_mode_unlocked = True
+    server.connection_mode = "local"
     server.audio_capture = FakeAudioCapture()
 
     payload = build_main_pipeline_preview(server, total_channels=4)

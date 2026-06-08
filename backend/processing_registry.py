@@ -6919,9 +6919,15 @@ def build_pipeline_runtime_summary(operator_mode: Dict[str, Any], manual_write_s
             and "mute" not in allowed
         ):
             allowed.append("mute")
-        if not allowed:
-            allowed = list(LIVE_ALLOWED_WRITE_KINDS)
         approved_live_write_kinds = allowed
+    else:
+        seen = set()
+        approved = []
+        for item in list(approved_live_write_kinds):
+            if item not in seen:
+                seen.add(item)
+                approved.append(item)
+        approved_live_write_kinds = approved
     main = get_pipeline_profile("main_live_assist")
     return {
         "main_pipeline_id": "main_live_assist",

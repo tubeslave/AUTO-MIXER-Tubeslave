@@ -213,6 +213,31 @@ def test_pipeline_runtime_summary_falls_back_to_supervised_mode_live_write_kinds
     assert runtime["allowed_live_write_kinds"] == ["fader", "gain", "mute"]
 
 
+def test_pipeline_runtime_summary_shows_no_live_write_kinds_in_assisted_mode_without_manual_override():
+    operator_mode = {
+        "mode": "assist",
+        "capabilities": {"allowed_live_write_kinds": [], "can_apply_to_console": False},
+    }
+
+    runtime = build_pipeline_runtime_summary(operator_mode, {})
+
+    assert runtime["allowed_live_write_kinds"] == []
+
+
+def test_pipeline_runtime_summary_shows_no_live_write_kinds_in_locked_auto_mode():
+    operator_mode = {
+        "mode": "auto",
+        "capabilities": {
+            "allowed_live_write_kinds": [],
+            "can_apply_to_console": False,
+        },
+    }
+
+    runtime = build_pipeline_runtime_summary(operator_mode, {})
+
+    assert runtime["allowed_live_write_kinds"] == []
+
+
 def test_supervised_proof_artifact_evaluator_is_shadow_only_not_executor():
     method = get_processing_method("supervised_proof_artifact_evaluator")
     assert method is not None
