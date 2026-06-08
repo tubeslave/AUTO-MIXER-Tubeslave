@@ -271,7 +271,7 @@ class AutoMixerServer:
         )
         self._manual_write_last_write_ts: Dict[tuple[int, str], float] = {}
         self._last_manual_write_result: Optional[Dict[str, Any]] = None
-        self._manual_write_readback_tolerance = {"fader": 0.05, "gain": 0.06}
+        self._manual_write_readback_tolerance = {"fader": 0.05, "gain": 0.06, "mute": 0.0}
         manual_write_artifacts_dir = Path(
             os.getenv(
                 "AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR",
@@ -359,7 +359,7 @@ class AutoMixerServer:
             "wing_observation_only": self._wing_observation_only,
             "wing_record_telemetry": self._wing_record_telemetry,
             "connection_mode": self.connection_mode,
-            "approved_live_write_kinds": ["fader", "gain"],
+            "approved_live_write_kinds": ["fader", "gain", "mute"],
             "operator_mode": self.operator_mode,
             "requires_operator_mode": "supervised",
             "emergency_stopped": self._manual_write_emergency_stopped,
@@ -679,7 +679,7 @@ class AutoMixerServer:
             "request": dict(command or {}),
             "message": (
                 "WING deployment path is limited to Product Layer proposals and "
-                "approved manual fader/gain writes; direct voice-command writes "
+                "approved manual fader/gain/mute writes; direct voice-command writes "
                 "are quarantined."
             ),
             "manual_write_supervision": self.get_manual_write_supervision_status(),
@@ -750,7 +750,33 @@ class AutoMixerServer:
             return f"/ch/{channel}/fdr"
         if value_type == "gain":
             return f"/ch/{channel}/in/set/trim"
+        if value_type == "mute":
+            return f"/ch/{channel}/mute"
         return ""
+
+    @staticmethod
+    def _coerce_optional_bool(value: Any) -> Optional[bool]:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return value
+        if str(type(value).__module__).startswith("unittest.mock"):
+            return None
+        if isinstance(value, (int, float)):
+            if value in {0, 1, 0.0, 1.0}:
+                return bool(int(value))
+            return None
+        if isinstance(value, str):
+            text = value.strip().lower()
+            if text in {"1", "true", "on", "yes"}:
+                return True
+            if text in {"0", "false", "off", "no"}:
+                return False
+            if text == "mute":
+                return True
+            if text == "unmute":
+                return False
+        return None
 
     @staticmethod
     def _coerce_epoch_seconds(value: Any) -> Optional[float]:
@@ -852,6 +878,8 @@ class AutoMixerServer:
             return max(-144.0, min(10.0, float(value)))
         if value_type == "gain":
             return max(-18.0, min(18.0, float(value)))
+        if value_type == "mute":
+            return 1.0 if bool(value) else 0.0
         return float(value)
 
     @staticmethod
@@ -879,11 +907,31 @@ class AutoMixerServer:
         *,
         old_value: Any,
         readback_value: Any,
-        effective_value: float,
+        effective_value: Any,
         value_type: str,
         readback_source: str = "mixer_state_cache",
         readback_cache_freshness: Optional[Dict[str, Any]] = None,
     ) -> str:
+        if value_type == "mute":
+            readback_bool = self._coerce_optional_bool(readback_value)
+            if readback_bool is None:
+                return "readback_unavailable"
+            if readback_source == "mixer_state_cache":
+                if not isinstance(readback_cache_freshness, dict) or readback_cache_freshness.get("status") != "fresh":
+                    return "readback_cache_not_fresh"
+            if readback_bool == bool(effective_value):
+                return (
+                    "verified_from_physical_readback"
+                    if readback_source == "physical_readback"
+                    else "verified_from_cache"
+                )
+            old_bool = self._coerce_optional_bool(old_value)
+            if old_bool is not None and old_bool == readback_bool:
+                return "not_verified"
+            if readback_source == "physical_readback":
+                return "mismatch_from_physical_readback"
+            return "mismatch_from_cache"
+
         readback_float = self._coerce_optional_float(readback_value)
         if readback_float is None:
             return "readback_unavailable"
@@ -1024,7 +1072,7 @@ class AutoMixerServer:
         record_event: bool = True,
     ) -> Dict[str, Any]:
         write_kind = self._normalize_manual_write_kind(value_type)
-        if write_kind not in {"fader", "gain"}:
+        if write_kind not in {"fader", "gain", "mute"}:
             return self._manual_write_blocked_result(
                 reason="unsupported_value_type",
                 channel=channel,
@@ -1032,7 +1080,7 @@ class AutoMixerServer:
                 value_type=write_kind or value_type,
                 source=source,
                 approval_id=approval_id,
-                extra={"allowed_live_write_kinds": ["fader", "gain"]},
+                extra={"allowed_live_write_kinds": ["fader", "gain", "mute"]},
             )
 
         operator_mode = self.get_operator_mode_status()
@@ -1108,7 +1156,15 @@ class AutoMixerServer:
             )
 
         try:
-            requested_value = float(value)
+            if write_kind == "mute":
+                parsed_mute = self._coerce_optional_bool(value)
+                if parsed_mute is None:
+                    raise ValueError("invalid_mute_value")
+                requested_value = bool(parsed_mute)
+                effective_value = self._clamp_manual_write_value(requested_value, write_kind)
+            else:
+                requested_value = float(value)
+                effective_value = self._clamp_manual_write_value(requested_value, write_kind)
         except (TypeError, ValueError):
             return self._manual_write_blocked_result(
                 reason="invalid_value",
@@ -1118,7 +1174,6 @@ class AutoMixerServer:
                 source=source,
                 approval_id=approval_id,
             )
-        effective_value = self._clamp_manual_write_value(requested_value, write_kind)
 
         if not self.mixer_client or not getattr(self.mixer_client, "is_connected", False):
             return self._manual_write_blocked_result(
@@ -1130,7 +1185,11 @@ class AutoMixerServer:
                 approval_id=approval_id,
             )
 
-        method_name = "set_channel_fader" if write_kind == "fader" else "set_channel_gain"
+        method_name = {
+            "fader": "set_channel_fader",
+            "gain": "set_channel_gain",
+            "mute": "set_channel_mute",
+        }.get(write_kind, "")
         write_method = getattr(self.mixer_client, method_name, None)
         if not callable(write_method):
             return self._manual_write_blocked_result(
@@ -1152,10 +1211,11 @@ class AutoMixerServer:
         )
         old_value = pre_read.get("value")
         old_value_float = self._coerce_optional_float(old_value)
+        old_value_bool = self._coerce_optional_bool(old_value)
         pre_read_status = str(pre_read.get("status") or "readback_unavailable")
         pre_read_source = str(pre_read.get("source") or "unavailable")
         pre_read_cache_freshness = pre_read.get("cache_freshness")
-        if old_value_float is None:
+        if old_value_float is None and old_value_bool is None:
             return self._manual_write_blocked_result(
                 reason="pre_read_unavailable",
                 channel=channel_int,
@@ -6884,12 +6944,15 @@ class AutoMixerServer:
                     
             elif cmd_type == "mute_channel":
                 muted = command.get("muted", True)
-                # Note: Add mute method to mixer_client if not exists
+                parsed_mute = self._coerce_optional_bool(muted)
+                if parsed_mute is None:
+                    parsed_mute = bool(muted)
+                self.mixer_client.set_channel_mute(channel, int(parsed_mute))
                 await self.broadcast({
                     "type": "voice_command_executed",
                     "command": cmd_type,
                     "channel": channel,
-                    "muted": muted
+                    "muted": bool(parsed_mute)
                     })
                 
             elif cmd_type == "volume_up":

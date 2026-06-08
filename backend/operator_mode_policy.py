@@ -39,6 +39,7 @@ FULL_AUTONOMOUS_TARGET_SURFACES = (
 PROVEN_LIVE_WRITE_SURFACE_BY_KIND = {
     "fader": ("fader",),
     "gain": ("preamp", "trim"),
+    "mute": ("mute",),
 }
 
 OPERATOR_MODE_ALIASES = {

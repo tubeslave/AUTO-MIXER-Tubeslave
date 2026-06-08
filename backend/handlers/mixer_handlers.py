@@ -8,7 +8,7 @@ def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int]
     channel = data.get("channel")
     address = str(data.get("address") or "").strip()
 
-    if value_type in {"fader", "gain"} and channel is not None:
+    if value_type in {"fader", "gain", "mute"} and channel is not None:
         try:
             channel_int = int(channel)
         except (TypeError, ValueError):
@@ -26,6 +26,8 @@ def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int]
             parsed_type = "fader"
         elif len(parts) == 6 and parts[1] == "ch" and parts[3:] == ["in", "set", "trim"]:
             parsed_type = "gain"
+        elif len(parts) == 4 and parts[1] == "ch" and parts[3] == "mute":
+            parsed_type = "mute"
         else:
             return None, None, None, "unsupported_address"
         try:
@@ -99,6 +101,28 @@ def register_handlers(server):
             return
         if server.mixer_client:
             server.mixer_client.set_channel_gain(channel, value)
+
+    async def handle_set_mute(websocket, data):
+        channel = data.get("channel")
+        value = data.get("muted", data.get("value"))
+        if server._is_wing_deployment_write_boundary_active():
+            result = await server._apply_manual_console_write(
+                websocket,
+                channel=channel,
+                value=value,
+                value_type="mute",
+                source="websocket:set_mute",
+                reason=data.get("reason") or "websocket_set_mute",
+                approved=bool(data.get("approved", False)),
+                approval_id=data.get("approval_id"),
+            )
+            result_type = "manual_write_applied" if result.get("status") == "applied" else "manual_write_blocked"
+            if result.get("status") == "error":
+                result_type = "manual_write_error"
+            await server.send_to_client(websocket, {"type": result_type, **result})
+            return
+        if server.mixer_client:
+            server.mixer_client.set_channel_mute(channel, value)
 
     async def handle_set_eq(websocket, data):
         channel = data.get("channel")
@@ -190,6 +214,7 @@ def register_handlers(server):
     return {
         "set_fader": handle_set_fader,
         "set_gain": handle_set_gain,
+        "set_mute": handle_set_mute,
         "set_eq": handle_set_eq,
         "set_compressor": handle_set_compressor,
         "rollback_last_manual_write": handle_rollback_last_manual_write,

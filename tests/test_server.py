@@ -765,6 +765,31 @@ class TestAutoMixerServerRuntimeErrors:
     @pytest.mark.asyncio
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_mute_channel_applies_mute(self, mock_config, mock_bleed):
+        server = AutoMixerServer()
+        client = MagicMock()
+        client.set_channel_mute = MagicMock()
+        client.is_connected = True
+        client.get_channel_fader = MagicMock(return_value=0.0)
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command({
+            "type": "mute_channel",
+            "channel": 1,
+            "muted": True,
+        })
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_executed"
+        assert payload["command"] == "mute_channel"
+        assert payload["channel"] == 1
+        assert payload["muted"] is True
+        client.set_channel_mute.assert_called_once_with(1, 1)
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
     async def test_run_auto_soundcheck_cycle_reraises_cancelled_error_and_cleans_up(self, mock_config, mock_bleed):
         server = AutoMixerServer()
         server.auto_soundcheck_running = True
@@ -1145,6 +1170,50 @@ class TestWingDeploymentWriteBoundary:
         assert payload["rollback_value"] == -8.0
         assert payload["rollback_status"] == "not_attempted"
         server.mixer_client.set_channel_fader.assert_called_once_with(1, -6.0)
+
+    @pytest.mark.asyncio
+    async def test_websocket_mute_requires_supervised_approval_for_wing(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_mute"](websocket, {"channel": 1, "muted": True})
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "approval_required"
+        assert payload["value_type"] == "mute"
+        server.mixer_client.set_channel_mute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_websocket_mute_routes_approved_write_through_manual_gate(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server.mixer_client.state["/ch/1/mute"] = 0
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_mute"](
+            websocket,
+            {"channel": 1, "muted": True, "approved": True, "approval_id": "unit-mute-approval"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_applied"
+        assert payload["status"] == "applied"
+        assert payload["value_type"] == "mute"
+        assert payload["old_value"] == 0
+        assert payload["readback_status"] in {"not_verified", "mismatch_from_cache", "readback_cache_not_fresh"}
+        assert payload["readback_value"] == 0
+        assert payload["proof_status"] == "partial"
+        assert payload["rollback_available"] is True
+        assert payload["rollback_value"] == 0
+        assert payload["rollback_status"] == "not_attempted"
+        server.mixer_client.set_channel_mute.assert_called_once_with(1, True)
 
     @pytest.mark.asyncio
     @patch.object(AutoMixerServer, "_load_config", return_value={})
@@ -2053,6 +2122,42 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.query_parameter.assert_called_once_with("/ch/3/in/set/trim")
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
+        server.mixer_client.set_channel_mute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_query_mixer_parameter_reads_mute_without_writing(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.mixer_client.state = {}
+        server.mixer_client.query_parameter = MagicMock(
+            return_value={"status": "received", "address": "/ch/3/mute", "value": 1}
+        )
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["query_mixer_parameter"](
+            websocket,
+            {
+                "request_id": "wing-readonly-preflight:ch3:mute",
+                "channel": 3,
+                "value_type": "mute",
+                "address": "/ch/3/mute",
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "mixer_parameter_value"
+        assert payload["request_id"] == "wing-readonly-preflight:ch3:mute"
+        assert payload["status"] == "verified_from_physical_readback"
+        assert payload["source"] == "physical_readback"
+        assert payload["channel"] == 3
+        assert payload["value_type"] == "mute"
+        assert payload["address"] == "/ch/3/mute"
+        assert payload["value"] == 1
+        server.mixer_client.query_parameter.assert_called_once_with("/ch/3/mute")
+        server.mixer_client.set_channel_gain.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+        server.mixer_client.set_channel_mute.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_query_mixer_parameter_blocks_unsupported_address(self, dummy_wing_server):
