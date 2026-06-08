@@ -1943,13 +1943,13 @@ class AutoMixerServer:
 
     def _handle_external_fader_update(self, address: str, args: tuple[Any, ...]) -> None:
         """Track manual fader moves and forward them to live controllers when possible."""
-        if not (address.startswith("/ch/") and address.endswith("/fdr") and args):
+        parsed = self._parse_manual_write_address(address)
+        if parsed is None:
+            return
+        channel, value_type = parsed
+        if value_type != "fader" or not args:
             return
         try:
-            channel_match = re.search(r'/ch/(\d+)/fdr', address)
-            if not channel_match:
-                return
-            channel = int(channel_match.group(1))
             fader_value = float(args[0])
         except (TypeError, ValueError, IndexError, AttributeError):
             return
