@@ -680,6 +680,7 @@ PROCESSING_DOMAINS = {
 }
 
 LIVE_ALLOWED_WRITE_KINDS = ("fader", "gain")
+SUPPORTED_MANUAL_LIVE_WRITE_KINDS = LIVE_ALLOWED_WRITE_KINDS + ("mute",)
 
 
 @dataclass(frozen=True)
@@ -6921,12 +6922,22 @@ def build_pipeline_runtime_summary(operator_mode: Dict[str, Any], manual_write_s
             allowed.append("mute")
         approved_live_write_kinds = allowed
     else:
+        supported_manual_live_write_kinds = set(SUPPORTED_MANUAL_LIVE_WRITE_KINDS)
+        normalized_mapping = {
+            "preamp_gain": "gain",
+            "trim": "gain",
+            "input_gain": "gain",
+        }
         seen = set()
         approved = []
         for item in list(approved_live_write_kinds):
-            if item not in seen:
-                seen.add(item)
-                approved.append(item)
+            normalized = str(item or "").strip().lower()
+            normalized = normalized_mapping.get(normalized, normalized)
+            if normalized not in supported_manual_live_write_kinds:
+                continue
+            if normalized not in seen:
+                seen.add(normalized)
+                approved.append(normalized)
         approved_live_write_kinds = approved
     main = get_pipeline_profile("main_live_assist")
     return {

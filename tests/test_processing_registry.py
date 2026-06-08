@@ -192,14 +192,30 @@ def test_pipeline_runtime_summary_prefers_manual_approved_live_write_kinds():
             "can_apply_to_console": True,
         },
     }
-    manual_write_supervision = {"approved_live_write_kinds": ["fader", "gain", "eq"]}
+    manual_write_supervision = {
+        "approved_live_write_kinds": [
+            "fader",
+            "gain",
+            "eq",
+            "trim",
+            "gain",
+            "input_gain",
+            "mute",
+            "fader",
+            "preamp_gain",
+        ]
+    }
 
     runtime = build_pipeline_runtime_summary(
         operator_mode,
         manual_write_supervision,
     )
 
-    assert runtime["allowed_live_write_kinds"] == ["fader", "gain", "eq"]
+    assert runtime["allowed_live_write_kinds"] == [
+        "fader",
+        "gain",
+        "mute",
+    ]
 
 
 def test_pipeline_runtime_summary_falls_back_to_supervised_mode_live_write_kinds():
