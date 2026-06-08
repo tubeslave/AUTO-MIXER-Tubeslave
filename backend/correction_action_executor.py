@@ -23,6 +23,7 @@ from autofoh_safety import (
     ChannelEQMove,
     ChannelFaderMove,
     ChannelGainMove,
+    ChannelMuteMove,
     DCAFaderMove,
     DelayAdjust,
     EmergencyFeedbackNotch,
@@ -43,6 +44,7 @@ DEFAULT_PROMOTED_ACTION_TYPES = {
     "BusFaderMove": False,
     "DCAFaderMove": False,
     "MasterFaderMove": False,
+    "ChannelMuteMove": False,
     "ChannelEQMove": False,
     "BusEQMove": False,
     "HighPassAdjust": False,
@@ -536,6 +538,20 @@ class GatedCorrectionActionExecutor:
                 rollback_action=self._rollback_action_for(action, current),
                 target=target,
             )
+        if isinstance(action, ChannelMuteMove):
+            current, source = self._read_method_or_state(
+                methods=(("get_channel_mute", (action.channel_id,)), ("get_mute", (action.channel_id,))),
+                state_keys=(f"/ch/{action.channel_id}/mute",),
+            )
+            return ActionReadPlan(
+                value_type="mute",
+                target_value=action.muted,
+                current_value=bool(current) if current is not None else None,
+                current_source=source,
+                tolerance=0.0,
+                rollback_action=self._rollback_action_for(action, current),
+                target=target,
+            )
         if isinstance(action, SendLevelAdjust):
             current, source = self._read_method_or_state(
                 methods=(("get_send_level", (action.channel_id, action.send_bus)),),
@@ -647,6 +663,12 @@ class GatedCorrectionActionExecutor:
             return PanAdjust(
                 channel_id=action.channel_id,
                 pan=old_float,
+                reason=f"rollback {action.reason}",
+            )
+        if isinstance(action, ChannelMuteMove) and old_value is not None:
+            return ChannelMuteMove(
+                channel_id=action.channel_id,
+                muted=bool(old_value),
                 reason=f"rollback {action.reason}",
             )
         if isinstance(action, SendLevelAdjust) and old_float is not None:

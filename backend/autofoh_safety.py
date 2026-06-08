@@ -396,6 +396,7 @@ class AutoFOHSafetyConfig:
     fx_send_max_db: float = -5.0
     fx_return_min_interval_sec: float = 3.0
     channel_mute_min_interval_sec: float = 3.0
+    allow_direct_mute_writes: bool = False
     master_fader_max_cut_db: float = 1.0
     master_fader_min_interval_sec: float = 1.0
     delay_max_step_ms: float = 0.25
@@ -432,6 +433,7 @@ class AutoFOHSafetyConfig:
             fx_send_max_db=float(config.get("fx_send_max_db", -5.0)),
             fx_return_min_interval_sec=float(config.get("fx_return_min_interval_sec", 3.0)),
             channel_mute_min_interval_sec=float(config.get("channel_mute_min_interval_sec", 3.0)),
+            allow_direct_mute_writes=bool(config.get("allow_direct_mute_writes", False)),
             master_fader_max_cut_db=float(config.get("master_fader_max_cut_db", 1.0)),
             master_fader_min_interval_sec=float(config.get("master_fader_min_interval_sec", 1.0)),
             delay_max_step_ms=float(config.get("delay_max_step_ms", 0.25)),
@@ -545,8 +547,13 @@ class AutoFOHSafetyController:
             payload[key] = value
         return payload
 
+    def _is_direct_write_allowed(self, action: TypedCorrectionAction) -> bool:
+        if isinstance(action, ChannelMuteMove):
+            return bool(self.config.allow_direct_mute_writes)
+        return isinstance(action, AUTOFOH_ALLOWED_DIRECT_WRITE_TYPES)
+
     def _blocked_direct_write_payload(self, action: TypedCorrectionAction) -> Dict[str, Any] | None:
-        if isinstance(action, AUTOFOH_ALLOWED_DIRECT_WRITE_TYPES):
+        if self._is_direct_write_allowed(action):
             return None
 
         blocked_calls = self._blocked_calls_for(action)
@@ -1006,6 +1013,11 @@ class AutoFOHSafetyController:
             return self._require_method("set_gain", lambda a: self.mixer_client.set_gain(a.channel_id, a.target_db))
         if isinstance(action, ChannelFaderMove):
             return self._require_method("set_fader", lambda a: self.mixer_client.set_fader(a.channel_id, a.target_db))
+        if isinstance(action, ChannelMuteMove):
+            return self._require_method(
+                "set_channel_mute",
+                lambda a: self.mixer_client.set_channel_mute(a.channel_id, a.muted),
+            )
         return None
 
     def _require_method(self, method_name: str, callback):

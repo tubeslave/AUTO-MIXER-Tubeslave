@@ -244,6 +244,32 @@ def test_mute_action_is_quarantined_as_proposal_and_keeps_payload_shape():
     assert mixer.calls == []
 
 
+def test_mute_action_can_be_allowed_for_live_write_when_configured():
+    mixer = FakeMixer()
+    controller = AutoFOHSafetyController(
+        mixer,
+        config=AutoFOHSafetyConfig(
+            allow_direct_mute_writes=True,
+            channel_fader_min_interval_sec=0.0,
+        ),
+    )
+
+    decision = controller.execute(
+        ChannelMuteMove(
+            channel_id=2,
+            muted=True,
+            reason="manual emergency mute",
+        ),
+        runtime_state=RuntimeState.SOURCE_LEARNING,
+    )
+
+    assert decision.allowed is True
+    assert decision.blocked is False
+    assert decision.sent is True
+    assert decision.message == "sent"
+    assert mixer.calls == [("set_channel_mute", 2, True)]
+
+
 def test_mute_action_is_bounded_to_bool():
     mixer = FakeMixer()
     controller = AutoFOHSafetyController(mixer)

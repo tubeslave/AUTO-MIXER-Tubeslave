@@ -12,6 +12,7 @@ from autofoh_safety import (
     ChannelEQMove,
     ChannelFaderMove,
     ChannelGainMove,
+    ChannelMuteMove,
 )
 from correction_action_executor import (
     CorrectionActionExecutorConfig,
@@ -50,6 +51,14 @@ class ProofMixer:
         self.calls.append(("set_eq_band", channel, band, freq, gain, q))
         return True
 
+    def get_channel_mute(self, channel):
+        return self.eq_gain.get(("mute", channel), False)
+
+    def set_channel_mute(self, channel, muted):
+        self.calls.append(("set_channel_mute", channel, bool(muted)))
+        self.eq_gain[("mute", channel)] = bool(muted)
+        return True
+
 
 class NoGainReadMixer(ProofMixer):
     def get_channel_gain(self, channel):
@@ -63,12 +72,15 @@ class StaleReadbackMixer(ProofMixer):
 
 
 def _executor(mixer, **config):
+    config = dict(config)
+    allow_direct_mute_writes = config.pop("allow_direct_mute_writes", False)
     safety = AutoFOHSafetyController(
         mixer,
         config=AutoFOHSafetyConfig(
             channel_fader_max_step_db=2.0,
             channel_fader_min_interval_sec=0.0,
             gain_min_interval_sec=0.0,
+            allow_direct_mute_writes=allow_direct_mute_writes,
         ),
     )
     return GatedCorrectionActionExecutor(
@@ -174,3 +186,27 @@ def test_failed_readback_rolls_back_and_demotes_action_type():
         RuntimeState.SOURCE_LEARNING,
     )
     assert blocked.message == "action_not_promoted_for_live_write"
+
+
+def test_promoted_mute_move_with_direct_write_path_is_pre_read_verified_and_rollback_ready():
+    mixer = ProofMixer()
+    executor = _executor(
+        mixer,
+        promoted_action_types={"ChannelMuteMove": True},
+        allow_direct_mute_writes=True,
+    )
+
+    result = executor.execute(
+        ChannelMuteMove(channel_id=1, muted=True, reason="safety isolation"),
+        RuntimeState.SOURCE_LEARNING,
+    )
+
+    assert result.sent is True
+    assert result.write_sent is True
+    assert result.pre_read_ok is True
+    assert result.readback_ok is True
+    assert result.rollback_available is True
+    assert result.rollback_action is not None
+    assert isinstance(result.rollback_action, ChannelMuteMove)
+    assert result.rollback_action.muted is False
+    assert mixer.calls == [("set_channel_mute", 1, True)]
