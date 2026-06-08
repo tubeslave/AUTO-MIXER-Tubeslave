@@ -5267,6 +5267,9 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     assert main_pipeline_registry["autonomy_mode_transition_gate"]["summary"][
         "supervised_current_live_write_surfaces"
     ] == ["preamp", "trim", "fader"]
+    assert payload["summary"][
+        "autonomy_mode_transition_gate_supervised_current_live_write_surfaces"
+    ] == ["preamp", "trim", "fader"]
     assert (
         payload["summary"]["autonomy_mode_transition_gate_mode_count"]
         == len(main_pipeline_registry["autonomy_mode_transition_gate"]["rows"])
