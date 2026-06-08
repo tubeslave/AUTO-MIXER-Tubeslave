@@ -467,7 +467,7 @@ class AutoFOHSafetyController:
 
         if not self.runtime_policy.is_action_allowed(runtime_state, action_family):
             decision.allowed = False
-            decision.message = f"{action.family} not allowed in {runtime_state.value}"
+            decision.message = f"{action_family} not allowed in {runtime_state.value}"
             self.history.append(decision)
             return decision
 

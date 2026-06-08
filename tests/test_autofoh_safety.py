@@ -28,6 +28,7 @@ from autofoh_safety import (
     MasterFaderMove,
     PolarityAdjust,
 )
+from autofoh_runtime import ACTION_FAMILY_FX
 
 
 def assert_blocked_evidence(decision, cmd):
@@ -145,6 +146,19 @@ class InvalidCorrectionAction(TypedCorrectionAction):
         return ("invalid",)
 
 
+@dataclass
+class InvalidTargetKeyAction(TypedCorrectionAction):
+    """Action with valid family but invalid target key implementation."""
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_FX
+
+    @property
+    def target_key(self) -> tuple[Any, ...]:
+        raise NotImplementedError("invalid target key")
+
+
 def test_base_typed_action_contract_is_abstract():
     with pytest.raises(TypeError):
         TypedCorrectionAction(reason="invalid")
@@ -162,6 +176,20 @@ def test_invalid_action_contract_is_rejected_without_crash():
     assert decision.allowed is False
     assert decision.sent is False
     assert "unsupported action family" in decision.message
+
+
+def test_invalid_action_target_key_is_rejected_without_crash():
+    controller = AutoFOHSafetyController(FakeMixer())
+
+    decision = controller.execute(
+        InvalidTargetKeyAction(reason="bad target key"),
+        runtime_state=RuntimeState.SOURCE_LEARNING,
+    )
+
+    assert decision.supported is False
+    assert decision.allowed is False
+    assert decision.sent is False
+    assert "invalid action target key" in decision.message
 
 
 def test_state_machine_forbids_tonal_correction_during_song_start_stabilize():
