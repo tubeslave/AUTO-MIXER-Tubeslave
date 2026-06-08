@@ -1216,6 +1216,52 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_mute.assert_called_once_with(1, True)
 
     @pytest.mark.asyncio
+    async def test_websocket_mute_channel_alias_routes_to_manual_gate(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server.mixer_client.state["/ch/3/mute"] = 0
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["mute_channel"](
+            websocket,
+            {"channel": 3, "muted": True, "approved": True, "approval_id": "unit-mute-channel"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_applied"
+        assert payload["status"] == "applied"
+        assert payload["value_type"] == "mute"
+        assert payload["requested_value"] is True
+        assert payload["old_value"] == 0
+        assert payload["proof_status"] == "partial"
+        server.mixer_client.set_channel_mute.assert_called_once_with(3, True)
+
+    @pytest.mark.asyncio
+    async def test_websocket_unmute_channel_alias_defaults_to_false_and_routes_to_manual_gate(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server.mixer_client.state["/ch/4/mute"] = 1
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["unmute_channel"](
+            websocket,
+            {"channel": 4, "approved": True, "approval_id": "unit-unmute-channel"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_applied"
+        assert payload["status"] == "applied"
+        assert payload["value_type"] == "mute"
+        assert payload["requested_value"] is False
+        assert payload["old_value"] == 1
+        assert payload["proof_status"] == "partial"
+        server.mixer_client.set_channel_mute.assert_called_once_with(4, False)
+
+    @pytest.mark.asyncio
     @patch.object(AutoMixerServer, "_load_config", return_value={})
     @patch("server.BleedService")
     async def test_auto_mode_unlocked_offline_allows_direct_fader_write(

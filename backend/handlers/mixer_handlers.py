@@ -124,6 +124,17 @@ def register_handlers(server):
         if server.mixer_client:
             server.mixer_client.set_channel_mute(channel, value)
 
+    async def handle_mute_channel(websocket, data):
+        payload = dict(data)
+        if "muted" not in payload and "value" not in payload:
+            payload["muted"] = True
+        await handle_set_mute(websocket, payload)
+
+    async def handle_unmute_channel(websocket, data):
+        payload = dict(data)
+        payload["muted"] = False if payload.get("muted") is None else payload.get("muted")
+        await handle_set_mute(websocket, payload)
+
     async def handle_set_eq(websocket, data):
         channel = data.get("channel")
         band = data.get("band")
@@ -215,6 +226,8 @@ def register_handlers(server):
         "set_fader": handle_set_fader,
         "set_gain": handle_set_gain,
         "set_mute": handle_set_mute,
+        "mute_channel": handle_mute_channel,
+        "unmute_channel": handle_unmute_channel,
         "set_eq": handle_set_eq,
         "set_compressor": handle_set_compressor,
         "rollback_last_manual_write": handle_rollback_last_manual_write,

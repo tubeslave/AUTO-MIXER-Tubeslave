@@ -107,6 +107,16 @@ class TestValidateCommand:
         error = validate_command(cmd)
         assert error is None
 
+    def test_valid_mute_channel(self):
+        cmd = WSCommand(action="mute_channel", channel=3, params={"value": 1})
+        error = validate_command(cmd)
+        assert error is None
+
+    def test_valid_unmute_channel(self):
+        cmd = WSCommand(action="unmute_channel", channel=5, params={"value": 0})
+        error = validate_command(cmd)
+        assert error is None
+
     def test_unknown_action(self):
         cmd = WSCommand(action="do_something_weird", channel=1, params={})
         error = validate_command(cmd)
@@ -138,6 +148,20 @@ class TestCommandToOSC:
         actions = command_to_osc(cmd)
         assert len(actions) >= 1
         assert "mute" in actions[0].address.lower() or "/ch/5/" in actions[0].address
+
+    def test_mute_channel_to_osc(self):
+        cmd = WSCommand(action="mute_channel", channel=5, params={"value": 1})
+        actions = command_to_osc(cmd)
+        assert len(actions) >= 1
+        assert actions[0].address == "/ch/5/mute"
+        assert actions[0].args[0] == 1
+
+    def test_unmute_channel_to_osc(self):
+        cmd = WSCommand(action="unmute_channel", channel=5, params={"value": 0})
+        actions = command_to_osc(cmd)
+        assert len(actions) >= 1
+        assert actions[0].address == "/ch/5/mute"
+        assert actions[0].args[0] == 0
 
     def test_set_pan_to_osc(self):
         cmd = WSCommand(action="set_pan", channel=2, params={"value": 50.0})

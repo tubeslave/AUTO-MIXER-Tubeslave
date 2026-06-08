@@ -61,7 +61,7 @@ def parse_ws_message(message: str) -> WSCommand:
 
 
 def validate_command(command: WSCommand) -> Optional[str]:
-    supported = {"set_fader", "set_mute", "set_pan"}
+    supported = {"set_fader", "set_mute", "set_pan", "mute_channel", "unmute_channel"}
     if command.action not in supported:
         return f"Unknown action: {command.action}"
     if command.channel is None:
@@ -74,7 +74,14 @@ def command_to_osc(command: WSCommand) -> List[OSCAction]:
     value = command.params.get("value")
     if command.action == "set_fader":
         return [OSCAction(address=f"/ch/{command.channel}/fdr", args=(value,))]
-    if command.action == "set_mute":
+    if command.action in {"set_mute", "mute_channel", "unmute_channel"}:
+        if value is None:
+            if command.action == "unmute_channel":
+                value = 0
+            elif command.action == "mute_channel":
+                value = 1
+            else:
+                value = command.params.get("muted", 1)
         return [OSCAction(address=f"/ch/{command.channel}/mute", args=(value,))]
     if command.action == "set_pan":
         return [OSCAction(address=f"/ch/{command.channel}/pan", args=(value,))]
