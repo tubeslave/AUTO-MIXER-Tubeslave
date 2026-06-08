@@ -797,7 +797,12 @@ class AutoMixerServer:
         return config["address"].format(channel=channel)
 
     @staticmethod
-    def _parse_manual_write_address(address: str) -> Optional[tuple[int, str]]:
+    def _parse_manual_write_address(address: Any) -> Optional[tuple[int, str]]:
+        if isinstance(address, (bytes, bytearray)):
+            try:
+                address = address.decode("utf-8")
+            except UnicodeDecodeError:
+                return None
         normalized = str(address or "").strip()
         if not normalized:
             return None

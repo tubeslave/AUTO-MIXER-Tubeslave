@@ -1062,6 +1062,11 @@ class TestWingDeploymentWriteBoundary:
         assert minimal_server._parse_manual_write_address("/ch/12/fdr") == (12, "fader")
         assert minimal_server._parse_manual_write_address("/ch/12/in/set/trim") == (12, "gain")
         assert minimal_server._parse_manual_write_address("  /ch/12/mute  ") == (12, "mute")
+        assert minimal_server._parse_manual_write_address(b"/ch/13/fdr") == (13, "fader")
+
+        assert minimal_server._parse_manual_write_address(
+            bytearray(b"/ch/14/in/set/trim")
+        ) == (14, "gain")
 
     def test_parse_manual_write_address_rejects_unknown_paths(self, minimal_server):
         assert minimal_server._parse_manual_write_address("/ch/12/eq") is None
@@ -1070,6 +1075,7 @@ class TestWingDeploymentWriteBoundary:
         assert minimal_server._parse_manual_write_address("") is None
         assert minimal_server._parse_manual_write_address(None) is None
         assert minimal_server._parse_manual_write_address("/ch/12/fdr/") is None
+        assert minimal_server._parse_manual_write_address(b"/ch/\xff/fdr") is None
 
     def test_handle_external_fader_update_tracks_fader_and_notifies_realtime_controller(self, minimal_server):
         controller = MagicMock()
