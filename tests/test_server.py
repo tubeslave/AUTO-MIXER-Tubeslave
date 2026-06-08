@@ -9,6 +9,7 @@ import asyncio
 import json
 import os
 import time
+from pathlib import Path
 import numpy as np
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
@@ -1063,6 +1064,7 @@ class TestWingDeploymentWriteBoundary:
         assert minimal_server._parse_manual_write_address("/ch/12/in/set/trim") == (12, "gain")
         assert minimal_server._parse_manual_write_address("  /ch/12/mute  ") == (12, "mute")
         assert minimal_server._parse_manual_write_address(b"/ch/13/fdr") == (13, "fader")
+        assert minimal_server._parse_manual_write_address(Path("/ch/15/fdr")) == (15, "fader")
 
         assert minimal_server._parse_manual_write_address(
             bytearray(b"/ch/14/in/set/trim")
