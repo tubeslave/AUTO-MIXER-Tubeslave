@@ -1130,6 +1130,17 @@ class TestWingDeploymentWriteBoundary:
 
         assert minimal_server.last_fader_values == {}
 
+    def test_handle_external_fader_update_survives_controller_exception(self, minimal_server):
+        controller = MagicMock()
+        controller.realtime_enabled = True
+        controller.handle_external_fader_change.side_effect = RuntimeError("osc flood")
+        minimal_server.auto_fader_controller = controller
+
+        minimal_server._handle_external_fader_update("/ch/9/fdr", (-8.25,))
+
+        assert minimal_server.last_fader_values[9] == -8.25
+        controller.handle_external_fader_change.assert_called_once_with(9, -8.25)
+
     def test_handle_external_fader_update_uses_first_arg_if_multiple_provided(self, minimal_server):
         controller = MagicMock()
         controller.realtime_enabled = True
