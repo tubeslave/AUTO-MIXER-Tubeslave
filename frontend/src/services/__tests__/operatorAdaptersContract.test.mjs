@@ -566,6 +566,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
           proposal_creation_allowed: true,
           live_apply_allowed: true,
           current_live_write_kinds: ['fader', 'gain'],
+          current_live_write_surfaces: ['preamp', 'trim', 'fader'],
           blockers: ['supervised_mode_is_narrow_fader_gain_only'],
           next_required_actions: ['Keep physical proof review manual.'],
           readiness_gap_bucket_counts: {
@@ -1605,7 +1606,11 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.deepEqual(supervisedMode.liveWriteKinds, []);
   assert.equal(supervisedMode.tone, 'yellow');
   assert.match(supervisedMode.module, /policy:fader,gain/);
+  assert.match(supervisedMode.module, /surfaces:preamp,trim,fader/);
   assert.match(supervisedMode.nextStep, /Current policy live-write kinds: fader, gain/);
+  assert.equal(supervisedMode.pipelineProfiles.includes('current_write_surface:preamp'), true);
+  assert.equal(supervisedMode.pipelineProfiles.includes('current_write_surface:trim'), true);
+  assert.equal(supervisedMode.pipelineProfiles.includes('current_write_surface:fader'), true);
 
   const autoMode = rows.find(row => row.moduleId === 'mode_gate:auto');
   assert.equal(autoMode.label, 'Full Autonomous Mixing Mode');

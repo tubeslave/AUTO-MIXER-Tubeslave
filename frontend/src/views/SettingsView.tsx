@@ -119,14 +119,24 @@ function modeGateWriteKinds(row?: ModuleStatusRecord) {
     .filter(Boolean);
 }
 
+function modeGateWriteSurfaces(row?: ModuleStatusRecord) {
+  if (!row) return [];
+  return row.pipelineProfiles
+    .filter(profile => profile.startsWith('current_write_surface:'))
+    .map(profile => profile.replace('current_write_surface:', ''))
+    .filter(Boolean);
+}
+
 function modePolicyRows(ui: UiState, modules: ModuleStatusRecord[], writeScope: string) {
   const supervised = modeGateRow(modules, 'supervised');
   const auto = modeGateRow(modules, 'auto');
   const supervisedWriteKinds = modeGateWriteKinds(supervised);
+  const supervisedWriteSurfaces = modeGateWriteSurfaces(supervised);
   return [
     { label: 'Current mode', value: getModeDisplayLabel(ui.mode), tone: ui.mode === 'Supervised' ? 'yellow' as const : ui.mode === 'Auto' ? 'red' as const : 'blue' as const },
     { label: 'Supervised gate', value: supervised ? readableStatus(supervised.status) : 'Unknown', tone: supervised?.tone ?? 'yellow' as const },
     { label: 'Supervised scope', value: supervisedWriteKinds.length ? supervisedWriteKinds.join(', ') : writeScope, tone: supervisedWriteKinds.length ? 'yellow' as const : 'red' as const },
+    { label: 'Supervised surfaces', value: supervisedWriteSurfaces.length ? supervisedWriteSurfaces.join(', ') : 'No current surfaces', tone: supervisedWriteSurfaces.length ? 'yellow' as const : 'red' as const },
     { label: 'Full Autonomous Mixing', value: auto ? readableStatus(auto.status) : 'Unknown', tone: auto?.tone ?? 'red' as const }
   ];
 }

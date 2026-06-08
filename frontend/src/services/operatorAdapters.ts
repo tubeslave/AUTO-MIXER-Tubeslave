@@ -742,6 +742,11 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     const blockers = stringList(row.blockers);
     const nextActions = stringList(row.next_required_actions);
     const writeKinds = stringList(row.current_live_write_kinds);
+    const writeSurfaces = stringList(row.current_live_write_surfaces);
+    const writePolicyText = [
+      writeKinds.length ? `policy:${writeKinds.join(',')}` : '',
+      writeSurfaces.length ? `surfaces:${writeSurfaces.join(',')}` : '',
+    ].filter(Boolean).join(' / ');
     const gapCounts = asRecord(row.readiness_gap_bucket_counts);
     const gapText = Object.entries(gapCounts)
       .map(([bucket, rawCount]) => {
@@ -761,7 +766,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       domain: 'autonomy_mode_gate',
       status,
       entrypoint: mode,
-      module: writeKinds.length ? `policy:${writeKinds.join(',')}` : 'no_current_write_authority',
+      module: writePolicyText || 'no_current_write_authority',
       uiSurface: 'Autonomy mode transition gate',
       canWriteLive: false,
       liveWriteKinds: [],
@@ -770,6 +775,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `proposal_creation:${Boolean(row.proposal_creation_allowed)}`,
         `live_apply:${Boolean(row.live_apply_allowed)}`,
         ...writeKinds.map(kind => `current_write:${kind}`),
+        ...writeSurfaces.map(surface => `current_write_surface:${surface}`),
       ],
       blockedReason: blockers.length
         ? blockers.join(', ')
