@@ -10,6 +10,10 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Mapping, Tuple
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
 
 try:
     from autonomy_promotion_readiness import iter_promotion_readiness_rows
@@ -32,6 +36,7 @@ TARGET_BY_VALUE_TYPE = {
     "fader": "fader_supervised_promotion",
     "gain": "gain_trim_supervised_promotion",
 }
+PROMOTION_VALUE_TYPES = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
 
 @dataclass(frozen=True)
@@ -206,7 +211,7 @@ def build_autonomy_evidence_overlay(proof_report: Mapping[str, Any]) -> Dict[str
             remediation=remediation,
             static_rows=static_rows,
         )
-        for value_type in ("fader", "gain")
+        for value_type in PROMOTION_VALUE_TYPES
     )
     status_counts: Dict[str, int] = {status: 0 for status in sorted(OVERLAY_STATUSES)}
     for row in rows:

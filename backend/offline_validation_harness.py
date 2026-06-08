@@ -25,10 +25,14 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.operator_analysis import build_operator_analysis_report
     from backend.operator_mode_policy import build_operator_mode_status
     from backend.operator_proposal_queue import OperatorProposalQueue
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
 
 
 VERIFIED_SIMULATED_READBACK = "verified_from_simulated_readback"
-ALLOWED_OFFLINE_VALUE_TYPES = {"fader", "gain"}
+ALLOWED_OFFLINE_VALUE_TYPES = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 FORBIDDEN_LIVE_MESSAGES = ["set_fader", "set_gain", "route_output", "load_snap", "save_snap"]
 
 
@@ -181,7 +185,7 @@ class OfflineServerFixture:
             "deployment_write_boundary_enabled": True,
             "deployment_write_boundary_active": False,
             "connection_mode": self.connection_mode,
-            "approved_live_write_kinds": ["fader", "gain"],
+                "approved_live_write_kinds": list(ALLOWED_OFFLINE_VALUE_TYPES),
             "operator_mode": self.operator_mode,
             "requires_operator_mode": "supervised",
             "emergency_stopped": False,

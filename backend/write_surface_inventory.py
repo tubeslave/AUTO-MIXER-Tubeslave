@@ -11,6 +11,10 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Tuple
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
 
 
 WRITE_SURFACE_STATUSES = {
@@ -21,7 +25,7 @@ WRITE_SURFACE_STATUSES = {
     "blocked",
 }
 
-LIVE_ALLOWED_WRITE_KINDS = ("fader", "gain")
+LIVE_ALLOWED_WRITE_KINDS = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
 
 @dataclass(frozen=True)
@@ -140,7 +144,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "backend/operator_recommendation_bridge.py",
         ),
         entrypoints=("main_pipeline_preview", "run_operator_analysis", "import_soundcheck_recommendations"),
-        write_kinds=("fader", "gain"),
+        write_kinds=LIVE_ALLOWED_WRITE_KINDS,
         allowed_live=False,
         gate="Product Layer proposal queue; live apply requires product_layer_fader_gain_apply",
         current_policy="May create bounded fader/gain recommendations only; no direct mixer mutation.",
@@ -195,7 +199,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         status="lab_only",
         paths=("tools/offline_agent_mix.py", "mix_agent/", "backend/offline_validation_harness.py"),
         entrypoints=("offline render", "offline validation harness", "local in-memory mixer facade"),
-        write_kinds=("fader", "gain", "eq", "compressor", "gate", "pan", "fx"),
+        write_kinds=(*(LIVE_ALLOWED_WRITE_KINDS), "eq", "compressor", "gate", "pan", "fx"),
         allowed_live=False,
         gate="Offline files and local fake mixer state only.",
         current_policy="Safe for offline renders/tests; must not import live WING/OSC transport.",

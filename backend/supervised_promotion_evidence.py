@@ -10,6 +10,10 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Mapping, Tuple
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
 
 try:
     from safety_coverage_matrix import get_safety_coverage_row
@@ -19,15 +23,12 @@ except ImportError:  # pragma: no cover - package import compatibility
 
 SUPERVISED_PROMOTION_EVIDENCE_METHOD_ID = "supervised_promotion_evidence_bridge"
 EVIDENCE_STATUSES = {"safety_review_candidate", "dry_run_only", "evidence_blocked"}
-PROMOTION_VALUE_TYPES = ("fader", "gain")
+PROMOTION_VALUE_TYPES = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 SAFETY_ROW_BY_VALUE_TYPE = {
     "fader": "fader_supervised",
     "gain": "gain_supervised",
 }
-DEFAULT_MIN_PHYSICAL_CANDIDATES = {
-    "fader": 1,
-    "gain": 1,
-}
+DEFAULT_MIN_PHYSICAL_CANDIDATES = {value_type: 1 for value_type in PROMOTION_VALUE_TYPES}
 
 
 @dataclass(frozen=True)

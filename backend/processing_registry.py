@@ -13,6 +13,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from operator_mode_policy import (
     normalize_manual_live_write_kinds,
+    CURRENT_PROVEN_LIVE_WRITE_KINDS,
 )
 
 try:
@@ -683,7 +684,7 @@ PROCESSING_DOMAINS = {
     "offline_render",
 }
 
-LIVE_ALLOWED_WRITE_KINDS = ("fader", "gain")
+LIVE_ALLOWED_WRITE_KINDS = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
 
 @dataclass(frozen=True)

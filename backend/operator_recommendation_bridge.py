@@ -9,11 +9,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+try:
+    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
 
 
 SAFE_GAIN_SOURCE = "safe_gain_calibrator"
 SOUNDCHECK_SOURCE = "soundcheck_recommendation_bundle"
 CACHE_FRESHNESS_STALE_AFTER_SEC = 30.0
+ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
 
 def _utc_now() -> str:
@@ -143,7 +148,7 @@ def _cache_freshness_for_change(client: Any, change: Dict[str, Any]) -> Dict[str
     updated_epoch = _state_cache_timestamp(client, address) if address else None
     now = datetime.now(timezone.utc).timestamp()
     age_sec = round(max(0.0, now - updated_epoch), 3) if updated_epoch is not None else None
-    if value_type not in {"gain", "fader"} or channel is None:
+    if value_type not in ALLOWED_VALUE_TYPES or channel is None:
         status = "unsupported"
     elif address is None:
         status = "missing"
