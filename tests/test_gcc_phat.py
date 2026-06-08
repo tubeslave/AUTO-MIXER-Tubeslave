@@ -77,3 +77,35 @@ class TestAutoPhaseAligner:
         status = aligner.get_status()
         assert status['reference_channel'] == 1
         assert 2 in status['channels']
+
+    def test_process_audio_passes_reference_then_target_to_analyzer(self):
+        aligner = AutoPhaseAligner()
+        aligner.add_channel(1)
+
+        call_log = []
+
+        class SpyAnalyzer:
+            def add_frames(self, ref_frame, tgt_frame):
+                call_log.append((ref_frame, tgt_frame))
+
+            def compute_delay(self):
+                return DelayMeasurement(
+                    delay_ms=1.0,
+                    delay_samples=48.0,
+                    correlation_peak=1.0,
+                    psr=10.0,
+                    snr_db=40.0,
+                    confidence=1.0,
+                    coherence=1.0,
+                )
+
+        aligner.channel_analyzers[1] = SpyAnalyzer()
+        ref = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        tgt = np.array([4.0, 5.0, 6.0], dtype=np.float64)
+
+        aligner.process_audio(1, ref, tgt)
+
+        assert call_log
+        logged_ref, logged_tgt = call_log[0]
+        assert logged_ref is ref
+        assert logged_tgt is tgt
