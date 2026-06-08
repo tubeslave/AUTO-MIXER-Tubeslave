@@ -1596,6 +1596,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.equal(analysisMode.label, 'Analysis Mode');
   assert.equal(analysisMode.canWriteLive, false);
   assert.deepEqual(analysisMode.liveWriteKinds, []);
+  assert.equal(analysisMode.module, 'no_current_write_authority');
   assert.equal(analysisMode.tone, 'green');
   assert.match(analysisMode.blockedReason, /mode_has_no_live_apply_authority/);
   assert.match(analysisMode.nextStep, /No live-write authority for this mode/);
@@ -1618,6 +1619,7 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
   assert.equal(autoMode.status, 'blocked');
   assert.equal(autoMode.canWriteLive, false);
   assert.deepEqual(autoMode.liveWriteKinds, []);
+  assert.equal(autoMode.module, 'no_current_write_authority');
   assert.equal(autoMode.tone, 'red');
   assert.match(autoMode.blockedReason, /full_autonomous_mode_remains_blocked/);
   assert.match(autoMode.nextStep, /No live-write authority for this mode/);
