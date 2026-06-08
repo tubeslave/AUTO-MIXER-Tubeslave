@@ -20,6 +20,7 @@ from autofoh_safety import (
     BusFaderMove,
     ChannelEQMove,
     ChannelFaderMove,
+    ChannelMuteMove,
     CompressorMakeupAdjust,
     DCAFaderMove,
     DelayAdjust,
@@ -50,6 +51,7 @@ class FakeMixer:
         self.bus_fader = {1: -8.0}
         self.dca_fader = {2: -9.0}
         self.main_fader = {1: -2.0}
+        self.channel_mute = {}
         self.delay = {1: 1.0}
         self.polarity = {}
         self.eq_gain = {}
@@ -62,6 +64,14 @@ class FakeMixer:
     def set_fader(self, channel, value_db):
         self.fader[channel] = value_db
         self.calls.append(("set_fader", channel, value_db))
+        return True
+
+    def get_channel_mute(self, channel):
+        return self.channel_mute.get(channel, False)
+
+    def set_channel_mute(self, channel, muted):
+        self.channel_mute[channel] = bool(muted)
+        self.calls.append(("set_channel_mute", channel, self.channel_mute[channel]))
         return True
 
     def get_main_fader(self, main):
@@ -190,6 +200,86 @@ def test_invalid_action_target_key_is_rejected_without_crash():
     assert decision.allowed is False
     assert decision.sent is False
     assert "invalid action target key" in decision.message
+
+
+def test_mute_action_is_rejected_in_disallowed_state():
+    controller = AutoFOHSafetyController(FakeMixer())
+
+    decision = controller.execute(
+        ChannelMuteMove(
+            channel_id=1,
+            muted=True,
+            reason="prevent feedback path",
+        ),
+        runtime_state=RuntimeState.SONG_START_STABILIZE,
+    )
+
+    assert decision.allowed is False
+    assert decision.sent is False
+    assert decision.blocked is False
+    assert "not allowed" in decision.message
+
+
+def test_mute_action_is_quarantined_as_proposal_and_keeps_payload_shape():
+    mixer = FakeMixer()
+    controller = AutoFOHSafetyController(mixer)
+
+    decision = controller.execute(
+        ChannelMuteMove(
+            channel_id=2,
+            muted=True,
+            reason="remove hot mic",
+        ),
+        runtime_state=RuntimeState.SOURCE_LEARNING,
+    )
+
+    assert_blocked_evidence(decision, "set_channel_mute")
+    assert decision.bounded is False
+    assert decision.payload["blocked_calls"][0] == {
+        "cmd": "set_channel_mute",
+        "channel": 2,
+        "muted": True,
+        "semantic": "channel_mute_move",
+    }
+    assert mixer.calls == []
+
+
+def test_mute_action_is_bounded_to_bool():
+    mixer = FakeMixer()
+    controller = AutoFOHSafetyController(mixer)
+
+    decision = controller.execute(
+        ChannelMuteMove(
+            channel_id=2,
+            muted=1,
+            reason="coerce int mute command",
+        ),
+        runtime_state=RuntimeState.SOURCE_LEARNING,
+    )
+
+    assert_blocked_evidence(decision, "set_channel_mute")
+    assert decision.bounded is True
+    assert decision.payload["blocked_calls"][0]["muted"] is True
+
+
+def test_mute_action_is_rate_limited_on_repeated_channel_commands():
+    current_time = [100.0]
+
+    def now():
+        return current_time[0]
+
+    mixer = FakeMixer()
+    controller = AutoFOHSafetyController(mixer, time_provider=now)
+    action = ChannelMuteMove(channel_id=5, muted=True, reason="hot mic guard")
+
+    assert controller._is_rate_limited(action) is False
+
+    controller._last_sent_at[action.target_key] = now()
+    current_time[0] += 1.0
+    assert controller._is_rate_limited(action) is True
+
+    current_time[0] += 3.0
+    assert controller._is_rate_limited(action) is False
 
 
 def test_state_machine_forbids_tonal_correction_during_song_start_stabilize():

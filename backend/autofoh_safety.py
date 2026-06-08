@@ -22,6 +22,7 @@ from autofoh_runtime import (
     ACTION_FAMILY_GAIN,
     ACTION_FAMILY_HPF,
     ACTION_FAMILY_PAN,
+    ACTION_FAMILY_MUTE,
     ACTION_FAMILY_PHASE,
     ACTION_FAMILY_TONAL_EQ,
     RuntimeStatePolicy,
@@ -119,6 +120,20 @@ class MasterFaderMove(TypedCorrectionAction):
     @property
     def target_key(self) -> Tuple[Any, ...]:
         return (self.action_type, self.main_id)
+
+
+@dataclass
+class ChannelMuteMove(TypedCorrectionAction):
+    channel_id: int
+    muted: bool
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_MUTE
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.channel_id)
 
 
 @dataclass
@@ -380,6 +395,7 @@ class AutoFOHSafetyConfig:
     fx_send_min_db: float = -40.0
     fx_send_max_db: float = -5.0
     fx_return_min_interval_sec: float = 3.0
+    channel_mute_min_interval_sec: float = 3.0
     master_fader_max_cut_db: float = 1.0
     master_fader_min_interval_sec: float = 1.0
     delay_max_step_ms: float = 0.25
@@ -415,6 +431,7 @@ class AutoFOHSafetyConfig:
             fx_send_min_db=float(config.get("fx_send_min_db", -40.0)),
             fx_send_max_db=float(config.get("fx_send_max_db", -5.0)),
             fx_return_min_interval_sec=float(config.get("fx_return_min_interval_sec", 3.0)),
+            channel_mute_min_interval_sec=float(config.get("channel_mute_min_interval_sec", 3.0)),
             master_fader_max_cut_db=float(config.get("master_fader_max_cut_db", 1.0)),
             master_fader_min_interval_sec=float(config.get("master_fader_min_interval_sec", 1.0)),
             delay_max_step_ms=float(config.get("delay_max_step_ms", 0.25)),
@@ -687,6 +704,13 @@ class AutoFOHSafetyController:
                 "level_db": action.level_db,
                 "semantic": "fx_send_level_adjust",
             }]
+        if isinstance(action, ChannelMuteMove):
+            return [{
+                "cmd": "set_channel_mute",
+                "channel": action.channel_id,
+                "muted": action.muted,
+                "semantic": "channel_mute_move",
+            }]
         if isinstance(action, EmergencyFeedbackNotch):
             return [{
                 "cmd": "set_eq_band",
@@ -922,6 +946,11 @@ class AutoFOHSafetyController:
             bounded = level != action.level_db
             return SendLevelAdjust(channel_id=action.channel_id, send_bus=action.send_bus, level_db=level, reason=action.reason), bounded
 
+        if isinstance(action, ChannelMuteMove):
+            muted = bool(action.muted)
+            bounded = not isinstance(action.muted, bool)
+            return ChannelMuteMove(channel_id=action.channel_id, muted=muted, reason=action.reason), bounded
+
         if isinstance(action, EmergencyFeedbackNotch):
             gain_db = min(0.0, max(self.config.feedback_notch_max_cut_db, action.gain_db))
             q = max(self.config.feedback_notch_min_q, action.q)
@@ -962,6 +991,8 @@ class AutoFOHSafetyController:
             min_interval = self.config.compressor_min_interval_sec
         elif isinstance(action, SendLevelAdjust):
             min_interval = self.config.fx_return_min_interval_sec
+        elif isinstance(action, ChannelMuteMove):
+            min_interval = self.config.channel_mute_min_interval_sec
         elif isinstance(action, EmergencyFeedbackNotch):
             min_interval = 0.0
 
