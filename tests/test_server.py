@@ -1010,6 +1010,12 @@ def dummy_wing_server():
         yield server
 
 
+@pytest.fixture
+def minimal_server():
+    with patch("server.BleedService"), patch.object(AutoMixerServer, "_load_config", return_value={}):
+        yield AutoMixerServer(ws_host="localhost", ws_port=8765)
+
+
 class TestWingDeploymentWriteBoundary:
 
     @staticmethod
@@ -1051,6 +1057,41 @@ class TestWingDeploymentWriteBoundary:
         assert AutoMixerServer._get_supported_manual_write_kinds() == tuple(
             SUPPORTED_MANUAL_LIVE_WRITE_KINDS
         )
+
+    def test_parse_manual_write_address_supports_supported_paths(self, minimal_server):
+        assert minimal_server._parse_manual_write_address("/ch/12/fdr") == (12, "fader")
+        assert minimal_server._parse_manual_write_address("/ch/12/in/set/trim") == (12, "gain")
+        assert minimal_server._parse_manual_write_address("  /ch/12/mute  ") == (12, "mute")
+
+    def test_parse_manual_write_address_rejects_unknown_paths(self, minimal_server):
+        assert minimal_server._parse_manual_write_address("/ch/12/eq") is None
+        assert minimal_server._parse_manual_write_address("/bus/1/fdr") is None
+        assert minimal_server._parse_manual_write_address("/ch/not-an-int/fdr") is None
+
+    def test_handle_external_fader_update_tracks_fader_and_notifies_realtime_controller(self, minimal_server):
+        controller = MagicMock()
+        controller.realtime_enabled = True
+        minimal_server.auto_fader_controller = controller
+
+        minimal_server._handle_external_fader_update("/ch/5/fdr", (-9.75,))
+
+        assert minimal_server.last_fader_values[5] == -9.75
+        controller.handle_external_fader_change.assert_called_once_with(5, -9.75)
+
+    def test_handle_external_fader_update_ignores_non_fader_write(self, minimal_server):
+        controller = MagicMock()
+        controller.realtime_enabled = True
+        minimal_server.auto_fader_controller = controller
+
+        minimal_server._handle_external_fader_update("/ch/5/in/set/trim", (3.0,))
+
+        assert minimal_server.last_fader_values == {}
+        controller.handle_external_fader_change.assert_not_called()
+
+    def test_handle_external_fader_update_gracefully_ignores_invalid_value(self, minimal_server):
+        minimal_server._handle_external_fader_update("/ch/5/fdr", ("abc",))
+
+        assert minimal_server.last_fader_values == {}
 
     @pytest.mark.asyncio
     async def test_reset_trim_is_quarantined_for_wing(self, dummy_wing_server):
