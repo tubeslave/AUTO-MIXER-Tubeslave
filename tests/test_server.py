@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from handlers import automation_handlers, fx_handlers, mixer_handlers, routing_handlers, snapshot_handlers
+from backend.operator_mode_policy import SUPPORTED_MANUAL_LIVE_WRITE_KINDS
 
 try:
     from server import convert_numpy_types, AutoMixerServer
@@ -1045,6 +1046,11 @@ class TestWingDeploymentWriteBoundary:
 
         status = server.get_manual_write_supervision_status()
         assert status["approved_live_write_kinds"] == ["fader", "gain"]
+
+    def test_supported_manual_write_kinds_remain_in_sync(self):
+        assert AutoMixerServer._get_supported_manual_write_kinds() == tuple(
+            SUPPORTED_MANUAL_LIVE_WRITE_KINDS
+        )
 
     @pytest.mark.asyncio
     async def test_reset_trim_is_quarantined_for_wing(self, dummy_wing_server):

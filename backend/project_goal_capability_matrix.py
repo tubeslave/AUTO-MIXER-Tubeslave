@@ -11,6 +11,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Tuple
 
+from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+
 
 GOAL_CAPABILITY_STATUSES = {
     "canonical",
@@ -33,9 +35,6 @@ AUTONOMY_MODE_CEILINGS = {
     "blocked",
     "missing",
 }
-
-CURRENT_PROVEN_LIVE_WRITE_KINDS = ("fader", "gain")
-
 
 @dataclass(frozen=True)
 class ProjectGoalCapabilityRow:

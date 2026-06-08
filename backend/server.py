@@ -61,6 +61,8 @@ from ws_transport import broadcast_json, is_connection_closed_error, send_json
 from operator_mode_policy import (
     DEFAULT_OPERATOR_MODE,
     build_operator_mode_status,
+    MANUAL_LIVE_WRITE_KIND_ALIASES,
+    SUPPORTED_MANUAL_LIVE_WRITE_KINDS,
     normalize_operator_mode,
 )
 from operator_proposal_queue import OperatorProposalQueue
@@ -744,13 +746,13 @@ class AutoMixerServer:
     @staticmethod
     def _normalize_manual_write_kind(value_type: Any) -> str:
         value = str(value_type or "").strip().lower()
-        if value in {"trim", "input_gain", "preamp_gain"}:
-            return "gain"
+        if value in MANUAL_LIVE_WRITE_KIND_ALIASES:
+            return MANUAL_LIVE_WRITE_KIND_ALIASES[value]
         return value
 
     @classmethod
     def _get_supported_manual_write_kinds(cls) -> tuple[str, ...]:
-        return ("fader", "gain", "mute")
+        return tuple(SUPPORTED_MANUAL_LIVE_WRITE_KINDS)
 
     def _effective_live_write_kinds_for_manual_gate(
         self,
