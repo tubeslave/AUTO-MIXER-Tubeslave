@@ -1,8 +1,12 @@
 """Tests for the AutoFOH runtime policy and safety controller."""
 
 import os
+from dataclasses import dataclass
 import sys
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
@@ -10,6 +14,7 @@ from autofoh_models import RuntimeState
 from autofoh_safety import (
     AutoFOHSafetyConfig,
     AutoFOHSafetyController,
+    TypedCorrectionAction,
     BusCompressorAdjust,
     BusEQMove,
     BusFaderMove,
@@ -125,6 +130,38 @@ class FakeMixer:
 
 class NoHPFMixer(FakeMixer):
     pass
+
+
+@dataclass
+class InvalidCorrectionAction(TypedCorrectionAction):
+    """Action that omits required contract behavior."""
+
+    @property
+    def family(self) -> str:
+        raise NotImplementedError("invalid action family")
+
+    @property
+    def target_key(self) -> tuple[Any, ...]:
+        return ("invalid",)
+
+
+def test_base_typed_action_contract_is_abstract():
+    with pytest.raises(TypeError):
+        TypedCorrectionAction(reason="invalid")
+
+
+def test_invalid_action_contract_is_rejected_without_crash():
+    controller = AutoFOHSafetyController(FakeMixer())
+
+    decision = controller.execute(
+        InvalidCorrectionAction(reason="bad contract"),
+        runtime_state=RuntimeState.SOURCE_LEARNING,
+    )
+
+    assert decision.supported is False
+    assert decision.allowed is False
+    assert decision.sent is False
+    assert "unsupported action family" in decision.message
 
 
 def test_state_machine_forbids_tonal_correction_during_song_start_stabilize():

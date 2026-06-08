@@ -8,6 +8,7 @@ still works, but only through explicit permissions and safety checks.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from abc import ABC, abstractmethod
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -28,7 +29,7 @@ from autofoh_runtime import (
 
 
 @dataclass
-class TypedCorrectionAction:
+class TypedCorrectionAction(ABC):
     reason: str
 
     @property
@@ -36,12 +37,14 @@ class TypedCorrectionAction:
         return self.__class__.__name__
 
     @property
+    @abstractmethod
     def family(self) -> str:
-        raise NotImplementedError
+        ...
 
     @property
+    @abstractmethod
     def target_key(self) -> Tuple[Any, ...]:
-        raise NotImplementedError
+        ...
 
 
 @dataclass
@@ -453,7 +456,16 @@ class AutoFOHSafetyController:
     ) -> SafetyDecision:
         decision = SafetyDecision(action=action, runtime_state=runtime_state)
 
-        if not self.runtime_policy.is_action_allowed(runtime_state, action.family):
+        try:
+            action_family = action.family
+        except NotImplementedError as exc:
+            decision.supported = False
+            decision.allowed = False
+            decision.message = f"unsupported action family: {exc}"
+            self.history.append(decision)
+            return decision
+
+        if not self.runtime_policy.is_action_allowed(runtime_state, action_family):
             decision.allowed = False
             decision.message = f"{action.family} not allowed in {runtime_state.value}"
             self.history.append(decision)
@@ -462,6 +474,15 @@ class AutoFOHSafetyController:
         bounded_action, bounded = self._apply_bounds(action)
         decision.action = bounded_action
         decision.bounded = bounded
+
+        try:
+            _ = bounded_action.target_key
+        except Exception as exc:
+            decision.supported = False
+            decision.allowed = False
+            decision.message = f"invalid action target key: {exc}"
+            self.history.append(decision)
+            return decision
 
         blocked_payload = self._blocked_direct_write_payload(bounded_action)
         if blocked_payload is not None:
