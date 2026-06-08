@@ -23,6 +23,14 @@ from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 
+try:
+    from scipy.signal import butter, sosfilt
+    _HAS_SCIPY_SOS = True
+except Exception:  # pragma: no cover - optional dependency safety path
+    butter = None
+    sosfilt = None
+    _HAS_SCIPY_SOS = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -112,12 +120,18 @@ class LinkwitzRileyCrossover:
         self.high_freq = 4000.0
         
         # Filter states
-        self.low_state = np.zeros(4)
-        self.mid_state = np.zeros(4)
-        self.high_state = np.zeros(4)
+        self.low_x_state = np.zeros(4)
+        self.low_y_state = np.zeros(4)
+        self.mid_x_state = np.zeros(4)
+        self.mid_y_state = np.zeros(4)
+        self.high_x_state = np.zeros(4)
+        self.high_y_state = np.zeros(4)
+        self.use_sos = False
         
         # Filter coefficients (LR4)
         self._calculate_coeffs()
+        if _HAS_SCIPY_SOS:
+            self._init_sos_filters()
         
         logger.info(f"LinkwitzRileyCrossover initialized: {self.low_freq}Hz, {self.high_freq}Hz")
     
@@ -132,6 +146,35 @@ class LinkwitzRileyCrossover:
         
         self.high_a = np.array([1.0, -3.7, 5.3, -3.4, 0.82])
         self.high_b = np.array([0.003, 0.012, 0.018, 0.012, 0.003])
+
+    def _init_sos_filters(self):
+        """Build stable SOS filters for LR4 split."""
+        if not _HAS_SCIPY_SOS:
+            self.use_sos = False
+            return
+        try:
+            low_section = butter(
+                2,
+                self.low_freq,
+                btype="low",
+                fs=self.sample_rate,
+                output="sos",
+            )
+            high_section = butter(
+                2,
+                self.high_freq,
+                btype="high",
+                fs=self.sample_rate,
+                output="sos",
+            )
+            # LR4: cascade two identical 2nd-order Butterworth sections
+            self._low_sos = np.vstack([low_section, low_section]).astype(float)
+            self._high_sos = np.vstack([high_section, high_section]).astype(float)
+            self._low_state = np.zeros((self._low_sos.shape[0], 2))
+            self._high_state = np.zeros((self._high_sos.shape[0], 2))
+            self.use_sos = True
+        except Exception:
+            self.use_sos = False
     
     def process(self, audio: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -141,36 +184,76 @@ class LinkwitzRileyCrossover:
             (low_band, mid_band, high_band)
         """
         # Simplified processing - in production use proper filter implementation
-        # Low band
-        low = self._apply_filter(audio, self.low_b, self.low_a, self.low_state)
+        if self.use_sos:
+            low, self._low_state = self._apply_sos(audio, self._low_sos, self._low_state)
+            high, self._high_state = self._apply_sos(audio, self._high_sos, self._high_state)
+        else:
+            # Low band
+            low = self._apply_filter(
+                audio,
+                self.low_b,
+                self.low_a,
+                self.low_x_state,
+                self.low_y_state,
+            )
         
-        # High band
-        high = self._apply_filter(audio, self.high_b, self.high_a, self.high_state)
+            # High band
+            high = self._apply_filter(
+                audio,
+                self.high_b,
+                self.high_a,
+                self.high_x_state,
+                self.high_y_state,
+            )
         
         # Mid band = original - low - high
         mid = audio - low - high
         
         return low, mid, high
+
+    @staticmethod
+    def _apply_sos(audio: np.ndarray, sos: np.ndarray, state: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Apply SOS filter with state persistence."""
+        filtered, next_state = sosfilt(sos, audio, zi=state)
+        return filtered, next_state
     
-    def _apply_filter(self, x: np.ndarray, b: np.ndarray, a: np.ndarray, 
-                     state: np.ndarray) -> np.ndarray:
+    def _apply_filter(
+        self,
+        x: np.ndarray,
+        b: np.ndarray,
+        a: np.ndarray,
+        state_x: np.ndarray,
+        state_y: np.ndarray,
+    ) -> np.ndarray:
         """Apply IIR filter with state."""
         y = np.zeros_like(x)
         for i in range(len(x)):
-            # Shift state
-            state[3] = state[2]
-            state[2] = state[1]
-            state[1] = state[0]
-            state[0] = x[i]
-            
-            # Compute output
-            y[i] = (b[0] * state[0] + b[1] * state[1] + b[2] * state[2] + 
-                   b[3] * state[3] + b[4] * (state[3] if len(state) > 3 else 0))
-            y[i] -= (a[1] * (y[i-1] if i > 0 else 0) + 
-                    a[2] * (y[i-2] if i > 1 else 0) +
-                    a[3] * (y[i-3] if i > 2 else 0))
+            x_n = x[i]
+            y_n = (
+                b[0] * x_n
+                + b[1] * state_x[0]
+                + b[2] * state_x[1]
+                + b[3] * state_x[2]
+                + b[4] * state_x[3]
+                - a[1] * state_y[0]
+                - a[2] * state_y[1]
+                - a[3] * state_y[2]
+                - a[4] * state_y[3]
+            )
             y[i] /= a[0]
-        
+            
+            # Update state: [n-1, n-2, n-3, n-4]
+            state_x[3] = state_x[2]
+            state_x[2] = state_x[1]
+            state_x[1] = state_x[0]
+            state_x[0] = x_n
+            state_y[3] = state_y[2]
+            state_y[2] = state_y[1]
+            state_y[1] = state_y[0]
+            state_y[0] = y_n
+            
+            y[i] = y_n
+            
         return y
 
 

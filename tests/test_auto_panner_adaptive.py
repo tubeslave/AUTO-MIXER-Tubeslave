@@ -1,7 +1,13 @@
 import numpy as np
 from pathlib import Path
 
-from auto_panner_adaptive import AutoPannerController, Genre, PanPosition, PanningDecision
+from auto_panner_adaptive import (
+    AutoPannerController,
+    Genre,
+    PanPosition,
+    PanningDecision,
+    LinkwitzRileyCrossover,
+)
 
 
 class FakeAdaptivePanMixer:
@@ -78,3 +84,30 @@ def test_adaptive_panner_has_no_direct_set_channel_pan_call():
 
     assert ".set_channel_pan(" not in source
     assert '"cmd": "set_channel_pan"' in source
+
+
+def test_linkwitz_riley_crossover_outputs_stable_finite_signals():
+    crossover = LinkwitzRileyCrossover(sample_rate=48000)
+    noise = np.random.RandomState(42).standard_normal(1024).astype(np.float64) * 0.1
+    
+    low, mid, high = crossover.process(noise)
+    
+    assert low.shape == noise.shape
+    assert mid.shape == noise.shape
+    assert high.shape == noise.shape
+    assert np.all(np.isfinite(low))
+    assert np.all(np.isfinite(mid))
+    assert np.all(np.isfinite(high))
+    assert np.max(np.abs(low)) < 20.0
+    assert np.max(np.abs(mid)) < 20.0
+    assert np.max(np.abs(high)) < 20.0
+
+
+def test_linkwitz_riley_crossover_handles_silent_block():
+    crossover = LinkwitzRileyCrossover(sample_rate=48000)
+    silence = np.zeros(256, dtype=np.float64)
+    low, mid, high = crossover.process(silence)
+
+    assert np.all(low == 0.0)
+    assert np.all(mid == silence)
+    assert np.all(high == 0.0)
