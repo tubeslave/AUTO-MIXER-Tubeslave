@@ -130,3 +130,59 @@ def test_disabling_above_unity_reclamps_existing_ceiling():
     controller.update_settings(allow_fader_above_unity=False)
 
     assert controller.fader_ceiling_db == pytest.approx(0.0)
+
+
+def test_handle_external_fader_change_updates_matching_channel_within_limits():
+    controller = make_controller()
+    state = FakeChannelState("leadVocal", mixer_channel=7, integrated_lufs=-20.0)
+    state.current_fader = -12.0
+    controller.channels = {1: state}
+    controller.realtime_enabled = True
+
+    controller.handle_external_fader_change(7, -8.5)
+
+    assert state.current_fader == pytest.approx(-8.5)
+
+
+def test_handle_external_fader_change_clamps_to_controller_limits():
+    controller = make_controller({
+        "allow_fader_above_unity": True,
+        "fader_ceiling_db": 6.0,
+        "fader_floor_db": -24.0,
+    })
+    state = FakeChannelState("drums", mixer_channel=4, integrated_lufs=-20.0)
+    state.current_fader = -5.0
+    controller.channels = {1: state}
+    controller.realtime_enabled = True
+
+    controller.handle_external_fader_change(4, 10.0)
+    assert state.current_fader == pytest.approx(6.0)
+
+    controller.handle_external_fader_change(4, -200.0)
+    assert state.current_fader == pytest.approx(-24.0)
+
+
+def test_handle_external_fader_change_ignores_invalid_values():
+    controller = make_controller()
+    state = FakeChannelState("leadVocal", mixer_channel=2, integrated_lufs=-20.0)
+    state.current_fader = -10.0
+    controller.channels = {1: state}
+    controller.realtime_enabled = True
+
+    controller.handle_external_fader_change(2, float("nan"))
+    controller.handle_external_fader_change(2, float("inf"))
+    controller.handle_external_fader_change(2, "bad-value")
+
+    assert state.current_fader == pytest.approx(-10.0)
+
+
+def test_handle_external_fader_change_is_noop_when_realtime_disabled():
+    controller = make_controller()
+    state = FakeChannelState("leadVocal", mixer_channel=3, integrated_lufs=-20.0)
+    state.current_fader = -8.0
+    controller.channels = {1: state}
+    controller.realtime_enabled = False
+
+    controller.handle_external_fader_change(3, -2.0)
+
+    assert state.current_fader == pytest.approx(-8.0)

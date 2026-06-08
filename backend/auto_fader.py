@@ -23,6 +23,7 @@ import threading
 import logging
 import time
 import re
+import math
 from typing import Dict, List, Callable, Optional, Any, Tuple
 from collections import deque
 from scipy import signal
@@ -2418,15 +2419,32 @@ class AutoFaderController:
         """
         if not self.realtime_enabled:
             return
+
+        try:
+            new_fader_db = float(new_fader_db)
+        except (TypeError, ValueError):
+            return
+
+        if not math.isfinite(new_fader_db):
+            return
+
+        safe_fader_db = float(np.clip(new_fader_db, self.fader_floor_db, self.fader_ceiling_db))
         
         # Находим канал по mixer_channel
         for audio_ch, state in self.channels.items():
             if state.mixer_channel == mixer_channel:
                 old_fader = state.current_fader
-                fader_change = abs(new_fader_db - old_fader) if old_fader is not None else 0.0
+                fader_change = abs(safe_fader_db - old_fader) if old_fader is not None else 0.0
                 
                 # Обновляем значение фейдера
-                state.current_fader = new_fader_db
+                state.current_fader = safe_fader_db
+                logger.debug(
+                    "External fader change applied: mixer_channel=%s, fader=%s dB (raw=%s dB, change=%+.2f dB)",
+                    mixer_channel,
+                    safe_fader_db,
+                    new_fader_db,
+                    fader_change,
+                )
                 
                 break
     
