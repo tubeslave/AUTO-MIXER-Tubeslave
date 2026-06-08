@@ -162,6 +162,9 @@ def build_autonomy_gap_rollup(report: Mapping[str, Any]) -> dict[str, Any]:
     evidence_by_family = _string_list_map(gap_summary.get("evidence_requirement_ids_by_action_family"))
     next_by_family = _string_list_map(gap_summary.get("next_required_evidence_by_action_family"))
     supervised_live_write_kinds = _string_list(supervised_row.get("current_live_write_kinds"))
+    supervised_live_write_surfaces = _string_list(
+        supervised_row.get("current_live_write_surfaces")
+    )
 
     return {
         "read_only": True,
@@ -176,6 +179,7 @@ def build_autonomy_gap_rollup(report: Mapping[str, Any]) -> dict[str, Any]:
         "next_required_evidence_by_action_family": next_by_family,
         "supervised_live_apply_allowed": bool(supervised_row.get("live_apply_allowed")),
         "supervised_current_live_write_kinds": supervised_live_write_kinds,
+        "supervised_current_live_write_surfaces": supervised_live_write_surfaces,
         "next_required_evidence": [
             "Reduce every Full Autonomous readiness gap bucket to zero before reviewing auto mode.",
             "Keep live apply limited to current supervised write kinds until physical readback and rollback evidence exists.",

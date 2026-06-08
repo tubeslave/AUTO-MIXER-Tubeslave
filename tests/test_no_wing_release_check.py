@@ -19,6 +19,7 @@ from tools.no_wing_release_check import (
     channel_processing_readback_artifact_intake_summary,
     channel_processing_readback_contract_summary,
     current_supervised_live_write_kinds,
+    current_supervised_live_write_surfaces,
     dlive_state_readback_artifact_intake_summary,
     dlive_state_readback_contract_summary,
     fx_slots_inserts_readback_artifact_intake_summary,
@@ -231,6 +232,10 @@ def test_no_wing_release_check_derives_supervised_boundary_from_operator_policy(
         policy_status["capabilities"]["allowed_live_write_kinds"]
     )
     assert current_supervised_live_write_kinds() == ("fader", "gain")
+    assert current_supervised_live_write_surfaces() == tuple(
+        policy_status["capabilities"]["allowed_live_write_surfaces"]
+    )
+    assert current_supervised_live_write_surfaces() == ("preamp", "trim", "fader")
 
 
 def test_no_wing_release_check_validates_read_surface_fixture_evidence_snapshot():
@@ -4754,6 +4759,7 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     ],
                 },
                 "supervised_current_live_write_kinds": ["fader", "gain"],
+                "supervised_current_live_write_surfaces": ["preamp", "trim", "fader"],
                 "next_required_evidence": [
                     "Reduce every Full Autonomous readiness gap bucket to zero before reviewing auto mode.",
                     "Keep live apply limited to current supervised write kinds until physical readback and rollback evidence exists.",
@@ -5019,7 +5025,17 @@ def test_no_wing_release_check_validates_proof_report_gap_rollup_schema(tmp_path
     ]
     assert "bus_group_matrix" in result.detail["next_required_evidence_by_action_family"]
     assert result.detail["supervised_current_live_write_kinds"] == ["fader", "gain"]
+    assert result.detail["supervised_current_live_write_surfaces"] == [
+        "preamp",
+        "trim",
+        "fader",
+    ]
     assert result.detail["policy_supervised_live_write_kinds"] == ["fader", "gain"]
+    assert result.detail["policy_supervised_live_write_surfaces"] == [
+        "preamp",
+        "trim",
+        "fader",
+    ]
 
 
 def test_no_wing_release_check_validates_gain_dry_run_report_schema(tmp_path):
@@ -5492,6 +5508,12 @@ def test_no_wing_release_check_rejects_misleading_proof_report_gap_rollup_claims
     rollup["claim"] = "Full Autonomous is ready for wider live apply."
     rollup["next_required_evidence"] = []
     rollup["supervised_current_live_write_kinds"] = ["fader", "gain", "eq"]
+    rollup["supervised_current_live_write_surfaces"] = [
+        "preamp",
+        "trim",
+        "fader",
+        "send",
+    ]
     report_path.write_text(json.dumps(payload), encoding="utf-8")
 
     result = validate_supervised_proof_report_gap_rollup(report_path)
@@ -5502,7 +5524,12 @@ def test_no_wing_release_check_rejects_misleading_proof_report_gap_rollup_claims
     assert "autonomy_gap_rollup_claim_does_not_preserve_live_boundary" in result.detail["violations"]
     assert "autonomy_gap_rollup_next_required_evidence_missing" in result.detail["violations"]
     assert "autonomy_gap_rollup_unexpected_supervised_live_write_kinds" in result.detail["violations"]
+    assert (
+        "autonomy_gap_rollup_unexpected_supervised_live_write_surfaces"
+        in result.detail["violations"]
+    )
     assert result.detail["unexpected_supervised_live_write_kinds"] == ["eq"]
+    assert result.detail["unexpected_supervised_live_write_surfaces"] == ["send"]
 
 
 def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, monkeypatch):
@@ -6371,6 +6398,9 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
             },
             "supervised_current_live_write_kinds": ["fader", "gain"],
             "policy_supervised_live_write_kinds": ["fader", "gain"],
+            "supervised_current_live_write_surfaces": ["preamp", "trim", "fader"],
+            "policy_supervised_live_write_surfaces": ["preamp", "trim", "fader"],
+            "unexpected_supervised_live_write_surfaces": [],
             "unexpected_supervised_live_write_kinds": [],
             "violations": [],
         },
@@ -6404,6 +6434,8 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
     assert "bus_group_assignment_cache_freshness" in markdown_summary
     assert "next_required_evidence_by_action_family" in markdown_summary
     assert 'supervised_current_live_write_kinds: `["fader", "gain"]`' in markdown_summary
+    assert 'supervised_current_live_write_surfaces: `["preamp", "trim", "fader"]`' in markdown_summary
+    assert 'policy_supervised_live_write_surfaces: `["preamp", "trim", "fader"]`' in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_gain_dry_run_proof(tmp_path):

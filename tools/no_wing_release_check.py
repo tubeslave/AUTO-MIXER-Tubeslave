@@ -721,6 +721,21 @@ def current_supervised_live_write_kinds() -> tuple[str, ...]:
     return tuple(str(kind) for kind in capabilities.get("allowed_live_write_kinds", ()) if kind)
 
 
+def current_supervised_live_write_surfaces() -> tuple[str, ...]:
+    status = build_operator_mode_status(
+        mode=MODE_SUPERVISED,
+        connection_mode="wing",
+        wing_boundary_active=True,
+        auto_mode_unlocked=False,
+    )
+    capabilities = status.get("capabilities") if isinstance(status.get("capabilities"), Mapping) else {}
+    return tuple(
+        str(surface)
+        for surface in capabilities.get("allowed_live_write_surfaces", ())
+        if surface
+    )
+
+
 @dataclass(frozen=True)
 class CommandCheck:
     name: str
@@ -1412,13 +1427,23 @@ def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResul
         supervised_write_kinds = rollup.get("supervised_current_live_write_kinds")
         if not isinstance(supervised_write_kinds, list):
             supervised_write_kinds = []
+        supervised_write_surfaces = rollup.get("supervised_current_live_write_surfaces")
+        if not isinstance(supervised_write_surfaces, list):
+            supervised_write_surfaces = []
         unexpected_write_kinds = [
             str(kind)
             for kind in supervised_write_kinds
             if str(kind) not in current_supervised_live_write_kinds()
         ]
+        unexpected_write_surfaces = [
+            str(surface)
+            for surface in supervised_write_surfaces
+            if str(surface) not in current_supervised_live_write_surfaces()
+        ]
         if unexpected_write_kinds:
             violations.append("autonomy_gap_rollup_unexpected_supervised_live_write_kinds")
+        if unexpected_write_surfaces:
+            violations.append("autonomy_gap_rollup_unexpected_supervised_live_write_surfaces")
 
         detail["autonomy_gap_rollup_present"] = bool(rollup)
         detail["full_auto_gap_bucket_counts"] = dict(rollup_counts)
@@ -1426,6 +1451,11 @@ def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResul
         detail["next_required_evidence_by_action_family"] = next_by_family
         detail["supervised_current_live_write_kinds"] = list(supervised_write_kinds)
         detail["policy_supervised_live_write_kinds"] = list(current_supervised_live_write_kinds())
+        detail["supervised_current_live_write_surfaces"] = list(supervised_write_surfaces)
+        detail["policy_supervised_live_write_surfaces"] = list(
+            current_supervised_live_write_surfaces()
+        )
+        detail["unexpected_supervised_live_write_surfaces"] = unexpected_write_surfaces
         detail["unexpected_supervised_live_write_kinds"] = unexpected_write_kinds
 
     detail["violations"] = violations
@@ -9624,7 +9654,10 @@ def autonomy_gap_rollup_summary(results: Sequence[CheckResult]) -> dict[str, obj
         next_by_family = detail.get("next_required_evidence_by_action_family")
         supervised_kinds = detail.get("supervised_current_live_write_kinds")
         policy_kinds = detail.get("policy_supervised_live_write_kinds")
+        supervised_surfaces = detail.get("supervised_current_live_write_surfaces")
+        policy_surfaces = detail.get("policy_supervised_live_write_surfaces")
         unexpected_kinds = detail.get("unexpected_supervised_live_write_kinds")
+        unexpected_surfaces = detail.get("unexpected_supervised_live_write_surfaces")
         violations = detail.get("violations")
         return {
             "status": result.status,
@@ -9641,6 +9674,15 @@ def autonomy_gap_rollup_summary(results: Sequence[CheckResult]) -> dict[str, obj
             else {},
             "supervised_current_live_write_kinds": list(supervised_kinds) if isinstance(supervised_kinds, list) else [],
             "policy_supervised_live_write_kinds": list(policy_kinds) if isinstance(policy_kinds, list) else [],
+            "supervised_current_live_write_surfaces": list(supervised_surfaces)
+            if isinstance(supervised_surfaces, list)
+            else [],
+            "policy_supervised_live_write_surfaces": list(policy_surfaces)
+            if isinstance(policy_surfaces, list)
+            else [],
+            "unexpected_supervised_live_write_surfaces": list(unexpected_surfaces)
+            if isinstance(unexpected_surfaces, list)
+            else [],
             "unexpected_supervised_live_write_kinds": list(unexpected_kinds)
             if isinstance(unexpected_kinds, list)
             else [],
@@ -13043,8 +13085,14 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(gap_rollup['next_required_evidence_by_action_family'], sort_keys=True)}`",
                 "- supervised_current_live_write_kinds: "
                 f"`{json.dumps(gap_rollup['supervised_current_live_write_kinds'])}`",
+                "- supervised_current_live_write_surfaces: "
+                f"`{json.dumps(gap_rollup['supervised_current_live_write_surfaces'])}`",
                 "- policy_supervised_live_write_kinds: "
                 f"`{json.dumps(gap_rollup['policy_supervised_live_write_kinds'])}`",
+                "- policy_supervised_live_write_surfaces: "
+                f"`{json.dumps(gap_rollup['policy_supervised_live_write_surfaces'])}`",
+                "- unexpected_supervised_live_write_surfaces: "
+                f"`{json.dumps(gap_rollup['unexpected_supervised_live_write_surfaces'])}`",
                 f"- violations: `{json.dumps(gap_rollup['violations'])}`",
             ]
         )

@@ -327,6 +327,11 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     )
     assert gap_rollup["supervised_live_apply_allowed"] is True
     assert gap_rollup["supervised_current_live_write_kinds"] == ["fader", "gain"]
+    assert gap_rollup["supervised_current_live_write_surfaces"] == [
+        "preamp",
+        "trim",
+        "fader",
+    ]
     assert "Full Autonomous remains blocked" in gap_rollup["claim"]
     assert report["next_wing_proof_plan"]["safety"]["execution_allowed_by_plan"] is False
     assert report["next_wing_proof_plan"]["status"] == "blocked_by_readonly_preflight"

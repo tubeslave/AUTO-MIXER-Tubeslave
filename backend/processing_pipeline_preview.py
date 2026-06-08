@@ -1322,6 +1322,12 @@ def build_main_pipeline_preview(
                     [],
                 )
             ),
+            "autonomy_mode_transition_gate_supervised_current_live_write_surfaces": list(
+                autonomy_mode_transition_gate_summary.get(
+                    "supervised_current_live_write_surfaces",
+                    (),
+                )
+            ),
             "source_identity_calibration_memory_index_record_count": int(
                 source_identity_memory_index_summary.get("memory_record_count", 0) or 0
             ),
