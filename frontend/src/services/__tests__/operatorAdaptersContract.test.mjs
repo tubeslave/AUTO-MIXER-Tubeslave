@@ -3561,9 +3561,11 @@ test('Settings Mode Policy panel summarizes read-only mode gate rows', async () 
   assert.match(source, /modeGateRow\(modules, 'supervised'\)/);
   assert.match(source, /modeGateRow\(modules, 'auto'\)/);
   assert.match(source, /current_write:/);
+  assert.match(source, /current_write_surface:/);
   assert.match(source, /Full Auto/);
   assert.match(source, /<Panel title="Mode Policy">/);
-  assert.match(source, /rows=\{modeRows\.slice\(0, 2\)\}/);
+  assert.match(source, /rows=\{modeRows\.slice\(0, 3\)\}/);
+  assert.match(source, /Supervised surfaces/);
 });
 
 test('Settings Module Status inspector includes project goal capability summaries', async () => {
