@@ -353,13 +353,17 @@ class AutoMixerServer:
         return status
 
     def get_manual_write_supervision_status(self) -> Dict[str, Any]:
+        operator_mode_status = self.get_operator_mode_status()
+        approved_live_write_kinds = self._effective_live_write_kinds_for_manual_gate(
+            operator_mode_status
+        )
         status: Dict[str, Any] = {
             "deployment_write_boundary_enabled": self._wing_deployment_write_boundary_enabled,
             "deployment_write_boundary_active": self._is_wing_deployment_write_boundary_active(),
             "wing_observation_only": self._wing_observation_only,
             "wing_record_telemetry": self._wing_record_telemetry,
             "connection_mode": self.connection_mode,
-            "approved_live_write_kinds": ["fader", "gain", "mute"],
+            "approved_live_write_kinds": approved_live_write_kinds,
             "operator_mode": self.operator_mode,
             "requires_operator_mode": "supervised",
             "emergency_stopped": self._manual_write_emergency_stopped,
@@ -744,6 +748,23 @@ class AutoMixerServer:
             return "gain"
         return value
 
+    @classmethod
+    def _get_supported_manual_write_kinds(cls) -> tuple[str, ...]:
+        return ("fader", "gain", "mute")
+
+    def _effective_live_write_kinds_for_manual_gate(
+        self,
+        operator_mode: Dict[str, Any],
+    ) -> list[str]:
+        operator_capabilities = operator_mode.get("capabilities", {})
+        allowed = list(operator_capabilities.get("allowed_live_write_kinds") or [])
+        if (
+            operator_mode.get("mode") == "supervised"
+            and "mute" not in allowed
+        ):
+            allowed.append("mute")
+        return allowed
+
     @staticmethod
     def _manual_write_address(channel: int, value_type: str) -> str:
         if value_type == "fader":
@@ -1072,7 +1093,8 @@ class AutoMixerServer:
         record_event: bool = True,
     ) -> Dict[str, Any]:
         write_kind = self._normalize_manual_write_kind(value_type)
-        if write_kind not in {"fader", "gain", "mute"}:
+        supported_manual_write_kinds = self._get_supported_manual_write_kinds()
+        if write_kind not in supported_manual_write_kinds:
             return self._manual_write_blocked_result(
                 reason="unsupported_value_type",
                 channel=channel,
@@ -1080,19 +1102,14 @@ class AutoMixerServer:
                 value_type=write_kind or value_type,
                 source=source,
                 approval_id=approval_id,
-                extra={"allowed_live_write_kinds": ["fader", "gain", "mute"]},
+                extra={"allowed_live_write_kinds": list(supported_manual_write_kinds)},
             )
 
         operator_mode = self.get_operator_mode_status()
         operator_capabilities = operator_mode.get("capabilities", {})
-        allowed_live_write_kinds = list(
-            operator_capabilities.get("allowed_live_write_kinds") or []
+        allowed_live_write_kinds = self._effective_live_write_kinds_for_manual_gate(
+            operator_mode
         )
-        if (
-            operator_mode.get("mode") == "supervised"
-            and "mute" not in allowed_live_write_kinds
-        ):
-            allowed_live_write_kinds.append("mute")
         if not operator_capabilities.get("can_apply_to_console"):
             return self._manual_write_blocked_result(
                 reason="operator_mode_blocks_live_write",
