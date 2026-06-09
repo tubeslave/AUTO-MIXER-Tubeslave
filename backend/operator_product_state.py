@@ -29,6 +29,14 @@ except ImportError:  # pragma: no cover - package import compatibility
         build_processing_registry_snapshot,
     )
 try:
+    from project_goal_capability_matrix import (
+        build_project_goal_objective_alignment_snapshot,
+    )
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.project_goal_capability_matrix import (
+        build_project_goal_objective_alignment_snapshot,
+    )
+try:
     from operator_mode_policy import normalize_manual_live_write_kinds
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.operator_mode_policy import normalize_manual_live_write_kinds
@@ -3887,6 +3895,8 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
         else {}
     )
     processing_runtime = build_pipeline_runtime_summary(operator_mode, manual_write_supervision)
+    objective_alignment_snapshot = build_project_goal_objective_alignment_snapshot()
+    objective_summary = objective_alignment_snapshot.get("summary", {})
 
     return {
         "type": "dashboard_snapshot",
@@ -3909,6 +3919,28 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
             "gain_fader": gain_fader_runtime,
             "voice": voice_runtime,
             "processing": processing_runtime,
+            "goal_capability_objective_alignment": {
+                "status": objective_alignment_snapshot.get("type"),
+                "required_row_count": int(
+                    objective_summary.get("required_row_count", 0) or 0
+                ),
+                "present_row_count": int(
+                    objective_summary.get("present_row_count", 0) or 0
+                ),
+                "missing_row_count": int(
+                    objective_summary.get("missing_row_count", 0) or 0
+                ),
+                "blocked_live_rows": list(
+                    objective_summary.get("blocked_live_rows", ())
+                ),
+                "full_autonomous_status": objective_summary.get("full_autonomous_status"),
+                "read_only": bool(
+                    objective_alignment_snapshot.get("safety", {}).get("read_only", False)
+                ),
+                "live_write": bool(
+                    objective_alignment_snapshot.get("safety", {}).get("live_write", False)
+                ),
+            },
             "agent_available": bool(decision_queue.get("agent_runtime_available")),
             "proposal_queue_available": bool(decision_queue.get("proposal_queue_available")),
         },

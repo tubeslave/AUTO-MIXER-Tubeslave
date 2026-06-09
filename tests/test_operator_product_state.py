@@ -1809,6 +1809,26 @@ def test_dashboard_snapshot_tolerates_missing_supervised_pilot_status(server):
     assert payload["safety"]["pilot_ready"] is None
     assert payload["runtime"]["processing"]["main_pipeline_id"] == "main_live_assist"
     assert payload["runtime"]["processing"]["live_apply_policy"] == "supervised_fader_gain_only"
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"]["status"]
+        == "project_goal_capability_objective_alignment_snapshot"
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "required_row_count"
+        ]
+        == payload["runtime"]["goal_capability_objective_alignment"][
+            "present_row_count"
+        ]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"]["missing_row_count"]
+        == 0
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"]["full_autonomous_status"]
+        == "blocked_live"
+    )
 
 
 def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(server):
