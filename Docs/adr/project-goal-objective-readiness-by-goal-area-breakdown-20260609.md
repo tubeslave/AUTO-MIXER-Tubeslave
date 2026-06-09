@@ -37,6 +37,12 @@ For planning action, it also exposes:
   - `blocker_row_count`
   - `blocker_row_ids`
 
+These hotspot fields are also surfaced in:
+- processing registry snapshot summary as
+  `project_goal_capability_objective_readiness_hotspots`;
+- processing pipeline preview summary under the same key;
+- operator product state snapshots through registry and pipeline payload summaries.
+
 The readiness calculation in each area uses the same rule as the global score:
 `int((ready_row_count / required_row_count) * 100)` with required set
 `{canonical, supervised_narrow}` as ready.

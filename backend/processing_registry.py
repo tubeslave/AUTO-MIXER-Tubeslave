@@ -6571,6 +6571,8 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         {"autonomy_promotion_readiness": autonomy_promotion_readiness}
     )
     objective_alignment_summary = objective_alignment_snapshot.get("summary", {})
+    project_goal_capability_progress_snapshot = build_project_goal_capability_progress_snapshot()
+    progress_summary = project_goal_capability_progress_snapshot.get("summary", {})
     status_counts: Dict[str, int] = {status: 0 for status in sorted(PROCESSING_STATUSES)}
     domain_counts: Dict[str, int] = {domain: 0 for domain in sorted(PROCESSING_DOMAINS)}
     for method in PROCESSING_METHODS:
@@ -6617,6 +6619,12 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
             "project_goal_capability_objective_readiness_by_goal_area": dict(
                 objective_alignment_summary.get("autonomy_readiness_by_goal_area", {}) or {}
             ),
+            "project_goal_capability_objective_readiness_hotspots": list(
+                progress_summary.get(
+                    "project_goal_objective_autonomy_readiness_hotspots", []
+                )
+                or []
+            ),
             "project_goal_capability_objective_blocked_live_row_count": len(
                 objective_alignment_summary.get("blocked_live_rows", ())
             ),
@@ -6635,9 +6643,7 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
         "pipeline_profiles": profiles,
         "module_status_map": build_module_status_map(),
         "project_goal_capability_matrix": build_project_goal_capability_matrix_snapshot(),
-        "project_goal_capability_progress_snapshot": (
-            build_project_goal_capability_progress_snapshot()
-        ),
+        "project_goal_capability_progress_snapshot": project_goal_capability_progress_snapshot,
         "project_goal_capability_objective_alignment_snapshot": (
             objective_alignment_snapshot
         ),

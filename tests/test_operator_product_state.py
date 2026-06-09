@@ -1965,6 +1965,14 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
         == goal_alignment["summary"]["autonomy_readiness_by_goal_area"]
     )
     assert (
+        payload["summary"][
+            "project_goal_capability_objective_readiness_hotspots"
+        ]
+        == payload["project_goal_capability_progress_snapshot"]["summary"][
+            "project_goal_objective_autonomy_readiness_hotspots"
+        ]
+    )
+    assert (
         payload["summary"]["project_goal_capability_objective_blocked_live_row_count"]
         == goal_alignment["summary"]["blocked_live_row_count"]
     )
@@ -7815,6 +7823,14 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
             "project_goal_capability_objective_readiness_by_goal_area"
         ]
         == alignment_snapshot["summary"]["autonomy_readiness_by_goal_area"]
+    )
+    assert (
+        by_type["processing_pipeline_snapshot"]["summary"][
+            "project_goal_capability_objective_readiness_hotspots"
+        ]
+        == by_type["processing_pipeline_snapshot"][
+            "project_goal_capability_progress_snapshot"
+        ]["summary"]["project_goal_objective_autonomy_readiness_hotspots"]
     )
     assert (
         by_type["processing_pipeline_snapshot"]["summary"][

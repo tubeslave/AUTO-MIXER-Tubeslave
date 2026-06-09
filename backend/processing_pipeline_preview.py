@@ -1352,6 +1352,13 @@ def build_main_pipeline_preview(
                 )
                 or {}
             ),
+            "project_goal_capability_objective_readiness_hotspots": list(
+                project_goal_capability_progress_snapshot_summary.get(
+                    "project_goal_objective_autonomy_readiness_hotspots",
+                    [],
+                )
+                or []
+            ),
             "project_goal_capability_objective_blocked_live_row_count": int(
                 project_goal_capability_objective_alignment_summary.get(
                     "blocked_live_row_count",
