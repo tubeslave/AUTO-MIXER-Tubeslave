@@ -1877,17 +1877,21 @@ def test_dashboard_snapshot_tolerates_missing_supervised_pilot_status(server):
         payload["runtime"]["goal_capability_objective_alignment"][
             "project_goal_capability_objective_readiness_by_goal_area"
         ]
-        == progress_snapshot["summary"][
-            "project_goal_objective_autonomy_readiness_by_goal_area"
-        ]
+        == processing_pipeline_preview._normalize_goal_capability_readiness_rows(
+            progress_snapshot["summary"][
+                "project_goal_objective_autonomy_readiness_by_goal_area"
+            ]
+        )
     )
     assert (
         payload["runtime"]["goal_capability_objective_alignment"][
             "project_goal_capability_objective_readiness_hotspots"
         ]
-        == progress_snapshot["summary"][
-            "project_goal_objective_autonomy_readiness_hotspots"
-        ]
+        == processing_pipeline_preview._normalize_goal_capability_readiness_hotspots(
+            progress_snapshot["summary"][
+                "project_goal_objective_autonomy_readiness_hotspots"
+            ]
+        )
     )
     assert (
         payload["runtime"]["goal_capability_objective_alignment"][

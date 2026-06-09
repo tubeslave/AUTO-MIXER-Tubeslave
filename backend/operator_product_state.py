@@ -4041,19 +4041,17 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
                     )
                     else []
                 ),
-                "project_goal_capability_objective_readiness_by_goal_area": dict(
+                "project_goal_capability_objective_readiness_by_goal_area": _normalize_goal_capability_readiness_rows(
                     objective_progress_summary.get(
                         "project_goal_objective_autonomy_readiness_by_goal_area",
                         {},
                     )
-                    or {}
                 ),
-                "project_goal_capability_objective_readiness_hotspots": list(
+                "project_goal_capability_objective_readiness_hotspots": _normalize_goal_capability_readiness_hotspots(
                     objective_progress_summary.get(
                         "project_goal_objective_autonomy_readiness_hotspots",
                         [],
                     )
-                    or []
                 ),
                 "blocked_live_row_count": int(
                     objective_summary.get("blocked_live_row_count", 0) or 0
