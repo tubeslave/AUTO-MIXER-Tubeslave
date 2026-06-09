@@ -302,6 +302,8 @@ def _address_for(channel: int, value_type: str) -> str:
         return f"/ch/{channel}/fdr"
     if value_type == "gain":
         return f"/ch/{channel}/in/set/trim"
+    if value_type == "pan":
+        return f"/ch/{channel}/pan"
     return ""
 
 

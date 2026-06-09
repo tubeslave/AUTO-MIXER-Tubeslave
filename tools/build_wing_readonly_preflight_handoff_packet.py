@@ -18,7 +18,7 @@ from tools import no_wing_release_check
 
 DEFAULT_URL = "ws://localhost:8765"
 DEFAULT_CHANNELS = "3"
-DEFAULT_VALUE_TYPES = "fader,gain"
+DEFAULT_VALUE_TYPES = "fader,gain,pan"
 DEFAULT_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
 DEFAULT_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md"
 DEFAULT_DECISION_TEMPLATE_OUTPUT = (

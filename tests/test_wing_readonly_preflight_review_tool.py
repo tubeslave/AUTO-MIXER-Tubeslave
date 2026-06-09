@@ -30,7 +30,7 @@ def _valid_summary() -> dict:
         "operator_confirmed_channels": [3],
         "operator_session_confirmation_required": True,
         "operator_confirmed_session_ready": True,
-        "value_types": ["fader", "gain"],
+        "value_types": ["fader", "gain", "pan"],
         "require_physical_readback": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "expected_plan_path": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
@@ -48,10 +48,11 @@ def _valid_summary() -> dict:
             "get_state",
             "query_mixer_parameter",
             "query_mixer_parameter",
+            "query_mixer_parameter",
         ],
         "forbidden_request_types_sent": [],
-        "readback_count": 2,
-        "physical_readback_count": 2,
+        "readback_count": 3,
+        "physical_readback_count": 3,
         "readbacks": [
             {
                 "type": "mixer_parameter_value",
@@ -72,6 +73,16 @@ def _valid_summary() -> dict:
                 "value_type": "gain",
                 "address": "/ch/3/in/set/trim",
                 "value": -0.25,
+            },
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:pan",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "pan",
+                "address": "/ch/3/pan",
+                "value": 0.0,
             },
         ],
     }
@@ -250,12 +261,12 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "operator_confirmed_channels": [3],
             "operator_session_confirmation_required": True,
             "operator_confirmed_session_ready": True,
-            "value_types": ["fader", "gain"],
-            "readback_count": 2,
-            "physical_readback_count": 2,
-            "violations": [],
-        }
-    ]
+                "value_types": ["fader", "gain", "pan"],
+                "readback_count": 3,
+                "physical_readback_count": 3,
+                "violations": [],
+            }
+        ]
     assert review_tool.exit_code_for_report(report) == 0
     markdown = review_tool.render_markdown(report)
     assert "candidate_ready_for_manual_review" in markdown

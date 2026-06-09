@@ -36,7 +36,7 @@ def _valid_summary() -> dict:
         "operator_confirmed_channels": [3],
         "operator_session_confirmation_required": True,
         "operator_confirmed_session_ready": True,
-        "value_types": ["fader", "gain"],
+        "value_types": ["fader", "gain", "pan"],
         "require_physical_readback": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "expected_plan_path": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
@@ -54,10 +54,11 @@ def _valid_summary() -> dict:
             "get_state",
             "query_mixer_parameter",
             "query_mixer_parameter",
+            "query_mixer_parameter",
         ],
         "forbidden_request_types_sent": [],
-        "readback_count": 2,
-        "physical_readback_count": 2,
+        "readback_count": 3,
+        "physical_readback_count": 3,
         "readbacks": [
             {
                 "type": "mixer_parameter_value",
@@ -78,6 +79,16 @@ def _valid_summary() -> dict:
                 "value_type": "gain",
                 "address": "/ch/3/in/set/trim",
                 "value": -0.25,
+            },
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:pan",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "pan",
+                "address": "/ch/3/pan",
+                "value": 0.0,
             },
         ],
         "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
@@ -282,7 +293,7 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
     assert evidence["artifacts"][0]["captured_at"] == "2026-06-07T01:00:00Z"
     assert evidence["artifacts"][0]["summary_path"] == "artifacts/wing_readonly_preflight/run/summary.json"
     assert evidence["artifacts"][0]["events_path"] == "artifacts/wing_readonly_preflight/run/events.jsonl"
-    assert evidence["artifacts"][0]["physical_readback_count"] == 2
+    assert evidence["artifacts"][0]["physical_readback_count"] == 3
     assert evidence["artifacts"][0]["channels"] == [3]
     assert evidence["artifacts"][0]["operator_confirmed_channels"] == [3]
     assert evidence["artifacts"][0]["operator_session_confirmation_required"] is True
@@ -843,7 +854,7 @@ def test_file_preflight_artifact_rejects_event_timestamp_after_capture(tmp_path)
     assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert evidence["summary"]["invalid_candidate_count"] == 1
-    assert "event_log_timestamp_after_captured_at:7" in evidence["summary"]["violations"]
+    assert "event_log_timestamp_after_captured_at:9" in evidence["summary"]["violations"]
 
 
 def test_file_preflight_artifact_rejects_query_readback_identity_mismatch(tmp_path):

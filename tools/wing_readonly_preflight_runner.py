@@ -134,6 +134,8 @@ def address_for(channel: int, value_type: str) -> str:
         return f"/ch/{channel}/fdr"
     if value_type == "gain":
         return f"/ch/{channel}/in/set/trim"
+    if value_type == "pan":
+        return f"/ch/{channel}/pan"
     raise ValueError(f"Unsupported value_type: {value_type}")
 
 
@@ -269,7 +271,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a read-only WING Rack preflight through backend WebSocket.")
     parser.add_argument("--url", default="ws://localhost:8765", help="Backend WebSocket URL")
     parser.add_argument("--channels", default="1", help="Comma-separated WING input channels, each 1..48")
-    parser.add_argument("--value-types", default="fader,gain", help="Comma-separated read-only value types: fader,gain")
+    parser.add_argument("--value-types", default="fader,gain,pan", help="Comma-separated read-only value types: fader,gain,pan")
     parser.add_argument(
         "--require-physical-readback",
         action="store_true",
@@ -332,7 +334,7 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
         return "--value-types must include at least one value type"
     if len(set(value_types)) != len(value_types):
         return "--value-types must not contain duplicates"
-    unsupported = sorted(set(value_types) - {"fader", "gain"})
+    unsupported = sorted(set(value_types) - {"fader", "gain", "pan"})
     if unsupported:
         return f"--value-types unsupported: {','.join(unsupported)}"
     if args.require_physical_readback:

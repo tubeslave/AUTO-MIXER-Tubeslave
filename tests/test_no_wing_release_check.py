@@ -540,7 +540,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "3",
         "--operator-confirm-session-ready",
         "--value-types",
-        "fader,gain",
+        "fader,gain,pan",
         "--require-physical-readback",
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
@@ -555,7 +555,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     assert result.detail["plan_command_channels"] == "3"
     assert result.detail["plan_command_operator_confirmed_channels"] == "3"
     assert result.detail["plan_command_confirms_session_ready"] is True
-    assert result.detail["plan_command_value_types"] == "fader,gain"
+    assert result.detail["plan_command_value_types"] == "fader,gain,pan"
     assert result.detail["plan_command_artifact_root"] == (
         "artifacts/wing_readonly_preflight"
     )
@@ -571,7 +571,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "3",
         "--operator-confirm-session-ready",
         "--value-types",
-        "fader,gain",
+        "fader,gain,pan",
         "--require-physical-readback",
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
@@ -675,7 +675,7 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "operator_confirmed_channels": [3],
         "operator_session_confirmation_required": True,
         "operator_confirmed_session_ready": True,
-        "value_types": ["fader", "gain"],
+        "value_types": ["fader", "gain", "pan"],
         "require_physical_readback": True,
         "read_only": True,
         "live_write": False,
@@ -723,6 +723,13 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
                 "value_type": "gain",
                 "address": "/ch/3/in/set/trim",
             },
+            {
+                "type": "query_mixer_parameter",
+                "request_id": "wing-readonly-preflight:ch3:pan",
+                "channel": 3,
+                "value_type": "pan",
+                "address": "/ch/3/pan",
+            },
         ],
         "expected_artifacts": [
             "artifacts/wing_readonly_preflight/<run_id>/summary.json",
@@ -764,7 +771,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "full_autonomous_ready": False,
         "url": "ws://localhost:8765",
         "channels": [3],
-        "value_types": ["fader", "gain"],
+        "value_types": ["fader", "gain", "pan"],
         "artifact_root": "artifacts/wing_readonly_preflight",
         "decision_root": "artifacts/wing_readonly_preflight_review_decisions",
         "expected_run_artifact_glob": (
@@ -794,7 +801,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "3",
                 "--operator-confirm-session-ready",
                 "--value-types",
-                "fader,gain",
+                "fader,gain,pan",
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
@@ -813,7 +820,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "3",
                 "--operator-confirm-session-ready",
                 "--value-types",
-                "fader,gain",
+                "fader,gain,pan",
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
@@ -2042,9 +2049,9 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
     assert result.detail["plan_output"] == str(plan_path)
     assert result.detail["channels"] == [3]
     assert result.detail["operator_confirmed_channels"] == [3]
-    assert result.detail["value_types"] == ["fader", "gain"]
-    assert result.detail["request_count"] == 4
-    assert result.detail["expected_request_count"] == 4
+    assert result.detail["value_types"] == ["fader", "gain", "pan"]
+    assert result.detail["request_count"] == 5
+    assert result.detail["expected_request_count"] == 5
     assert result.detail["request_sequence_matches_expected"] is True
     assert result.detail["read_only"] is True
     assert result.detail["live_write"] is False
@@ -2215,7 +2222,7 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["full_autonomous_ready"] is False
     assert result.detail["plan_output"] == str(plan_path)
     assert result.detail["channels"] == [3]
-    assert result.detail["value_types"] == ["fader", "gain"]
+    assert result.detail["value_types"] == ["fader", "gain", "pan"]
     assert result.detail["preview_command_uses_plan_only"] is True
     assert result.detail["capture_command_requires_physical_readback"] is True
     assert result.detail["review_command_writes_decision_template"] is True
@@ -2516,7 +2523,7 @@ def test_no_wing_release_check_rejects_wing_preflight_plan_command_mismatch(
             "4",
                 "--operator-confirm-session-ready",
             "--value-types",
-            "fader,gain",
+            "fader,gain,pan",
             "--require-physical-readback",
             "--artifact-root",
             "artifacts/wing_readonly_preflight",
@@ -5220,7 +5227,7 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
                 "3",
                 "--operator-confirm-session-ready",
                 "--value-types",
-                "fader,gain",
+                "fader,gain,pan",
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
@@ -6980,7 +6987,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "3",
                 "--operator-confirm-session-ready",
                 "--value-types",
-                "fader,gain",
+                "fader,gain,pan",
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
@@ -6993,7 +7000,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "plan_command_channels": "3",
             "plan_command_operator_confirmed_channels": "3",
             "plan_command_confirms_session_ready": True,
-            "plan_command_value_types": "fader,gain",
+            "plan_command_value_types": "fader,gain,pan",
             "plan_command_artifact_root": "artifacts/wing_readonly_preflight",
             "plan_command_matches_capture": True,
             "capture_command_template": [
@@ -7007,7 +7014,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "3",
                 "--operator-confirm-session-ready",
                 "--value-types",
-                "fader,gain",
+                "fader,gain,pan",
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
@@ -7129,7 +7136,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["plan_command_channels"] == "3"
     assert preflight["plan_command_operator_confirmed_channels"] == "3"
     assert preflight["plan_command_confirms_session_ready"] is True
-    assert preflight["plan_command_value_types"] == "fader,gain"
+    assert preflight["plan_command_value_types"] == "fader,gain,pan"
     assert preflight["plan_command_artifact_root"] == "artifacts/wing_readonly_preflight"
     assert preflight["plan_command_matches_capture"] is True
     assert preflight["capture_command_template"][1] == "tools/wing_readonly_preflight_runner.py"
@@ -7253,9 +7260,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "operator_confirmed_channels": [3],
             "operator_session_confirmation_required": True,
             "operator_confirmed_session_ready": True,
-            "value_types": ["fader", "gain"],
-            "request_count": 4,
-            "expected_request_count": 4,
+            "value_types": ["fader", "gain", "pan"],
+            "request_count": 5,
+            "expected_request_count": 5,
             "request_sequence_matches_expected": True,
             "read_only": True,
             "live_write": False,
@@ -7309,9 +7316,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["operator_confirmed_channels"] == [3]
     assert artifact["operator_session_confirmation_required"] is True
     assert artifact["operator_confirmed_session_ready"] is True
-    assert artifact["value_types"] == ["fader", "gain"]
-    assert artifact["request_count"] == 4
-    assert artifact["expected_request_count"] == 4
+    assert artifact["value_types"] == ["fader", "gain", "pan"]
+    assert artifact["request_count"] == 5
+    assert artifact["expected_request_count"] == 5
     assert artifact["request_sequence_matches_expected"] is True
     assert artifact["forbidden_request_types"] == ["apply_operator_proposal", "set_gain"]
     assert artifact["fail_closed_conditions"] == [
@@ -7374,7 +7381,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "full_autonomous_ready": False,
             "plan_output": "/tmp/wing_readonly_preflight_plan.json",
             "channels": [3],
-            "value_types": ["fader", "gain"],
+            "value_types": ["fader", "gain", "pan"],
             "command_names": [
                 "capture_readonly_preflight",
                 "focused_validation",

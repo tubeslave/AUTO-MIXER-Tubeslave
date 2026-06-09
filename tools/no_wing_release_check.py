@@ -330,7 +330,7 @@ REPO_LOCAL_COMMAND_OUTPUT_FLAGS = {"--artifact-root", "--output", "--plan-output
 WING_READONLY_PREFLIGHT_RUNNER_TOOL = "tools/wing_readonly_preflight_runner.py"
 WING_READONLY_PREFLIGHT_RUNNER_URL = "ws://localhost:8765"
 WING_READONLY_PREFLIGHT_RUNNER_CHANNELS = "3"
-WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = "fader,gain"
+WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = "fader,gain,pan"
 WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
 WING_READONLY_PREFLIGHT_PLAN_OUTPUT = (
     "artifacts/wing_readonly_preflight_plan/latest_plan.json"
@@ -3058,7 +3058,14 @@ def _csv_ints(value: str | None) -> list[int]:
 
 
 def _expected_wing_read_request(channel: int, value_type: str) -> dict[str, object]:
-    address = f"/ch/{channel}/fdr" if value_type == "fader" else f"/ch/{channel}/in/set/trim"
+    if value_type == "fader":
+        address = f"/ch/{channel}/fdr"
+    elif value_type == "gain":
+        address = f"/ch/{channel}/in/set/trim"
+    elif value_type == "pan":
+        address = f"/ch/{channel}/pan"
+    else:
+        address = ""
     return {
         "type": "query_mixer_parameter",
         "request_id": f"wing-readonly-preflight:ch{channel}:{value_type}",

@@ -225,6 +225,16 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
                 "address": "/ch/3/in/set/trim",
                 "value": -0.25,
             },
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:pan",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "pan",
+                "address": "/ch/3/pan",
+                "value": 0.0,
+            },
         ]
     )
     patch_websocket_connect(monkeypatch, websocket)
@@ -233,7 +243,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
         "--channels",
         "3",
         "--value-types",
-        "fader,gain",
+        "fader,gain,pan",
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
@@ -244,7 +254,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
         "--channels",
         "3",
         "--value-types",
-        "fader,gain",
+        "fader,gain,pan",
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
@@ -260,6 +270,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
     assert [request["type"] for request in websocket.sent] == [
         "get_operator_mode",
         "get_state",
+        "query_mixer_parameter",
         "query_mixer_parameter",
         "query_mixer_parameter",
     ]
@@ -281,9 +292,11 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
     assert summary["live_write"] is False
     assert summary["write_request_sent"] is False
     assert summary["proposal_request_sent"] is False
-    assert summary["physical_readback_count"] == 2
+    assert summary["physical_readback_count"] == 3
     assert summary["forbidden_request_types_sent"] == []
     assert [event["event_type"] for event in read_events(summary)] == [
+        "send",
+        "recv",
         "send",
         "recv",
         "send",
@@ -781,7 +794,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
         "--channels",
         "3",
         "--value-types",
-        "fader,gain",
+        "fader,gain,pan",
         "--require-physical-readback",
         "--operator-confirm-channels",
         "3",
@@ -822,11 +835,14 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
         "get_state",
         "query_mixer_parameter",
         "query_mixer_parameter",
+        "query_mixer_parameter",
     ]
     assert written["request_sequence"][2]["request_id"] == "wing-readonly-preflight:ch3:fader"
     assert written["request_sequence"][2]["address"] == "/ch/3/fdr"
     assert written["request_sequence"][3]["request_id"] == "wing-readonly-preflight:ch3:gain"
     assert written["request_sequence"][3]["address"] == "/ch/3/in/set/trim"
+    assert written["request_sequence"][4]["request_id"] == "wing-readonly-preflight:ch3:pan"
+    assert written["request_sequence"][4]["address"] == "/ch/3/pan"
     assert "set_gain" in written["forbidden_request_types"]
     assert written["post_run_review_commands"] == [
         (
@@ -874,7 +890,7 @@ async def test_plan_only_blocks_invalid_channel_confirmation_before_websocket(
         "--channels",
         "3",
         "--value-types",
-        "fader,gain",
+        "fader,gain,pan",
         "--require-physical-readback",
         "--operator-confirm-channels",
         "4",

@@ -28,7 +28,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["live_authority_granted"] is False
     assert packet["full_autonomous_ready"] is False
     assert packet["channels"] == [3]
-    assert packet["value_types"] == ["fader", "gain"]
+    assert packet["value_types"] == ["fader", "gain", "pan"]
     assert packet["commands"]["preview_readonly_request_plan"] == [
         "python3",
         "tools/wing_readonly_preflight_runner.py",
@@ -40,7 +40,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "3",
         "--operator-confirm-session-ready",
         "--value-types",
-        "fader,gain",
+        "fader,gain,pan",
         "--require-physical-readback",
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
@@ -59,7 +59,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "3",
         "--operator-confirm-session-ready",
         "--value-types",
-        "fader,gain",
+        "fader,gain,pan",
         "--require-physical-readback",
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
